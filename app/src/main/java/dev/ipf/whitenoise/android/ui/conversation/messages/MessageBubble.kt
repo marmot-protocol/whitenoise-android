@@ -2727,7 +2727,7 @@ internal fun MessageBubble(
                                 ComposerGate.PENDING ->
                                     if (controller.inviteAcceptanceResolutionPending) {
                                         InviteAcceptanceResolutionStatus(
-                                            state = controller.memberRosterState,
+                                            state = controller.inviteAcceptanceResolutionState,
                                             onRetry = {
                                                 appState.launchMutation {
                                                     controller.retryInviteAcceptanceAuthority()

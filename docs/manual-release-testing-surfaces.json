@@ -1041,6 +1041,7 @@
           "CHL-002",
           "CHL-011",
           "CHL-016",
+          "CHL-019",
           "FIND-003"
         ]
       },
@@ -1054,6 +1055,7 @@
           "CHL-002",
           "CHL-011",
           "CHL-016",
+          "CHL-019",
           "FIND-003"
         ]
       },
@@ -2825,6 +2827,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
         "anchor": "fun InviteAcceptanceResolutionStatus(",
         "test_ids": [
+          "GRP-011",
           "GRP-012",
           "GRP-014"
         ]
@@ -3044,9 +3047,18 @@
           "CON-005",
           "CON-017",
           "CON-020",
+          "CON-024",
           "DIC-001",
           "DIC-002",
           "DIC-003"
+        ]
+      },
+      {
+        "surface": "Automatic composer height ceiling",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationCompactHeight.kt",
+        "anchor": "fun resolveAutomaticComposerCeiling(",
+        "test_ids": [
+          "CON-024"
         ]
       },
       {
@@ -3091,7 +3103,8 @@
           "CON-007",
           "CON-013",
           "CON-020",
-          "CON-021"
+          "CON-021",
+          "CON-024"
         ]
       },
       {
@@ -27958,6 +27971,23 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageOutboundShare.kt",
         "anchor": "internal const val OUTBOUND_SHARE_MAX_BYTES",
         "test_ids": ["MED-016"]
+      },
+      {
+        "surface": "Conflicting invitation snapshots retain identifiable chat-row presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListItem.kt",
+        "anchor": "val checkingInvitation: Boolean",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "Foreground invitation authority retry without consent mutation replay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "anchor": "scope.launch { controller.retryInviteAcceptanceAuthority() }",
+        "test_ids": [
+          "GRP-011",
+          "GRP-014"
+        ]
       }
     ],
     "notification_content_contracts": [
@@ -28083,6 +28113,38 @@
           "END-002",
           "END-003",
           "END-004"
+        ]
+      },
+      {
+        "surface": "R.string.checking_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.checking_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.checking_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.checking_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.couldnt_check_invitation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.couldnt_check_invitation",
+        "test_ids": [
+          "GRP-011"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-011"
         ]
       }
     ]

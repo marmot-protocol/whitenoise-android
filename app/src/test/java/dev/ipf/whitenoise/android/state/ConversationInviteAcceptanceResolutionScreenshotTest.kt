@@ -102,7 +102,7 @@ class ConversationInviteAcceptanceResolutionScreenshotTest {
             controller.markAuthoritativeTimelinePublishedForTest()
             showConversation(appState, controller, group)
 
-            val error = context.getString(R.string.couldnt_load_conversation)
+            val error = context.getString(R.string.couldnt_check_invitation)
             val retry = context.getString(R.string.retry)
             composeRule.onNodeWithText(error).assertIsDisplayed()
             val retryNode =
@@ -163,7 +163,7 @@ class ConversationInviteAcceptanceResolutionScreenshotTest {
             composeRule.onNodeWithText(context.getString(R.string.message_read_more)).performScrollTo().performClick()
             composeRule.onNodeWithTag(MESSAGE_FULL_SCREEN_TAG).assertIsDisplayed()
             val retry = context.getString(R.string.retry)
-            composeRule.onNodeWithText(context.getString(R.string.couldnt_load_conversation)).assertIsDisplayed()
+            composeRule.onNodeWithText(context.getString(R.string.couldnt_check_invitation)).assertIsDisplayed()
             composeRule.onNodeWithText(retry).assertIsDisplayed().assertHasClickAction()
             composeRule.onNode(hasSetTextAction()).assertDoesNotExist()
             composeRule

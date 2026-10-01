@@ -2137,4 +2137,6 @@
     <string name="dictation_pause_other_audio_title">Metti in pausa gli altri audio</string>
     <string name="dictation_pause_other_audio_subtitle">Metti in pausa musica e podcast durante la dettatura; possono riprendere quando la registrazione termina. La lettura vocale e i messaggi vocali di White Noise vengono sempre messi in pausa per sicurezza.</string>
     <string name="dictation_audio_focus_unavailable">Impossibile mettere in pausa gli altri audio. Riprova oppure disattiva questa opzione nelle impostazioni della dettatura.</string>
+    <string name="checking_invitation">Verifica dell’invito…</string>
+    <string name="couldnt_check_invitation">Impossibile verificare l’invito</string>
 </resources>

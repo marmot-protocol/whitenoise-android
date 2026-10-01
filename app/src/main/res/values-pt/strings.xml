@@ -2137,4 +2137,6 @@
     <string name="dictation_pause_other_audio_title">Pausar outro áudio</string>
     <string name="dictation_pause_other_audio_subtitle">Pausa música e podcasts durante o ditado; podem retomar quando a gravação terminar. A leitura em voz alta e as mensagens de voz do White Noise são sempre pausadas por segurança.</string>
     <string name="dictation_audio_focus_unavailable">Não foi possível pausar outro áudio. Tenta novamente ou desativa esta opção nas definições de ditado.</string>
+    <string name="checking_invitation">A verificar o convite…</string>
+    <string name="couldnt_check_invitation">Não foi possível verificar o convite</string>
 </resources>
