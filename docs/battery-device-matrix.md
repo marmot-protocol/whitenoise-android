@@ -23,7 +23,8 @@ use a disposable/self conversation.
 
 | Scenario | Setup | Pass criteria |
 |---|---|---|
-| Process death | Force-stop the app while backgrounded under each delivery mode (`kill`/`am force-stop`), then trigger a real message delivery. | The app recovers delivery (push wake or next foreground open) without a stuck pending state or a duplicate/missed notification. |
+| Process death | Kill the backgrounded app's process directly (`kill`, not `am force-stop`) under each delivery mode, without otherwise touching its package state, then trigger a real message delivery. | The app recovers delivery (push wake or next foreground open) without a stuck pending state or a duplicate/missed notification. |
+| Force-stop recovery | Force-stop the app from Settings/`am force-stop`, then explicitly reopen it before triggering delivery. | A force-stopped app enters Android's stopped-package state, which blocks FCM delivery until the user reopens it — a separate contract from ordinary process death. Delivery resumes only after that explicit reopen, with no stuck pending state. |
 | Doze / idle | Put the device into Doze (`dumpsys deviceidle force-idle`) with the app backgrounded, then exit Doze and verify delivery. | No busy-wake during Doze; delivery resumes once Doze exits or on a maintenance-window wake, matching `BackgroundIdleBenchmark`'s idle baselines. |
 | Push burst | Send roughly five messages in quick succession while backgrounded. | All five are delivered; no duplicate notifications; wake-lock/catch-up cost is bounded, matching `pushBurstPower`'s observation window. |
 | Reconnect failure | Go offline, then block the relay/network beyond the bounded recovery window before restoring connectivity. | Recovery attempts stay bounded (no retry storm); the app recovers once connectivity is genuinely restored, consistent with `NotificationNetworkRecovery`'s existing contract. |

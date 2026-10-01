@@ -50,6 +50,10 @@ class BackgroundIdleBenchmark {
                     journeys.run { resumeToChatList() }
                     journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Fcm)
                     revokeNotificationPermission()
+                    // Revoking a granted runtime permission can kill the app's process; resume
+                    // and settle again so the measured window samples a live, backgrounded app
+                    // rather than one that never came back up after the revoke.
+                    journeys.run { resumeToChatList() }
                     pressHome()
                 },
                 measureBlock = {
@@ -124,6 +128,7 @@ class BackgroundIdleBenchmark {
             iterations = BURST_ITERATIONS,
             setupBlock = {
                 journeys.run { resumeToChatList() }
+                journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Fcm)
                 pressHome()
             },
             measureBlock = {

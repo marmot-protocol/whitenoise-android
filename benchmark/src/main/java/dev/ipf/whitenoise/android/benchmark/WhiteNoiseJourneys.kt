@@ -220,6 +220,25 @@ internal class WhiteNoiseJourneys {
         )
         waitForVisibleTag(mode.testTag, NETWORK_STATE_TIMEOUT_MS).click()
         device.waitForIdle()
+        waitForCheckedTag(mode.testTag, NETWORK_STATE_TIMEOUT_MS)
+    }
+
+    /**
+     * Waits for the radio at [tag] to report itself checked, since the delivery-mode mutation is
+     * asynchronous and can be rejected (for example when notification permission is absent) —
+     * [android.view.accessibility.AccessibilityNodeInfo.isChecked] reflects the app's actual
+     * applied mode, where a settled idle frame alone does not.
+     */
+    private fun waitForCheckedTag(
+        tag: String,
+        timeoutMs: Long,
+    ) {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < deadline) {
+            if (findTag(tag)?.isChecked == true) return
+            SystemClock.sleep(SELECTOR_POLL_INTERVAL_MS)
+        }
+        error("Timed out waiting for '$tag' to report checked; the delivery-mode change may have been rejected.")
     }
 
     /** Opens the exact prepared group-message channel and records Android's first visible frame. */
