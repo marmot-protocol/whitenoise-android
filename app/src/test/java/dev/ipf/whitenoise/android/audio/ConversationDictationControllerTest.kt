@@ -2911,15 +2911,16 @@ class ConversationDictationControllerTest {
     /** No queued PCM does not imply that a discarded native recorder has finished closing. */
     @Test
     fun transcriptOnlyFailureForcesDiscardedCaptureClosed() {
-        val fixture = fixture(draft = TextFieldValue("Keep"))
+        val fixture = fixture(draft = TextFieldValue("Keep"), platform = FakePlatform(deferCaptureCompletion = true))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first segment")
         fixture.scheduler.runDelay(500L)
+        fixture.controller.send()
         fixture.platform.tracksCallerAudioDisposal = true
         fixture.platform.discardCaptureActive = true
         fixture.platform.deferDiscardClosure = true
         fixture.platform.deferCallerAudioFinish = true
-        fixture.platform.listener.onError(ConversationDictationFailure.PermissionDenied)
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
         val failed = fixture.controller.state as ConversationDictationState.Failed
         assertEquals("first segment", failed.retainedTranscript)
         assertTrue(fixture.controller.hasDurableSession)

@@ -94,7 +94,7 @@ class ConversationDictationNotificationRestorationTest {
     /** Expiry as the first channel user must preserve the foreground card's badge-free settings. */
     @Test
     fun expiryCreatesTheSharedBadgeFreeDictationChannel() {
-        val context = RuntimeEnvironment.getApplication<Application>()
+        val context = RuntimeEnvironment.getApplication()
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.deleteNotificationChannel(ConversationDictationForegroundService.CHANNEL_ID)
         notifyConversationDictationRecoveryExpired(context)
