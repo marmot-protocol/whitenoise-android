@@ -113,7 +113,40 @@ class QuarantinedGroupsOwnershipTest {
             replacement.close()
         }
 
-    @Test fun retiredUnadmittedAccessNeverCallsNativeAndLeasesAreReleasedAfterAllUsers() {
+    @Test fun workRetiredWhileWaitingForTheSharedLockNeverCallsNative() =
+        runTest {
+            var calls = 0
+            var current = true
+            val runtime =
+                AppMarmotRuntime(
+                    "private",
+                    native { _, _ ->
+                        calls++
+                        emptyList<Any>()
+                    },
+                )
+            val access =
+                NativeQuarantinedGroupsAccess("a", runtime, { current }, StandardTestDispatcher(testScheduler))
+            val held = QuarantinedGroupsOperationLeases.acquire(runtime, "a")
+            held.mutex.lock()
+            try {
+                val queued = launch { access.load() }
+                runCurrent()
+                assertFalse(queued.isCompleted)
+                assertEquals(0, calls)
+                current = false
+                held.mutex.unlock()
+                runCurrent()
+                assertTrue(queued.isCancelled)
+                assertEquals(0, calls)
+            } finally {
+                if (held.mutex.isLocked) held.mutex.unlock()
+                held.close()
+                access.close()
+            }
+        }
+
+    @Test fun leasesAreReleasedOnlyAfterAllUsersFinish() {
         val runtime = Any()
         val lease = QuarantinedGroupsOperationLeases.acquire(runtime, "a")
         val admitted = QuarantinedGroupsOperationLeases.acquire(runtime, "a")

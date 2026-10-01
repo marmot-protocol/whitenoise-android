@@ -49,7 +49,7 @@ internal interface QuarantinedGroupsAccess : Closeable {
 /** Captures the runtime rather than reacquiring whichever one is current after IO dispatch. */
 internal fun WhiteNoiseAppState.quarantinedGroupsAccess(): QuarantinedGroupsAccess? {
     val account = activeAccountRef
-    val epoch = captureActiveAccountSwitchEpoch()
+    val epoch = captureAccountSwitchEpoch()
     val owner = captureHostPerformanceRuntimeOwner()
     if (account == null || epoch == null || owner == null) return null
     val current = {
@@ -58,7 +58,7 @@ internal fun WhiteNoiseAppState.quarantinedGroupsAccess(): QuarantinedGroupsAcce
             !wipeInProgress &&
             accounts.any { it.label == account && it.isSignedInSigningAccount() } &&
             activeAccountRef == account &&
-            captureActiveAccountSwitchEpoch() == epoch &&
+            captureAccountSwitchEpoch() == epoch &&
             ownsHostPerformanceRuntimeOwner(owner)
     }
     return if (current()) NativeQuarantinedGroupsAccess(account, owner.runtime, current) else null

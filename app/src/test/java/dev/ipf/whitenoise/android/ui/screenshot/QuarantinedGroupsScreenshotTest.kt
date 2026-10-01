@@ -33,7 +33,11 @@ class QuarantinedGroupsScreenshotTest {
     @Test fun loadedLight() = capture("quarantine_loaded_light", inventory())
 
     @Test fun recoveringDark() =
-        capture("quarantine_recovering_dark", inventory().copy(recoveringGroup = GROUP), dark = true)
+        capture(
+            "quarantine_recovering_dark",
+            inventory().copy(recoveringGroup = GROUP),
+            dark = true,
+        )
 
     @Test fun loadedEmpty() = capture("quarantine_empty_light", QuarantinedGroupsUiState(loaded = true))
 

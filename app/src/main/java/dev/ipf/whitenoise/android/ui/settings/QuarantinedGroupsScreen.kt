@@ -39,7 +39,7 @@ internal fun rememberQuarantinedGroupsController(appState: WhiteNoiseAppState): 
             appState,
             signedIn,
             appState.activeAccountRef,
-            appState.captureActiveAccountSwitchEpoch(),
+            appState.captureAccountSwitchEpoch(),
             runtime?.let { QuarantineRuntimeKey(it.runtime) },
             runtime?.generation,
             appState.developerMode,
