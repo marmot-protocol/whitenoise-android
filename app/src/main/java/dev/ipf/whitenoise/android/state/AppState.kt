@@ -3379,12 +3379,11 @@ class WhiteNoiseAppState private constructor(
         accountRef: String,
         groupIdHex: String,
         conversationRow: ChatListRowFfi?,
-    ): Boolean =
-        isConversationReadVisible(accountRef, groupIdHex) &&
-            (chatsController
-                ?.takeIf { it.boundAccountRef == accountRef }
-                ?.hasManualUnreadReminder(groupIdHex)
-                ?: (conversationRow?.manuallyMarkedUnread == true))
+    ): Boolean {
+        if (!isConversationReadVisible(accountRef, groupIdHex)) return false
+        val boundChats = chatsController?.takeIf { it.boundAccountRef == accountRef }
+        return boundChats?.hasManualUnreadReminder(groupIdHex) ?: (conversationRow?.manuallyMarkedUnread == true)
+    }
 
     internal fun rollbackOptimisticSentPreview(
         accountRef: String?,
