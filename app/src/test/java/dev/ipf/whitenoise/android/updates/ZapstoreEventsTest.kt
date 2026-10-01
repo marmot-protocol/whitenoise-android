@@ -21,7 +21,15 @@ class ZapstoreEventsTest {
     fun otherwiseValidReleaseCannotPassWhenVerifierRejectsIt() {
         val event = signedEvent(SIGNED_RELEASE_EVENT_JSON)
         assertNull(ZapstoreEvents.latestReleaseVersion(event, APP_ID, TEST_PUBLISHER_PUBKEY, verifyEvent = { false }))
-        assertNull(ZapstoreEvents.versionFromReleaseEvent(event, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION", verifyEvent = { false }))
+        assertNull(
+            ZapstoreEvents.versionFromReleaseEvent(
+                event,
+                APP_ID,
+                TEST_PUBLISHER_PUBKEY,
+                "$APP_ID@$VERSION",
+                verifyEvent = { false },
+            ),
+        )
     }
 
     // --- Latest-release discovery (signature-gated). Reads the version straight
@@ -45,12 +53,22 @@ class ZapstoreEventsTest {
         // A release for another app under the same publisher must not be read as
         // this app's latest — this is the Dark Matter / White Noise boundary.
         assertNull(
-            ZapstoreEvents.latestReleaseVersion(releaseEvent, "org.parres.whitenoise", TEST_PUBLISHER_PUBKEY, verifyEvent = verifyEvent),
+            ZapstoreEvents.latestReleaseVersion(
+                releaseEvent,
+                "org.parres.whitenoise",
+                TEST_PUBLISHER_PUBKEY,
+                verifyEvent = verifyEvent,
+            ),
         )
 
         val mutatedSignature = releaseEvent.copy(sig = "0".repeat(128))
         assertNull(
-            ZapstoreEvents.latestReleaseVersion(mutatedSignature, APP_ID, TEST_PUBLISHER_PUBKEY, verifyEvent = verifyEvent),
+            ZapstoreEvents.latestReleaseVersion(
+                mutatedSignature,
+                APP_ID,
+                TEST_PUBLISHER_PUBKEY,
+                verifyEvent = verifyEvent,
+            ),
         )
     }
 
@@ -62,15 +80,33 @@ class ZapstoreEventsTest {
 
         assertEquals(
             VERSION,
-            ZapstoreEvents.versionFromReleaseEvent(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION", verifyEvent = verifyEvent),
+            ZapstoreEvents.versionFromReleaseEvent(
+                releaseEvent,
+                APP_ID,
+                TEST_PUBLISHER_PUBKEY,
+                "$APP_ID@$VERSION",
+                verifyEvent = verifyEvent,
+            ),
         )
         assertNull(
-            ZapstoreEvents.versionFromReleaseEvent(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@2026.6.21", verifyEvent = verifyEvent),
+            ZapstoreEvents.versionFromReleaseEvent(
+                releaseEvent,
+                APP_ID,
+                TEST_PUBLISHER_PUBKEY,
+                "$APP_ID@2026.6.21",
+                verifyEvent = verifyEvent,
+            ),
         )
 
         val mutatedSignature = releaseEvent.copy(sig = "0".repeat(128))
         assertNull(
-            ZapstoreEvents.versionFromReleaseEvent(mutatedSignature, APP_ID, TEST_PUBLISHER_PUBKEY, "$APP_ID@$VERSION", verifyEvent = verifyEvent),
+            ZapstoreEvents.versionFromReleaseEvent(
+                mutatedSignature,
+                APP_ID,
+                TEST_PUBLISHER_PUBKEY,
+                "$APP_ID@$VERSION",
+                verifyEvent = verifyEvent,
+            ),
         )
     }
 

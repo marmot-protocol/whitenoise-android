@@ -300,7 +300,7 @@ class ZapstoreAssetEventsTest {
             id = ASSET_ID,
             pubkey = TEST_PUBLISHER_PUBKEY,
             createdAt = 1L,
-            kind = 3063,
+            kind = ASSET_KIND,
             tags = tags,
             content = "",
             sig = "0".repeat(128),
@@ -309,6 +309,7 @@ class ZapstoreAssetEventsTest {
     private fun signedEvent(json: String): NostrEvent = NostrEvent.fromJson(JSONObject(json)) ?: error("fixture")
 
     private companion object {
+        private const val ASSET_KIND = 3063
         private const val APP_ID = "org.parres.darkmatter"
         private const val VERSION = "2026.6.20"
         private const val TEST_PUBLISHER_PUBKEY = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
