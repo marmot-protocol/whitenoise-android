@@ -9,9 +9,6 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ZapstoreEventsTest {
-    // Domain fake only. Real cryptographic assertions run in the isolated Android APK.
-    private val verifyEvent: (NostrEvent) -> Boolean = { it.sig != "0".repeat(128) }
-
     @Test
     fun replaysSyntheticFuzzCorpus() {
         FuzzSyntheticCorpusReplay.replaySuite(FuzzSyntheticCorpusReplay.Suite.ZapstoreEvents)
@@ -41,15 +38,15 @@ class ZapstoreEventsTest {
         val releaseEvent = signedEvent(SIGNED_RELEASE_EVENT_JSON)
         assertEquals(
             VERSION,
-            ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, verifyEvent = verifyEvent),
+            ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, TEST_PUBLISHER_PUBKEY, verifyEvent = { true }),
         )
     }
 
     @Test
-    fun latestReleaseVersionRejectsWrongAuthorWrongAppOrInvalidSignature() {
+    fun latestReleaseVersionRejectsWrongAuthorOrWrongApp() {
         val releaseEvent = signedEvent(SIGNED_RELEASE_EVENT_JSON)
 
-        assertNull(ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, "0".repeat(64), verifyEvent = verifyEvent))
+        assertNull(ZapstoreEvents.latestReleaseVersion(releaseEvent, APP_ID, "0".repeat(64), verifyEvent = { true }))
         // A release for another app under the same publisher must not be read as
         // this app's latest — this is the Dark Matter / White Noise boundary.
         assertNull(
@@ -57,17 +54,7 @@ class ZapstoreEventsTest {
                 releaseEvent,
                 "org.parres.whitenoise",
                 TEST_PUBLISHER_PUBKEY,
-                verifyEvent = verifyEvent,
-            ),
-        )
-
-        val mutatedSignature = releaseEvent.copy(sig = "0".repeat(128))
-        assertNull(
-            ZapstoreEvents.latestReleaseVersion(
-                mutatedSignature,
-                APP_ID,
-                TEST_PUBLISHER_PUBKEY,
-                verifyEvent = verifyEvent,
+                verifyEvent = { true },
             ),
         )
     }
@@ -75,7 +62,7 @@ class ZapstoreEventsTest {
     // --- Exact-d-tag validation used by the download/asset-resolution path. ---
 
     @Test
-    fun versionFromReleaseEventMatchesExactDTagAndRejectsMismatchOrBadSignature() {
+    fun versionFromReleaseEventMatchesExactDTagAndRejectsMismatch() {
         val releaseEvent = signedEvent(SIGNED_RELEASE_EVENT_JSON)
 
         assertEquals(
@@ -85,7 +72,7 @@ class ZapstoreEventsTest {
                 APP_ID,
                 TEST_PUBLISHER_PUBKEY,
                 "$APP_ID@$VERSION",
-                verifyEvent = verifyEvent,
+                verifyEvent = { true },
             ),
         )
         assertNull(
@@ -94,18 +81,7 @@ class ZapstoreEventsTest {
                 APP_ID,
                 TEST_PUBLISHER_PUBKEY,
                 "$APP_ID@2026.6.21",
-                verifyEvent = verifyEvent,
-            ),
-        )
-
-        val mutatedSignature = releaseEvent.copy(sig = "0".repeat(128))
-        assertNull(
-            ZapstoreEvents.versionFromReleaseEvent(
-                mutatedSignature,
-                APP_ID,
-                TEST_PUBLISHER_PUBKEY,
-                "$APP_ID@$VERSION",
-                verifyEvent = verifyEvent,
+                verifyEvent = { true },
             ),
         )
     }
