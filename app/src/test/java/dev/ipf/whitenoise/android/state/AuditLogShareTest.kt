@@ -29,6 +29,7 @@ class AuditLogShareTest {
     @get:Rule
     val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
 
+    /** Retained dictation and performance data export without native audit files and clear locally. */
     @Test
     fun retainedDiagnosticExportAndClearWorkWithoutNativeLogs() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -36,6 +37,9 @@ class AuditLogShareTest {
         try {
             DictationDiagnostics.clear()
             assertNull(prepareAuditAndDictationLogArchive(context, emptyList()))
+            val performance = "schema=2 op=app_start phase=accepted\n".toByteArray()
+            val performanceOnly = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList(), performance))
+            assertEquals(performance.decodeToString(), performanceOnly.entries()["performance-session.log"])
             DictationDiagnostics.setEnabled(true)
             DictationDiagnostics.record("event=session_started session=4")
             val archive = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList()))
@@ -107,7 +111,7 @@ class AuditLogShareTest {
         assertEquals(mapOf("audit.jsonl" to "one", "audit-b.jsonl" to "two"), archive.entries())
     }
 
-    /** A flushed WNPerf snapshot shares the same explicit archive, even without native audit files. */
+    /** One archive combines audit, dictation, and WNPerf; performance alone also exports. */
     @Test
     fun prepareAuditLogArchiveIncludesPerformanceSessionWithAndWithoutAuditFiles() {
         val audit = temporaryFolder.newFile("audit.jsonl").apply { writeText("audit") }
@@ -115,14 +119,24 @@ class AuditLogShareTest {
         val performance = "schema=2 op=app_start phase=accepted\n".toByteArray()
 
         val combined =
-            prepareAuditLogArchive(cache, temporaryFolder.root, listOf(audit.absolutePath), performance)
+            prepareAuditLogArchive(
+                cache,
+                temporaryFolder.root,
+                listOf(audit.absolutePath),
+                supplementalEntries = mapOf("dictation-current.jsonl" to "dictation".toByteArray()),
+                performanceLogBytes = performance,
+            )
         assertEquals(
-            mapOf("performance-session.log" to performance.decodeToString(), "audit.jsonl" to "audit"),
+            mapOf(
+                "performance-session.log" to performance.decodeToString(),
+                "audit.jsonl" to "audit",
+                "dictation-current.jsonl" to "dictation",
+            ),
             combined.entries(),
         )
 
         val onlyPerformance =
-            prepareAuditLogArchive(cache, temporaryFolder.root, emptyList(), performance)
+            prepareAuditLogArchive(cache, temporaryFolder.root, emptyList(), performanceLogBytes = performance)
         assertEquals(mapOf("performance-session.log" to performance.decodeToString()), onlyPerformance.entries())
     }
 

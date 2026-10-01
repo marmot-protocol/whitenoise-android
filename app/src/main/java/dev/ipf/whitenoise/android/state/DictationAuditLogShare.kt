@@ -25,8 +25,15 @@ internal fun prepareAuditAndDictationLogArchive(
                 manifest.optLong("dropped_in_process") + manifest.optLong("invalid_files_in_process")
             }
         } ?: 0L
-    if (sourcePaths.isEmpty() && entries.keys.none { it.endsWith(".jsonl") } && dropped == 0L && performanceLogBytes == null) return null
-    return prepareAuditLogArchive(context.cacheDir, File(context.filesDir, "Marmot"), sourcePaths, entries, performanceLogBytes)
+    val hasDictationRecords = entries.keys.any { it.endsWith(".jsonl") } || dropped != 0L
+    if (sourcePaths.isEmpty() && !hasDictationRecords && performanceLogBytes == null) return null
+    return prepareAuditLogArchive(
+        context.cacheDir,
+        File(context.filesDir, "Marmot"),
+        sourcePaths,
+        entries,
+        performanceLogBytes,
+    )
 }
 
 /** Attempts every app-owned diagnostic store; one deletion cannot hide another store's failure. */
