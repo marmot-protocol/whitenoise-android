@@ -22,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -195,24 +194,23 @@ internal fun MessageFullScreenView(
             bottomBar = bottomBar,
         ) { padding ->
             AdaptiveContent(Modifier.fillMaxSize().padding(padding)) {
-                key(selectionKey) {
-                    val scrollState = rememberScrollState()
-                    MessageFullScreenBody(
-                        body = body,
-                        markdownDocument = bodyMarkdownDocument,
-                        mentionDisplayName = mentionDisplayName,
-                        isGroupMember = isGroupMember,
-                        onNostrProfileTap = onNostrProfileTap,
-                        onCopyMarkdownLink = onCopyMarkdownLink,
-                        selectionController = selection,
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .readerScrollIndicator(scrollState, selectionKey, enabled = !selection.active)
-                                .verticalScroll(scrollState)
-                                .padding(16.dp),
-                    )
-                }
+                // Keep the native saveable reading position independent of the selection session.
+                val scrollState = rememberScrollState()
+                MessageFullScreenBody(
+                    body = body,
+                    markdownDocument = bodyMarkdownDocument,
+                    mentionDisplayName = mentionDisplayName,
+                    isGroupMember = isGroupMember,
+                    onNostrProfileTap = onNostrProfileTap,
+                    onCopyMarkdownLink = onCopyMarkdownLink,
+                    selectionController = selection,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .readerScrollIndicator(scrollState, selectionKey, enabled = !selection.active)
+                            .verticalScroll(scrollState)
+                            .padding(16.dp),
+                )
             }
         }
     }
