@@ -614,6 +614,14 @@
         ]
       },
       {
+        "surface": "Bare www autolink destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun markdownAutolinkDestination(",
+        "test_ids": [
+          "MSG-029"
+        ]
+      },
+      {
         "surface": "MarkdownCodeBlockView",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "anchor": "fun MarkdownCodeBlockView(",

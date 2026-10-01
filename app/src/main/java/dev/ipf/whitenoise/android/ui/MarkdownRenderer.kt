@@ -1458,6 +1458,7 @@ private class MarkdownInlineRenderContext(
     val useDecorativeBackgrounds: Boolean,
 )
 
+/** Appends [inlines] with their styles and gated link annotations, bounded by [depth]. */
 private fun AnnotatedString.Builder.appendMarkdownInlines(
     inlines: List<MarkdownInlineFfi>,
     ctx: MarkdownInlineRenderContext,
@@ -1497,20 +1498,7 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
             is MarkdownInlineFfi.Image ->
                 appendMarkdownLink(inline.dest, inline.alt, ctx, depth + 1)
             is MarkdownInlineFfi.Autolink -> {
-                // Normalize at the boundary: the gate, the annotation, and the
-                // eventual ACTION_VIEW all see the same trimmed destination.
-                // A bare email autolink opens through mailto: (the visible
-                // text stays the plain address).
-                val trimmed = inline.url.trim()
-                val dest =
-                    if (inline.kind == MarkdownAutolinkKindFfi.EMAIL &&
-                        !trimmed.startsWith("mailto:", ignoreCase = true)
-                    ) {
-                        "mailto:$trimmed"
-                    } else {
-                        trimmed
-                    }
-                val parsedLink = parsedOpenableMarkdownLink(dest)
+                val parsedLink = parsedOpenableMarkdownLink(markdownAutolinkDestination(inline.url, inline.kind))
                 if (parsedLink != null) {
                     withLink(LinkAnnotation.Url(parsedLink.destination, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)) {
                         append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
@@ -1910,6 +1898,24 @@ internal data class ParsedOpenableMarkdownLink(
     val destination: String,
     val effectiveAuthority: String?,
 )
+
+/**
+ * Openable destination for an MDK autolink, normalized at the boundary so the gate,
+ * the annotation and the eventual ACTION_VIEW all see the same trimmed value.
+ * A bare email opens through `mailto:` and a bare `www.` host through `https://`,
+ * while the visible text stays exactly what the sender typed.
+ */
+internal fun markdownAutolinkDestination(
+    url: String,
+    kind: MarkdownAutolinkKindFfi,
+): String {
+    val trimmed = url.trim()
+    return when {
+        kind == MarkdownAutolinkKindFfi.EMAIL && !trimmed.startsWith("mailto:", ignoreCase = true) -> "mailto:$trimmed"
+        kind == MarkdownAutolinkKindFfi.WWW && trimmed.startsWith("www.", ignoreCase = true) -> "https://$trimmed"
+        else -> trimmed
+    }
+}
 
 /** Parses an allowed link and canonicalizes Unicode HTTP hosts to their ASCII form. */
 internal fun parsedOpenableMarkdownLink(dest: String): ParsedOpenableMarkdownLink? {
