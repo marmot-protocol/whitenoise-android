@@ -146,6 +146,7 @@ import dev.ipf.whitenoise.android.notifications.PushWakeEvent
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.normalizeNotificationReaction
+import dev.ipf.whitenoise.android.notifications.notificationReactionOutcome
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
 import dev.ipf.whitenoise.android.notifications.notificationReplySendWindowReady
 import dev.ipf.whitenoise.android.notifications.readNotificationBatteryPolicy
@@ -8382,6 +8383,7 @@ class WhiteNoiseAppState private constructor(
         }.getOrElse(::notificationReplySendFailureOutcome)
     }
 
+    /** Sends a notification quick reaction and reports MDK's accept disposition, not an assumed publication. */
     internal suspend fun sendNotificationReaction(
         accountRef: String,
         groupIdHex: String,
@@ -8398,10 +8400,11 @@ class WhiteNoiseAppState private constructor(
         }
         return runCatchingCancellable {
             withGroupCommitLock(accountRef, groupIdHex) {
-                marmotIo(MarmotTraceSection.MESSAGE_REACT) {
-                    reactToMessage(accountRef, groupIdHex, messageIdHex, emoji)
-                }
-                NotificationReactionSendOutcome.Sent
+                val summary =
+                    marmotIo(MarmotTraceSection.MESSAGE_REACT) {
+                        reactToMessage(accountRef, groupIdHex, messageIdHex, emoji)
+                    }
+                notificationReactionOutcome(summary.acceptDisposition)
             }
         }.onFailure {
             appStateDebug(it) {
