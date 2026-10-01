@@ -3,6 +3,24 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "PreparedVisibleGroupAvatarContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
+        "anchor": "fun <T> PreparedVisibleGroupAvatarContent(",
+        "test_ids": ["CHL-017"]
+      },
+      {
+        "surface": "Stored avatar export failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "Stored avatar is no longer available",
+        "test_ids": ["CHL-017"]
+      },
+      {
+        "surface": "PreparedGroupAvatarContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PreparedGroupAvatarContent.kt",
+        "anchor": "fun PreparedGroupAvatarContent(",
+        "test_ids": ["CHL-017"]
+      },
+      {
         "surface": "Composer cursor updates during dictation Send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
         "anchor": "fun setDraft(",
@@ -23967,6 +23985,206 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Stored group-avatar surface: R.string.chat_list_filter_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_list_filter_groups",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.notification_channel_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.notification_channel_messages",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.disappearing_tooltip_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.disappearing_tooltip_text",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.just_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.just_you",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.members_count",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.one_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.one_member",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.couldnt_load_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.couldnt_load_chats",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.forward_no_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.forward_no_chats",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.forward_no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.forward_no_matches",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.recent_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.recent_chats",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.forward_search_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.forward_search_chats",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.members_count",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_add_to_groups_confirm_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_add_to_groups_confirm_label",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_add_to_groups_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_add_to_groups_description",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_add_to_groups_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_add_to_groups_title",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_make_admin_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_make_admin_description",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_make_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_make_admin_title",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_no_addable_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_no_addable_groups",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_no_promotable_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_no_promotable_groups",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.recent_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+        "anchor": "R.string.recent_chats",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.share_no_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+        "anchor": "R.string.share_no_chats",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.share_no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+        "anchor": "R.string.share_no_matches",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
       {"surface": "Developer review demo cancel", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt", "anchor": "R.string.cancel", "test_ids": ["SET-020", "SET-029"]},
       {"surface": "Developer review demo review demo accepting invitation", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt", "anchor": "R.string.review_demo_accepting_invitation", "test_ids": ["SET-029"]},
       {"surface": "Developer review demo review demo account missing", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt", "anchor": "R.string.review_demo_account_missing", "test_ids": ["SET-029"]},

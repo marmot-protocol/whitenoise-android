@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import android.graphics.BitmapFactory
 import android.util.LruCache
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -55,6 +56,9 @@ object AvatarImageLoader {
     // their results so a logout/account-switch can't be re-polluted by an
     // in-flight request that was already on the network.
     private val cacheLifetime = StalenessGuard()
+
+    // Observable presentation token; the guard remains authoritative for async publication.
+    private val observedCacheLifetime = mutableLongStateOf(cacheLifetime.capture())
     private val requestLifetime = StalenessGuard()
 
     /**
@@ -180,18 +184,22 @@ object AvatarImageLoader {
         }
     }
 
-    /** Shares one bounded fetch and rejects cache publication after an account-scoped clear. */
-    @Suppress("LongMethod") // Request deduplication and generation-safe completion form one atomic lifecycle.
+    /** Shares one bounded fetch, with request deduplication and generation-safe completion in one lifecycle. */
+    @Suppress("LongMethod", "LongParameterList")
     private suspend fun load(
         request: ProfileImageRequest,
         expectedGeneration: Long?,
         fetchLane: AvatarFetchLane,
         waitForDetachedFetch: Boolean = false,
+        expectedCacheLifetime: Long? = null,
+        fetchImage: suspend (ProfileImageRequest) -> AvatarImageFetchResult = ::fetch,
     ): ImageBitmap? {
         val url = request.cacheKey
-        cached(url)?.let { return it }
         val pending =
             synchronized(lock) {
+                if (expectedCacheLifetime != null && !cacheLifetime.isCurrent(expectedCacheLifetime)) {
+                    return@synchronized CompletedAvatarRequest(null)
+                }
                 if (expectedGeneration != null && !requestLifetime.isCurrent(expectedGeneration)) {
                     return@synchronized CompletedAvatarRequest(null)
                 }
@@ -225,7 +233,7 @@ object AvatarImageLoader {
                                     if (!isCurrentRequest(launchedGeneration, launchedRequest)) {
                                         AvatarImageFetchResult.Unavailable
                                     } else {
-                                        fetch(request)
+                                        fetchImage(request)
                                     }
                                 }
                             }.getOrElse { AvatarImageFetchResult.Failed }
@@ -326,8 +334,17 @@ object AvatarImageLoader {
     /** Wipes cached avatars and invalidates every queued or in-flight fetch. */
     fun clear() {
         synchronized(lock) {
-            cacheLifetime.advance()
+            observedCacheLifetime.longValue = cacheLifetime.advance()
             cache.evictAll()
+            retireRequestsLocked()
+        }
+    }
+
+    /** Retires account-private stored pixels/reads while preserving already decoded public URL images. */
+    internal fun clearStoredAvatars() {
+        synchronized(lock) {
+            observedCacheLifetime.longValue = cacheLifetime.advance()
+            cache.evictStoredAvatars()
             retireRequestsLocked()
         }
     }
@@ -388,7 +405,30 @@ object AvatarImageLoader {
     internal fun cachedImage(key: String): ImageBitmap? = cached(key.trim())
 
     /** The cache lifetime a durable read must capture before it suspends; [clear] makes it stale. */
-    internal fun currentCacheLifetime(): Long = cacheLifetime.capture()
+    internal fun currentCacheLifetime(): Long {
+        // Subscribe Compose to invalidation, but discarded snapshots cannot rewind the async guard.
+        observedCacheLifetime.longValue
+        return synchronized(lock) { cacheLifetime.capture() }
+    }
+
+    /** Shares local reads and off-main decodes through the existing bounded, generation-fenced loader. */
+    internal suspend fun loadStored(
+        key: String,
+        lifetime: Long,
+        readBytes: suspend () -> ByteArray?,
+    ): ImageBitmap? =
+        load(
+            request = avatarRequest(key),
+            expectedGeneration = null,
+            expectedCacheLifetime = lifetime,
+            fetchLane = AvatarFetchLane.STORED,
+            fetchImage = { request ->
+                readBytes()
+                    ?.let { decode(it, request.variant, request.maxDimension)?.asImageBitmap() }
+                    ?.let(AvatarImageFetchResult::Success)
+                    ?: AvatarImageFetchResult.Unavailable
+            },
+        )
 
     /**
      * Decodes avatar bytes MarmotKit already validated and stored, caching them under [key] unless the
@@ -505,6 +545,15 @@ internal class PartitionedProfileImageCache(
         banners.evictAll()
     }
 
+    /** Stored MDK avatar keys hold account-scoped plaintext; public URL keys retain their warm pixels. */
+    fun evictStoredAvatars() {
+        avatars
+            .snapshot()
+            .keys
+            .filter { it.startsWith("marmot-avatar:") }
+            .forEach(avatars::remove)
+    }
+
     /** Bytes currently charged to [variant]'s budget, so each ceiling can be asserted directly. */
     fun byteSize(variant: ProfileImageVariant): Int = partition(variant).size()
 
@@ -580,6 +629,7 @@ private sealed interface AvatarImageFetchResult {
 internal enum class AvatarFetchLane {
     REGULAR,
     NOTIFICATION,
+    STORED,
     PREWARM_ADMITTED,
 }
 
@@ -600,6 +650,9 @@ internal class AvatarFetchGate(
     private val regular = Semaphore(regularPermits)
     private val notification = Semaphore(notificationPermits)
 
+    // Local decoding has its own bounded capacity; offline socket waits cannot starve it.
+    private val stored = Semaphore(2)
+
     suspend fun <T> withPermit(
         lane: AvatarFetchLane,
         block: suspend () -> T,
@@ -607,6 +660,7 @@ internal class AvatarFetchGate(
         when (lane) {
             AvatarFetchLane.REGULAR -> regular.withPermit(block)
             AvatarFetchLane.NOTIFICATION -> notification.withPermit(block)
+            AvatarFetchLane.STORED -> stored.withPermit(block)
             AvatarFetchLane.PREWARM_ADMITTED -> block()
         }
 

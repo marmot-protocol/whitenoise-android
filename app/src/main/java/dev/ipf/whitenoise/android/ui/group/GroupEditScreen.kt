@@ -49,16 +49,18 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.ScopedGroupImageMutation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.ui.common.GroupAvatar
+import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.GroupNameEmojiField
 import dev.ipf.whitenoise.android.ui.common.IMAGE_DOCUMENT_MIME_TYPES
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropFlow
+import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
-import dev.ipf.whitenoise.android.ui.common.rememberEncryptedGroupAvatar
+import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
+import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
@@ -93,425 +95,440 @@ internal fun GroupEditScreen(
     controller: ConversationController,
     onBack: () -> Unit,
 ) {
-    val groupTitleCopy = rememberGroupTitleCopy()
-    // Key only on the group id, not on name/description: the group-state
-    // subscription can converge a backend update (another admin's edit, a
-    // kind-1210 row) while this screen is open, and re-keying on those values
-    // would re-init the fields and discard the user's in-progress edit. State
-    // resets only when navigating to a different group. (CodeRabbit, #512.)
-    var name by
-        rememberSaveable(controller.group.groupIdHex, stateSaver = TextFieldValue.Saver) {
-            mutableStateOf(TextFieldValue(controller.group.name))
-        }
-    var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
-    var showEmojiPicker by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
-    var showImageSearch by remember { mutableStateOf(false) }
-    var showGroupEmojiImagePicker by remember { mutableStateOf(false) }
-    var avatarViewerOpen by remember { mutableStateOf(false) }
-    var saving by remember { mutableStateOf(false) }
-    var imageSaving by remember { mutableStateOf(false) }
-    val imageFailureScope =
-        remember(appState, appState.activeAccountRef, appState.runtimeGeneration, controller.group.groupIdHex) {
-            GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
-        }
-    DisposableEffect(imageFailureScope) { onDispose { imageFailureScope.dispose() } }
-    val context = LocalContext.current
-    val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
-    val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
-    val nameEditable =
-        groupNameEmojiEditable(
-            canEdit = canEdit,
-            saving = saving,
-            mutationInFlight = controller.mutationInFlight,
-        )
-    val groupAvatarUrl = ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl)
-    val encryptedGroupAvatar = rememberEncryptedGroupAvatar(appState, controller.group)
-    val legacyGroupAvatarAvailable = rememberAvatarImageAvailable(groupAvatarUrl)
-    val groupAvatarImageAvailable = encryptedGroupAvatar != null || legacyGroupAvatarAvailable
-    val hasGroupImage = groupAvatarUrl != null || controller.group.imageHashHex != null
-    val saveEnabled =
-        !saving &&
-            !controller.mutationInFlight &&
-            (name.text != controller.group.name || description != controller.group.description)
-
-    LaunchedEffect(nameEditable) {
-        if (!nameEditable) showEmojiPicker = false
-    }
-
-    fun saveGroupProfile() {
-        if (!saveEnabled) return
-        saving = true
-        controller.clearLastMutationError()
-        appState.launchMutation {
-            try {
-                if (controller.updateGroupProfile(name.text, description)) onBack()
-            } finally {
-                saving = false
-            }
-        }
-    }
-
-    /** Apply or remove the encrypted group image and own any preparation failure shown here. */
-    @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
-    fun updateImage(prepare: suspend () -> ImageUploadDraft?) {
-        if (imageSaving || controller.mutationInFlight) return
-        val failureAttempt = imageFailureScope.begin()
-        imageSaving = true
-        controller.clearLastMutationError()
-        appState.launchMutation {
-            try {
-                val draft = prepare()
-                val change = ScopedGroupImageMutation(draft) { imageFailureScope.isCurrent(failureAttempt) }
-                if (controller.updateGroupImage(change)) {
-                    showImageSearch = false
-                    showGroupEmojiImagePicker = false
-                } else if (controller.lastMutationError != null) {
-                    imageFailureScope.captureFailure(failureAttempt)
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
-                appState.presentFailure(
-                    R.string.toast_couldnt_prepare_image,
-                    "GROUP_IMAGE_PREPARE",
-                    error,
-                )
-                imageFailureScope.captureFailure(failureAttempt)
-            } finally {
-                imageSaving = false
-            }
-        }
-    }
-
-    /** Validate and publish a public HTTPS avatar URL for this group's current editor. */
-    @Suppress("TooGenericExceptionCaught") // The FFI boundary can surface unchecked non-cancellation failures.
-    fun setPublicAvatarUrl(url: String) {
-        if (imageSaving || controller.mutationInFlight) return
-        val failureAttempt = imageFailureScope.begin()
-        // Same HTTPS/credential/loopback policy the upload path enforces, but a
-        // hand-typed URL earns a toast rather than safeAvatarUploadUrl's throw.
-        val safeUrl = ProfileSanitizer.androidOwnedHttpsImageUrl(url)
-        if (safeUrl == null) {
-            appState.present(R.string.profile_picture_invalid, copyable = true)
-            imageFailureScope.captureFailure(failureAttempt)
-            return
-        }
-        imageSaving = true
-        controller.clearLastMutationError()
-        appState.launchMutation {
-            try {
-                val change = ScopedGroupImageMutation(safeUrl) { imageFailureScope.isCurrent(failureAttempt) }
-                if (controller.updateGroupAvatarUrl(change)) {
-                    showImageSearch = false
-                } else if (controller.lastMutationError != null) {
-                    imageFailureScope.captureFailure(failureAttempt)
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
-                appState.presentFailure(
-                    R.string.toast_couldnt_upload_group_image,
-                    "GROUP_AVATAR_UPDATE",
-                    error,
-                )
-                imageFailureScope.captureFailure(failureAttempt)
-            } finally {
-                imageSaving = false
-            }
-        }
-    }
-
-    /**
-     * Upload a device photo as a public avatar after preparation. Its plaintext bytes go to
-     * Blossom because people outside the encrypted group cannot read the private group image.
-     */
-    @Suppress("TooGenericExceptionCaught") // Preparation, upload, and FFI calls have different failure types.
-    fun uploadPublicAvatar(load: suspend () -> ImageUploadDraft) {
-        val accountRef = appState.activeAccountRef ?: return
-        if (imageSaving || controller.mutationInFlight) return
-        val failureAttempt = imageFailureScope.begin()
-        imageSaving = true
-        controller.clearLastMutationError()
-        appState.launchMutation {
-            var prepared = false
-            try {
-                val draft = load()
-                prepared = true
-                // The picker and the crop keep this open long enough for membership, admin rights
-                // or recoverability to change underneath it, so the permission is read again here
-                // rather than trusted from when the picture was chosen.
-                if (!controller.isSelfMember || !controller.isSelfAdmin || controller.group.unrecoverable) {
-                    return@launchMutation
-                }
-                val uploaded =
-                    appState.marmotIo {
-                        uploadProfileImage(accountRef, draft.plaintext, draft.mediaType, null)
-                    }
-                val change =
-                    ScopedGroupImageMutation(safeAvatarUploadUrl(uploaded)) {
-                        imageFailureScope.isCurrent(failureAttempt)
-                    }
-                val updated = controller.updateGroupAvatarUrl(change)
-                if (updated) {
-                    showImageSearch = false
-                } else if (controller.lastMutationError != null) {
-                    imageFailureScope.captureFailure(failureAttempt)
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
-                appState.presentFailure(
-                    titleRes =
-                        if (prepared) {
-                            R.string.toast_couldnt_upload_group_image
-                        } else {
-                            R.string.toast_couldnt_prepare_image
-                        },
-                    operationCode = if (prepared) "GROUP_IMAGE_UPLOAD" else "GROUP_IMAGE_PREPARE",
-                    throwable = error,
-                )
-                imageFailureScope.captureFailure(failureAttempt)
-            } finally {
-                imageSaving = false
-            }
-        }
-    }
-
-    // System back returns to Group Details, not all the way out to the
-    // conversation. This composes after the details screen's own BackHandler
-    // (rendered just before the early return that shows this screen), so it
-    // wins the back event while the editor is open.
-    BackHandler { onBack() }
-
-    var photoMenuOpen by remember { mutableStateOf(false) }
-    var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
-    val photoPicker =
-        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) pendingCropUri = uri
-        }
-    val filePicker =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) pendingCropUri = uri
-        }
-    IdentityImageCropFlow(
-        uri = pendingCropUri,
-        shape = IdentityImageCropShape.RoundedSquare,
-        onDismiss = {
-            imageFailureScope.clear()
-            pendingCropUri = null
-        },
-        onUnreadable = { picked ->
-            uploadPublicAvatar { GroupImageDraftProcessor.fromContentUri(context.contentResolver, picked) }
-        },
-        onCropped = { bytes, crop ->
-            pendingCropUri = null
-            uploadPublicAvatar { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
-        },
-    )
-
-    val saveLabel = stringResource(if (saving) R.string.saving_group else R.string.save_group)
-    GroupEditScaffold(
-        onBack = onBack,
-        bottomBar = {
-            if (canEdit) {
-                StickyFormActionBar {
-                    WhiteNoiseButton(
-                        onClick = { saveGroupProfile() },
-                        enabled = saveEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                        loading = saving,
-                        loadingLabel = saveLabel,
-                    ) {
-                        Text(saveLabel)
-                    }
-                }
-            }
-        },
+    PreparedGroupAvatarContent(
+        appState,
+        listOfNotNull(conversationGroupAvatarAsset(appState, controller)),
+        controller.boundAccountRef,
+        surfaceIdentity = controller,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .whiteNoiseVerticalScroll(rememberScrollState())
-                    .padding(vertical = WhiteNoiseSpacing.Section),
-            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section),
+        val groupTitleCopy = rememberGroupTitleCopy()
+        // Key only on the group id, not on name/description: the group-state
+        // subscription can converge a backend update (another admin's edit, a
+        // kind-1210 row) while this screen is open, and re-keying on those values
+        // would re-init the fields and discard the user's in-progress edit. State
+        // resets only when navigating to a different group. (CodeRabbit, #512.)
+        var name by
+            rememberSaveable(controller.group.groupIdHex, stateSaver = TextFieldValue.Saver) {
+                mutableStateOf(TextFieldValue(controller.group.name))
+            }
+        var description by remember(controller.group.groupIdHex) { mutableStateOf(controller.group.description) }
+        var showEmojiPicker by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(false) }
+        var showImageSearch by remember { mutableStateOf(false) }
+        var showGroupEmojiImagePicker by remember { mutableStateOf(false) }
+        var avatarViewerOpen by remember { mutableStateOf(false) }
+        var saving by remember { mutableStateOf(false) }
+        var imageSaving by remember { mutableStateOf(false) }
+        val imageFailureScope =
+            remember(appState, appState.activeAccountRef, appState.runtimeGeneration, controller.group.groupIdHex) {
+                GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
+            }
+        DisposableEffect(imageFailureScope) { onDispose { imageFailureScope.dispose() } }
+        val context = LocalContext.current
+        val recentEmojiRecentsOwner = rememberRecentEmojiRecentsOwner(context)
+        val canEdit = controller.isSelfMember && controller.isSelfAdmin && !controller.group.unrecoverable
+        val nameEditable =
+            groupNameEmojiEditable(
+                canEdit = canEdit,
+                saving = saving,
+                mutationInFlight = controller.mutationInFlight,
+            )
+        val groupAvatar = rememberConversationGroupAvatar(appState, controller)
+        val groupAvatarUrl = groupAvatar.pictureUrl
+        val encryptedGroupAvatar = groupAvatar.image
+        val legacyGroupAvatarAvailable =
+            rememberAvatarImageAvailable(groupAvatarUrl.takeIf { encryptedGroupAvatar == null })
+        val groupAvatarImageAvailable = encryptedGroupAvatar != null || legacyGroupAvatarAvailable
+        val hasGroupImage =
+            ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl) != null ||
+                controller.group.imageHashHex != null
+        val saveEnabled =
+            !saving &&
+                !controller.mutationInFlight &&
+                (name.text != controller.group.name || description != controller.group.description)
+
+        LaunchedEffect(nameEditable) {
+            if (!nameEditable) showEmojiPicker = false
+        }
+
+        fun saveGroupProfile() {
+            if (!saveEnabled) return
+            saving = true
+            controller.clearLastMutationError()
+            appState.launchMutation {
+                try {
+                    if (controller.updateGroupProfile(name.text, description)) onBack()
+                } finally {
+                    saving = false
+                }
+            }
+        }
+
+        /** Apply or remove the encrypted group image and own any preparation failure shown here. */
+        @Suppress("TooGenericExceptionCaught") // The callback can surface any non-cancellation preparation failure.
+        fun updateImage(prepare: suspend () -> ImageUploadDraft?) {
+            if (imageSaving || controller.mutationInFlight) return
+            val failureAttempt = imageFailureScope.begin()
+            imageSaving = true
+            controller.clearLastMutationError()
+            appState.launchMutation {
+                try {
+                    val draft = prepare()
+                    val change = ScopedGroupImageMutation(draft) { imageFailureScope.isCurrent(failureAttempt) }
+                    if (controller.updateGroupImage(change)) {
+                        showImageSearch = false
+                        showGroupEmojiImagePicker = false
+                    } else if (controller.lastMutationError != null) {
+                        imageFailureScope.captureFailure(failureAttempt)
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
+                    appState.presentFailure(
+                        R.string.toast_couldnt_prepare_image,
+                        "GROUP_IMAGE_PREPARE",
+                        error,
+                    )
+                    imageFailureScope.captureFailure(failureAttempt)
+                } finally {
+                    imageSaving = false
+                }
+            }
+        }
+
+        /** Validate and publish a public HTTPS avatar URL for this group's current editor. */
+        @Suppress("TooGenericExceptionCaught") // The FFI boundary can surface unchecked non-cancellation failures.
+        fun setPublicAvatarUrl(url: String) {
+            if (imageSaving || controller.mutationInFlight) return
+            val failureAttempt = imageFailureScope.begin()
+            // Same HTTPS/credential/loopback policy the upload path enforces, but a
+            // hand-typed URL earns a toast rather than safeAvatarUploadUrl's throw.
+            val safeUrl = ProfileSanitizer.androidOwnedHttpsImageUrl(url)
+            if (safeUrl == null) {
+                appState.present(R.string.profile_picture_invalid, copyable = true)
+                imageFailureScope.captureFailure(failureAttempt)
+                return
+            }
+            imageSaving = true
+            controller.clearLastMutationError()
+            appState.launchMutation {
+                try {
+                    val change = ScopedGroupImageMutation(safeUrl) { imageFailureScope.isCurrent(failureAttempt) }
+                    if (controller.updateGroupAvatarUrl(change)) {
+                        showImageSearch = false
+                    } else if (controller.lastMutationError != null) {
+                        imageFailureScope.captureFailure(failureAttempt)
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
+                    appState.presentFailure(
+                        R.string.toast_couldnt_upload_group_image,
+                        "GROUP_AVATAR_UPDATE",
+                        error,
+                    )
+                    imageFailureScope.captureFailure(failureAttempt)
+                } finally {
+                    imageSaving = false
+                }
+            }
+        }
+
+        /**
+         * Upload a device photo as a public avatar after preparation. Its plaintext bytes go to
+         * Blossom because people outside the encrypted group cannot read the private group image.
+         */
+        @Suppress("TooGenericExceptionCaught") // Preparation, upload, and FFI calls have different failure types.
+        fun uploadPublicAvatar(load: suspend () -> ImageUploadDraft) {
+            val accountRef = appState.activeAccountRef ?: return
+            if (imageSaving || controller.mutationInFlight) return
+            val failureAttempt = imageFailureScope.begin()
+            imageSaving = true
+            controller.clearLastMutationError()
+            appState.launchMutation {
+                var prepared = false
+                try {
+                    val draft = load()
+                    prepared = true
+                    // The picker and the crop keep this open long enough for membership, admin rights
+                    // or recoverability to change underneath it, so the permission is read again here
+                    // rather than trusted from when the picture was chosen.
+                    if (!controller.isSelfMember || !controller.isSelfAdmin || controller.group.unrecoverable) {
+                        return@launchMutation
+                    }
+                    val uploaded =
+                        appState.marmotIo {
+                            uploadProfileImage(accountRef, draft.plaintext, draft.mediaType, null)
+                        }
+                    val change =
+                        ScopedGroupImageMutation(safeAvatarUploadUrl(uploaded)) {
+                            imageFailureScope.isCurrent(failureAttempt)
+                        }
+                    val updated = controller.updateGroupAvatarUrl(change)
+                    if (updated) {
+                        showImageSearch = false
+                    } else if (controller.lastMutationError != null) {
+                        imageFailureScope.captureFailure(failureAttempt)
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
+                    appState.presentFailure(
+                        titleRes =
+                            if (prepared) {
+                                R.string.toast_couldnt_upload_group_image
+                            } else {
+                                R.string.toast_couldnt_prepare_image
+                            },
+                        operationCode = if (prepared) "GROUP_IMAGE_UPLOAD" else "GROUP_IMAGE_PREPARE",
+                        throwable = error,
+                    )
+                    imageFailureScope.captureFailure(failureAttempt)
+                } finally {
+                    imageSaving = false
+                }
+            }
+        }
+
+        // System back returns to Group Details, not all the way out to the
+        // conversation. This composes after the details screen's own BackHandler
+        // (rendered just before the early return that shows this screen), so it
+        // wins the back event while the editor is open.
+        BackHandler { onBack() }
+
+        var photoMenuOpen by remember { mutableStateOf(false) }
+        var pendingCropUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+        val photoPicker =
+            rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                if (uri != null) pendingCropUri = uri
+            }
+        val filePicker =
+            rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                if (uri != null) pendingCropUri = uri
+            }
+        IdentityImageCropFlow(
+            uri = pendingCropUri,
+            shape = IdentityImageCropShape.RoundedSquare,
+            onDismiss = {
+                imageFailureScope.clear()
+                pendingCropUri = null
+            },
+            onUnreadable = { picked ->
+                uploadPublicAvatar { GroupImageDraftProcessor.fromContentUri(context.contentResolver, picked) }
+            },
+            onCropped = { bytes, crop ->
+                pendingCropUri = null
+                uploadPublicAvatar { renderIdentityImageDraft(bytes, crop, MediaQuality.Standard) }
+            },
+        )
+
+        val saveLabel = stringResource(if (saving) R.string.saving_group else R.string.save_group)
+        GroupEditScaffold(
+            onBack = onBack,
+            bottomBar = {
+                if (canEdit) {
+                    StickyFormActionBar {
+                        WhiteNoiseButton(
+                            onClick = { saveGroupProfile() },
+                            enabled = saveEnabled,
+                            modifier = Modifier.fillMaxWidth(),
+                            loading = saving,
+                            loadingLabel = saveLabel,
+                        ) {
+                            Text(saveLabel)
+                        }
+                    }
+                }
+            },
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .whiteNoiseVerticalScroll(rememberScrollState())
+                        .padding(vertical = WhiteNoiseSpacing.Section),
+                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Section),
             ) {
-                Text(stringResource(R.string.group_private_image), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.group_private_image_detail), style = MaterialTheme.typography.bodyMedium)
-                Box(
-                    modifier =
-                        Modifier
-                            .clip(CircleShape)
-                            .clickable(
-                                enabled = groupAvatarImageAvailable,
-                                onClickLabel = stringResource(R.string.profile_view_picture),
-                                role = Role.Button,
-                            ) { avatarViewerOpen = true },
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
                 ) {
-                    GroupAvatar(
-                        appState = appState,
-                        group = controller.group,
-                        title = controller.title(groupTitleCopy),
-                        seed = controller.group.groupIdHex,
-                        size = GroupEditAvatarSize,
+                    Text(stringResource(R.string.group_private_image), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.group_private_image_detail),
+                        style = MaterialTheme.typography.bodyMedium,
                     )
-                }
-                if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
-                Box {
-                    WhiteNoiseFilledTonalButton(
-                        onClick = {
-                            imageFailureScope.clear()
-                            photoMenuOpen = true
-                        },
-                        enabled = canEdit && !imageSaving,
-                        modifier = Modifier.testTag("group_edit.photoAction"),
+                    Box(
+                        modifier =
+                            Modifier
+                                .clip(CircleShape)
+                                .clickable(
+                                    enabled = groupAvatarImageAvailable,
+                                    onClickLabel = stringResource(R.string.profile_view_picture),
+                                    role = Role.Button,
+                                ) { avatarViewerOpen = true },
                     ) {
-                        Text(stringResource(if (hasGroupImage) R.string.change_photo else R.string.add_photo))
+                        Avatar(
+                            title = controller.title(groupTitleCopy),
+                            seed = controller.group.groupIdHex,
+                            size = GroupEditAvatarSize,
+                            pictureUrl = groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
+                            picture = encryptedGroupAvatar,
+                        )
                     }
-                    GroupEditPhotoMenu(
-                        expanded = photoMenuOpen,
-                        hasImage = hasGroupImage,
-                        onDismiss = {
-                            imageFailureScope.clear()
-                            photoMenuOpen = false
+                    if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    Box {
+                        WhiteNoiseFilledTonalButton(
+                            onClick = {
+                                imageFailureScope.clear()
+                                photoMenuOpen = true
+                            },
+                            enabled = canEdit && !imageSaving,
+                            modifier = Modifier.testTag("group_edit.photoAction"),
+                        ) {
+                            Text(stringResource(if (hasGroupImage) R.string.change_photo else R.string.add_photo))
+                        }
+                        GroupEditPhotoMenu(
+                            expanded = photoMenuOpen,
+                            hasImage = hasGroupImage,
+                            onDismiss = {
+                                imageFailureScope.clear()
+                                photoMenuOpen = false
+                            },
+                            onChoosePhoto = {
+                                imageFailureScope.clear()
+                                photoPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                            onChooseFile = {
+                                imageFailureScope.clear()
+                                filePicker.launch(IMAGE_DOCUMENT_MIME_TYPES)
+                            },
+                            onFindWebImage = {
+                                imageFailureScope.clear()
+                                showImageSearch = true
+                            },
+                            onCreateEmoji = {
+                                imageFailureScope.clear()
+                                showGroupEmojiImagePicker = true
+                            },
+                            onRemove = { updateImage { null } },
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+                    verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
+                ) {
+                    GroupNameEmojiField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = stringResource(R.string.group_name),
+                        emojiPickerOpen = showEmojiPicker,
+                        onEmojiPickerClick = {
+                            if (nameEditable) showEmojiPicker = true
                         },
-                        onChoosePhoto = {
-                            imageFailureScope.clear()
-                            photoPicker.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                            )
-                        },
-                        onChooseFile = {
-                            imageFailureScope.clear()
-                            filePicker.launch(IMAGE_DOCUMENT_MIME_TYPES)
-                        },
-                        onFindWebImage = {
-                            imageFailureScope.clear()
-                            showImageSearch = true
-                        },
-                        onCreateEmoji = {
-                            imageFailureScope.clear()
-                            showGroupEmojiImagePicker = true
-                        },
-                        onRemove = { updateImage { null } },
+                        enabled = nameEditable,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    TextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text(stringResource(R.string.group_description)) },
+                        minLines = 3,
+                        maxLines = 6,
+                        enabled = canEdit,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-            }
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
-                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
-            ) {
-                GroupNameEmojiField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = stringResource(R.string.group_name),
-                    emojiPickerOpen = showEmojiPicker,
-                    onEmojiPickerClick = {
-                        if (nameEditable) showEmojiPicker = true
-                    },
-                    enabled = nameEditable,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                TextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.group_description)) },
-                    minLines = 3,
-                    maxLines = 6,
-                    enabled = canEdit,
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
         }
-    }
 
-    if (avatarViewerOpen && groupAvatarImageAvailable) {
-        AvatarFullScreenViewer(
-            title = controller.title(groupTitleCopy),
-            seed = controller.group.groupIdHex,
-            pictureUrl = groupAvatarUrl,
-            picture = encryptedGroupAvatar,
-            onDismiss = { avatarViewerOpen = false },
-            editActionLabel = if (canEdit) stringResource(R.string.group_image_search_edit) else null,
-            onEditPicture =
-                if (canEdit) {
-                    {
-                        avatarViewerOpen = false
-                        imageFailureScope.clear()
-                        showImageSearch = true
-                    }
-                } else {
-                    null
+        if (avatarViewerOpen && groupAvatarImageAvailable) {
+            AvatarFullScreenViewer(
+                title = controller.title(groupTitleCopy),
+                seed = controller.group.groupIdHex,
+                pictureUrl = groupAvatarUrl,
+                picture = encryptedGroupAvatar,
+                onDismiss = { avatarViewerOpen = false },
+                readLocalBytes = groupAvatar.readOriginalBytes,
+                editActionLabel = if (canEdit) stringResource(R.string.group_image_search_edit) else null,
+                onEditPicture =
+                    if (canEdit) {
+                        {
+                            avatarViewerOpen = false
+                            imageFailureScope.clear()
+                            showImageSearch = true
+                        }
+                    } else {
+                        null
+                    },
+            )
+        }
+
+        if (showImageSearch) {
+            ImageSearchSheet(
+                initialUrl = controller.group.avatarUrl.orEmpty(),
+                hasCurrentImage = hasGroupImage,
+                header = stringResource(R.string.group_image_search_title),
+                title = controller.title(groupTitleCopy),
+                seed = controller.group.groupIdHex,
+                urlLabel = stringResource(R.string.group_avatar_url),
+                applyInFlight = imageSaving || controller.mutationInFlight,
+                onApply = { picked ->
+                    // Removal clears both the public URL and any encrypted image.
+                    if (picked == null) updateImage { null } else setPublicAvatarUrl(picked)
                 },
-        )
-    }
-
-    if (showImageSearch) {
-        ImageSearchSheet(
-            initialUrl = controller.group.avatarUrl.orEmpty(),
-            hasCurrentImage = hasGroupImage,
-            header = stringResource(R.string.group_image_search_title),
-            title = controller.title(groupTitleCopy),
-            seed = controller.group.groupIdHex,
-            urlLabel = stringResource(R.string.group_avatar_url),
-            applyInFlight = imageSaving || controller.mutationInFlight,
-            onApply = { picked ->
-                // Removal clears both the public URL and any encrypted image.
-                if (picked == null) updateImage { null } else setPublicAvatarUrl(picked)
-            },
-            onPickPhoto = { uri ->
-                if (imageSaving || controller.mutationInFlight) return@ImageSearchSheet
-                imageFailureScope.clear()
-                pendingCropUri = uri
-            },
-            onPickEmoji = {
-                imageFailureScope.clear()
-                showImageSearch = false
-                showGroupEmojiImagePicker = true
-            },
-            onDismiss = {
-                if (!imageSaving && !controller.mutationInFlight) {
+                onPickPhoto = { uri ->
+                    if (imageSaving || controller.mutationInFlight) return@ImageSearchSheet
+                    imageFailureScope.clear()
+                    pendingCropUri = uri
+                },
+                onPickEmoji = {
                     imageFailureScope.clear()
                     showImageSearch = false
-                }
-            },
-        )
-    }
+                    showGroupEmojiImagePicker = true
+                },
+                onDismiss = {
+                    if (!imageSaving && !controller.mutationInFlight) {
+                        imageFailureScope.clear()
+                        showImageSearch = false
+                    }
+                },
+            )
+        }
 
-    if (showGroupEmojiImagePicker) {
-        GroupEmojiImagePickerSheet(
-            applyInFlight = imageSaving || controller.mutationInFlight,
-            recentEmojis = recentEmojiRecentsOwner.recents,
-            onEmojiUsed = recentEmojiRecentsOwner::onEmojiUsed,
-            onApply = { draft -> updateImage { draft } },
-            onDismiss = {
-                if (!imageSaving && !controller.mutationInFlight) {
-                    imageFailureScope.clear()
-                    showGroupEmojiImagePicker = false
-                }
-            },
-        )
-    }
+        if (showGroupEmojiImagePicker) {
+            GroupEmojiImagePickerSheet(
+                applyInFlight = imageSaving || controller.mutationInFlight,
+                recentEmojis = recentEmojiRecentsOwner.recents,
+                onEmojiUsed = recentEmojiRecentsOwner::onEmojiUsed,
+                onApply = { draft -> updateImage { draft } },
+                onDismiss = {
+                    if (!imageSaving && !controller.mutationInFlight) {
+                        imageFailureScope.clear()
+                        showGroupEmojiImagePicker = false
+                    }
+                },
+            )
+        }
 
-    if (showEmojiPicker && nameEditable) {
-        EmojiPickerSheet(
-            onDismissRequest = { showEmojiPicker = false },
-            onEmojiPicked = { emoji ->
-                if (nameEditable) name = insertEmojiAtSelection(name, emoji)
-            },
-            recentEmojis = recentEmojiRecentsOwner.recents,
-            onEmojiUsed = { emoji ->
-                if (nameEditable) recentEmojiRecentsOwner.onEmojiUsed(emoji)
-            },
-        )
+        if (showEmojiPicker && nameEditable) {
+            EmojiPickerSheet(
+                onDismissRequest = { showEmojiPicker = false },
+                onEmojiPicked = { emoji ->
+                    if (nameEditable) name = insertEmojiAtSelection(name, emoji)
+                },
+                recentEmojis = recentEmojiRecentsOwner.recents,
+                onEmojiUsed = { emoji ->
+                    if (nameEditable) recentEmojiRecentsOwner.onEmojiUsed(emoji)
+                },
+            )
+        }
     }
 }
 

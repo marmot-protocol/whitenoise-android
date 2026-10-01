@@ -24,6 +24,7 @@ import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import java.util.Locale
 
 enum class ChatListAvatarSource {
+    DURABLE,
     LEGACY_URL,
     ENCRYPTED_GROUP,
     FALLBACK_URL,
@@ -33,6 +34,9 @@ data class ChatListAvatarSeed(
     val source: ChatListAvatarSource,
     val key: String,
     val image: ImageBitmap,
+    val accountRef: String? = null,
+    // staleness-exempt: captured loader lifetime, not an independent counter owner.
+    val cacheLifetime: Long? = null,
 )
 
 /** A peer projection stands for a two-person conversation. */
