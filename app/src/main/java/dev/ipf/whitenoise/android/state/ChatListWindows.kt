@@ -241,7 +241,8 @@ internal class ChatListWindowSet private constructor(
             // MDK publishes the answered frame to the stream before it replies, so the receive loop may
             // have installed this very frame already. The command still succeeded: callers re-apply the
             // installed rows, which is idempotent, and a parked forward page must not lose its anchor to it.
-            result?.also { install(view, it) }
+            // A result that arrives after retirement, or one older than the installed frame, is still dropped.
+            result?.takeIf { install(view, it) || alreadyInstalled(view, it) }
         }
 
     /** Installs a newer same-generation replacement for [view] and bumps the frame revision; false for a duplicate. */
@@ -260,6 +261,16 @@ internal class ChatListWindowSet private constructor(
         update.logWindowFrame(view, "replace")
         return true
     }
+
+    /** Whether [update] is the very frame the receive loop already installed for a live [view]. */
+    private fun alreadyInstalled(
+        view: ChatListViewFfi,
+        update: ChatListWindowSnapshotFfi,
+    ): Boolean =
+        synchronized(frameLock) {
+            val current = installed[view]?.takeUnless { closed } ?: return@synchronized false
+            current.sequence == update.sequence && current.subscriptionGeneration == update.subscriptionGeneration
+        }
 
     companion object {
         /**
