@@ -115,6 +115,7 @@ class LocalNotificationReactionChipsTest {
     private fun presenter(choices: List<String>) =
         LocalNotificationPresenter(
             context,
+            groupReconciliation = {},
             quickReactionChoices = { choices },
         ).also(LocalNotificationPresenter::ensureChannels)
 

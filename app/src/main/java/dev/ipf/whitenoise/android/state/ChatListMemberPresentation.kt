@@ -123,7 +123,16 @@ internal fun adoptableSelectedAvatarAsset(
     avatarSource: PresentationSourceFfi?,
     group: AppGroupRecordFfi,
     memberCount: Int,
+    selectedAvatar: SelectedAvatarFfi? = null,
 ): AvatarAssetFfi? =
     asset?.takeIf {
-        avatarSource?.isPeerSourced() != true || GroupProjector.lendsPeerAvatar(group, memberCount)
+        (avatarSource?.isPeerSourced() != true || GroupProjector.lendsPeerAvatar(group, memberCount)) &&
+            when (selectedAvatar) {
+                is SelectedAvatarFfi.EncryptedGroupImage ->
+                    group.avatarUrl.isNullOrBlank() && selectedAvatar.image.imageHashHex == group.imageHashHex
+                is SelectedAvatarFfi.RemoteImage ->
+                    avatarSource?.isPeerSourced() == true || selectedAvatar.url == group.avatarUrl
+                is SelectedAvatarFfi.Placeholder -> false
+                null -> true
+            }
     }

@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="notification_channel_summary">Benachrichtigungsübersicht</string>
+    <string name="notification_channel_summary_description">Stille Übersicht der Nachrichten und anderer Ereignisse</string>
+    <plurals name="notification_group_count">
+        <item quantity="one">%1$d Benachrichtigung</item>
+        <item quantity="other">%1$d Benachrichtigungen</item>
+    </plurals>
     <string name="poll_custom_time">Eigene Dauer</string>
     <string name="poll_custom_duration">Dauer</string>
     <string name="poll_unit_seconds">Sekunden</string>
@@ -1221,6 +1227,9 @@
     <string name="chat_folder_description_label">Beschreibung</string>
     <string name="chat_folder_keyword_label">Stichwort</string>
     <string name="chat_folder_unread_only">Nur ungelesen</string>
+    <string name="chat_folder_unread_mentions_only">Nur ungelesene Erwähnungen</string>
+    <string name="chat_folder_direct_chats_only">Nur Direktchats</string>
+    <string name="chat_folder_pinned_only">Nur angeheftete Chats</string>
     <string name="chat_folder_include_muted">Stummgeschaltete Chats einbeziehen</string>
     <string name="chat_folder_groups_only">Nur Gruppen</string>
     <string name="chat_folder_archived_only">Nur archiviert</string>
@@ -1238,7 +1247,7 @@
     <string name="folder_manual_hint">Hier hinzugefügte Chats bleiben enthalten, auch wenn sie nicht zu den automatischen Regeln passen.</string>
     <string name="folder_rules">Automatische Regeln</string>
     <string name="folder_keyword_hint">Passt auf Chat-Titel oder Gruppenbeschreibung. Chats mit einer ausgewählten Person passen ebenfalls.</string>
-    <string name="folder_rule_hint">Chats werden aufgenommen, wenn sie einer ausgewählten Personen- oder Stichwortregel entsprechen. Kategorieoptionen grenzen diese Treffer ein. Ein entfernter Chat kommt zurück, wenn er weiterhin passt.</string>
+    <string name="folder_rule_hint">Chats müssen einer ausgewählten Personen- oder Stichwortregel und allen ausgewählten Kategorien entsprechen. Ohne Person oder Stichwort gelten die Kategorien allein. Ein entfernter Chat kommt zurück, wenn er weiterhin passt.</string>
     <string name="folder_preview">Vorschau</string>
     <string name="folder_discard_title">Änderungen verwerfen?</string>
     <string name="folder_discard_detail">Deine Ordneränderungen wurden nicht gespeichert.</string>

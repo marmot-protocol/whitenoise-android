@@ -244,6 +244,19 @@ class ChatFolderPreferencesTest {
     }
 
     @Test
+    fun attentionCategoriesRoundTripThroughAtomicEditorSaveAndStayAccountLocal() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        store.foldersFor("acct-a")
+        val rule = ChatFolderRule(unreadMentionsOnly = true, directChatsOnly = true, pinnedOnly = true)
+        val folder = store.commitFolderDraft("acct-a", null, "Mentions", "", emptySet(), rule)!!
+        val reloaded = ChatFolderPreferences(context)
+        assertEquals(rule, reloaded.folderRule("acct-a", folder.id))
+        assertNull(reloaded.folderRule("acct-b", folder.id))
+        assertTrue(reloaded.setFolderRule("acct-a", folder.id, ChatFolderRule()))
+        assertEquals(ChatFolderRule(), ChatFolderPreferences(context).folderRule("acct-a", folder.id))
+    }
+
+    @Test
     fun accountsAreIsolatedAndClearable() {
         val a = store.createFolder("acct-a", "Mine")!!
         store.createFolder("acct-b", "Theirs")

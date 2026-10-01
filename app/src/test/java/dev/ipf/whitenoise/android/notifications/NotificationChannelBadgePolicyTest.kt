@@ -40,6 +40,24 @@ class NotificationChannelBadgePolicyTest {
     }
 
     @Test
+    fun summaryKeepsTheGroupIconWithoutSoundVibrationBadgeOrConversationSettings() {
+        deleteOrdinaryChannels()
+        NotificationChannels.ensureChannels(context)
+        val summary = manager.getNotificationChannel(NotificationChannelSpec.USER_EVENT_SUMMARY.id)
+        assertEquals(NotificationManager.IMPORTANCE_DEFAULT, summary.importance)
+        assertEquals(null, summary.sound)
+        assertFalse(summary.shouldVibrate())
+        assertFalse(summary.canShowBadge())
+        listOf(false, true).forEach { isDm ->
+            assertFalse(
+                ConversationNotificationChannels
+                    .relevantParents(isDm)
+                    .contains(NotificationChannelSpec.USER_EVENT_SUMMARY),
+            )
+        }
+    }
+
+    @Test
     fun conversationChildrenInheritTheirParentBadgePolicy() {
         deleteOrdinaryChannels()
         NotificationChannels.ensureChannels(context)

@@ -1449,6 +1449,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Publishes a runtime, invalidates obsolete permission work, and seeds synchronization for retained accounts. */
     private fun publishMarmotRuntime(runtime: AppMarmotRuntime) {
+        if (marmotRuntime !== runtime) AvatarImageLoader.clearStoredAvatars()
         marmotRuntime = runtime
         hostPerformance.publishEmitter(runtime, runtimeGeneration, runtimeHostPerformanceEmitter(runtime))
         nativeAttachmentPermissions.invalidate(runtime)
@@ -1460,6 +1461,7 @@ class WhiteNoiseAppState private constructor(
     /** Clears only the runtime that failed and immediately fences its permission callbacks. */
     private fun clearMarmotRuntime(runtime: AppMarmotRuntime) {
         if (marmotRuntime !== runtime) return
+        AvatarImageLoader.clearStoredAvatars()
         hostPerformance.clearEmitter(runtime)
         marmotRuntime = null
         nativeAttachmentPermissions.invalidate(null)
@@ -3175,6 +3177,7 @@ class WhiteNoiseAppState private constructor(
     /** Retires observation tickets whenever destructive recovery replaces the runtime generation. */
     private fun applyDestructiveWipeRuntimeState(state: DestructiveAccountWipeRuntimeState) {
         if (runtimeGeneration != state.runtimeGeneration) {
+            AvatarImageLoader.clearStoredAvatars()
             diagnostics.observations.reset()
             nativePushFallback.invalidateAll()
         }
@@ -3720,6 +3723,9 @@ class WhiteNoiseAppState private constructor(
     internal val profileGroupPickerRevision: Long
         get() = chatsController?.memberSnapshotsRevision ?: 0L
 
+    internal val groupPresentationChatsController: ChatsController?
+        get() = chatsController
+
     internal fun profileAddableGroupsState(accountIdHex: String): ProfileGroupPickerState =
         chatsController?.profileAddableGroupsState(accountIdHex, activeAccount?.accountIdHex)
             ?: ProfileGroupPickerState.empty()
@@ -3727,17 +3733,6 @@ class WhiteNoiseAppState private constructor(
     internal fun profilePromotableGroupsState(accountIdHex: String): ProfileGroupPickerState =
         chatsController?.profilePromotableGroupsState(accountIdHex, activeAccount?.accountIdHex)
             ?: ProfileGroupPickerState.empty()
-
-    internal fun requestProfileGroupMembers(
-        groupIds: Iterable<String>,
-        retry: Boolean = false,
-    ) {
-        if (retry) {
-            chatsController?.retryMemberSnapshots(groupIds)
-        } else {
-            chatsController?.requestMemberSnapshots(groupIds)
-        }
-    }
 
     suspend fun promoteProfileInGroup(
         targetRef: String,
@@ -6053,6 +6048,7 @@ class WhiteNoiseAppState private constructor(
         accountScopedCaches.clearAll()
         authoritativeMuteOverrides.clear()
         pendingMuteCommands.clear()
+        AvatarImageLoader.clearStoredAvatars()
         GroupAvatarImageLoader.clear()
         pruneIdleGroupCommitLocks()
         profileRevision += 1
@@ -7887,6 +7883,7 @@ class WhiteNoiseAppState private constructor(
         }
         if (foreground) {
             refreshLocalNotificationPermission()
+            localNotificationPresenter.reconcileNotificationGroup()
             refreshNotificationBatteryPolicy()
             notificationScope.launch { catchUpAfterForegroundActivation() }
         }
