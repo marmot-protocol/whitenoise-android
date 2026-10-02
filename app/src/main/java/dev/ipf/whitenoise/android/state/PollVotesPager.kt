@@ -3,9 +3,13 @@ package dev.ipf.whitenoise.android.state
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollVoteFfi
 import dev.ipf.marmotkit.PollVotePageFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 
 /** MDK accepts 1 through 100 votes per page, and the largest page keeps most polls to a single read. */
 internal const val POLL_VOTES_PAGE_SIZE = 100u
@@ -62,17 +66,22 @@ internal class PollVotesPager(
 
     private var generation = 0
 
-    /** Discards loaded votes and in-flight reads, then reads the first page again. */
+    /**
+     * Reads the first page again and supersedes any in-flight read. Votes already shown stay visible until
+     * the new page replaces them, so a reprojection does not blank the list or lose the scroll position.
+     */
     suspend fun refresh() {
         val mine = ++generation
-        votes = emptyList()
-        hasMore = false
-        phase = PollVotesPhase.LOADING
+        val hadVotes = votes.isNotEmpty()
+        if (!hadVotes) {
+            hasMore = false
+            phase = PollVotesPhase.LOADING
+        }
         read(mine, cursor = null)?.let { page ->
             votes = page.votes
             hasMore = page.hasMoreAfter && page.votes.isNotEmpty()
             phase = PollVotesPhase.READY
-        } ?: failIfCurrent(mine, PollVotesPhase.FAILED)
+        } ?: failIfCurrent(mine, if (hadVotes) PollVotesPhase.READY else PollVotesPhase.FAILED)
     }
 
     /** Appends the next page; ignored while a read is in flight or when nothing follows. */
@@ -83,9 +92,11 @@ internal class PollVotesPager(
         val mine = ++generation
         phase = PollVotesPhase.LOADING_MORE
         read(mine, cursor = last)?.let { page ->
-            votes = votes + page.votes
-            // A page whose last vote repeats the cursor cannot advance, so stop instead of looping.
-            hasMore = page.hasMoreAfter && page.votes.isNotEmpty() && page.votes.last() != last
+            // MDK lists each voter's latest response, so a re-vote between pages can repeat a loaded voter
+            // later in the order. The newest entry wins, which also keeps list keys unique.
+            val repeated = page.votes.mapTo(hashSetOf()) { it.voterAccountIdHex }
+            votes = votes.filterNot { it.voterAccountIdHex in repeated } + page.votes
+            hasMore = page.hasMoreAfter && page.votes.isNotEmpty()
             phase = PollVotesPhase.READY
         } ?: failIfCurrent(mine, PollVotesPhase.MORE_FAILED)
     }
@@ -104,35 +115,60 @@ internal class PollVotesPager(
         cursor: PollVoteFfi?,
     ): PollVotePageFfi? =
         runCatchingCancellable { reader.read(cursor?.votedAt, cursor?.voterAccountIdHex, pageSize) }
+            .onFailure { appStateDebug(it) { "poll votes read failed" } }
             .getOrNull()
             ?.takeIf { mine == generation && isCurrent() }
 }
 
-/** One rendered voter, resolved from MDK's vote and the host's profile and block-list lookups. */
+/** One rendered voter, with option labels resolved from the card's own options. */
 internal data class PollVoteRow(
     val voterAccountIdHex: String,
-    val displayName: String,
-    val avatarUrl: String?,
     val choices: List<String>,
-    val blocked: Boolean,
 )
 
-/** Maps native votes to rows, labelling option ids from the card's own options and keeping blocked voters. */
+/** Maps native votes to rows, labelling option ids from the card's options and ignoring unknown ids. */
 internal fun pollVoteRows(
     votes: List<PollVoteFfi>,
     options: List<PollOptionResultFfi>,
-    displayName: (String) -> String,
-    avatarUrl: (String) -> String?,
-    isBlocked: (String) -> Boolean,
 ): List<PollVoteRow> {
     val labels = options.associate { it.id to it.label }
-    return votes.map { vote ->
-        PollVoteRow(
-            voterAccountIdHex = vote.voterAccountIdHex,
-            displayName = displayName(vote.voterAccountIdHex),
-            avatarUrl = avatarUrl(vote.voterAccountIdHex),
-            choices = vote.optionIds.mapNotNull(labels::get),
-            blocked = isBlocked(vote.voterAccountIdHex),
-        )
+    return votes.map { vote -> PollVoteRow(vote.voterAccountIdHex, vote.optionIds.mapNotNull(labels::get)) }
+}
+
+/** Forwards each projection event that touched the poll to [onTouched] until the stream ends or is cancelled. */
+internal suspend fun observePollProjection(
+    nextEvent: suspend () -> MarmotEventFfi?,
+    touched: (MarmotEventFfi) -> Boolean,
+    onTouched: () -> Unit,
+) {
+    while (currentCoroutineContext().isActive) {
+        val event = nextEvent() ?: return
+        if (touched(event)) onTouched()
     }
+}
+
+/**
+ * Whether [event] reprojected the poll [pollEventId] of [groupIdHex] for [accountIdHex]. MDK says to re-read
+ * per-voter results from the start then, and a same-option re-vote changes only `votedAt`, which the
+ * poll row in the window never shows.
+ */
+internal fun pollProjectionTouched(
+    event: MarmotEventFfi,
+    accountIdHex: String?,
+    groupIdHex: String,
+    pollEventId: String,
+): Boolean {
+    val runtime = (event as? MarmotEventFfi.ProjectionUpdated)?.update ?: return false
+    val update = runtime.update
+    val sameScope = runtime.accountIdHex.equals(accountIdHex, ignoreCase = true) && update.groupIdHex == groupIdHex
+    return sameScope &&
+        (
+            update.messages.any { it.messageIdHex == pollEventId } ||
+                update.changes.any { change ->
+                    when (change) {
+                        is TimelineMessageChangeFfi.Upsert -> change.message.messageIdHex == pollEventId
+                        is TimelineMessageChangeFfi.Remove -> change.messageIdHex == pollEventId
+                    }
+                }
+        )
 }

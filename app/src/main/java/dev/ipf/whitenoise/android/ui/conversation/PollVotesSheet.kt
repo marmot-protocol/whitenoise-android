@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.icu.text.ListFormatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,11 +17,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDirection
@@ -32,11 +38,18 @@ import dev.ipf.whitenoise.android.state.PollVoteRow
 import dev.ipf.whitenoise.android.state.PollVotesPager
 import dev.ipf.whitenoise.android.state.PollVotesPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.observePollProjection
+import dev.ipf.whitenoise.android.state.pollProjectionTouched
 import dev.ipf.whitenoise.android.state.pollVoteRows
 import dev.ipf.whitenoise.android.state.pollVotesPage
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 internal const val POLL_VOTES_SHEET_TAG = "poll-votes-sheet"
 internal const val POLL_VOTES_LOAD_MORE_TAG = "poll-votes-load-more"
@@ -57,7 +70,7 @@ internal fun PollVotesSheet(
     onDismissRequest: () -> Unit,
 ) {
     val pager =
-        remember(owner, poll, controller) {
+        remember(owner, controller) {
             PollVotesPager(
                 reader = { afterVotedAt, afterVoter, limit ->
                     controller.pollVotesPage(owner.messageId, afterVotedAt, afterVoter, limit)
@@ -65,18 +78,13 @@ internal fun PollVotesSheet(
                 isCurrent = { controller.acceptsConversationActionOwner(owner.accountRef, owner.groupId) },
             )
         }
-    LaunchedEffect(pager) { pager.refresh() }
+    var reprojections by remember(pager) { mutableIntStateOf(0) }
+    // A changed projection or a poll-touching event re-reads from the first page, keeping the list visible.
+    LaunchedEffect(pager, poll, reprojections) { pager.refresh() }
+    PollProjectionWatch(appState, owner) { reprojections++ }
     val scope = rememberCoroutineScope()
     val blockedUsers = appState.runtimeMirrors.blocks
-    val rows =
-        pollVoteRows(
-            votes = pager.votes,
-            options = poll.options,
-            displayName = appState::displayName,
-            avatarUrl = appState::avatarUrl,
-            // Reading the mirror's observable list subscribes the sheet to live block changes.
-            isBlocked = { id -> blockedUsers.users.isNotEmpty() && blockedUsers.isBlocked(id) },
-        )
+    val rows = remember(pager.votes, poll.options) { pollVoteRows(pager.votes, poll.options) }
     KeyboardPreservingBottomSheet(
         paneTitle = stringResource(R.string.poll_votes_title),
         onDismissRequest = onDismissRequest,
@@ -84,6 +92,10 @@ internal fun PollVotesSheet(
     ) {
         PollVotesContent(
             rows = rows,
+            displayName = appState::displayName,
+            avatarUrl = appState::avatarUrl,
+            // Reading the mirror's observable list subscribes the sheet to live block changes.
+            isBlocked = { id -> blockedUsers.users.isNotEmpty() && blockedUsers.isBlocked(id) },
             phase = pager.phase,
             hasMore = pager.hasMore,
             onRetry = {
@@ -94,11 +106,45 @@ internal fun PollVotesSheet(
     }
 }
 
+/** Counts each event that reprojected this poll while the sheet is open, so MDK's guide re-read happens. */
+@Composable
+@Suppress("FunctionNaming")
+private fun PollProjectionWatch(
+    appState: WhiteNoiseAppState,
+    owner: PollMessageActionOwner,
+    onTouched: () -> Unit,
+) {
+    val currentOnTouched by rememberUpdatedState(onTouched)
+    LaunchedEffect(owner) {
+        val accountId = appState.accounts.firstOrNull { it.label == owner.accountRef }?.accountIdHex
+        while (true) {
+            val subscription = runCatchingCancellable { appState.marmotIo { subscribeEvents() } }.getOrNull()
+            try {
+                if (subscription != null) {
+                    observePollProjection(
+                        nextEvent = { withContext(Dispatchers.IO) { subscription.next() } },
+                        touched = { pollProjectionTouched(it, accountId, owner.groupId, owner.messageId) },
+                        onTouched = { currentOnTouched() },
+                    )
+                }
+            } finally {
+                subscription?.let { withContext(NonCancellable + Dispatchers.IO) { runCatching { it.destroy() } } }
+            }
+            delay(POLL_PROJECTION_RETRY_MS)
+        }
+    }
+}
+
+private const val POLL_PROJECTION_RETRY_MS = 5_000L
+
 /** Stateless sheet body, so every paging state renders without a live engine. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun PollVotesContent(
     rows: List<PollVoteRow>,
+    displayName: (String) -> String,
+    avatarUrl: (String) -> String?,
+    isBlocked: (String) -> Boolean,
     phase: PollVotesPhase,
     hasMore: Boolean,
     onRetry: () -> Unit,
@@ -125,7 +171,9 @@ internal fun PollVotesContent(
             }
             else ->
                 LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                    items(rows, key = { it.voterAccountIdHex }) { row -> PollVoterItem(row) }
+                    items(rows, key = { it.voterAccountIdHex }) { row ->
+                        PollVoterItem(row, displayName, avatarUrl, isBlocked)
+                    }
                     item { PollVotesFooter(phase, hasMore, onRetry, onLoadMore) }
                 }
         }
@@ -179,30 +227,41 @@ private fun CenteredProgress() {
 /** One voter with their chosen option labels, marked when the account blocks them. */
 @Composable
 @Suppress("FunctionNaming")
-private fun PollVoterItem(row: PollVoteRow) {
+private fun PollVoterItem(
+    row: PollVoteRow,
+    displayName: (String) -> String,
+    avatarUrl: (String) -> String?,
+    isBlocked: (String) -> Boolean,
+) {
+    val id = row.voterAccountIdHex
+    val name = displayName(id)
+    val blocked = isBlocked(id)
+    val locale = LocalConfiguration.current.locales[0]
+    val choices = remember(row.choices, locale) { ListFormatter.getInstance(locale).format(row.choices) }
     ListItem(
         headlineContent = {
             Text(
-                row.displayName,
+                name,
                 style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
             )
         },
         supportingContent = {
             Text(
-                row.choices.joinToString(", "),
+                choices,
                 style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
             )
         },
         leadingContent = {
             Avatar(
-                title = row.displayName,
-                seed = row.voterAccountIdHex,
+                title = name,
+                seed = id,
                 size = VoterAvatarSize,
-                pictureUrl = row.avatarUrl,
+                // A blocked voter keeps a monogram, so their picture is never fetched for this list.
+                pictureUrl = if (blocked) null else avatarUrl(id),
             )
         },
         trailingContent =
-            if (row.blocked) {
+            if (blocked) {
                 { Text(stringResource(R.string.poll_voter_blocked), style = MaterialTheme.typography.labelSmall) }
             } else {
                 null

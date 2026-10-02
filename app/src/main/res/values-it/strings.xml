@@ -48,7 +48,7 @@
     <string name="poll_votes_empty">Ancora nessun voto.</string>
     <string name="poll_votes_load_failed">Impossibile caricare i voti.</string>
     <string name="poll_votes_load_more">Carica altro</string>
-    <string name="poll_voter_blocked">Bloccato</string>
+    <string name="poll_voter_blocked">Persona bloccata</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d voto</item>
         <item quantity="other">%1$d voti</item>

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -16,6 +17,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -159,8 +161,14 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         openSheet()
         awaitTag("poll-voter-$voterB")
 
-        composeRule.onNodeWithTag("poll-voter-$voterA").assertExists()
-        composeRule.onNodeWithText("Blocked").assertExists()
+        composeRule.onNodeWithTag("poll-voter-$voterB").assertTextContains("Blocked", substring = true)
+        val unblockedText =
+            composeRule
+                .onNodeWithTag("poll-voter-$voterA")
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.Text]
+                .joinToString { it.text }
+        assertFalse(unblockedText.contains("Blocked"))
         assertTrue(recordedCalls().any { it.first == "pollVotes" })
     }
 
@@ -170,5 +178,24 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         render(pollMessage())
 
         assertEquals(0, composeRule.countTagged(POLL_VIEW_VOTES_TAG))
+    }
+
+    /** A voter who re-voted between pages and reappears on page two renders once and does not crash the list. */
+    @Test
+    fun repeatedVoterAcrossPagesRendersOnceWithoutCrashing() {
+        val first = listOf(PollVoteFfi(voterA, listOf("a"), 10uL), PollVoteFfi(voterB, listOf("a"), 11uL))
+        val second = listOf(PollVoteFfi(voterC, listOf("b"), 12uL), PollVoteFfi(voterA, listOf("b"), 99uL))
+        pollVotesResponder = { args ->
+            if (args[3] == null) PollVotePageFfi(first, true) else PollVotePageFfi(second, false)
+        }
+        render(votedPoll())
+
+        openSheet()
+        awaitTag("poll-voter-$voterB")
+        composeRule.onNodeWithTag(POLL_VOTES_LOAD_MORE_TAG).performClick()
+        awaitTag("poll-voter-$voterC")
+
+        composeRule.onNodeWithTag("poll-voter-$voterA").assertTextContains("Salad", substring = true)
+        assertEquals(1, composeRule.countTagged("poll-voter-$voterA"))
     }
 }

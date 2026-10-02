@@ -36,10 +36,12 @@ class PollVotesScreenshotTest {
 
     private val rows =
         listOf(
-            PollVoteRow("0a".repeat(32), "Amina", null, listOf("Soup"), blocked = false),
-            PollVoteRow("0b".repeat(32), "Bilal", null, listOf("Soup", "Salad"), blocked = true),
-            PollVoteRow("0c".repeat(32), "Chidi", null, listOf("Salad"), blocked = false),
+            PollVoteRow("0a".repeat(32), listOf("Soup")),
+            PollVoteRow("0b".repeat(32), listOf("Soup", "Salad")),
+            PollVoteRow("0c".repeat(32), listOf("Salad")),
         )
+
+    private val names = mapOf("0a".repeat(32) to "Amina", "0b".repeat(32) to "Bilal", "0c".repeat(32) to "Chidi")
 
     /** Renders [PollVotesContent] on the sheet surface and captures it to [path]. */
     private fun capture(
@@ -69,7 +71,16 @@ class PollVotesScreenshotTest {
         phase: PollVotesPhase = PollVotesPhase.READY,
         hasMore: Boolean = false,
         voters: List<PollVoteRow> = rows,
-    ) = PollVotesContent(voters, phase, hasMore, onRetry = {}, onLoadMore = {})
+    ) = PollVotesContent(
+        rows = voters,
+        displayName = { id -> names.getValue(id) },
+        avatarUrl = { null },
+        isBlocked = { id -> id == "0b".repeat(32) },
+        phase = phase,
+        hasMore = hasMore,
+        onRetry = {},
+        onLoadMore = {},
+    )
 
     /** A loaded page lists each voter's choices and marks the blocked voter. */
     @Test fun votesLight() = capture("poll_votes_light") { Votes(hasMore = true) }
@@ -136,5 +147,30 @@ class PollVotesScreenshotTest {
                 onVote = {},
                 onViewVotes = {},
             )
+        }
+
+    /** A poll with votes, so the participants row offers View votes. */
+    private fun votedCard() =
+        PollProjectionFfi(
+            question = "Lunch?",
+            options = listOf(PollOptionResultFfi("a", "Soup", 2uL), PollOptionResultFfi("b", "Salad", 1uL)),
+            pollType = PollTypeFfi.SINGLE_CHOICE,
+            participants = 3uL,
+            localSelection = listOf("a"),
+            creator = "0a".repeat(32),
+            endsAt = null,
+            open = true,
+        )
+
+    /** RTL mirrors the participants row and keeps View votes reachable. */
+    @Test fun cardWithViewVotesDarkRtl() =
+        capture("poll_card_view_votes_dark_rtl", darkTheme = true, rtl = true) {
+            PollCard(poll = votedCard(), canVote = true, onVote = {}, onViewVotes = {})
+        }
+
+    /** 200% text wraps the participants row without hiding View votes. */
+    @Test fun cardWithViewVotesLarge() =
+        capture("poll_card_view_votes_large", fontScale = 2f) {
+            PollCard(poll = votedCard(), canVote = true, onVote = {}, onViewVotes = {})
         }
 }
