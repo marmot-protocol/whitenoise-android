@@ -17,9 +17,10 @@ internal class AccountSetupDefaults(
         }
         check(initial.accountIdHex == account)
         val step = AccountSetupState(snapshot = initial).currentStep
-        if (step?.step != OnboardingStepFfi.FOLLOWS || OnboardingActionFfi.CONTINUE_WITHOUT !in step.actions) {
-            return initial
+        return if (step?.step == OnboardingStepFfi.FOLLOWS && OnboardingActionFfi.CONTINUE_WITHOUT in step.actions) {
+            marmot.continueOnboardingWithout(account, step.step)
+        } else {
+            initial
         }
-        return marmot.continueOnboardingWithout(account, step.step)
     }
 }
