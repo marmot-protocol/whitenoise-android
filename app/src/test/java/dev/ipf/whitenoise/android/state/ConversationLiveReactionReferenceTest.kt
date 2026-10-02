@@ -64,6 +64,18 @@ class ConversationLiveReactionReferenceTest {
     }
 
     /**
+     * A row the window no longer retains (slid outside MDK's bounded window) is not reported, so its
+     * retained tally is left as it was rather than cleared; it refreshes once the window covers it again.
+     */
+    @Test
+    fun rowsOutsideTheWindowKeepTheirRetainedTally() {
+        val state = ConversationWindowState()
+        state.install(frame(sequence = 1uL, reactions = thumbsUp()))
+        val slidPast = frame(sequence = 2uL, reactions = null).copy(references = emptyMap())
+        assertEquals(emptySet<String>(), state.reactionReferenceChanges(slidPast))
+    }
+
+    /**
      * Waits for the pump to take the replacement and for [condition] to hold. The pump's batch drain is a
      * short main-looper timeout, so the paused looper is nudged forward while waiting.
      */
