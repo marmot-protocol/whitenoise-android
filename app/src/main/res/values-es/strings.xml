@@ -130,10 +130,14 @@
     <string name="chat_row_action_delete_group">Eliminar grupo</string>
     <string name="chat_row_action_delete_chat">Eliminar chat</string>
     <string name="delete_chat_dialog_title">¿Eliminar chat?</string>
-    <string name="delete_chat_dialog_message">¿Quitar este chat de este dispositivo? Si aún eres miembro, primero saldrás del chat.</string>
+    <string name="delete_chat_dialog_message">¿Eliminar este chat de este dispositivo?</string>
     <string name="delete_group_dialog_title">¿Eliminar grupo?</string>
-    <string name="delete_group_dialog_message">¿Quitar este grupo de este dispositivo? Si aún eres miembro, primero saldrás del grupo.</string>
+    <string name="delete_group_dialog_message">¿Eliminar este grupo de este dispositivo?</string>
     <string name="delete_group_confirm">Eliminar</string>
+    <string name="delete_from_device">Eliminar de este dispositivo</string>
+    <string name="leave_and_delete">Salir y eliminar</string>
+    <string name="leave_and_delete_message">¿Salir del grupo y eliminar su historial de este dispositivo?</string>
+    <string name="toast_left_chat_delete_failed">Has salido del grupo. No se pudo eliminar el historial local.</string>
     <string name="group_reset_action">Restablecer y esperar una nueva invitación</string>
     <string name="group_reset_dialog_title">¿Restablecer este grupo en este dispositivo?</string>
     <string name="group_reset_dialog_message">White Noise borra el historial y el estado de cifrado de este grupo solo en este dispositivo. No se envía nada al grupo. Volverás a unirte cuando un administrador envíe una nueva invitación creada después de este restablecimiento.</string>
@@ -166,8 +170,8 @@
     </plurals>
     <string name="message_selection_action_delete">Eliminar mensajes seleccionados</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">¿Eliminar %1$d chat de este dispositivo?</item>
-        <item quantity="other">¿Eliminar %1$d chats de este dispositivo?</item>
+        <item quantity="one">¿Eliminar %1$d chat? Esto no te hará salir.</item>
+        <item quantity="other">¿Eliminar %1$d chats? Esto no te hará salir.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d chat archivado</item>
@@ -2159,4 +2163,6 @@
     <string name="dictation_audio_focus_unavailable">No se pudo pausar otro audio. Inténtalo de nuevo o desactiva esta opción en los ajustes de dictado.</string>
     <string name="checking_invitation">Comprobando invitación…</string>
     <string name="couldnt_check_invitation">No se pudo comprobar la invitación</string>
+    <string name="toast_leave_not_confirmed_history_kept">Salida no confirmada. Se conserva el historial.</string>
+    <string name="delete_local_does_not_leave">Esto no abandona el chat.</string>
 </resources>

@@ -4525,18 +4525,25 @@ class ChatsController private constructor(
      * Leave `groupIdHex` from the chat-list long-press menu. Mirrors the
      * conversation-screen guard: a sole admin in a multi-member group is
      * blocked (the group would lose its only admin); a sole admin in a
-     * single-member group self-demotes before the leave so the engine
-     * doesn't refuse the publish. Both paths share `GroupProjector`'s
+     * single-member group resets local protocol state without publishing a
+     * leave that has no remaining participant. Both paths share `GroupProjector`'s
      * pure predicates so the safety levels stay aligned — see
      * [ConversationController.leaveGroup] for the canonical reference.
      *
      * The chat-list row doesn't carry a member count (`memberCount = 0`
      * in `chatListItemFromProjection`), so this fetches members via the
      * `groupMembers` FFI before evaluating the guard. The fetch is the
-     * only added IO vs the conversation path.
+     * preflight for both departure commands.
      */
-    suspend fun leaveGroup(groupIdHex: String): Boolean {
+    suspend fun leaveGroup(
+        groupIdHex: String,
+        deleteAfterLeave: Boolean = false,
+    ): Boolean {
         val account = accountRef ?: return false
+        val epoch = bindEpoch
+        val runtime = appState.runtimeGeneration
+        val isCurrent = { chatListDepartureIsCurrent(account, epoch, runtime) }
+        if (!isCurrent()) return false
         val group = groupRecordsById[groupIdHex] ?: return false
         val activeAccountIdHex = appState.activeAccount?.accountIdHex
         // Tracks whether selfDemoteAdmin succeeded before the leaveGroup
@@ -4545,78 +4552,154 @@ class ChatsController private constructor(
         // in the group) rather than the generic "couldn't leave" copy.
         var demotedBeforeLeave = false
         return runCatchingCancellable {
-            val members = appState.marmotIo { groupMembers(account, groupIdHex) }
-            val memberCount = GroupProjector.uniqueMemberCount(members)
-            // #811: when the live roster is just you there is no one to
-            // coordinate an MLS commit with, so a normal leave would fail (and
-            // the sole-admin transfer block must not apply either). Dissolve the
-            // group with local cleanup instead of an MLS leave/self-demote.
-            val soleMember =
-                GroupProjector.shouldDissolveAsSoleMember(
-                    members,
-                    activeAccountIdHex,
-                )
-            if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
-                appState.present(
-                    R.string.toast_make_another_admin_before_leaving,
-                    R.string.toast_group_needs_admin,
-                )
-                return@runCatchingCancellable false
-            }
-            appState.withGroupCommitLock(account, groupIdHex) {
-                if (soleMember) {
-                    appState.deleteGroupLocalWithClientCleanup(account, groupIdHex)
-                } else {
-                    if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
-                        withContext(NonCancellable) {
-                            val demoteResult =
-                                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                    selfDemoteAdminDetailed(account, groupIdHex)
-                                }
-                            demotedBeforeLeave = true
-                            appState.applyLocalGroupUpdate(demoteResult.details.group)
+            var members = emptyList<AppGroupMemberRecordFfi>()
+            val departed =
+                appState.withGroupCommitLock(account, groupIdHex) {
+                    if (!isCurrent()) return@withGroupCommitLock false
+                    members = appState.marmotIo { groupMembers(account, groupIdHex) }
+                    if (!isCurrent()) return@withGroupCommitLock false
+                    val memberCount = GroupProjector.uniqueMemberCount(members)
+                    // #811: the last member has no peer to coordinate an MLS leave with.
+                    val soleMember = GroupProjector.shouldDissolveAsSoleMember(members, activeAccountIdHex)
+                    if (!chatListDepartureAllowed(group, activeAccountIdHex, memberCount, soleMember)) {
+                        return@withGroupCommitLock false
+                    }
+                    if (soleMember) {
+                        removeSoleMemberChat(account, groupIdHex, deleteAfterLeave)
+                    } else {
+                        if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
+                            withContext(NonCancellable) {
+                                val demoteResult =
+                                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                        selfDemoteAdminDetailed(account, groupIdHex)
+                                    }
+                                demotedBeforeLeave = true
+                                if (isCurrent()) appState.applyLocalGroupUpdate(demoteResult.details.group)
+                                appState.marmotIo { leaveGroup(account, groupIdHex) }
+                            }
+                        } else {
                             appState.marmotIo { leaveGroup(account, groupIdHex) }
                         }
-                    } else {
-                        appState.marmotIo { leaveGroup(account, groupIdHex) }
                     }
+                    true
                 }
-            }
-            appState.removeComposerExpansionForGroup(account, groupIdHex)
-            // Invalidate both snapshot sources that seed the next
-            // ConversationController so re-opening the just-left group renders
-            // the disabled notice immediately instead of flashing the active
-            // composer (issue #545): the shared AppState snapshot (the
-            // cachedGroupMemberSnapshot fallback) and this controller's own
-            // memberCacheByGroup entry (which builds ChatListItem.memberSnapshot).
-            // schedulePendingMemberFetches() skips groups already cached, so a
-            // stale positive entry would otherwise survive until the next bind.
-            appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
-            if (activeAccountIdHex != null) {
-                memberCacheByGroup =
-                    memberCacheByGroup +
-                    (groupIdHex to GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex))
-                // Known removal: a self-leave omits self from the roster even
-                // when that leaves it empty (sole-member leave). Mark it so the
-                // badge stays suppressed instead of reading the empty roster as
-                // a fetch failure.
-                removedGroupIds = removedGroupIds + groupIdHex
-                recompute()
-            }
-            appState.presentTransient(R.string.toast_left_chat)
-            true
+            if (!departed || !isCurrent()) return@runCatchingCancellable false
+            finishChatListDeparture(account, groupIdHex, members, deleteAfterLeave, isCurrent)
         }.onFailure {
+            if (!isCurrent()) return@onFailure
             if (demotedBeforeLeave) {
-                // User was demoted but we couldn't complete the leave.
-                // Tell them so they know to ask another admin to restore
-                // their role (or retry); the generic "couldn't leave"
-                // toast misses that they're now mid-state.
                 appState.presentFailure(R.string.toast_demoted_but_couldnt_leave, "CHAT_LEAVE_AFTER_DEMOTE", it)
             } else {
                 appState.presentFailure(R.string.toast_couldnt_leave_chat, "CHAT_LEAVE", it)
             }
         }.getOrDefault(false)
     }
+
+    private fun chatListDepartureAllowed(
+        group: AppGroupRecordFfi,
+        activeAccountIdHex: String?,
+        memberCount: Int,
+        soleMember: Boolean,
+    ): Boolean {
+        val allowed = soleMember || GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)
+        if (!allowed) {
+            appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
+        }
+        return allowed
+    }
+
+    private suspend fun removeSoleMemberChat(
+        account: String,
+        groupIdHex: String,
+        deleteAfterLeave: Boolean,
+    ) {
+        // Native forget retires MLS state; plain local deletion retains it.
+        if (deleteAfterLeave) {
+            appState.forgetGroupLocalWithClientCleanup(account, groupIdHex)
+        } else {
+            appState.deleteGroupLocalWithClientCleanup(account, groupIdHex)
+        }
+    }
+
+    /** Reject stale presentation and destructive session teardown before another departure step. */
+    private fun chatListDepartureIsCurrent(
+        account: String,
+        epoch: Long,
+        runtime: Int,
+    ): Boolean =
+        accountRef == account &&
+            isActiveBindEpoch(epoch) &&
+            appState.activeAccountRef == account &&
+            appState.runtimeGeneration == runtime &&
+            !appState.signOutInProgress &&
+            !appState.wipeInProgress
+
+    /** Confirm native departure before admitting cleanup; uncertainty always retains history. */
+    private suspend fun finishChatListDeparture(
+        account: String,
+        groupIdHex: String,
+        members: List<AppGroupMemberRecordFfi>,
+        deleteAfterLeave: Boolean,
+        isCurrent: () -> Boolean,
+    ): Boolean {
+        val activeAccountIdHex = boundAccountIdHex()
+        val soleMember = GroupProjector.shouldDissolveAsSoleMember(members, activeAccountIdHex)
+        if (deleteAfterLeave && !soleMember && !confirmChatListDeparture(account, groupIdHex, isCurrent)) return false
+        recordChatListDeparture(account, groupIdHex, activeAccountIdHex, members)
+        return if (deleteAfterLeave && !soleMember) {
+            deleteGroupLocalFromChatList(groupIdHex, failureMessage = R.string.toast_left_chat_delete_failed)
+        } else {
+            if (deleteAfterLeave) {
+                removeChatRow(groupIdHex)
+                finishRemovedChatRowClientState(groupIdHex)
+            }
+            appState.presentTransient(
+                if (deleteAfterLeave) R.string.toast_chat_deleted_local else R.string.toast_left_chat,
+            )
+            true
+        }
+    }
+
+    private suspend fun confirmChatListDeparture(
+        account: String,
+        groupIdHex: String,
+        isCurrent: () -> Boolean,
+    ): Boolean {
+        // An evicted MLS session can reject roster reads; use the durable native row.
+        val departureRow =
+            runCatchingCancellable {
+                appState.marmotIo { chatList(account, true) }.firstOrNull { it.groupIdHex == groupIdHex }
+            }.getOrNull()
+        if (!isCurrent()) return false
+        departureRow?.let { foldChatRow(it) }
+        val confirmed = departureRow?.selfMembership?.isNonMember() == true
+        if (!confirmed) appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+        return confirmed
+    }
+
+    /** Retire presentation snapshots only after the native departure settles on the current bind. */
+    private fun recordChatListDeparture(
+        account: String,
+        groupIdHex: String,
+        activeAccountIdHex: String?,
+        members: List<AppGroupMemberRecordFfi>,
+    ) {
+        appState.removeComposerExpansionForGroup(account, groupIdHex)
+        appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
+        if (activeAccountIdHex != null) {
+            memberCacheByGroup = memberCacheByGroup +
+                (groupIdHex to GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex))
+            removedGroupIds = removedGroupIds + groupIdHex
+            recompute()
+        }
+    }
+
+    /** Explicit single-chat departure; unconfirmed leave never admits local deletion. */
+    suspend fun leaveAndDeleteFromChatList(groupIdHex: String): Boolean =
+        leaveGroup(
+            groupIdHex = groupIdHex,
+            deleteAfterLeave = true,
+        )
 
     /**
      * Local-only chat-list wipe: hide the row optimistically, run client cleanup
@@ -4626,6 +4709,7 @@ class ChatsController private constructor(
     suspend fun deleteGroupLocalFromChatList(
         groupIdHex: String,
         notify: Boolean = true,
+        failureMessage: Int = R.string.toast_couldnt_delete_chat,
     ): Boolean {
         val account = accountRef ?: return false
         val epoch = bindEpoch
@@ -4647,7 +4731,7 @@ class ChatsController private constructor(
                 finishRemovedChatRowClientState(groupIdHex)
             }
             if (it is CancellationException) throw it
-            if (isCurrent()) appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
+            if (isCurrent()) appState.presentFailure(failureMessage, "CHAT_LOCAL_DELETE", it)
             return false
         }
         if (!isCurrent()) return false

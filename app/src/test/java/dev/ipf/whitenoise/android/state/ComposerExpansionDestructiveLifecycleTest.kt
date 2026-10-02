@@ -582,6 +582,121 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    /** An explicit departure completes before local deletion is admitted. */
+    @Test
+    fun leaveAndDeleteWaitsForLeaveBeforeDeleting() =
+        runBlocking {
+            val fixture = fixture()
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertEquals(listOf("leave", "delete"), fixture.calls.order)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** A rejected departure must never delete history. */
+    @Test
+    fun rejectedLeaveAndDeletePreservesLocalData() =
+        runBlocking {
+            val fixture = fixture(failLeave = true)
+            val retained = retainExpansion(fixture.appState)
+            val controller = fixture.seededChatsController()
+            try {
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertEquals(listOf("leave"), fixture.calls.order)
+                assertEquals(
+                    retained,
+                    fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                )
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** Cleanup failure is not complete deletion and does not undo or replay departure. */
+    @Test
+    fun leaveAndDeleteReportsIncompleteCleanup() =
+        runBlocking {
+            val fixture = fixture(failDelete = true)
+            val controller = fixture.seededChatsController()
+            try {
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertEquals(listOf("leave", "delete"), fixture.calls.order)
+                assertEquals(1, fixture.calls.leave.get())
+                assertTrue(controller.items.single().removedFromGroup(ACCOUNT_ID))
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** A request still awaiting native departure confirmation keeps local history. */
+    @Test
+    fun unconfirmedLeaveNeverDeletesHistory() =
+        runBlocking {
+            val fixture = fixture(leaveConfirmed = false)
+            val controller = fixture.seededChatsController()
+            try {
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertEquals(listOf("leave"), fixture.calls.order)
+                assertEquals(0, fixture.calls.delete.get())
+                assertEquals(
+                    AppText.Resource(dev.ipf.whitenoise.android.R.string.toast_leave_not_confirmed_history_kept),
+                    fixture.appState.transientNotice?.title,
+                )
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** The last member resets native state rather than retaining a joined group behind local deletion. */
+    @Test
+    fun soleMemberDepartureForgetsProtocolState() =
+        runBlocking {
+            val fixture = fixture(soleMember = true, groupRecord = group().copy(admins = listOf(ACCOUNT_ID)))
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertEquals(listOf("forget"), fixture.calls.order)
+                assertEquals(0, fixture.calls.leave.get())
+                assertEquals(0, fixture.calls.delete.get())
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
+                assertTrue(controller.items.isEmpty())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** A shared group must retain an administrator before departure can begin. */
+    @Test
+    fun soleAdminOfSharedGroupCannotLeaveAndDelete() =
+        runBlocking {
+            val fixture = fixture(groupRecord = group().copy(admins = listOf(ACCOUNT_ID)))
+            val controller = fixture.seededChatsController()
+            try {
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertTrue(fixture.calls.order.isEmpty())
+                assertEquals(0, fixture.calls.leave.get())
+                assertEquals(0, fixture.calls.delete.get())
+                assertFalse(controller.items.isEmpty())
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** Rebinding after departure must not retarget cleanup to a successor account. */
+    @Test
+    fun retiredControllerNeverAdmitsDeletionAfterLeave() =
+        runBlocking {
+            lateinit var controller: ChatsController
+            val fixture = fixture(leaveResultHook = { controller.onCleared() })
+            controller = fixture.seededChatsController()
+            assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+            assertEquals(listOf("leave"), fixture.calls.order)
+            assertEquals(0, fixture.calls.delete.get())
+        }
+
     /** Creates one isolated app/runtime pair with controllable native leave and delete commits. */
     private fun fixture(
         failLeave: Boolean = false,
@@ -591,6 +706,10 @@ class ComposerExpansionDestructiveLifecycleTest {
         failDraftDelete: Boolean = false,
         sendResult: () -> SendSummaryFfi = ::successfulSendSummary,
         attachConversationController: Boolean = true,
+        leaveConfirmed: Boolean = true,
+        soleMember: Boolean = false,
+        leaveResultHook: () -> Unit = {},
+        groupRecord: AppGroupRecordFfi = group(),
     ): LifecycleFixture {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appState =
@@ -611,14 +730,17 @@ class ComposerExpansionDestructiveLifecycleTest {
                 commitBeforeTransportFailure,
                 calls,
                 sendResult,
+                leaveConfirmed,
+                soleMember,
+                leaveResultHook,
             )
         WhiteNoiseAppState::class.java
             .getDeclaredField("marmotRuntime")
             .apply { isAccessible = true }
             .set(appState, AppMarmotRuntime(rootPath = "test", marmot = marmot))
-        val conversationController = ConversationController(appState = appState, initialGroup = group())
+        val conversationController = ConversationController(appState = appState, initialGroup = groupRecord)
         if (attachConversationController) appState.attachConversationController(conversationController)
-        return LifecycleFixture(appState, calls, conversationController)
+        return LifecycleFixture(appState, calls, conversationController, groupRecord)
     }
 
     /** Retains one manual expansion and returns the exact value expected after a failed commit. */
@@ -648,64 +770,56 @@ class ComposerExpansionDestructiveLifecycleTest {
         commitBeforeTransportFailure: Boolean,
         calls: LifecycleCalls,
         sendResult: () -> SendSummaryFfi,
+        leaveConfirmed: Boolean,
+        soleMember: Boolean,
+        leaveResultHook: () -> Unit,
     ): MarmotInterface {
         var localGroupPresent = true
+        var left = false
         return Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
-            /** Completes one reflected suspend call with the requested native failure. */
-            fun suspendFailure(failure: Throwable): Any {
-                (arguments!!.last() as Continuation<Any?>).resumeWithException(failure)
-                return COROUTINE_SUSPENDED
-            }
-
             when (method.name.substringBefore('-')) {
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "selectedMessageDraft" -> SelectedMessageDraftFfi(emptyDraftRevision, null)
                 "localSendStatus" -> null
-                "sendTextWithClientToken" -> {
-                    calls.send.incrementAndGet()
-                    val summary = sendResult()
-                    LocalSendAcceptanceFfi(
-                        clientToken = arguments!![3] as String,
-                        messageIdHex = summary.messageIds.single(),
-                    )
-                }
-                "sendText" -> {
-                    calls.send.incrementAndGet()
-                    sendResult()
-                }
-                "groupMembers" -> members()
+                "sendTextWithClientToken" -> acceptedTextSend(arguments, countedSendResult(calls, sendResult))
+                "sendText" -> countedSendResult(calls, sendResult)
+                "groupMembers" -> if (soleMember) members().take(1) else members()
                 "listMedia" -> emptyList<Any>()
                 "chatList" -> {
                     calls.chatList.incrementAndGet()
-                    if (localGroupPresent) listOf(groupRow()) else emptyList<ChatListRowFfi>()
+                    lifecycleChatRows(localGroupPresent, left)
                 }
                 "leaveGroup" -> {
+                    calls.order.add("leave")
                     calls.leave.incrementAndGet()
                     if (failLeave) {
-                        suspendFailure(IllegalStateException("leave rejected"))
+                        failNativeCall(arguments, IllegalStateException("leave rejected"))
                     } else {
-                        SendSummaryFfi(
-                            published = 1u,
-                            messageIds = listOf("leave-commit"),
-                            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
-                            maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
-                        )
+                        left = leaveConfirmed
+                        leaveResultHook()
+                        successfulSendSummary().copy(messageIds = listOf("leave-commit"))
                     }
                 }
                 "deleteGroupLocal" -> {
+                    calls.order.add("delete")
                     val attempt = calls.delete.incrementAndGet()
                     if (failDelete) {
-                        suspendFailure(IllegalStateException("delete rejected"))
+                        failNativeCall(arguments, IllegalStateException("delete rejected"))
                     } else if (attempt <= deleteTransportFailures) {
                         if (commitBeforeTransportFailure) localGroupPresent = false
-                        suspendFailure(MarmotKitException.TransportClosed())
+                        failNativeCall(arguments, MarmotKitException.TransportClosed())
                     } else {
                         localGroupPresent = false
                         true
                     }
+                }
+                "forgetGroupLocal" -> {
+                    calls.order.add("forget")
+                    localGroupPresent = false
+                    true
                 }
                 "toString" -> "ComposerExpansionLifecycleMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -714,6 +828,43 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         } as MarmotInterface
     }
+
+    private fun acceptedTextSend(
+        arguments: Array<out Any?>?,
+        summary: SendSummaryFfi,
+    ): LocalSendAcceptanceFfi =
+        LocalSendAcceptanceFfi(
+            clientToken = arguments!![3] as String,
+            messageIdHex = summary.messageIds.single(),
+        )
+
+    private fun countedSendResult(
+        calls: LifecycleCalls,
+        sendResult: () -> SendSummaryFfi,
+    ): SendSummaryFfi {
+        calls.send.incrementAndGet()
+        return sendResult()
+    }
+
+    /** Completes one reflected suspend call with the requested native failure. */
+    @Suppress("UNCHECKED_CAST")
+    private fun failNativeCall(
+        arguments: Array<out Any?>?,
+        failure: Throwable,
+    ): Any {
+        (arguments!!.last() as Continuation<Any?>).resumeWithException(failure)
+        return COROUTINE_SUSPENDED
+    }
+
+    private fun lifecycleChatRows(
+        present: Boolean,
+        left: Boolean,
+    ): List<ChatListRowFfi> =
+        if (present) {
+            listOf(groupRow().copy(selfMembership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER))
+        } else {
+            emptyList()
+        }
 
     /** Creates a signed-in local account matching the self member returned by the native fixture. */
     private fun account() =
@@ -768,6 +919,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         val appState: WhiteNoiseAppState,
         val calls: LifecycleCalls,
         val conversationController: ConversationController,
+        val groupRecord: AppGroupRecordFfi,
     ) {
         /** Seeds the actual chat-list projection required by its leave and delete actions. */
         fun seededChatsController(): ChatsController =
@@ -778,13 +930,14 @@ class ComposerExpansionDestructiveLifecycleTest {
             ).also { controller ->
                 controller.setChatListVisible(false)
                 controller.applyChatListRow(groupRow())
-                controller.applyLocalGroupUpdate(group())
+                controller.applyLocalGroupUpdate(groupRecord)
                 controller.setChatListVisible(true)
             }
     }
 
     /** Counts authoritative native mutations so false results cannot pass via an earlier guard. */
     private class LifecycleCalls {
+        val order = mutableListOf<String>()
         val send = AtomicInteger()
         val leave = AtomicInteger()
         val delete = AtomicInteger()
