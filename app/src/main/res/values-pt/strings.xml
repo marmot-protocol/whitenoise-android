@@ -61,6 +61,7 @@
     <string name="error_loaded_content_may_be_out_of_date">O conteúdo carregado continua disponível, mas pode estar desatualizado. Tentando novamente…</string>
     <string name="error_loaded_content_kept">Não foi possível carregar mais conteúdo. Suas mensagens continuam disponíveis; tente novamente quando quiser.</string>
     <string name="error_conversation_membership_unavailable">Não foi possível verificar os membros desta conversa. Tente novamente para exibir suas mensagens.</string>
+    <string name="error_conversation_membership_inconsistent">A lista de membros desta conversa não corresponde a esta conta, então as mensagens continuam ocultas. Tente novamente para verificar outra vez.</string>
     <string name="refresh">Atualizar dump</string>
     <string name="retry">Tentar novamente</string>
     <string name="creating_identity_title">Criando identidade</string>
@@ -130,10 +131,14 @@
     <string name="chat_row_action_delete_group">Excluir grupo</string>
     <string name="chat_row_action_delete_chat">Excluir conversa</string>
     <string name="delete_chat_dialog_title">Excluir conversa?</string>
-    <string name="delete_chat_dialog_message">Remover esta conversa deste dispositivo? Se você ainda for membro, sairá da conversa primeiro.</string>
+    <string name="delete_chat_dialog_message">Excluir esta conversa deste dispositivo?</string>
     <string name="delete_group_dialog_title">Excluir grupo?</string>
-    <string name="delete_group_dialog_message">Remover este grupo deste dispositivo? Se você ainda for membro, sairá do grupo primeiro.</string>
+    <string name="delete_group_dialog_message">Excluir este grupo deste dispositivo?</string>
     <string name="delete_group_confirm">Excluir</string>
+    <string name="delete_from_device">Excluir deste dispositivo</string>
+    <string name="leave_and_delete">Sair e excluir</string>
+    <string name="leave_and_delete_message">Sair do grupo e excluir seu histórico deste dispositivo?</string>
+    <string name="toast_left_chat_delete_failed">Você saiu do grupo. A exclusão local falhou.</string>
     <string name="group_reset_action">Redefinir e aguardar um novo convite</string>
     <string name="group_reset_dialog_title">Redefinir este grupo neste dispositivo?</string>
     <string name="group_reset_dialog_message">O White Noise apaga o histórico e o estado de criptografia deste grupo apenas neste dispositivo. Nada é enviado ao grupo. Você só voltará a entrar quando um administrador enviar um novo convite criado após esta redefinição.</string>
@@ -166,8 +171,8 @@
     </plurals>
     <string name="message_selection_action_delete">Excluir mensagens selecionadas</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">Excluir %1$d chat deste dispositivo?</item>
-        <item quantity="other">Excluir %1$d chats deste dispositivo?</item>
+        <item quantity="one">Excluir %1$d conversa? Isso não faz você sair.</item>
+        <item quantity="other">Excluir %1$d conversas? Isso não faz você sair.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d chat arquivado</item>
@@ -1290,6 +1295,10 @@
     <string name="conversation_search_next">Próximo resultado</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Nenhum resultado</string>
+    <string name="conversation_search_loading">Pesquisando em todas as mensagens…</string>
+    <string name="conversation_search_incomplete">Não foi possível pesquisar mensagens mais antigas</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d nas mensagens carregadas</string>
+    <string name="conversation_search_retry">Tentar pesquisar novamente</string>
     <string name="message_read_more">Ler mais</string>
     <string name="message_react">Reagir</string>
     <string name="sign_out">Sair</string>
@@ -2159,4 +2168,6 @@
     <string name="dictation_audio_focus_unavailable">Não foi possível pausar outro áudio. Tenta novamente ou desativa esta opção nas definições de ditado.</string>
     <string name="checking_invitation">A verificar o convite…</string>
     <string name="couldnt_check_invitation">Não foi possível verificar o convite</string>
+    <string name="toast_leave_not_confirmed_history_kept">Saída não confirmada. Histórico mantido.</string>
+    <string name="delete_local_does_not_leave">Isso não faz você sair da conversa.</string>
 </resources>

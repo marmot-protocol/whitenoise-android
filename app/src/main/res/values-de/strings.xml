@@ -61,6 +61,7 @@
     <string name="error_loaded_content_may_be_out_of_date">Ihre geladenen Inhalte sind weiterhin verfügbar, könnten aber veraltet sein. Wird erneut versucht…</string>
     <string name="error_loaded_content_kept">Weitere Inhalte konnten nicht geladen werden. Deine Nachrichten sind weiterhin verfügbar; versuche es erneut, wenn du bereit bist.</string>
     <string name="error_conversation_membership_unavailable">Die Mitglieder dieser Unterhaltung konnten nicht bestätigt werden. Versuche es erneut, um deine Nachrichten anzuzeigen.</string>
+    <string name="error_conversation_membership_inconsistent">Die Mitgliederliste dieser Unterhaltung passt nicht zu diesem Konto, daher bleiben ihre Nachrichten ausgeblendet. Versuche es erneut, um sie noch einmal zu prüfen.</string>
     <string name="refresh">Dump aktualisieren</string>
     <string name="retry">Erneut versuchen</string>
     <string name="creating_identity_title">Identität wird erstellt</string>
@@ -130,10 +131,14 @@
     <string name="chat_row_action_delete_group">Gruppe löschen</string>
     <string name="chat_row_action_delete_chat">Chat löschen</string>
     <string name="delete_chat_dialog_title">Chat löschen?</string>
-    <string name="delete_chat_dialog_message">Diesen Chat von diesem Gerät entfernen? Wenn du noch Mitglied bist, verlässt du zuerst den Chat.</string>
+    <string name="delete_chat_dialog_message">Diesen Chat auf diesem Gerät löschen?</string>
     <string name="delete_group_dialog_title">Gruppe löschen?</string>
-    <string name="delete_group_dialog_message">Diese Gruppe von diesem Gerät entfernen? Wenn du noch Mitglied bist, verlässt du zuerst die Gruppe.</string>
+    <string name="delete_group_dialog_message">Diese Gruppe auf diesem Gerät löschen?</string>
     <string name="delete_group_confirm">Löschen</string>
+    <string name="delete_from_device">Auf diesem Gerät löschen</string>
+    <string name="leave_and_delete">Verlassen und löschen</string>
+    <string name="leave_and_delete_message">Diese Gruppe verlassen und ihren Verlauf auf diesem Gerät löschen?</string>
+    <string name="toast_left_chat_delete_failed">Gruppe verlassen. Lokales Löschen fehlgeschlagen.</string>
     <string name="group_reset_action">Zurücksetzen und auf neue Einladung warten</string>
     <string name="group_reset_dialog_title">Diese Gruppe auf diesem Gerät zurücksetzen?</string>
     <string name="group_reset_dialog_message">White Noise löscht den Verlauf und den Verschlüsselungszustand dieser Gruppe nur auf diesem Gerät. An die Gruppe wird nichts gesendet. Du trittst erst wieder bei, wenn ein Admin nach diesem Zurücksetzen eine neue Einladung sendet.</string>
@@ -166,8 +171,8 @@
     </plurals>
     <string name="message_selection_action_delete">Ausgewählte Nachrichten löschen</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">%1$d Chat von diesem Gerät löschen?</item>
-        <item quantity="other">%1$d Chats von diesem Gerät löschen?</item>
+        <item quantity="one">%1$d Chat löschen? Dadurch verlässt du ihn nicht.</item>
+        <item quantity="other">%1$d Chats löschen? Dadurch verlässt du sie nicht.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d Chat archiviert</item>
@@ -1288,6 +1293,10 @@
     <string name="conversation_search_next">Nächster Treffer</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Keine Treffer</string>
+    <string name="conversation_search_loading">Alle Nachrichten werden durchsucht…</string>
+    <string name="conversation_search_incomplete">Ältere Nachrichten konnten nicht durchsucht werden</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d in geladenen Nachrichten</string>
+    <string name="conversation_search_retry">Suche wiederholen</string>
     <string name="message_read_more">Mehr lesen</string>
     <string name="message_react">Reagieren</string>
     <string name="sign_out">Abmelden</string>
@@ -2176,4 +2185,6 @@
     <string name="dictation_audio_focus_unavailable">Andere Audioinhalte konnten nicht pausiert werden. Versuche es erneut oder deaktiviere diese Option in den Diktiereinstellungen.</string>
     <string name="checking_invitation">Einladung wird geprüft…</string>
     <string name="couldnt_check_invitation">Einladung konnte nicht geprüft werden</string>
+    <string name="toast_leave_not_confirmed_history_kept">Verlassen nicht bestätigt. Verlauf behalten.</string>
+    <string name="delete_local_does_not_leave">Dadurch verlässt du den Chat nicht.</string>
 </resources>

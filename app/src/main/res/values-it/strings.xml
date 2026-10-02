@@ -61,6 +61,7 @@
     <string name="error_loaded_content_may_be_out_of_date">I contenuti caricati sono ancora disponibili, ma potrebbero non essere aggiornati. Nuovo tentativo…</string>
     <string name="error_loaded_content_kept">Impossibile caricare altri contenuti. I tuoi messaggi sono ancora disponibili; riprova quando vuoi.</string>
     <string name="error_conversation_membership_unavailable">Impossibile verificare i membri di questa conversazione. Riprova per mostrare i tuoi messaggi.</string>
+    <string name="error_conversation_membership_inconsistent">L\'elenco dei membri di questa conversazione non corrisponde a questo account, quindi i messaggi restano nascosti. Riprova per controllare di nuovo.</string>
     <string name="refresh">Aggiorna dump</string>
     <string name="retry">Riprova</string>
     <string name="creating_identity_title">Creazione identità</string>
@@ -130,10 +131,14 @@
     <string name="chat_row_action_delete_group">Elimina gruppo</string>
     <string name="chat_row_action_delete_chat">Elimina chat</string>
     <string name="delete_chat_dialog_title">Eliminare la chat?</string>
-    <string name="delete_chat_dialog_message">Rimuovere questa chat da questo dispositivo? Se sei ancora un membro, uscirai prima dalla chat.</string>
+    <string name="delete_chat_dialog_message">Eliminare questa chat da questo dispositivo?</string>
     <string name="delete_group_dialog_title">Eliminare il gruppo?</string>
-    <string name="delete_group_dialog_message">Rimuovere questo gruppo da questo dispositivo? Se sei ancora un membro, uscirai prima dal gruppo.</string>
+    <string name="delete_group_dialog_message">Eliminare questo gruppo da questo dispositivo?</string>
     <string name="delete_group_confirm">Elimina</string>
+    <string name="delete_from_device">Elimina da questo dispositivo</string>
+    <string name="leave_and_delete">Esci ed elimina</string>
+    <string name="leave_and_delete_message">Uscire dal gruppo ed eliminare la cronologia da questo dispositivo?</string>
+    <string name="toast_left_chat_delete_failed">Gruppo lasciato. Eliminazione locale non riuscita.</string>
     <string name="group_reset_action">Reimposta e attendi un nuovo invito</string>
     <string name="group_reset_dialog_title">Reimpostare questo gruppo su questo dispositivo?</string>
     <string name="group_reset_dialog_message">White Noise cancella la cronologia e lo stato di cifratura di questo gruppo solo su questo dispositivo. Al gruppo non viene inviato nulla. Rientrerai solo quando un admin invierà un nuovo invito creato dopo questa reimpostazione.</string>
@@ -166,8 +171,8 @@
     </plurals>
     <string name="message_selection_action_delete">Elimina messaggi selezionati</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">Eliminare %1$d chat da questo dispositivo?</item>
-        <item quantity="other">Eliminare %1$d chat da questo dispositivo?</item>
+        <item quantity="one">Eliminare %1$d chat? Non uscirai dalla chat.</item>
+        <item quantity="other">Eliminare %1$d chat? Non uscirai dalle chat.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d chat archiviata</item>
@@ -1290,6 +1295,10 @@
     <string name="conversation_search_next">Risultato successivo</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Nessun risultato</string>
+    <string name="conversation_search_loading">Ricerca in tutti i messaggi…</string>
+    <string name="conversation_search_incomplete">Impossibile cercare nei messaggi meno recenti</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d nei messaggi caricati</string>
+    <string name="conversation_search_retry">Riprova la ricerca</string>
     <string name="message_read_more">Leggi tutto</string>
     <string name="message_react">Reagisci</string>
     <string name="sign_out">Esci</string>
@@ -2159,4 +2168,6 @@
     <string name="dictation_audio_focus_unavailable">Impossibile mettere in pausa gli altri audio. Riprova oppure disattiva questa opzione nelle impostazioni della dettatura.</string>
     <string name="checking_invitation">Verifica dell’invito…</string>
     <string name="couldnt_check_invitation">Impossibile verificare l’invito</string>
+    <string name="toast_leave_not_confirmed_history_kept">Uscita non confermata. Cronologia conservata.</string>
+    <string name="delete_local_does_not_leave">Questa azione non abbandona la chat.</string>
 </resources>

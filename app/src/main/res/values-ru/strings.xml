@@ -67,6 +67,7 @@
     <string name="error_loaded_content_may_be_out_of_date">Загруженные данные по-прежнему доступны, но могли устареть. Повторная попытка…</string>
     <string name="error_loaded_content_kept">Не удалось загрузить дополнительные данные. Ваши сообщения по-прежнему доступны; повторите попытку, когда будете готовы.</string>
     <string name="error_conversation_membership_unavailable">Не удалось проверить участников этой переписки. Повторите попытку, чтобы показать сообщения.</string>
+    <string name="error_conversation_membership_inconsistent">Список участников этой переписки не совпадает с этим аккаунтом, поэтому сообщения скрыты. Повторите попытку, чтобы проверить снова.</string>
     <string name="refresh">Обновить дамп</string>
     <string name="retry">Повторить</string>
     <string name="creating_identity_title">Создание идентичности</string>
@@ -138,10 +139,14 @@
     <string name="chat_row_action_delete_group">Удалить группу</string>
     <string name="chat_row_action_delete_chat">Удалить чат</string>
     <string name="delete_chat_dialog_title">Удалить чат?</string>
-    <string name="delete_chat_dialog_message">Удалить этот чат с этого устройства? Если вы ещё участник, сначала вы покинете чат.</string>
+    <string name="delete_chat_dialog_message">Удалить этот чат с этого устройства?</string>
     <string name="delete_group_dialog_title">Удалить группу?</string>
-    <string name="delete_group_dialog_message">Удалить эту группу с этого устройства? Если вы ещё участник, сначала вы покинете группу.</string>
+    <string name="delete_group_dialog_message">Удалить эту группу с этого устройства?</string>
     <string name="delete_group_confirm">Удалить</string>
+    <string name="delete_from_device">Удалить с этого устройства</string>
+    <string name="leave_and_delete">Выйти и удалить</string>
+    <string name="leave_and_delete_message">Выйти из группы и удалить её историю с этого устройства?</string>
+    <string name="toast_left_chat_delete_failed">Вы вышли из группы. Не удалось удалить локальную историю.</string>
     <string name="group_reset_action">Сбросить и ждать новое приглашение</string>
     <string name="group_reset_dialog_title">Сбросить эту группу на этом устройстве?</string>
     <string name="group_reset_dialog_message">White Noise удалит историю и состояние шифрования этой группы только на этом устройстве. В группу ничего не отправляется. Вы вернётесь в неё только после нового приглашения, созданного администратором после сброса.</string>
@@ -178,10 +183,10 @@
     </plurals>
     <string name="message_selection_action_delete">Удалить выбранные сообщения</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">Удалить %1$d чат с этого устройства?</item>
-        <item quantity="few">Удалить %1$d чата с этого устройства?</item>
-        <item quantity="many">Удалить %1$d чатов с этого устройства?</item>
-        <item quantity="other">Удалить %1$d чата с этого устройства?</item>
+        <item quantity="one">Удалить %1$d чат? Это не выход из чата.</item>
+        <item quantity="few">Удалить %1$d чата? Это не выход из чатов.</item>
+        <item quantity="many">Удалить %1$d чатов? Это не выход из чатов.</item>
+        <item quantity="other">Удалить %1$d чата? Это не выход из чатов.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d чат архивирован</item>
@@ -1342,6 +1347,10 @@
     <string name="conversation_search_next">Следующее совпадение</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Совпадений нет</string>
+    <string name="conversation_search_loading">Поиск по всем сообщениям…</string>
+    <string name="conversation_search_incomplete">Не удалось выполнить поиск по более старым сообщениям</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d в загруженных сообщениях</string>
+    <string name="conversation_search_retry">Повторить поиск</string>
     <string name="message_read_more">Читать далее</string>
     <string name="message_react">Отреагировать</string>
     <string name="sign_out">Выйти</string>
@@ -2227,4 +2236,6 @@
     <string name="dictation_audio_focus_unavailable">Не удалось приостановить другое аудио. Повторите попытку или отключите этот параметр в настройках диктовки.</string>
     <string name="checking_invitation">Проверка приглашения…</string>
     <string name="couldnt_check_invitation">Не удалось проверить приглашение</string>
+    <string name="toast_leave_not_confirmed_history_kept">Выход не подтверждён. История сохранена.</string>
+    <string name="delete_local_does_not_leave">Это не приводит к выходу из чата.</string>
 </resources>

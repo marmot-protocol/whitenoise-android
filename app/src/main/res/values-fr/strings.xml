@@ -61,6 +61,7 @@
     <string name="error_loaded_content_may_be_out_of_date">Votre contenu chargé reste disponible, mais il n’est peut-être plus à jour. Nouvelle tentative…</string>
     <string name="error_loaded_content_kept">Impossible de charger davantage de contenu. Vos messages restent disponibles ; réessayez quand vous le souhaitez.</string>
     <string name="error_conversation_membership_unavailable">Impossible de vérifier les membres de cette conversation. Réessayez pour afficher vos messages.</string>
+    <string name="error_conversation_membership_inconsistent">La liste des membres de cette conversation ne correspond pas à ce compte, ses messages restent donc masqués. Réessayez pour vérifier à nouveau.</string>
     <string name="refresh">Actualiser l’export</string>
     <string name="retry">Réessayer</string>
     <string name="creating_identity_title">Création de l’identité</string>
@@ -130,10 +131,14 @@
     <string name="chat_row_action_delete_group">Supprimer le groupe</string>
     <string name="chat_row_action_delete_chat">Supprimer la conversation</string>
     <string name="delete_chat_dialog_title">Supprimer la conversation ?</string>
-    <string name="delete_chat_dialog_message">Retirer cette conversation de cet appareil ? Si vous êtes encore membre, vous quitterez d\'abord la conversation.</string>
+    <string name="delete_chat_dialog_message">Supprimer cette conversation de cet appareil ?</string>
     <string name="delete_group_dialog_title">Supprimer le groupe ?</string>
-    <string name="delete_group_dialog_message">Retirer ce groupe de cet appareil ? Si vous êtes encore membre, vous quitterez d\'abord le groupe.</string>
+    <string name="delete_group_dialog_message">Supprimer ce groupe de cet appareil ?</string>
     <string name="delete_group_confirm">Supprimer</string>
+    <string name="delete_from_device">Supprimer de cet appareil</string>
+    <string name="leave_and_delete">Quitter et supprimer</string>
+    <string name="leave_and_delete_message">Quitter ce groupe et supprimer son historique de cet appareil ?</string>
+    <string name="toast_left_chat_delete_failed">Groupe quitté. Suppression locale impossible.</string>
     <string name="group_reset_action">Réinitialiser et attendre une nouvelle invitation</string>
     <string name="group_reset_dialog_title">Réinitialiser ce groupe sur cet appareil ?</string>
     <string name="group_reset_dialog_message">White Noise efface l’historique et l’état de chiffrement de ce groupe sur cet appareil uniquement. Rien n’est envoyé au groupe. Vous le rejoindrez seulement quand un admin enverra une nouvelle invitation créée après cette réinitialisation.</string>
@@ -166,8 +171,8 @@
     </plurals>
     <string name="message_selection_action_delete">Supprimer les messages sélectionnés</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">Supprimer %1$d discussion de cet appareil ?</item>
-        <item quantity="other">Supprimer %1$d discussions de cet appareil ?</item>
+        <item quantity="one">Supprimer %1$d conversation ? Vous ne la quitterez pas.</item>
+        <item quantity="other">Supprimer %1$d conversations ? Vous ne les quitterez pas.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d discussion archivée</item>
@@ -1290,6 +1295,10 @@
     <string name="conversation_search_next">Résultat suivant</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Aucun résultat</string>
+    <string name="conversation_search_loading">Recherche dans tous les messages…</string>
+    <string name="conversation_search_incomplete">Impossible de rechercher dans les messages plus anciens</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d dans les messages chargés</string>
+    <string name="conversation_search_retry">Relancer la recherche</string>
     <string name="message_read_more">Lire plus</string>
     <string name="message_react">Réagir</string>
     <string name="sign_out">Se déconnecter</string>
@@ -2159,4 +2168,6 @@
     <string name="dictation_audio_focus_unavailable">Impossible de mettre les autres contenus audio en pause. Réessayez ou désactivez cette option dans les paramètres de dictée.</string>
     <string name="checking_invitation">Vérification de l’invitation…</string>
     <string name="couldnt_check_invitation">Impossible de vérifier l’invitation</string>
+    <string name="toast_leave_not_confirmed_history_kept">Départ non confirmé. Historique conservé.</string>
+    <string name="delete_local_does_not_leave">Cela ne quitte pas la conversation.</string>
 </resources>

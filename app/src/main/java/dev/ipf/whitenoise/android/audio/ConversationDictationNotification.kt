@@ -1,12 +1,16 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.app.Notification
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+
+internal const val DICTATION_RECOVERY_NOTIFICATION_TAG = "dictation-recovery"
+internal const val DICTATION_RECOVERY_NOTIFICATION_ID = 1002
 
 /** Metadata-free rendering reads only the current controller; it never owns capture or a service lease. */
 internal fun buildConversationDictationNotification(
@@ -17,17 +21,53 @@ internal fun buildConversationDictationNotification(
     Notification
         .Builder(context, ConversationDictationForegroundService.CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_stat_whitenoise)
-        .setContentTitle(context.getString(R.string.dictation_notification_title))
-        .setContentText(context.getString(dictationNotificationStatus(controller)))
+        .setContentTitle(
+            context.getString(
+                if (controller.state is ConversationDictationState.Failed) {
+                    R.string.dictation_recovery_title
+                } else {
+                    R.string.dictation_notification_title
+                },
+            ),
+        ).setContentText(
+            context.getString(
+                if (controller.state is ConversationDictationState.Failed) {
+                    R.string.dictation_recovery_text
+                } else {
+                    dictationNotificationStatus(controller)
+                },
+            ),
+        )
         // Status names the phase; an indeterminate progress bar looked stuck during normal provider restarts.
         .setContentIntent(openDictationAppIntent(context))
         .setVisibility(Notification.VISIBILITY_PUBLIC)
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .setShowWhen(false)
-        .setStyle(Notification.DecoratedCustomViewStyle())
-        .setCustomContentView(compactDictationControls(context, controller, actionIntent))
-        .build()
+        .apply {
+            if (controller.state is ConversationDictationState.Failed) {
+                addAction(0, context.getString(R.string.dictation_recovery_open), openDictationAppIntent(context))
+            } else {
+                setStyle(Notification.DecoratedCustomViewStyle())
+                setCustomContentView(compactDictationControls(context, controller, actionIntent))
+            }
+        }.build()
+
+/** Expiry clears recovery data and leaves one ordinary, dismissible notice with no recording actions. */
+internal fun notifyConversationDictationRecoveryExpired(context: Context) {
+    val manager = context.getSystemService(NotificationManager::class.java)
+    ConversationDictationForegroundService.ensureChannel(context)
+    val notification =
+        Notification
+            .Builder(context, ConversationDictationForegroundService.CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_whitenoise)
+            .setContentTitle(context.getString(R.string.dictation_recovery_expired_title))
+            .setContentText(context.getString(R.string.dictation_recovery_expired_text))
+            .setContentIntent(openDictationAppIntent(context))
+            .setAutoCancel(true)
+            .build()
+    manager.notify(DICTATION_RECOVERY_NOTIFICATION_TAG, DICTATION_RECOVERY_NOTIFICATION_ID, notification)
+}
 
 private fun compactDictationControls(
     context: Context,

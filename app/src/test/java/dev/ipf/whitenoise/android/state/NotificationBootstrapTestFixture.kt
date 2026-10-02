@@ -125,6 +125,7 @@ internal class NotificationBootstrapTestFixture(
     private val onPresentedChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     private val onGroupMemberIdsPage: ((groupIds: List<String>) -> List<AppGroupMemberIdsFfi>)? = null,
     private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
+    private val onSetChatManuallyUnread: ((Boolean) -> ChatListRowFfi?)? = null,
     private val onSendText: ((accountRef: String, groupIdHex: String, text: String) -> SendSummaryFfi)? = null,
     private val onReactToMessage: (() -> SendSummaryFfi)? = null,
     private val onCatchUpAccounts: (() -> Unit)? = null,
@@ -184,7 +185,9 @@ internal class NotificationBootstrapTestFixture(
     val directChatListCalls = AtomicInteger(0)
     val memberProjectionCalls = AtomicInteger(0)
     val signerRegistrationCalls = AtomicInteger(0)
+    val markReadRequests = CopyOnWriteArrayList<Triple<String, String, String>>()
     val markReadCalls = AtomicInteger(0)
+    val manualUnreadWrites = CopyOnWriteArrayList<Triple<String, String, Boolean>>()
     val sendTextCalls = AtomicInteger(0)
     val reactToMessageCalls = AtomicInteger(0)
     val npubCalls = AtomicInteger(0)
@@ -374,9 +377,21 @@ internal class NotificationBootstrapTestFixture(
                         share = completePushRegistrationClear(),
                     )
                 }
+                "setChatManuallyUnread" -> {
+                    val account = arguments?.get(0) as String
+                    val group = arguments[1] as String
+                    val marked = arguments[2] as Boolean
+                    manualUnreadWrites += Triple(account, group, marked)
+                    val hook =
+                        onSetChatManuallyUnread
+                            ?: throw UnsupportedOperationException("Unexpected Marmot call: setChatManuallyUnread")
+                    hook(marked)
+                }
                 "markTimelineMessageRead" -> {
                     markReadCalls.incrementAndGet()
-                    onMarkTimelineMessageRead?.invoke() ?: markReadRow
+                    markReadRequests +=
+                        Triple(arguments!![0] as String, arguments[1] as String, arguments[2] as String)
+                    if (onMarkTimelineMessageRead != null) onMarkTimelineMessageRead.invoke() else markReadRow
                 }
                 "sendText" -> {
                     sendTextCalls.incrementAndGet()

@@ -68,7 +68,10 @@ class StateSourceSizeCeilingTest {
         // report native failures; per-id failure handling lives in HistoryNoticeDismissal.kt.
         // Dev Zapstore Kover covers 5,049 / 6,821 controller lines, including this
         // dismissal path, and all six executable helper lines.
-        const val CONTROLLERS_MAX_LINES = 13446
+        // Master reached 13,518 lines without moving this ratchet. PR #2977 adds 68 covered
+        // lines for owned roster backoff, the blocked-transcript reason and anchored search
+        // jumps; its policy, diagnostics and copy live in GroupRosterReadRecovery.kt.
+        const val CONTROLLERS_MAX_LINES = 13586
 
         // Master includes the covered draft lifecycle and host-timing changes. PR #2534
         // adds 38 lines for the async prepared-speech handoff while keeping preparation
@@ -94,7 +97,8 @@ class StateSourceSizeCeilingTest {
         // fencing keeps stale Activity samples out of replacement MDK runtimes (+27 lines);
         // exact-head Kover rechecks the wiring and this ratchet stays at the source size.
         // The pending-edit handoff adds process-scoped ownership and sign-out cleanup.
-        const val APP_STATE_MAX_LINES = 11491
+        // Master reached 11,497 lines; PR #2977 adds three for the reaction accept disposition.
+        const val APP_STATE_MAX_LINES = 11500
 
         /** Counts physical source lines with the same trailing-newline semantics as `wc -l`. */
         internal fun sourceLineCount(file: File): Int = file.bufferedReader().useLines { lines -> lines.count() }

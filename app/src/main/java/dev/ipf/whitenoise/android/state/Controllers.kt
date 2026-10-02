@@ -3875,6 +3875,14 @@ class ChatsController private constructor(
             .toList()
     }
 
+    /** Read-request dedupe reads the native flag without constructing a display item. */
+    internal fun hasManualUnreadReminder(groupIdHex: String): Boolean? {
+        val row =
+            chatRowsByGroup[chatRowKey(groupIdHex)]
+                ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+        return row?.manuallyMarkedUnread
+    }
+
     fun chatItemForGroup(groupIdHex: String): ChatListItem? {
         val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
         return row?.let { projectChatRow(it) }
@@ -4517,18 +4525,25 @@ class ChatsController private constructor(
      * Leave `groupIdHex` from the chat-list long-press menu. Mirrors the
      * conversation-screen guard: a sole admin in a multi-member group is
      * blocked (the group would lose its only admin); a sole admin in a
-     * single-member group self-demotes before the leave so the engine
-     * doesn't refuse the publish. Both paths share `GroupProjector`'s
+     * single-member group resets local protocol state without publishing a
+     * leave that has no remaining participant. Both paths share `GroupProjector`'s
      * pure predicates so the safety levels stay aligned — see
      * [ConversationController.leaveGroup] for the canonical reference.
      *
      * The chat-list row doesn't carry a member count (`memberCount = 0`
      * in `chatListItemFromProjection`), so this fetches members via the
      * `groupMembers` FFI before evaluating the guard. The fetch is the
-     * only added IO vs the conversation path.
+     * preflight for both departure commands.
      */
-    suspend fun leaveGroup(groupIdHex: String): Boolean {
+    suspend fun leaveGroup(
+        groupIdHex: String,
+        deleteAfterLeave: Boolean = false,
+    ): Boolean {
         val account = accountRef ?: return false
+        val epoch = bindEpoch
+        val runtime = appState.runtimeGeneration
+        val isCurrent = { chatListDepartureIsCurrent(account, epoch, runtime) }
+        if (!isCurrent()) return false
         val group = groupRecordsById[groupIdHex] ?: return false
         val activeAccountIdHex = appState.activeAccount?.accountIdHex
         // Tracks whether selfDemoteAdmin succeeded before the leaveGroup
@@ -4537,78 +4552,154 @@ class ChatsController private constructor(
         // in the group) rather than the generic "couldn't leave" copy.
         var demotedBeforeLeave = false
         return runCatchingCancellable {
-            val members = appState.marmotIo { groupMembers(account, groupIdHex) }
-            val memberCount = GroupProjector.uniqueMemberCount(members)
-            // #811: when the live roster is just you there is no one to
-            // coordinate an MLS commit with, so a normal leave would fail (and
-            // the sole-admin transfer block must not apply either). Dissolve the
-            // group with local cleanup instead of an MLS leave/self-demote.
-            val soleMember =
-                GroupProjector.shouldDissolveAsSoleMember(
-                    members,
-                    activeAccountIdHex,
-                )
-            if (!soleMember && !GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)) {
-                appState.present(
-                    R.string.toast_make_another_admin_before_leaving,
-                    R.string.toast_group_needs_admin,
-                )
-                return@runCatchingCancellable false
-            }
-            appState.withGroupCommitLock(account, groupIdHex) {
-                if (soleMember) {
-                    appState.deleteGroupLocalWithClientCleanup(account, groupIdHex)
-                } else {
-                    if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
-                        withContext(NonCancellable) {
-                            val demoteResult =
-                                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                    selfDemoteAdminDetailed(account, groupIdHex)
-                                }
-                            demotedBeforeLeave = true
-                            appState.applyLocalGroupUpdate(demoteResult.details.group)
+            var members = emptyList<AppGroupMemberRecordFfi>()
+            val departed =
+                appState.withGroupCommitLock(account, groupIdHex) {
+                    if (!isCurrent()) return@withGroupCommitLock false
+                    members = appState.marmotIo { groupMembers(account, groupIdHex) }
+                    if (!isCurrent()) return@withGroupCommitLock false
+                    val memberCount = GroupProjector.uniqueMemberCount(members)
+                    // #811: the last member has no peer to coordinate an MLS leave with.
+                    val soleMember = GroupProjector.shouldDissolveAsSoleMember(members, activeAccountIdHex)
+                    if (!chatListDepartureAllowed(group, activeAccountIdHex, memberCount, soleMember)) {
+                        return@withGroupCommitLock false
+                    }
+                    if (soleMember) {
+                        removeSoleMemberChat(account, groupIdHex, deleteAfterLeave)
+                    } else {
+                        if (GroupProjector.requiresSelfDemoteBeforeLeave(group, activeAccountIdHex, memberCount)) {
+                            withContext(NonCancellable) {
+                                val demoteResult =
+                                    appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                        selfDemoteAdminDetailed(account, groupIdHex)
+                                    }
+                                demotedBeforeLeave = true
+                                if (isCurrent()) appState.applyLocalGroupUpdate(demoteResult.details.group)
+                                appState.marmotIo { leaveGroup(account, groupIdHex) }
+                            }
+                        } else {
                             appState.marmotIo { leaveGroup(account, groupIdHex) }
                         }
-                    } else {
-                        appState.marmotIo { leaveGroup(account, groupIdHex) }
                     }
+                    true
                 }
-            }
-            appState.removeComposerExpansionForGroup(account, groupIdHex)
-            // Invalidate both snapshot sources that seed the next
-            // ConversationController so re-opening the just-left group renders
-            // the disabled notice immediately instead of flashing the active
-            // composer (issue #545): the shared AppState snapshot (the
-            // cachedGroupMemberSnapshot fallback) and this controller's own
-            // memberCacheByGroup entry (which builds ChatListItem.memberSnapshot).
-            // schedulePendingMemberFetches() skips groups already cached, so a
-            // stale positive entry would otherwise survive until the next bind.
-            appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
-            if (activeAccountIdHex != null) {
-                memberCacheByGroup =
-                    memberCacheByGroup +
-                    (groupIdHex to GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex))
-                // Known removal: a self-leave omits self from the roster even
-                // when that leaves it empty (sole-member leave). Mark it so the
-                // badge stays suppressed instead of reading the empty roster as
-                // a fetch failure.
-                removedGroupIds = removedGroupIds + groupIdHex
-                recompute()
-            }
-            appState.presentTransient(R.string.toast_left_chat)
-            true
+            if (!departed || !isCurrent()) return@runCatchingCancellable false
+            finishChatListDeparture(account, groupIdHex, members, deleteAfterLeave, isCurrent)
         }.onFailure {
+            if (!isCurrent()) return@onFailure
             if (demotedBeforeLeave) {
-                // User was demoted but we couldn't complete the leave.
-                // Tell them so they know to ask another admin to restore
-                // their role (or retry); the generic "couldn't leave"
-                // toast misses that they're now mid-state.
                 appState.presentFailure(R.string.toast_demoted_but_couldnt_leave, "CHAT_LEAVE_AFTER_DEMOTE", it)
             } else {
                 appState.presentFailure(R.string.toast_couldnt_leave_chat, "CHAT_LEAVE", it)
             }
         }.getOrDefault(false)
     }
+
+    private fun chatListDepartureAllowed(
+        group: AppGroupRecordFfi,
+        activeAccountIdHex: String?,
+        memberCount: Int,
+        soleMember: Boolean,
+    ): Boolean {
+        val allowed = soleMember || GroupProjector.canLeaveGroup(group, activeAccountIdHex, memberCount)
+        if (!allowed) {
+            appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
+        }
+        return allowed
+    }
+
+    private suspend fun removeSoleMemberChat(
+        account: String,
+        groupIdHex: String,
+        deleteAfterLeave: Boolean,
+    ) {
+        // Native forget retires MLS state; plain local deletion retains it.
+        if (deleteAfterLeave) {
+            appState.forgetGroupLocalWithClientCleanup(account, groupIdHex)
+        } else {
+            appState.deleteGroupLocalWithClientCleanup(account, groupIdHex)
+        }
+    }
+
+    /** Reject stale presentation and destructive session teardown before another departure step. */
+    private fun chatListDepartureIsCurrent(
+        account: String,
+        epoch: Long,
+        runtime: Int,
+    ): Boolean =
+        accountRef == account &&
+            isActiveBindEpoch(epoch) &&
+            appState.activeAccountRef == account &&
+            appState.runtimeGeneration == runtime &&
+            !appState.signOutInProgress &&
+            !appState.wipeInProgress
+
+    /** Confirm native departure before admitting cleanup; uncertainty always retains history. */
+    private suspend fun finishChatListDeparture(
+        account: String,
+        groupIdHex: String,
+        members: List<AppGroupMemberRecordFfi>,
+        deleteAfterLeave: Boolean,
+        isCurrent: () -> Boolean,
+    ): Boolean {
+        val activeAccountIdHex = boundAccountIdHex()
+        val soleMember = GroupProjector.shouldDissolveAsSoleMember(members, activeAccountIdHex)
+        if (deleteAfterLeave && !soleMember && !confirmChatListDeparture(account, groupIdHex, isCurrent)) return false
+        recordChatListDeparture(account, groupIdHex, activeAccountIdHex, members)
+        return if (deleteAfterLeave && !soleMember) {
+            deleteGroupLocalFromChatList(groupIdHex, failureMessage = R.string.toast_left_chat_delete_failed)
+        } else {
+            if (deleteAfterLeave) {
+                removeChatRow(groupIdHex)
+                finishRemovedChatRowClientState(groupIdHex)
+            }
+            appState.presentTransient(
+                if (deleteAfterLeave) R.string.toast_chat_deleted_local else R.string.toast_left_chat,
+            )
+            true
+        }
+    }
+
+    private suspend fun confirmChatListDeparture(
+        account: String,
+        groupIdHex: String,
+        isCurrent: () -> Boolean,
+    ): Boolean {
+        // An evicted MLS session can reject roster reads; use the durable native row.
+        val departureRow =
+            runCatchingCancellable {
+                appState.marmotIo { chatList(account, true) }.firstOrNull { it.groupIdHex == groupIdHex }
+            }.getOrNull()
+        if (!isCurrent()) return false
+        departureRow?.let { foldChatRow(it) }
+        val confirmed = departureRow?.selfMembership?.isNonMember() == true
+        if (!confirmed) appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
+        return confirmed
+    }
+
+    /** Retire presentation snapshots only after the native departure settles on the current bind. */
+    private fun recordChatListDeparture(
+        account: String,
+        groupIdHex: String,
+        activeAccountIdHex: String?,
+        members: List<AppGroupMemberRecordFfi>,
+    ) {
+        appState.removeComposerExpansionForGroup(account, groupIdHex)
+        appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
+        if (activeAccountIdHex != null) {
+            memberCacheByGroup = memberCacheByGroup +
+                (groupIdHex to GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex))
+            removedGroupIds = removedGroupIds + groupIdHex
+            recompute()
+        }
+    }
+
+    /** Explicit single-chat departure; unconfirmed leave never admits local deletion. */
+    suspend fun leaveAndDeleteFromChatList(groupIdHex: String): Boolean =
+        leaveGroup(
+            groupIdHex = groupIdHex,
+            deleteAfterLeave = true,
+        )
 
     /**
      * Local-only chat-list wipe: hide the row optimistically, run client cleanup
@@ -4618,6 +4709,7 @@ class ChatsController private constructor(
     suspend fun deleteGroupLocalFromChatList(
         groupIdHex: String,
         notify: Boolean = true,
+        failureMessage: Int = R.string.toast_couldnt_delete_chat,
     ): Boolean {
         val account = accountRef ?: return false
         val epoch = bindEpoch
@@ -4639,7 +4731,7 @@ class ChatsController private constructor(
                 finishRemovedChatRowClientState(groupIdHex)
             }
             if (it is CancellationException) throw it
-            if (isCurrent()) appState.presentFailure(R.string.toast_couldnt_delete_chat, "CHAT_LOCAL_DELETE", it)
+            if (isCurrent()) appState.presentFailure(failureMessage, "CHAT_LOCAL_DELETE", it)
             return false
         }
         if (!isCurrent()) return false
@@ -4821,8 +4913,9 @@ class ChatsController private constructor(
 
     /**
      * Mark the chat's unread count to zero by advancing the read pointer to
-     * its latest projected message. No-op when the chat has no unread or no
-     * known last-message id. Called from the long-press "Mark as read"
+     * its latest projected message. Without a known message id, the explicit
+     * action can still ask MDK to clear a manual reminder; MDK preserves any
+     * actual unread count and watermark. Called from the long-press "Mark as read"
      * action — the per-conversation scroll-driven path remains the
      * normal mechanism while a chat is open.
      */
@@ -4832,9 +4925,17 @@ class ChatsController private constructor(
             item.projection
                 ?.lastMessage
                 ?.messageIdHex
-                ?.takeIf { it.isNotBlank() } ?: return false
+                ?.takeIf { it.isNotBlank() }
+        if (lastId == null && item.projection?.manuallyMarkedUnread != true) return false
         return runCatchingCancellable {
-            val row = appState.marmotIo { markTimelineMessageRead(account, item.group.groupIdHex, lastId) }
+            val row =
+                appState.marmotIo {
+                    if (lastId != null) {
+                        markTimelineMessageRead(account, item.group.groupIdHex, lastId)
+                    } else {
+                        setChatManuallyUnread(account, item.group.groupIdHex, false)
+                    }
+                }
             row?.let(::applyChatListRow)
             appState.dismissConversationNotifications(account, item.group.groupIdHex)
             true
@@ -5606,7 +5707,6 @@ private const val LIVE_TIMELINE_WINDOW_CAP = 200
 // One frame: long enough to collapse a chat-list sync burst into a single
 // recompute, short enough to stay imperceptible.
 private const val CHAT_LIST_RECOMPUTE_DEBOUNCE_MS = 16L
-private const val GROUP_HYDRATION_RETRY_DELAY_MS = 750L
 private const val MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY = 64
 private const val CHAT_LIST_AVATAR_WARM_ROWS = 24
 
@@ -6052,6 +6152,10 @@ class ConversationController(
     internal val memberRosterState: GroupRosterLoadState
         get() = memberRosterLoadTracker.state
 
+    /** The settled branch that left the roster unverified, cleared by the next verified roster. */
+    internal var rosterBlockReason by mutableStateOf<GroupRosterBlockReason?>(null)
+        private set
+
     private val memberRosterRefreshGeneration = StalenessGuard()
 
     // Invalidated when a timeline page or live subscription batch lands so an
@@ -6416,14 +6520,23 @@ class ConversationController(
     // so indexes and messageById cannot grow without bound (#1163).
     internal val protectedTimelineMessageIds = mutableSetOf<String>()
 
-    // Last message id we successfully marked as read on the Rust side.
-    // Dedupes scroll-driven [markReadUpTo] calls so settling on the same row
-    // doesn't issue redundant FFI hops. Compose-observable so UI (the
-    // jump-to-mention chip) can derive unread state off the engine read
+    // Read watermark seeded from MDK, then updated by visible read requests.
+    // Compose-observable so the jump-to-mention chip follows the engine
     // watermark rather than the scroll position.
     var lastReadMessageId: String? by
         mutableStateOf(initialChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() })
         private set
+
+    // A persisted watermark is not a read performed during this visit. The
+    // first settled visible message must reach MDK even when the watermark
+    // stays unchanged: MDK also clears manual unread attention on that read.
+    private var lastSubmittedReadMessageId: String? = null
+    private var manualUnreadReminderConsumed = false
+    private var nextReadRequestId = 0L
+    private var lastReadRequestId = 0L
+    private val pendingReadRequestIds = mutableSetOf<Long>()
+    private var lastSuccessfulReadRequestId = 0L
+    private var successfulReadWithoutRow: Pair<ChatListRowFfi?, String>? = null
 
     // Persisted read watermark from the chat-list projection / mark-read FFI.
     // Drives read-anchored disappearing-message deferral (#797).
@@ -7394,12 +7507,21 @@ class ConversationController(
         groupIdHex: String,
     ): Boolean = conversationAccountRef == accountRef && group.groupIdHex == groupIdHex
 
-    /** Applies the chat-list subscription's current row to this mounted conversation. */
+    /** Applies a matching native row and invalidates any null-result acknowledgement superseded by that row. */
     internal fun applyAuthoritativeChatListRow(
         accountRef: String?,
         row: ChatListRowFfi,
     ) {
         if (!matchesConversation(accountRef, row.groupIdHex)) return
+        // A new native row supersedes a null-result acknowledgement, including
+        // a new reminder whose preceding manual=false echo was not observed.
+        if (successfulReadWithoutRow?.let { it.first !== row } == true) {
+            successfulReadWithoutRow = null
+            manualUnreadReminderConsumed = false
+        }
+        if (!row.manuallyMarkedUnread || latestChatListRow?.manuallyMarkedUnread != true) {
+            manualUnreadReminderConsumed = false
+        }
         latestChatListRow = row
     }
 
@@ -11190,7 +11312,9 @@ class ConversationController(
                 )
             val madeProgress =
                 when (direction) {
-                    ConversationSearchPageDirection.OLDER -> loadOlderPage()
+                    // Anchor at the oldest held row: an unanchored page at the window cap stays
+                    // head-anchored and trims what it just fetched, so it never reaches the match (#2873).
+                    ConversationSearchPageDirection.OLDER -> loadOlderPage(anchorMessageIdHex = oldest.messageIdHex)
                     ConversationSearchPageDirection.NEWER -> loadNewerPage()
                     null -> false
                 }
@@ -11732,47 +11856,108 @@ class ConversationController(
      * chat-list unread count decrement incrementally during the session
      * instead of being zeroed out on chat open.
      *
-     * Reuses the controller's [lastReadMessageId] dedupe so a quiet scroll
+     * Dedupes requests submitted by this controller so a quiet scroll
      * (settled on the same row) doesn't issue redundant FFI hops.
+     * Invalid/optimistic IDs and hidden, locked or differently owned conversations are ignored.
+     * A stored watermark alone does not dedupe the first visible read of a new visit.
      */
     suspend fun markReadUpTo(messageId: String) {
-        val trimmed = messageId.takeIf { it.isNotBlank() } ?: return
-        // Optimistic messages carry a Kotlin UUID as their messageIdHex
-        // ("xxxxxxxx-xxxx-..."). The FFI rejects anything that isn't a 64-char
-        // hex blob (InvalidHex at the first '-'). Skip — the projection will
-        // call markReadUpTo again with the confirmed hex id once it echoes.
-        if (!HEX_MESSAGE_ID.matches(trimmed)) return
-        if (trimmed == lastReadMessageId) return
+        // Optimistic UUIDs and missing anchors cannot reach native read commands.
+        val trimmed = messageId.takeIf { it.isNotBlank() && HEX_MESSAGE_ID.matches(it) } ?: return
         val account = conversationAccountRef ?: return
-        val previous = lastReadMessageId
+        if (appState.isConversationReadVisible(account, group.groupIdHex)) {
+            submitVisibleReadUpTo(account, trimmed)
+        }
+    }
+
+    /**
+     * Submits the visit's visible cursor to MDK, including a saved cursor with pending manual attention.
+     * Successful rows fold monotonically; after failures, only the latest remaining request restores display state.
+     * A latest failure clears request dedupe for retry, and cancellation is rethrown. A null success acknowledges
+     * this row instance until a new native row arrives. Already-confirmed reads do not restart retention deadlines.
+     */
+    private suspend fun submitVisibleReadUpTo(
+        account: String,
+        trimmed: String,
+    ) {
+        val consumeManualReminder = shouldConsumeManualUnreadReminder(account)
+        if (trimmed == lastSubmittedReadMessageId && !consumeManualReminder) return
+        val readWasAlreadyConfirmed = trimmed == latestChatListRow?.lastReadMessageIdHex
+        val requestId = ++nextReadRequestId
+        lastReadRequestId = requestId
+        pendingReadRequestIds += requestId
         lastReadMessageId = trimmed
+        lastSubmittedReadMessageId = trimmed
         val markReadResult =
             runCatching {
                 appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
             }
+        pendingReadRequestIds -= requestId
         val markReadFailure = markReadResult.exceptionOrNull()
         if (markReadFailure != null) {
-            if (lastReadMessageId == trimmed) lastReadMessageId = previous
+            restoreFailedReadRequest(requestId)
             if (markReadFailure is CancellationException) throw markReadFailure
             if (BuildConfig.DEBUG) Log.w("DMConversation", "mark read failed", markReadFailure)
             return
         }
-        markReadResult.getOrNull()?.let { row ->
-            persistedLastReadTimelineAt =
-                foldMarkReadReturnedRow(
-                    row = row,
-                    persistedLastReadTimelineAt = persistedLastReadTimelineAt,
-                    applyChatListRow = { appState.applyChatListRowFromMarkRead(account, it) },
-                )
+        markReadResult.getOrNull()?.let { row -> foldVisibleReadRow(account, row) }
+        if (requestId > lastSuccessfulReadRequestId) {
+            lastSuccessfulReadRequestId = requestId
+            successfulReadWithoutRow = if (markReadResult.getOrNull() == null) latestChatListRow to trimmed else null
         }
-        val anchoredAtSeconds = (clockMillis() / 1_000L).toULong()
-        anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
+        if (lastReadRequestId == requestId) {
+            lastReadMessageId = confirmedReadMessageId()
+            lastSubmittedReadMessageId = trimmed
+            if (consumeManualReminder) manualUnreadReminderConsumed = true
+        }
+        // A visit-level attention acknowledgement must not restart an
+        // already-confirmed message's disappearing deadline after reopening.
+        if (!readWasAlreadyConfirmed) {
+            val anchoredAtSeconds = (clockMillis() / 1_000L).toULong()
+            anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
+        }
         runCatchingCancellable {
             appState.dismissConversationNotifications(account, group.groupIdHex)
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMConversation", "dismiss read notifications failed", it)
         }
     }
+
+    /** Restores only the latest failed request; finished requests never regain ownership or suppress retries. */
+    private fun restoreFailedReadRequest(requestId: Long) {
+        if (lastReadRequestId != requestId) return
+        lastReadMessageId = confirmedReadMessageId()
+        manualUnreadReminderConsumed = false
+        lastSubmittedReadMessageId = null
+        lastReadRequestId = pendingReadRequestIds.maxOrNull() ?: 0L
+    }
+
+    /** Uses the native cursor, or a successful null-result cursor only while its original row remains current. */
+    private fun confirmedReadMessageId(): String? =
+        successfulReadWithoutRow?.takeIf { it.first === latestChatListRow }?.second
+            ?: latestChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() }
+
+    /** Folds MDK's read result into the matching list, or monotonically into this conversation if no list is bound. */
+    private fun foldVisibleReadRow(
+        accountRef: String,
+        row: ChatListRowFfi,
+    ) {
+        persistedLastReadTimelineAt =
+            foldMarkReadReturnedRow(row, persistedLastReadTimelineAt) { incoming ->
+                if (!appState.applyChatListRowFromMarkRead(accountRef, incoming)) {
+                    val folded =
+                        latestChatListRow?.let { current ->
+                            reduceSubscriptionChatListRow(current, incoming, ChatListUpdateTriggerFfi.UNREAD_CHANGED)
+                        } ?: incoming
+                    applyAuthoritativeChatListRow(accountRef, folded)
+                }
+            }
+    }
+
+    /** Retries an unconsumed native manual reminder only while this account's conversation is visibly owned. */
+    private fun shouldConsumeManualUnreadReminder(accountRef: String): Boolean =
+        !manualUnreadReminderConsumed &&
+            appState.hasManualUnreadReminder(accountRef, group.groupIdHex, latestChatListRow)
 
     private fun anchorReadExpiryUpTo(
         messageId: String,
@@ -12765,22 +12950,30 @@ class ConversationController(
             memberRosterRefreshGeneration.isCurrent(generation) &&
             appState.runtimeGeneration == runtimeGeneration
 
-    /** Publishes the latest authoritative roster while rejecting older refresh completions. */
+    /**
+     * Publishes the latest authoritative roster while rejecting older refresh completions.
+     * [automaticRetryAttempt] counts the bounded re-reads already spent by this chain (#2861).
+     */
     private suspend fun refreshMembers(
-        retryOnPendingRead: Boolean = true,
+        automaticRetryAttempt: Int = 0,
         prefetchedRoster: Deferred<Result<GroupRosterFfi>>? = null,
     ) {
         val account = conversationAccountRef ?: return
         val generation = beginMemberRosterRefresh() ?: return
         val runtimeGeneration = appState.runtimeGeneration
+        val recoveringFromBlock = automaticRetryAttempt > 0 || rosterBlockReason != null
         if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.LOADING
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.STARTED)
         try {
             runCatchingCancellable {
                 readAndApplyMembers(account, generation, runtimeGeneration, prefetchedRoster)
+            }.onSuccess {
+                if (recoveringFromBlock && memberRosterState == GroupRosterLoadState.READY) {
+                    logRosterRead("recovered", kind = null, attempt = automaticRetryAttempt)
+                }
             }.onFailure { failure ->
                 if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
-                    handleMemberReadFailure(account, generation, runtimeGeneration, failure, retryOnPendingRead)
+                    handleMemberReadFailure(account, generation, runtimeGeneration, failure, automaticRetryAttempt)
                 }
             }
         } catch (cancel: CancellationException) {
@@ -12820,22 +13013,48 @@ class ConversationController(
         }
     }
 
-    /** Retry one fresh read after hydration or supersession, then expose the existing Retry state. */
+    /**
+     * Re-reads a retryable failure with bounded backoff while the read is still owned, then
+     * exposes manual Retry. An account switch, newer read, disposal or runtime change wins.
+     * A blocked transcript's backoff runs on [controllerScope], so it never holds the caller's
+     * mutation lock or stalls the group-state stream; other retries keep the old inline re-read.
+     */
     private suspend fun handleMemberReadFailure(
         account: String,
         generation: Long,
         runtimeGeneration: Int,
         failure: Throwable,
-        retryOnPendingRead: Boolean,
+        attempt: Int,
     ) {
-        val hydrationPending = failure is MarmotKitException.GroupHydrationPending
-        val superseded = failure is SupersededGroupRosterRead
-        if (superseded && !group.acceptsInviteResults()) return
-        if (retryOnPendingRead && (hydrationPending || superseded)) {
-            if (hydrationPending) delay(GROUP_HYDRATION_RETRY_DELAY_MS)
-            if (ownsCurrentMemberRead(generation, runtimeGeneration)) refreshMembers(retryOnPendingRead = false)
+        val kind = classifyGroupRosterReadFailure(failure)
+        if (kind == GroupRosterReadFailureKind.SUPERSEDED && !group.acceptsInviteResults()) return
+        val transcriptBlocked = !hasKnownTranscriptPresentation
+        val retryDelay =
+            groupRosterReadRetryDelayMs(kind, attempt, transcriptBlocked)
+                .takeUnless { failure.isUseAfterEviction() }
+        val backgroundBackoff = transcriptBlocked && kind != GroupRosterReadFailureKind.SUPERSEDED
+        if (retryDelay != null) {
+            logRosterRead("retry", kind, attempt)
+            if (backgroundBackoff) {
+                controllerScope.launch { retryMemberReadAfter(retryDelay, generation, runtimeGeneration, attempt) }
+            } else {
+                retryMemberReadAfter(retryDelay, generation, runtimeGeneration, attempt)
+            }
         } else {
-            settleMemberReadFailure(account, generation, runtimeGeneration, failure)
+            settleMemberReadFailure(account, generation, runtimeGeneration, failure, attempt)
+        }
+    }
+
+    /** Waits [delayMs], then re-reads only if the failed read is still the current owned read. */
+    private suspend fun retryMemberReadAfter(
+        delayMs: Long,
+        generation: Long,
+        runtimeGeneration: Int,
+        attempt: Int,
+    ) {
+        if (delayMs > 0L) delay(delayMs)
+        if (ownsCurrentMemberRead(generation, runtimeGeneration)) {
+            refreshMembers(automaticRetryAttempt = attempt + 1)
         }
     }
 
@@ -12845,17 +13064,42 @@ class ConversationController(
         generation: Long,
         runtimeGeneration: Int,
         failure: Throwable,
+        attempt: Int,
     ) {
         memberRosterRefreshGeneration.runIfCurrent(generation) {
             if (!ownsCurrentMemberRead(generation, runtimeGeneration)) return@runIfCurrent
             if (failure.isUseAfterEviction()) {
                 markActiveAccountRemovedFromMembers(account)
             } else {
+                val kind = classifyGroupRosterReadFailure(failure)
                 memberRosterLoadTracker.transition(GroupRosterRefreshEvent.FAILED)
+                if (memberRosterState == GroupRosterLoadState.FAILED) {
+                    rosterBlockReason = GroupRosterBlockReason.ReadFailed(kind, attempts = attempt + 1)
+                }
                 if (inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.FAILED
+                logRosterRead("failed", kind, attempt)
                 if (BuildConfig.DEBUG) Log.w("DMConversation", "refresh members failed", failure)
             }
         }
+    }
+
+    /** Logs a roster read branch with gate facts only, never account, group or member IDs. */
+    private fun logRosterRead(
+        event: String,
+        kind: GroupRosterReadFailureKind?,
+        attempt: Int,
+    ) {
+        Log.w(
+            "DMConversation",
+            groupRosterReadDiagnostic(
+                event = event,
+                kind = kind,
+                attempt = attempt,
+                transcriptBlocked = !hasKnownTranscriptPresentation,
+                initialSnapshot = initialMemberSnapshot != null,
+                targetAccountActive = conversationAccountRef == appState.activeAccountRef,
+            ),
+        )
     }
 
     /** Applies the engine's eviction proof and invalidates any in-flight group mutation result. */
@@ -12879,6 +13123,7 @@ class ConversationController(
         inviteAcceptanceAwaitingAuthority = null
         inviteConfirmationUnresolved = false
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
+        rosterBlockReason = null
         // UseAfterEviction is the engine's authoritative signal that this
         // conversation can no longer accept composer writes. Invalidate an
         // in-flight immutable dictation target before any late provider result
@@ -12936,6 +13181,7 @@ class ConversationController(
         )
     }
 
+    /** Applies a verified roster, or records the failed invariant that keeps the transcript gated. */
     private fun applyResolvedGroupRoster(
         account: String,
         resolution: GroupRosterResolution,
@@ -12946,6 +13192,7 @@ class ConversationController(
         val previousGroup = group
         resolution.invariant?.let { invariant ->
             memberRosterLoadTracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
+            rosterBlockReason = GroupRosterBlockReason.Inconsistent(invariant)
             logGroupRosterInvariant(
                 resolution = resolution,
                 invariant = invariant,
@@ -12990,6 +13237,7 @@ class ConversationController(
         inviteAcceptanceAwaitingAuthority = null
         if (!inviteAcceptanceResolutionPending) inviteAcceptanceResolutionState = GroupRosterLoadState.READY
         memberRosterLoadTracker.transition(GroupRosterRefreshEvent.SUCCEEDED)
+        rosterBlockReason = null
         cacheAppliedGroupMembers(appState, account, group.groupIdHex, members)
         return AppliedGroupDetails(group = group, members = members)
     }

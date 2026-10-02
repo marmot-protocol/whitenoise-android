@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -62,6 +63,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
@@ -75,9 +77,19 @@ class DeletedMessageLocalRemovalTest {
     private val backingPreferences
         get() = context.getSharedPreferences("deleted-message-local-removal-test", Context.MODE_PRIVATE)
 
+    private val originalTimeZone = TimeZone.getDefault()
+
+    /** Clears stored removals and pins UTC, because bubble timestamps render in the default zone. */
     @Before
     fun clearPreferences() {
         backingPreferences.edit().clear().commit()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    /** Restores the machine's zone after each test. */
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(originalTimeZone)
     }
 
     @Test

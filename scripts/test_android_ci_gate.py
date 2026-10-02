@@ -167,6 +167,35 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPropertyName("roborazziSnapshots")', self.app_build)
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
+    def test_screenshot_owners_come_from_the_checked_registry(self):
+        """Both flavors verify the registered owners, then prove every golden was compared."""
+        self.assertIn("name: Curated screenshot verification (${{ matrix.flavor }})", self.screenshots)
+        self.assertIn('        flavor: [Zapstore, Play]\n', self.screenshots)
+        step = self.named_step(self.screenshots, 'Screenshot tests (Roborazzi)')
+        select = 'owner_filters="$(python3 scripts/check_screenshot_baseline_owners.py --gradle-test-args)"'
+        verify = ':app:verifyRoborazziDev${{ matrix.flavor }}Debug'
+        coverage = (
+            '--results app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json'
+        )
+        self.assertIn(select, step)
+        self.assertIn('"${owner_args[@]}"', step)
+        self.assertLess(step.index(select), step.index(verify))
+        self.assertLess(step.index(verify), step.index(coverage))
+        self.assertNotIn("--tests '", step)
+        self.assertNotIn('\n        if:', step)
+        self.assertNotIn('continue-on-error:', self.screenshots)
+        static = self.named_step(self.build_contracts, 'Check committed screenshot golden owners')
+        self.assertIn("        if: matrix.phase == 'tooling'\n", static)
+        self.assertIn('python3 -m unittest scripts/test_check_screenshot_baseline_owners.py', static)
+        self.assertIn('python3 scripts/check_screenshot_baseline_owners.py\n', static)
+
+    def test_instrumented_dispatch_tooling_runs_without_an_emulator(self):
+        """The dispatcher and required-case parser tests run in the fast tooling phase."""
+        step = self.named_step(self.build_contracts, 'Test instrumented dispatch and required cases')
+        self.assertIn("        if: matrix.phase == 'tooling'\n", step)
+        self.assertIn('python3 -m unittest scripts/test_run_android_instrumented_dispatch.py', step)
+        self.assertIn('python3 -m unittest scripts/test_check_instrumented_required_cases.py', step)
+
     def test_job_caches(self):
         """Every workload retains its own task cache; forks remain read-only."""
         gradle_setup_steps = re.findall(

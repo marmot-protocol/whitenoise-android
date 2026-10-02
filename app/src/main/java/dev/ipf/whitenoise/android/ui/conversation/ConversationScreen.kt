@@ -147,10 +147,10 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
-import dev.ipf.whitenoise.android.state.reportVisibleMessage
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
+import dev.ipf.whitenoise.android.state.transcriptRosterError
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
@@ -274,6 +274,8 @@ private class ConversationNavigationState(
     var searchJob by mutableStateOf<Job?>(null)
     var preSearchScrollAnchor by mutableStateOf<ConversationSearchScrollAnchor?>(null)
     var historySearchMatches by mutableStateOf<List<ConversationSearchMatch>?>(null)
+    var historySearchFailed by mutableStateOf(false)
+    var historySearchRetryGeneration by mutableStateOf(0)
     val timelineItemHeightsPx = mutableStateMapOf<String, Int>()
     val searchFocusRequester = FocusRequester()
 
@@ -308,12 +310,6 @@ private val InitialTimelineBackfillNoProgressError =
         report =
             "Operation: CONVERSATION_INITIAL_BACKFILL_NO_PROGRESS\n" +
                 "No backward timeline progress was observed.",
-    )
-
-private val InitialTranscriptRosterError =
-    ErrorPresentation(
-        message = AppText.Resource(R.string.error_conversation_membership_unavailable),
-        report = "Operation: CONVERSATION_TRANSCRIPT_ROSTER\nAccount-owned membership could not be verified.",
     )
 
 /** Remembers navigation state per controller and cancels all controller-owned jobs on disposal. */
@@ -2475,17 +2471,34 @@ internal fun ConversationScreen(
     // it lands, so a result cannot depend on incidental scroll history. The
     // effect restarting on each keystroke cancels a superseded scan, and the
     // debounce keeps typing from firing one scan per character.
-    LaunchedEffect(navigationState.searchQuery, chat.id, controller) {
+    LaunchedEffect(navigationState.searchQuery, chat.id, controller, navigationState.historySearchRetryGeneration) {
         navigationState.historySearchMatches = null
+        navigationState.historySearchFailed = false
         if (navigationState.searchQuery.isBlank()) return@LaunchedEffect
         delay(HISTORY_SEARCH_DEBOUNCE_MILLIS)
         val launchedForQuery = navigationState.searchQuery
-        val scan = searchConversationHistoryMatches(appState, controller.group.groupIdHex, launchedForQuery)
+        val scan =
+            searchConversationHistoryMatches(
+                appState = appState,
+                accountRef = controller.boundAccountRef,
+                groupIdHex = controller.group.groupIdHex,
+                query = launchedForQuery,
+            )
         // Only publish if this is still the current query. Cancellation already
         // propagates from the scan, so this only guards a scan that completed
-        // in the gap before the effect restarted for a newer keystroke.
-        if (navigationState.searchQuery == launchedForQuery) navigationState.historySearchMatches = scan
+        // in the gap before the effect restarted for a newer keystroke. A null
+        // scan is a failure, kept distinct so loaded-window matches never read as final.
+        if (navigationState.searchQuery == launchedForQuery) {
+            navigationState.historySearchMatches = scan
+            navigationState.historySearchFailed = scan == null
+        }
     }
+    val searchScanStatus =
+        conversationSearchScanStatus(
+            query = navigationState.searchQuery,
+            scanMatches = navigationState.historySearchMatches,
+            scanFailed = navigationState.historySearchFailed,
+        )
     val effectiveSearchMatches =
         remember(searchWindowMatches, navigationState.historySearchMatches, renderedTimeline) {
             val scan = navigationState.historySearchMatches
@@ -2597,10 +2610,12 @@ internal fun ConversationScreen(
             }
     }
 
-    // Step the cursor (next = forward/newer, previous = backward/older) with
-    // wrap-around, pin the new match, and jump+highlight it.
+    /**
+     * Steps the cursor (next = forward/newer, previous = backward/older) with wrap-around,
+     * pins the new match and jumps to it. Ignored while the full-history scan is loading.
+     */
     fun navigateToSearchMatch(forward: Boolean) {
-        if (effectiveSearchMatchIds.isEmpty()) return
+        if (!searchScanStatus.allowsSearchSteps(effectiveSearchMatchIds.size)) return
         val next = MessageSearch.step(searchActiveIndex, effectiveSearchMatchIds.size, forward)
         if (next < 0) return
         val target = effectiveSearchMatches[next]
@@ -3288,25 +3303,11 @@ internal fun ConversationScreen(
         showTransientMessageHighlight(target)
     }
 
-    // Scroll-driven read pointer advance. Watches the shared read anchor
-    // (`readAnchorMessageId`) so the FFI only sees IDs that strictly advance
-    // the pointer — scroll-up cannot regress the count. Settle-gated
-    // (`!isScrollInProgress`) avoids per-frame FFI hops while scrolling.
-    LaunchedEffect(listState, controller) {
-        snapshotFlow {
-            if (!initialTimelineAnchored || listState.isScrollInProgress) {
-                null
-            } else {
-                readAnchorMessageId
-            }
-        }.filterNotNull()
-            .distinctUntilChanged()
-            .collect { messageId ->
-                if (messageId.isNotBlank()) {
-                    controller.markReadUpTo(messageId)
-                    controller.reportVisibleMessage(messageId)
-                }
-            }
+    // A settled visible anchor submits its first read even at the saved watermark
+    // so MDK can clear manual attention. The controller deduplicates later reads;
+    // MDK keeps the durable pointer monotonic. Settling avoids per-frame FFI hops.
+    observeConversationVisibleReads(appState, controller, resumeLifecycleOwner) {
+        readAnchorMessageId.takeIf { initialTimelineAnchored && !listState.isScrollInProgress }
     }
 
     // Own prepared files above the details early return so staged media
@@ -3710,9 +3711,10 @@ internal fun ConversationScreen(
                 searchOpen = navigationState.searchOpen,
                 searchMatchCount = effectiveSearchMatchIds.size,
                 searchActiveIndex = searchActiveIndex,
-                hasSearchQuery = navigationState.searchQuery.isNotBlank(),
+                searchScanStatus = searchScanStatus,
                 onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
                 onNextSearchMatch = { navigateToSearchMatch(forward = true) },
+                onRetrySearchScan = { navigationState.historySearchRetryGeneration += 1 },
                 hasError =
                     loadFailurePlacement == LoadFailurePlacement.FullScreen ||
                         navigationState.initialTimelineBackfillNoProgress ||
@@ -3952,7 +3954,7 @@ internal fun ConversationScreen(
                         )
                     transcriptPresentationNeedsRetry ->
                         ConversationLoadErrorContent(
-                            error = InitialTranscriptRosterError,
+                            error = controller.rosterBlockReason.transcriptRosterError(),
                             onRetry = { scope.launch { controller.retryMembers() } },
                         )
                     renderedTimeline.isEmpty() &&

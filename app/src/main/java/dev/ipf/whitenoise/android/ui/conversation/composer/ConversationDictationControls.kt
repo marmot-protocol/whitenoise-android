@@ -23,8 +23,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -153,9 +151,7 @@ internal fun ConversationDictationCompactActions(
             if (state.hasActiveRecognitionActions) {
                 ConversationDictationActiveActions(controller, actionColors)
             } else {
-                if (state is ConversationDictationState.Failed &&
-                    state.reason == ConversationDictationFailure.SendBlocked
-                ) {
+                if (state.hasRecoverableTranscript) {
                     IconButton(onClick = controller::paste, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
                     }
@@ -211,6 +207,13 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Listening ||
             this is ConversationDictationState.Processing
 
+/** An unsent prefix remains accessible even when sealed PCM also needs retrying. */
+private val ConversationDictationState.hasRecoverableTranscript: Boolean
+    get() =
+        this is ConversationDictationState.Failed &&
+            reason != ConversationDictationFailure.DeliveryUnknown &&
+            !retainedTranscript.isNullOrBlank()
+
 /** Reserves either the listening pulse or processing-only action width without shifting controls. */
 private fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
     when (this) {
@@ -219,7 +222,7 @@ private fun ConversationDictationState.compactActionsWidth(captureInProgress: Bo
         is ConversationDictationState.Processing,
         -> if (captureInProgress) DICTATION_ACTIVE_ACTIONS_WIDTH else DICTATION_PROCESSING_ACTIONS_WIDTH
         is ConversationDictationState.Failed ->
-            if (reason == ConversationDictationFailure.SendBlocked) 144.dp else 96.dp
+            if (hasRecoverableTranscript) 144.dp else 96.dp
         else -> 96.dp
     }
 
@@ -364,48 +367,6 @@ private fun ConversationDictationPrimaryAction(
                         .semantics { contentDescription = status },
                 strokeWidth = 2.dp,
             )
-    }
-}
-
-/** Chooses the settings page that can actually clear a failure, and retry for the rest. */
-@Composable
-private fun ConversationDictationFailureAction(
-    state: ConversationDictationState.Failed,
-    controller: ConversationDictationController,
-) {
-    val context = LocalContext.current
-    val recovery = dictationFailureRecovery(state.cause ?: state.reason)
-    IconButton(
-        onClick =
-            when (recovery) {
-                ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
-                ConversationDictationRecovery.SpeechProviderSetup ->
-                    ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
-                ConversationDictationRecovery.Retry -> controller::retry
-            },
-        modifier = Modifier.size(48.dp),
-    ) {
-        Icon(
-            imageVector =
-                if (recovery == ConversationDictationRecovery.Retry) {
-                    Icons.Default.Refresh
-                } else {
-                    Icons.Default.Settings
-                },
-            contentDescription =
-                stringResource(
-                    when (recovery) {
-                        ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
-                        ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service
-                        ConversationDictationRecovery.Retry ->
-                            if (state.reason == ConversationDictationFailure.SendBlocked) {
-                                R.string.dictation_retry_send
-                            } else {
-                                R.string.retry
-                            }
-                    },
-                ),
-        )
     }
 }
 

@@ -19,44 +19,105 @@ internal class ConversationForegroundRecord(
         private set
     private var foregroundPromoted = false
     private var publishedServiceType = 0
-    private var connectionUserOwned = false
 
-    fun foregroundNotification(): Notification = dictation.notificationOrNull() ?: connectionNotification()
+    fun foregroundNotification(): Notification = dictation.notificationOrNull() ?: connectionNotification
 
-    private fun connectionNotification(): Notification = BackgroundConnectionNotification.build(service)
+    private val connectionNotification: Notification
+        get() = BackgroundConnectionNotification.build(service)
 
     fun promoteConnection(trigger: ForegroundStartTrigger) {
-        val type = foregroundServiceTypeForTrigger(trigger)
+        // Automatic nudges cannot change an already authorized connection's type. Dictation
+        // takes specialUse while visible, so a new connection can share that existing protection.
+        val type =
+            connectionServiceType.takeIf { it != 0 }
+                ?: if (dictation.hasForegroundLease) {
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                } else {
+                    foregroundServiceTypeForTrigger(trigger)
+                }
         publishForeground(
             foregroundNotification(),
-            type or if (dictation.hasForegroundLease) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0,
+            type or dictation.foregroundServiceType,
+            replaceRecord = !dictation.hasForegroundLease,
         )
         connectionServiceType = type
-        connectionUserOwned = connectionUserOwned || trigger == ForegroundStartTrigger.UserToggle
     }
 
+    @Suppress("TooGenericExceptionCaught") // Android foreground rejection subclasses RuntimeException.
     private fun publishForeground(
         notification: Notification,
         type: Int,
+        acquireMicrophone: Boolean = false,
+        replaceRecord: Boolean = false,
     ) {
-        if (!foregroundPromoted || publishedServiceType != type) {
+        val microphone = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        val keepsAuthorizedMicrophone =
+            foregroundPromoted &&
+                publishedServiceType and microphone != 0 &&
+                type and microphone != 0
+        val keepsExistingType = publishedServiceType == type || keepsAuthorizedMicrophone
+        val requiresRecordUpdate = acquireMicrophone || replaceRecord
+        if (foregroundPromoted && !requiresRecordUpdate && keepsExistingType) {
+            // Keep the authorized record intact while capture continues. Removed ordinary type
+            // bits are narrowed after capture closes; never reassert microphone from a wake.
+            notifyPresentation(notification)
+            return
+        }
+        try {
             NotificationStreamForegroundService.foregroundPublisher(service, notification, type)
             publishedServiceType = type
             foregroundPromoted = true
-        } else {
-            service.getSystemService(NotificationManager::class.java).notify(
-                BackgroundConnectionNotification.NOTIFICATION_ID,
-                notification,
-            )
+        } catch (error: RuntimeException) {
+            val addsType = type and publishedServiceType.inv() != 0
+            val narrowingExistingRecord = foregroundPromoted && !acquireMicrophone && !addsType
+            val foregroundRejection = error is SecurityException || error.isForegroundServiceStartRejection()
+            if (!narrowingExistingRecord || !foregroundRejection) throw error
+            // Detaching would lose foreground protection and a background restart can fail.
+            // Keep the existing record, replace its controls, and retry narrowing on foreground.
+            notifyPresentation(notification)
         }
     }
 
-    fun promoteDictation(notification: Notification) {
-        publishForeground(notification, connectionServiceType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+    private fun notifyPresentation(notification: Notification) {
+        service.getSystemService(NotificationManager::class.java).notify(
+            BackgroundConnectionNotification.NOTIFICATION_ID,
+            notification,
+        )
+    }
+
+    /** An earlier rejected narrowing must retry even when dictation has already completed. */
+    fun reconcileAfterForegroundReturn() {
+        if (!isCurrent() || !foregroundPromoted) return
+        val type = connectionServiceType or dictation.foregroundServiceType
+        if (type == publishedServiceType || type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0) return
+        if (type == 0) {
+            removeForegroundAndStop(serviceStartId())
+        } else {
+            publishForeground(foregroundNotification(), type, replaceRecord = true)
+        }
+    }
+
+    fun promoteDictation(
+        notification: Notification,
+        type: Int,
+    ) {
+        publishForeground(
+            notification,
+            connectionServiceType or type,
+            acquireMicrophone = type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0,
+            replaceRecord = true,
+        )
     }
 
     fun updateDictationNotification(notification: Notification) {
-        if (isCurrent() && dictation.hasForegroundLease) promoteDictation(notification)
+        if (isCurrent() && dictation.hasForegroundLease) {
+            val type = connectionServiceType or dictation.foregroundServiceType
+            publishForeground(
+                notification,
+                type,
+                replaceRecord = type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE == 0,
+            )
+        }
     }
 
     /** A rejected ordinary card must never leave completed microphone controls behind. */
@@ -64,18 +125,7 @@ internal class ConversationForegroundRecord(
     fun releaseDictation(startId: Int = serviceStartId()) {
         if (dictation.hasForegroundLease || !isCurrent()) return
         if (connectionServiceType != 0) {
-            try {
-                publishForeground(connectionNotification(), connectionServiceType)
-            } catch (_: SecurityException) {
-                val reconcilePreference = connectionUserOwned
-                releaseConnection()
-                if (reconcilePreference) service.onConnectionRestoreRejected()
-            } catch (error: RuntimeException) {
-                if (!error.isForegroundServiceStartRejection()) throw error
-                val reconcilePreference = connectionUserOwned
-                releaseConnection()
-                if (reconcilePreference) service.onConnectionRestoreRejected()
-            }
+            publishForeground(connectionNotification, connectionServiceType, replaceRecord = true)
         } else {
             removeForegroundAndStop(startId)
         }
@@ -89,7 +139,6 @@ internal class ConversationForegroundRecord(
             return
         }
         connectionServiceType = 0
-        connectionUserOwned = false
         try {
             if (dictation.hasForegroundLease) {
                 dictation.refreshNotification()
@@ -112,7 +161,6 @@ internal class ConversationForegroundRecord(
 
     fun onDestroy() {
         connectionServiceType = 0
-        connectionUserOwned = false
         dictation.onDestroy()
         removeForegroundAndStop(serviceStartId())
     }

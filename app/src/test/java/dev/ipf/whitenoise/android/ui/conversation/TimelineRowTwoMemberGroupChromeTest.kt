@@ -45,8 +45,10 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +56,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
+import java.util.TimeZone
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -64,6 +67,19 @@ class TimelineRowTwoMemberGroupChromeTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val composerTextState = ComposerTextState(TextFieldValue())
+    private val originalTimeZone = TimeZone.getDefault()
+
+    /** Bubble timestamps render in the default zone; pin UTC so baselines match CI. */
+    @Before
+    fun pinTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    /** Restores the machine's zone after each test. */
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(originalTimeZone)
+    }
 
     @Test
     fun mountedNamedGroupPreservesTwoMemberChromeAcrossInitialRefresh() {
