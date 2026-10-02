@@ -123,18 +123,19 @@ class PollMessageEligibilityTest : PollMessageTestFixtures() {
         assertTrue(TimelineProjector.replyPreview(reply.copy(replyPreview = null), copy)?.originalUnavailable == true)
     }
 
-    @Test fun rejectedVoteOwnerStillCompletesCardCleanup() = runTest {
-        val item = pollMessage()
-        retain(item)
-        pollController.onCleared()
-        var completions = 0
-        submitOwnedPollVote(pollController, owner(item), listOf("a")) {
-            completions++
-            assertNull(it)
+    @Test fun rejectedVoteOwnerStillCompletesCardCleanup() =
+        runTest {
+            val item = pollMessage()
+            retain(item)
+            pollController.onCleared()
+            var completions = 0
+            submitOwnedPollVote(pollController, owner(item), listOf("a")) {
+                completions++
+                assertNull(it)
+            }
+            assertEquals(1, completions)
+            assertTrue(recordedCalls().none { it.first == "castPollVote" })
         }
-        assertEquals(1, completions)
-        assertTrue(recordedCalls().none { it.first == "castPollVote" })
-    }
 
     private fun owner(item: dev.ipf.whitenoise.android.state.TimelineMessage) =
         PollMessageActionOwner("personal", item.record.groupIdHex, item.record.messageIdHex)

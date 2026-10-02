@@ -138,7 +138,7 @@ class PollVotingInteractionTest {
     }
 
     @Test
-    fun losingVoteEligibilityClearsSubmittingWithoutACompletionCallback() {
+    fun losingVoteEligibilityHidesProgressButRetainsInFlightAdmission() {
         val available = mutableStateOf(true)
         val completions = mutableListOf<(SendAcceptDispositionFfi?) -> Unit>()
         composeRule.setContent {
@@ -157,10 +157,26 @@ class PollVotingInteractionTest {
         composeRule.onNodeWithText("Sending").assertDoesNotExist()
         composeRule.onNodeWithText("Salad").assertIsNotEnabled()
         composeRule.runOnIdle { available.value = true }
-        composeRule.onNodeWithText("Salad").assertIsEnabled().assertIsNotSelected().performClick()
+        composeRule.onNodeWithText("Sending").assertExists()
+        composeRule
+            .onNodeWithText("Salad")
+            .assertIsNotEnabled()
+            .assertIsNotSelected()
+        assertEquals(1, completions.size)
+        composeRule.runOnIdle { completions.first()(null) }
+        composeRule.onNodeWithText("Sending").assertDoesNotExist()
+        composeRule
+            .onNodeWithText("Salad")
+            .assertIsEnabled()
+            .assertIsNotSelected()
+            .performClick()
+        assertEquals(2, completions.size)
         composeRule.runOnIdle { completions.first()(null) }
         composeRule.onNodeWithText("Sending").assertExists()
-        composeRule.onNodeWithText("Salad", substring = true).assertIsSelected().assertIsNotEnabled()
+        composeRule
+            .onNodeWithText("Salad", substring = true)
+            .assertIsSelected()
+            .assertIsNotEnabled()
         composeRule.runOnIdle { completions.last()(SendAcceptDispositionFfi.PUBLISHED) }
         composeRule.onNodeWithText("Sending").assertDoesNotExist()
     }

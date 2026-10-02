@@ -989,7 +989,7 @@ internal fun MessageBubble(
     }
     LaunchedEffect(actionsReadOnly, isPollRecord) {
         if (isPollRecord && actionsReadOnly) {
-            onActionMenuOpenChange(false)
+            if (isActionMenuOpen) onActionMenuOpenChange(false)
             emojiPickerOpen = false
             reactionSheetOpen = false
             if (controller.replyingTo?.messageIdHex == record.messageIdHex) controller.replyingTo = null

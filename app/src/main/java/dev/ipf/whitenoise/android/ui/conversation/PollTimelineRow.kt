@@ -116,10 +116,6 @@ internal fun PollVotingCard(
     var pendingSelection by remember(voteKey) { mutableStateOf<List<String>?>(null) }
     var status by remember(voteKey) { mutableStateOf(PollVoteStatus.IDLE) }
     LaunchedEffect(voteKey, poll.localSelection, open, canVote) {
-        if (!canVote) {
-            voting = false
-            voteGeneration++
-        }
         if (pollVoteShouldReset(open, canVote, pendingSelection, poll.localSelection)) {
             pendingSelection = null
             status = PollVoteStatus.IDLE
@@ -131,7 +127,7 @@ internal fun PollVotingCard(
         poll = displayedPoll,
         canVote = effectiveCanVote && !voting,
         open = open,
-        status = if (voting) PollVoteStatus.SUBMITTING else status,
+        status = if (voting && effectiveCanVote) PollVoteStatus.SUBMITTING else status,
         footer = footer,
         onVote = vote@{ optionId ->
             if (!pollVoteCanStart(voting, effectiveCanVote, poll)) return@vote

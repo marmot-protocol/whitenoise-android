@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -196,6 +197,29 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule.waitUntil { composeRule.onAllNodesWithText("Sending").fetchSemanticsNodes().isEmpty() }
         composeRule.onNodeWithText("Soup").assertIsNotEnabled()
         composeRule.runOnIdle { assertEquals(1, recordedCalls().count { it.first == "castPollVote" }) }
+    }
+
+    @Test fun newlyMountedReadOnlyPollDoesNotDismissAnotherRowsMenu() {
+        val first = pollMessage()
+        val second = first.copy(record = first.record.copy(messageIdHex = "cc".repeat(32)), status = MessageStatus.Failed)
+        val secondMounted = mutableStateOf(false)
+        retain(first)
+        retain(second)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Column {
+                    RealPollMessage(first, menuOpen.value) { menuOpen.value = it }
+                    if (secondMounted.value) RealPollMessage(second, false) { menuOpen.value = it }
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag(messageBubbleRowTestTag(first.record.messageIdHex))
+            .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        composeRule.onNodeWithText("Reply").assertExists()
+        composeRule.runOnIdle { secondMounted.value = true }
+        composeRule.onNodeWithText("Reply").assertExists()
+        composeRule.runOnIdle { assertTrue(menuOpen.value) }
     }
 
     @Test fun deliveryWarningPreservesPollContentWithoutPermittingVotes() {
