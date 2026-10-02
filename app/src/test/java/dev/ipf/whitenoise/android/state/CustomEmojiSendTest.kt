@@ -194,13 +194,14 @@ class CustomEmojiSendTest {
     fun rejectedReferenceIsReuploadedOnceThenReportedAsAChangedChat() =
         runTest {
             val calls = mutableListOf<Pair<String, List<Any?>>>()
-            val stale = MarmotKitException.InvalidMediaReference("stale")
+            val stale = MarmotKitException.InvalidMediaReference(STALE_EPOCH_DETAILS)
             val recovered = recordingEngine(calls) { n -> if (n == 1) throw stale else sent }
             assertEquals(sent, recovered.send(listOf(artwork("party"))))
             assertEquals(2, calls.count { it.first == "uploadMedia" })
 
             val failing = mutableListOf<Pair<String, List<Any?>>>()
-            val engine = recordingEngine(failing) { throw MarmotKitException.InvalidMediaReference("stale") }
+            val rejection = MarmotKitException.InvalidMediaReference(STALE_EPOCH_DETAILS)
+            val engine = recordingEngine(failing) { throw rejection }
             val failure = runCatching { engine.send(listOf(artwork("party"))) }.exceptionOrNull()
             assertTrue(failure is EmojiChatChangedException)
             assertEquals(2, failing.count { it.first == "sendTaggedMedia" })
@@ -220,6 +221,36 @@ class CustomEmojiSendTest {
             assertEquals(2, calls.count { it.first == "sendTaggedMedia" })
             assertEquals(2, calls.count { it.first == "uploadMedia" })
         }
+
+    /** Only an epoch rejection is stale: a locator-policy rejection is not re-uploaded or called a changed chat. */
+    @Test
+    fun onlyEpochRejectionsAreTreatedAsStale() =
+        runTest {
+            val stale =
+                MarmotKitException.InvalidMediaReference(
+                    "media reference was encrypted at epoch 3 but the group is at epoch 4; upload it again",
+                )
+            val policy = MarmotKitException.InvalidMediaReference("no locator this client may fetch")
+            assertTrue(isStaleEmojiReference(stale))
+            assertFalse(isStaleEmojiReference(policy))
+            val calls = mutableListOf<Pair<String, List<Any?>>>()
+            val engine = recordingEngine(calls) { throw policy }
+            val failure = runCatching { engine.send(listOf(artwork("party"))) }.exceptionOrNull()
+            assertFalse(failure is EmojiChatChangedException)
+            assertEquals(1, calls.count { it.first == "uploadMedia" })
+            assertEquals(1, calls.count { it.first == "sendTaggedMedia" })
+        }
+
+    /** Each failure kind has its own notice: over the limit and a changed chat are not the generic failure. */
+    @Test
+    fun limitAndChangedChatHaveSpecificNotices() {
+        val generic = sendFailureMessageRes(IllegalStateException("x"))
+        val limit = sendFailureMessageRes(EmojiSendLimitException("too many"))
+        val changed = sendFailureMessageRes(EmojiChatChangedException(IllegalStateException("x")))
+        assertFalse(limit == generic)
+        assertFalse(changed == generic)
+        assertFalse(limit == changed)
+    }
 
     /** A send over MDK's tag limits, or with an unsendable code, fails before any native call. */
     @Test
@@ -321,3 +352,7 @@ class CustomEmojiSendTest {
         assertEquals(listOf(listOf("emoji", "party", "https://blob/party.png")), tags)
     }
 }
+
+/** The text MDK gives an `InvalidMediaReference` for a reference from an earlier epoch. */
+private const val STALE_EPOCH_DETAILS =
+    "media reference was encrypted at epoch 3 but the group is at epoch 4; upload it again"

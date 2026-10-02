@@ -797,6 +797,7 @@
     <string name="toast_send_connection_failed">Relay konnte nicht erreicht werden. Überprüfe deine Verbindung und versuche es erneut.</string>
     <string name="toast_send_queue_full">In diesem Chat warten zu viele Nachrichten auf den Versand, deine wurde nicht gesendet. Versuche es erneut, sobald der Rückstand abgebaut ist.</string>
     <string name="toast_send_chat_changed">Der Chat hat sich während des Sendens geändert, deshalb wurde die Nachricht nicht gesendet. Versuche es erneut.</string>
+    <string name="toast_send_emoji_limit">Diese Nachricht enthält zu viele eigene Emoji und wurde deshalb nicht gesendet. Entferne einige und versuche es erneut.</string>
     <string name="toast_chat_still_loading">Dieser Chat wird noch geladen. Versuche es gleich noch einmal.</string>
     <string name="toast_send_membership_verifying">Deine Gruppenmitgliedschaft wird überprüft — deine Nachricht wurde nicht gesendet. Sie bleibt im Eingabefeld; versuche es gleich erneut.</string>
     <string name="toast_reaction_failed">Reaktion fehlgeschlagen</string>
@@ -1537,7 +1538,7 @@
     <string name="custom_emoji_remove_title">%1$s entfernen?</string>
     <string name="custom_emoji_remove_detail">Das Bild wird von diesem Gerät gelöscht. Bereits gesendete Nachrichten behalten das hochgeladene Bild.</string>
     <string name="custom_emoji_too_large">Dieses Bild ist größer als 1 MB.</string>
-    <string name="custom_emoji_not_image">Diese Datei ist kein Bild, das White Noise anzeigen kann.</string>
+    <string name="custom_emoji_not_image">Diese Datei hat kein Bildformat, das White Noise als Emoji senden kann. Verwende PNG, GIF, WebP oder JPEG.</string>
     <string name="custom_emoji_save_failed">Das Emoji konnte nicht gespeichert werden.</string>
     <string name="action_color">Aktionsfarbe</string>
     <string name="action_color_no_active_account">Wähle ein aktives Konto aus, bevor du seine App-Akzentfarbe festlegst.</string>

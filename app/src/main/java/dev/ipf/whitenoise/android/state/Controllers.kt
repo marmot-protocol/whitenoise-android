@@ -119,6 +119,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
@@ -1204,8 +1205,7 @@ internal fun failedOptimisticMessageIdForInvalidatedProjection(
             if (!optimistic.record.sender.equals(projected.sender, ignoreCase = true)) return@firstOrNull false
             if (optimistic.record.kind != projected.kind) return@firstOrNull false
             optimistic.record.plaintext == projected.plaintext &&
-                optimistic.record.tags.filterNot { it.values.firstOrNull() == "p" } ==
-                projected.tags.filterNot { it.values.firstOrNull() == "p" }
+                sameRenderableSendTags(optimistic.record.tags, projected.tags)
         }?.record
         ?.messageIdHex
 
@@ -1247,9 +1247,25 @@ private fun messagesHaveSameRenderableSendShape(
     if (left.groupIdHex != right.groupIdHex) return false
     if (!left.sender.equals(right.sender, ignoreCase = true)) return false
     if (left.kind != right.kind) return false
-    return left.plaintext == right.plaintext &&
-        left.tags.filterNot { it.values.firstOrNull() == "p" } ==
-        right.tags.filterNot { it.values.firstOrNull() == "p" }
+    return left.plaintext == right.plaintext && sameRenderableSendTags(left.tags, right.tags)
+}
+
+/**
+ * Whether two copies of one send carry the same tags that matter. Engine-derived `p` mentions never
+ * count. A custom-emoji send is a media message, so MDK's copy adds `imeta` and `emoji` rows the
+ * typed optimistic copy never has, and after a re-upload their URLs differ too. When either side
+ * carries emoji tags only the reply identity is compared.
+ */
+internal fun sameRenderableSendTags(
+    left: List<MessageTagFfi>,
+    right: List<MessageTagFfi>,
+): Boolean {
+    val hasEmoji = (left + right).any { it.values.firstOrNull() == "emoji" }
+    return if (hasEmoji) {
+        replyIdentityTags(left) == replyIdentityTags(right)
+    } else {
+        left.filterNot { it.values.firstOrNull() == "p" } == right.filterNot { it.values.firstOrNull() == "p" }
+    }
 }
 
 /**
@@ -1275,11 +1291,22 @@ internal fun committedButUnpublishedProjectionForOptimistic(
             timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
         } else {
             optimistic.plaintext == projectedAction.plaintext &&
-                optimistic.tags == projectedAction.tags &&
+                (
+                    optimistic.tags == projectedAction.tags ||
+                        emojiSendTagsMatch(optimistic.tags, projectedAction.tags)
+                ) &&
                 timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
         }
     }
 }
+
+/** Whether [projected] is the MDK copy of an emoji send whose typed copy [optimistic] has the same reply identity. */
+private fun emojiSendTagsMatch(
+    optimistic: List<MessageTagFfi>,
+    projected: List<MessageTagFfi>,
+): Boolean =
+    projected.any { it.values.firstOrNull() == "emoji" } &&
+        replyIdentityTags(optimistic) == replyIdentityTags(projected)
 
 private fun timestampsAreNear(
     left: ULong,
@@ -8120,9 +8147,9 @@ class ConversationController(
 
     /**
      * One native publication of the composer text: the durable token-bound send, or, when the text
-     * uses the user's own emoji, upload-only images followed by one tagged media send. The account
-     * and the optimistic send are re-checked after the upload, so a result for a replaced scope is
-     * never published.
+     * uses the user's own emoji, upload-only images followed by one tagged media send. The optimistic
+     * send is re-checked on this controller's context after the upload and again inside the commit
+     * lock right before publishing, so a cancelled send is never published.
      */
     @Suppress("LongParameterList")
     private suspend fun publishComposerTextOnce(
@@ -8134,9 +8161,10 @@ class ConversationController(
         emojiArtwork: List<LocalEmojiArtwork>,
         optimisticKey: String,
     ): dev.ipf.marmotkit.SendSummaryFfi {
-        val ensureCurrent = {
-            check(conversationAccountRef == account) { "account changed while sending custom emoji" }
-            requireOptimisticSendNotCancelled(optimisticKey)
+        // The native calls run on the IO dispatcher, but the send phases belong to this controller's context.
+        val controllerContext = currentCoroutineContext()
+        val ensureCurrent: suspend () -> Unit = {
+            withContext(controllerContext) { requireOptimisticSendNotCancelled(optimisticKey) }
         }
         val injected = customEmojiSender
         return when {
@@ -8214,7 +8242,7 @@ class ConversationController(
         optimisticKey: String,
     ): dev.ipf.marmotkit.SendSummaryFfi {
         // Replies and injected publishers keep their plain-text path. A message that uses the user's
-        // own emoji uploads their images, which are not idempotent, so a failure is not auto-retried.
+        // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
         val emojiArtwork = emojiArtworkForSend(replyTarget, trimmed)
         return appState.withConversationTextSendOrder(account, group.groupIdHex) {
             retryPendingConversationSend(

@@ -833,6 +833,7 @@
     <string name="toast_send_connection_failed">Не удалось подключиться к ретранслятору. Проверьте подключение и повторите попытку.</string>
     <string name="toast_send_queue_full">В этом чате слишком много сообщений ожидает отправки, поэтому ваше не отправлено. Повторите попытку, когда очередь разберётся.</string>
     <string name="toast_send_chat_changed">Чат изменился во время отправки, поэтому сообщение не отправлено. Повторите попытку.</string>
+    <string name="toast_send_emoji_limit">В сообщении слишком много своих эмодзи, поэтому оно не отправлено. Уберите часть и повторите попытку.</string>
     <string name="toast_chat_still_loading">Этот чат ещё загружается. Повторите попытку чуть позже.</string>
     <string name="toast_send_membership_verifying">Проверяем ваше участие в группе — сообщение не отправлено. Оно сохранено в поле ввода; повторите попытку через мгновение.</string>
     <string name="toast_reaction_failed">Реакция не удалась</string>
@@ -1599,7 +1600,7 @@
     <string name="custom_emoji_remove_title">Удалить %1$s?</string>
     <string name="custom_emoji_remove_detail">Изображение удаляется с этого устройства. Уже отправленные сообщения сохраняют загруженное изображение.</string>
     <string name="custom_emoji_too_large">Изображение больше 1 МБ.</string>
-    <string name="custom_emoji_not_image">Этот файл не является изображением, которое White Noise может показать.</string>
+    <string name="custom_emoji_not_image">Этот файл не в формате, который White Noise может отправлять как эмодзи. Используйте PNG, GIF, WebP или JPEG.</string>
     <string name="custom_emoji_save_failed">Не удалось сохранить эмодзи.</string>
     <string name="action_color">Цвет действия</string>
     <string name="action_color_no_active_account">Выберите активную учётную запись, прежде чем настраивать её акцентный цвет.</string>

@@ -797,6 +797,7 @@
     <string name="toast_send_connection_failed">Impossibile raggiungere il relay. Controlla la connessione e riprova.</string>
     <string name="toast_send_queue_full">Questa chat ha troppi messaggi in attesa di invio, quindi il tuo non è stato inviato. Riprova quando sarà in pari.</string>
     <string name="toast_send_chat_changed">La chat è cambiata durante l\'invio, quindi il messaggio non è stato inviato. Riprova.</string>
+    <string name="toast_send_emoji_limit">Questo messaggio ha troppe emoji personalizzate, quindi non è stato inviato. Rimuovine alcune e riprova.</string>
     <string name="toast_chat_still_loading">Questa chat si sta ancora caricando. Riprova tra un attimo.</string>
     <string name="toast_send_membership_verifying">Verifica dell’appartenenza al gruppo — il messaggio non è stato inviato. È rimasto nella casella; riprova tra un istante.</string>
     <string name="toast_reaction_failed">La reazione è fallita</string>
@@ -1539,7 +1540,7 @@
     <string name="custom_emoji_remove_title">Rimuovere %1$s?</string>
     <string name="custom_emoji_remove_detail">L\'immagine viene eliminata da questo dispositivo. I messaggi già inviati mantengono l\'immagine caricata.</string>
     <string name="custom_emoji_too_large">L’immagine supera 1 MB.</string>
-    <string name="custom_emoji_not_image">Questo file non è un’immagine che White Noise può mostrare.</string>
+    <string name="custom_emoji_not_image">Questo file non è in un formato immagine che White Noise può inviare come emoji. Usa PNG, GIF, WebP o JPEG.</string>
     <string name="custom_emoji_save_failed">Impossibile salvare l’emoji.</string>
     <string name="action_color">Colore azione</string>
     <string name="action_color_no_active_account">Seleziona un account attivo prima di impostarne il colore d’accento.</string>

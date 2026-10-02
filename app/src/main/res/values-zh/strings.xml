@@ -783,6 +783,7 @@
     <string name="toast_send_connection_failed">无法连接到中继。请检查网络连接，然后重试。</string>
     <string name="toast_send_queue_full">此聊天有太多消息在等待发送，因此你的消息未发送。等积压清空后再试。</string>
     <string name="toast_send_chat_changed">发送期间聊天已更改，因此消息未发出。请重试。</string>
+    <string name="toast_send_emoji_limit">此消息的自定义表情太多，因此未发出。请移除一些后重试。</string>
     <string name="toast_chat_still_loading">此聊天仍在加载中，稍后再试。</string>
     <string name="toast_send_membership_verifying">正在确认群组成员身份 — 消息未发送。文字已保留在输入框中，请稍后重试。</string>
     <string name="toast_reaction_failed">反应失败</string>
@@ -1511,7 +1512,7 @@
     <string name="custom_emoji_remove_title">移除 %1$s？</string>
     <string name="custom_emoji_remove_detail">图片将从此设备删除。已发送的消息会保留其上传的图片。</string>
     <string name="custom_emoji_too_large">该图片超过 1 MB。</string>
-    <string name="custom_emoji_not_image">该文件不是 White Noise 可以显示的图片。</string>
+    <string name="custom_emoji_not_image">此文件不是 White Noise 可作为表情发送的图片格式。请使用 PNG、GIF、WebP 或 JPEG。</string>
     <string name="custom_emoji_save_failed">无法保存该表情。</string>
     <string name="action_color">动作颜色</string>
     <string name="action_color_no_active_account">设置应用强调色前，请先选择一个活跃账户。</string>

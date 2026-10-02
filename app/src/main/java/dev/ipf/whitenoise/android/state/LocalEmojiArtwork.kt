@@ -102,13 +102,20 @@ private data class EmojiUploadKey(
 
 /**
  * Uploaded emoji references, reused while the group's epoch is the one they were encrypted under.
- * One lock serializes uploads, so a retry or a concurrent send waits for the in-flight upload and
- * then reuses it instead of uploading the same image twice. Only references live here, never
- * plaintext, and a rejected reference is dropped with [invalidate].
+ * One lock per (account, group) serializes that chat's uploads, so a retry or a concurrent send
+ * waits for the in-flight upload and then reuses it instead of uploading the same image twice,
+ * while other chats upload independently. Only references live here, never plaintext, and a
+ * rejected reference is dropped with [invalidate].
  */
 internal class EmojiUploadCache {
-    private val lock = Mutex()
+    private val locks = HashMap<Pair<String, String>, Mutex>()
     private val references = LinkedHashMap<EmojiUploadKey, MediaAttachmentReferenceFfi>()
+
+    /** The lock serializing uploads for one chat. */
+    private fun lockFor(
+        account: String,
+        group: String,
+    ): Mutex = synchronized(locks) { locks.getOrPut(account to group) { Mutex() } }
 
     /** One reference per distinct image in [artwork], uploading only those not already cached. */
     suspend fun referencesFor(
@@ -118,25 +125,26 @@ internal class EmojiUploadCache {
         artwork: List<LocalEmojiArtwork>,
         currentEpoch: suspend () -> ULong,
     ): Map<String, MediaAttachmentReferenceFfi> =
-        lock.withLock {
+        lockFor(account, group).withLock {
             val epoch = currentEpoch()
 
             fun key(emoji: LocalEmojiArtwork) = EmojiUploadKey(account, group, emoji.sha256, epoch)
-            val missing = artwork.distinctBy { it.sha256 }.filter { key(it) !in references }
-            if (missing.isNotEmpty()) {
-                val uploaded = engine.uploadEmojiArtwork(account, group, missing)
+            val distinct = artwork.distinctBy { it.sha256 }
+            val missing = synchronized(references) { distinct.filter { key(it) !in references } }
+            val uploaded = if (missing.isEmpty()) emptyList() else engine.uploadEmojiArtwork(account, group, missing)
+            synchronized(references) {
                 missing.zip(uploaded).forEach { (emoji, reference) -> references[key(emoji)] = reference }
+                // Build the result first, then evict, so eviction can never remove a reference this send needs.
+                val result = artwork.associate { it.sha256 to references.getValue(key(it)) }
+                // Touch the batch so it is the newest, then drop the oldest entries beyond the limit.
+                result.forEach { (sha, reference) ->
+                    val touched = EmojiUploadKey(account, group, sha, epoch)
+                    references.remove(touched)
+                    references[touched] = reference
+                }
+                while (references.size > MAX_ENTRIES) references.remove(references.keys.first())
+                result
             }
-            // Build the result first, then evict, so eviction can never remove a reference this send needs.
-            val result = artwork.associate { it.sha256 to references.getValue(key(it)) }
-            // Touch the batch so it is the newest, then drop the oldest entries beyond the limit.
-            result.forEach { (sha, reference) ->
-                val touched = EmojiUploadKey(account, group, sha, epoch)
-                references.remove(touched)
-                references[touched] = reference
-            }
-            while (references.size > MAX_ENTRIES) references.remove(references.keys.first())
-            result
         }
 
     /** Forgets every reference for [account] and [group], so the next send re-encrypts under the current epoch. */
@@ -144,7 +152,9 @@ internal class EmojiUploadCache {
         account: String,
         group: String,
     ) {
-        lock.withLock { references.keys.removeAll { it.account == account && it.group == group } }
+        lockFor(account, group).withLock {
+            synchronized(references) { references.keys.removeAll { it.account == account && it.group == group } }
+        }
     }
 
     private companion object {
@@ -198,7 +208,7 @@ internal fun emojiTags(
 
 /** Test seam for the emoji send: account, text, emoji, the scope check, then the lock around the publish. */
 typealias CustomEmojiSender =
-    suspend (String, String, List<LocalEmojiArtwork>, () -> Unit, EmojiPublishLock) -> SendSummaryFfi
+    suspend (String, String, List<LocalEmojiArtwork>, suspend () -> Unit, EmojiPublishLock) -> SendSummaryFfi
 
 /** Runs the given publish while holding whatever lock serializes group commits. */
 typealias EmojiPublishLock = suspend (suspend () -> SendSummaryFfi) -> SendSummaryFfi
@@ -239,7 +249,7 @@ private suspend fun MarmotInterface.attemptEmojiSend(
     artwork: List<LocalEmojiArtwork>,
     cache: EmojiUploadCache,
     currentEpoch: suspend () -> ULong,
-    ensureCurrent: () -> Unit,
+    ensureCurrent: suspend () -> Unit,
     publishLock: EmojiPublishLock,
 ): SendSummaryFfi {
     val referenceBySha = uploadStage(cache, account, group, artwork, currentEpoch)
@@ -278,7 +288,7 @@ internal suspend fun MarmotInterface.sendTextWithCustomEmoji(
     artwork: List<LocalEmojiArtwork>,
     cache: EmojiUploadCache,
     currentEpoch: suspend () -> ULong = { groupMlsState(account, group).epoch },
-    ensureCurrent: () -> Unit = {},
+    ensureCurrent: suspend () -> Unit = {},
     publishLock: EmojiPublishLock = { it() },
 ): SendSummaryFfi {
     precheckEmojiSend(artwork)

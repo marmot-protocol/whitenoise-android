@@ -288,6 +288,14 @@
         ]
       },
       {
+        "surface": "Custom emoji send refused for too many emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "R.string.toast_send_emoji_limit",
+        "test_ids": [
+          "MSG-034"
+        ]
+      },
+      {
         "surface": "Generic send failure notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
         "anchor": "R.string.toast_send_failed",
