@@ -87,6 +87,30 @@ class InvariantGateRegistryTest {
         )
     }
 
+    /** Only Kotlin tests inside a test source set can be gates, so production or tooling files are rejected. */
+    @Test
+    fun registryEntryOutsideATestSourceSetFails() {
+        val mainActivity = "app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt"
+        val escape = "app/src/test/../main/java/EscapeCoverageTest.kt"
+        val device = "app/src/androidTest/java/dev/ipf/whitenoise/android/DeviceCoverageTest.kt"
+        val rows =
+            parseInvariantGateRegistry(
+                registry(
+                    row("MainActivity", mainActivity),
+                    row("EscapeCoverageTest", escape),
+                    row("DeviceCoverageTest", device),
+                ),
+            )
+
+        assertEquals(
+            listOf(
+                "line 4: $mainActivity must be a Kotlin test under app/src/test or app/src/androidTest",
+                "line 5: $escape must be a Kotlin test under app/src/test or app/src/androidTest",
+            ),
+            invariantGateRegistryErrors(rows, setOf(device)) { true },
+        )
+    }
+
     /** Malformed rows and missing table markers are rejected rather than skipped. */
     @Test
     fun malformedRegistryIsRejected() {

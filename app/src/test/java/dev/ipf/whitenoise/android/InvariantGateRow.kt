@@ -18,6 +18,7 @@ private const val COVERAGE_TEST_SUFFIX = "CoverageTest.kt"
 private const val REGISTRY_COLUMNS = 3
 private val gateCell = Regex("""^\[`([A-Za-z0-9_]+)`]\(\.\./([^)\s]+)\)$""")
 private val skippedDirectories = setOf("build", "node_modules")
+private val testSourceRoots = listOf("app/src/test/", "app/src/androidTest/")
 
 /**
  * Parses the marked registry table into rows, failing on any malformed row so a typo cannot silently
@@ -79,14 +80,25 @@ internal fun invariantGateRegistryErrors(
         unregistered.sorted().map { "unregistered coverage test $it, add it to $INVARIANT_GATE_REGISTRY_PATH" }
 }
 
-/** Returns the first problem local to this row — a missing file, a name mismatch or a blank cell — or null. */
+/**
+ * Returns the first problem local to this row — a path outside a test source set, a missing file, a name mismatch
+ * or a blank cell — or null.
+ */
 private fun InvariantGateRow.rowError(exists: (String) -> Boolean): String? =
     when {
+        !isTestSourcePath(path) -> "$path must be a Kotlin test under app/src/test or app/src/androidTest"
         !exists(path) -> "registered test $path does not exist"
         File(path).name != "$name.kt" -> "$name does not match its file $path"
         invariant.isBlank() || owner.isBlank() -> "$name needs an invariant and an owner"
         else -> null
     }
+
+/**
+ * True when [path] is a Kotlin file under a test source set with no `..` segment, so production code, tooling and
+ * escaped paths can never be registered as gates. Mirrors `isTestSourcePath` in `check-invariant-gate.js`.
+ */
+private fun isTestSourcePath(path: String): Boolean =
+    testSourceRoots.any(path::startsWith) && path.endsWith(".kt") && ".." !in path.split('/')
 
 /** Finds every `*CoverageTest.kt` under [root], skipping hidden and generated directories, as relative paths. */
 internal fun discoverCoverageTests(root: File): Set<String> =

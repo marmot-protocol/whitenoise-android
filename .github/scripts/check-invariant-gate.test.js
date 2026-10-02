@@ -203,3 +203,156 @@ test('run passes a feature-only pull request without a declaration', async () =>
   assert.deepEqual(outcome.failures, [])
   assert.match(outcome.infos[0], /No closing issue is a bug/)
 })
+
+test('registers only gates that live in a test source set', () => {
+  const outside = [
+    '<!-- invariant-gates:start -->',
+    '| [`MainActivity`](../app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt) | Rule. | Owner |',
+    '| [`Script`](../.github/scripts/check-invariant-gate.js) | Rule. | Owner |',
+    '| [`EscapeCoverageTest`](../app/src/test/../main/EscapeCoverageTest.kt) | Rule. | Owner |',
+    '| [`DeviceCoverageTest`](../app/src/androidTest/java/dev/ipf/DeviceCoverageTest.kt) | Rule. | Owner |',
+    '<!-- invariant-gates:end -->',
+  ].join('\n')
+  const gates = parseRegistry(outside)
+  assert.deepEqual([...gates.keys()], ['DeviceCoverageTest'])
+  const mainFile = { filename: 'app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt', status: 'modified' }
+  assert.equal(evaluate({ closingIssues: [bug], files: [mainFile], body: '', registry: gates }).status, 'fail')
+  const named = evaluate({ closingIssues: [bug], files: [], body: 'Invariant gate: MainActivity', registry: gates })
+  assert.equal(named.status, 'fail')
+})
+
+test('ignores declarations GitHub does not render as visible text', () => {
+  const hidden = [
+    '<script>\nInvariant gate exemption: one-off — hidden from reviewers\n</script>',
+    '<style>\nInvariant gate exemption: one-off — hidden from reviewers\n</style>',
+    '[x]: https://example.com "\nInvariant gate exemption: one-off — hidden from reviewers\n"',
+    "[x]:\n  https://example.com\n  '\nInvariant gate exemption: one-off — hidden from reviewers\n'",
+    '[x]: https://example.com (\nInvariant gate exemption: one-off — hidden from reviewers\n)',
+    'See <a title="\nInvariant gate exemption: one-off — hidden from reviewers\n">x</a>',
+    "<img alt='\nInvariant gate exemption: one-off — hidden from reviewers\n' src=x>",
+  ]
+  for (const body of hidden) assert.equal(gate({ body }).status, 'fail', body)
+})
+
+test('keeps declarations that GitHub renders next to HTML or link definitions', () => {
+  const visible = [
+    '<details>\n<summary>Gate</summary>\n\nInvariant gate exemption: upstream — owned and enforced by MDK\n</details>',
+    '[x]: https://example.com "title"\nInvariant gate exemption: upstream — owned and enforced by MDK',
+    '<br>\nInvariant gate exemption: upstream — owned and enforced by MDK',
+  ]
+  for (const body of visible) assert.equal(gate({ body }).status, 'pass', body)
+})
+
+test('requires ten visible, non-punctuation characters in an exemption explanation', () => {
+  const empty = [
+    'Invariant gate exemption: upstream ​​​​​​​​​​​',
+    'Invariant gate exemption: upstream — ..........',
+    'Invariant gate exemption: upstream — ⁠­　  — ---- !!!! ????',
+    'Invariant gate exemption: upstream — a b c d e f g',
+  ]
+  for (const body of empty) assert.equal(gate({ body }).status, 'fail', JSON.stringify(body))
+  assert.equal(gate({ body: 'Invariant gate exemption: upstream — MDK owns this rule' }).status, 'pass')
+})
+
+test('reads CRLF descriptions and short HTML comments the way GitHub renders them', () => {
+  const crlf = 'Summary\r\n\r\n```\r\ncode\r\n```\r\n\r\nInvariant gate exemption: upstream — owned by MDK entirely\r\n'
+  assert.equal(gate({ body: crlf }).status, 'pass')
+  for (const opener of ['<!-->', '<!--->']) {
+    const body = `${opener}\nInvariant gate exemption: upstream — owned by MDK entirely`
+    assert.equal(gate({ body }).status, 'pass', opener)
+  }
+})
+
+test('accepts an explanation or a link after a named gate', () => {
+  const bodies = [
+    'Invariant gate: StalenessGuardCoverageTest — it already enforces latest-wins publication',
+    'Invariant gate: [StalenessGuardCoverageTest](docs/invariant-gates.md)',
+    'Invariant gate: `StalenessGuardCoverageTest` - extended with the new call site',
+  ]
+  for (const body of bodies) assert.equal(gate({ body }).status, 'pass', body)
+  assert.deepEqual(parseDeclaration('Invariant gate: A, B — both apply').gates, ['A', 'B'])
+})
+
+test('run reads the proposed registry as data through the API at the live head commit', async () => {
+  const contentRequests = []
+  const failures = []
+  const github = {
+    graphql: async () => ({
+      repository: {
+        pullRequest: {
+          body: 'Invariant gate: StalenessGuardCoverageTest',
+          headRefOid: 'head-sha',
+          closingIssuesReferences: { nodes: [bug] },
+        },
+      },
+    }),
+    paginate: async () => [productionFile],
+    rest: {
+      pulls: { listFiles: () => {} },
+      repos: {
+        getContent: async request => {
+          contentRequests.push(request)
+          return { data: REGISTRY }
+        },
+      },
+    },
+  }
+  const context = { payload: { pull_request: { number: 42 } }, repo: { owner: 'marmot', repo: 'base' } }
+  const core = { info: () => {}, setFailed: message => failures.push(message) }
+
+  const outcome = await run({ github, context, core })
+
+  assert.deepEqual(contentRequests, [{
+    owner: 'marmot',
+    repo: 'base',
+    path: REGISTRY_PATH,
+    ref: 'head-sha',
+    mediaType: { format: 'raw' },
+  }])
+  assert.equal(outcome.status, 'pass')
+  assert.deepEqual(failures, [])
+})
+
+test('run treats a registry missing at the head commit as empty instead of crashing', async () => {
+  const github = {
+    graphql: async () => ({
+      repository: {
+        pullRequest: { body: 'Invariant gate: StalenessGuardCoverageTest', headRefOid: 'h', closingIssuesReferences: { nodes: [bug] } },
+      },
+    }),
+    paginate: async () => [productionFile],
+    rest: {
+      pulls: { listFiles: () => {} },
+      repos: { getContent: async () => { throw Object.assign(new Error('Not Found'), { status: 404 }) } },
+    },
+  }
+  const failures = []
+  const context = { payload: { pull_request: { number: 1 } }, repo: { owner: 'o', repo: 'r' } }
+  await run({ github, context, core: { info: () => {}, setFailed: m => failures.push(m) } })
+  assert.match(failures[0], /not a gate registered/)
+})
+
+test('the workflow runs the base-revision checker with a read-only token and no PR text in shell', () => {
+  const workflow = fs.readFileSync(path.join(__dirname, '..', 'workflows', 'invariant-gate.yml'), 'utf8')
+  const triggers = workflow.slice(workflow.indexOf('\non:'), workflow.indexOf('\nconcurrency:'))
+  assert.match(triggers, /^ {2}pull_request:$/m)
+  assert.doesNotMatch(triggers, /pull_request_target/, 'the job never needs a privileged token')
+  const permissions = workflow.slice(workflow.indexOf('\npermissions:'), workflow.indexOf('\njobs:'))
+  assert.deepEqual(permissions.trim().split('\n').slice(1).map(line => line.trim()).sort(), [
+    'contents: read',
+    'issues: read',
+    'pull-requests: read',
+  ])
+  assert.doesNotMatch(workflow, /secrets\./)
+  assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}\n\s+path: trusted/)
+  assert.match(workflow, /if: hashFiles\('trusted\/\.github\/scripts\/check-invariant-gate\.js'\) == ''/)
+  assert.doesNotMatch(workflow, /registryPath|proposed\/docs/, 'the proposed registry is read through the API')
+  const expressions = [...workflow.matchAll(/\$\{\{([^}]*)\}\}/g)].map(match => match[1].trim()).sort()
+  assert.deepEqual(expressions, [
+    'github.event.pull_request.base.sha',
+    'github.event.pull_request.number',
+    'steps.script.outputs.root',
+    'steps.script.outputs.root',
+  ])
+  assert.equal(workflow.match(/persist-credentials: false/g).length, 2)
+})

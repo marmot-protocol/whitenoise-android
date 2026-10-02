@@ -4,14 +4,17 @@ name: Invariant gate
 # registered invariant gate (docs/invariant-gates.md). The job reads PR metadata
 # with the default read-only token, needs no secrets and runs for fork pull
 # requests. `edited` re-runs it when the description gains or changes its
-# declaration. It never builds or compiles, and it is independent of the visual
-# gate.
+# declaration. It compiles nothing and is independent of the visual gate.
 #
-# The checker and its tests run from the trusted base revision, so a pull
-# request cannot rewrite the check that judges it. The pull request's registry
-# is read as data only. The single exception is bootstrap: when the base does
-# not contain the checker yet (only the pull request that introduces it), the
-# proposed checker runs and the job says so.
+# What is and is not protected: the checker script and its tests run from the
+# base revision, and the pull request's registry is fetched through the API as
+# data, so a pull request cannot alter the checker or its tests. This workflow
+# file itself runs from the pull request (pull_request event), so a change to it
+# is protected only by review: CODEOWNERS requests an owner for .github/, and
+# making this check required plus requiring code-owner review are admin
+# branch-protection steps. The one exception to base-revision execution is
+# bootstrap, when the base has no checker yet (only the pull request that adds
+# it), which falls back to the proposed checker with a warning.
 on:
   pull_request:
     branches: [master]
@@ -32,24 +35,27 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check out the trusted gate script
+      - name: Check out the base-revision gate script
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: trusted
-          # The trusted tests read the base registry, so check it out beside the script.
+          # The trusted tests read the base registry and this workflow, so check them out beside the script.
           sparse-checkout: |
             .github/scripts
+            .github/workflows/invariant-gate.yml
             docs/invariant-gates.md
           sparse-checkout-cone-mode: false
           persist-credentials: false
 
-      - name: Check out the proposed registry
+      - name: Check out the proposed gate script for bootstrap only
+        if: hashFiles('trusted/.github/scripts/check-invariant-gate.js') == ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: proposed
           sparse-checkout: |
             .github/scripts
+            .github/workflows/invariant-gate.yml
             docs/invariant-gates.md
           sparse-checkout-cone-mode: false
           persist-credentials: false
@@ -75,7 +81,6 @@ jobs:
         with:
           script: |
             const path = require('node:path')
-            const workspace = process.env.GITHUB_WORKSPACE
-            const gate = require(path.join(workspace, process.env.GATE_ROOT, '.github/scripts/check-invariant-gate.js'))
-            const registryPath = path.join(workspace, 'proposed/docs/invariant-gates.md')
-            await gate.run({ github, context, core, registryPath })
+            const root = path.join(process.env.GITHUB_WORKSPACE, process.env.GATE_ROOT)
+            const gate = require(path.join(root, '.github/scripts/check-invariant-gate.js'))
+            await gate.run({ github, context, core })
