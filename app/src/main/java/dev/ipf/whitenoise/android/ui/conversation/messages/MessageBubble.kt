@@ -2174,7 +2174,7 @@ internal fun MessageBubble(
                         null
                     }
                 val visiblePoll =
-                    item.projected?.poll.takeIf { isPollRecord && !deleted && !invalidated && !persistedFailure }
+                    item.projected?.poll.takeIf { isPollRecord && !deleted && !persistedFailure }
                 val pollTimestampColor =
                     if (visiblePoll != null) {
                         messageBubbleFooterColor(
@@ -2200,16 +2200,25 @@ internal fun MessageBubble(
                             canVote = !actionsReadOnly && !selectionMode,
                             modifier = Modifier.testTag("poll-message-card"),
                             footer = {
-                                MessageInlineFooter(
-                                    timeText = rememberedMessageBubbleTime(record.recordedAt),
-                                    color = pollTimestampColor,
-                                    showStatus = showOutgoingStatus,
-                                    status = item.status,
-                                    editedLabel = footerLabel,
-                                    onEditedClick = null,
-                                    modifier = Modifier.testTag("poll-message-footer"),
-                                    statusContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                )
+                                Column(horizontalAlignment = Alignment.End) {
+                                    invalidationWarning?.let { warning ->
+                                        MessageBubbleInvalidationWarning(
+                                            warning = warning,
+                                            color = pollTimestampColor,
+                                            modifier = Modifier.testTag("poll-message-warning"),
+                                        )
+                                    }
+                                    MessageInlineFooter(
+                                        timeText = rememberedMessageBubbleTime(record.recordedAt),
+                                        color = pollTimestampColor,
+                                        showStatus = showOutgoingStatus,
+                                        status = item.status,
+                                        editedLabel = footerLabel,
+                                        onEditedClick = null,
+                                        modifier = Modifier.testTag("poll-message-footer"),
+                                        statusContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    )
+                                }
                             },
                         )
                     }

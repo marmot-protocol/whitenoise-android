@@ -108,10 +108,15 @@ internal fun PollVotingCard(
     footer: (@Composable () -> Unit)? = null,
 ) {
     var voting by remember(voteKey) { mutableStateOf(false) }
+    var voteGeneration by remember(voteKey) { mutableStateOf(0L) }
     var pendingSelection by remember(voteKey) { mutableStateOf<List<String>?>(null) }
     var status by remember(voteKey) { mutableStateOf(PollVoteStatus.IDLE) }
-    LaunchedEffect(voteKey, poll.localSelection, open) {
-        if (!open || pendingSelection?.toSet() == poll.localSelection.toSet()) {
+    LaunchedEffect(voteKey, poll.localSelection, open, canVote) {
+        if (!canVote) {
+            voting = false
+            voteGeneration++
+        }
+        if (!open || !canVote || pendingSelection?.toSet() == poll.localSelection.toSet()) {
             pendingSelection = null
             status = PollVoteStatus.IDLE
         }
@@ -127,13 +132,16 @@ internal fun PollVotingCard(
         onVote = vote@{ optionId ->
             if (voting || !effectiveCanVote || !pollVoteAllowed(poll, System.currentTimeMillis())) return@vote
             val replacement = replacementPollSelection(displayedPoll, optionId) ?: return@vote
+            val submissionGeneration = ++voteGeneration
             voting = true
             status = PollVoteStatus.SUBMITTING
             pendingSelection = replacement
             submitVote(replacement) { outcome ->
-                status = if (pendingSelection == null) PollVoteStatus.IDLE else outcome.voteStatus()
-                if (outcome == null) pendingSelection = null
-                voting = false
+                if (submissionGeneration == voteGeneration) {
+                    status = if (pendingSelection == null) PollVoteStatus.IDLE else outcome.voteStatus()
+                    if (outcome == null) pendingSelection = null
+                    voting = false
+                }
             }
         },
     )

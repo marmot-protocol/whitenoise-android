@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -134,6 +135,29 @@ class PollVotingInteractionTest {
         composeRule.onNodeWithText("Delivery not confirmed").assertExists()
         composeRule.onNodeWithText("Sending").assertDoesNotExist()
         assertEquals(1, calls)
+    }
+
+    @Test
+    fun losingVoteEligibilityClearsSubmittingWithoutACompletionCallback() {
+        val available = mutableStateOf(true)
+        val completions = mutableListOf<(SendAcceptDispositionFfi?) -> Unit>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                PollVotingCard(poll(), "account" to "received-poll", canVote = available.value, submitVote = { _, done -> completions += done })
+            }
+        }
+        composeRule.onNodeWithText("Salad", substring = true).performClick()
+        composeRule.onNodeWithText("Sending").assertExists()
+        composeRule.runOnIdle { available.value = false }
+        composeRule.onNodeWithText("Sending").assertDoesNotExist()
+        composeRule.onNodeWithText("Salad").assertIsNotEnabled()
+        composeRule.runOnIdle { available.value = true }
+        composeRule.onNodeWithText("Salad").assertIsEnabled().assertIsNotSelected().performClick()
+        composeRule.runOnIdle { completions.first()(null) }
+        composeRule.onNodeWithText("Sending").assertExists()
+        composeRule.onNodeWithText("Salad", substring = true).assertIsSelected().assertIsNotEnabled()
+        composeRule.runOnIdle { completions.last()(SendAcceptDispositionFfi.PUBLISHED) }
+        composeRule.onNodeWithText("Sending").assertDoesNotExist()
     }
 
     @Test

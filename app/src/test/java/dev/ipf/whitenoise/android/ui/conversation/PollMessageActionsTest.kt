@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -184,10 +185,19 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule.runOnIdle { assertEquals(false, menuOpen.value) }
     }
 
+    @Test fun deliveryWarningPreservesPollContentWithoutPermittingVotes() {
+        render(invalidation = "local_publish_failed")
+        composeRule.onNodeWithText("Lunch?").assertExists()
+        composeRule.onNodeWithText("Soup").assertIsNotEnabled()
+        composeRule.onNodeWithTag("poll-message-warning").assertExists()
+        composeRule.runOnIdle { assertTrue(recordedCalls().none { it.first == "castPollVote" }) }
+    }
+
     private fun render(
         closed: Boolean = false,
         pending: Boolean = false,
         failed: Boolean = false,
+        invalidation: String? = null,
     ) = pollMessage(
         closed,
         mine = pending || failed,
@@ -197,7 +207,9 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
                 pending -> MessageStatus.Pending
                 else -> MessageStatus.Received
             },
-    ).also { item ->
+    ).let { item ->
+        item.copy(projected = checkNotNull(item.projected).copy(invalidationStatus = invalidation))
+    }.also { item ->
         retain(item)
         composeRule.setContent {
             WhiteNoiseTheme {

@@ -72,6 +72,9 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             PollScreenshotConfiguration(dark = true, amoled = true, reply = true, closed = true),
         )
 
+    @Test fun pollDeliveryWarningLight() =
+        render("warning_light", PollScreenshotConfiguration(invalidation = "local_publish_failed"))
+
     @Test fun pollInfoLight() {
         val item = pollMessage(closed = true)
         composeRule.setContent {
@@ -111,7 +114,8 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                         else -> MessageStatus.Received
                     },
             )
-        retain(item)
+        val warnedItem = item.copy(projected = checkNotNull(item.projected).copy(invalidationStatus = configuration.invalidation))
+        retain(warnedItem)
         runTest { pollController.toggleReaction("👍", item.record) }
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = configuration.dark, amoled = configuration.amoled) {
@@ -122,7 +126,7 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                     Surface(Modifier.width(360.dp).testTag("poll-discussion")) {
                         // Reaction pills overlap the footer; leave capture room for their full outline.
                         Column(Modifier.padding(bottom = 24.dp)) {
-                            RealPollMessage(item, configuration.menu) { }
+                            RealPollMessage(warnedItem, configuration.menu) { }
                             if (configuration.reply) {
                                 ComposerBar(
                                     replyingTo = item.record,
@@ -175,6 +179,7 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
 }
 
 private data class PollScreenshotConfiguration(
+    val invalidation: String? = null,
     val dark: Boolean = false,
     val amoled: Boolean = false,
     val rtl: Boolean = false,
