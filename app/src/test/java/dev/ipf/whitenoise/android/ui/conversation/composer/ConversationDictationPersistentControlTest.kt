@@ -330,6 +330,7 @@ class ConversationDictationPersistentControlTest {
                     ConversationDictationFailure.SendBlocked,
                     "Recognized prefix",
                     cause = ConversationDictationFailure.Network,
+                    recognitionIncomplete = true,
                 ),
         )
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -342,6 +343,103 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onNodeWithText("Incomplete dictation").assertIsDisplayed()
+        composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
+    }
+
+    /** A failed Paste tail keeps its recognized prefix accessible alongside audio Retry and Dismiss. */
+    @Test
+    fun failedAudioPrefixOffersPasteAtLargeRtl() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            fontScale = 2f,
+            rtl = true,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.NoSpeech,
+                    "Recognized prefix",
+                    recognitionIncomplete = true,
+                ),
+        )
+        listOf("Paste", "Retry", "Dismiss").forEach { label ->
+            val bounds = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.bottom - bounds.top >= 48.dp)
+        }
+    }
+
+    /** Provider settings remain available while the unsent prefix requires an explicit review choice. */
+    @Test
+    fun partialProviderFailureOffersRetrySendAndSettingsInConfirmation() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Recognized prefix",
+                    cause = ConversationDictationFailure.ProviderUnavailable,
+                    recognitionIncomplete = true,
+                ),
+        )
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onNodeWithText("Open the speech service").assertIsDisplayed()
+        composeRule.onNodeWithText("Paste").assertIsDisplayed()
+    }
+
+    /** Completed recognition that failed validation must not be described as interrupted speech. */
+    @Test
+    fun completedSendValidationDoesNotShowIncompleteDictation() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Completed transcript",
+                    cause = ConversationDictationFailure.Unknown,
+                ),
+        )
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onAllNodesWithText("Incomplete dictation").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+    }
+
+    /** Unknown recognition failures still require explicit consent before sending a prefix. */
+    @Test
+    fun unknownRecognitionFailureStillRequiresPartialSendConfirmation() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Recognized prefix",
+                    cause = ConversationDictationFailure.Unknown,
+                    recognitionIncomplete = true,
+                ),
+        )
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onNodeWithText("Incomplete dictation").assertIsDisplayed()
+        composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
     }
 
     private fun render(

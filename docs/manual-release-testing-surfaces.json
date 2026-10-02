@@ -3520,8 +3520,38 @@
         ]
       },
       {
+        "surface": "string:dictation_incomplete_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_incomplete_title",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_incomplete_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_incomplete_text",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_send_recognized_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_send_recognized_text",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "ConversationDictationSendConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "fun ConversationDictationSendConfirmation(",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "ConversationDictationPartialSendDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "fun ConversationDictationPartialSendDialog(",
+        "test_ids": ["DIC-002"]
+      },
+      {
         "surface": "ConversationDictationFailureAction",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "fun ConversationDictationFailureAction(",
         "test_ids": [
           "DIC-001",
@@ -9987,6 +10017,48 @@
         ]
       },
       {
+        "surface": "string:notification_channel_dictation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "R.string.notification_channel_dictation",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.paste",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_title",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_text",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_open",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_expired_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_expired_title",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_expired_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_expired_text",
+        "test_ids": ["DIC-002"]
+      },
+      {
         "surface": "Single foreground host releases dictation while preserving connection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationForegroundRecord.kt",
         "anchor": "fun releaseDictation(",
@@ -10002,7 +10074,7 @@
       },
       {
         "surface": "string:dictation_retry_send",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "R.string.dictation_retry_send",
         "test_ids": ["DIC-002"]
       },
@@ -12660,7 +12732,7 @@
       },
       {
         "surface": "string:dictation_open_speech_service",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "R.string.dictation_open_speech_service",
         "test_ids": [
           "DIC-002"
@@ -12694,7 +12766,7 @@
       },
       {
         "surface": "string:open_app_settings",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "R.string.open_app_settings",
         "test_ids": [
           "DIC-002"
@@ -12711,7 +12783,7 @@
       },
       {
         "surface": "string:retry",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "R.string.retry",
         "test_ids": [
           "DIC-002"
@@ -28929,6 +29001,14 @@
         "anchor": "internal const val MESSAGE_FULL_SCREEN_VIEWPORT_TAG",
         "test_ids": [
           "MSG-026"
+        ]
+      },
+      {
+        "surface": "Dictation recognized-prefix recovery alongside sealed audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "fun sendRecognizedText()",
+        "test_ids": [
+          "DIC-002"
         ]
       }
     ],

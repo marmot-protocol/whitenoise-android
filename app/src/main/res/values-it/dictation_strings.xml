@@ -21,4 +21,12 @@
     <string name="dictation_send_safety_note">Se la chat o la bozza cambia prima dell’invio, la dettatura resta non inviata. Riprova l’invio o scegli Incolla per controllare il testo.</string>
     <string name="dictation_send_blocked">Non inviato</string>
     <string name="dictation_retry_send">Riprova invio</string>
+    <string name="dictation_recovery_title">La dettatura richiede attenzione</string>
+    <string name="dictation_recovery_text">Apri White Noise per recuperare la dettatura. Le dettature incomplete possono essere recuperate per un massimo di 30 minuti.</string>
+    <string name="dictation_recovery_open">Apri app</string>
+    <string name="dictation_recovery_expired_title">Recupero della dettatura scaduto</string>
+    <string name="dictation_recovery_expired_text">La dettatura incompleta è stata eliminata da questo dispositivo.</string>
+    <string name="dictation_incomplete_title">Dettatura incompleta</string>
+    <string name="dictation_incomplete_text">La trascrizione si è interrotta prima di finire. Puoi inviare il testo riconosciuto o incollarlo per controllarlo.</string>
+    <string name="dictation_send_recognized_text">Invia il testo riconosciuto</string>
 </resources>
