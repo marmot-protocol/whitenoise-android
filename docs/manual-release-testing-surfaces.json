@@ -9638,15 +9638,63 @@
         "test_ids": ["MSG-032"]
       },
       {
+        "surface": "Poll votes string poll_view_votes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.poll_view_votes",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_voter_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_voter_blocked",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_empty",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_load_failed",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_load_more",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_load_more",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_not_anonymous",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_not_anonymous",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_title",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.retry",
+        "test_ids": ["MSG-032"]
+      },
+      {
         "surface": "PollVotesSheet",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
-        "anchor": "internal fun PollVotesSheet(",
+        "anchor": "fun PollVotesSheet(",
         "test_ids": ["MSG-032"]
       },
       {
         "surface": "PollVotesContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
-        "anchor": "internal fun PollVotesContent(",
+        "anchor": "fun PollVotesContent(",
         "test_ids": ["MSG-032"]
       },
       {
