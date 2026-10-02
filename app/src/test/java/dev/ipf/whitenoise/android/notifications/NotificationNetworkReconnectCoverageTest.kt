@@ -238,6 +238,11 @@ class NotificationNetworkReconnectCoverageTest {
         val prepare = appState.functionBody("prepareForDestructiveAccountWipe")
         val restore = appState.functionBody("restoreAfterFailedDestructiveAccountWipe")
         val teardown = appState.functionBody("stopNotificationListenerForAccountTeardown")
+        val teardownBindings = appState.propertyInitializerCall("runtimeListenerTeardownOwner")
+        val teardownOwner =
+            File(appStateSource().parentFile, "AppRuntimeListenerTeardownOwner.kt")
+                .readText()
+                .functionBody("stopForAccountTeardown")
         val wipe = appState.functionBody("signOutAndWipeActiveAccount")
         val recovery = notificationNetworkRecoverySource().readText()
         val reconnect = recovery.functionBody("schedule")
@@ -253,10 +258,14 @@ class NotificationNetworkReconnectCoverageTest {
         )
         assertTrue(
             "teardown must cancel producers before they can reinstall the notification listener",
-            teardown.indexOf("notificationNetworkRecovery.cancelAndJoin()") in 0 until
-                teardown.indexOf("pushWakeCatchUpDrainJob.cancelAndJoin()") &&
-                teardown.indexOf("pushWakeCatchUpDrainJob.cancelAndJoin()") <
-                teardown.indexOf("notificationJob.cancelAndJoin()"),
+            "runtimeListenerTeardownOwner.stopForAccountTeardown()" in teardown &&
+                "cancelNetworkRecovery = { notificationNetworkRecovery.cancelAndJoin() }" in teardownBindings &&
+                "cancelPushWakeDrain = { pushWakeCatchUpDrainJob.cancelAndJoin() }" in teardownBindings &&
+                "cancelListener = { notificationJob.cancelAndJoin() }" in teardownBindings &&
+                teardownOwner.indexOf("cancelNetworkRecovery()") in 0 until
+                teardownOwner.indexOf("cancelPushWakeDrain()") &&
+                teardownOwner.indexOf("cancelPushWakeDrain()") <
+                teardownOwner.indexOf("cancelListener()"),
         )
         assertTrue(
             "teardown must suppress connectivity callbacks before its first suspension",

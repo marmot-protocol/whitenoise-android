@@ -24472,6 +24472,24 @@
     ],
     "source_coverage": [
       {
+        "surface": "Account teardown notification lifecycle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun stopNotificationListenerForAccountTeardown()",
+        "test_ids": [
+          "ACC-014",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "Runtime listener resource cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppRuntimeListenerTeardownOwner.kt",
+        "anchor": "class AppRuntimeListenerTeardownOwner(",
+        "test_ids": [
+          "ACC-014",
+          "NTF-011"
+        ]
+      },
+      {
         "surface": "Settled visible-read retry on resume and manual-reminder changes",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "observeConversationVisibleReads(",

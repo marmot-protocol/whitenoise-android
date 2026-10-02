@@ -530,12 +530,24 @@ jobs:
         run: ./gradlew :app:koverVerifyDevZapstoreDebug --build-cache --profile --daemon --stacktrace
 
       # Coverage visibility (phase 1): generate HTML/XML reports and publish them as
-      # an artifact. Non-blocking so report upload still runs when the gate above fails.
+      # an artifact. Continue to uploads on report errors; Zapstore still requires
+      # a successful report in the teardown coverage floor below.
       # Flavor-specific DevDebug variants only (see gate step).
       - name: Coverage report (Kover)
+        id: coverage_report
         if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' }}
         continue-on-error: true
         run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug --build-cache --profile --daemon --stacktrace
+
+      # Reuse the report from the full suite; no extra Gradle invocation or tests.
+      # Measured owner family: 16/17 lines (94.1176%), zero eligible branches.
+      - name: Runtime listener teardown coverage floor
+        if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
+        env:
+          COVERAGE_REPORT_OUTCOME: ${{ steps.coverage_report.outcome }}
+        run: |
+          test "$COVERAGE_REPORT_OUTCOME" = success
+          python3 scripts/check_runtime_listener_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
 
       - name: Save MarmotKit artifact
         if: >-
