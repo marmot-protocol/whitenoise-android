@@ -58,6 +58,7 @@
     <string name="error_loaded_content_may_be_out_of_date">已加载的内容仍然可用，但可能不是最新的。正在重试…</string>
     <string name="error_loaded_content_kept">无法加载更多内容。你的消息仍然可用；请在方便时重试。</string>
     <string name="error_conversation_membership_unavailable">无法验证此对话的成员。请重试以显示你的消息。</string>
+    <string name="error_conversation_membership_inconsistent">此对话的成员列表与此账户不符，因此消息仍会隐藏。请重试以重新检查。</string>
     <string name="refresh">刷新转储</string>
     <string name="retry">重试</string>
     <string name="creating_identity_title">正在创建身份</string>
@@ -1270,6 +1271,10 @@
     <string name="conversation_search_next">下一个匹配项</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">无匹配项</string>
+    <string name="conversation_search_loading">正在搜索所有消息…</string>
+    <string name="conversation_search_incomplete">无法搜索较早的消息</string>
+    <string name="conversation_search_match_count_loaded_only">已加载消息中的 %1$d/%2$d</string>
+    <string name="conversation_search_retry">重试搜索</string>
     <string name="message_read_more">阅读更多</string>
     <string name="message_react">回应</string>
     <string name="sign_out">退出登录</string>

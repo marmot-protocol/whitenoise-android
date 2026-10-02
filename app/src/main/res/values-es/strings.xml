@@ -61,6 +61,7 @@
     <string name="error_loaded_content_may_be_out_of_date">El contenido cargado sigue disponible, pero puede estar desactualizado. Reintentando…</string>
     <string name="error_loaded_content_kept">No se pudo cargar más contenido. Tus mensajes siguen disponibles; vuelve a intentarlo cuando quieras.</string>
     <string name="error_conversation_membership_unavailable">No se pudieron verificar los miembros de esta conversación. Vuelve a intentarlo para mostrar tus mensajes.</string>
+    <string name="error_conversation_membership_inconsistent">La lista de miembros de esta conversación no coincide con esta cuenta, así que sus mensajes siguen ocultos. Vuelve a intentarlo para comprobarla de nuevo.</string>
     <string name="refresh">Actualizar volcado</string>
     <string name="retry">Reintentar</string>
     <string name="creating_identity_title">Creando identidad</string>
@@ -1294,6 +1295,10 @@
     <string name="conversation_search_next">Coincidencia siguiente</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Sin coincidencias</string>
+    <string name="conversation_search_loading">Buscando en todos los mensajes…</string>
+    <string name="conversation_search_incomplete">No se pudieron buscar los mensajes anteriores</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d en los mensajes cargados</string>
+    <string name="conversation_search_retry">Reintentar búsqueda</string>
     <string name="message_read_more">Leer más</string>
     <string name="message_react">Reaccionar</string>
     <string name="sign_out">Cerrar sesión</string>

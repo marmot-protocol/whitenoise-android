@@ -14,6 +14,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
@@ -26,10 +27,25 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 internal enum class NotificationReactionSendOutcome {
+    /** MDK published the reaction event. */
     Sent,
+
+    /** MDK durably accepted the reaction and owns its later publication. */
+    AcceptedPending,
+
+    /** MDK froze the event but relay acknowledgement is unknown; it must not be sent again. */
+    CompletionUnknown,
     RetryableFailure,
     NonRetryableFailure,
 }
+
+/** Maps MDK's accept disposition without claiming publication it did not report (#2928). */
+internal fun notificationReactionOutcome(disposition: SendAcceptDispositionFfi): NotificationReactionSendOutcome =
+    when (disposition) {
+        SendAcceptDispositionFfi.PUBLISHED -> NotificationReactionSendOutcome.Sent
+        SendAcceptDispositionFfi.ACCEPTED_PENDING -> NotificationReactionSendOutcome.AcceptedPending
+        SendAcceptDispositionFfi.COMPLETION_UNKNOWN -> NotificationReactionSendOutcome.CompletionUnknown
+    }
 
 internal sealed interface NotificationReactionSendAttempt {
     data object Locked : NotificationReactionSendAttempt
@@ -106,6 +122,7 @@ class NotificationReactionWorker(
             terminalReactionResult(retryStore, retryKey, surfaceFailure = true)
         }
 
+    /** Sends once and completes MDK-accepted reactions without resending; failures follow the retry budget. */
     private suspend fun sendReaction(
         application: WhiteNoiseApplication,
         input: NotificationReactionInput.Ready,
@@ -146,6 +163,13 @@ class NotificationReactionWorker(
                 when (sendAttempt.outcome) {
                     NotificationReactionSendOutcome.Sent ->
                         completedReactionResult(application, input, retryStore, retryKey)
+                    // MDK owns delivery of an accepted event; resending would duplicate it.
+                    NotificationReactionSendOutcome.AcceptedPending,
+                    NotificationReactionSendOutcome.CompletionUnknown,
+                    -> {
+                        Log.i(TAG, "notification_reaction_accepted outcome=${sendAttempt.outcome.name}")
+                        completedReactionResult(application, input, retryStore, retryKey)
+                    }
                     NotificationReactionSendOutcome.RetryableFailure ->
                         retryableReactionFailureResult(retryStore, retryKey)
                     NotificationReactionSendOutcome.NonRetryableFailure ->

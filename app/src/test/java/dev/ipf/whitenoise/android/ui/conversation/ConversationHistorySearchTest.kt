@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -89,4 +90,34 @@ class ConversationHistorySearchTest {
             assertEquals(1, calls)
             assertNull(result)
         }
+
+    /** Loading never reads as final: a pending scan is LOADING and its window matches cannot be stepped (#2873). */
+    @Test
+    fun aPendingScanIsLoadingAndBlocksArrows() {
+        val status = conversationSearchScanStatus(query = "hello", scanMatches = null, scanFailed = false)
+        assertEquals(ConversationSearchScanStatus.LOADING, status)
+        assertFalse("partial window matches are not steppable", status.allowsSearchSteps(matchCount = 3))
+    }
+
+    /** A completed scan is authoritative, even when it found nothing. */
+    @Test
+    fun aCompletedScanEnablesArrowsOnlyWithMatches() {
+        val done = conversationSearchScanStatus("hello", scanMatches = emptyList(), scanFailed = false)
+        assertEquals(ConversationSearchScanStatus.COMPLETE, done)
+        assertFalse(done.allowsSearchSteps(matchCount = 0))
+        assertTrue(done.allowsSearchSteps(matchCount = 2))
+    }
+
+    /** A failed scan is distinct from loading, and a blank query is idle whatever a stale scan held. */
+    @Test
+    fun failedAndIdleScansAreDistinct() {
+        val failed = conversationSearchScanStatus("hello", scanMatches = null, scanFailed = true)
+        assertEquals(ConversationSearchScanStatus.FAILED, failed)
+        assertTrue("loaded-only matches stay steppable once labelled", failed.allowsSearchSteps(matchCount = 1))
+        val match = ConversationSearchMatch(messageIdHex = "a", timelineAt = 1uL)
+        assertEquals(
+            ConversationSearchScanStatus.IDLE,
+            conversationSearchScanStatus(" ", scanMatches = listOf(match), scanFailed = true),
+        )
+    }
 }
