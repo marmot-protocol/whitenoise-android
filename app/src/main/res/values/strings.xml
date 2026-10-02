@@ -2022,7 +2022,7 @@
     <string name="setup_device_possible">Another device may be using this account. Continuing here may stop it from receiving new chats.</string>
     <string name="setup_device_unknown">We could not determine whether another installation exists. Continue only if you want to use this device.</string>
     <string name="setup_profile_publish_help">Save this profile to your Nostr account.</string>
-    <string name="setup_replacement_warning">Relays left out of this list will be removed. This also affects your other Nostr apps.</string>
+    <string name="setup_replacement_warning">Recommendations keep all existing relay entries, including ones not shown here. A custom list removes omitted relays. Changes also affect your other Nostr apps.</string>
     <string name="setup_inbox_list">Inbox relays</string>
     <string name="setup_read_list">Read relays</string>
     <string name="setup_write_list">Write relays</string>

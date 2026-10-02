@@ -1819,7 +1819,7 @@
     <string name="setup_device_possible">此帳號可能正在另一台裝置上使用。在此繼續後，那台裝置可能無法接收新聊天。</string>
     <string name="setup_device_unknown">無法確定是否存在另一處安裝。僅在你想使用此裝置時繼續。</string>
     <string name="setup_profile_publish_help">將此個人資料儲存到你的 Nostr 帳號。</string>
-    <string name="setup_replacement_warning">不在此清單中的中繼將被移除。這也會影響你的其他 Nostr 應用程式。</string>
+    <string name="setup_replacement_warning">推薦方案會保留所有現有中繼條目，包括此處未顯示的條目。自訂清單會移除未包含的中繼。變更也會影響你的其他 Nostr 應用程式。</string>
     <string name="setup_inbox_list">收件匣中繼站</string>
     <string name="setup_read_list">讀取中繼站</string>
     <string name="setup_write_list">寫入中繼站</string>

@@ -120,8 +120,17 @@ class AccountSetupContentScreenshotTest {
     @Config(qualifiers = "en-w780dp-h360dp-mdpi")
     fun landscapeDevice() = capture("landscape_device", AccountSetupState(snapshot = deviceSnapshot()))
 
-    /** Recommended defaults retain existing read/write capabilities in the full publication preview. */
-    @Test fun relayProposal() {
+    /** Relay approval explains preservation and replacement without assuming a proposal mode. */
+    @Test fun relayProposal() = capture("relay_proposal", relayProposalState())
+
+    @Test fun relayProposalDark() = capture("relay_proposal_dark", relayProposalState(), dark = true)
+
+    @Test
+    fun relayProposalRtlLarge() {
+        capture("relay_proposal_rtl_large", relayProposalState(), rtl = true, fontScale = 2f)
+    }
+
+    private fun relayProposalState(): AccountSetupState {
         val snapshot =
             setupSnapshot(
                 OnboardingStepFfi.RELAYS,
@@ -140,7 +149,7 @@ class AccountSetupContentScreenshotTest {
                 null,
                 null,
             )
-        capture("relay_proposal", AccountSetupState(snapshot = snapshot))
+        return AccountSetupState(snapshot = snapshot)
     }
 
     /** Covers the signer-recovery decision using the dark application theme. */

@@ -27995,7 +27995,7 @@
         ]
       },
       {
-        "surface": "Imported-account setup: R.string.setup_replacement_warning",
+        "surface": "Relay approval: recommendations preserve entries; custom lists remove omissions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
         "anchor": "R.string.setup_replacement_warning",
         "test_ids": [
