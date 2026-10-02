@@ -82,8 +82,9 @@ the established committed-baseline allowlist and run beside the full suite inste
 of extending its critical path. API preparation and system-label checks reuse
 one runner-local Gradle daemon across sequential invocations, as do both test
 jobs. System-label checks read each invocation's stable or isolated preview
-environment. Tooling compilation and static analysis, baseline packaging, fresh
-Compose reports and independent reproducibility builds retain process isolation.
+environment, then stop the lightweight daemon before isolated builds. Tooling
+compilation and static analysis, baseline packaging, fresh Compose reports and
+independent reproducibility builds retain process isolation.
 Unit suites use three isolated 1 GiB workers;
 local tests stay serial unless `-PciTestForks=3` is set. Coverage reports run only
 after a successful unit step, so a

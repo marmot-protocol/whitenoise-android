@@ -188,7 +188,10 @@ jobs:
 
       - name: Verify packaged system labels for every app variant
         if: matrix.phase == 'tooling'
-        run: ./scripts/test-system-labels.sh
+        run: |
+          ./scripts/test-system-labels.sh
+          # This runner owns the lightweight daemon; free its heap before isolated builds.
+          ./gradlew --stop
 
       - name: Verify production signing and bundle task isolation
         if: matrix.phase == 'tooling'

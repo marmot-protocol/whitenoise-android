@@ -248,7 +248,17 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertGreaterEqual(len(invocations), 3)
         tooling = [step for step in self.gradle_steps(self.build_contracts)
                    if "if: matrix.phase == 'tooling'" in step]
-        self.assertEqual(len(tooling), 3)
+        self.assertEqual(len(tooling), 4)
+        label_step = self.named_step(self.build_contracts,
+                                     'Verify packaged system labels for every app variant')
+        self.assertIn('./scripts/test-system-labels.sh', label_step)
+        self.assertIn('./gradlew --stop', label_step)
+        self.assertLess(label_step.index('./scripts/test-system-labels.sh'),
+                        label_step.index('./gradlew --stop'))
+        self.assertLess(self.build_contracts.index(label_step),
+                        self.build_contracts.index('      - name: Compile (Kotlin)'))
+        self.assertLess(self.build_contracts.index(label_step),
+                        self.build_contracts.index('      - name: Verify production signing and bundle task isolation'))
         api = self.named_step(self.build_contracts, 'Prepare MarmotKit API signature')
         self.assertTrue(all(' --daemon ' in step for step in invocations + [api]))
         self.assertTrue(all(' --no-daemon ' not in step for step in invocations + [api]))
