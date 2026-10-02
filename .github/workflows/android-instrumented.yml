@@ -60,6 +60,10 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/ControlledAttachmentProbe.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaAttachmentLatencyProbe.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt'
+      # Cold-start direct-peer presentation (#2149) is proven against the real native runtime.
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/state/ChatListColdStartDirectPeerPresentationFfiIntegrationTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/state/LoopbackNostrRelay.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDurableAvatars.kt'
       - 'scripts/check_instrumented_required_cases.py'
       - 'config/instrumented-required-cases.txt'
 
