@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -62,8 +63,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -82,7 +85,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
     private fun assertLibraryRetry(accepted: Boolean) =
         runTest {
             Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-            val state = appState()
+            val state = mediaSendReconciliationAppState()
             var nativeState = AttachmentTransferStateFfi.FAILED
             var admissions = 0
             val engine =
@@ -147,12 +150,107 @@ class ConversationMediaSendReconciliationIntegrationTest {
                 assertEquals(1, admissions)
                 assertEquals(if (accepted) 1 else 0, acceptedCallbacks)
                 assertEquals(if (accepted) 0 else 1, failedCallbacks)
+                if (accepted) {
+                    assertNull(state.toast)
+                } else {
+                    assertEquals(
+                        AppText.Resource(dev.ipf.whitenoise.android.R.string.media_couldnt_load),
+                        state.toast?.title,
+                    )
+                }
                 assertFalse(controller.hasAttachmentOpenIntent(CONFIRMED_MESSAGE_ID, 0))
                 controller.onCleared()
                 assertFalse(controller.retryAttachmentTransfer(CONFIRMED_MESSAGE_ID, 0, {}, {}))
             } finally {
                 controller.onCleared()
                 state.mutationsScope.cancel()
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** Batched and overlapping separate file sends retain their visible order through each canonical echo. */
+    @Test
+    fun pendingFileSiblingsKeepConfirmedSendPositions() = assertPendingFileOrder(failSecond = false)
+
+    /** A failed sibling releases the transient bridge instead of pinning completed rows forever. */
+    @Test
+    fun failedFileSiblingReleasesConfirmedSendPosition() = assertPendingFileOrder(failSecond = true)
+
+    /** Drives real queue, publish and projection handoffs, including both scheduling patterns. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // The intermediate and settled frames are essential to the ordering regression.
+    private fun assertPendingFileOrder(failSecond: Boolean) =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            try {
+                for (queueTogether in listOf(true, false)) {
+                    val state = mediaSendReconciliationAppState()
+                    val reference = mediaReference().copy(mediaType = "application/zip", fileName = "file.zip")
+                    var publishes = 0
+                    var second: ConversationController.QueuedAttachmentSend? = null
+                    val secondId = "e5".repeat(32)
+                    val controller =
+                        ConversationController(
+                            appState = state,
+                            initialGroup = group(),
+                            initialMemberSnapshot = memberSnapshot(),
+                            groupRosterReader = { _, _ -> authoritativeRoster() },
+                            clockMillis = { 100_000L },
+                            mediaUploader = { _, _, _ ->
+                                if (failSecond && publishes == 1) error("second file upload failed")
+                                uploadResult(reference).copy(sent = null)
+                            },
+                            mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                            mediaPublisher = { _, _, _, _ ->
+                                val id = if (publishes++ == 0) CONFIRMED_MESSAGE_ID else secondId
+                                acceptedPendingSummary().copy(messageIds = listOf(id))
+                            },
+                        )
+
+                    suspend fun queueFile(): ConversationController.QueuedAttachmentSend {
+                        val attachment =
+                            PendingAttachment(byteArrayOf(1, 2, 3, 4), reference.mediaType, reference.fileName)
+                        return checkNotNull(controller.queueAttachments(listOf(attachment), null))
+                    }
+                    try {
+                        controller.retryMembers()
+                        val first = queueFile()
+                        if (queueTogether) second = queueFile()
+                        controller.uploadQueued(first)
+                        // Separate sends can queue after upload returns but before its relay echo arrives.
+                        if (!queueTogether) second = queueFile()
+                        val pendingId =
+                            controller.timeline
+                                .last()
+                                .record.messageIdHex
+                        applyProjection(controller, projectedMediaMessage(200u, reference))
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+                        assertEquals(
+                            listOf(CONFIRMED_MESSAGE_ID, pendingId),
+                            controller.timeline.map { it.record.messageIdHex },
+                        )
+                        assertTrue(controller.timeline.first().timelineOrder < controller.timeline.last().timelineOrder)
+                        controller.uploadQueued(checkNotNull(second))
+                        if (!failSecond) {
+                            val projection = projectedMediaMessage(201u, reference).copy(messageIdHex = secondId)
+                            applyProjection(controller, projection)
+                        }
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+                        val overrides =
+                            ConversationController::class.java
+                                .getDeclaredField("localTimelineTimestampOverrides")
+                                .apply { isAccessible = true }
+                                .get(controller) as Map<*, *>
+                        assertFalse(
+                            "completed sends must return to MDK positions after sibling settlement",
+                            overrides.containsKey(CONFIRMED_MESSAGE_ID),
+                        )
+                    } finally {
+                        controller.onCleared()
+                        state.mutationsScope.cancel()
+                    }
+                }
+            } finally {
                 Dispatchers.resetMain()
             }
         }
@@ -170,7 +268,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
                     }
                 val controller =
                     ConversationController(
-                        appState = appState(),
+                        appState = mediaSendReconciliationAppState(),
                         initialGroup = group(),
                         initialMemberSnapshot = memberSnapshot(),
                         groupRosterReader = { _, _ -> authoritativeRoster() },
@@ -271,7 +369,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
             val reference = mediaReference()
             val controller =
                 ConversationController(
-                    appState = appState(),
+                    appState = mediaSendReconciliationAppState(),
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     groupRosterReader = { _, _ -> authoritativeRoster() },
@@ -335,7 +433,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
     @Test
     fun acceptedPendingReturnSettlesAProjectionThatArrivedFirstAndReleasesUploadState() =
         runTest {
-            val appState = appState()
+            val appState = mediaSendReconciliationAppState()
             val chatsController = attachedChatsController(appState)
             val reference = mediaReference()
             lateinit var controller: ConversationController
@@ -408,7 +506,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
     @Suppress("LongMethod") // One send, one failure and one retry belong in a single ordered flow.
     fun pendingVideoKeepsItsPosterSourceAcrossRetryUntilTheConfirmedBubbleTakesOver() =
         runTest {
-            val appState = appState()
+            val appState = mediaSendReconciliationAppState()
             attachedChatsController(appState)
             val reference = mediaReference()
             var uploadAttempts = 0
@@ -523,7 +621,7 @@ class ConversationMediaSendReconciliationIntegrationTest {
                 }
             } as MarmotInterface
         val appState =
-            appState().also { state ->
+            mediaSendReconciliationAppState().also { state ->
                 WhiteNoiseAppState::class.java
                     .getDeclaredField("marmotRuntime")
                     .apply { isAccessible = true }
@@ -686,7 +784,7 @@ private fun projectedMediaMessage(
 )
 
 /** Builds a single account owner with process-local drafts and no real relay connection. */
-private fun appState() =
+internal fun mediaSendReconciliationAppState() =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext(),
         draftStore = DraftStore(TestDraftPersistence()),

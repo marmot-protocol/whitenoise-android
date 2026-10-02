@@ -19,7 +19,9 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -59,6 +61,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
@@ -206,6 +209,45 @@ class ReceivedFileCachedFirstFrameTest {
             assertEquals("a cached first frame must not cross the MDK boundary", 0, case.marmotCalls.get())
             case.controller.releaseAttachmentTransferState(case.messageIdHex, 0)
         }
+    }
+
+    /** Own files keep their identity visible while a definitive local cache probe is still blocked. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun ownFileRemainsVisibleDuringLocalPreparation() {
+        val case = productionCase("own-preparing", autoDownloadAllowed = false)
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    MediaFileBubble(
+                        messageIdHex = case.messageIdHex,
+                        attachmentIndex = 0,
+                        reference = case.reference,
+                        controller = case.controller,
+                        appState = case.appState,
+                        senderKey = ACCOUNT_ID,
+                        senderDisplayName = "Me",
+                        mine = true,
+                    )
+                }
+            }
+            assertTrue(case.hydrationEntered.await(5, TimeUnit.SECONDS))
+            assertEquals(AttachmentTransferState.Resolving, case.transferState.value)
+            composeRule.onNodeWithText(case.fileName).assertExists()
+            composeRule.onNodeWithText("Preparing attachment").assertExists()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/own-file-local-preparation.png")
+            composeRule
+                .onNodeWithTag(fileAttachmentCardTestTag(case.messageIdHex, 0), useUnmergedTree = true)
+                .assert(
+                    SemanticsMatcher("own metadata is visible during preparation") { node ->
+                        !node.config.contains(SemanticsProperties.HideFromAccessibility)
+                    },
+                )
+        } finally {
+            case.releaseHydration.countDown()
+        }
+        composeRule.waitUntil(5_000) { case.transferState.value == AttachmentTransferState.Available }
+        composeRule.onNodeWithText(case.fileName).assertExists()
     }
 
     @Test

@@ -4388,9 +4388,15 @@ class WhiteNoiseAppState private constructor(
             },
         )
 
-    /** True for host-retained or native-retained verified plaintext. */
-    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean =
-        hasHostCachedAttachmentAfterHydration(request) || hasNativeAttachment(request)
+    /** Native retention bypasses a pending own-file host copy; other probes keep the usual host-first order. */
+    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean {
+        val key = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
+        return if (outgoingAttachmentCachePublications.isPending(key)) {
+            hasNativeAttachment(request) || hasHostCachedAttachmentAfterHydration(request)
+        } else {
+            hasHostCachedAttachmentAfterHydration(request) || hasNativeAttachment(request)
+        }
+    }
 
     /** Ensures durable work consumes large cache hits as leases instead of full heap copies. */
     internal suspend fun downloadAttachmentForDurableWork(

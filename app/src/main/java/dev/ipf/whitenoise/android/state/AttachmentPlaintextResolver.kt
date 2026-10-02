@@ -91,6 +91,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
                 clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
             },
             loadNative = { openNativeAttachment(request) },
+            preferNative = outgoingAttachmentCachePublications.isPending(cacheKey),
             loadMiss = {
                 diagnostics?.phase(
                     phase = PerformancePhase.ATTACHMENT_ACQUISITION_START,
@@ -260,6 +261,8 @@ internal suspend fun materializeAttachmentAcquisition(
 /**
  * Chooses Android cache or canonical native plaintext before admitting acquisition, and transfers
  * lease ownership to the caller only after all post-load bookkeeping succeeds.
+ * Pending outgoing host writes may prefer native retention; a native miss still waits
+ * for the matching disk publication before acquisition can start.
  * `loadDisk` must invoke its acquisition callback before crossing back from the
  * dispatcher where the source was acquired, so cancellation can close it.
  */
@@ -274,6 +277,7 @@ internal suspend fun resolveAttachmentPlaintext(
     clearInteractiveIntent: suspend () -> Unit,
     loadMiss: suspend () -> AttachmentPlaintext,
     loadNative: suspend () -> AttachmentPlaintext? = { null },
+    preferNative: Boolean = false,
 ): AttachmentPlaintext {
     val memory = loadMemory()
     val callerContext = currentCoroutineContext()
@@ -282,11 +286,12 @@ internal suspend fun resolveAttachmentPlaintext(
     try {
         source =
             memory?.let(AttachmentPlaintext::Bytes)
+                ?: (if (preferNative) loadNative() else null)
                 ?: loadDisk(
                     { callerContext.ensureActive() },
                     { pendingSource = it },
                 )
-                ?: loadNative()
+                ?: (if (preferNative) null else loadNative())
         pendingSource = null
         source?.let { resolved ->
             if (resolved is AttachmentPlaintext.Bytes && memory == null) {

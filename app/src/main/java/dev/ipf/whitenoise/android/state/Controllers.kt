@@ -12356,23 +12356,30 @@ class ConversationController(
     }
 
     /**
-     * Drops completed optimistic-send bridges so projected rows settle back to
-     * their authoritative positions in MDK's current bounded window.
+     * Keeps send bridges while media siblings remain pending, then lets projected
+     * rows settle back to their authoritative positions in MDK's bounded window.
      */
     private fun releaseOrphanedOptimisticSendPreserves(): Boolean {
+        // Keep completed rows beside their still-pending send siblings. MDK order wins
+        // after the last media handoff, failure or discard removes this transient bridge.
+        val pendingMedia =
+            optimisticMessages.values.any { message ->
+                message.status == MessageStatus.Pending &&
+                    message.record.tags.any { tag -> tag.values.firstOrNull() == "_media_pending" }
+            }
+        if (pendingMedia) return false
         val orphaned =
             optimisticSendPositionPreserves.releaseOrphaned(
                 optimisticKeys = optimisticMessages.keys,
                 projectedMessageIds = projectedMessageIds,
             )
-        if (orphaned.isEmpty()) return false
         orphaned.forEach { id ->
             localTimelineOrderOverrides.remove(id)
             localTimelineTimestampOverrides.remove(id)
             preservedTimelinePositionOverrideIds.remove(id)
             refreshProjectedTimelinePosition(id)
         }
-        return true
+        return orphaned.isNotEmpty()
     }
 
     /**

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.DiskByteCacheLease
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
@@ -42,6 +43,61 @@ class AttachmentPlaintextResolverTest {
             assertTrue(file.exists())
             source.close()
             assertFalse(file.exists())
+        }
+
+    /** A retained native source stays immediately usable while its optional host copy is encrypted. */
+    @Test
+    fun preferredNativeLeaseSkipsPendingHostPublication() =
+        runBlocking {
+            val file = File.createTempFile("outgoing-retained", ".lease")
+            val lease = AttachmentPlaintext.Lease(DiskByteCacheLease(file))
+            val source =
+                resolveAttachmentPlaintext(
+                    loadMemory = { null },
+                    loadDisk = { _, _ -> error("must not wait for the outgoing host copy") },
+                    cacheMemory = { error("leases must remain streamed") },
+                    clearInteractiveIntent = {},
+                    loadMiss = { error("retained data must not download") },
+                    loadNative = { lease },
+                    preferNative = true,
+                )
+            assertSame(lease, source)
+            source.close()
+            assertFalse(file.exists())
+        }
+
+    /** If native retention is unavailable, a pending host write still precedes every network admission. */
+    @Test
+    fun preferredNativeMissWaitsForHostPublication() =
+        runBlocking {
+            val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val entered = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val expected = byteArrayOf(4, 5)
+            var nativeProbes = 0
+            val read =
+                async {
+                    resolveAttachmentPlaintext(
+                        loadMemory = { null },
+                        loadDisk = { _, acquired ->
+                            entered.complete(Unit)
+                            release.await()
+                            AttachmentPlaintext.Bytes(expected).also(acquired)
+                        },
+                        cacheMemory = {},
+                        clearInteractiveIntent = {},
+                        loadMiss = { error("pending outgoing data must not download") },
+                        loadNative = {
+                            nativeProbes++
+                            null
+                        },
+                        preferNative = true,
+                    )
+                }
+            entered.await()
+            assertFalse(read.isCompleted)
+            release.complete(Unit)
+            assertArrayEquals(expected, (read.await() as AttachmentPlaintext.Bytes).bytes)
+            org.junit.Assert.assertEquals(1, nativeProbes)
         }
 
     /** Failed local preparation propagates without silently turning a retained hit into a transfer. */

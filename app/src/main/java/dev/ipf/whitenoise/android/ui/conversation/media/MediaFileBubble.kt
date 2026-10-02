@@ -127,7 +127,6 @@ internal fun MediaFileBubble(
     val cancellationState by remember(controller, pillKey) {
         controller.attachmentCancellationState(messageIdHex, attachmentIndex)
     }.collectAsStateWithLifecycle()
-    val transferState = attachmentFilePresentationState(hostTransferState, nativeProgress, cancellationState)
     val presentation =
         remember(reference.mediaType, reference.fileName) {
             resolveAttachmentPresentation(reference.mediaType, reference.fileName)
@@ -157,6 +156,15 @@ internal fun MediaFileBubble(
         ) {
             controller.refreshAttachmentTransferState(messageIdHex, attachmentIndex)
         }
+    // Own-file metadata remains visible while its verified local source is being resolved.
+    // A stale native failure must not flash Retry during the outgoing cache handoff.
+    val presentationProgress = if (mine && !firstFrameCacheResolved) null else nativeProgress
+    val transferState =
+        attachmentFilePresentationState(
+            hostTransferState,
+            presentationProgress,
+            cancellationState,
+        )
     var reconciledCacheRevision by remember(controller, pillKey) { mutableStateOf(cacheRevision) }
     // Later cache writes and evictions still reconcile the controller-owned
     // state, but they never re-hide a card that already crossed the first-frame
@@ -379,7 +387,7 @@ internal fun MediaFileBubble(
         modifier =
             Modifier
                 .fileBubbleWidth()
-                .fileAttachmentFirstFrameVisibility(firstFrameCacheResolved)
+                .fileAttachmentFirstFrameVisibility(mine || firstFrameCacheResolved)
                 .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
                     enabled =
@@ -408,7 +416,7 @@ internal fun MediaFileBubble(
                                     openRequested = controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                                 }
                             },
-                            onFailure = { appState.present(couldntLoadMessage, copyable = true) },
+                            onFailure = {},
                         )
                     },
                 ),
@@ -422,7 +430,7 @@ internal fun MediaFileBubble(
             status = status,
             footerWarningText = footerWarningText,
             openPending = opening,
-            nativeProgress = nativeProgress,
+            nativeProgress = presentationProgress,
             cancellationState = cancellationState,
             onCancelTransfer = { controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex) },
         )

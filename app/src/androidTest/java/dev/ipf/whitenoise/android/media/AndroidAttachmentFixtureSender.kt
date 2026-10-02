@@ -50,6 +50,8 @@ internal suspend fun sendAndroidFixtureAttachment(
                 initialMarmotRuntime = AppMarmotRuntime(root.absolutePath, marmot),
             )
         }
+    val heldHostCopy =
+        if (qualifyOwnLocalCache) LargeAttachmentLocalReadComparison.holdOutgoingHostCopy(state, root) else null
     val controller =
         withContext(Dispatchers.Main.immediate) {
             ConversationController(state, details.group, GroupMemberSnapshot(members))
@@ -65,15 +67,24 @@ internal suspend fun sendAndroidFixtureAttachment(
         if (qualifyOwnLocalCache) {
             // Accepted-pending sends seed the confirmed cache when the shipping live projection reconciles.
             awaitAndroidFixtureProjection(controller, messageId)
+            val request = AttachmentTransferRequest(sender.label, group, messageId, 0)
+            LargeAttachmentLocalReadComparison.assertNativeBeforeHostCopy(
+                state,
+                request,
+                reference,
+                bytes,
+                checkNotNull(heldHostCopy),
+            )
             LargeAttachmentLocalReadComparison.assertOwnHostCache(
                 state,
-                AttachmentTransferRequest(sender.label, group, messageId, 0),
+                request,
                 reference,
                 bytes,
             )
         }
         return reference
     } finally {
+        heldHostCopy?.release()
         withContext(Dispatchers.Main.immediate) {
             controller.onCleared()
             state.mutationsScope.cancel()

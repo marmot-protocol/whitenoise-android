@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
@@ -49,7 +50,10 @@ internal fun ConversationController.retryAttachmentTransfer(
                 deliverAttachmentRetryFailure(
                     failure,
                     reopen = { destination != null && requestAttachmentOpen(messageIdHex, attachmentIndex) },
-                    notify = onFailure,
+                    notify = {
+                        appState.present(R.string.media_couldnt_load)
+                        onFailure()
+                    },
                 )
             }
         },

@@ -36,8 +36,11 @@ internal class OutgoingAttachmentCachePublications(
         publication.work.start()
     }
 
-    /** Waits only for this file's already-started write, without cancelling it when a UI observer leaves. */
+    /** Reports a matching active write so native retention can bypass slow host encryption. */
+    fun isPending(key: String): Boolean = synchronized(lock) { active[key]?.work?.isCompleted == false }
+
+    /** Waits for this file's write without surfacing cache IO failures; observer cancellation still propagates. */
     suspend fun await(key: String) {
-        synchronized(lock) { active[key]?.work }?.await()
+        synchronized(lock) { active[key]?.work }?.join()
     }
 }

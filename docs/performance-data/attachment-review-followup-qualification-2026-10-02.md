@@ -2,6 +2,8 @@
 
 This supplements the [candidate qualification report](attachment-candidate-qualification-2026-10-02.md). It covers the Media library Retry regression, duplicate Retry failure feedback, queued cancellation, readable progress, outgoing local publication and bounded native reads. It does not complete tracker #2779 or qualify the full manual flows.
 
+This is the earlier `5c0719897` cohort. The [sender handoff and Retry follow-up](attachment-sender-followup-qualification-2026-10-02.md) records subsequent Pixel findings and qualification separately.
+
 ## Method and results
 
 Generated 32 MiB plaintext is genuinely sent through the shipping Android controller and published by MDK. The foreground conversation projection reconciles accepted-pending sends before the confirmed card is probed. L1 rejects this payload under its unchanged 8 MiB entry limit; the test waits for the matching encrypted host publication and hashes a lease from the shipping resolver. The server ledger requires exactly one upload and one received acquisition, each **33,554,448 ciphertext bytes** including the authentication tag, zero HEAD requests and zero additional transfers during retained reads.

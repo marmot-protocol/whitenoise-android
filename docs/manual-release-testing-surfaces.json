@@ -455,7 +455,7 @@
       {
         "surface": "Single-owner attachment retry admission failure notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentControllerActions.kt",
-        "anchor": "notify = onFailure",
+        "anchor": "notify = {",
         "test_ids": [
           "MED-024"
         ]
