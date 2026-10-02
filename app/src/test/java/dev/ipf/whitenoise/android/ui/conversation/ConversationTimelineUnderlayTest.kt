@@ -107,6 +107,9 @@ class ConversationTimelineUnderlayTest {
         // value 17 two rows above the covered origin.
         rule.onNodeWithTag("row-$CLEAR_ROW_VALUE").performTouchInput { click(Offset(8f, 12f)) }
         assertEquals(listOf(CLEAR_ROW_VALUE), clickedRows)
+        // Capture the settled canvas, after the readable row's tap ripple fades.
+        rule.mainClock.advanceTimeBy(500L)
+        rule.waitForIdle()
         val pixels = rule.onNodeWithTag("frame").captureToImage().toPixelMap()
         assertEquals("the existing row must paint through the composer margin", Color.Cyan, pixels[14, 440])
         rule.onNodeWithTag("frame").captureRoboImage("src/test/snapshots/conversation_timeline_underlay.png")
