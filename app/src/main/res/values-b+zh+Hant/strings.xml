@@ -41,6 +41,13 @@
     <string name="poll_duration_1_day">1 天</string>
     <string name="poll_duration_1_week">1 週</string>
     <string name="poll_ends_at">%1$s 結束</string>
+    <string name="poll_view_votes">查看投票</string>
+    <string name="poll_votes_title">投票</string>
+    <string name="poll_votes_not_anonymous">投票並非匿名。群組中的所有成員都能看到誰選擇了哪個選項。</string>
+    <string name="poll_votes_empty">尚無投票。</string>
+    <string name="poll_votes_load_failed">無法載入投票。</string>
+    <string name="poll_votes_load_more">載入更多</string>
+    <string name="poll_voter_blocked">已封鎖</string>
     <plurals name="poll_option_votes">
         <item quantity="other">%1$d 票</item>
     </plurals>
