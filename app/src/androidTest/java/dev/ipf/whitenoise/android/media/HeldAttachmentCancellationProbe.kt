@@ -42,7 +42,10 @@ internal object HeldAttachmentCancellationProbe {
         val cold = async { runCatching { read(state, request, reference).close() } }
         val progress =
             withTimeout(5_000L) {
-                state.nativeProgress(request).first { it?.phase == AttachmentTransferStateFfi.DOWNLOADING }
+                // DOWNLOADING may precede response headers; this fixture declares a known 1040-byte body.
+                state.nativeProgress(request).first {
+                    it?.phase == AttachmentTransferStateFfi.DOWNLOADING && it.total == 1040uL
+                }
             }
         assertEquals(1040uL, requireNotNull(progress).total)
         awaitLedger(port) { events -> events.any { it.getString("kind") == "held" } }
