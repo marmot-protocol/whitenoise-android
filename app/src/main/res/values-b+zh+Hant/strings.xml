@@ -2162,4 +2162,8 @@
     <string name="delete_local_does_not_leave">此操作不會退出對話。</string>
     <string name="user_search_address_unverified">無法驗證此地址。</string>
     <string name="user_search_address_result">地址未驗證</string>
+    <string name="onboarding_share_usage_title">分享使用情況</string>
+    <string name="onboarding_share_usage_summary">功能使用情況和應用程式效能。</string>
+    <string name="onboarding_share_logs_title">分享診斷日誌</string>
+    <string name="onboarding_share_logs_summary">有關訊息傳遞的技術資料。</string>
 </resources>

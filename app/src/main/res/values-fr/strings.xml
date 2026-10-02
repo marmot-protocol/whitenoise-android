@@ -2194,4 +2194,8 @@
     <string name="delete_local_does_not_leave">Cela ne quitte pas la conversation.</string>
     <string name="user_search_address_unverified">Impossible de vérifier cette adresse.</string>
     <string name="user_search_address_result">Adresse non vérifiée</string>
+    <string name="onboarding_share_usage_title">Partager les données d’utilisation</string>
+    <string name="onboarding_share_usage_summary">Utilisation des fonctions et performances.</string>
+    <string name="onboarding_share_logs_title">Partager les journaux de diagnostic</string>
+    <string name="onboarding_share_logs_summary">Données techniques sur la messagerie.</string>
 </resources>

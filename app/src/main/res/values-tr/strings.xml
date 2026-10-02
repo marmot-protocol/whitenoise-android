@@ -2192,4 +2192,8 @@
     <string name="delete_local_does_not_leave">Bu işlem sohbetten ayrılmanıza neden olmaz.</string>
     <string name="user_search_address_unverified">Bu adres doğrulanamadı.</string>
     <string name="user_search_address_result">Adres doğrulanmadı</string>
+    <string name="onboarding_share_usage_title">Kullanım verilerini paylaş</string>
+    <string name="onboarding_share_usage_summary">Özellik kullanımı ve uygulama performansı.</string>
+    <string name="onboarding_share_logs_title">Tanılama günlüklerini paylaş</string>
+    <string name="onboarding_share_logs_summary">Mesajlaşmayla ilgili teknik veriler.</string>
 </resources>

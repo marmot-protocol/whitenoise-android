@@ -2194,4 +2194,8 @@
     <string name="delete_local_does_not_leave">Questa azione non abbandona la chat.</string>
     <string name="user_search_address_unverified">Impossibile verificare questo indirizzo.</string>
     <string name="user_search_address_result">Indirizzo non verificato</string>
+    <string name="onboarding_share_usage_title">Condividi dati di utilizzo</string>
+    <string name="onboarding_share_usage_summary">Uso delle funzioni e prestazioni dell’app.</string>
+    <string name="onboarding_share_logs_title">Condividi log diagnostici</string>
+    <string name="onboarding_share_logs_summary">Dati tecnici sulla messaggistica.</string>
 </resources>

@@ -2211,4 +2211,8 @@
     <string name="delete_local_does_not_leave">Dadurch verlässt du den Chat nicht.</string>
     <string name="user_search_address_unverified">Diese Adresse konnte nicht verifiziert werden.</string>
     <string name="user_search_address_result">Adresse nicht verifiziert</string>
+    <string name="onboarding_share_usage_title">Nutzung teilen</string>
+    <string name="onboarding_share_usage_summary">Funktionsnutzung und App-Leistung.</string>
+    <string name="onboarding_share_logs_title">Diagnoseprotokolle teilen</string>
+    <string name="onboarding_share_logs_summary">Technische Daten zu Nachrichten.</string>
 </resources>

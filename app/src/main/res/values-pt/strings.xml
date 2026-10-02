@@ -2194,4 +2194,8 @@
     <string name="delete_local_does_not_leave">Isso não faz você sair da conversa.</string>
     <string name="user_search_address_unverified">Não foi possível verificar este endereço.</string>
     <string name="user_search_address_result">Endereço não verificado</string>
+    <string name="onboarding_share_usage_title">Compartilhar dados de uso</string>
+    <string name="onboarding_share_usage_summary">Uso dos recursos e desempenho do app.</string>
+    <string name="onboarding_share_logs_title">Compartilhar registros de diagnóstico</string>
+    <string name="onboarding_share_logs_summary">Dados técnicos sobre mensagens.</string>
 </resources>

@@ -2262,4 +2262,8 @@
     <string name="delete_local_does_not_leave">Это не приводит к выходу из чата.</string>
     <string name="user_search_address_unverified">Не удалось подтвердить этот адрес.</string>
     <string name="user_search_address_result">Адрес не подтверждён</string>
+    <string name="onboarding_share_usage_title">Делиться данными об использовании</string>
+    <string name="onboarding_share_usage_summary">Использование функций и работа приложения.</string>
+    <string name="onboarding_share_logs_title">Делиться журналами диагностики</string>
+    <string name="onboarding_share_logs_summary">Технические данные об обмене сообщениями.</string>
 </resources>
