@@ -9635,7 +9635,7 @@
         "surface": "PollVotesHost",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesHost.kt",
         "anchor": "internal fun PollVotesHost(",
-        "test_ids": ["MSG-032"]
+        "test_ids": ["MSG-032", "MSG-036"]
       },
       {
         "surface": "PollParticipantsRow",

@@ -6961,10 +6961,20 @@ class ConversationController(
         )
     }
 
-    /** The retained row's expiry input, read from the unfiltered row map the timeline filter starts from. */
+    /**
+     * The retained timeline row for the raw message id [messageId]. The row map is keyed by item id
+     * (`msg:<hex>`, or `stream:<id>` for stream starts), so the id is resolved the way [removeProjectedRecord]
+     * resolves it. Null when the bounded window no longer holds the row.
+     */
+    internal fun retainedTimelineItem(messageId: String): TimelineMessage? {
+        val itemId = timelineRecords[messageId]?.let(::projectedItemId) ?: "msg:$messageId"
+        return timelineItemsById[itemId]
+    }
+
+    /** The retained row's expiry input, ordered like the timeline filter and the sweep (optimistic ids first). */
     private fun retainedExpiryRow(messageId: String): Pair<TimelineMessage, DisappearingMessageSweep.LocalExpiryRow>? {
-        val item = timelineItemsById[messageId] ?: return null
-        val order = firstMessageOrder(timelineOrder.mapNotNull { timelineItemsById[it]?.record?.messageIdHex })
+        val item = retainedTimelineItem(messageId) ?: return null
+        val order = firstMessageOrder(sweepExpiryMessages().map { it.record.messageIdHex })
         return item to localExpiryRow(item, order)
     }
 
@@ -6979,18 +6989,32 @@ class ConversationController(
         return deleted || isTimelineRecordLocallyExpired(clockMillis(), item.record, row)
     }
 
-    /** Milliseconds until the retained row [messageId] reaches its local expiry, or null without a deadline. */
-    internal fun retainedRowExpiryDelayMillis(messageId: String): Long? {
+    /**
+     * What a host watching the row [messageId] should do next, given the last deadline it saw for the row
+     * ([rememberedDeadlineMillis]). Combines the retained row's state with the wall clock.
+     */
+    internal fun watchRetainedRow(
+        messageId: String,
+        rememberedDeadlineMillis: Long?,
+    ): RetainedRowWatch =
+        decideRetainedRowWatch(
+            nowMillis = clockMillis(),
+            retained = retainedTimelineItem(messageId) != null,
+            gone = isRetainedRowGone(messageId),
+            deadlineMillis = retainedRowExpiryDeadlineMillis(messageId),
+            rememberedDeadlineMillis = rememberedDeadlineMillis,
+        )
+
+    /** The wall-clock deadline in milliseconds of the retained row [messageId], or null without a resolved deadline. */
+    private fun retainedRowExpiryDeadlineMillis(messageId: String): Long? {
         val seconds =
             retainedExpiryRow(messageId)?.let { (item, row) ->
                 DisappearingMessageSweep
                     .resolveLocalExpirySeconds(row)
                     ?.takeIf { shouldApplyLocalDisappearingExpiry(item.record) }
             } ?: return null
-        val expiryMillis =
-            java.util.concurrent.TimeUnit.SECONDS
-                .toMillis(seconds.coerceAtMost(Long.MAX_VALUE.toULong()).toLong())
-        return expiryMillis - clockMillis()
+        return java.util.concurrent.TimeUnit.SECONDS
+            .toMillis(seconds.coerceAtMost(Long.MAX_VALUE.toULong()).toLong())
     }
 
     /** Distinguishes timeout wakes from publish signals that expose due rows. */
@@ -7228,6 +7252,13 @@ class ConversationController(
     // the current policy changes so optimistic-send state is immediately
     // reconciled. Each row's pinned deadline remains independent of the current
     // policy, so historical rows are never reinterpreted by this republish.
+
+    /** Test entry that installs [item] under its item id and in the membership index, as a projection apply does. */
+    @VisibleForTesting
+    internal fun retainTimelineItemForTest(item: TimelineMessage) {
+        if (item.id !in timelineItemsById) insertTimelineItemId(item.id)
+        timelineItemsById[item.id] = item
+    }
 
     /** Test entry to the subscription-update application path. */
     @VisibleForTesting

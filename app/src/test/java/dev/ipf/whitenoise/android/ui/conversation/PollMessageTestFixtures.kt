@@ -16,6 +16,8 @@ import dev.ipf.marmotkit.PollVotePageFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -26,6 +28,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFileAttachmentFixtures
+import kotlinx.coroutines.runBlocking
 import java.lang.reflect.Proxy
 import java.util.Locale
 import java.util.concurrent.LinkedBlockingQueue
@@ -187,9 +190,21 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
         )
     }
 
+    /** Retains [item] the way production does, keyed by its item id (`msg:<hex>`) and listed in the order index. */
     protected fun retain(item: TimelineMessage) {
-        pollController.timelineItemsById[item.record.messageIdHex] = item
+        pollController.retainTimelineItemForTest(item)
         item.projected?.let { pollController.timelineRecords[item.record.messageIdHex] = it }
+    }
+
+    /** Puts [records] into the controller through a real timeline page apply instead of direct map writes. */
+    protected fun applyPage(vararg records: TimelineMessageRecordFfi) {
+        runBlocking {
+            pollController.applyTimelinePage(
+                page = TimelinePageFfi(records.toList(), hasMoreBefore = false, hasMoreAfter = false),
+                replaceWindow = true,
+                updatePagination = true,
+            )
+        }
     }
 
     protected fun recordedCalls(): List<Pair<String, List<Any?>>> = synchronized(nativeCalls) { nativeCalls.toList() }

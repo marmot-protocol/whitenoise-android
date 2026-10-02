@@ -202,7 +202,9 @@ internal fun pollProjectionTouched(
  * upserted as deleted or without a poll, or removed as pruned, cleared or no longer matching. An invalidated
  * removal is excluded because the row may be reprojected, which [pollProjectionTouched] handles. In MDK
  * 0.12.0 only INVALIDATED removals actually arrive on this stream, so the other reasons are forward-compatible.
- * Deleted rows and local retention expiry are covered by the row and the host, not by this event.
+ * Local retention expiry produces no engine event and is covered by the votes host. A remote delete while
+ * the row is off screen is expected to arrive as an upsert with deleted or no poll, which this handles, but
+ * that is unconfirmed until a device run.
  */
 internal fun pollProjectionEnded(
     event: MarmotEventFfi,

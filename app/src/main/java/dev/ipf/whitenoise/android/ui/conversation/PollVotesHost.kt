@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.RetainedRowWatch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import kotlinx.coroutines.delay
 
@@ -66,16 +67,23 @@ internal fun PollVotesHost(
 ) {
     val open = host.open ?: return
     // Expired disappearing polls leave the timeline without an engine event, so watch the deadline here.
-    // Absence from the bounded window is not expiry, so only the retained row decides.
-    LaunchedEffect(open.owner, open.poll) {
-        val id = open.owner.messageId
+    // Waits are capped like the controller sweep and re-read the wall clock, because this timer does not
+    // count deep sleep. A row absent from the bounded window is not expiry until its remembered deadline has
+    // passed. The read watermark is a key so a received poll's deferred deadline is re-evaluated once read.
+    LaunchedEffect(open.owner, open.poll, controller.lastReadMessageId) {
+        var deadlineMillis: Long? = null
         while (true) {
-            if (controller.isRetainedRowGone(id)) {
-                host.dismissIf(open.owner)
-                return@LaunchedEffect
+            when (val watch = controller.watchRetainedRow(open.owner.messageId, deadlineMillis)) {
+                RetainedRowWatch.Gone -> {
+                    host.dismissIf(open.owner)
+                    return@LaunchedEffect
+                }
+                RetainedRowWatch.Unwatched -> return@LaunchedEffect
+                is RetainedRowWatch.Waiting -> {
+                    deadlineMillis = watch.deadlineMillis
+                    delay(watch.delayMillis)
+                }
             }
-            val wait = controller.retainedRowExpiryDelayMillis(id)?.takeIf { it > 0L } ?: return@LaunchedEffect
-            delay(wait)
         }
     }
     PollVotesSheet(
