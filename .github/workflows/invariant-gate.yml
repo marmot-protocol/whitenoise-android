@@ -1,0 +1,45 @@
+name: Invariant gate
+
+# A pull request that closes a bug must change, name or exempt a registered
+# invariant gate (docs/invariant-gates.md). The job reads PR metadata with the
+# default read-only token, needs no secrets and runs for fork pull requests.
+# `edited` re-runs it when the description gains or changes its declaration.
+# It never builds or compiles, and it is independent of the visual gate.
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+concurrency:
+  group: invariant-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  check:
+    name: Bug-fix invariant gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out the gate script and registry
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: |
+            .github/scripts
+            docs/invariant-gates.md
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Test invariant-gate check
+        run: node --test .github/scripts/check-invariant-gate.test.js
+
+      - name: Check bug-fix invariant gate
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v8
+        with:
+          script: |
+            const gate = require('./.github/scripts/check-invariant-gate.js')
+            await gate.run({ github, context, core })

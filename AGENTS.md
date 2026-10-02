@@ -45,6 +45,11 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
   relevant themes, RTL, font scales and UI states, regenerate/commit PNG baselines,
   and verify both distributions. The PR's **Visual changes** must show current-head
   baselines; missing-screenshot CI is blocking.
+- A PR closing a bug must add or extend an [invariant gate](docs/invariant-gates.md),
+  name an already-applicable registered gate (`Invariant gate: FooCoverageTest`), or
+  declare `Invariant gate exemption: <reason> — <why>` with `one-off` (value or presentation
+  fix, no reusable invariant), `upstream` (owned and enforced upstream) or `non-production`
+  (cannot alter the reported behavior). Register every `*CoverageTest.kt`; the `Invariant gate` CI enforces both.
 - Datawav PRs open draft until CI passes, conflicts are absent and findings are
   addressed. Recheck discussion before marking ready. Pending checks alone do not
   justify demoting a ready PR; readiness never authorizes merging.
