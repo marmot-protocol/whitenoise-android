@@ -29263,6 +29263,32 @@
           "ONB-023",
           "ONB-026"
         ]
+      },
+      {
+        "surface": "Custom emoji image read for sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalEmojiArtwork.kt",
+        "anchor": "internal fun readLocalEmojiArtwork(",
+        "test_ids": [
+          "MSG-034",
+          "MSG-035"
+        ]
+      },
+      {
+        "surface": "Chat message carrying custom emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalEmojiArtwork.kt",
+        "anchor": "internal suspend fun MarmotInterface.sendTextWithCustomEmoji(",
+        "test_ids": [
+          "MSG-034"
+        ]
+      },
+      {
+        "surface": "Reaction emoji artwork lookup by reaction event",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationEmojiLookups.kt",
+        "anchor": "internal suspend fun ConversationController.reactionArtwork(",
+        "test_ids": [
+          "MSG-024",
+          "MSG-035"
+        ]
       }
     ],
     "notification_content_contracts": [

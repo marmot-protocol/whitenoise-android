@@ -84,4 +84,20 @@ class Nip30EmojiTest {
         assertFalse(Nip30Emoji.hasEmojiTags(listOf(tag("imeta", "url u"))))
         assertFalse(Nip30Emoji.hasEmojiTags(listOf(MessageTagFfi(emptyList()))))
     }
+
+    /** Sending finds each distinct `:code:` once, in the order typed, and ignores lone colons. */
+    @Test
+    fun shortcodesInTextAreDistinctAndOrdered() {
+        assertEquals(
+            listOf(":party:", ":Two-2:"),
+            Nip30Emoji.shortcodesIn("hi :party: and :Two-2: then :party: at noon: ok"),
+        )
+        assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("no codes: here, 10:30 :: ::"))
+    }
+
+    /** The emitted row names the attachment by its first locator, with the shortcode unwrapped. */
+    @Test
+    fun tagNamesTheShortcodeWithoutColonsAndTheUrl() {
+        assertEquals(listOf("emoji", "party", "https://a/party"), Nip30Emoji.tag(":party:", "https://a/party"))
+    }
 }

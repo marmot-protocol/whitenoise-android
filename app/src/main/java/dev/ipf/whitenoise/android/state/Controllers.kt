@@ -8082,6 +8082,41 @@ class ConversationController(
         isTransientRelaySendError(throwable) ||
             (textPublisher == null && isTransientRuntimeWorkerError(throwable))
 
+    /** The user's own emoji a plain, non-reply text send must carry; replies and injected publishers carry none. */
+    private suspend fun emojiArtworkForSend(
+        replyTarget: String?,
+        text: String,
+    ): List<LocalEmojiArtwork> {
+        val plainSend = replyTarget == null && textPublisher == null
+        return if (plainSend) appState.localEmojiArtworkIn(text) else emptyList()
+    }
+
+    /** Admission failures retry only for plain text, because an emoji send uploads non-idempotent blobs. */
+    private fun isRetryableComposerSend(
+        emojiArtwork: List<LocalEmojiArtwork>,
+        throwable: Throwable,
+    ): Boolean = emojiArtwork.isEmpty() && isRetryableTextAdmissionError(throwable)
+
+    /**
+     * One native publication of the composer text: the durable token-bound send, or, when the text
+     * uses the user's own emoji, upload-only images followed by one tagged media send.
+     */
+    private suspend fun publishComposerTextOnce(
+        account: String,
+        replyTarget: String?,
+        text: String,
+        clientToken: String,
+        probeExistingAdmission: Boolean,
+        emojiArtwork: List<LocalEmojiArtwork>,
+    ): dev.ipf.marmotkit.SendSummaryFfi =
+        if (emojiArtwork.isEmpty()) {
+            publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
+        } else {
+            appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
+                sendTextWithCustomEmoji(account, group.groupIdHex, text, emojiArtwork)
+            }
+        }
+
     /** Keeps accepted-pending settlement alive when navigation disposes this conversation's visible route. */
     private suspend fun convergeAcceptedPendingTextSend(
         account: String,
@@ -8136,12 +8171,15 @@ class ConversationController(
         trace: PerformanceTrace?,
         clientToken: String,
         optimisticKey: String,
-    ): dev.ipf.marmotkit.SendSummaryFfi =
-        appState.withConversationTextSendOrder(account, group.groupIdHex) {
+    ): dev.ipf.marmotkit.SendSummaryFfi {
+        // Replies and injected publishers keep their plain-text path. A message that uses the user's
+        // own emoji uploads their images, which are not idempotent, so a failure is not auto-retried.
+        val emojiArtwork = emojiArtworkForSend(replyTarget, trimmed)
+        return appState.withConversationTextSendOrder(account, group.groupIdHex) {
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
                 cancellationGeneration = optimisticCancellationGeneration,
-                retryableFailure = ::isRetryableTextAdmissionError,
+                retryableFailure = { isRetryableComposerSend(emojiArtwork, it) },
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
             ) { attempt ->
                 // Serialize only this commit-producing FFI attempt. Releasing the
@@ -8172,7 +8210,14 @@ class ConversationController(
                     try {
                         val summary =
                             textPublisher?.invoke(replyTarget, account, group.groupIdHex, trimmed)
-                                ?: publishDurableComposerText(account, replyTarget, trimmed, clientToken, attempt > 1)
+                                ?: publishComposerTextOnce(
+                                    account,
+                                    replyTarget,
+                                    trimmed,
+                                    clientToken,
+                                    attempt > 1,
+                                    emojiArtwork,
+                                )
                         recordOptimisticSendAcceptance(optimisticKey, summary)
                         sendTrace(
                             trace,
@@ -8205,6 +8250,7 @@ class ConversationController(
                 }
             }
         }
+    }
 
     /**
      * Trace a transient send retry with the current relay-health snapshot.

@@ -1,16 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MediaRecordFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.IndexedAttachment
-import dev.ipf.whitenoise.android.core.MessageAttachments
-import dev.ipf.whitenoise.android.core.Nip30Emoji
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
-
-private const val REACTION_EVENT_KIND = 7uL
-
-// Reaction artwork is looked up among the group's newest reactions only.
-private const val REACTION_EMOJI_SCAN_LIMIT = 500u
 
 /** A reaction event id and the attachment in it that carries the emoji artwork. */
 internal typealias EmojiAttachment = Pair<String, IndexedAttachment>
@@ -26,37 +19,38 @@ internal suspend fun ConversationController.messageTags(messageIdHex: String): L
 }
 
 /**
- * The image a recent `:code:` reaction in this group defined through its NIP-30 tag, paired with
- * the reaction event that carries it. Reaction summaries omit tags, so this reads the events.
+ * The artwork each `:code:` reaction names, paired with the reaction event that carries it. MDK
+ * names that event on the chip (`reactionMessageIdHex`) and `listMedia` returns its image, so the
+ * lookup never scans reactions. One native read serves every chip; chips MDK named no event for,
+ * or whose event has no accepted image, are absent and render as the literal shortcode.
  */
-internal suspend fun ConversationController.reactionEmojiAttachment(shortcode: String): EmojiAttachment? {
-    val account = boundAccountRef ?: return null
-    val reactions =
+internal suspend fun ConversationController.reactionArtwork(events: Map<String, String>): Map<String, EmojiAttachment> {
+    val account = boundAccountRef
+    if (events.isEmpty() || account == null) {
+        return emptyMap()
+    }
+    val media =
         runCatchingCancellable {
-            appState.marmotIo {
-                messages(account, group.groupIdHex, REACTION_EMOJI_SCAN_LIMIT, listOf(REACTION_EVENT_KIND))
-            }
-        }.getOrNull()
-            .orEmpty()
-    // Newest first, so a redefined code shows its latest artwork.
-    return reactions.asReversed().firstNotNullOfOrNull { reactionRecordEmoji(it, shortcode) }
+            appState.marmotIo(MarmotTraceSection.MEDIA_LIST) { listMedia(account, group.groupIdHex, null) }
+        }.getOrNull().orEmpty()
+    return reactionEmojiAttachmentsFrom(media, events)
 }
 
-/** The attachment a `:code:` reaction's own NIP-30 tag defines, keyed by its reaction event id. */
-private fun reactionRecordEmoji(
-    record: AppMessageRecordFfi,
-    shortcode: String,
-): EmojiAttachment? {
-    if (record.plaintext != shortcode || !Nip30Emoji.hasEmojiTags(record.tags)) {
-        return null
-    }
-    val references = MediaReferenceSupport.parseAllImetaTags(record.tags, record.sourceEpoch ?: 0uL)
-    val attachments = MessageAttachments.indexed(references)
-    val index =
-        Nip30Emoji
-            .attachmentShortcodes(record.tags, attachments)
-            .entries
-            .firstOrNull { it.value == shortcode }
-            ?.key
-    return attachments.firstOrNull { it.index == index }?.let { record.messageIdHex to it }
-}
+/**
+ * Matches [reactionMessageIds] (shortcode to reaction event id) to the image each event carries in
+ * [media]. A shortcode only ever gets artwork from its own reaction event, so identical codes on
+ * other reactions can never lend or borrow it.
+ */
+internal fun reactionEmojiAttachmentsFrom(
+    media: List<MediaRecordFfi>,
+    reactionMessageIds: Map<String, String>,
+): Map<String, EmojiAttachment> =
+    reactionMessageIds
+        .mapNotNull { (shortcode, reactionId) ->
+            val record =
+                media.firstOrNull {
+                    it.messageIdHex.equals(reactionId, ignoreCase = true) &&
+                        MediaReferenceSupport.isImageMedia(it.reference)
+                } ?: return@mapNotNull null
+            shortcode to (reactionId to IndexedAttachment(record.attachmentIndex.toInt(), record.reference))
+        }.toMap()

@@ -13,7 +13,7 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.messageTags
-import dev.ipf.whitenoise.android.state.reactionEmojiAttachment
+import dev.ipf.whitenoise.android.state.reactionArtwork
 import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
@@ -97,7 +97,11 @@ private fun rememberDefinedEmoji(
     return defined
 }
 
-/** Artwork for `:code:` reactions on this message that nothing local or in the message defines. */
+/**
+ * Artwork for `:code:` reactions on this message that nothing local or in the message defines.
+ * MDK names each chip's artwork event (`reactionMessageIdHex`), so a reaction update or removal
+ * changes the keys below and the lookup restarts for exactly that chip.
+ */
 @Composable
 private fun rememberReactionEmojiArt(
     controller: ConversationController,
@@ -106,18 +110,19 @@ private fun rememberReactionEmojiArt(
     allowNetwork: Boolean,
 ): Map<String, EmojiArt> {
     val custom = LocalCustomEmoji.current
-    val reactionCodes =
+    val reactionEvents =
         controller.reactions[messageIdHex]
             .orEmpty()
-            .map { it.emoji }
-            .filter { EmojiShortcodes.isShortcode(it) && EmojiShortcodes.art(it, custom, messageArt) == null }
-            .distinct()
-    val reactionArt by produceState(emptyMap(), messageIdHex, reactionCodes, allowNetwork) {
+            .filter {
+                EmojiShortcodes.isShortcode(it.emoji) && EmojiShortcodes.art(it.emoji, custom, messageArt) == null
+            }.mapNotNull { tally -> tally.reactionMessageIdHex?.let { tally.emoji to it } }
+            .toMap()
+    val reactionArt by produceState(emptyMap(), messageIdHex, reactionEvents, allowNetwork) {
+        val attachments = controller.reactionArtwork(reactionEvents)
         value =
-            reactionCodes
-                .mapNotNull { shortcode ->
-                    val (eventIdHex, attachment) =
-                        controller.reactionEmojiAttachment(shortcode) ?: return@mapNotNull null
+            attachments
+                .mapNotNull { (shortcode, found) ->
+                    val (eventIdHex, attachment) = found
                     emojiArt {
                         imageAttachmentBytes(
                             controller = controller,

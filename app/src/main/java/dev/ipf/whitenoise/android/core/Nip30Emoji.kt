@@ -12,6 +12,7 @@ object Nip30Emoji {
     private const val TAG_NAME = "emoji"
     private const val TAG_SIZE = 3
     private val codePattern = Regex("[A-Za-z0-9_-]{1,64}")
+    private val shortcodeInText = Regex(":($codePattern):")
 
     /** Whether [tags] carry any emoji tag, so they are the event's own tags rather than a stripped projection. */
     fun hasEmojiTags(tags: List<MessageTagFfi>): Boolean = tags.any { it.values.firstOrNull() == TAG_NAME }
@@ -43,6 +44,20 @@ object Nip30Emoji {
         }
         return defined
     }
+
+    /** Every distinct `:code:` in [text], in first-appearance order. */
+    fun shortcodesIn(text: String): List<String> =
+        shortcodeInText
+            .findAll(text)
+            .map { it.value }
+            .distinct()
+            .toList()
+
+    /** The `["emoji", code, url]` row naming an attachment by its first locator, for a `:code:` shortcode. */
+    fun tag(
+        shortcode: String,
+        url: String,
+    ): List<String> = listOf(TAG_NAME, shortcode.trim(':'), url)
 
     /** `:code:` and url of a well-formed emoji tag. */
     private fun shortcodeAndUrl(tag: MessageTagFfi): Pair<String, String>? {
