@@ -11312,7 +11312,9 @@ class ConversationController(
                 )
             val madeProgress =
                 when (direction) {
-                    ConversationSearchPageDirection.OLDER -> loadOlderPage()
+                    // Anchor at the oldest held row: an unanchored page at the window cap stays
+                    // head-anchored and trims what it just fetched, so it never reaches the match (#2873).
+                    ConversationSearchPageDirection.OLDER -> loadOlderPage(anchorMessageIdHex = oldest.messageIdHex)
                     ConversationSearchPageDirection.NEWER -> loadNewerPage()
                     null -> false
                 }
