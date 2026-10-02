@@ -116,7 +116,7 @@ internal fun PollVotingCard(
             voting = false
             voteGeneration++
         }
-        if (!open || !canVote || pendingSelection?.toSet() == poll.localSelection.toSet()) {
+        if (pollVoteShouldReset(open, canVote, pendingSelection, poll.localSelection)) {
             pendingSelection = null
             status = PollVoteStatus.IDLE
         }
@@ -130,7 +130,7 @@ internal fun PollVotingCard(
         status = if (voting) PollVoteStatus.SUBMITTING else status,
         footer = footer,
         onVote = vote@{ optionId ->
-            if (voting || !effectiveCanVote || !pollVoteAllowed(poll, System.currentTimeMillis())) return@vote
+            if (!pollVoteCanStart(voting, effectiveCanVote, poll)) return@vote
             val replacement = replacementPollSelection(displayedPoll, optionId) ?: return@vote
             val submissionGeneration = ++voteGeneration
             voting = true
@@ -146,6 +146,21 @@ internal fun PollVotingCard(
         },
     )
 }
+
+/** Presentation cleanup also runs when the native selection confirms an optimistic choice. */
+private fun pollVoteShouldReset(
+    open: Boolean,
+    canVote: Boolean,
+    pending: List<String>?,
+    confirmed: List<String>,
+): Boolean = !open || !canVote || pending?.toSet() == confirmed.toSet()
+
+/** Rechecks the deadline at the tap boundary as well as the rendered card's eligibility. */
+private fun pollVoteCanStart(
+    voting: Boolean,
+    canVote: Boolean,
+    poll: PollProjectionFfi,
+): Boolean = !voting && canVote && pollVoteAllowed(poll, System.currentTimeMillis())
 
 internal enum class PollVoteStatus { IDLE, SUBMITTING, UNCONFIRMED, FAILED }
 

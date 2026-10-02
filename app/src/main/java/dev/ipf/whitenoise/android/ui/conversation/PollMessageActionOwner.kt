@@ -79,8 +79,8 @@ internal suspend fun submitOwnedPollVote(
             outcome = controller.castPollVote(owner.messageId, replacement)
         }
     } finally {
-        if (controller.acceptsConversationActionOwner(owner.accountRef, owner.groupId)) {
-            onCompleted(outcome)
-        }
+        // The captured card must always settle its local progress, even after
+        // its controller closes. An obsolete owner never receives an accepted result.
+        onCompleted(outcome.takeIf { controller.acceptsConversationActionOwner(owner.accountRef, owner.groupId) })
     }
 }

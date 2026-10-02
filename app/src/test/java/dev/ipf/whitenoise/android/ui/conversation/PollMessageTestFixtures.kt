@@ -29,6 +29,7 @@ import java.util.Locale
 open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
     protected val nativeCalls = mutableListOf<Pair<String, List<Any?>>>()
     protected var reactionFailure: Throwable? = null
+    protected var beforeVoteReturn: (() -> Unit)? = null
     private val native =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -41,6 +42,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                 else -> {
                     synchronized(nativeCalls) { nativeCalls += name to args.orEmpty().toList() }
                     if (name == "reactToMessage") reactionFailure?.let { throw it }
+                    if (name == "castPollVote") beforeVoteReturn?.invoke()
                     when (name) {
                         "castPollVote", "reactToMessage", "deleteMessage" ->
                             SendSummaryFfi(

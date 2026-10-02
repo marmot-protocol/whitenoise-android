@@ -114,7 +114,8 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                         else -> MessageStatus.Received
                     },
             )
-        val warnedItem = item.copy(projected = checkNotNull(item.projected).copy(invalidationStatus = configuration.invalidation))
+        val warnedItem =
+            item.copy(projected = checkNotNull(item.projected).copy(invalidationStatus = configuration.invalidation))
         retain(warnedItem)
         runTest { pollController.toggleReaction("👍", item.record) }
         composeRule.setContent {

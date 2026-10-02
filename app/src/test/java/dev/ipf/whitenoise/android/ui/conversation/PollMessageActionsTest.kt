@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -183,6 +184,18 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule.runOnIdle { mounted.value = false }
         composeRule.onNodeWithText("Reply").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(false, menuOpen.value) }
+    }
+
+    @Test fun disposedControllerStillSettlesTheMountedCardsVoteProgress() {
+        beforeVoteReturn = { pollController.onCleared() }
+        render()
+        composeRule.onNodeWithText("Soup").performClick()
+        composeRule.waitUntil {
+            !pollController.acceptsConversationActionOwner("personal", pollController.group.groupIdHex)
+        }
+        composeRule.waitUntil { composeRule.onAllNodesWithText("Sending").fetchSemanticsNodes().isEmpty() }
+        composeRule.onNodeWithText("Soup").assertIsNotEnabled()
+        composeRule.runOnIdle { assertEquals(1, recordedCalls().count { it.first == "castPollVote" }) }
     }
 
     @Test fun deliveryWarningPreservesPollContentWithoutPermittingVotes() {

@@ -7505,10 +7505,8 @@ class ConversationController(
     ): Boolean = conversationAccountRef == accountRef && group.groupIdHex == groupIdHex
 
     /** Rejects UI callbacks after their conversation or account lifecycle has ended. */
-    internal fun acceptsConversationActionOwner(
-        accountRef: String?,
-        groupIdHex: String,
-    ): Boolean = !controllerCleared && !isAccountTeardownRequested() && matchesConversation(accountRef, groupIdHex)
+    internal fun acceptsConversationActionOwner(accountRef: String?, groupIdHex: String): Boolean =
+        !controllerCleared && !isAccountTeardownRequested() && matchesConversation(accountRef, groupIdHex)
 
     /** Applies a matching native row and invalidates any null-result acknowledgement superseded by that row. */
     internal fun applyAuthoritativeChatListRow(
@@ -9002,16 +9000,7 @@ class ConversationController(
         // FFI target-only unreact would drop the wrong emoji when the user holds
         // more than one reaction on the same message.
         val me = conversationAccountIdHex ?: error("no active account to retract reaction")
-        val ownReactions =
-            timelineRecords[target]
-                ?.reactions
-                ?.userReactions
-                .orEmpty()
-                .filter { it.sender.equals(me, ignoreCase = true) }
-        val projectedEventIdByEmoji =
-            ownReactions
-                .filter { it.reactionMessageIdHex.isNotBlank() }
-                .associate { it.emoji to it.reactionMessageIdHex }
+        val projectedEventIdByEmoji = projectedOwnReactionEventIds(timelineRecords[target], me)
         val preferredReactionEventId = preferredEventId?.takeIf(String::isNotBlank)
         val requiresAuthoritativeHistory =
             preferredReactionEventId == null &&
@@ -9060,23 +9049,11 @@ class ConversationController(
     }
 
     /** Own reactions known by projection plus locally committed additions awaiting projection. */
-    private fun authoritativeOwnReactionEmojis(target: String): Set<String> {
-        val me = conversationAccountIdHex ?: return emptySet()
-        val projected =
-            window
-                .references(target)
-                ?.reactions
-                ?.items
-                ?.filter { it.viewerReacted }
-                ?.mapTo(linkedSetOf()) { it.emoji }
-                ?: timelineRecords[target]
-                    ?.reactions
-                    ?.userReactions
-                    .orEmpty()
-                    .filter { it.sender.equals(me, ignoreCase = true) }
-                    .mapTo(linkedSetOf()) { it.emoji }
-        return projected.includeUnprojectedReactionEmojis(target, unprojectedOwnReactionEventIds.keys)
-    }
+    private fun authoritativeOwnReactionEmojis(target: String): Set<String> =
+        conversationAccountIdHex?.let { me ->
+            projectedOwnReactionEmojis(window.references(target), timelineRecords[target], me)
+                .includeUnprojectedReactionEmojis(target, unprojectedOwnReactionEventIds.keys)
+        } ?: emptySet()
 
     /** Drives native state toward the newest intent without blocking later optimistic taps. */
     private suspend fun convergeReactionIntent(

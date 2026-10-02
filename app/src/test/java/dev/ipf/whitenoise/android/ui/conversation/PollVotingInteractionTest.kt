@@ -143,7 +143,12 @@ class PollVotingInteractionTest {
         val completions = mutableListOf<(SendAcceptDispositionFfi?) -> Unit>()
         composeRule.setContent {
             WhiteNoiseTheme {
-                PollVotingCard(poll(), "account" to "received-poll", canVote = available.value, submitVote = { _, done -> completions += done })
+                PollVotingCard(
+                    poll(),
+                    "account" to "received-poll",
+                    canVote = available.value,
+                    submitVote = { _, done -> completions += done },
+                )
             }
         }
         composeRule.onNodeWithText("Salad", substring = true).performClick()
