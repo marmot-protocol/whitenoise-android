@@ -201,7 +201,11 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
 
     @Test fun newlyMountedReadOnlyPollDoesNotDismissAnotherRowsMenu() {
         val first = pollMessage()
-        val second = first.copy(record = first.record.copy(messageIdHex = "cc".repeat(32)), status = MessageStatus.Failed)
+        val second =
+            first.copy(
+                record = first.record.copy(messageIdHex = "cc".repeat(32)),
+                status = MessageStatus.Failed,
+            )
         val secondMounted = mutableStateOf(false)
         retain(first)
         retain(second)

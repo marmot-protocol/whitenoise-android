@@ -72,7 +72,11 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             PollScreenshotConfiguration(dark = true, amoled = true, reply = true, closed = true),
         )
 
-    @Test fun pollDeliveryWarningLight() = render("warning_light", PollScreenshotConfiguration(invalidation = "local_publish_failed"))
+    @Test fun pollDeliveryWarningLight() =
+        render(
+            "warning_light",
+            PollScreenshotConfiguration(invalidation = "local_publish_failed"),
+        )
 
     @Test fun pollInfoLight() {
         val item = pollMessage(closed = true)
