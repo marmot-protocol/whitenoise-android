@@ -598,11 +598,11 @@
     <string name="notification_scope_custom_chat">Особые настройки для этого чата</string>
     <string name="notification_custom_for_chat_control">Настроить %1$s для этого чата</string>
     <string name="open_notification_category_settings">Открыть настройки Android для %1$s</string>
-    <string name="notification_notify_restore">Выбор «Уведомлять о» сохраняется на время отключения звука и восстанавливается после него.</string>
-    <string name="notification_mute_detail">Приостановить уведомления, не меняя выбор «Уведомлять о».</string>
+    <string name="notification_notify_restore">Пока уведомления этого чата отключены, прямые упоминания всё ещё могут вызывать уведомления. После включения уведомлений снова действует выбор «Уведомлять о».</string>
+    <string name="notification_mute_detail">Отключить уведомления об обычных сообщениях. Прямые упоминания всё ещё могут уведомлять.</string>
     <string name="notification_scope_switch_detail">Выключите, чтобы снова использовать глобальные настройки.</string>
     <string name="notification_chat_categories_detail">Уведомления о сообщениях используют настройки этого чата. Остальные категории могут использовать глобальные или отдельные настройки для этого чата.</string>
-    <string name="notify_nothing_while_muted">Ничего, пока звук отключён.</string>
+    <string name="notify_nothing_while_muted">Только прямые упоминания, пока уведомления чата отключены.</string>
     <string name="notification_categories_loading">Загрузка категорий уведомлений…</string>
     <string name="toast_notification_scope_update_failed">Не удалось обновить эту настройку уведомлений</string>
     <string name="toast_notification_settings_unavailable">Не удалось открыть настройки уведомлений</string>
@@ -1512,7 +1512,7 @@
     <string name="notify_all_messages">Все сообщения</string>
     <string name="notify_only_mentions">Только упоминания</string>
     <string name="notify_nothing">Ничего</string>
-    <string name="notify_muted_until">Отключено до %1$s</string>
+    <string name="notify_muted_until">Уведомления чата отключены до %1$s; прямые упоминания всё ещё могут вызывать уведомления.</string>
     <string name="vibration_pattern">Схема вибрации</string>
     <string name="vibration_pattern_description">Выберите схему для новых сообщений в этом чате. Предпросмотр воспроизводится один раз.</string>
     <string name="vibration_pattern_system_default">Системная</string>

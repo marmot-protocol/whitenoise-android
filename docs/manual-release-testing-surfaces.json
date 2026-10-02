@@ -5934,6 +5934,14 @@
         ]
       },
       {
+        "surface": "ConversationMuteSettingsSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "fun ConversationMuteSettingsSwitch(",
+        "test_ids": [
+          "NTF-028"
+        ]
+      },
+      {
         "surface": "LoadedNotificationCategories",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "fun LoadedNotificationCategories(",

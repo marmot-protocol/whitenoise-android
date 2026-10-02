@@ -562,11 +562,11 @@
     <string name="notification_scope_custom_chat">Personalizzata per questa chat</string>
     <string name="notification_custom_for_chat_control">Personalizza %1$s per questa chat</string>
     <string name="open_notification_category_settings">Apri le impostazioni Android di %1$s</string>
-    <string name="notification_notify_restore">La scelta «Notifica per» viene mantenuta durante il silenzioso e ripristinata al termine.</string>
-    <string name="notification_mute_detail">Sospendi le notifiche senza cambiare la scelta «Notifica per».</string>
+    <string name="notification_notify_restore">Le menzioni dirette possono ancora inviare notifiche mentre la chat è silenziata. La scelta «Notifica per» riprende al termine.</string>
+    <string name="notification_mute_detail">Disattiva le notifiche dei messaggi normali. Le menzioni dirette possono ancora inviare notifiche.</string>
     <string name="notification_scope_switch_detail">Disattiva per tornare al valore predefinito globale.</string>
     <string name="notification_chat_categories_detail">Le notifiche dei messaggi usano le impostazioni di questa chat. Le altre categorie possono usare i valori globali o impostazioni personalizzate per questa chat.</string>
-    <string name="notify_nothing_while_muted">Niente finché è silenziosa.</string>
+    <string name="notify_nothing_while_muted">Solo menzioni dirette mentre la chat è silenziata.</string>
     <string name="notification_categories_loading">Caricamento delle categorie di notifiche…</string>
     <string name="toast_notification_scope_update_failed">Impossibile aggiornare questa impostazione di notifica</string>
     <string name="toast_notification_settings_unavailable">Impossibile aprire le impostazioni delle notifiche</string>
@@ -1452,7 +1452,7 @@
     <string name="notify_all_messages">Tutti i messaggi</string>
     <string name="notify_only_mentions">Solo menzioni</string>
     <string name="notify_nothing">Niente</string>
-    <string name="notify_muted_until">Silenziato fino alle %1$s</string>
+    <string name="notify_muted_until">Chat silenziata fino alle %1$s; le menzioni dirette possono inviare notifiche.</string>
     <string name="vibration_pattern">Schema di vibrazione</string>
     <string name="vibration_pattern_description">Scegli uno schema per i nuovi messaggi in questa chat. L’anteprima viene riprodotta una volta.</string>
     <string name="vibration_pattern_system_default">Predefinito di sistema</string>
