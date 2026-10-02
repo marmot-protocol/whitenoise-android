@@ -1,7 +1,7 @@
 <resources>
     <string name="smart_folder_start">Criar regras personalizadas</string>
     <string name="smart_folder_legacy">As regras simples continuam ativas até serem substituídas.</string>
-    <string name="smart_folder_prototype">A prévia usa apenas conversas carregadas. Conversas com informações ausentes não são contadas.</string>
+    <string name="smart_folder_prototype">Apenas conversas carregadas são usadas. Conversas com informações ausentes não são contadas.</string>
     <string name="smart_folder_all">Cumprir todas as condições</string>
     <string name="smart_folder_any">Cumprir qualquer condição</string>
     <string name="smart_folder_not">NÃO</string>

@@ -1,7 +1,7 @@
 <resources>
     <string name="smart_folder_start">Eigene Regeln erstellen</string>
     <string name="smart_folder_legacy">Einfache Regeln bleiben aktiv, bis du sie ersetzt.</string>
-    <string name="smart_folder_prototype">Die Vorschau nutzt nur geladene Chats. Chats mit fehlenden Angaben werden nicht gezählt.</string>
+    <string name="smart_folder_prototype">Nur geladene Chats werden berücksichtigt. Chats mit fehlenden Angaben werden nicht gezählt.</string>
     <string name="smart_folder_all">Alle Bedingungen erfüllen</string>
     <string name="smart_folder_any">Eine Bedingung erfüllen</string>
     <string name="smart_folder_not">NICHT</string>

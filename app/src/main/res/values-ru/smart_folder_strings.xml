@@ -1,7 +1,7 @@
 <resources>
     <string name="smart_folder_start">Создать свои правила</string>
     <string name="smart_folder_legacy">Простые правила действуют, пока вы их не замените.</string>
-    <string name="smart_folder_prototype">Предпросмотр использует только загруженные чаты. Чаты с неполными данными не учитываются.</string>
+    <string name="smart_folder_prototype">Учитываются только загруженные чаты. Чаты с неполными данными не учитываются.</string>
     <string name="smart_folder_all">Выполнить все условия</string>
     <string name="smart_folder_any">Выполнить любое условие</string>
     <string name="smart_folder_not">НЕ</string>

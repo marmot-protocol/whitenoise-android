@@ -1,7 +1,7 @@
 <resources>
     <string name="smart_folder_start">Créer des règles personnalisées</string>
     <string name="smart_folder_legacy">Les règles simples restent actives jusqu’à leur remplacement.</string>
-    <string name="smart_folder_prototype">Seules les discussions chargées sont prévisualisées. Celles dont les informations sont incomplètes ne sont pas comptées.</string>
+    <string name="smart_folder_prototype">Seules les discussions chargées sont utilisées. Celles dont les informations sont incomplètes ne sont pas comptées.</string>
     <string name="smart_folder_all">Respecter toutes les conditions</string>
     <string name="smart_folder_any">Respecter au moins une condition</string>
     <string name="smart_folder_not">NON</string>

@@ -1,7 +1,7 @@
 <resources>
     <string name="smart_folder_start">Crear reglas propias</string>
     <string name="smart_folder_legacy">Las reglas simples siguen activas hasta que las reemplaces.</string>
-    <string name="smart_folder_prototype">La vista previa usa solo chats cargados. No se cuentan los chats con información incompleta.</string>
+    <string name="smart_folder_prototype">Solo se usan los chats cargados. No se cuentan los chats con información incompleta.</string>
     <string name="smart_folder_all">Cumplir todas las condiciones</string>
     <string name="smart_folder_any">Cumplir cualquier condición</string>
     <string name="smart_folder_not">NO</string>

@@ -1,7 +1,7 @@
 <resources>
     <string name="smart_folder_start">创建自定义规则</string>
     <string name="smart_folder_legacy">简单规则会一直生效，直到被替换。</string>
-    <string name="smart_folder_prototype">预览仅使用已加载的聊天。信息缺失的聊天不计入匹配。</string>
+    <string name="smart_folder_prototype">仅使用已加载的聊天。信息缺失的聊天不计入匹配。</string>
     <string name="smart_folder_all">满足所有条件</string>
     <string name="smart_folder_any">满足任一条件</string>
     <string name="smart_folder_not">非</string>

@@ -1,7 +1,7 @@
 <resources>
   <string name="smart_folder_start">Build custom rules</string>
   <string name="smart_folder_legacy">Simple rules stay in use until you replace them.</string>
-  <string name="smart_folder_prototype">Preview uses loaded chats only. Chats with missing information are not counted.</string>
+  <string name="smart_folder_prototype">Matches loaded chats only. Chats with missing information are not counted.</string>
   <string name="smart_folder_all">Match every condition</string>
   <string name="smart_folder_any">Match any condition</string>
   <string name="smart_folder_not">NOT</string>

@@ -185,6 +185,9 @@ class SmartFolderEditorScreenshotTest {
         if (replace) {
             composeRule.onNodeWithTag("folder.presets").performClick()
             composeRule.onNodeWithText(mentionLabel).performClick()
+            composeRule.mainClock.advanceTimeBy(PRESET_MENU_SETTLE_MILLIS)
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("folder.confirmPreset").assertExists()
         }
         if (dialog) composeRule.onNodeWithTag("folder.condition.1").performClick()
         val target = if (dialog || replace) composeRule.onNode(isDialog()) else composeRule.onRoot()
@@ -226,3 +229,5 @@ class SmartFolderEditorScreenshotTest {
         if (rtl) content.performScrollToNode(hasTestTag("folder.keyword"))
     }
 }
+
+private const val PRESET_MENU_SETTLE_MILLIS = 300L

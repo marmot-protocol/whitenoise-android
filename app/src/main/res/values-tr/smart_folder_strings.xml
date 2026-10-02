@@ -1,7 +1,7 @@
 <resources>
     <string name="smart_folder_start">Özel kurallar oluştur</string>
     <string name="smart_folder_legacy">Basit kurallar, siz değiştirene kadar etkin kalır.</string>
-    <string name="smart_folder_prototype">Önizleme yalnızca yüklenen sohbetleri kullanır. Bilgileri eksik sohbetler sayılmaz.</string>
+    <string name="smart_folder_prototype">Yalnızca yüklenen sohbetler kullanılır. Bilgileri eksik sohbetler sayılmaz.</string>
     <string name="smart_folder_all">Tüm koşulları karşıla</string>
     <string name="smart_folder_any">Herhangi bir koşulu karşıla</string>
     <string name="smart_folder_not">DEĞİL</string>

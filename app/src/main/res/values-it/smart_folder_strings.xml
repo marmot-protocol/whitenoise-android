@@ -1,7 +1,7 @@
 <resources>
     <string name="smart_folder_start">Crea regole personalizzate</string>
     <string name="smart_folder_legacy">Le regole semplici restano attive finché non le sostituisci.</string>
-    <string name="smart_folder_prototype">L’anteprima usa solo chat caricate. Le chat con informazioni mancanti non vengono contate.</string>
+    <string name="smart_folder_prototype">Vengono usate solo le chat caricate. Le chat con informazioni mancanti non vengono contate.</string>
     <string name="smart_folder_all">Soddisfa tutte le condizioni</string>
     <string name="smart_folder_any">Soddisfa almeno una condizione</string>
     <string name="smart_folder_not">NON</string>
