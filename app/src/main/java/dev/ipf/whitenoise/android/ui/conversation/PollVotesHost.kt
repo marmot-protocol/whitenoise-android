@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -70,8 +71,10 @@ internal fun PollVotesHost(
     // Waits are capped like the controller sweep and re-read the wall clock, because this timer does not
     // count deep sleep. A row absent from the bounded window is not expiry until its remembered deadline has
     // passed. The read watermark is a key so a received poll's deferred deadline is re-evaluated once read.
+    // The remembered deadline outlives effect restarts, so a restart after the row was trimmed still knows it.
+    val remembered = remember(open.owner) { arrayOfNulls<Long>(1) }
     LaunchedEffect(open.owner, open.poll, controller.lastReadMessageId) {
-        var deadlineMillis: Long? = null
+        var deadlineMillis: Long? = remembered[0]
         while (true) {
             when (val watch = controller.watchRetainedRow(open.owner.messageId, deadlineMillis)) {
                 RetainedRowWatch.Gone -> {
@@ -81,6 +84,7 @@ internal fun PollVotesHost(
                 RetainedRowWatch.Unwatched -> return@LaunchedEffect
                 is RetainedRowWatch.Waiting -> {
                     deadlineMillis = watch.deadlineMillis
+                    remembered[0] = deadlineMillis
                     delay(watch.delayMillis)
                 }
             }

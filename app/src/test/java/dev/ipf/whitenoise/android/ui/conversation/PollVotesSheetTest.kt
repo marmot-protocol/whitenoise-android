@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineRemoveReasonFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.state.RetainedRowWatch
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
@@ -496,6 +497,53 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
     }
 
+    /** Marks [messageId] read through the controller's real visible-read path, as the foreground conversation. */
+    private fun markRead(messageId: String) {
+        pollState.setAppInForeground(true)
+        runBlocking { pollState.setActiveConversation("personal", pollController.group.groupIdHex) }
+        runBlocking { pollController.markReadUpTo(messageId) }
+    }
+
+    /** A read watermark change after the row was trimmed must not forget the deadline the effect saw. */
+    @Test
+    fun readWatermarkChangeAfterTheRowWasTrimmedStillClosesTheSheet() {
+        pollVotesResponder = { singleVoterPage() }
+        val item = expiringPoll(60)
+        val rowShown = openWithPausedClock(item)
+        rowShown.value = false
+        pollController.removeProjectedRecord(item.record.messageIdHex)
+
+        markRead("dd".repeat(32))
+        Snapshot.sendApplyNotifications()
+        pollClockMillis += 120_000L
+        composeRule.mainClock.advanceTimeBy(61_000L)
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
+
+    /** The expiry order lists optimistic rows first, so an optimistic row shadowing the read anchor defers a poll. */
+    @Test
+    fun expiryOrderPutsOptimisticRowsFirst() {
+        val poll = checkNotNull(applyExpiringPage(seconds = 300, direction = "received").projected)
+        val anchorId = "aa".repeat(32)
+        val anchor =
+            poll.copy(messageIdHex = anchorId, sourceMessageIdHex = anchorId, poll = null, retentionExpiresAt = null)
+        applyPage(poll, anchor)
+        markRead(anchorId)
+        // Projected order is poll then anchor, so the poll is already read and its engine deadline applies.
+        assertEquals(
+            RetainedRowWatch.Waiting(60_000L, (pollClockMillis / 1_000L + 300L) * 1_000L),
+            pollController.watchRetainedRow(poll.messageIdHex, null),
+        )
+
+        val optimistic = votedPoll()
+        val shadow = optimistic.copy(id = "optimistic-anchor", record = optimistic.record.copy(messageIdHex = anchorId))
+        pollState.optimisticMessages("personal", pollController.group.groupIdHex)[shadow.id] = shadow
+
+        // With the shadow first, the anchor now precedes the poll, so the poll is unread and its deadline deferred.
+        assertEquals(RetainedRowWatch.Waiting(60_000L, null), pollController.watchRetainedRow(poll.messageIdHex, null))
+    }
+
     /** A received poll's deadline is deferred until read, and closes the sheet once the read anchor settles. */
     @Test
     fun receivedPollThatBecomesDueAfterReadClosesTheSheet() {
@@ -507,9 +555,7 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         composeRule.mainClock.advanceTimeBy(61_000L)
         composeRule.onNodeWithTag(POLL_VOTES_SHEET_TAG).assertExists()
 
-        pollState.setAppInForeground(true)
-        runBlocking { pollState.setActiveConversation("personal", pollController.group.groupIdHex) }
-        runBlocking { pollController.markReadUpTo(applied.record.messageIdHex) }
+        markRead(applied.record.messageIdHex)
         assertEquals(applied.record.messageIdHex, pollController.lastReadMessageId)
         // The paused Robolectric looper does not deliver this off-composition write to the recomposer by itself.
         Snapshot.sendApplyNotifications()
