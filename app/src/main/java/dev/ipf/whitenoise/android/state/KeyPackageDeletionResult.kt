@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.RelayEndpointClassificationFfi
 import dev.ipf.marmotkit.RelayEndpointPolicyFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.HostSafety
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -57,11 +58,21 @@ internal suspend fun deleteKeyPackageThroughSafeSourceRelays(
     accountStillActive: () -> Boolean = { true },
     delete: suspend (List<String>) -> Unit,
 ): KeyPackageDeletionResult =
+    Dispatchers.IO.deleteKeyPackageThroughSafeSourceRelays(sourceRelays, classify, resolve, accountStillActive, delete)
+
+/** Runs the same verification boundary on an explicit dispatcher for deterministic deadline tests. */
+internal suspend fun CoroutineDispatcher.deleteKeyPackageThroughSafeSourceRelays(
+    sourceRelays: List<String>,
+    classify: suspend (List<String>) -> List<RelayEndpointClassificationFfi>,
+    resolve: KeyPackageDeletionHostResolver,
+    accountStillActive: () -> Boolean = { true },
+    delete: suspend (List<String>) -> Unit,
+): KeyPackageDeletionResult =
     if (!accountStillActive()) {
         KeyPackageDeletionResult.Superseded
     } else {
         runCatchingCancellable {
-            selectKeyPackageDeletionRelays(sourceRelays, classify, resolve, accountStillActive)
+            selectKeyPackageDeletionRelays(sourceRelays, classify, resolve, accountStillActive, this)
         }.fold(
             onSuccess = { selection -> executeSelectedKeyPackageDeletion(selection, accountStillActive, delete) },
             onFailure = { failure -> KeyPackageDeletionResult.Failed(failure) },
@@ -135,8 +146,9 @@ private suspend fun selectKeyPackageDeletionRelays(
     classify: suspend (List<String>) -> List<RelayEndpointClassificationFfi>,
     resolve: KeyPackageDeletionHostResolver,
     accountStillActive: () -> Boolean,
+    verificationDispatcher: CoroutineDispatcher,
 ): KeyPackageDeletionRelaySelection =
-    withContext(Dispatchers.IO) {
+    withContext(verificationDispatcher) {
         val candidates = keyPackageDeletionRelayCandidates(sourceRelays)
         when {
             candidates.isEmpty() -> KeyPackageDeletionRelaySelection.NoUsableRelay
