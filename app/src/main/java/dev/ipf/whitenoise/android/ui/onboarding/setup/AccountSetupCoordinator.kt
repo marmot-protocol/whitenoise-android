@@ -209,4 +209,9 @@ internal class AccountSetupCoordinator(
 internal fun OnboardingSnapshotFfi.requiresSetup(): Boolean = !ready || cancellationPending
 
 /** Discover existing Nostr lists beyond our messaging relays before offering additive defaults. */
-internal fun setupOptions() = OnboardingOptionsFfi(MarmotClient.bootstrapRelays, MarmotClient.discoveryRelays)
+internal fun setupOptions() =
+    OnboardingOptionsFfi(
+        defaultRelays = MarmotClient.accountRelays,
+        discoveryRelays = MarmotClient.discoveryRelays,
+        inboxRelays = MarmotClient.bootstrapRelays,
+    )

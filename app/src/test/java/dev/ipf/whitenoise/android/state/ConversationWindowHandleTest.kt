@@ -424,7 +424,7 @@ private fun conversationMessage(messageIdHex: String) =
 
 /** One thumbs-up from another member, the reference every scripted message carries. */
 private fun singleReaction(): ConversationReactionsFfi {
-    val thumbsUp = ConversationReactionFfi("👍", 1uL, listOf("a"), false)
+    val thumbsUp = ConversationReactionFfi("👍", 1uL, listOf("a"), false, null)
     return ConversationReactionsFfi(1uL, 1uL, listOf(thumbsUp), 0uL)
 }
 

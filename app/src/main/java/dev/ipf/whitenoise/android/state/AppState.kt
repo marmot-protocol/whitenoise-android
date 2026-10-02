@@ -4985,28 +4985,37 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Imports an identity with public NIP-65 defaults and White Noise key-package and inbox routes. */
     private suspend fun engineLogin(nsec: String): AccountSummaryFfi {
         val relays = MarmotClient.bootstrapRelays
         val injected = identityLoginCalls
-        if (injected != null) return injected.login(nsec, relays, relays)
-        return marmotIo { login(nsec, relays, relays) }
+        if (injected != null) return injected.login(nsec, MarmotClient.accountRelays, relays)
+        return marmotIo { login(nsec, MarmotClient.accountRelays, relays, relays) }
     }
 
-    // The acknowledgement is a constant, never derived from state: the only
-    // caller is the consent prompt's confirm action.
+    /**
+     * Recovers an incomplete setup only after the consent prompt confirms the invitation-key risk.
+     * The acknowledgement is constant; recovery keeps the same NIP-65 and inbox defaults as login.
+     */
     private suspend fun engineRecoveringLogin(nsec: String): AccountSummaryFfi {
         val relays = MarmotClient.bootstrapRelays
         val injected = identityLoginCalls
         if (injected != null) {
             return injected.loginRecoveringIncompleteSetup(
                 nsec,
-                relays,
+                MarmotClient.accountRelays,
                 relays,
                 acknowledgePossibleKeyPackageOrphan = true,
             )
         }
         return marmotIo {
-            loginRecoveringIncompleteSetup(nsec, relays, relays, acknowledgePossibleKeyPackageOrphan = true)
+            loginRecoveringIncompleteSetup(
+                nsec,
+                MarmotClient.accountRelays,
+                relays,
+                acknowledgePossibleKeyPackageOrphan = true,
+                inboxRelays = relays,
+            )
         }
     }
 
@@ -5035,7 +5044,10 @@ class WhiteNoiseAppState private constructor(
     /** Whether a NIP-55 external signer (Amber) is installed — gates the UI entry point. */
     fun isAmberSignerInstalled(): Boolean = amberSigner.isSignerInstalled()
 
-    /** Opens staged Amber setup or the legacy path; failures keep existing accounts intact. */
+    /**
+     * Opens staged Amber setup or legacy login with public NIP-65 defaults and White Noise inbox routes.
+     * Re-registers the signer before exposing the account; failures keep existing accounts intact.
+     */
     suspend fun loginWithAmber() {
         try {
             amberSignInStage = 1
@@ -5064,6 +5076,7 @@ class WhiteNoiseAppState private constructor(
                     loginExternalSigner(
                         pubkeyHex,
                         amberSigner.buildSigner(pubkeyHex),
+                        MarmotClient.accountRelays,
                         MarmotClient.bootstrapRelays,
                         MarmotClient.bootstrapRelays,
                     )

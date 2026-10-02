@@ -28974,7 +28974,7 @@
         ]
       },
       {
-        "surface": "MarmotKit SDK pin: backed-up in-place upgrade across the 0.11.0 recovery migrations, responsive startup comparison recovery, sign-in, replicated attachment download, and all Android-applicable performance-registry compatibility",
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade across the 0.11.0 recovery and 0.12.0 attachment migrations 99–101, retained sent files, responsive startup comparison recovery, sign-in, replicated attachment download, and all Android-applicable performance-registry compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
         "test_ids": [
@@ -29184,6 +29184,32 @@
         "anchor": "fun sendRecognizedText()",
         "test_ids": [
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "New-account and import relay defaults",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MarmotClient.kt",
+        "anchor": "val accountRelays = bootstrapRelays + generalPurposeRelays",
+        "test_ids": [
+          "ONB-026"
+        ]
+      },
+      {
+        "surface": "Generated identity relay-list split",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "createIdentity(MarmotClient.accountRelays, relays, relays)",
+        "test_ids": [
+          "ONB-003",
+          "ONB-026"
+        ]
+      },
+      {
+        "surface": "Imported-account per-list recommended relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupCoordinator.kt",
+        "anchor": "internal fun setupOptions() =",
+        "test_ids": [
+          "ONB-023",
+          "ONB-026"
         ]
       }
     ],

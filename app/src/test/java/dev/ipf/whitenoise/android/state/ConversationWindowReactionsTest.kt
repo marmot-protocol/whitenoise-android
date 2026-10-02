@@ -13,8 +13,20 @@ class ConversationWindowReactionsTest {
             totalKinds = 2uL,
             items =
                 listOf(
-                    ConversationReactionFfi("👍", 3uL, listOf("a", "b"), viewerReacted = false),
-                    ConversationReactionFfi("❤️", 2uL, listOf("me", "c"), viewerReacted = true),
+                    ConversationReactionFfi(
+                        "👍",
+                        3uL,
+                        listOf("a", "b"),
+                        viewerReacted = false,
+                        reactionMessageIdHex = null,
+                    ),
+                    ConversationReactionFfi(
+                        "❤️",
+                        2uL,
+                        listOf("me", "c"),
+                        viewerReacted = true,
+                        reactionMessageIdHex = null,
+                    ),
                 ),
             omittedKinds = 0uL,
         )
@@ -45,7 +57,7 @@ class ConversationWindowReactionsTest {
     /** Removing the only reaction of a kind drops the chip; a duplicate add is not double counted. */
     @Test
     fun optimisticEdgeCases() {
-        val fire = ConversationReactionFfi("🔥", 1uL, listOf("me"), true)
+        val fire = ConversationReactionFfi("🔥", 1uL, listOf("me"), true, null)
         val single = ConversationReactionsFfi(1uL, 1uL, listOf(fire), 0uL)
         val removed = windowReactionTallies(single, listOf(OptimisticReactionChange("m", "🔥", add = false)))
         assertEquals(emptyList<ReactionTally>(), removed)
