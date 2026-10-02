@@ -167,6 +167,7 @@ class NewMessageScreenshotTest {
                         NewMessageActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}),
                         isValidNpub = { true },
                         identifierLookupFailed = lookupFailed,
+                        addressFallback = identifier,
                     )
                 }
             }
@@ -193,7 +194,7 @@ class NewMessageScreenshotTest {
                     ),
             )
         return recipientDirectoryMatches("ada@example.com", null, emptyList(), listOf(candidate), null)
-            .map { NewMessagePerson(it, "Search result", null) }
+            .map { NewMessagePerson(it, "Address not verified", null) }
     }
 
     /** Synthetic render-only people cover each supported provenance with stable public-key labels. */

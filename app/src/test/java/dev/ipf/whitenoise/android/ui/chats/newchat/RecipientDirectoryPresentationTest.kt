@@ -28,6 +28,19 @@ class RecipientDirectoryPresentationTest {
                 ),
         )
 
+    /** Lookup failure is address-specific and independent of the directory traversal outcome. */
+    @Test
+    fun addressFailureIsIndependentOfDirectoryMatchesAndDoesNotLeakToOtherQueryTypes() {
+        assertTrue(recipientAddressLookupFailed("bob@example.com", RecipientPreviewState.Invalid))
+        assertFalse(recipientAddressLookupFailed("Bob", RecipientPreviewState.Invalid))
+        assertFalse(recipientAddressLookupFailed("npub1synthetic", RecipientPreviewState.Invalid))
+        val pendingOrResolved =
+            listOf(RecipientPreviewState.Empty, RecipientPreviewState.Resolving, RecipientPreviewState.Loaded)
+        for (state in pendingOrResolved) {
+            assertFalse(recipientAddressLookupFailed("bob@example.com", state))
+        }
+    }
+
     /** Finishing the domain must not turn a directory match into an empty result. */
     @Test
     fun completingAddressKeepsDirectoryDiscovery() {

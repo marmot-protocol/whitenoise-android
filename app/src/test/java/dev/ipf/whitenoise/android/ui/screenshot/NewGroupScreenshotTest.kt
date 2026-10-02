@@ -45,6 +45,14 @@ class NewGroupScreenshotTest {
     /** Partial discovery keeps people and exposes recovery. */
     @Test fun partial() = picker("new_group_partial.png", partial = true)
 
+    @Test fun addressFailedLight() = picker("new_group_address_failed_light.png", addressFailed = true)
+
+    @Test fun addressFailedDark() = picker("new_group_address_failed_dark.png", addressFailed = true, dark = true)
+
+    @Test fun addressFailedAmoled() = picker("new_group_address_failed_amoled.png", addressFailed = true, dark = true, amoled = true)
+
+    @Test fun addressFailedLargeRtl() = picker("new_group_address_failed_large_rtl.png", addressFailed = true, largeRtl = true)
+
     /** Large RTL chips and field retain scrolling and native directionality. */
     @Test fun selectedLargeRtl() = picker("new_group_selected_large_rtl.png", selected = true, largeRtl = true)
 
@@ -78,6 +86,7 @@ class NewGroupScreenshotTest {
         empty: Boolean = false,
         partial: Boolean = false,
         largeRtl: Boolean = false,
+        addressFailed: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -85,14 +94,19 @@ class NewGroupScreenshotTest {
             ) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
                     NewGroupRecipientContent(
-                        TextFieldState(),
-                        if (empty) emptyList() else people(),
+                        TextFieldState(if (addressFailed) "ada@example.com" else ""),
+                        when {
+                            empty -> emptyList()
+                            addressFailed -> people().take(1).map { it.copy(subtitle = "Address not verified") }
+                            else -> people()
+                        },
                         if (selected) people().take(2) else emptyList(),
                         false,
                         false,
                         partial,
                         NewGroupRecipientActions({}, {}, {}, {}, {}, {}, {}, {}),
                         isValidNpub = { true },
+                        addressLookupFailed = addressFailed,
                     )
                 }
             }

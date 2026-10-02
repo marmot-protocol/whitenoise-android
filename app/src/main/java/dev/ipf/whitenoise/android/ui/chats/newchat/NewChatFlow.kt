@@ -665,7 +665,7 @@ private fun NewMessageAccountScreen(
                 candidate = candidate,
                 subtitle =
                     if (addressQuery && resolution.resolvedHex == null) {
-                        stringResource(R.string.user_search_result)
+                        stringResource(R.string.user_search_address_result)
                     } else {
                         appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
                     },
@@ -723,7 +723,8 @@ private fun NewMessageAccountScreen(
             creatingHex = creatingHex,
             error = startChatError,
             retryableIdentifier = addressQuery,
-            identifierLookupFailed = addressQuery && resolution.state == RecipientPreviewState.Invalid,
+            identifierLookupFailed = recipientAddressLookupFailed(query, resolution.state),
+            addressFallback = addressQuery && resolution.resolvedHex == null,
             actions =
                 NewMessageActions(
                     back = { leaveScreen(onBack) },

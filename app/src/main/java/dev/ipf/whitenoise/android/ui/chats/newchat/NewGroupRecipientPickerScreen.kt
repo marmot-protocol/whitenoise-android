@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -74,6 +75,10 @@ private fun NewGroupRecipientAccountScreen(
     var scannerSession by remember { mutableStateOf<Long?>(null) }
     var nextScannerSession by remember { mutableLongStateOf(0L) }
     val resolution = rememberRecipientResolution(query, appState, retry)
+    val addressFallback =
+        ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05 &&
+            resolution.resolvedHex == null
+    val addressResultLabel = stringResource(R.string.user_search_address_result)
     val directoryQuery = query.takeIf { resolution.resolvedHex == null }.orEmpty()
     val search by rememberRecipientUserSearchState(directoryQuery, appState, retry)
     val activeHex = appState.activeAccount?.accountIdHex
@@ -106,6 +111,7 @@ private fun NewGroupRecipientAccountScreen(
         GroupCreationPerson(
             candidate.copy(displayName = selectedMemberDisplayName(candidate, appState)),
             when {
+                addressFallback -> addressResultLabel
                 candidate.isFollowing -> followedLabel
                 candidate.searchProfile != null -> resultLabel
                 else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
@@ -180,6 +186,7 @@ private fun NewGroupRecipientAccountScreen(
                     },
                 ),
             isValidNpub = { npub -> appState.accountIdHexForMention(npub) != null },
+            addressLookupFailed = recipientAddressLookupFailed(query, resolution.state),
         )
     }
     scannerSession?.takeIf { owner.isCurrent() }?.let { token ->

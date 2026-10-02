@@ -248,6 +248,7 @@ class NewMessagePresentationTest {
                     ),
                     isValidNpub = { true },
                     identifierLookupFailed = lookupFailed,
+                    addressFallback = identifier && query.contains('@'),
                 )
             }
         }

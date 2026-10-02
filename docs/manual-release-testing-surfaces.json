@@ -2036,6 +2036,14 @@
         ]
       },
       {
+        "surface": "RecipientAddressLookupFeedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientAddressLookupFeedback.kt",
+        "anchor": "fun RecipientAddressLookupFeedback(",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
         "surface": "UserSearchStatusRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientUserSearch.kt",
         "anchor": "fun UserSearchStatusRow(",

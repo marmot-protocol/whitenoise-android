@@ -28,6 +28,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,6 +39,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -85,7 +87,9 @@ internal fun ContactPickerScreen(
     // this transient navigation state in the same lifetime so process
     // recreation cannot restore an empty review screen over a rebuilt picker.
     var reviewingSelection by remember { mutableStateOf(false) }
-    val resolution = rememberRecipientResolution(query, appState)
+    var searchRetry by remember { mutableIntStateOf(0) }
+    val resolution = rememberRecipientResolution(query, appState, searchRetry)
+    val addressQuery = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05
 
     // Installed unconditionally: a disabled handler would let back fall
     // through to the Activity while a mutation is mid-flight.
@@ -119,7 +123,7 @@ internal fun ContactPickerScreen(
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
     val directoryQuery = query.takeIf { resolution.resolvedHex == null }.orEmpty()
-    val userSearch by rememberRecipientUserSearchState(directoryQuery, appState)
+    val userSearch by rememberRecipientUserSearchState(directoryQuery, appState, searchRetry)
     val discovered = userSearch.candidates
     val followedIds = userSearch.followedAccountIds
     val matches =
@@ -229,6 +233,9 @@ internal fun ContactPickerScreen(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(bottom = 96.dp),
             ) {
+                if (recipientAddressLookupFailed(query, resolution.state)) {
+                    item { RecipientAddressLookupFeedback(busy) { searchRetry++ } }
+                }
                 // A pasted/scanned self identifier is dropped like the browse
                 // list drops the active account, landing on "No matches".
                 val resolvedHex =
@@ -308,6 +315,7 @@ internal fun ContactPickerScreen(
                             title = candidate.displayName,
                             subtitle =
                                 when {
+                                    addressQuery -> stringResource(R.string.user_search_address_result)
                                     candidate.isFollowing -> stringResource(R.string.user_search_you_follow)
                                     candidate.searchProfile != null -> stringResource(R.string.user_search_result)
                                     else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }

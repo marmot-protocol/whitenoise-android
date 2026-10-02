@@ -97,6 +97,7 @@ internal fun NewMessageContent(
     isValidNpub: (String) -> Boolean,
     retryableIdentifier: Boolean = false,
     identifierLookupFailed: Boolean = false,
+    addressFallback: Boolean = false,
 ) {
     val query = queryState.text.toString()
     val busy = creatingHex != null
@@ -136,7 +137,7 @@ internal fun NewMessageContent(
                 )
             }
             val groups =
-                if (query.isBlank() || identifierQuery) {
+                if (query.isBlank() || (identifierQuery && !addressFallback)) {
                     mapOf(R.string.new_message_people to people)
                 } else {
                     people.groupBy { newMessageSource(it.candidate) }
