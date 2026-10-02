@@ -5959,8 +5959,7 @@ class ConversationController(
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
     // Test seams: the user's own emoji a text uses, and the send that carries them.
     private val customEmojiReader: suspend (String) -> List<LocalEmojiArtwork> = { appState.localEmojiArtworkIn(it) },
-    private val customEmojiSender: (suspend (String, String, List<LocalEmojiArtwork>, () -> Unit) -> SendSummaryFfi)? =
-        null,
+    private val customEmojiSender: CustomEmojiSender? = null,
     private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
     },
@@ -8086,6 +8085,16 @@ class ConversationController(
         isTransientRelaySendError(throwable) ||
             (textPublisher == null && isTransientRuntimeWorkerError(throwable))
 
+    /** The lock an emoji send takes around its publish only, so uploads never hold up cancel or other mutations. */
+    private fun commitPublishLock(account: String): EmojiPublishLock = { publish -> appState.withGroupCommitLock(account, group.groupIdHex) { publish() } }
+
+    /** Runs [block] under the group commit lock, or directly when [skip] says the block locks its own publish. */
+    private suspend fun <T> commitLockUnless(
+        skip: Boolean,
+        account: String,
+        block: suspend () -> T,
+    ): T = if (skip) block() else appState.withGroupCommitLock(account, group.groupIdHex, block)
+
     /** The user's own emoji a plain, non-reply text send must carry, or none when this send carries none. */
     private suspend fun emojiArtworkForSend(
         replyTarget: String?,
@@ -8133,7 +8142,7 @@ class ConversationController(
         return when {
             emojiArtwork.isEmpty() ->
                 publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
-            injected != null -> injected(account, text, emojiArtwork, ensureCurrent)
+            injected != null -> injected(account, text, emojiArtwork, ensureCurrent, commitPublishLock(account))
             else ->
                 appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
                     sendTextWithCustomEmoji(
@@ -8143,6 +8152,7 @@ class ConversationController(
                         emojiArtwork,
                         appState.emojiUploads,
                         ensureCurrent = ensureCurrent,
+                        publishLock = commitPublishLock(account),
                     )
                 }
         }
@@ -8219,7 +8229,9 @@ class ConversationController(
                 // sends behind this one until its outcome is known.
                 val lockWaitStartMs = trace?.let { traceNowMs() }
                 updatePendingSendStage(clientToken, PerformanceSendStage.WAITING_COMMIT_LOCK, attempt)
-                appState.withGroupCommitLock(account, group.groupIdHex) {
+                // An emoji send uploads outside the commit lock and locks only its publish, so a cancel
+                // taking the same lock never waits for a slow upload.
+                commitLockUnless(emojiArtwork.isNotEmpty() && textPublisher == null, account) {
                     requireOptimisticSendNotCancelled(optimisticKey)
                     val lockHeldAtMs = trace?.let { traceNowMs() }
                     sendTrace(

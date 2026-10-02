@@ -41,5 +41,5 @@ internal fun reactionEmojiAttachmentsFrom(
                             MediaReferenceSupport.isImageMedia(it.reference)
                     }.map { IndexedValue(it.attachmentIndex.toInt(), it.reference) }
             val named = Nip30Emoji.attachmentShortcodes(tagsByEvent[reactionId.lowercase()].orEmpty(), images)
-            images.firstOrNull { named[it.index] == shortcode }?.let { shortcode to (reactionId to it) }
+            images.firstOrNull { shortcode in named[it.index].orEmpty() }?.let { shortcode to (reactionId to it) }
         }.toMap()

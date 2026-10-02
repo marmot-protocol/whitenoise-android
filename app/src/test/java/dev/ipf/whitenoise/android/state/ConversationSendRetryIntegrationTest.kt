@@ -725,6 +725,9 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(MessageStatus.Failed, controller.timeline.single().status)
         }
 
+    /** The `:party:` emoji image these tests send. */
+    private fun partyArtwork() = LocalEmojiArtwork(":party:", "party.png", "image/png", byteArrayOf(1))
+
     /** A controller whose text uses one custom emoji and whose emoji send runs [send] instead of a native call. */
     private fun emojiController(
         appState: WhiteNoiseAppState,
@@ -733,9 +736,57 @@ class ConversationSendRetryIntegrationTest {
         appState = appState,
         initialGroup = group(),
         initialMemberSnapshot = memberSnapshot(),
-        customEmojiReader = { listOf(LocalEmojiArtwork(":party:", "party.png", "image/png", byteArrayOf(1))) },
-        customEmojiSender = { _, _, _, _ -> send() },
+        customEmojiReader = { listOf(partyArtwork()) },
+        customEmojiSender = { _, _, _, _, _ -> send() },
     )
+
+    /**
+     * Cancelling while the emoji images upload must not wait for the upload, must publish nothing, and
+     * must not hold the group commit lock, so reactions and edits stay usable meanwhile.
+     */
+    @Test
+    fun cancellingDuringACustomEmojiUploadPublishesNothingAndDoesNotBlockMutations() =
+        runTest {
+            val uploadStarted = CompletableDeferred<Unit>()
+            val releaseUpload = CompletableDeferred<Unit>()
+            var published = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { listOf(partyArtwork()) },
+                    customEmojiSender = { _, _, _, ensureCurrent, publishLock ->
+                        uploadStarted.complete(Unit)
+                        releaseUpload.await()
+                        publishLock {
+                            ensureCurrent()
+                            published += 1
+                            successfulSendSummary()
+                        }
+                    },
+                )
+
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    appState.sendConversationText(controller, "hi :party:")
+                }
+            uploadStarted.await()
+            val pending = controller.timeline.single().record
+
+            // Other group mutations take the same lock and must not wait for the upload.
+            withTimeout(5_000) { appState.withGroupCommitLock(ACCOUNT_REF, GROUP_ID) { } }
+            // Cancel must also complete without waiting for the upload.
+            withTimeout(5_000) { assertTrue(controller.deleteMessage(pending, presentFailure = false)) }
+            assertTrue(controller.timeline.isEmpty())
+
+            releaseUpload.complete(Unit)
+            send.await()
+
+            assertEquals(0, published)
+            assertTrue(controller.timeline.isEmpty())
+        }
 
     /** An upload-stage failure published nothing, so the bubble ends Failed and never stays Pending. */
     @Test

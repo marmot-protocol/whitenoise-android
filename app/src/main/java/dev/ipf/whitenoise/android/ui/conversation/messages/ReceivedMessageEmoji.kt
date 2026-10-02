@@ -48,19 +48,22 @@ internal fun rememberReceivedEmoji(
     val messageArt by produceState(emptyMap<String, EmojiArt>(), record.messageIdHex, defined, allowNetwork) {
         value =
             defined
-                .mapNotNull { (index, shortcode) ->
+                .flatMap { (index, shortcodes) ->
                     val reference = attachments.accepted.first { it.index == index }.value
-                    emojiArt {
-                        imageAttachmentBytes(
-                            controller = controller,
-                            messageIdHex = record.messageIdHex,
-                            attachmentIndex = index,
-                            reference = reference,
-                            mine = mine,
-                            priority = AttachmentDownloadPriority.Automatic,
-                            allowNetwork = allowNetwork,
-                        )
-                    }?.let { shortcode to it }
+                    val art =
+                        emojiArt {
+                            imageAttachmentBytes(
+                                controller = controller,
+                                messageIdHex = record.messageIdHex,
+                                attachmentIndex = index,
+                                reference = reference,
+                                mine = mine,
+                                priority = AttachmentDownloadPriority.Automatic,
+                                allowNetwork = allowNetwork,
+                            )
+                        }
+                    // Every alias of one image renders the same artwork.
+                    shortcodes.mapNotNull { shortcode -> art?.let { shortcode to it } }
                 }.toMap()
     }
     // Reaction chips stay literal `:code:` text until MDK can resolve a reaction's attachment (mdk#2151).
@@ -69,13 +72,13 @@ internal fun rememberReceivedEmoji(
     }
 }
 
-/** Which attachments the message's own emoji tags claim, keyed by attachment index. */
+/** Which attachments the message's own emoji tags claim, with every alias each carries, keyed by index. */
 @Composable
 private fun rememberDefinedEmoji(
     controller: ConversationController,
     record: AppMessageRecordFfi,
     attachments: MessageAttachmentSet,
-): Map<Int, String> {
+): Map<Int, List<String>> {
     // Conversation-window rows omit event tags, so only a message that could define emoji is re-read.
     val mayDefineEmoji =
         remember(record.plaintext, attachments) {

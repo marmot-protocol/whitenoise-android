@@ -37,7 +37,7 @@ class Nip30EmojiTest {
                 IndexedValue(2, reference("image/png", "https://a/mirror", "https://a/party")),
             )
         val tags = listOf(tag("imeta", "url https://a/party"), tag("emoji", "party", "https://a/party"))
-        assertEquals(mapOf(2 to ":party:"), Nip30Emoji.attachmentShortcodes(tags, attachments))
+        assertEquals(mapOf(2 to listOf(":party:")), Nip30Emoji.attachmentShortcodes(tags, attachments))
     }
 
     @Test
@@ -58,11 +58,11 @@ class Nip30EmojiTest {
                 tag("emoji", "clip", "https://a/v"),
                 tag("emoji", "elsewhere", "https://a/other"),
             )
-        assertEquals(emptyMap<Int, String>(), Nip30Emoji.attachmentShortcodes(tags, attachments))
+        assertEquals(emptyMap<Int, List<String>>(), Nip30Emoji.attachmentShortcodes(tags, attachments))
     }
 
     @Test
-    fun firstTagWinsPerAttachmentAndPerCode() {
+    fun firstTagWinsPerCodeAndAliasesShareTheirAttachment() {
         val attachments =
             listOf(
                 IndexedValue(0, reference("image/gif", "https://a/one")),
@@ -75,7 +75,8 @@ class Nip30EmojiTest {
                 tag("emoji", "one", "https://a/two"),
                 tag("emoji", "Two-2", "https://a/two"),
             )
-        assertEquals(mapOf(0 to ":one:", 1 to ":Two-2:"), Nip30Emoji.attachmentShortcodes(tags, attachments))
+        val expected = mapOf(0 to listOf(":one:", ":again:"), 1 to listOf(":Two-2:"))
+        assertEquals(expected, Nip30Emoji.attachmentShortcodes(tags, attachments))
     }
 
     @Test
@@ -83,6 +84,25 @@ class Nip30EmojiTest {
         assertTrue(Nip30Emoji.hasEmojiTags(listOf(tag("imeta"), tag("emoji", "a", "u"))))
         assertFalse(Nip30Emoji.hasEmojiTags(listOf(tag("imeta", "url u"))))
         assertFalse(Nip30Emoji.hasEmojiTags(listOf(MessageTagFfi(emptyList()))))
+    }
+
+    /** A repeated code with another URL cannot rebind, even when its first tag named no attachment. */
+    @Test
+    fun repeatedCodeNeverRebindsToAnotherAttachment() {
+        val attachments = listOf(IndexedValue(0, reference("image/png", "https://a/one")))
+        val tags = listOf(tag("emoji", "x", "https://a/missing"), tag("emoji", "x", "https://a/one"))
+        assertEquals(emptyMap<Int, List<String>>(), Nip30Emoji.attachmentShortcodes(tags, attachments))
+    }
+
+    /** What the sender builds for two aliases of identical artwork resolves both codes on the receiver. */
+    @Test
+    fun aliasesOfIdenticalArtworkRoundTripFromSenderToReceiver() {
+        val shared = reference("image/png", "https://blob/party.png")
+        val tags =
+            listOf(":party:", ":parrot:").map { MessageTagFfi(Nip30Emoji.tag(it, shared.locators.first().value)) }
+        val attachments = listOf(IndexedValue(0, shared))
+        assertEquals(mapOf(0 to listOf(":party:", ":parrot:")), Nip30Emoji.attachmentShortcodes(tags, attachments))
+        assertEquals(setOf(0), Nip30Emoji.attachmentShortcodes(tags, attachments).keys)
     }
 
     /** Sending finds each distinct `:code:` once, in the order typed, and ignores lone colons. */

@@ -33,28 +33,28 @@ object Nip30Emoji {
     fun hasEmojiTags(tags: List<MessageTagFfi>): Boolean = tags.any { it.values.firstOrNull() == TAG_NAME }
 
     /**
-     * The `:code:` each image attachment defines, keyed by protocol attachment index. The first tag
-     * naming an attachment wins, and a code keeps the first attachment it names.
+     * The `:code:`s each image attachment defines, keyed by protocol attachment index and in tag
+     * order. Aliases of one image share its attachment, so one attachment may carry several codes.
+     * The first well-formed tag for a code wins even when it names no attachment, so a repeated
+     * code with another URL cannot rebind it.
      */
     fun attachmentShortcodes(
         tags: List<MessageTagFfi>,
         attachments: List<IndexedAttachment>,
-    ): Map<Int, String> {
+    ): Map<Int, List<String>> {
         val images = attachments.filter { MediaReferenceSupport.isImageMedia(it.value) }
         if (images.isEmpty()) {
             return emptyMap()
         }
-        val defined = linkedMapOf<Int, String>()
+        val defined = linkedMapOf<Int, MutableList<String>>()
+        val seen = mutableSetOf<String>()
         for ((shortcode, url) in tags.mapNotNull(::shortcodeAndUrl)) {
-            if (shortcode in defined.values) {
+            if (!seen.add(shortcode)) {
                 continue
             }
-            val attachment =
-                images.firstOrNull { (index, reference) ->
-                    index !in defined && reference.locators.any { it.value == url }
-                }
+            val attachment = images.firstOrNull { (_, reference) -> reference.locators.any { it.value == url } }
             if (attachment != null) {
-                defined[attachment.index] = shortcode
+                defined.getOrPut(attachment.index) { mutableListOf() }.add(shortcode)
             }
         }
         return defined

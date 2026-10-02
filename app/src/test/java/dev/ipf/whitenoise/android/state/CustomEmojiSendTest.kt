@@ -8,9 +8,11 @@ import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.core.Nip30Emoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
@@ -161,6 +163,16 @@ class CustomEmojiSendTest {
             val tagged = calls[1].second
             assertEquals(1, (tagged[2] as List<*>).size)
             assertEquals(2, (tagged[4] as List<*>).size)
+            // The receiver maps both aliases onto the one attachment the sender attached.
+            @Suppress("UNCHECKED_CAST")
+            val receiverTags = (tagged[4] as List<List<String>>).map { MessageTagFfi(it) }
+
+            @Suppress("UNCHECKED_CAST")
+            val receiverAttachments = (tagged[2] as List<MediaAttachmentReferenceFfi>).withIndex().toList()
+            assertEquals(
+                mapOf(0 to listOf(":party:", ":parrot:")),
+                Nip30Emoji.attachmentShortcodes(receiverTags, receiverAttachments),
+            )
         }
 
     /** A second send of the same image under the same epoch reuses the upload, and a new epoch re-uploads. */

@@ -196,6 +196,13 @@ internal fun emojiTags(
         Nip30Emoji.tag(emoji.shortcode, url)
     }
 
+/** Test seam for the emoji send: account, text, emoji, the scope check, then the lock around the publish. */
+typealias CustomEmojiSender =
+    suspend (String, String, List<LocalEmojiArtwork>, () -> Unit, EmojiPublishLock) -> SendSummaryFfi
+
+/** Runs the given publish while holding whatever lock serializes group commits. */
+typealias EmojiPublishLock = suspend (suspend () -> SendSummaryFfi) -> SendSummaryFfi
+
 /**
  * Uploads (or reuses) the images, wrapping any failure as [EmojiUploadFailure] because nothing has
  * been published at that point. Cancellation passes through.
@@ -218,8 +225,11 @@ private suspend fun MarmotInterface.uploadStage(
     }
 
 /**
- * One upload-then-publish pass. A reference MDK rejects drops the cache and surfaces as
- * [EmojiChatChangedException], and any other publish failure propagates unchanged.
+ * One upload-then-publish pass. The upload and tag checks run outside any lock, so a slow upload
+ * never blocks cancel or other mutations. Only the publish runs inside [publishLock], after
+ * [ensureCurrent] confirms again that the send was not cancelled. A reference MDK rejects drops
+ * the cache and surfaces as [EmojiChatChangedException], and any other publish failure
+ * propagates unchanged.
  */
 @Suppress("LongParameterList")
 private suspend fun MarmotInterface.attemptEmojiSend(
@@ -230,6 +240,7 @@ private suspend fun MarmotInterface.attemptEmojiSend(
     cache: EmojiUploadCache,
     currentEpoch: suspend () -> ULong,
     ensureCurrent: () -> Unit,
+    publishLock: EmojiPublishLock,
 ): SendSummaryFfi {
     val referenceBySha = uploadStage(cache, account, group, artwork, currentEpoch)
     ensureCurrent()
@@ -237,7 +248,10 @@ private suspend fun MarmotInterface.attemptEmojiSend(
     checkEmojiTagBytes(tags)
     val attachments = artwork.map { it.sha256 }.distinct().map { referenceBySha.getValue(it) }
     return try {
-        sendTaggedMedia(account, group, attachments, text, tags)
+        publishLock {
+            ensureCurrent()
+            sendTaggedMedia(account, group, attachments, text, tags)
+        }
     } catch (
         @Suppress("TooGenericExceptionCaught") failure: Exception,
     ) {
@@ -252,7 +266,8 @@ private suspend fun MarmotInterface.attemptEmojiSend(
  * one tagged media send whose caption is the text. Limits are checked before any upload. An upload
  * failure is an [EmojiUploadFailure] (nothing published). A reference MDK rejects is re-uploaded
  * once, then reported as [EmojiChatChangedException]. [ensureCurrent] runs after the upload and
- * throws when the account, chat or send was cancelled meanwhile. A failure of the send itself
+ * throws when the account, chat or send was cancelled meanwhile, and runs again inside [publishLock].
+ * A failure of the send itself
  * propagates unchanged, because the event may have reached a relay.
  */
 @Suppress("LongParameterList")
@@ -264,12 +279,13 @@ internal suspend fun MarmotInterface.sendTextWithCustomEmoji(
     cache: EmojiUploadCache,
     currentEpoch: suspend () -> ULong = { groupMlsState(account, group).epoch },
     ensureCurrent: () -> Unit = {},
+    publishLock: EmojiPublishLock = { it() },
 ): SendSummaryFfi {
     precheckEmojiSend(artwork)
     var attempt = 1
     while (true) {
         try {
-            return attemptEmojiSend(account, group, text, artwork, cache, currentEpoch, ensureCurrent)
+            return attemptEmojiSend(account, group, text, artwork, cache, currentEpoch, ensureCurrent, publishLock)
         } catch (stale: EmojiChatChangedException) {
             if (attempt++ >= 2) throw stale
         }
