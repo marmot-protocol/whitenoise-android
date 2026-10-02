@@ -19,17 +19,23 @@ internal const val FIRST_FRAME_DURABLE_AVATAR_ROWS = 24
 internal const val FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS = 250L
 
 /**
- * The renderable MDK-stored avatars of the rows a restored chat list draws first, in the engine's visible
- * order (pinned, then most recent activity). Archived rows are not on the first frame and are skipped.
+ * The renderable stored avatars of the rows the restored chat list draws first. The rows are projected and
+ * ordered exactly as the first frame orders them: [chatListItemFromProjection] and [sortChatListItems] with
+ * the same [draftedAtSeconds] lookup `ChatsController` uses (pending confirmation, pinned block and manual pin
+ * position, draft-aware recency, arrival order, title). Archived rows are not on the first frame and are
+ * skipped. Each asset is the one the row itself adopts, so a picture the row would not draw is not decoded.
  */
-internal fun firstFrameDurableAvatarAssets(rows: List<PresentedChatRowFfi>): List<AvatarAssetFfi> =
-    rows
+internal fun firstFrameDurableAvatarAssets(
+    rows: List<PresentedChatRowFfi>,
+    draftedAtSeconds: (groupIdHex: String) -> ULong? = { null },
+): List<AvatarAssetFfi> =
+    sortChatListItems(
+        rows.map { chatListItemFromProjection(it.row, it.presentation, it.avatarAsset) },
+    ) { item -> draftedAtSeconds(item.group.groupIdHex) }
         .asSequence()
-        .filterNot { it.row.archived }
-        .sortedWith(
-            compareByDescending<PresentedChatRowFfi> { it.row.pinned }.thenByDescending { it.row.activitySortAt },
-        ).take(FIRST_FRAME_DURABLE_AVATAR_ROWS)
-        .mapNotNull { presented -> presented.avatarAsset?.takeIf(AvatarAssetFfi::isRenderable) }
+        .filterNot { it.group.archived }
+        .take(FIRST_FRAME_DURABLE_AVATAR_ROWS)
+        .mapNotNull { item -> item.selectedAvatarAsset?.takeIf(AvatarAssetFfi::isRenderable) }
         .distinctBy { asset -> asset.reference to asset.contentRevision }
         .toList()
 
@@ -55,7 +61,9 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
     accountRef: String,
     rows: List<PresentedChatRowFfi>,
 ): List<FirstFrameDurableAvatar> {
-    val assets = firstFrameDurableAvatarAssets(rows).takeIf { it.isNotEmpty() } ?: return emptyList()
+    val assets =
+        firstFrameDurableAvatarAssets(rows) { groupIdHex -> draftStore.draftedAtSecondsFor(accountRef, groupIdHex) }
+            .takeIf { it.isNotEmpty() } ?: return emptyList()
     withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
         coroutineScope {
             assets.map { asset -> async { durableAvatar(asset, accountRef, acquireMissing = false) } }.awaitAll()

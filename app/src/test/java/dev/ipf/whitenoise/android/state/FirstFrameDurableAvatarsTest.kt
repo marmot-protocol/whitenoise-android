@@ -83,6 +83,45 @@ class FirstFrameDurableAvatarsTest {
         )
     }
 
+    /**
+     * Past the 24-row window, a pending invitation and the chat at manual pin position 0 sort first in the
+     * visible list even though 25 other pinned chats have newer activity, so both must be decoded.
+     */
+    @Test
+    fun pendingInvitationAndFirstManualPinAreDecodedPastTheWindow() {
+        val pinnedByActivity =
+            (1..FIRST_FRAME_DURABLE_AVATAR_ROWS + 1).map { position ->
+                pinnedRow("pinned-$position", position.toUInt(), activity = 1_000uL + position.toULong())
+            }
+        val firstPin = pinnedRow(FIRST_PIN, 0u, activity = 1uL)
+        val pending = row(PENDING, activity = 2uL).copy(pendingConfirmation = true)
+        val rows = (pinnedByActivity + firstPin + pending).map { presented(it, asset(it.groupIdHex)) }
+
+        val selected = firstFrameDurableAvatarAssets(rows).map(AvatarAssetFfi::target)
+
+        assertEquals(FIRST_FRAME_DURABLE_AVATAR_ROWS, selected.size)
+        assertEquals(listOf(PENDING, FIRST_PIN), selected.take(2))
+    }
+
+    /** Past the 24-row window, a chat raised by a newer draft sorts first and must be decoded. */
+    @Test
+    fun draftRaisedChatIsDecodedPastTheWindow() {
+        val newer =
+            (1..FIRST_FRAME_DURABLE_AVATAR_ROWS + 6).map { index ->
+                row("recent-$index", activity = 1_000uL + index.toULong())
+            }
+        val drafted = row(DRAFTED, activity = 1uL)
+        val rows = (newer + drafted).map { presented(it, asset(it.groupIdHex)) }
+
+        val withoutDraft = firstFrameDurableAvatarAssets(rows).map(AvatarAssetFfi::target)
+        val withDraft =
+            firstFrameDurableAvatarAssets(rows) { id -> 10_000uL.takeIf { id == DRAFTED } }.map(AvatarAssetFfi::target)
+
+        assertTrue("an old chat without a draft stays outside the window", DRAFTED !in withoutDraft)
+        assertEquals(DRAFTED, withDraft.first())
+        assertEquals(FIRST_FRAME_DURABLE_AVATAR_ROWS, withDraft.size)
+    }
+
     /** The window is bounded to the rows the first frame seeds. */
     @Test
     fun firstFrameAssetsAreBoundedToTheSeededRows() {
@@ -200,6 +239,9 @@ class FirstFrameDurableAvatarsTest {
         val GROUP = "d1".repeat(16)
         val PEER = "aa".repeat(32)
         const val NANOS_PER_MS = 1_000_000L
+        const val FIRST_PIN = "first-pin"
+        const val PENDING = "pending-invitation"
+        const val DRAFTED = "drafted"
 
         /** An unnamed direct row as MDK stores it. */
         fun row(
@@ -214,6 +256,13 @@ class FirstFrameDurableAvatarsTest {
                 activitySortAt = activity,
                 lastMessage = null,
             )
+
+        /** A pinned unnamed direct row at engine-normalized manual [position]. */
+        fun pinnedRow(
+            group: String,
+            position: UInt,
+            activity: ULong,
+        ): ChatListRowFfi = row(group, activity).copy(pinned = true, pinnedPosition = position)
 
         /** MDK's stored avatar selection for [target]. */
         fun asset(
