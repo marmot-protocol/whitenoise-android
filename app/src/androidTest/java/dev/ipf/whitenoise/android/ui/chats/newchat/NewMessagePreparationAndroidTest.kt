@@ -7,7 +7,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.test.filters.SdkSuppress
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -18,10 +17,10 @@ import org.junit.Rule
 import org.junit.Test
 
 /** Device/emulator coverage for the delayed profile/prewarm first-frame contract. */
-@SdkSuppress(minSdkVersion = 36)
 class NewMessagePreparationAndroidTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** The fallback recipient row stays displayed and tappable while profile, prewarm and lookup are held open. */
     @Test
     fun recipientRemainsActionableWhileProfilePrewarmAndLookupAreDelayed() {
         val targetHex = "b".repeat(64)
@@ -85,7 +84,9 @@ class NewMessagePreparationAndroidTest {
         releaseAll(releaseProfile, releasePrewarm, releaseLookup)
     }
 
+    /** Asserts that none of the held preparation gates has been released yet. */
     private fun assertBlocked(vararg gates: CompletableDeferred<Unit>) = gates.forEach { assertFalse(it.isCompleted) }
 
+    /** Releases every held preparation gate so the coordinator can finish. */
     private fun releaseAll(vararg gates: CompletableDeferred<Unit>) = gates.forEach { it.complete(Unit) }
 }
