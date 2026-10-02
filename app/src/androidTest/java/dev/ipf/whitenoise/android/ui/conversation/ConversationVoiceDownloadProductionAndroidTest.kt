@@ -25,6 +25,10 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.AttachmentLocalAssetFfi
+import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
+import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
@@ -34,8 +38,10 @@ import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
@@ -45,6 +51,7 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -58,8 +65,10 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
+import dev.ipf.whitenoise.android.state.NotificationSuppression
 import dev.ipf.whitenoise.android.state.TimelinePageOutcome.Advanced
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.conversation.media.LocalVoiceAttachmentPresentationRuntime
 import dev.ipf.whitenoise.android.ui.conversation.media.VoiceAttachmentMaterializationRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.VoiceAttachmentPresentationRuntime
@@ -73,6 +82,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -82,6 +92,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.io.IOException
+import java.lang.reflect.Proxy
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -222,7 +233,12 @@ class ConversationVoiceDownloadProductionAndroidTest {
     @Suppress("LongMethod") // One device contract must span all real materialization outcomes and cold-owner rebuild.
     fun productionFailureCancellationRetryAndFreshOwnerCacheReentryStayAnchored() {
         val idOffset = 3_000
-        val fixture = instrumentedConversationFixture(setOf(DEVICE_HISTORY_VOICE_INDEX), idOffset)
+        val fixture =
+            instrumentedConversationFixture(
+                setOf(DEVICE_HISTORY_VOICE_INDEX),
+                idOffset,
+                retryAdmission = true,
+            )
         val voiceId = fixture.voiceMessageIds.single()
         val control = InstrumentedVoiceControl(voiceId, materializationAttemptCount = 3)
         val runtime = InstrumentedVoiceRuntime(mapOf(voiceId to control))
@@ -578,6 +594,7 @@ private fun instrumentedConversationFixture(
     voiceIndices: Set<Int>,
     idOffset: Int,
     clearVoiceCacheOnCreate: Boolean = true,
+    retryAdmission: Boolean = false,
 ): InstrumentedConversationFixture {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val group = instrumentedGroup()
@@ -636,6 +653,13 @@ private fun instrumentedConversationFixture(
             MediaAutoDownloadNetwork.entries.forEach { network ->
                 state.setMediaAutoDownload(MediaAutoDownloadType.Audio, network, enabled = false)
             }
+            // Fresh runs discard prior emulator data for these synthetic IDs; owner re-entry retains it.
+            if (clearVoiceCacheOnCreate) {
+                references.keys.forEach { messageId ->
+                    state.diskMediaCache.remove(mediaCacheKey(DEVICE_ACCOUNT_REF, DEVICE_GROUP_ID, messageId, 0))
+                }
+            }
+            if (retryAdmission) installInstrumentedVoiceRetryAdmission(state)
         }
     val members = instrumentedMemberSnapshot()
     val controller =
@@ -654,6 +678,13 @@ private fun instrumentedConversationFixture(
             navigationGeneration = idOffset.toLong(),
         ),
     )
+    if (clearVoiceCacheOnCreate) {
+        references.keys.forEach { messageId ->
+            controller.attachmentOpenRequest(messageId, 0)?.let { request ->
+                runBlocking { appState.attachmentOpens.consume(request) }
+            }
+        }
+    }
     return InstrumentedConversationFixture(
         appState = appState,
         controller = controller,
@@ -671,6 +702,47 @@ private fun instrumentedConversationFixture(
         references = references,
         idOffset = idOffset,
     )
+}
+
+/** Admits a host-side voice retry without resetting a native transfer that is still queued. */
+private fun installInstrumentedVoiceRetryAdmission(state: WhiteNoiseAppState) {
+    val native =
+        Proxy.newProxyInstance(
+            MarmotInterface::class.java.classLoader,
+            arrayOf(MarmotInterface::class.java),
+        ) { _, method, _ ->
+            when (method.name.substringBefore('-')) {
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "attachmentLocalAssets" -> listOf(AttachmentLocalAssetFfi(null, 0u))
+                "attachmentTransferSnapshot" ->
+                    AttachmentTransferSnapshotFfi(
+                        listOf(
+                            AttachmentTransferStatusFfi(
+                                "voice-fixture",
+                                AttachmentTransferStateFfi.QUEUED,
+                                0u,
+                                0u,
+                                null,
+                                null,
+                            ),
+                        ),
+                    )
+                "requestExplicitAttachment" -> "voice-fixture"
+                "downloadAttachmentAgain" -> error("Host-side voice retry must not reset native acquisition")
+                else -> error("Unexpected native voice fixture call: ${method.name}")
+            }
+        } as MarmotInterface
+    WhiteNoiseAppState::class.java.getDeclaredField("suppression").apply { isAccessible = true }.set(
+        state,
+        NotificationSuppression().onForeground().onActiveConversation(
+            DEVICE_GROUP_ID,
+            accountRef = state.activeAccountRef,
+        ),
+    )
+    WhiteNoiseAppState::class.java
+        .getDeclaredField("marmotRuntime")
+        .apply { isAccessible = true }
+        .set(state, AppMarmotRuntime("instrumented-voice-retry-fixture", native))
 }
 
 /** Returns the fixture's authoritative empty recovery state for a conversation. */

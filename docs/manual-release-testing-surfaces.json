@@ -13,6 +13,63 @@
         ]
       },
       {
+        "surface": "SmartFolderRulePanel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "internal fun SmartFolderRulePanel(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "FolderButtonLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "internal fun FolderButtonLabel(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "SmartFolderEditor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "internal fun SmartFolderEditor(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "LegacyFolderRuleControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "internal fun LegacyFolderRuleControls(",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "FolderChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "internal fun <T> FolderChoice(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "SmartFolderConditionDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "private fun SmartFolderConditionDialog(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "SmartFolderGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "private fun SmartFolderGroup(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
         "surface": "observeConversationVisibleReads",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVisibleReads.kt",
         "anchor": "internal fun observeConversationVisibleReads(",
@@ -29649,6 +29706,541 @@
         ]
       },
       {
+        "surface": "chat_folder_archived_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_archived_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_direct_chats_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_direct_chats_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_groups_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_groups_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_include_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_include_muted",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_keyword_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_keyword_label",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_people",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_pinned_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_pinned_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_unread_mentions_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_unread_mentions_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "chat_folder_unread_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.chat_folder_unread_only",
+        "test_ids": [
+          "FLD-003",
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_accepted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_accepted",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_add",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_add",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_add_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_add_key",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_all",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_all_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_all_people",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_any",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_any",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_any_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_any_people",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_archived",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_chat_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_chat_group",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_direct",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_direct",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_draft",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_edit_condition",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_edit_condition",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_empty",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_empty_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_empty_group",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_excludes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_excludes",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_group",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_group_items",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.plurals.smart_folder_group_items",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_ignore",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_ignore",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_include_match",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_include_match",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_invalid_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_invalid_key",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_key",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_keyword",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_keyword",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_keyword_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_keyword_hint",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_limit",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_mentions",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_muted",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_negate_condition",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_negate_condition",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_none",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_none",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_not",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_not",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_not_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_not_hint",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_participants",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_participants",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_pending",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_pending_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_pending_hint",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_pinned",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_pinned",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_present",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_present",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_remove_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_remove_group",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_select_people",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_select_people",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_title",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_type",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_type",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_unread",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_unread_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_unread_hint",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "fun SmartFolderConditionDialog(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "fun SmartFolderConditionDialog(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "folder_rules",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.folder_rules",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "Explicit legacy rule editor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_edit_legacy",
+        "test_ids": ["FLD-003", "FLD-004"]
+      },
+      {
+        "surface": "smart_folder_invalid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_invalid",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_legacy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_legacy",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_loaded_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "R.plurals.smart_folder_loaded_count",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_preset_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_preset_hint",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_preset_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_preset_mentions",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_preset_read",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_preset_read",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_presets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_presets",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_prototype",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_prototype",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_start",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_start",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_unresolved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_unresolved",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "Advanced folder loaded scope",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.smart_folder_prototype",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
         "surface": "Custom emoji image read for sending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalEmojiArtwork.kt",
         "anchor": "internal fun readLocalEmojiArtwork(",
@@ -29671,6 +30263,118 @@
         "anchor": "internal fun TimelineMessage.mediaAttachments(",
         "test_ids": [
           "MSG-034"
+        ]
+      },
+      {
+        "surface": "more_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.more_options",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "no",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.no",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_has_draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_has_draft",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_has_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_has_mentions",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_has_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_has_pending",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_has_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_has_unread",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_no_draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_no_draft",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_no_mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_no_mentions",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_no_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_no_pending",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_no_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.smart_folder_no_unread",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "yes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+        "anchor": "R.string.yes",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_replace",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_replace",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_replace_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_replace_hint",
+        "test_ids": [
+          "FLD-004"
         ]
       }
     ],
@@ -29894,6 +30598,18 @@
         "test_ids": [
           "GRP-011"
         ]
+      },
+      {
+        "surface": "Simple folder keyword help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.folder_keyword_hint",
+        "test_ids": ["FLD-003", "FLD-004"]
+      },
+      {
+        "surface": "Simple folder combination help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.folder_rule_hint",
+        "test_ids": ["FLD-003", "FLD-004"]
       }
     ]
   },

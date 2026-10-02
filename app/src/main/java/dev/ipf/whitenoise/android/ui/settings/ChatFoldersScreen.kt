@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
@@ -411,8 +412,7 @@ private fun folderChatCount(
 ): Int {
     if (accountRef == null) return 0
     val rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id)
-    val archivedSource = rule?.archivedOnly == true
-    val source = if (archivedSource) appState.archivedChatListItems else appState.chatListItems
+    val source = chatFolderSource(rule, appState.chatListItems, appState.archivedChatListItems)
     val ids =
         chatFolderChatIds(
             items = source,

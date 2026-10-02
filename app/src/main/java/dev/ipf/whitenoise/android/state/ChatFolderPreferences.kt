@@ -42,6 +42,8 @@ data class ChatFolderRule(
     val unreadMentionsOnly: Boolean = false,
     val directChatsOnly: Boolean = false,
     val pinnedOnly: Boolean = false,
+    /** Versioned prototype payload. Preserve unsupported versions verbatim rather than opening the rule. */
+    val smartFilter: String? = null,
 )
 
 /** One account's folder state: ordered folders, manual memberships, rules. */
@@ -447,6 +449,7 @@ class ChatFolderPreferences(
                 unreadMentionsOnly = json.optBoolean(RULE_UNREAD_MENTIONS_ONLY, false),
                 directChatsOnly = json.optBoolean(RULE_DIRECT_CHATS_ONLY, false),
                 pinnedOnly = json.optBoolean(RULE_PINNED_ONLY, false),
+                smartFilter = if (json.has("smartFilter")) json.getString("smartFilter") else null,
             )
         }.getOrNull()
     }
@@ -462,6 +465,7 @@ class ChatFolderPreferences(
                 .put(RULE_UNREAD_MENTIONS_ONLY, rule.unreadMentionsOnly)
                 .put(RULE_DIRECT_CHATS_ONLY, rule.directChatsOnly)
                 .put(RULE_PINNED_ONLY, rule.pinnedOnly)
+        rule.smartFilter?.let { json.put("smartFilter", it) }
         rule.keyword?.takeIf { it.isNotBlank() }?.let { json.put(RULE_KEYWORD, it.trim()) }
         return json
     }
