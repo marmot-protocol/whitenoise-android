@@ -13,8 +13,20 @@ class ConversationWindowReactionsTest {
             totalKinds = 2uL,
             items =
                 listOf(
-                    ConversationReactionFfi("👍", 3uL, listOf("a", "b"), viewerReacted = false, reactionMessageIdHex = null),
-                    ConversationReactionFfi("❤️", 2uL, listOf("me", "c"), viewerReacted = true, reactionMessageIdHex = null),
+                    ConversationReactionFfi(
+                        "👍",
+                        3uL,
+                        listOf("a", "b"),
+                        viewerReacted = false,
+                        reactionMessageIdHex = null,
+                    ),
+                    ConversationReactionFfi(
+                        "❤️",
+                        2uL,
+                        listOf("me", "c"),
+                        viewerReacted = true,
+                        reactionMessageIdHex = null,
+                    ),
                 ),
             omittedKinds = 0uL,
         )

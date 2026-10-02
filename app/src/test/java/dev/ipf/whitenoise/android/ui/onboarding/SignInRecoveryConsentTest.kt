@@ -107,6 +107,7 @@ class SignInRecoveryConsentTest {
         assertEquals(1, engine.logins.size)
     }
 
+    /** Confirmation recovers the submitted key once, preserving the account and key-package relay split. */
     @Test
     fun confirmingRecoversTheSameKeyExactlyOnceWithTheAcknowledgement() {
         val engine = recoveryRequiredEngine()

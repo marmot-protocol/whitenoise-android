@@ -350,6 +350,7 @@ class RelayUrlsTest {
         assertEquals(emptyList<String>(), MarmotClient.bootstrapRelays.filterNot { isAcceptableRelayUrl(it) })
     }
 
+    /** New NIP-65 defaults retain both messaging relays and add only acceptable public relay URLs. */
     @Test
     fun accountRelaysAddGeneralPurposeRelaysToTheBootstrapSet() {
         assertEquals(
