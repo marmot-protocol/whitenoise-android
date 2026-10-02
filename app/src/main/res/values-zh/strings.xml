@@ -41,6 +41,13 @@
     <string name="poll_duration_1_day">1 天</string>
     <string name="poll_duration_1_week">1 周</string>
     <string name="poll_ends_at">%1$s 结束</string>
+    <string name="poll_view_votes">查看投票</string>
+    <string name="poll_votes_title">投票</string>
+    <string name="poll_votes_not_anonymous">投票并非匿名。群组中的所有成员都能看到谁选择了哪个选项。</string>
+    <string name="poll_votes_empty">暂无投票。</string>
+    <string name="poll_votes_load_failed">无法加载投票。</string>
+    <string name="poll_votes_load_more">加载更多</string>
+    <string name="poll_voter_blocked">已屏蔽</string>
     <plurals name="poll_option_votes">
         <item quantity="other">%1$d 票</item>
     </plurals>
@@ -775,6 +782,8 @@
     <string name="toast_send_failed">发送失败</string>
     <string name="toast_send_connection_failed">无法连接到中继。请检查网络连接，然后重试。</string>
     <string name="toast_send_queue_full">此聊天有太多消息在等待发送，因此你的消息未发送。等积压清空后再试。</string>
+    <string name="toast_send_chat_changed">发送期间聊天已更改，因此消息未发出。请重试。</string>
+    <string name="toast_send_emoji_limit">此消息的自定义表情太多，因此未发出。请移除一些后重试。</string>
     <string name="toast_chat_still_loading">此聊天仍在加载中，稍后再试。</string>
     <string name="toast_send_membership_verifying">正在确认群组成员身份 — 消息未发送。文字已保留在输入框中，请稍后重试。</string>
     <string name="toast_reaction_failed">反应失败</string>
@@ -1494,16 +1503,16 @@
 
     <string name="chat_bubble_colors">聊天气泡颜色</string>
     <string name="custom_emoji">自定义表情</string>
-    <string name="custom_emoji_detail">在此添加的图片会在消息和回应中变成 :短代码: 表情。它们只保存在此设备上，其他人看到的是短代码文本。</string>
+    <string name="custom_emoji_detail">在此添加的图片会在消息和回应中变成 :my_emoji: 表情，并保存在此设备上。当你发送使用它的新消息（不含回复）时，其图片会以加密方式上传到该聊天，让成员能够看到。回应、回复和编辑只会发送短代码。</string>
     <string name="custom_emoji_empty">还没有自定义表情。</string>
     <string name="custom_emoji_name_title">为此表情命名</string>
     <string name="custom_emoji_name_label">短代码</string>
     <string name="custom_emoji_name_help">字母、数字和下划线。</string>
     <string name="custom_emoji_replaces">将替换你现有的 %1$s。</string>
     <string name="custom_emoji_remove_title">移除 %1$s？</string>
-    <string name="custom_emoji_remove_detail">图片会从此设备删除。消息中的短代码会保留为文本。</string>
+    <string name="custom_emoji_remove_detail">图片将从此设备删除。已发送的消息会保留其上传的图片。</string>
     <string name="custom_emoji_too_large">该图片超过 1 MB。</string>
-    <string name="custom_emoji_not_image">该文件不是 White Noise 可以显示的图片。</string>
+    <string name="custom_emoji_not_image">此文件不是 White Noise 可作为表情发送的图片格式。请使用 PNG、GIF、WebP 或 JPEG。</string>
     <string name="custom_emoji_save_failed">无法保存该表情。</string>
     <string name="action_color">动作颜色</string>
     <string name="action_color_no_active_account">设置应用强调色前，请先选择一个活跃账户。</string>

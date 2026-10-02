@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.Nip30Emoji
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -328,15 +329,22 @@ private fun buildTiles(
     )
 }
 
-/** Accepted attachments keyed by protocol index; unprojected rows fall back to positional tag parsing. */
-private fun TimelineMessage.mediaAttachments(): List<IndexedAttachment> =
-    projected?.media?.let(MessageAttachments::accepted)
-        ?: MessageAttachments.indexed(
-            MediaReferenceSupport.parseAllImetaTags(
-                tags = record.tags,
-                sourceEpoch = record.sourceEpoch ?: 0uL,
-            ),
-        )
+/**
+ * Accepted attachments keyed by protocol index, minus the images the message's own emoji tags claim
+ * as inline artwork, which are not shared media. Unprojected rows fall back to positional tag parsing.
+ */
+internal fun TimelineMessage.mediaAttachments(): List<IndexedAttachment> {
+    val attachments =
+        projected?.media?.let(MessageAttachments::accepted)
+            ?: MessageAttachments.indexed(
+                MediaReferenceSupport.parseAllImetaTags(
+                    tags = record.tags,
+                    sourceEpoch = record.sourceEpoch ?: 0uL,
+                ),
+            )
+    val claimed = Nip30Emoji.attachmentShortcodes(record.tags, attachments).keys
+    return if (claimed.isEmpty()) attachments else attachments.filter { it.index !in claimed }
+}
 
 private fun TimelineMessage.toSharedMediaTile(
     attachmentIndex: Int,

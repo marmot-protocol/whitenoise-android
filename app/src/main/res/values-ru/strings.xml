@@ -44,6 +44,13 @@
     <string name="poll_duration_1_day">1 день</string>
     <string name="poll_duration_1_week">1 неделя</string>
     <string name="poll_ends_at">Завершится %1$s</string>
+    <string name="poll_view_votes">Посмотреть голоса</string>
+    <string name="poll_votes_title">Голоса</string>
+    <string name="poll_votes_not_anonymous">Опросы не анонимны. Все участники группы видят, кто выбрал каждый вариант.</string>
+    <string name="poll_votes_empty">Голосов пока нет.</string>
+    <string name="poll_votes_load_failed">Не удалось загрузить голоса.</string>
+    <string name="poll_votes_load_more">Загрузить ещё</string>
+    <string name="poll_voter_blocked">В блок-листе</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d голос</item>
         <item quantity="few">%1$d голоса</item>
@@ -825,6 +832,8 @@
     <string name="toast_send_failed">Отправить не удалось</string>
     <string name="toast_send_connection_failed">Не удалось подключиться к ретранслятору. Проверьте подключение и повторите попытку.</string>
     <string name="toast_send_queue_full">В этом чате слишком много сообщений ожидает отправки, поэтому ваше не отправлено. Повторите попытку, когда очередь разберётся.</string>
+    <string name="toast_send_chat_changed">Чат изменился во время отправки, поэтому сообщение не отправлено. Повторите попытку.</string>
+    <string name="toast_send_emoji_limit">В сообщении слишком много своих эмодзи, поэтому оно не отправлено. Уберите часть и повторите попытку.</string>
     <string name="toast_chat_still_loading">Этот чат ещё загружается. Повторите попытку чуть позже.</string>
     <string name="toast_send_membership_verifying">Проверяем ваше участие в группе — сообщение не отправлено. Оно сохранено в поле ввода; повторите попытку через мгновение.</string>
     <string name="toast_reaction_failed">Реакция не удалась</string>
@@ -1582,16 +1591,16 @@
 
     <string name="chat_bubble_colors">Цвета сообщений</string>
     <string name="custom_emoji">Свои эмодзи</string>
-    <string name="custom_emoji_detail">Добавленные здесь изображения становятся эмодзи :код: в сообщениях и реакциях. Они остаются на этом устройстве, а другие видят код как текст.</string>
+    <string name="custom_emoji_detail">Добавленные здесь изображения становятся эмодзи :kod: в сообщениях и реакциях. Они хранятся на этом устройстве. Когда вы отправляете новое сообщение (не ответ) с таким эмодзи, его изображение загружается в чат в зашифрованном виде, чтобы участники могли его увидеть. В реакциях, ответах и правках отправляется только код.</string>
     <string name="custom_emoji_empty">Своих эмодзи пока нет.</string>
     <string name="custom_emoji_name_title">Название эмодзи</string>
     <string name="custom_emoji_name_label">Код</string>
     <string name="custom_emoji_name_help">Буквы, цифры и подчёркивания.</string>
     <string name="custom_emoji_replaces">Заменит текущий %1$s.</string>
     <string name="custom_emoji_remove_title">Удалить %1$s?</string>
-    <string name="custom_emoji_remove_detail">Изображение удаляется с этого устройства. В сообщениях код останется текстом.</string>
+    <string name="custom_emoji_remove_detail">Изображение удаляется с этого устройства. Уже отправленные сообщения сохраняют загруженное изображение.</string>
     <string name="custom_emoji_too_large">Изображение больше 1 МБ.</string>
-    <string name="custom_emoji_not_image">Этот файл не является изображением, которое White Noise может показать.</string>
+    <string name="custom_emoji_not_image">Этот файл не в формате, который White Noise может отправлять как эмодзи. Используйте PNG, GIF, WebP или JPEG.</string>
     <string name="custom_emoji_save_failed">Не удалось сохранить эмодзи.</string>
     <string name="action_color">Цвет действия</string>
     <string name="action_color_no_active_account">Выберите активную учётную запись, прежде чем настраивать её акцентный цвет.</string>

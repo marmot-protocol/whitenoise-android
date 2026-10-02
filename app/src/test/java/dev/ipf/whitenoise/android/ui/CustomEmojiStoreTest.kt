@@ -49,6 +49,18 @@ class CustomEmojiStoreTest {
         assertEquals("", emojiCodeForFileName(".gif"))
     }
 
+    /** An uppercase extension is listed like the sender reads it, and an unsendable type is not listed. */
+    @Test
+    fun scanMatchesExtensionsCaseInsensitively() =
+        runBlocking {
+            val directory = folder.newFolder("emoji")
+            directory.resolve("party.PNG").writeBytes(image(Bitmap.CompressFormat.PNG))
+            directory.resolve("legacy.img").writeBytes(image(Bitmap.CompressFormat.PNG))
+            val store = CustomEmojiStore(directory)
+            store.load()
+            assertEquals(listOf(":party:"), store.emoji.entries.map { it.shortcode })
+        }
+
     @Test
     fun saveOverwritesTheSameCodeAndSurvivesReload() =
         runBlocking {

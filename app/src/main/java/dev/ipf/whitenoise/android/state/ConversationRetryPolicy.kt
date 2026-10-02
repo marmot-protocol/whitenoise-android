@@ -42,6 +42,8 @@ internal fun isTransientRelaySendError(throwable: Throwable): Boolean {
  */
 internal fun isAmbiguousRelayDeliveryError(throwable: Throwable): Boolean {
     val causes = throwable.causeChain()
+    // A custom-emoji upload fails before any publication, so whatever it wraps is a definite failure.
+    if (causes.any { it is EmojiUploadFailure }) return false
     val transportClosed = causes.any { it is MarmotKitException.TransportClosed }
     val text = causes.joinToString("\n") { it.errorIdentity() }.lowercase()
     val explicitRejection = "relay rejected event" in text

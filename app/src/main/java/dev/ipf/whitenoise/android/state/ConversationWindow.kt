@@ -359,12 +359,14 @@ internal fun windowReactionTallies(
 ): List<ReactionTally> {
     val byEmoji = linkedMapOf<String, ReactionTally>()
     reactions.items.forEach { item ->
-        byEmoji[item.emoji] = ReactionTally(item.emoji, item.count.toInt(), item.viewerReacted)
+        byEmoji[item.emoji] =
+            ReactionTally(item.emoji, item.count.toInt(), item.viewerReacted, item.reactionMessageIdHex)
     }
     optimisticChanges.forEach { change ->
         val current = byEmoji[change.emoji]
         if (change.add && current?.mine != true) {
-            byEmoji[change.emoji] = ReactionTally(change.emoji, (current?.count ?: 0) + 1, mine = true)
+            byEmoji[change.emoji] =
+                ReactionTally(change.emoji, (current?.count ?: 0) + 1, true, current?.reactionMessageIdHex)
         } else if (!change.add && current?.mine == true) {
             if (current.count <= 1) {
                 byEmoji.remove(change.emoji)

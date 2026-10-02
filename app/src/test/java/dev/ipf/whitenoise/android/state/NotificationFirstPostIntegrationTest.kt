@@ -467,6 +467,9 @@ class NotificationFirstPostIntegrationTest {
                     previewText = raw,
                     markdownDocumentFactory = ::mentionMarkdown,
                     notificationFirstPostTimingObserver = events::add,
+                    // The resolver fails immediately, so a generous budget keeps a loaded runner from
+                    // reporting timeout_fallback instead of failed_fallback.
+                    receiverTimeoutMillis = 5_000L,
                     accountIdHexResolver = { bech32 ->
                         check(bech32 == MENTION_NPUB)
                         if (identityReads.incrementAndGet() == 1) {

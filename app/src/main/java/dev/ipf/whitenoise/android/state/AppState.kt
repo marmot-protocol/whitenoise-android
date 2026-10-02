@@ -1215,6 +1215,9 @@ class WhiteNoiseAppState private constructor(
     )
 
     internal val appContext = context.applicationContext
+
+    /** Emoji images already uploaded for the current epoch, so sends and retries never upload one twice. */
+    internal val emojiUploads = EmojiUploadCache()
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))

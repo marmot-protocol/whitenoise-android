@@ -42,6 +42,13 @@
     <string name="poll_duration_1_day">1 gün</string>
     <string name="poll_duration_1_week">1 hafta</string>
     <string name="poll_ends_at">Bitiş: %1$s</string>
+    <string name="poll_view_votes">Oyları gör</string>
+    <string name="poll_votes_title">Oylar</string>
+    <string name="poll_votes_not_anonymous">Anketler anonim değildir. Grubun tüm üyeleri hangi seçeneği kimin seçtiğini görebilir.</string>
+    <string name="poll_votes_empty">Henüz oy yok.</string>
+    <string name="poll_votes_load_failed">Oylar yüklenemedi.</string>
+    <string name="poll_votes_load_more">Daha fazla yükle</string>
+    <string name="poll_voter_blocked">Engellendi</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d oy</item>
         <item quantity="other">%1$d oy</item>
@@ -789,6 +796,8 @@
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
     <string name="toast_send_connection_failed">Aktarıcıya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="toast_send_queue_full">Bu sohbette gönderilmeyi bekleyen çok fazla mesaj var, bu yüzden mesajınız gönderilmedi. Sıra ilerleyince yeniden deneyin.</string>
+    <string name="toast_send_chat_changed">Mesajın gönderilirken sohbet değişti, bu yüzden gönderilmedi. Tekrar dene.</string>
+    <string name="toast_send_emoji_limit">Bu mesajda çok fazla özel emoji var, bu yüzden gönderilmedi. Bazılarını kaldırıp tekrar dene.</string>
     <string name="toast_chat_still_loading">Bu sohbet hâlâ yükleniyor. Birazdan yeniden deneyin.</string>
     <string name="toast_send_membership_verifying">Grup üyeliğin doğrulanıyor — mesajın gönderilmedi. Metin kutusunda saklandı; birazdan tekrar dene.</string>
     <string name="toast_reaction_failed">Tepki başarısız oldu</string>
@@ -1520,16 +1529,16 @@
 
     <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
     <string name="custom_emoji">Özel emoji</string>
-    <string name="custom_emoji_detail">Buraya eklediğin görseller mesajlarda ve tepkilerde :kısakod: emojisine dönüşür. Bu cihazda kalırlar; diğer kişiler kısa kodu metin olarak görür.</string>
+    <string name="custom_emoji_detail">Buraya eklediğin görseller mesajlarda ve tepkilerde :kisa_kod: emojisine dönüşür. Bu cihazda saklanırlar. Birini kullanan yeni bir mesaj (yanıt değil) gönderdiğinde görseli, üyelerin görebilmesi için şifreli olarak o sohbete yüklenir. Tepkiler, yanıtlar ve düzenlemeler yalnızca kısa kodu gönderir.</string>
     <string name="custom_emoji_empty">Henüz özel emoji yok.</string>
     <string name="custom_emoji_name_title">Bu emojiye ad ver</string>
     <string name="custom_emoji_name_label">Kısa kod</string>
     <string name="custom_emoji_name_help">Harfler, rakamlar ve alt çizgiler.</string>
     <string name="custom_emoji_replaces">Mevcut %1$s yerine geçer.</string>
     <string name="custom_emoji_remove_title">%1$s kaldırılsın mı?</string>
-    <string name="custom_emoji_remove_detail">Görsel bu cihazdan silinir. Mesajlar kısa kodu metin olarak korur.</string>
+    <string name="custom_emoji_remove_detail">Görsel bu cihazdan silinir. Daha önce gönderdiğin mesajlar yüklenmiş görseli korur.</string>
     <string name="custom_emoji_too_large">Bu görsel 1 MB’tan büyük.</string>
-    <string name="custom_emoji_not_image">Bu dosya White Noise’un gösterebileceği bir görsel değil.</string>
+    <string name="custom_emoji_not_image">Bu dosya, White Noise\'ın emoji olarak gönderebileceği bir görsel biçimi değil. PNG, GIF, WebP veya JPEG kullan.</string>
     <string name="custom_emoji_save_failed">Emoji kaydedilemedi.</string>
     <string name="action_color">Eylem rengi</string>
     <string name="action_color_no_active_account">Uygulama vurgu rengini ayarlamadan önce etkin bir hesap seçin.</string>

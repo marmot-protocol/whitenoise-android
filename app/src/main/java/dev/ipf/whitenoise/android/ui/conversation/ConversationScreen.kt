@@ -3327,6 +3327,7 @@ internal fun ConversationScreen(
         pendingDocumentUris = restored.documentUris
     }
 
+    val pollVotesHost = remember(controller) { PollVotesHostState() }
     var mediaPreviewIndex by rememberSaveable(controller.boundAccountRef, chat.id) { mutableStateOf<Int?>(null) }
     var attachmentSendPending by remember(controller, chat.id) { mutableStateOf(false) }
     LaunchedEffect(pendingMediaSlots.size, pendingDocumentUris.size) {
@@ -3906,6 +3907,7 @@ internal fun ConversationScreen(
         },
     ) { padding ->
         CompositionLocalProvider(
+            LocalPollVotesHost provides pollVotesHost,
             LocalKeptMessages provides keptMessagesController,
             // Bubbles mark their own matches while search is open, so a hit is obvious on any
             // bubble colour rather than only on the one the jump happened to land on.
@@ -4588,6 +4590,8 @@ internal fun ConversationScreen(
             },
         )
     }
+
+    PollVotesHost(pollVotesHost, controller, appState)
 
     ConversationMediaDraftContent(
         state = mediaDraftState,

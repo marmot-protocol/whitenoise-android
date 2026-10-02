@@ -42,6 +42,13 @@
     <string name="poll_duration_1_day">1 Tag</string>
     <string name="poll_duration_1_week">1 Woche</string>
     <string name="poll_ends_at">Endet %1$s</string>
+    <string name="poll_view_votes">Stimmen ansehen</string>
+    <string name="poll_votes_title">Stimmen</string>
+    <string name="poll_votes_not_anonymous">Umfragen sind nicht anonym. Alle Gruppenmitglieder sehen, wer welche Option gewählt hat.</string>
+    <string name="poll_votes_empty">Noch keine Stimmen.</string>
+    <string name="poll_votes_load_failed">Stimmen konnten nicht geladen werden.</string>
+    <string name="poll_votes_load_more">Mehr laden</string>
+    <string name="poll_voter_blocked">Blockiert</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d Stimme</item>
         <item quantity="other">%1$d Stimmen</item>
@@ -789,6 +796,8 @@
     <string name="toast_send_failed">Senden fehlgeschlagen</string>
     <string name="toast_send_connection_failed">Relay konnte nicht erreicht werden. Überprüfe deine Verbindung und versuche es erneut.</string>
     <string name="toast_send_queue_full">In diesem Chat warten zu viele Nachrichten auf den Versand, deine wurde nicht gesendet. Versuche es erneut, sobald der Rückstand abgebaut ist.</string>
+    <string name="toast_send_chat_changed">Der Chat hat sich während des Sendens geändert, deshalb wurde die Nachricht nicht gesendet. Versuche es erneut.</string>
+    <string name="toast_send_emoji_limit">Diese Nachricht enthält zu viele eigene Emoji und wurde deshalb nicht gesendet. Entferne einige und versuche es erneut.</string>
     <string name="toast_chat_still_loading">Dieser Chat wird noch geladen. Versuche es gleich noch einmal.</string>
     <string name="toast_send_membership_verifying">Deine Gruppenmitgliedschaft wird überprüft — deine Nachricht wurde nicht gesendet. Sie bleibt im Eingabefeld; versuche es gleich erneut.</string>
     <string name="toast_reaction_failed">Reaktion fehlgeschlagen</string>
@@ -1520,16 +1529,16 @@
 
     <string name="chat_bubble_colors">Farben der Chatblasen</string>
     <string name="custom_emoji">Eigene Emoji</string>
-    <string name="custom_emoji_detail">Bilder, die du hier hinzufügst, werden in Nachrichten und Reaktionen zu :kurzcode:-Emoji. Sie bleiben auf diesem Gerät, und andere sehen den Kurzcode als Text.</string>
+    <string name="custom_emoji_detail">Bilder, die du hier hinzufügst, werden in Nachrichten und Reaktionen zu :kurzcode:-Emoji. Sie werden auf diesem Gerät gespeichert. Wenn du eine neue Nachricht (keine Antwort) sendest, die eines verwendet, wird sein Bild verschlüsselt in diesen Chat hochgeladen, damit die Mitglieder es sehen. Reaktionen, Antworten und Bearbeitungen senden nur den Kurzcode.</string>
     <string name="custom_emoji_empty">Noch keine eigenen Emoji.</string>
     <string name="custom_emoji_name_title">Emoji benennen</string>
     <string name="custom_emoji_name_label">Kurzcode</string>
     <string name="custom_emoji_name_help">Buchstaben, Zahlen und Unterstriche.</string>
     <string name="custom_emoji_replaces">Ersetzt dein bisheriges %1$s.</string>
     <string name="custom_emoji_remove_title">%1$s entfernen?</string>
-    <string name="custom_emoji_remove_detail">Das Bild wird von diesem Gerät gelöscht. Nachrichten behalten den Kurzcode als Text.</string>
+    <string name="custom_emoji_remove_detail">Das Bild wird von diesem Gerät gelöscht. Bereits gesendete Nachrichten behalten das hochgeladene Bild.</string>
     <string name="custom_emoji_too_large">Dieses Bild ist größer als 1 MB.</string>
-    <string name="custom_emoji_not_image">Diese Datei ist kein Bild, das White Noise anzeigen kann.</string>
+    <string name="custom_emoji_not_image">Diese Datei hat kein Bildformat, das White Noise als Emoji senden kann. Verwende PNG, GIF, WebP oder JPEG.</string>
     <string name="custom_emoji_save_failed">Das Emoji konnte nicht gespeichert werden.</string>
     <string name="action_color">Aktionsfarbe</string>
     <string name="action_color_no_active_account">Wähle ein aktives Konto aus, bevor du seine App-Akzentfarbe festlegst.</string>

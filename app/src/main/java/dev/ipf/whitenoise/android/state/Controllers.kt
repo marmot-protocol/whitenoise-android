@@ -119,6 +119,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
@@ -133,6 +134,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.util.Locale
 import java.util.UUID
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 
@@ -1192,6 +1194,10 @@ private fun isSendableOptimisticStatus(
         status == MessageStatus.Sent ||
         (allowFailed && status == MessageStatus.Failed)
 
+/**
+ * The retained Failed optimistic send that [projected], a retracted MDK row, is the engine copy of, or null.
+ * Matching uses identity, plaintext and [sameRenderableSendTags], so an emoji send still matches.
+ */
 internal fun failedOptimisticMessageIdForInvalidatedProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
@@ -1204,8 +1210,7 @@ internal fun failedOptimisticMessageIdForInvalidatedProjection(
             if (!optimistic.record.sender.equals(projected.sender, ignoreCase = true)) return@firstOrNull false
             if (optimistic.record.kind != projected.kind) return@firstOrNull false
             optimistic.record.plaintext == projected.plaintext &&
-                optimistic.record.tags.filterNot { it.values.firstOrNull() == "p" } ==
-                projected.tags.filterNot { it.values.firstOrNull() == "p" }
+                sameRenderableSendTags(optimistic.record.tags, projected.tags)
         }?.record
         ?.messageIdHex
 
@@ -1239,6 +1244,7 @@ internal fun unpublishedProjectionIdsMatchingMessage(
                 MessageProjector.isMine(TimelineProjector.toAppMessageRecord(projected), activeAccountIdHex)
         }.map { it.messageIdHex }
 
+/** Whether two records are copies of one send: same direction, chat, sender, kind, text and renderable tags. */
 private fun messagesHaveSameRenderableSendShape(
     left: AppMessageRecordFfi,
     right: AppMessageRecordFfi,
@@ -1247,9 +1253,25 @@ private fun messagesHaveSameRenderableSendShape(
     if (left.groupIdHex != right.groupIdHex) return false
     if (!left.sender.equals(right.sender, ignoreCase = true)) return false
     if (left.kind != right.kind) return false
-    return left.plaintext == right.plaintext &&
-        left.tags.filterNot { it.values.firstOrNull() == "p" } ==
-        right.tags.filterNot { it.values.firstOrNull() == "p" }
+    return left.plaintext == right.plaintext && sameRenderableSendTags(left.tags, right.tags)
+}
+
+/**
+ * Whether two copies of one send carry the same tags that matter. Engine-derived `p` mentions never
+ * count. A custom-emoji send is a media message, so MDK's copy adds `imeta` and `emoji` rows the
+ * typed optimistic copy never has, and after a re-upload their URLs differ too. When either side
+ * carries emoji tags only the reply identity is compared.
+ */
+internal fun sameRenderableSendTags(
+    left: List<MessageTagFfi>,
+    right: List<MessageTagFfi>,
+): Boolean {
+    val hasEmoji = (left + right).any { it.values.firstOrNull() == "emoji" }
+    return if (hasEmoji) {
+        replyIdentityTags(left) == replyIdentityTags(right)
+    } else {
+        left.filterNot { it.values.firstOrNull() == "p" } == right.filterNot { it.values.firstOrNull() == "p" }
+    }
 }
 
 /**
@@ -1275,11 +1297,22 @@ internal fun committedButUnpublishedProjectionForOptimistic(
             timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
         } else {
             optimistic.plaintext == projectedAction.plaintext &&
-                optimistic.tags == projectedAction.tags &&
+                (
+                    optimistic.tags == projectedAction.tags ||
+                        emojiSendTagsMatch(optimistic.tags, projectedAction.tags)
+                ) &&
                 timestampsAreNear(optimistic.recordedAt, projectedAction.recordedAt)
         }
     }
 }
+
+/** Whether [projected] is the MDK copy of an emoji send whose typed copy [optimistic] has the same reply identity. */
+private fun emojiSendTagsMatch(
+    optimistic: List<MessageTagFfi>,
+    projected: List<MessageTagFfi>,
+): Boolean =
+    projected.any { it.values.firstOrNull() == "emoji" } &&
+        replyIdentityTags(optimistic) == replyIdentityTags(projected)
 
 private fun timestampsAreNear(
     left: ULong,
@@ -5957,6 +5990,9 @@ class ConversationController(
         appState.marmotIo { dismissHistoryNotice(account, noticeId) }
     },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
+    // Test seams: the user's own emoji a text uses, and the send that carries them.
+    private val customEmojiReader: suspend (String) -> List<LocalEmojiArtwork> = { appState.localEmojiArtworkIn(it) },
+    private val customEmojiSender: CustomEmojiSender? = null,
     private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
     },
@@ -6959,6 +6995,38 @@ class ConversationController(
                     messageOrder = messageOrder,
                 ),
         )
+    }
+
+    /** The retained row's expiry input, read from the unfiltered row map the timeline filter starts from. */
+    private fun retainedExpiryRow(messageId: String): Pair<TimelineMessage, DisappearingMessageSweep.LocalExpiryRow>? {
+        val item = timelineItemsById[messageId] ?: return null
+        val order = firstMessageOrder(timelineOrder.mapNotNull { timelineItemsById[it]?.record?.messageIdHex })
+        return item to localExpiryRow(item, order)
+    }
+
+    /**
+     * Whether the retained row [messageId] is deleted or past its local disappearing-message deadline. The
+     * timeline filters expired rows out without an engine event, so UI hosted outside the row asks here. A row
+     * that is merely absent from the bounded window is unknown, not gone, and reads as false.
+     */
+    internal fun isRetainedRowGone(messageId: String): Boolean {
+        val (item, row) = retainedExpiryRow(messageId) ?: return false
+        val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(messageId, deletedMessageIds)
+        return deleted || isTimelineRecordLocallyExpired(clockMillis(), item.record, row)
+    }
+
+    /** Milliseconds until the retained row [messageId] reaches its local expiry, or null without a deadline. */
+    internal fun retainedRowExpiryDelayMillis(messageId: String): Long? {
+        val seconds =
+            retainedExpiryRow(messageId)?.let { (item, row) ->
+                DisappearingMessageSweep
+                    .resolveLocalExpirySeconds(row)
+                    ?.takeIf { shouldApplyLocalDisappearingExpiry(item.record) }
+            } ?: return null
+        val expiryMillis =
+            java.util.concurrent.TimeUnit.SECONDS
+                .toMillis(seconds.coerceAtMost(Long.MAX_VALUE.toULong()).toLong())
+        return expiryMillis - clockMillis()
     }
 
     /** Distinguishes timeout wakes from publish signals that expose due rows. */
@@ -8082,6 +8150,115 @@ class ConversationController(
         isTransientRelaySendError(throwable) ||
             (textPublisher == null && isTransientRuntimeWorkerError(throwable))
 
+    /**
+     * The lock an emoji send takes around its publish only, so uploads never hold up cancel or other
+     * mutations. The acceptance bookkeeping happens inside the same lock, so a cancel waiting for it
+     * sees the send as owned by MDK (or uncertain) and cannot report success for a published send. A
+     * rejection that published nothing, such as a stale epoch, leaves the send pre-acceptance.
+     */
+    private fun commitPublishLock(
+        account: String,
+        optimisticKey: String,
+        controllerContext: CoroutineContext,
+    ): EmojiPublishLock =
+        { publish ->
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                try {
+                    publish().also { summary ->
+                        withContext(controllerContext) { recordOptimisticSendAcceptance(optimisticKey, summary) }
+                    }
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") failure: Throwable,
+                ) {
+                    if (failure !is OptimisticSendCancelledException && isAmbiguousRelayDeliveryError(failure)) {
+                        withContext(controllerContext) { markAcceptanceUnknownIfPreAcceptance(optimisticKey) }
+                    }
+                    throw failure
+                }
+            }
+        }
+
+    /** Records that a publish may have reached a relay, unless the send already moved past pre-acceptance. */
+    private fun markAcceptanceUnknownIfPreAcceptance(optimisticKey: String) {
+        if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.PRE_ACCEPTANCE) {
+            optimisticSendPhases[optimisticKey] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
+        }
+    }
+
+    /** Runs [block] under the group commit lock, or directly when [skip] says the block locks its own publish. */
+    private suspend fun <T> commitLockUnless(
+        skip: Boolean,
+        account: String,
+        block: suspend () -> T,
+    ): T = if (skip) block() else appState.withGroupCommitLock(account, group.groupIdHex, block)
+
+    /** The user's own emoji a plain, non-reply text send must carry, or none when this send carries none. */
+    private suspend fun emojiArtworkForSend(
+        replyTarget: String?,
+        text: String,
+    ): List<LocalEmojiArtwork> {
+        val applies = emojiSendApplies(replyTarget, textPublisher != null)
+        return if (applies) customEmojiReader(text) else emptyList()
+    }
+
+    /**
+     * Admission failures retry for plain text. An emoji send retries only an upload-stage failure,
+     * because nothing was published then, and never a failure of the publish itself.
+     */
+    private fun isRetryableComposerSend(
+        emojiArtwork: List<LocalEmojiArtwork>,
+        throwable: Throwable,
+    ): Boolean =
+        if (emojiArtwork.isEmpty()) {
+            isRetryableTextAdmissionError(throwable)
+        } else {
+            isRetryableEmojiUploadFailure(throwable)
+        }
+
+    /**
+     * One native publication of the composer text: the durable token-bound send, or, when the text
+     * uses the user's own emoji, upload-only images followed by one tagged media send. The optimistic
+     * send is re-checked on this controller's context after the upload and again inside the commit
+     * lock right before publishing, so a cancelled send is never published.
+     */
+    @Suppress("LongParameterList")
+    private suspend fun publishComposerTextOnce(
+        account: String,
+        replyTarget: String?,
+        text: String,
+        clientToken: String,
+        probeExistingAdmission: Boolean,
+        emojiArtwork: List<LocalEmojiArtwork>,
+        optimisticKey: String,
+    ): dev.ipf.marmotkit.SendSummaryFfi {
+        // The native calls run on the IO dispatcher, but the send phases belong to this controller's context.
+        val controllerContext = currentCoroutineContext()
+        val ensureCurrent: suspend () -> Unit = {
+            withContext(controllerContext) { requireOptimisticSendNotCancelled(optimisticKey) }
+        }
+        val injected = customEmojiSender
+        return when {
+            emojiArtwork.isEmpty() ->
+                publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
+            injected != null -> {
+                val lock = commitPublishLock(account, optimisticKey, controllerContext)
+                injected(account, text, emojiArtwork, ensureCurrent, lock)
+            }
+            else ->
+                appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
+                    sendTextWithCustomEmoji(
+                        account,
+                        group.groupIdHex,
+                        text,
+                        emojiArtwork,
+                        appState.emojiUploads,
+                        ensureCurrent = ensureCurrent,
+                        publishLock = commitPublishLock(account, optimisticKey, controllerContext),
+                    )
+                }
+        }
+    }
+
     /** Keeps accepted-pending settlement alive when navigation disposes this conversation's visible route. */
     private suspend fun convergeAcceptedPendingTextSend(
         account: String,
@@ -8136,12 +8313,15 @@ class ConversationController(
         trace: PerformanceTrace?,
         clientToken: String,
         optimisticKey: String,
-    ): dev.ipf.marmotkit.SendSummaryFfi =
-        appState.withConversationTextSendOrder(account, group.groupIdHex) {
+    ): dev.ipf.marmotkit.SendSummaryFfi {
+        // Replies and injected publishers keep their plain-text path. A message that uses the user's
+        // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
+        val emojiArtwork = emojiArtworkForSend(replyTarget, trimmed)
+        return appState.withConversationTextSendOrder(account, group.groupIdHex) {
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,
                 cancellationGeneration = optimisticCancellationGeneration,
-                retryableFailure = ::isRetryableTextAdmissionError,
+                retryableFailure = { isRetryableComposerSend(emojiArtwork, it) },
                 onTransientFailure = { attempt, _ -> logSendRetry(trace, clientToken, attempt) },
             ) { attempt ->
                 // Serialize only this commit-producing FFI attempt. Releasing the
@@ -8150,7 +8330,9 @@ class ConversationController(
                 // sends behind this one until its outcome is known.
                 val lockWaitStartMs = trace?.let { traceNowMs() }
                 updatePendingSendStage(clientToken, PerformanceSendStage.WAITING_COMMIT_LOCK, attempt)
-                appState.withGroupCommitLock(account, group.groupIdHex) {
+                // An emoji send uploads outside the commit lock and locks only its publish, so a cancel
+                // taking the same lock never waits for a slow upload.
+                commitLockUnless(emojiArtwork.isNotEmpty() && textPublisher == null, account) {
                     requireOptimisticSendNotCancelled(optimisticKey)
                     val lockHeldAtMs = trace?.let { traceNowMs() }
                     sendTrace(
@@ -8172,7 +8354,15 @@ class ConversationController(
                     try {
                         val summary =
                             textPublisher?.invoke(replyTarget, account, group.groupIdHex, trimmed)
-                                ?: publishDurableComposerText(account, replyTarget, trimmed, clientToken, attempt > 1)
+                                ?: publishComposerTextOnce(
+                                    account,
+                                    replyTarget,
+                                    trimmed,
+                                    clientToken,
+                                    attempt > 1,
+                                    emojiArtwork,
+                                    optimisticKey,
+                                )
                         recordOptimisticSendAcceptance(optimisticKey, summary)
                         sendTrace(
                             trace,
@@ -8205,6 +8395,7 @@ class ConversationController(
                 }
             }
         }
+    }
 
     /**
      * Trace a transient send retry with the current relay-health snapshot.

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.em
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.Nip30Emoji
 
 /** Artwork one `:shortcode:` renders as. */
 @Immutable
@@ -71,13 +72,7 @@ internal object EmojiShortcodes {
             .single()
             .tag
 
-    // Legacy plaintext surfaces have no AST. Keep raw code delimiters and their contents literal.
-    private val rawCodePattern =
-        Regex(
-            """(?m)^ {0,3}((?>`{3,}))[^\n`]*(?:\n|\z)[\s\S]*?(?:^ {0,3}\1`*[ \t]*\r?$|\z)|""" +
-                """^ {0,3}((?>~{3,}))[^\n]*(?:\n|\z)[\s\S]*?(?:^ {0,3}\2~*[ \t]*\r?$|\z)|""" +
-                """(`+)[\s\S]*?\3""",
-        )
+    private val rawCodePattern = Nip30Emoji.rawCodePattern
 
     fun isShortcode(text: String): Boolean = shortcodePattern.matches(text)
 
