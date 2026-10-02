@@ -5470,6 +5470,7 @@ class WhiteNoiseAppState private constructor(
                     presentedChatList(accountRef, includeArchived = true)
                 }.rows
             val rows = presentedRows.map { it.row }
+            prewarmFirstFrameDurableAvatars(accountRef, presentedRows)
             ensureAccountSwitchRequestIsCurrent(generation)
             recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
             val presentation =
