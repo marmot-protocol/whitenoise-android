@@ -108,6 +108,13 @@ private fun adoptableSelectedAvatar(
     return presentation.avatar.takeIf { adoptable }
 }
 
+/**
+ * True when the row's adopted durable avatar is a member's profile picture rather than the group's own
+ * image, so it may animate like any other profile picture.
+ */
+internal val ChatListItem.selectedAvatarIsPersonPicture: Boolean
+    get() = selectedAvatarAsset != null && selectedPresentation?.avatarSource?.isPeerSourced() == true
+
 /** True for the two presentation sources that resolve to a member rather than the group itself. */
 internal fun PresentationSourceFfi.isPeerSourced(): Boolean =
     this == PresentationSourceFfi.PEER_PROFILE ||

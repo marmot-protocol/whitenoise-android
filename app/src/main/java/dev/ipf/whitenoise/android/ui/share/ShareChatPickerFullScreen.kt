@@ -690,6 +690,7 @@ private fun rememberShareChatPickerState(
     }
 }
 
+/** One share destination; a DM's stored peer picture animates like any other profile picture. */
 @Composable
 private fun ShareTargetRow(
     item: ChatListItem,
@@ -731,6 +732,7 @@ private fun ShareTargetRow(
         avatarSeed = avatarAccount ?: item.group.groupIdHex,
         avatarUrl = avatar.pictureUrl,
         avatarImage = avatar.image,
+        avatarAnimationKey = avatar.animationKey,
         modifier = Modifier.semantics { this.selected = selected },
         onClick = { onToggle(groupId) },
         trailing = { SelectionIndicator(selected = selected) },

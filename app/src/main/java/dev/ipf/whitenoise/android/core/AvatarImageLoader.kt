@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import dev.ipf.whitenoise.android.media.ByteSizeLruCache
 import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,7 @@ object AvatarImageLoader {
     private const val NOTIFICATION_FETCH_CONCURRENCY = 2
     private const val REGULAR_FETCH_CONCURRENCY = FETCH_CONCURRENCY - NOTIFICATION_FETCH_CONCURRENCY
     private const val PREWARM_MAX_QUEUED = 64
+    private const val ANIMATED_SOURCE_CACHE_SIZE_BYTES = 4L * 1024 * 1024
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val fetchGate = AvatarFetchGate(REGULAR_FETCH_CONCURRENCY, NOTIFICATION_FETCH_CONCURRENCY)
@@ -50,6 +52,15 @@ object AvatarImageLoader {
     // staleness-exempt: captured request-lifetime tokens for bounded queued work, not a counter owner.
     private val preWarmQueuedGeneration = mutableMapOf<String, Long>()
     private val failureExpiresAt = AvatarFailureExpiryCache(FAILURE_CACHE_MAX_ENTRIES)
+
+    // Encoded GIF bytes behind an already-cached first frame, so a visible surface can animate
+    // without a second fetch. Bounded on its own, since the bitmap budget above stays where it was.
+    private val animatedSources =
+        ByteSizeLruCache<String, ByteArray>(
+            maxBytes = ANIMATED_SOURCE_CACHE_SIZE_BYTES,
+            sizeOf = { it.size },
+            maxEntryBytes = MAX_AVATAR_BYTES.toLong(),
+        )
     private var profileImageFetcher: (suspend (String, ULong) -> ByteArray)? = null
 
     // Bumped by clear(); fetches launched under an older generation discard
@@ -250,6 +261,7 @@ object AvatarImageLoader {
                                 is AvatarImageFetchResult.Success -> {
                                     cache.put(url, fetchResult.image)
                                     failureExpiresAt.remove(url)
+                                    publishAnimatedSourceLocked(url, fetchResult.animatedSource)
                                 }
                                 AvatarImageFetchResult.Failed -> {
                                     val nowMillis = System.currentTimeMillis()
@@ -294,6 +306,33 @@ object AvatarImageLoader {
         return synchronized(lock) { cache.get(key) }
     }
 
+    /**
+     * The encoded GIF behind [url]'s cached first frame, or null for a static, uncached or evicted
+     * image. Surfaces animate only from these bytes, so they never fetch or decode a URL themselves.
+     */
+    fun peekAnimatedSource(url: String?): ByteArray? {
+        val key = url ?: return null
+        return synchronized(lock) { animatedSources.get(key) }
+    }
+
+    /** Test-only injection of a first frame together with its animated source. */
+    internal fun putCachedAnimated(
+        url: String,
+        firstFrame: ImageBitmap,
+        source: ByteArray,
+    ) {
+        putCached(url, firstFrame)
+        synchronized(lock) { publishAnimatedSourceLocked(url.trim(), source) }
+    }
+
+    /** Keeps the animated source in step with the first frame just published for [url]. */
+    private fun publishAnimatedSourceLocked(
+        url: String,
+        source: ByteArray?,
+    ) {
+        if (source == null) animatedSources.remove(url) else animatedSources.put(url, source)
+    }
+
     /** Test-only injection for deterministic first-frame composition coverage. */
     internal fun putCached(
         url: String,
@@ -304,6 +343,7 @@ object AvatarImageLoader {
         synchronized(lock) {
             cache.put(key, image)
             failureExpiresAt.remove(key)
+            animatedSources.remove(key)
         }
     }
 
@@ -337,15 +377,20 @@ object AvatarImageLoader {
         synchronized(lock) {
             observedCacheLifetime.longValue = cacheLifetime.advance()
             cache.evictAll()
+            animatedSources.clear()
             retireRequestsLocked()
         }
     }
 
-    /** Retires account-private stored pixels/reads while preserving already decoded public URL images. */
+    /**
+     * Retires account-private stored pixels, animation bytes and reads while preserving already decoded
+     * public URL images and their animated sources.
+     */
     internal fun clearStoredAvatars() {
         synchronized(lock) {
             observedCacheLifetime.longValue = cacheLifetime.advance()
             cache.evictStoredAvatars()
+            animatedSources.keysSnapshot().filter(::isStoredAvatarKey).forEach(animatedSources::remove)
             retireRequestsLocked()
         }
     }
@@ -394,13 +439,22 @@ object AvatarImageLoader {
         return if (bytes.size <= maxBytes) AvatarByteFetchResult.Success(bytes) else AvatarByteFetchResult.Failed
     }
 
-    /** Fetches and decodes one URL-backed profile image within the requested variant's bounds. */
+    /**
+     * Fetches and decodes one URL-backed profile image within the requested variant's bounds. An avatar
+     * whose bytes sniff as a bounded GIF also keeps those bytes as its animated source — the first frame
+     * is still the static decode every other consumer (notifications, shortcuts) already uses.
+     */
     private suspend fun fetch(request: ProfileImageRequest): AvatarImageFetchResult =
         when (val result = fetchBytes(request.url, request.maxBytes, request.variant == ProfileImageVariant.AVATAR)) {
             is AvatarByteFetchResult.Success ->
                 decode(result.bytes, request.variant, request.maxDimension)
                     ?.asImageBitmap()
-                    ?.let(AvatarImageFetchResult::Success)
+                    ?.let { firstFrame ->
+                        val animatedSource =
+                            profileAvatarAnimationSource(result.bytes)
+                                .takeIf { request.variant == ProfileImageVariant.AVATAR }
+                        AvatarImageFetchResult.Success(firstFrame, animatedSource)
+                    }
                     ?: AvatarImageFetchResult.Failed
             AvatarByteFetchResult.Failed -> AvatarImageFetchResult.Failed
             AvatarByteFetchResult.Unavailable -> AvatarImageFetchResult.Unavailable
@@ -416,7 +470,11 @@ object AvatarImageLoader {
         return synchronized(lock) { cacheLifetime.capture() }
     }
 
-    /** Shares local reads and off-main decodes through the existing bounded, generation-fenced loader. */
+    /**
+     * Shares local reads and off-main decodes through the existing bounded, generation-fenced loader. A
+     * stored GIF keeps its bytes as an animated source under the same account-private key, so whether it
+     * may animate is decided by the surface that knows it is a person's picture.
+     */
     internal suspend fun loadStored(
         key: String,
         lifetime: Long,
@@ -429,9 +487,10 @@ object AvatarImageLoader {
             fetchLane = AvatarFetchLane.STORED,
             fetchImage = { request ->
                 AvatarCacheDiagnostics.fetch(AvatarCacheKind.PROFILE)
-                readBytes()
+                val bytes = readBytes()
+                bytes
                     ?.let { decode(it, request.variant, request.maxDimension)?.asImageBitmap() }
-                    ?.let(AvatarImageFetchResult::Success)
+                    ?.let { AvatarImageFetchResult.Success(it, profileAvatarAnimationSource(bytes)) }
                     ?: AvatarImageFetchResult.Unavailable
             },
         )
@@ -564,7 +623,7 @@ internal class PartitionedProfileImageCache(
         avatars
             .snapshot()
             .keys
-            .filter { it.startsWith("marmot-avatar:") }
+            .filter(::isStoredAvatarKey)
             .forEach(avatars::remove)
     }
 
@@ -642,8 +701,9 @@ internal sealed interface AvatarByteFetchResult {
 }
 
 private sealed interface AvatarImageFetchResult {
-    data class Success(
+    class Success(
         val image: ImageBitmap,
+        val animatedSource: ByteArray? = null,
     ) : AvatarImageFetchResult
 
     data object Failed : AvatarImageFetchResult
