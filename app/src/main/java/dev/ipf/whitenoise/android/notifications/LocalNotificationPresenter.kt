@@ -1775,6 +1775,10 @@ class LocalNotificationPresenter(
         reaction: String,
     ): Boolean = markRemoteInputHandled(notificationTag, notificationId, reactedMessageIdHex, reaction)
 
+    /**
+     * Re-posts the live (tag, id) card with [handledText] as its RemoteInput history, ending
+     * SystemUI's reply spinner. Skipped when [expectedMessageIdHex] no longer matches the live card.
+     */
     @SuppressLint("MissingPermission")
     private fun markRemoteInputHandled(
         notificationTag: String,
@@ -1817,6 +1821,7 @@ class LocalNotificationPresenter(
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
+                        .withoutApi30RemoteInputHistoryItems()
                 if (postNotificationSafely(
                         NotificationManagerCompat.from(context),
                         notificationTag,
@@ -1874,6 +1879,7 @@ class LocalNotificationPresenter(
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
+                        .withoutApi30RemoteInputHistoryItems()
                 if (postNotificationSafely(
                         NotificationManagerCompat.from(context),
                         notificationTag,
