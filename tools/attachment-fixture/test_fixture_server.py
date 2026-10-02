@@ -85,6 +85,16 @@ class FixtureContractTest(unittest.TestCase):
         self.assertEqual(1024, sum(e["value"] for e in events if e["kind"] == "body_bytes"))
         self.assertEqual(1, sum(e["kind"] == "acquisition_unavailable" for e in events))
 
+    def test_global_hold_release_does_not_hold_the_deliberate_retry(self):
+        """The release control removes the hold rather than reporting a second fake hold event."""
+        source = self.server.generate("released", 1040)
+        self.assertEqual(200, self.get("/__hold-acquisition", method="POST")[0])
+        self.assertEqual(1024, self.server.controls["released"].hold_after)
+        self.assertEqual(200, self.get("/__release-acquisition", method="POST")[0])
+        self.assertEqual(source.read_bytes(), self.get("/released")[2])
+        events = self.await_event("complete")
+        self.assertEqual(0, sum(e["kind"] == "held" for e in events))
+
     def test_restart_preserves_all_attempts_including_missing_body(self):
         """A restart must retain successful and failed request attempts in one ledger."""
         self.server.generate("restart", 1024)

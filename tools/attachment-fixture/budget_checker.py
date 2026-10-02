@@ -12,6 +12,7 @@ PHASE_COUNTS = {"received-cold": 1, "received-retained": 10, REOPEN: 1}
 PROFILES = {
     "reference-api30-arm64": {"api": "30", "abi": "arm64-v8a"},
     "ci-api34-x86_64": {"api": "34", "abi": "x86_64"},
+    "pixel-api37-arm64": {"api": "37", "abi": "arm64-v8a"},
 }
 LIMITS = {"cold_ms": 1500, "local_ms": 150, "java_peak_bytes": 32 * 1024**2,
           "native_peak_bytes": 128 * 1024**2}

@@ -1,0 +1,107 @@
+package dev.ipf.whitenoise.android.media
+
+import android.content.Context
+import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AppBlobEndpointFfi
+import dev.ipf.marmotkit.AttachmentPageReadFfi
+import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.DraftPersistence
+import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
+import dev.ipf.whitenoise.android.state.PendingAttachment
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import java.io.File
+
+/** Uses the shipping Android send controller and native admission, upload, publication and retention paths. */
+internal suspend fun sendAndroidFixtureAttachment(
+    context: Context,
+    root: File,
+    marmot: Marmot,
+    sender: AccountSummaryFfi,
+    group: String,
+    blobPort: Int,
+    bytes: ByteArray,
+): MediaAttachmentReferenceFfi {
+    check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
+    val endpoint = AppBlobEndpointFfi("blossom-v1", "http://127.0.0.1:$blobPort")
+    marmot.replaceEncryptedMediaBlobEndpoints(sender.label, group, listOf(endpoint))
+    marmot.catchUpAccounts()
+    val details = marmot.groupDetails(sender.label, group)
+    val members = marmot.groupMembers(sender.label, group)
+    val state =
+        withContext(Dispatchers.Main.immediate) {
+            WhiteNoiseAppState(
+                context = context,
+                draftStore = DraftStore(GeneratedSenderDrafts),
+                accountIdHexResolver = { if (it == sender.label) sender.accountIdHex else null },
+                accounts = listOf(sender),
+                activeAccountRef = sender.label,
+                initialMarmotRuntime = AppMarmotRuntime(root.absolutePath, marmot),
+            )
+        }
+    val controller =
+        withContext(Dispatchers.Main.immediate) {
+            ConversationController(state, details.group, GroupMemberSnapshot(members))
+        }
+    try {
+        withContext(Dispatchers.Main.immediate) {
+            controller.retryMembers()
+            check(controller.canSendMessages) { "generated sender membership not ready" }
+            controller.sendAttachments(listOf(PendingAttachment(bytes, "text/plain", "fixture.txt")), caption = null)
+        }
+        return awaitAndroidFixtureReference(marmot, sender.label, group)
+    } finally {
+        withContext(Dispatchers.Main.immediate) {
+            controller.onCleared()
+            state.mutationsScope.cancel()
+        }
+    }
+}
+
+/** Reads the actual published source; no outgoing row, asset reference or accepted send is manufactured. */
+private suspend fun awaitAndroidFixtureReference(
+    marmot: Marmot,
+    sender: String,
+    group: String,
+): MediaAttachmentReferenceFfi =
+    withTimeout(30_000L) {
+        var reference: MediaAttachmentReferenceFfi? = null
+        while (reference == null) {
+            val read = marmot.attachmentHistoryPage(sender, group, 100u, null)
+            if (read is AttachmentPageReadFfi.Page) {
+                val page = read.page
+                try {
+                    reference =
+                        page.entries
+                            .mapNotNull { (it.attachment as? MediaAttachmentOutcomeFfi.Accepted)?.reference }
+                            .singleOrNull { it.fileName == "fixture.txt" }
+                } finally {
+                    page.nextCursor?.close()
+                    page.version.close()
+                }
+            }
+            if (reference == null) delay(100L)
+        }
+        reference
+    }
+
+/** Generated drafts never read or write the diagnostic app's existing drafts. */
+private object GeneratedSenderDrafts : DraftPersistence {
+    /** The generated send has no saved draft. */
+    override fun read(): Map<String, String> = emptyMap()
+
+    /** Discards only fixture draft mutations. */
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
+}
