@@ -224,6 +224,11 @@ jobs:
           app_apk="$(dirname "$metadata")/$output_file"
           bash scripts/verify-baseline-profile.sh "$app_apk"
 
+      # Temporary one-off experiment; removed before readiness.
+      - name: Measure matched cold and warm tooling startup
+        if: matrix.phase == 'tooling'
+        run: python3 .github/scripts/probe-tooling-startup.py
+
       # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
         if: failure()
