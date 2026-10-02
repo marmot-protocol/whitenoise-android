@@ -1742,6 +1742,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
         "anchor": "fun ContactPickerScreen(",
         "test_ids": [
+          "NCH-003",
           "NCH-001",
           "GRP-005"
         ]
@@ -1811,6 +1812,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
         "anchor": "fun NewMessageAccountScreen(",
         "test_ids": [
+          "NCH-003",
           "NCH-001",
           "NCH-002",
           "ACC-003",
@@ -1881,6 +1883,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
         "anchor": "fun NewGroupRecipientAccountScreen(",
         "test_ids": [
+          "NCH-003",
           "NCH-002",
           "ACC-017"
         ]

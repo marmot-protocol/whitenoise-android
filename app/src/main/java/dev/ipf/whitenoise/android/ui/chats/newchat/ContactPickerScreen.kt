@@ -118,23 +118,21 @@ internal fun ContactPickerScreen(
             deriveRecipientCandidates(appState, activeHex)
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
-    val userSearch by rememberRecipientUserSearchState(query, appState)
+    val userSearch by rememberRecipientUserSearchState(query.takeIf { resolution.resolvedHex == null }.orEmpty(), appState)
     val discovered = userSearch.candidates
     val followedIds = userSearch.followedAccountIds
     val matches =
-        remember(query, candidates, discovered, followedIds, activeHex, excludeAccountIdHexes) {
-            if (identifierQuery) {
-                emptyList()
-            } else {
-                RecipientSearch.mergeAndBrowse(
-                    query = query,
-                    known = candidates,
-                    discovered = discovered,
-                    activeAccountIdHex = activeHex,
-                    excludeAccountIdHexes = excludeAccountIdHexes,
-                    followedAccountIds = followedIds,
-                )
-            }
+        remember(query, resolution.resolvedHex, candidates, discovered, followedIds, activeHex, excludeAccountIdHexes) {
+            recipientDirectoryMatches(
+                query = query,
+                resolvedHex = resolution.resolvedHex,
+                known = candidates,
+                discovered = discovered,
+                activeAccountIdHex = activeHex,
+                excludeAccountIdHexes = excludeAccountIdHexes,
+                followedAccountIds = followedIds,
+                accountIdHex = appState::accountIdHexForMention,
+            )
         }
     val selectedHexes = selected.map { it.accountIdHex.lowercase(Locale.ROOT) }.toSet()
     val canConfirm = (allowEmptyConfirm || selected.isNotEmpty()) && !busy
@@ -234,7 +232,7 @@ internal fun ContactPickerScreen(
                 // list drops the active account, landing on "No matches".
                 val resolvedHex =
                     resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
-                if (identifierQuery && resolution.state == RecipientPreviewState.Resolving) {
+                if (identifierQuery && resolution.state == RecipientPreviewState.Resolving && matches.isEmpty()) {
                     item { ResolvingContactRow() }
                 } else if (identifierQuery && resolvedHex != null) {
                     item {
@@ -281,9 +279,9 @@ internal fun ContactPickerScreen(
                             },
                         )
                     }
-                } else if (identifierQuery || matches.isEmpty()) {
+                } else if (matches.isEmpty()) {
                     item {
-                        if (!identifierQuery && userSearch.isSearching) {
+                        if (userSearch.isSearching) {
                             UserSearchStatusRow(R.string.user_search_searching, showProgress = true)
                         } else {
                             Text(
@@ -331,7 +329,7 @@ internal fun ContactPickerScreen(
                             trailing = { SelectionIndicator(selected = isSelected) },
                         )
                     }
-                    if (userSearch.isSearching) {
+                    if (userSearch.isSearching || resolution.state == RecipientPreviewState.Resolving) {
                         item { UserSearchStatusRow(R.string.user_search_searching, showProgress = true) }
                     } else if (userSearch.failed || userSearch.isIncomplete) {
                         item {

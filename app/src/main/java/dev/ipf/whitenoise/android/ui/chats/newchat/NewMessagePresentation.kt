@@ -123,9 +123,9 @@ internal fun NewMessageContent(
             error?.let { item { StartChatErrorCard(it, actions.retryChat, actions.invite, actions.copyError) } }
             item {
                 NewMessageSearchFeedback(
-                    searching = resolvingIdentifier || (!identifierQuery && search.isSearching),
-                    failed = !identifierQuery && search.failed,
-                    incomplete = !identifierQuery && search.isIncomplete,
+                    searching = resolvingIdentifier || search.isSearching,
+                    failed = search.failed,
+                    incomplete = search.isIncomplete,
                     empty = query.isNotBlank() && people.isEmpty(),
                     busy = busy,
                     onRetry = actions.retrySearch,

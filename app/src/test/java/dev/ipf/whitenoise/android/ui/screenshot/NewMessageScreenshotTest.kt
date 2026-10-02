@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageActions
@@ -14,6 +15,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageContent
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePerson
 import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientUserSearchState
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
+import dev.ipf.whitenoise.android.ui.chats.newchat.recipientDirectoryMatches
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -61,6 +63,44 @@ class NewMessageScreenshotTest {
     /** Terminal empty search uses the shared empty treatment. */
     @Test fun noMatches() = capture("new_message_no_matches.png", people = emptyList())
 
+    /** Address lookup does not replace available people with an empty loading page. */
+    @Test fun addressPendingLight() =
+        capture("new_message_address_pending_light.png", query = "ada@example.com", people = addressPeople(), identifier = true, resolving = true)
+
+    @Test fun addressPendingDark() =
+        capture("new_message_address_pending_dark.png", dark = true, query = "ada@example.com", people = addressPeople(), identifier = true, resolving = true)
+
+    @Test fun addressPendingAmoled() =
+        capture(
+            "new_message_address_pending_amoled.png",
+            dark = true,
+            amoled = true,
+            query = "ada@example.com",
+            people = addressPeople(),
+            identifier = true,
+            resolving = true,
+        )
+
+    /** Discovery failure retains actionable people and retry, including large RTL presentation. */
+    @Test fun addressFailed() =
+        capture(
+            "new_message_address_failed.png",
+            query = "ada@example.com",
+            people = addressPeople(),
+            identifier = true,
+            search = RecipientUserSearchState(failed = true),
+        )
+
+    @Test fun addressFailedLargeRtl() =
+        capture(
+            "new_message_address_failed_large_rtl.png",
+            largeRtl = true,
+            query = "ada@example.com",
+            people = addressPeople(),
+            identifier = true,
+            search = RecipientUserSearchState(failed = true),
+        )
+
     /** Canonical creation recovery exposes Open chat and safe diagnostic copying. */
     @Test fun createdRecovery() =
         capture(
@@ -93,6 +133,8 @@ class NewMessageScreenshotTest {
         people: List<NewMessagePerson> = people(),
         search: RecipientUserSearchState = RecipientUserSearchState(),
         error: StartChatErrorUiState? = null,
+        identifier: Boolean = false,
+        resolving: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -103,8 +145,8 @@ class NewMessageScreenshotTest {
                         TextFieldState(query),
                         people,
                         search,
-                        false,
-                        false,
+                        identifier,
+                        resolving,
                         true,
                         null,
                         error,
@@ -115,6 +157,28 @@ class NewMessageScreenshotTest {
             }
         }
         composeRule.onNodeWithTag("new_message.screen").captureRoboImage("src/test/snapshots/$file")
+    }
+
+    /** Projects an unresolved full address from a native directory fixture, never a verified identity. */
+    private fun addressPeople(): List<NewMessagePerson> {
+        val candidate =
+            RecipientSearch.Candidate(
+                "a".repeat(64),
+                "Ada Lovelace",
+                "npub1ada",
+                searchProfile =
+                    UserProfileMetadataFfi(
+                        name = null,
+                        displayName = "Ada Lovelace",
+                        about = null,
+                        picture = null,
+                        banner = null,
+                        nip05 = "ada@example.com",
+                        lud16 = null,
+                    ),
+            )
+        return recipientDirectoryMatches("ada@example.com", null, emptyList(), listOf(candidate), null)
+            .map { NewMessagePerson(it, "npub1ada…2kz", null) }
     }
 
     /** Synthetic render-only people cover each supported provenance with stable public-key labels. */

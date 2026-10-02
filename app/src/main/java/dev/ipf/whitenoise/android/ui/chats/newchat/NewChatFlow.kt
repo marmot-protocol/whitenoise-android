@@ -486,23 +486,21 @@ private fun NewMessageAccountScreen(
             }
         }
     val userSearch by key(query, searchRetry, appState.relationshipRevision) {
-        rememberRecipientUserSearchState(query, appState, retryKey = searchRetry)
+        rememberRecipientUserSearchState(query.takeIf { resolution.resolvedHex == null }.orEmpty(), appState, retryKey = searchRetry)
     }
     val discovered = userSearch.candidates
     val followedIds = userSearch.followedAccountIds
     val matches =
-        remember(query, candidates, discovered, followedIds, activeHex) {
-            if (identifierQuery) {
-                emptyList()
-            } else {
-                RecipientSearch.mergeAndBrowse(
-                    query = query,
-                    known = candidates,
-                    discovered = discovered,
-                    activeAccountIdHex = activeHex,
-                    followedAccountIds = followedIds,
-                )
-            }
+        remember(query, resolution.resolvedHex, candidates, discovered, followedIds, activeHex) {
+            recipientDirectoryMatches(
+                query = query,
+                resolvedHex = resolution.resolvedHex,
+                known = candidates,
+                discovered = discovered,
+                activeAccountIdHex = activeHex,
+                followedAccountIds = followedIds,
+                accountIdHex = appState::accountIdHexForMention,
+            )
         }
     SideEffect { contactsLoadAttempt.success() }
 
@@ -651,7 +649,7 @@ private fun NewMessageAccountScreen(
     }
 
     val displayedCandidates =
-        if (identifierQuery) {
+        if (identifierQuery && resolution.resolvedHex != null) {
             resolvedHex
                 ?.let {
                     listOf(RecipientSearch.Candidate(it, appState.displayName(it), appState.npub(it)))

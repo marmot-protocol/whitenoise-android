@@ -74,7 +74,7 @@ private fun NewGroupRecipientAccountScreen(
     var scannerSession by remember { mutableStateOf<Long?>(null) }
     var nextScannerSession by remember { mutableLongStateOf(0L) }
     val resolution = rememberRecipientResolution(query, appState, retry)
-    val search by rememberRecipientUserSearchState(query, appState, retry)
+    val search by rememberRecipientUserSearchState(query.takeIf { resolution.resolvedHex == null }.orEmpty(), appState, retry)
     val activeHex = appState.activeAccount?.accountIdHex
     val candidates =
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
@@ -83,18 +83,20 @@ private fun NewGroupRecipientAccountScreen(
     val identifier = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
     val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, true) }
     val matches =
-        if (identifier) {
+        if (identifier && resolution.resolvedHex != null) {
             resolvedHex
                 ?.let { hex ->
                     listOf(RecipientSearch.Candidate(hex, appState.displayName(hex), appState.npub(hex)))
                 }.orEmpty()
         } else {
-            RecipientSearch.mergeAndBrowse(
+            recipientDirectoryMatches(
                 query,
+                resolution.resolvedHex,
                 candidates,
                 search.candidates,
                 activeHex,
                 followedAccountIds = search.followedAccountIds,
+                accountIdHex = appState::accountIdHexForMention,
             )
         }
 
@@ -152,9 +154,9 @@ private fun NewGroupRecipientAccountScreen(
             queryState,
             matches.map(::person),
             selected.map(::person),
-            searching = if (identifier) resolution.state == RecipientPreviewState.Resolving else search.isSearching,
-            failed = !identifier && search.failed,
-            incomplete = !identifier && search.isIncomplete,
+            searching = resolution.state == RecipientPreviewState.Resolving || search.isSearching,
+            failed = search.failed,
+            incomplete = search.isIncomplete,
             actions =
                 NewGroupRecipientActions(
                     back = { leave(onBack) },

@@ -94,6 +94,23 @@ class NewMessagePresentationTest {
         composeRule.onNodeWithText(context.getString(R.string.user_search_searching)).assertExists()
     }
 
+    /** Complete addresses still show ordinary directory rows while HTTPS lookup is pending. */
+    @Test fun addressLookupKeepsDirectoryRowActionable() {
+        show(identifier = true, resolving = true, query = "ada@example.com")
+        composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.user_search_searching)).assertExists()
+        assertEquals(listOf("person"), calls)
+    }
+
+    /** Directory failure copy is not hidden just because the query also has address syntax. */
+    @Test fun addressDirectoryFailureKeepsRowAndRetry() {
+        show(identifier = true, query = "ada@example.com", search = RecipientUserSearchState(failed = true))
+        composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.user_search_failed)).assertExists()
+        composeRule.onNodeWithTag("people.retry").performClick()
+        assertEquals(listOf("retrySearch"), calls)
+    }
+
     /** An unresolved address offers a deliberate retry without implying it is a valid recipient. */
     @Test fun unresolvedAddressOffersRetry() {
         composeRule.setContent {
@@ -181,11 +198,12 @@ class NewMessagePresentationTest {
         creating: String? = null,
         identifier: Boolean = false,
         resolving: Boolean = false,
+        query: String = "Ada",
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 NewMessageContent(
-                    TextFieldState("Ada"),
+                    TextFieldState(query),
                     people,
                     search,
                     identifier,
