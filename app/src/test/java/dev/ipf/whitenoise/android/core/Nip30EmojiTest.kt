@@ -61,6 +61,7 @@ class Nip30EmojiTest {
         assertEquals(emptyMap<Int, List<String>>(), Nip30Emoji.attachmentShortcodes(tags, attachments))
     }
 
+    /** The first tag per code wins, and several codes naming one attachment all map onto it. */
     @Test
     fun firstTagWinsPerCodeAndAliasesShareTheirAttachment() {
         val attachments =

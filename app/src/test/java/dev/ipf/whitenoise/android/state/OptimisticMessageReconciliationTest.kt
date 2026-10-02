@@ -633,6 +633,7 @@ class OptimisticMessageReconciliationTest {
             receivedAt = 1uL,
         )
 
+    /** A projected timeline row for the given identity, text and tags, with every other field neutral. */
     private fun timelineRecord(
         messageIdHex: String,
         plaintext: String,

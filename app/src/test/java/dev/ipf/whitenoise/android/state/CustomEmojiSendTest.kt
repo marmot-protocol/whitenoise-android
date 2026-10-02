@@ -105,6 +105,17 @@ class CustomEmojiSendTest {
         assertTrue(readLocalEmojiArtwork(folder.root.resolve("missing"), listOf(":party:")).isEmpty())
     }
 
+    /** A leftover unsendable `party.img` never shadows the sendable `party.png` beside it. */
+    @Test
+    fun staleUnsendableFileDoesNotShadowTheSendableOne() {
+        val directory = folder.newFolder("emoji")
+        directory.resolve("party.img").writeBytes(byteArrayOf(8))
+        directory.resolve("party.png").writeBytes(byteArrayOf(1, 2))
+        val read = readLocalEmojiArtwork(directory, listOf(":party:")).single()
+        assertEquals("party.png", read.fileName)
+        assertArrayEquals(byteArrayOf(1, 2), read.bytes)
+    }
+
     /** A second read after the file changed returns the new bytes and digest, so nothing stale is sent. */
     @Test
     fun rereadingAfterAnEditReturnsTheCurrentImage() {

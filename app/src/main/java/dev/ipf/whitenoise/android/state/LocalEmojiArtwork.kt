@@ -41,7 +41,12 @@ internal fun readLocalEmojiArtwork(
     directory: File,
     shortcodes: List<String>,
 ): List<LocalEmojiArtwork> {
-    val files = directory.listFiles().orEmpty().filter { it.isFile && !it.name.startsWith('.') }
+    // The same extension rule as the picker, so a stale party.img can never shadow party.png.
+    val files =
+        directory
+            .listFiles()
+            .orEmpty()
+            .filter { it.isFile && !it.name.startsWith('.') && CustomEmojiStore.hasSendableExtension(it) }
     return shortcodes.mapNotNull { shortcode ->
         val code = shortcode.trim(':')
         val file = files.firstOrNull { it.nameWithoutExtension == code } ?: return@mapNotNull null
@@ -134,6 +139,9 @@ internal class EmojiUploadCache {
             val uploaded = if (missing.isEmpty()) emptyList() else engine.uploadEmojiArtwork(account, group, missing)
             synchronized(references) {
                 missing.zip(uploaded).forEach { (emoji, reference) -> references[key(emoji)] = reference }
+                // Another chat's eviction may have removed an entry seen as cached before the upload, so
+                // re-check under this lock and fail as an upload problem rather than with a missing key.
+                check(distinct.all { key(it) in references }) { "cached emoji reference was evicted" }
                 // Build the result first, then evict, so eviction can never remove a reference this send needs.
                 val result = artwork.associate { it.sha256 to references.getValue(key(it)) }
                 // Touch the batch so it is the newest, then drop the oldest entries beyond the limit.

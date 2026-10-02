@@ -134,6 +134,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.util.Locale
 import java.util.UUID
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 
@@ -1193,6 +1194,10 @@ private fun isSendableOptimisticStatus(
         status == MessageStatus.Sent ||
         (allowFailed && status == MessageStatus.Failed)
 
+/**
+ * The retained Failed optimistic send that [projected], a retracted MDK row, is the engine copy of, or null.
+ * Matching uses identity, plaintext and [sameRenderableSendTags], so an emoji send still matches.
+ */
 internal fun failedOptimisticMessageIdForInvalidatedProjection(
     optimisticMessages: Collection<TimelineMessage>,
     projected: AppMessageRecordFfi,
@@ -1239,6 +1244,7 @@ internal fun unpublishedProjectionIdsMatchingMessage(
                 MessageProjector.isMine(TimelineProjector.toAppMessageRecord(projected), activeAccountIdHex)
         }.map { it.messageIdHex }
 
+/** Whether two records are copies of one send: same direction, chat, sender, kind, text and renderable tags. */
 private fun messagesHaveSameRenderableSendShape(
     left: AppMessageRecordFfi,
     right: AppMessageRecordFfi,
@@ -8112,8 +8118,40 @@ class ConversationController(
         isTransientRelaySendError(throwable) ||
             (textPublisher == null && isTransientRuntimeWorkerError(throwable))
 
-    /** The lock an emoji send takes around its publish only, so uploads never hold up cancel or other mutations. */
-    private fun commitPublishLock(account: String): EmojiPublishLock = { publish -> appState.withGroupCommitLock(account, group.groupIdHex) { publish() } }
+    /**
+     * The lock an emoji send takes around its publish only, so uploads never hold up cancel or other
+     * mutations. The acceptance bookkeeping happens inside the same lock, so a cancel waiting for it
+     * sees the send as owned by MDK (or uncertain) and cannot report success for a published send. A
+     * rejection that published nothing, such as a stale epoch, leaves the send pre-acceptance.
+     */
+    private fun commitPublishLock(
+        account: String,
+        optimisticKey: String,
+        controllerContext: CoroutineContext,
+    ): EmojiPublishLock =
+        { publish ->
+            appState.withGroupCommitLock(account, group.groupIdHex) {
+                try {
+                    publish().also { summary ->
+                        withContext(controllerContext) { recordOptimisticSendAcceptance(optimisticKey, summary) }
+                    }
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") failure: Throwable,
+                ) {
+                    if (failure !is OptimisticSendCancelledException && isAmbiguousRelayDeliveryError(failure)) {
+                        withContext(controllerContext) { markAcceptanceUnknownIfPreAcceptance(optimisticKey) }
+                    }
+                    throw failure
+                }
+            }
+        }
+
+    /** Records that a publish may have reached a relay, unless the send already moved past pre-acceptance. */
+    private fun markAcceptanceUnknownIfPreAcceptance(optimisticKey: String) {
+        if (optimisticSendPhases[optimisticKey] == OptimisticSendPhase.PRE_ACCEPTANCE) {
+            optimisticSendPhases[optimisticKey] = OptimisticSendPhase.ACCEPTANCE_UNKNOWN
+        }
+    }
 
     /** Runs [block] under the group commit lock, or directly when [skip] says the block locks its own publish. */
     private suspend fun <T> commitLockUnless(
@@ -8170,7 +8208,10 @@ class ConversationController(
         return when {
             emojiArtwork.isEmpty() ->
                 publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
-            injected != null -> injected(account, text, emojiArtwork, ensureCurrent, commitPublishLock(account))
+            injected != null -> {
+                val lock = commitPublishLock(account, optimisticKey, controllerContext)
+                injected(account, text, emojiArtwork, ensureCurrent, lock)
+            }
             else ->
                 appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
                     sendTextWithCustomEmoji(
@@ -8180,7 +8221,7 @@ class ConversationController(
                         emojiArtwork,
                         appState.emojiUploads,
                         ensureCurrent = ensureCurrent,
-                        publishLock = commitPublishLock(account),
+                        publishLock = commitPublishLock(account, optimisticKey, controllerContext),
                     )
                 }
         }

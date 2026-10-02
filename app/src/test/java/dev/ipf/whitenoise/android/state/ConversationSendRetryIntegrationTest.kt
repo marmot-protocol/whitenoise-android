@@ -788,6 +788,93 @@ class ConversationSendRetryIntegrationTest {
             assertTrue(controller.timeline.isEmpty())
         }
 
+    /**
+     * A cancel that lands right after the emoji publish must not report success for a send MDK now
+     * owns. The publish and its acceptance bookkeeping share the commit lock, so the waiting cancel
+     * sees the finished send, and the yield after the lock models the hop back from the native call.
+     */
+    @Test
+    fun cancelRightAfterAnEmojiPublishDoesNotHideAPublishedSend() =
+        runTest {
+            val publishing = CompletableDeferred<Unit>()
+            val finishPublish = CompletableDeferred<Unit>()
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { listOf(partyArtwork()) },
+                    customEmojiSender = { _, _, _, ensureCurrent, publishLock ->
+                        val summary =
+                            publishLock {
+                                ensureCurrent()
+                                publishing.complete(Unit)
+                                finishPublish.await()
+                                successfulSendSummary()
+                            }
+                        yield()
+                        summary
+                    },
+                )
+
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    appState.sendConversationText(controller, "hi :party:")
+                }
+            publishing.await()
+            val pending = controller.timeline.single().record
+            val cancel = async { controller.deleteMessage(pending, presentFailure = false) }
+            runCurrent()
+            finishPublish.complete(Unit)
+
+            assertFalse("a published send must not be cancelled away", cancel.await())
+            send.await()
+            assertEquals(1, controller.timeline.size)
+        }
+
+    /** A publish that fails ambiguously may be on a relay, so it cannot be cancelled away either. */
+    @Test
+    fun cancelRightAfterAnUncertainEmojiPublishCannotRemoveTheRow() =
+        runTest {
+            val publishing = CompletableDeferred<Unit>()
+            val finishPublish = CompletableDeferred<Unit>()
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { listOf(partyArtwork()) },
+                    customEmojiSender = { _, _, _, ensureCurrent, publishLock ->
+                        try {
+                            publishLock {
+                                ensureCurrent()
+                                publishing.complete(Unit)
+                                finishPublish.await()
+                                throw MarmotKitException.TransportClosed()
+                            }
+                        } finally {
+                            yield()
+                        }
+                    },
+                )
+
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    appState.sendConversationText(controller, "hi :party:")
+                }
+            publishing.await()
+            val pending = controller.timeline.single().record
+            val cancel = async { controller.deleteMessage(pending, presentFailure = false) }
+            runCurrent()
+            finishPublish.complete(Unit)
+
+            assertFalse("an uncertain publish must not be cancelled away", cancel.await())
+            send.await()
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
     /** An upload-stage failure published nothing, so the bubble ends Failed and never stays Pending. */
     @Test
     fun customEmojiUploadFailureEndsFailedNotPending() =
