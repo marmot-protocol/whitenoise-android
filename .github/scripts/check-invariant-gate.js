@@ -33,9 +33,31 @@ function parseRegistry(markdown) {
 
 /** Returns the description without fenced code or HTML comments, so hidden text cannot satisfy the gate. */
 function visibleProse(body) {
-  return (body || '')
-    .replace(/(```|~~~)[\s\S]*?(?:\1|$)/g, '')
-    .replace(/<!--[\s\S]*?(?:-->|$)/g, '')
+  return withoutFencedCode(body || '').replace(/<!--[\s\S]*?(?:-->|$)/g, '')
+}
+
+/**
+ * Drops CommonMark fenced code blocks line by line. A fence closes only on a line of the same character, at least
+ * as long as its opener, with nothing else after it — so a shorter or annotated inner fence stays hidden. An
+ * unclosed fence hides everything after it.
+ */
+function withoutFencedCode(text) {
+  const kept = []
+  let fence = null
+  for (const line of text.split('\n')) {
+    if (fence) {
+      const closing = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line)
+      if (closing && closing[1][0] === fence[0] && closing[1].length >= fence.length) fence = null
+      continue
+    }
+    const opening = /^ {0,3}(`{3,}|~{3,})/.exec(line)
+    if (opening) {
+      fence = opening[1]
+    } else {
+      kept.push(line)
+    }
+  }
+  return kept.join('\n')
 }
 
 /** Collects the gate names and exemption declarations written as single visible lines in the description. */
@@ -112,32 +134,61 @@ function evaluate({ closingIssues, files, body, registry }) {
   }
 }
 
-const PULL_REQUEST_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
+const PULL_REQUEST_QUERY = `query($owner: String!, $repo: String!, $number: Int!, $after: String) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
       body
-      closingIssuesReferences(first: 50) {
-        nodes { number issueType { name } labels(first: 20) { nodes { name } } }
+      closingIssuesReferences(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          number
+          repository { owner { login } name }
+          issueType { name }
+          labels(first: 100) { pageInfo { hasNextPage } nodes { name } }
+        }
       }
     }
   }
 }`
 
+/**
+ * Reads the live description and every closing issue, following both pagination levels: further closing-issue
+ * pages through GraphQL, and the full label list through REST for any issue with more than one page of labels.
+ */
+async function loadPullRequest(github, { owner, repo, number }) {
+  const closingIssues = []
+  let body = ''
+  let after = null
+  do {
+    const result = await github.graphql(PULL_REQUEST_QUERY, { owner, repo, number, after })
+    const pullRequest = result.repository.pullRequest
+    const references = pullRequest.closingIssuesReferences
+    body = pullRequest.body
+    closingIssues.push(...references.nodes)
+    after = references.pageInfo?.hasNextPage ? references.pageInfo.endCursor : null
+  } while (after)
+  for (const issue of closingIssues) {
+    if (!issue.labels?.pageInfo?.hasNextPage || isBugIssue(issue)) continue
+    const labels = await github.paginate(github.rest.issues.listLabelsOnIssue, {
+      owner: issue.repository.owner.login,
+      repo: issue.repository.name,
+      issue_number: issue.number,
+      per_page: 100,
+    })
+    issue.labels = { nodes: labels }
+  }
+  return { body, closingIssues }
+}
+
 /** Loads the pull request's live description, closing issues and files, then fails the job on a gate violation. */
-async function run({ github, context, core, registryMarkdown }) {
+async function run({ github, context, core, registryMarkdown, registryPath }) {
   const owner = context.repo.owner
   const repo = context.repo.repo
   const number = context.payload.pull_request.number
-  const result = await github.graphql(PULL_REQUEST_QUERY, { owner, repo, number })
-  const pullRequest = result.repository.pullRequest
+  const { body, closingIssues } = await loadPullRequest(github, { owner, repo, number })
   const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: number, per_page: 100 })
-  const registry = parseRegistry(registryMarkdown ?? readRegistry())
-  const outcome = evaluate({
-    closingIssues: pullRequest.closingIssuesReferences.nodes,
-    files,
-    body: pullRequest.body,
-    registry,
-  })
+  const registry = parseRegistry(registryMarkdown ?? readRegistry(registryPath))
+  const outcome = evaluate({ closingIssues, files, body, registry })
   if (outcome.status === 'fail') {
     core.setFailed(outcome.message)
   } else {
@@ -146,9 +197,11 @@ async function run({ github, context, core, registryMarkdown }) {
   return outcome
 }
 
-/** Reads the registry from the checked-out pull-request head, or returns an empty table when it is absent. */
-function readRegistry() {
-  const file = path.join(process.cwd(), REGISTRY_PATH)
+/**
+ * Reads the pull-request head's registry as data from [file] (default: the working directory's copy), or returns
+ * an empty table when it is absent.
+ */
+function readRegistry(file = path.join(process.cwd(), REGISTRY_PATH)) {
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
 }
 

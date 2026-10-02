@@ -37,9 +37,11 @@ unknown reason key fails the check.
 The `Invariant gate` workflow
 ([`invariant-gate.yml`](../.github/workflows/invariant-gate.yml)) runs
 [`check-invariant-gate.js`](../.github/scripts/check-invariant-gate.js) on every
-pull request to `master`, including description edits. It reads the closing
-issue references through the GitHub API, so it needs no secrets and runs on fork
-pull requests. Pull requests that close no bug, such as feature-only work, pass
+pull request to `master`, including description edits. The checker runs from the
+trusted base revision, so a pull request cannot rewrite the check that judges it,
+and the pull request's registry is read only as data. It reads the closing issue
+references through the GitHub API, so it needs no secrets and runs on fork pull
+requests. Pull requests that close no bug, such as feature-only work, pass
 without a declaration. The check is separate from, and does not change, the
 visual-evidence gate in [Screenshot tests](../README.md#screenshot-tests).
 
