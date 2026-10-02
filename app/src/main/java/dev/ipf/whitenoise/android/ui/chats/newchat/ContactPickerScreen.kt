@@ -118,7 +118,8 @@ internal fun ContactPickerScreen(
             deriveRecipientCandidates(appState, activeHex)
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
-    val userSearch by rememberRecipientUserSearchState(query.takeIf { resolution.resolvedHex == null }.orEmpty(), appState)
+    val directoryQuery = query.takeIf { resolution.resolvedHex == null }.orEmpty()
+    val userSearch by rememberRecipientUserSearchState(directoryQuery, appState)
     val discovered = userSearch.candidates
     val followedIds = userSearch.followedAccountIds
     val matches =

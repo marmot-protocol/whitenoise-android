@@ -65,10 +65,23 @@ class NewMessageScreenshotTest {
 
     /** Address lookup does not replace available people with an empty loading page. */
     @Test fun addressPendingLight() =
-        capture("new_message_address_pending_light.png", query = "ada@example.com", people = addressPeople(), identifier = true, resolving = true)
+        capture(
+            "new_message_address_pending_light.png",
+            query = "ada@example.com",
+            people = addressPeople(),
+            identifier = true,
+            resolving = true,
+        )
 
     @Test fun addressPendingDark() =
-        capture("new_message_address_pending_dark.png", dark = true, query = "ada@example.com", people = addressPeople(), identifier = true, resolving = true)
+        capture(
+            "new_message_address_pending_dark.png",
+            dark = true,
+            query = "ada@example.com",
+            people = addressPeople(),
+            identifier = true,
+            resolving = true,
+        )
 
     @Test fun addressPendingAmoled() =
         capture(

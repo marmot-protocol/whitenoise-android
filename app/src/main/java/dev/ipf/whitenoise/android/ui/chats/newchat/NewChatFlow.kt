@@ -485,8 +485,9 @@ private fun NewMessageAccountScreen(
                     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_PROFILE_REFRESH_RETURN)
             }
         }
+    val directoryQuery = query.takeIf { resolution.resolvedHex == null }.orEmpty()
     val userSearch by key(query, searchRetry, appState.relationshipRevision) {
-        rememberRecipientUserSearchState(query.takeIf { resolution.resolvedHex == null }.orEmpty(), appState, retryKey = searchRetry)
+        rememberRecipientUserSearchState(directoryQuery, appState, retryKey = searchRetry)
     }
     val discovered = userSearch.candidates
     val followedIds = userSearch.followedAccountIds

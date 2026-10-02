@@ -74,7 +74,8 @@ private fun NewGroupRecipientAccountScreen(
     var scannerSession by remember { mutableStateOf<Long?>(null) }
     var nextScannerSession by remember { mutableLongStateOf(0L) }
     val resolution = rememberRecipientResolution(query, appState, retry)
-    val search by rememberRecipientUserSearchState(query.takeIf { resolution.resolvedHex == null }.orEmpty(), appState, retry)
+    val directoryQuery = query.takeIf { resolution.resolvedHex == null }.orEmpty()
+    val search by rememberRecipientUserSearchState(directoryQuery, appState, retry)
     val activeHex = appState.activeAccount?.accountIdHex
     val candidates =
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
