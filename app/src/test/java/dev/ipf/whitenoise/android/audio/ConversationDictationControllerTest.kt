@@ -2952,6 +2952,103 @@ class ConversationDictationControllerTest {
         fixture.controller.cancel()
     }
 
+    /** Service loss during Send must not turn a recognized prefix into a completed transcript. */
+    @Test
+    fun serviceLossDuringSendKeepsPartialConfirmationRequired() {
+        val fixture = fixture(draft = TextFieldValue("Keep"))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first segment")
+        fixture.scheduler.runDelay(500L)
+        fixture.platform.listener.onBeginningOfSpeech()
+        fixture.controller.send()
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        fixture.controller.onDurableServiceDestroyed(requireNotNull(fixture.controller.notificationSessionToken))
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals("first segment", failed.retainedTranscript)
+        assertTrue(failed.recognitionIncomplete)
+        assertEquals("Keep", fixture.drafts.getValue(key()).text)
+        fixture.controller.dismissFailure()
+    }
+
+    /** A completed transcript remains complete when its queued validation is interrupted. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun serviceLossDuringCompletedValidationDoesNotMarkTextIncomplete() =
+        runTest {
+            val validation = CompletableDeferred<ConversationDictationTargetValidation>()
+            val fixture =
+                fixture(
+                    draft = TextFieldValue("Keep"),
+                    targetValidator = { _, _ -> validation.await() },
+                    targetValidationScope = this,
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.send()
+            fixture.platform.listener.onResult("completed text")
+            runCurrent()
+            fixture.controller.onDurableServiceDestroyed(requireNotNull(fixture.controller.notificationSessionToken))
+            val failed = fixture.controller.state as ConversationDictationState.Failed
+            assertEquals("completed text", failed.retainedTranscript)
+            assertFalse(failed.recognitionIncomplete)
+            validation.complete(ConversationDictationTargetValidation.Available)
+            advanceUntilIdle()
+            assertTrue(fixture.controller.state === failed)
+            fixture.controller.dismissFailure()
+        }
+
+    /** Teardown failure cannot hold app audio ownership forever or pretend native closure succeeded. */
+    @Test
+    fun discardExceptionReleasesAppAudioWithoutAcknowledgingNativeClosure() {
+        var available = true
+        var releases = 0
+        var restored = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue(""),
+                tryAcquireMicrophone = { available.also { available = false } },
+                releaseMicrophone = {
+                    available = true
+                    releases++
+                },
+                onAfterAudioCapture = { restored++ },
+            )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.discardCaptureFailure = IllegalStateException("discard failed")
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        assertEquals(1, releases)
+        assertEquals(1, restored)
+        assertTrue(fixture.controller.foregroundMicrophoneRequired)
+        fixture.platform.discardCaptureFailure = null
+        fixture.controller.dismissFailure()
+        val oldSession = fixture.platform.session
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.scheduler.advanceBy(500L)
+        assertTrue(fixture.platform.session !== oldSession)
+        assertTrue(fixture.platform.session.started)
+        assertFalse(available)
+        fixture.controller.cancel()
+        assertEquals(2, releases)
+        assertEquals(2, restored)
+    }
+
+    /** A native-closure callback treats an unreadable queue as retained instead of crashing Main. */
+    @Test
+    fun closureStateQueryFailureKeepsRecoveryLeaseWithoutCrashing() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.platform.deferCallerAudioFinish = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        fixture.platform.callerAudioStateFailure = IllegalStateException("capture state failed")
+        fixture.scheduler.advanceBy(1_000L)
+        assertFalse(fixture.controller.foregroundMicrophoneRequired)
+        assertTrue(fixture.controller.hasDurableSession)
+        assertTrue(fixture.controller.state === failed)
+        fixture.platform.callerAudioStateFailure = null
+        fixture.controller.dismissFailure()
+    }
+
     /** Bounded recovery expires once and clears PCM without silently writing a draft. */
     @Test
     fun recoveryExpiresAtThirtyMinutesAndDoesNotSurviveExplicitDismissal() {
@@ -5971,6 +6068,8 @@ class ConversationDictationControllerTest {
         var discardClosureCallback: (() -> Unit)? = null
         var discardCaptureActive = false
         var forceCaptureFailure: RuntimeException? = null
+        var discardCaptureFailure: RuntimeException? = null
+        var callerAudioStateFailure: RuntimeException? = null
         var captureSessionsStarted = 0
 
         override fun beginCaptureSession() {
@@ -6019,7 +6118,10 @@ class ConversationDictationControllerTest {
         override fun callerAudioRequirement(): ConversationDictationCallerAudioRequirement = callerAudio
 
         /** Lets lifecycle tests retain caller PCM independently of recognizer readiness. */
-        override fun callerAudioHasPending(): Boolean = pendingCallerAudio
+        override fun callerAudioHasPending(): Boolean {
+            callerAudioStateFailure?.let { throw it }
+            return pendingCallerAudio
+        }
 
         /** Supplies capture activity independently of provider callbacks. */
         override fun callerAudioSilenceMillis(): Long? = capturedSilenceMillis
@@ -6044,6 +6146,7 @@ class ConversationDictationControllerTest {
         }
 
         override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
+            discardCaptureFailure?.let { throw it }
             if (!tracksCallerAudioDisposal || (!pendingCallerAudio && !discardCaptureActive)) return false
             discardedCallerAudio += 1
             pendingCallerAudio = false

@@ -43,6 +43,8 @@ an explicit Paste recovers the transcript into the latest draft for review; Retr
 cannot absorb another writer’s text or attachment generation. A dispatch
 whose acceptance is uncertain remains `DeliveryUnknown` and offers no resend.
 Send never reports success by silently performing Paste. If recognition stopped with only a recognized prefix, Retry Send first requires an explicit choice to send that text or Paste it for review; provider settings remain accessible.
+An involuntary abort while recognition is still active retains this incomplete
+status. Completed text awaiting validation is not described as interrupted speech.
 
 Tests exercise captured asynchronous notification posts/removals across both
 startup orders and all three actions, independent lease removal, microphone
@@ -118,7 +120,10 @@ window before its new logical target is published.
 Discard clears PCM immediately but retains the closing recorder's identity until
 native acknowledgment; stop and release run off the main looper. Transcript-only
 recovery uses the same closure watchdog, and a closure exception cannot count as
-acknowledgment. An uncertain dispatch retains its in-app explanation without a
+acknowledgment.
+Disposal exceptions still release app audio ownership after recognizer teardown;
+they cannot substitute for native closure proof or narrow the microphone type.
+An uncertain dispatch retains its in-app explanation without a
 recovery lease or expiry notice because retrying that dispatch could duplicate it.
 Audio wiping covers current, queued and in-flight arrays held at discard time;
 it does not promise erasure of copies already released to the provider or garbage collector.

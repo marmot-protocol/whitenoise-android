@@ -780,10 +780,7 @@ internal class ConversationDictationController internal constructor(
         // ownership check and become no-ops.
         clearRecognitionSession(cancel = true)
         resetTranscriptSession()
-        captureClosureGeneration += 1L
-        platform.beginCaptureSession()
-        foregroundMicrophoneRequired = true
-        notificationActionGeneration += 1L
+        beginCaptureOwnership()
         if (state.sessionId != null) conversationDictationDiagnostic("event=session_finished outcome=replaced")
         val sessionId = ++nextSessionId
         val capturedRevision = readDraft(accountRef, groupIdHex).revision
@@ -818,6 +815,14 @@ internal class ConversationDictationController internal constructor(
         }
         startTarget(sessionId, target)
         return true
+    }
+
+    /** A new gesture cannot inherit capture closure or notification actions from its predecessor. */
+    private fun beginCaptureOwnership() {
+        captureClosureGeneration += 1L
+        platform.beginCaptureSession()
+        foregroundMicrophoneRequired = true
+        notificationActionGeneration += 1L
     }
 
     /** Whether a duplicate request points at the current conversation and recognition mode. */
@@ -1136,7 +1141,21 @@ internal class ConversationDictationController internal constructor(
             if (dispatchedSessionId == sessionId) {
                 retainUndeliveredTranscript(sessionId, target, transcript)
             } else {
-                preserveTranscriptInLatestDraft(sessionId, target, transcript)
+                val incomplete =
+                    recognitionSession != null ||
+                        unresolvedRecognitionFailure != null ||
+                        runCatching(platform::callerAudioHasPending).getOrDefault(true)
+                preserveTranscriptInLatestDraft(
+                    sessionId,
+                    target,
+                    transcript,
+                    failureCause =
+                        if (incomplete) {
+                            unresolvedRecognitionFailure ?: ConversationDictationFailure.Unknown
+                        } else {
+                            null
+                        },
+                )
             }
         } else {
             cancelSession()
@@ -2305,7 +2324,8 @@ internal class ConversationDictationController internal constructor(
             finishPlaybackInterruption(sessionId)
             acknowledgeCaptureClosed(sessionId, captureGeneration)
             if (state === failed && notificationSessionToken == token) {
-                if (!platform.callerAudioHasPending() && failed.retainedTranscript.isNullOrBlank()) {
+                val retainedAudio = runCatching(platform::callerAudioHasPending).getOrDefault(true)
+                if (!retainedAudio && failed.retainedTranscript.isNullOrBlank()) {
                     releaseDurableSessionLease()
                 }
             }
@@ -2725,7 +2745,11 @@ internal class ConversationDictationController internal constructor(
                 target,
                 failureCause ?: ConversationDictationFailure.SendBlocked,
                 captureEnd =
-                    if (failureCause == null) DictationFailureCapture.Cancel else DictationFailureCapture.CancelIncomplete,
+                    if (failureCause == null) {
+                        DictationFailureCapture.Cancel
+                    } else {
+                        DictationFailureCapture.CancelIncomplete
+                    },
                 retainedTranscript = transcript,
             )
         } else {
@@ -2845,11 +2869,18 @@ internal class ConversationDictationController internal constructor(
             captureSessionId?.let(::finishPlaybackInterruption)
             closingSessionId?.let { acknowledgeCaptureClosed(it, closingCaptureGeneration) }
         }
-        val platformOwnsCaptureClosure =
-            runCatching { platform.discardCallerAudio(onCaptureFinished) }.getOrNull() != false
+        val platformOwnsCaptureClosure = runCatching { platform.discardCallerAudio(onCaptureFinished) }.getOrNull()
+        // A disposal exception can release app audio ownership after recognizer teardown,
+        // but cannot prove that a possibly separate native recorder has closed.
+        val onGenerationClosed: () -> Unit =
+            when (platformOwnsCaptureClosure) {
+                false -> onCaptureFinished
+                true -> ({})
+                null -> ({ captureSessionId?.let(::finishPlaybackInterruption) })
+            }
         clearRecognitionGeneration(
             cancel = cancel,
-            onAudioCaptureFinished = if (platformOwnsCaptureClosure) ({}) else onCaptureFinished,
+            onAudioCaptureFinished = onGenerationClosed,
         )
         if (releaseDurableSession) releaseDurableSessionLease()
     }
