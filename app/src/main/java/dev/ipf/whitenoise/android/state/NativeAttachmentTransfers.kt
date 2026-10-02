@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.AttachmentControlFfi
 import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
@@ -11,13 +10,10 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import java.io.Closeable
 import java.io.IOException
 
-private const val NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS = 5_000L
-
-private val NATIVE_TRANSFER_TERMINAL_FAILURES =
+internal val NATIVE_TRANSFER_TERMINAL_FAILURES =
     setOf(
         AttachmentTransferStateFfi.UNAVAILABLE,
         AttachmentTransferStateFfi.FAILED,
@@ -40,7 +36,6 @@ internal fun AttachmentTransferStatusFfi.toPresentationState(): AttachmentTransf
     when (state) {
         AttachmentTransferStateFfi.UNAVAILABLE,
         AttachmentTransferStateFfi.NOT_REQUESTED,
-        AttachmentTransferStateFfi.REMOVED,
         AttachmentTransferStateFfi.POLICY_BLOCKED,
         -> AttachmentTransferState.Remote
         AttachmentTransferStateFfi.QUEUED,
@@ -53,10 +48,12 @@ internal fun AttachmentTransferStatusFfi.toPresentationState(): AttachmentTransf
         -> AttachmentTransferState.Downloading
         AttachmentTransferStateFfi.READY -> AttachmentTransferState.Available
         AttachmentTransferStateFfi.FAILED,
-        AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
-        AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
         AttachmentTransferStateFfi.RETRY_EXHAUSTED,
         -> AttachmentTransferState.Failed
+        AttachmentTransferStateFfi.REMOVED,
+        AttachmentTransferStateFfi.PREVIOUSLY_ACQUIRED_UNAVAILABLE,
+        AttachmentTransferStateFfi.COMPLETED_UNRETAINED,
+        -> AttachmentTransferState.NotRetained
         AttachmentTransferStateFfi.CANCELLED -> AttachmentTransferState.Cancelled
     }
 
@@ -77,16 +74,25 @@ private class MarmotNativeTransferFeed(
     }
 }
 
+/** Opens a one-target subscription; its caller owns lexical disposal without cancelling acquisition. */
+internal suspend fun WhiteNoiseAppState.openNativeAttachmentFeed(
+    request: AttachmentTransferRequest,
+    target: NativeAttachmentTarget,
+): NativeTransferFeed =
+    MarmotNativeTransferFeed(
+        marmotIo { subscribeAttachmentTransfers(request.accountRef, request.groupIdHex, listOf(target.toFfi())) },
+    )
+
 /**
- * Observes native-owned acquisition. Automatic demand never resets the native
- * retry budget; only an explicit user action starts a new acquisition cycle.
+ * Observes native-owned acquisition. Interactive demand joins live work;
+ * only the explicit Retry intent permits terminal recovery.
  * Closing an observer does not cancel durable native work.
  */
 @Suppress("ReturnCount", "ThrowsCount") // Native terminal states map directly to explicit demand outcomes.
 internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
     request: AttachmentTransferRequest,
     priority: AttachmentDownloadPriority,
-    allowExplicitRetry: Boolean = true,
+    demandIntent: AttachmentDemandIntent = AttachmentDemandIntent.Join,
     diagnostics: AttachmentFetchDiagnostics? = null,
 ): AttachmentTransferRequest {
     val target =
@@ -135,15 +141,12 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
             if (priority == AttachmentDownloadPriority.Automatic) {
                 requestAutomaticAttachment(request.accountRef, request.groupIdHex, ffiTarget).status.state
             } else {
-                val current =
-                    attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(ffiTarget))
-                        .items
-                        .single()
-                        .state
-                if (!allowExplicitRetry && current != AttachmentTransferStateFfi.NOT_REQUESTED) return@marmotIo current
-                downloadAttachmentAgain(request.accountRef, request.groupIdHex, ffiTarget)
-                    ?: throw IOException("native attachment demand was rejected")
-                null
+                requestNativeInteractiveAttachment(
+                    request.accountRef,
+                    request.groupIdHex,
+                    ffiTarget,
+                    demandIntent,
+                )
             }
         }
     }
@@ -162,7 +165,7 @@ internal suspend fun awaitNativeAttachment(
         withContext(NonCancellable) { owned = open() }
         observeNativeAttachment(checkNotNull(owned), demand, onDemand, onState)
     } finally {
-        owned?.close()
+        withContext(NonCancellable + Dispatchers.IO) { owned?.close() }
     }
 }
 
@@ -207,29 +210,3 @@ private suspend fun NativeTransferFeed.nextState(): AttachmentTransferStateFfi =
 internal class NativeAttachmentTerminalException(
     val state: AttachmentTransferStateFfi,
 ) : IllegalStateException("native attachment transfer ended as $state")
-
-/** Sends native cancellation only for an explicit user action, bounded independently of caller cancellation. */
-internal suspend fun WhiteNoiseAppState.cancelNativeAttachmentBounded(request: AttachmentTransferRequest) {
-    withContext(NonCancellable) {
-        withTimeoutOrNull(NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS) {
-            runCatching { cancelNativeAttachment(request) }
-        }
-    }
-}
-
-/** Cancels the current native job by its ephemeral reference, when one exists. */
-@Suppress("ReturnCount") // Missing target/status/reference are distinct harmless stale-handle outcomes.
-internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(
-    request: AttachmentTransferRequest,
-    resolvedTarget: NativeAttachmentTarget? = null,
-): Boolean {
-    val target = resolvedTarget ?: resolveNativeAttachmentTarget(request) ?: return false
-    return marmotIo {
-        val status =
-            attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(target.toFfi()))
-                .items
-                .singleOrNull()
-        val reference = status?.reference ?: return@marmotIo false
-        controlAttachment(request.accountRef, reference, AttachmentControlFfi.CANCEL)
-    }
-}

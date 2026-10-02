@@ -67,7 +67,33 @@ class BudgetContractTest(unittest.TestCase):
             self.assertEqual(1, result.returncode)
             self.assertFalse(json.loads(result.stdout)["passed"])
 
-    def run_real_http(self, data, missing_event=None):
+    def test_physical_testing_requires_explicit_matching_serial_and_profile(self):
+        """Reject accidental personal-device or mislabeled environment runs before any adb call."""
+        with tempfile.TemporaryDirectory() as directory, patch.object(device_runner, "adb_command") as adb:
+            root = Path(directory)
+            for serial, profile, opt_in in (
+                ("physical", "reference-api30-arm64", None),
+                ("physical", "pixel-api37-arm64", None),
+                ("physical", "pixel-api37-arm64", "different"),
+                ("physical", "reference-api30-arm64", "physical"),
+                ("emulator-5554", "pixel-api37-arm64", "emulator-5554"),
+            ):
+                with self.subTest(serial=serial, profile=profile, opt_in=opt_in), self.assertRaises(ValueError):
+                    device_runner.run("adb", serial, root, root / "report.json",
+                                      budget_profile=profile, physical_fixture_serial=opt_in)
+            adb.assert_not_called()
+
+    def test_held_cancellation_cannot_claim_a_controller_send_without_selecting_it(self):
+        """Reject the unsupported mode before starting any HTTP fixture services."""
+        with tempfile.TemporaryDirectory() as directory, patch.object(device_runner, "adb_command") as adb:
+            adb.side_effect = ["1", "package:" + device_runner.APP]
+            with self.assertRaisesRegex(ValueError, "requires the Android send controller"), \
+                    patch.object(device_runner, "FixtureServer") as server:
+                device_runner.run("adb", "emulator-5554", Path(directory), Path(directory) / "report.json",
+                                  held_cancellation=True)
+            server.assert_not_called()
+
+    def run_real_http(self, data, missing_event=None, controller_required=False):
         """Keep real transport intact while independently controlling metrics or a missing ledger event."""
         owned = {}
         original_server = device_runner.FixtureServer
@@ -113,7 +139,8 @@ class BudgetContractTest(unittest.TestCase):
                              side_effect=lambda ledger, start: original_wait(ledger, start, timeout=0.1)):
             output = Path(directory) / "report.json"
             with self.assertRaises(RuntimeError):
-                device_runner.run("adb", "emulator-5554", Path(directory) / "server", output)
+                device_runner.run("adb", "emulator-5554", Path(directory) / "server", output,
+                                  android_send_controller=controller_required)
             report = json.loads(output.read_text())
             self.assertTrue(report["instrumentation_passed"])
             self.assertEqual(1, report["http_acquisition_requests"])
@@ -129,6 +156,14 @@ class BudgetContractTest(unittest.TestCase):
         report = self.run_real_http(data)
         self.assertTrue(report["ledger_finalized"])
         self.assertFalse(report["budget_check"]["passed"])
+
+    def test_required_controller_evidence_cannot_be_omitted(self):
+        """Successful transport and timings cannot qualify a requested controller send without its exact-read evidence."""
+        report = self.run_real_http(samples(), controller_required=True)
+        self.assertTrue(report["ledger_finalized"])
+        self.assertTrue(report["budget_check"]["passed"])
+        self.assertFalse(report["android_send_controller_qualified"])
+        self.assertFalse(report["qualified"])
 
     def test_runner_preserves_timeout_report_when_a_terminal_event_is_missing(self):
         """Passing instrumentation, budgets and exact bytes still fail without either terminal event."""

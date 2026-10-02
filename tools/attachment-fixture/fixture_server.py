@@ -171,6 +171,21 @@ class Handler(BaseHTTPRequestHandler):
             self.server.acquisition_unavailable.set()
             self.server.ledger.event(None, "control", "acquisition_unavailable")
             self.reply(200, {"acquisition_unavailable": True})
+        elif self.path == "/__hold-acquisition":
+            for control in self.server.controls.values():
+                control.hold_after = 1024
+                control.release.clear()
+            self.server.ledger.event(None, "control", "hold_acquisition")
+            self.reply(200, {"held_after": 1024})
+        elif self.path == "/__release-acquisition":
+            for control in self.server.controls.values():
+                control.release.set()
+                control.hold_after = None
+            self.server.ledger.event(None, "control", "release_acquisition")
+            self.reply(200, {"released": True})
+        elif self.path == "/__cancel-marker":
+            self.server.ledger.event(None, "control", "cancel_marker")
+            self.reply(200, {"marked": True})
         elif self.path.startswith("/__release/") and token in self.server.controls:
             self.server.controls[token].release.set()
             self.reply(200, {"released": True})

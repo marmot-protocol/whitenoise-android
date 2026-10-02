@@ -15,7 +15,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicLong
 
-internal const val NATIVE_ATTACHMENT_READ_CHUNK_BYTES = 256 * 1024
+internal const val NATIVE_ATTACHMENT_READ_CHUNK_BYTES = 1024 * 1024
 private const val NATIVE_ATTACHMENT_TARGET_LIMIT = 64
 private val nativeAttachmentLeaseCounter = AtomicLong()
 private val preparedNativeAttachmentRoots = mutableSetOf<String>()
@@ -49,7 +49,12 @@ internal class NativeAttachmentLocalAccess(
     private val cacheRoot: File,
     private val queryAssets: suspend (List<AttachmentLocalTargetFfi>) -> List<AttachmentLocalAssetFfi>,
     private val readAsset: suspend (String, ULong, UInt) -> AttachmentLocalBytesFfi,
+    private val readChunkBytes: Int = NATIVE_ATTACHMENT_READ_CHUNK_BYTES,
 ) {
+    init {
+        require(readChunkBytes in 1..NATIVE_ATTACHMENT_READ_CHUNK_BYTES) { "native read exceeds the 1 MiB API bound" }
+    }
+
     /** Returns one result for every target, preserving target order and duplicates. */
     @Suppress("TooGenericExceptionCaught") // Dispatcher cancellation must also release acquired leases.
     suspend fun open(targets: List<NativeAttachmentTarget>): List<AttachmentPlaintext?> {
@@ -96,7 +101,7 @@ internal class NativeAttachmentLocalAccess(
                 do {
                     currentCoroutineContext().ensureActive()
                     val remaining = asset.byteCount - offset
-                    val limit = minOf(NATIVE_ATTACHMENT_READ_CHUNK_BYTES.toULong(), maxOf(remaining, 1uL)).toUInt()
+                    val limit = minOf(readChunkBytes.toULong(), maxOf(remaining, 1uL)).toUInt()
                     val chunk = readAsset(reference, offset, limit)
                     if (!chunk.available) return null
                     if (chunk.bytes.isEmpty()) break

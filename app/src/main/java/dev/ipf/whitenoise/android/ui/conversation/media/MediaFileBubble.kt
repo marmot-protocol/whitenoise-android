@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
@@ -36,12 +37,17 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.attachmentCancellationState
 import dev.ipf.whitenoise.android.state.attachmentDownloadWorkState
+import dev.ipf.whitenoise.android.state.attachmentFilePresentationState
+import dev.ipf.whitenoise.android.state.attachmentNativeProgress
+import dev.ipf.whitenoise.android.state.attachmentRetryPending
 import dev.ipf.whitenoise.android.state.attachmentTransferRequest
 import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.cancelAttachmentTransfer
 import dev.ipf.whitenoise.android.state.hasAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
+import dev.ipf.whitenoise.android.state.performAttachmentUserAction
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.state.requestAttachmentInstallerHandoff
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
@@ -96,7 +102,7 @@ internal fun MediaFileBubble(
     var readerOpen by rememberSaveable(pillKey) { mutableStateOf(false) }
     val initiallyAvailable =
         remember(controller, pillKey, mine) {
-            mine || controller.hasCachedAttachmentInMemory(messageIdHex, attachmentIndex)
+            controller.hasCachedAttachmentInMemory(messageIdHex, attachmentIndex)
         }
     val transferStateFlow =
         remember(controller, pillKey, initiallyAvailable) {
@@ -111,7 +117,16 @@ internal fun MediaFileBubble(
             controller.releaseAttachmentTransferState(messageIdHex, attachmentIndex)
         }
     }
-    val transferState by transferStateFlow.collectAsState()
+    val hostTransferState by transferStateFlow.collectAsStateWithLifecycle()
+    val retryPending by remember(controller, pillKey) {
+        controller.attachmentRetryPending(messageIdHex, attachmentIndex)
+    }.collectAsStateWithLifecycle(initialValue = false)
+    val nativeProgress by remember(controller, pillKey, reference.ciphertextSha256, reference.sourceEpoch) {
+        controller.attachmentNativeProgress(messageIdHex, attachmentIndex)
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val cancellationState by remember(controller, pillKey) {
+        controller.attachmentCancellationState(messageIdHex, attachmentIndex)
+    }.collectAsStateWithLifecycle()
     val presentation =
         remember(reference.mediaType, reference.fileName) {
             resolveAttachmentPresentation(reference.mediaType, reference.fileName)
@@ -141,6 +156,15 @@ internal fun MediaFileBubble(
         ) {
             controller.refreshAttachmentTransferState(messageIdHex, attachmentIndex)
         }
+    // Own-file metadata remains visible while its verified local source is being resolved.
+    // A stale native failure must not flash Retry during the outgoing cache handoff.
+    val presentationProgress = if (mine && !firstFrameCacheResolved) null else nativeProgress
+    val transferState =
+        attachmentFilePresentationState(
+            hostTransferState,
+            presentationProgress,
+            cancellationState,
+        )
     var reconciledCacheRevision by remember(controller, pillKey) { mutableStateOf(cacheRevision) }
     // Later cache writes and evictions still reconcile the controller-owned
     // state, but they never re-hide a card that already crossed the first-frame
@@ -159,12 +183,15 @@ internal fun MediaFileBubble(
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     // A cancel is persisted per attachment, so recreating this card after
     // navigation or process death cannot let the policy restart what the user
-    // stopped. Only an explicit tap clears it.
+    // stopped. Only an accepted deliberate retry clears it.
     val cancelledByUser = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
     val installerHandoffPending =
         usesDurableInstallerHandoff &&
             controller.hasAttachmentInstallerHandoff(messageIdHex, attachmentIndex, reference.sourceEpoch)
-    val opening = if (usesDurableInstallerHandoff) installerHandoffPending else openRequested
+    val opening =
+        retryPending ||
+            cancellationState == dev.ipf.whitenoise.android.state.AttachmentCancellationState.Pending ||
+            if (usesDurableInstallerHandoff) installerHandoffPending else openRequested
     val autoDownloadAllowed =
         !cancelledByUser &&
             shouldMaterializeAttachmentAutomatically(
@@ -203,6 +230,7 @@ internal fun MediaFileBubble(
         if (usesDurableInstallerHandoff) return@LaunchedEffect
         val request = controller.attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return@LaunchedEffect
         if (!appState.attachmentOpens.hasIntent(request)) return@LaunchedEffect
+        val canDispatch = appState.attachmentOpens.captureDispatchGuard(request)
         AttachmentOpenTrace.phase(request, AttachmentOpenPhase.MaterializationStarted)
         openRequested = true
         try {
@@ -255,7 +283,7 @@ internal fun MediaFileBubble(
                 outcome = if (lifecycleEligible) "eligible" else "destroyed",
             )
             if (!lifecycleEligible) return@LaunchedEffect
-            val destinationVisible = appState.attachmentOpens.isVisible(request)
+            val destinationVisible = canDispatch()
             AttachmentOpenTrace.phase(
                 request,
                 AttachmentOpenPhase.VisibilityEligibility,
@@ -270,7 +298,7 @@ internal fun MediaFileBubble(
             val dispatched =
                 claimAndDispatchAttachmentOpenReportingFailure(
                     claim = { appState.attachmentOpens.claim(request) },
-                    restore = { appState.attachmentOpens.restore(request) },
+                    restore = { if (canDispatch()) appState.attachmentOpens.restore(request) },
                     dispatch = { claim ->
                         openResult =
                             openAttachment(
@@ -285,7 +313,7 @@ internal fun MediaFileBubble(
                                 ),
                                 AttachmentDispatchGuard(
                                     canDispatch = {
-                                        appState.attachmentOpens.isVisible(request).also { visible ->
+                                        canDispatch().also { visible ->
                                             AttachmentOpenTrace.phase(
                                                 request,
                                                 AttachmentOpenPhase.VisibilityEligibility,
@@ -359,7 +387,7 @@ internal fun MediaFileBubble(
         modifier =
             Modifier
                 .fileBubbleWidth()
-                .fileAttachmentFirstFrameVisibility(firstFrameCacheResolved)
+                .fileAttachmentFirstFrameVisibility(mine || firstFrameCacheResolved)
                 .testTag(fileAttachmentCardTestTag(messageIdHex, attachmentIndex))
                 .combinedClickable(
                     enabled =
@@ -368,22 +396,28 @@ internal fun MediaFileBubble(
                     onLongClick = onLongPress,
                     onClick = {
                         if (opening) return@combinedClickable
-                        if (textCandidate != null) {
-                            readerOpen = true
-                            return@combinedClickable
-                        }
-                        if (usesDurableInstallerHandoff) {
-                            controller.requestAttachmentInstallerHandoff(
-                                messageIdHex,
-                                attachmentIndex,
-                                reference.sourceEpoch,
-                                onPersistenceFailure = {
-                                    appState.present(couldntOpenMessage, copyable = true)
-                                },
-                            )
-                        } else {
-                            openRequested = controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
-                        }
+                        controller.performAttachmentUserAction(
+                            messageIdHex,
+                            attachmentIndex,
+                            transferState,
+                            onAccepted = {
+                                if (textCandidate != null) {
+                                    readerOpen = true
+                                } else if (usesDurableInstallerHandoff) {
+                                    controller.requestAttachmentInstallerHandoff(
+                                        messageIdHex,
+                                        attachmentIndex,
+                                        reference.sourceEpoch,
+                                        onPersistenceFailure = {
+                                            appState.present(couldntOpenMessage, copyable = true)
+                                        },
+                                    )
+                                } else {
+                                    openRequested = controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                                }
+                            },
+                            onFailure = {},
+                        )
                     },
                 ),
     ) {
@@ -396,6 +430,8 @@ internal fun MediaFileBubble(
             status = status,
             footerWarningText = footerWarningText,
             openPending = opening,
+            nativeProgress = presentationProgress,
+            cancellationState = cancellationState,
             onCancelTransfer = { controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex) },
         )
     }

@@ -18,7 +18,7 @@ import java.io.IOException
 internal suspend fun resolveAttachmentCacheAvailability(
     cacheKey: String,
     memoryContains: (String) -> Boolean,
-    diskContains: (String) -> Boolean,
+    diskContains: suspend (String) -> Boolean,
 ): Boolean =
     withContext(Dispatchers.Main.immediate) { memoryContains(cacheKey) } ||
         withContext(Dispatchers.IO) { diskContains(cacheKey) } ||
@@ -50,11 +50,11 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     reference: MediaAttachmentReferenceFfi,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     persistInteractiveIntent: Boolean = true,
-    allowExplicitRetry: Boolean = true,
+    demandIntent: AttachmentDemandIntent = AttachmentDemandIntent.Join,
 ): AttachmentPlaintext {
     val diagnostics = AttachmentFetchDiagnostics.begin(priority)
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
-    promoteQueuedAttachmentAcquisition(cacheKey, priority, allowExplicitRetry)
+    promoteQueuedAttachmentAcquisition(cacheKey, priority, demandIntent)
     return diagnostics.recordAttachmentFetchOutcome {
         resolveAttachmentPlaintext(
             loadMemory = {
@@ -73,6 +73,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             loadDisk = { cancellationCheck, onAcquired ->
                 val startedAtMs = diagnostics?.startSpan()
                 measureHostPerformance(HostPerformanceOperationFfi.MEDIA_CACHE_READ) {
+                    outgoingAttachmentCachePublications.await(cacheKey)
                     loadAttachmentDiskPlaintext(cacheKey, cancellationCheck, onAcquired).also { cached ->
                         diagnostics?.phase(
                             phase = PerformancePhase.ATTACHMENT_DISK_LOOKUP,
@@ -90,6 +91,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
                 clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
             },
             loadNative = { openNativeAttachment(request) },
+            preferNative = outgoingAttachmentCachePublications.isPending(cacheKey),
             loadMiss = {
                 diagnostics?.phase(
                     phase = PerformancePhase.ATTACHMENT_ACQUISITION_START,
@@ -102,7 +104,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
                         request = request,
                         priority = priority,
                         persistInteractiveIntent = persistInteractiveIntent,
-                        allowExplicitRetry = allowExplicitRetry,
+                        demandIntent = demandIntent,
                         diagnostics = diagnostics,
                     )
                 }
@@ -141,11 +143,11 @@ private suspend fun AttachmentFetchDiagnostics?.recordAttachmentFetchOutcome(
 private fun WhiteNoiseAppState.promoteQueuedAttachmentAcquisition(
     cacheKey: String,
     priority: AttachmentDownloadPriority,
-    allowExplicitRetry: Boolean,
+    demandIntent: AttachmentDemandIntent,
 ) {
     if (
         priority == AttachmentDownloadPriority.Interactive &&
-        allowExplicitRetry &&
+        demandIntent != AttachmentDemandIntent.Observe &&
         hasActiveAttachmentAcquisition(cacheKey)
     ) {
         promoteAdmittedAttachmentAcquisition(cacheKey)
@@ -185,16 +187,16 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     request: AttachmentTransferRequest,
     priority: AttachmentDownloadPriority,
     persistInteractiveIntent: Boolean,
-    allowExplicitRetry: Boolean,
+    demandIntent: AttachmentDemandIntent,
     diagnostics: AttachmentFetchDiagnostics?,
 ): AttachmentPlaintext {
-    promoteActiveAttachmentAcquisition(cacheKey, request, priority, allowExplicitRetry)
+    promoteActiveAttachmentAcquisition(cacheKey, request, priority, demandIntent)
     val resolved =
         memoizedAttachmentAcquisition(cacheKey, request, priority) {
             val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
             val qualifiedRequest = request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
             if (!hasNativeAttachment(qualifiedRequest)) {
-                acquireNativeAttachment(qualifiedRequest, priority, allowExplicitRetry, diagnostics)
+                acquireNativeAttachment(qualifiedRequest, priority, demandIntent, diagnostics)
             }
             AttachmentAcquisitionOutcome.NativeRetained(qualifiedRequest)
         }.await()
@@ -207,16 +209,16 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     )
 }
 
-/** Promotes an existing automatic native job when an explicit caller joins it. */
+/** Promotes an existing automatic native job without resetting its retry budget or backoff. */
 private suspend fun WhiteNoiseAppState.promoteActiveAttachmentAcquisition(
     cacheKey: String,
     request: AttachmentTransferRequest,
     priority: AttachmentDownloadPriority,
-    allowExplicitRetry: Boolean,
+    demandIntent: AttachmentDemandIntent,
 ) {
     val shouldPromote =
         priority == AttachmentDownloadPriority.Interactive &&
-            allowExplicitRetry &&
+            demandIntent != AttachmentDemandIntent.Observe &&
             hasActiveAttachmentAcquisition(cacheKey)
     if (!shouldPromote) return
     val admitted = promoteAdmittedAttachmentAcquisition(cacheKey)
@@ -228,7 +230,7 @@ private suspend fun WhiteNoiseAppState.promoteActiveAttachmentAcquisition(
         // Promotion is advisory. The joined automatic owner remains authoritative
         // even when native priority escalation is temporarily unavailable.
         runCatchingCancellable {
-            marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
+            marmotIo { requestExplicitAttachment(request.accountRef, request.groupIdHex, target.toFfi()) }
         }
     }
 }
@@ -259,6 +261,8 @@ internal suspend fun materializeAttachmentAcquisition(
 /**
  * Chooses Android cache or canonical native plaintext before admitting acquisition, and transfers
  * lease ownership to the caller only after all post-load bookkeeping succeeds.
+ * Pending outgoing host writes may prefer native retention; a native miss still waits
+ * for the matching disk publication before acquisition can start.
  * `loadDisk` must invoke its acquisition callback before crossing back from the
  * dispatcher where the source was acquired, so cancellation can close it.
  */
@@ -273,6 +277,7 @@ internal suspend fun resolveAttachmentPlaintext(
     clearInteractiveIntent: suspend () -> Unit,
     loadMiss: suspend () -> AttachmentPlaintext,
     loadNative: suspend () -> AttachmentPlaintext? = { null },
+    preferNative: Boolean = false,
 ): AttachmentPlaintext {
     val memory = loadMemory()
     val callerContext = currentCoroutineContext()
@@ -281,11 +286,12 @@ internal suspend fun resolveAttachmentPlaintext(
     try {
         source =
             memory?.let(AttachmentPlaintext::Bytes)
+                ?: (if (preferNative) loadNative() else null)
                 ?: loadDisk(
                     { callerContext.ensureActive() },
                     { pendingSource = it },
                 )
-                ?: loadNative()
+                ?: (if (preferNative) null else loadNative())
         pendingSource = null
         source?.let { resolved ->
             if (resolved is AttachmentPlaintext.Bytes && memory == null) {

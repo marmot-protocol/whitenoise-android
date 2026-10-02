@@ -289,7 +289,6 @@ class AttachmentDownloadWorker : CoroutineWorker {
         return application.appState.downloadAttachmentForDurableWork(
             request = request,
             priority = priority,
-            allowExplicitRetry = runAttemptCount == 0,
         )
     }
 

@@ -109,6 +109,40 @@ class AttachmentDownloadCacheRaceTest {
             assertEquals(0, downloads)
         }
 
+    /** Cancel revokes an Open waiting for admission before a released slot can start its native acquisition. */
+    @Test
+    fun cancelOpenWhileQueuedPreventsLateAcquisition() =
+        runTest(dispatcher) {
+            val release = CompletableDeferred<Unit>()
+            val started = CompletableDeferred<Unit>()
+            var holdersStarted = 0
+            val holders =
+                List(3) { index ->
+                    val holder = request("occupied-$index")
+                    appState.memoizedDownload(holder.cacheKey(), holder, AttachmentDownloadPriority.Automatic) {
+                        if (++holdersStarted == 3) started.complete(Unit)
+                        release.await()
+                        byteArrayOf(7)
+                    }
+                }
+            started.await()
+            val target = request("cancelled-open")
+            var acquisitions = 0
+            val queued =
+                appState.memoizedDownload(target.cacheKey(), target, AttachmentDownloadPriority.Interactive) {
+                    acquisitions++
+                    byteArrayOf(9)
+                }
+            runCurrent()
+            assertFalse(queued.isCompleted)
+            assertTrue(appState.cancelMemoizedAttachmentDownload(target))
+            release.complete(Unit)
+            holders.forEach { it.await() }
+            runCurrent()
+            assertTrue(queued.isCancelled)
+            assertEquals(0, acquisitions)
+        }
+
     /** Automatic and interactive callers still share the one in-flight owner. */
     @Test
     fun concurrentCallersShareOneDownload() =

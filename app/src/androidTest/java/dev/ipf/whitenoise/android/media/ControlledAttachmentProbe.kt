@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.downloadAttachmentPlaintextSource
 import dev.ipf.whitenoise.android.state.enforceAppOwnedAttachmentAcquisitionPolicy
+import dev.ipf.whitenoise.android.state.openNativeAttachment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -36,15 +37,13 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 /** Runs only generated peers through the unchanged Android resolver and the packaged native runtime. */
 internal object ControlledAttachmentProbe {
-    /** Publishes a genuine small attachment and measures cold then retained received reads. */
+    /** Explicit large-read comparisons leave the normal small-file baseline unchanged. */
     @Suppress("LongMethod") // One guarded sequence keeps disposable peers and measured source identity together.
     suspend fun run() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -52,11 +51,17 @@ internal object ControlledAttachmentProbe {
         val arguments = InstrumentationRegistry.getArguments()
         assumeTrue(arguments.getString("allowControlledAttachmentProbe") == "true")
         check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
+        val androidSendController = arguments.getString("fixtureUseAndroidSendController") == "true"
+        val compareLargeReads = arguments.getString("fixtureCompareLargeLocalReads") == "true"
+        val payloadBytes = LargeAttachmentLocalReadComparison.payloadBytes(compareLargeReads)
         val blobPort = requireNotNull(arguments.getString("fixtureBlobPort")).toInt()
         val relayPort = requireNotNull(arguments.getString("fixtureRelayPort")).toInt()
         require(blobPort in 1024..65535 && relayPort in 1024..65535)
         MarmotAndroid.initialize(context)
-        val root = File(context.cacheDir, "controlled-attachment-${UUID.randomUUID()}").apply { mkdirs() }
+        val restartRole = arguments.getString("fixtureRestartRole")
+        val session = arguments.getString("fixtureRestartSession")
+        val root = RestartAttachmentRetentionProbe.createRoot(context, restartRole, session)
+        var preserveRestartFixture = false
         val relays = listOf("ws://127.0.0.1:$relayPort")
         var marmot =
             Marmot.newWithConfiguration(
@@ -70,8 +75,12 @@ internal object ControlledAttachmentProbe {
         val accounts = mutableListOf<String>()
         var fixtureState: WhiteNoiseAppState? = null
         try {
-            withTimeout(120_000L) {
+            withTimeout(LargeAttachmentLocalReadComparison.timeoutMillis(compareLargeReads)) {
                 marmot.start()
+                if (restartRole == "read") {
+                    RestartAttachmentRetentionProbe.read(context, root, marmot, accounts)
+                    return@withTimeout
+                }
                 val receiver = marmot.createIdentity(relays, relays)
                 accounts += receiver.label
                 val sender = marmot.createIdentity(relays, relays)
@@ -79,23 +88,43 @@ internal object ControlledAttachmentProbe {
                 marmot.enforceAppOwnedAttachmentAcquisitionPolicy(listOf(receiver.label, sender.label))
                 val group = marmot.createGroup(sender.label, "Generated fixture", listOf(receiver.accountIdHex), null)
                 awaitReceivedGroup(marmot, receiver.label, group)
-                val bytes = ByteArray(1024) { (it % 251).toByte() }
-                val uploaded =
-                    marmot.uploadMedia(
-                        sender.label,
-                        group,
-                        MediaUploadRequestFfi(
-                            attachments =
-                                listOf(
-                                    MediaUploadAttachmentRequestFfi("fixture.txt", "text/plain", bytes, null, null),
+                val bytes = ByteArray(payloadBytes) { (it % 251).toByte() }
+                val reference =
+                    if (androidSendController) {
+                        sendAndroidFixtureAttachment(
+                            context,
+                            root,
+                            marmot,
+                            sender,
+                            group,
+                            blobPort,
+                            bytes,
+                            qualifyOwnLocalCache = compareLargeReads,
+                        )
+                    } else {
+                        val uploaded =
+                            marmot.uploadMedia(
+                                sender.label,
+                                group,
+                                MediaUploadRequestFfi(
+                                    attachments =
+                                        listOf(
+                                            MediaUploadAttachmentRequestFfi(
+                                                "fixture.txt",
+                                                "text/plain",
+                                                bytes,
+                                                null,
+                                                null,
+                                            ),
+                                        ),
+                                    caption = null,
+                                    send = true,
+                                    blossomServer = "http://127.0.0.1:$blobPort",
                                 ),
-                            caption = null,
-                            send = true,
-                            blossomServer = "http://127.0.0.1:$blobPort",
-                        ),
-                    )
-                check(requireNotNull(uploaded.sent).messageIds.size == 1)
-                val reference = uploaded.attachments.single().reference
+                            )
+                        check(requireNotNull(uploaded.sent).messageIds.size == 1)
+                        uploaded.attachments.single().reference
+                    }
                 report(JSONObject().put("phase", "fixture-stage").put("stage", "upload-published"))
                 marmot.catchUpAccounts()
                 val request = projectedRequest(marmot, receiver.label, group, reference)
@@ -113,7 +142,13 @@ internal object ControlledAttachmentProbe {
                     }
                 fixtureState = state
                 report(JSONObject().put("phase", "fixture-stage").put("stage", "received-projected"))
-                measure("received-cold") {
+                if (arguments.getString("fixtureCancellation") == "true") {
+                    measure("held-body-cancellation-overall") {
+                        HeldAttachmentCancellationProbe.run(state, request, reference, blobPort, bytes)
+                    }
+                    return@withTimeout
+                }
+                measure("received-cold", payloadBytes) {
                     state
                         .downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false)
                         .use {
@@ -121,6 +156,10 @@ internal object ControlledAttachmentProbe {
                         }
                 }
                 denyAcquisition(blobPort)
+                if (compareLargeReads) {
+                    LargeAttachmentLocalReadComparison.run(state, request, bytes)
+                    return@withTimeout
+                }
                 repeat(10) {
                     assertNoAndroidCache(state, request)
                     measure("received-retained") {
@@ -145,13 +184,15 @@ internal object ControlledAttachmentProbe {
                                 ),
                             ),
                         ).single()
-                report(
-                    JSONObject()
-                        .put("phase", "genuine-native-send-retention")
-                        .put("available", outgoing.reference != null)
-                        .put("android_send_controller_qualified", false)
-                        .put("restart_offline_qualified", false),
-                )
+                assertTrue("genuine native send did not retain its source", outgoing.reference != null)
+                state.openNativeAttachment(sentSource).use { local ->
+                    assertArrayEquals(bytes, requireNotNull(local).toByteArray())
+                }
+                if (restartRole == "prepare") {
+                    RestartAttachmentRetentionProbe.prepare(root, request, sentSource, androidSendController)
+                    preserveRestartFixture = true
+                    return@withTimeout
+                }
                 state.mutationsScope.cancel()
                 marmot.shutdownAndClose()
                 marmot =
@@ -184,14 +225,31 @@ internal object ControlledAttachmentProbe {
                             assertArrayEquals(bytes, it.toByteArray())
                         }
                 }
+                reopenedState.openNativeAttachment(sentSource).use { local ->
+                    assertArrayEquals(bytes, requireNotNull(local).toByteArray())
+                }
+                report(
+                    JSONObject()
+                        .put("phase", "genuine-native-send-retention")
+                        .put("available", true)
+                        .put("exact_native_lease_bytes", true)
+                        .put("native_runtime_reopen_exact_bytes", true)
+                        .put("android_send_controller_qualified", androidSendController)
+                        .put("process_restart_offline_qualified", false),
+                )
             }
         } finally {
             fixtureState?.mutationsScope?.cancel()
-            val cleanup = accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
+            val cleanup =
+                if (preserveRestartFixture) {
+                    emptyList()
+                } else {
+                    accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
+                }
             try {
                 marmot.shutdownAndClose()
             } finally {
-                root.deleteRecursively()
+                if (!preserveRestartFixture) root.deleteRecursively()
             }
             check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
         }
@@ -214,7 +272,7 @@ internal object ControlledAttachmentProbe {
         }
 
     /** Forbids warm Android cache substitution for the canonical native retained-read measurement. */
-    private suspend fun assertNoAndroidCache(
+    internal suspend fun assertNoAndroidCache(
         state: WhiteNoiseAppState,
         request: AttachmentTransferRequest,
     ) {
@@ -274,8 +332,9 @@ internal object ControlledAttachmentProbe {
         }
 
     /** Records absolute Java/native peaks, latency and success without identifiers or exception text. */
-    private suspend fun measure(
+    internal suspend fun measure(
         phase: String,
+        payloadBytes: Int = 1024,
         block: suspend () -> Unit,
     ) {
         val started = SystemClock.elapsedRealtimeNanos()
@@ -308,7 +367,7 @@ internal object ControlledAttachmentProbe {
                     JSONObject()
                         .put("phase", phase)
                         .put("success", success)
-                        .put("payload_bytes", 1024)
+                        .put("payload_bytes", payloadBytes)
                         .put("elapsed_ms", (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0)
                         .put("java_peak_bytes", peakJava.get())
                         .put("native_peak_bytes", peakNative.get()),
@@ -319,7 +378,7 @@ internal object ControlledAttachmentProbe {
     }
 
     /** Sends closed metrics to the host runner; no synthetic identity or locator is exported. */
-    private fun report(value: JSONObject) {
+    internal fun report(value: JSONObject) {
         InstrumentationRegistry.getInstrumentation().sendStatus(
             0,
             Bundle().apply { putString("controlled_attachment_json", value.toString()) },

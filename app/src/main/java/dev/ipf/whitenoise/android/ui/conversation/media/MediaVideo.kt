@@ -64,12 +64,15 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
+import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -244,8 +247,15 @@ internal fun MediaVideoGridTile(
 
     /** Promotes the tap to interactive priority and delegates ownership before this tile can dispose. */
     fun dispatchViewerOpen() {
-        materializationIntent = materializationIntent.afterInteractiveRequest()
-        onTap()
+        val open = {
+            materializationIntent = materializationIntent.afterInteractiveRequest()
+            onTap()
+        }
+        if (failed) {
+            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { failed = true })
+        } else {
+            open()
+        }
     }
 
     LaunchedEffect(
@@ -634,17 +644,24 @@ internal fun MediaVideoBubble(
 
     /** Opens the logical video immediately so materialization can continue after bubble disposal. */
     fun dispatchViewerOpen() {
-        materializationIntent = materializationIntent.afterInteractiveRequest()
-        onOpenConversationMedia(
-            ConversationMediaViewerOpenRequest(
-                messageIdHex = messageIdHex,
-                attachments = listOf(IndexedValue(attachmentIndex, reference)),
-                tappedAttachmentIndex = attachmentIndex,
-                sender = record.sender,
-                recordedAt = record.recordedAt,
-                mine = mine,
-            ),
-        )
+        val open = {
+            materializationIntent = materializationIntent.afterInteractiveRequest()
+            onOpenConversationMedia(
+                ConversationMediaViewerOpenRequest(
+                    messageIdHex = messageIdHex,
+                    attachments = listOf(IndexedValue(attachmentIndex, reference)),
+                    tappedAttachmentIndex = attachmentIndex,
+                    sender = record.sender,
+                    recordedAt = record.recordedAt,
+                    mine = mine,
+                ),
+            )
+        }
+        if (failed) {
+            controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { failed = true })
+        } else {
+            open()
+        }
     }
 
     /** Revalidates a cached bubble before handing its logical attachment to the viewer owner. */
@@ -831,28 +848,36 @@ internal fun MediaVideoBubble(
                                     Modifier
                                         .size(28.dp)
                                         .clickable(enabled = !loading) {
-                                            loading = true
-                                            playbackRecoveryJob.value =
-                                                scope.launch {
-                                                    try {
-                                                        localFile =
-                                                            rematerializeVideoAttachmentAfterPlaybackFailure(
-                                                                context = context,
-                                                                controller = controller,
-                                                                messageIdHex = messageIdHex,
-                                                                attachmentIndex = attachmentIndex,
-                                                                reference = reference,
-                                                                mine = mine,
-                                                            )
-                                                        failed = false
-                                                    } catch (t: Throwable) {
-                                                        if (t is CancellationException) throw t
-                                                        failed = true
-                                                        localFile = null
-                                                    } finally {
-                                                        loading = false
-                                                    }
-                                                }
+                                            controller.retryAttachmentTransfer(
+                                                messageIdHex,
+                                                attachmentIndex,
+                                                onAccepted = {
+                                                    loading = true
+                                                    playbackRecoveryJob.value =
+                                                        scope.launch {
+                                                            try {
+                                                                localFile =
+                                                                    rematerializeVideoAttachmentAfterPlaybackFailure(
+                                                                        context = context,
+                                                                        controller = controller,
+                                                                        messageIdHex = messageIdHex,
+                                                                        attachmentIndex = attachmentIndex,
+                                                                        reference = reference,
+                                                                        mine = mine,
+                                                                    )
+                                                                failed = false
+                                                            } catch (t: Throwable) {
+                                                                currentCoroutineContext().ensureActive()
+                                                                if (t is CancellationException) throw t
+                                                                failed = true
+                                                                localFile = null
+                                                            } finally {
+                                                                loading = false
+                                                            }
+                                                        }
+                                                },
+                                                onFailure = { failed = true },
+                                            )
                                         },
                             )
                         else ->
@@ -1254,31 +1279,49 @@ internal fun VideoViewerPage(
             playbackInvalidated = playbackInvalidated,
             loadFailed = loadFailed,
             onPlaybackRetry = {
-                cacheInvalidating = true
-                playbackRecoveryJob.value =
-                    scope.launch {
-                        try {
-                            localFile =
-                                rematerializeVideoAttachmentAfterPlaybackFailure(
-                                    context = context,
-                                    controller = controller,
-                                    messageIdHex = messageIdHex,
-                                    attachmentIndex = attachmentIndex,
-                                    reference = reference,
-                                    mine = mine,
-                                )
-                            playbackInvalidated = false
-                        } catch (t: Throwable) {
-                            if (t is CancellationException) throw t
-                            playbackInvalidated = true
-                        } finally {
-                            cacheInvalidating = false
-                        }
-                    }
+                controller.retryAttachmentTransfer(
+                    messageIdHex,
+                    attachmentIndex,
+                    onAccepted = {
+                        cacheInvalidating = true
+                        playbackRecoveryJob.value =
+                            scope.launch {
+                                try {
+                                    localFile =
+                                        rematerializeVideoAttachmentAfterPlaybackFailure(
+                                            context = context,
+                                            controller = controller,
+                                            messageIdHex = messageIdHex,
+                                            attachmentIndex = attachmentIndex,
+                                            reference = reference,
+                                            mine = mine,
+                                        )
+                                    playbackInvalidated = false
+                                } catch (t: Throwable) {
+                                    currentCoroutineContext().ensureActive()
+                                    if (t is CancellationException) throw t
+                                    playbackInvalidated = true
+                                } finally {
+                                    cacheInvalidating = false
+                                }
+                            }
+                    },
+                    onFailure = {
+                        playbackInvalidated = true
+                        cacheInvalidating = false
+                    },
+                )
             },
             onLoadRetry = {
-                loadFailed = false
-                reloadToken++
+                controller.retryAttachmentTransfer(
+                    messageIdHex,
+                    attachmentIndex,
+                    onAccepted = {
+                        loadFailed = false
+                        reloadToken++
+                    },
+                    onFailure = { loadFailed = true },
+                )
             },
         )
         return
