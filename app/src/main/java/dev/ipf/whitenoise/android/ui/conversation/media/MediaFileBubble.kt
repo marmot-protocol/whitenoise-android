@@ -222,6 +222,7 @@ internal fun MediaFileBubble(
         if (usesDurableInstallerHandoff) return@LaunchedEffect
         val request = controller.attachmentOpenRequest(messageIdHex, attachmentIndex) ?: return@LaunchedEffect
         if (!appState.attachmentOpens.hasIntent(request)) return@LaunchedEffect
+        val canDispatch = appState.attachmentOpens.captureDispatchGuard(request)
         AttachmentOpenTrace.phase(request, AttachmentOpenPhase.MaterializationStarted)
         openRequested = true
         try {
@@ -274,7 +275,7 @@ internal fun MediaFileBubble(
                 outcome = if (lifecycleEligible) "eligible" else "destroyed",
             )
             if (!lifecycleEligible) return@LaunchedEffect
-            val destinationVisible = appState.attachmentOpens.isVisible(request)
+            val destinationVisible = canDispatch()
             AttachmentOpenTrace.phase(
                 request,
                 AttachmentOpenPhase.VisibilityEligibility,
@@ -289,7 +290,7 @@ internal fun MediaFileBubble(
             val dispatched =
                 claimAndDispatchAttachmentOpenReportingFailure(
                     claim = { appState.attachmentOpens.claim(request) },
-                    restore = { appState.attachmentOpens.restore(request) },
+                    restore = { if (canDispatch()) appState.attachmentOpens.restore(request) },
                     dispatch = { claim ->
                         openResult =
                             openAttachment(
@@ -304,7 +305,7 @@ internal fun MediaFileBubble(
                                 ),
                                 AttachmentDispatchGuard(
                                     canDispatch = {
-                                        appState.attachmentOpens.isVisible(request).also { visible ->
+                                        canDispatch().also { visible ->
                                             AttachmentOpenTrace.phase(
                                                 request,
                                                 AttachmentOpenPhase.VisibilityEligibility,

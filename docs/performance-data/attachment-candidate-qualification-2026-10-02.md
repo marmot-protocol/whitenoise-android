@@ -26,6 +26,18 @@ The successful restart sessions each used one acquisition; every retained read a
 
 The initial Zapstore cancellation session failed before instrumentation with an ADB command error; it contains no native or HTTP samples. Its missing API/ABI budget failure is a consequence of that setup failure. The exact command failure was not captured. The diagnostic repeat passed, so the original remains FAIL, not a proven flake or a qualification pass.
 
+
+Final native rerun at `cbe7efff9a197ff7bf0290985902bfe67a454b56` passed all four sessions. The intervening production change only adds coroutine cancellation checks to video recovery. The same unchanged budgets and independent ledger apply:
+
+| Session | Outcome | GET / upload requests | Response bytes | Cold / restart ms | Ack / disconnect ms |
+| --- | --- | --- | --- | --- | --- |
+| Play-cancel | PASS | 2 / 1 | 2064 | — / — | 21.455 / 43.915 |
+| Play-restart | PASS | 1 / 1 | 1040 | 279.198 / 8.021 | — / — |
+| Zapstore-cancel | PASS | 2 / 1 | 2064 | — / — | 22.615 / 26.157 |
+| Zapstore-restart | PASS | 1 / 1 | 1040 | 274.087 / 6.208 | — / — |
+
+Together, the two emulator native cohorts contain nine attempts: eight PASS, one preserved pre-instrumentation FAIL. The final four-pass rerun does not relabel the original failure.
+
 ## Performance budgets and failures
 
 API 30 reference limits remain 1,500 ms cold, 150 ms local, 32 MiB Java and 128 MiB native. Passing emulator runs satisfy these unchanged limits. No p95 or production SLO is inferred from this small sample.
@@ -34,10 +46,12 @@ Earlier Pixel API 37 testing comprised 16 sessions: 13 PASS and 3 FAIL. One Play
 
 ## Host and platform validation
 
-- 273 focused unit/Compose tests per flavor; 39 fixture host tests; native published-pin suites: 10 promotion/budget tests and 21 checkpoint/resume tests. Host and native Rust results are not Android device lifecycle evidence.
+- 276 focused unit/Compose tests per flavor; 39 fixture host tests; native published-pin suites: 10 promotion/budget tests and 21 checkpoint/resume tests. Host and native Rust results are not Android device lifecycle evidence.
 - Fast completion gate includes both debug compilations, Android-test compilation, ktlint, detekt, Zapstore lint and focused Play Roborazzi verification. Four progress PNGs and the changed timestamp PNG are tracked.
 - Full local Play curated suite: 1,275 tests, 14 screenshot failures in four unrelated classes. The same 14 failed on exact master in the same configuration, with byte-identical actual PNG SHA-256 values. Changed attachment snapshots and the voice retry regression pass. Hosted full-matrix CI remains the authority for the Linux renderer. No baseline was rerecorded to suppress these failures.
 - Previous candidate CI failed the same voice retry wait in both flavors and both unit/screenshot jobs. The test now uses the existing bounded Compose-frame/main-looper/idle synchronization helper; no timeout increase or behavior assertion removal.
+- Three additional host regressions fence an already-claimed external launch, preserve per-file cancellation isolation and invalidate old gestures across navigation. A real Android opener test delays disk persistence and requires zero platform dispatch; both flavors passed. Both new platform classes are registered for PR device smoke and in the required full-suite case inventory.
+- A self-review found asynchronous cancellation cleanup did not fence an already-claimed launch. The fix captures a per-file gesture guard, revokes it immediately, prevents late restoration and prevents unrelated taps from rescuing cancelled intents. The first focused run exposed a legacy source-wiring assertion; it now checks the captured guard while the behavioral handoff assertions remain. Intermediate formatting failures remain preserved.
 - First platform progress assertions failed due to floating-point Dp conversion (47.999994 dp for a 48 dp control). The reusable test now compares rounded physical pixels; both matching-flavor runs pass. The failing runs and diagnostic mismatched-flavor run remain preserved and are excluded from passing qualification.
 
 ## Artifact provenance
@@ -70,3 +84,30 @@ Platform renderer test overlay SHA-256: `c7b7cd3f6c919b4eb5f469a2b1103ae1a5f87e9
 Full manual MED-009/MED-017, TalkBack, seven-file Android UI admission traces, Android worker interruption with Range, account lifecycle invalidation, large received APK, >64 MiB assets, representative throughput/memory qualification and the full fault matrix remain unqualified. Native checkpoint tests do not qualify Android JobScheduler behavior. Agent sender remains dependent on Danny’s #2106; no agent-specific implementation or completion is claimed. Share import, forwarding, native allocation/streaming redesign and real-endpoint probing remain separate. These gaps prohibit full-plan or issue-closure claims.
 
 All prior failures, raw ledgers, logs and APK provenance are retained privately in the workspace evidence directories. This concise report does not claim that those new private sessions have been published in the foundation archive. No raw session JSON was removed from Git by this PR.
+
+Final-code native APK provenance:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Play-app | `1624f6508110d101abe0654adaa2c8b0f7c85527cadccd4ffc8940bf5c549667` |
+| Play-test | `b4dcf70d196c68e5090f00e360b144b7be88391a6e8b04823b306c7c808de2ac` |
+| Zapstore-app | `c502b8b7094ec2b872143de42e7a825dc82ecaad8d305f84b81eef4fdc1f20cb` |
+| Zapstore-test | `b02a47c86a518d85de1de570048e4c6d599b204c51e0b39b1e783170b3636a5e` |
+
+Final registered platform tests passed **2 tests per flavor**. These APKs were built over `cbe7efff9a197ff7bf0290985902bfe67a454b56` with the exact source overlays below; all overlay file hashes were verified before committing. Documentation and required-case registration do not change runtime behavior.
+
+| Platform artifact | SHA-256 |
+| --- | --- |
+| Play-app | `8d921ddfa999a490ca867c61031c796afe56f66dde027f41f54f74d0a335a66f` |
+| Play-test | `b8951667b09d2a746ab7f325245e80f6bf0126153040c4ad11488cbb2539e246` |
+| Zapstore-app | `160552a5916478656ea5b8d45195b6d8a1489203d3a3b216e066622fc8f9df1a` |
+| Zapstore-test | `7ae6add085b981a194d98c638c127b912764ac0e925eb0d18a740e5de3e45523` |
+
+| Tested source overlay | SHA-256 |
+| --- | --- |
+| `app/src/androidTest/java/dev/ipf/whitenoise/android/media/AttachmentProgressDeviceTest.kt` | `6d5e4d6bdf901bc9c0a16b2e8f03fc0a1bf9802d977959b2b24f54129149c16b` |
+| `app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentOpenCoordinator.kt` | `f9ae1386dfe12ebe1dd886d31a15ad1aa83b6de83535c8f79750d42ae9c4b06f` |
+| `app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaFileBubble.kt` | `109a2c266d7264359a3e41fc93b54f6aa31b0b3353845c96f5c7f650c4d99fe5` |
+| `app/src/test/java/dev/ipf/whitenoise/android/state/AttachmentOpenCancellationTest.kt` | `e1e24b6c52ba4aac6747c8f241cfa97e588afd2de154efc1392859a61ca67156` |
+| `app/src/test/java/dev/ipf/whitenoise/android/ui/conversation/media/ReceivedApkAttachmentOpenIntegrationTest.kt` | `2bedcfdd8336efb1b9cb1484fe3133f8dd5689129443d52bda926b9f25e59ef4` |
+| `app/src/androidTest/java/dev/ipf/whitenoise/android/media/AttachmentOpenDispatchDeviceTest.kt` | `219a0e509bc9975451e0c605a67eb6a4a33a8916f22f6fa08eb2e9d30b8bc2c9` |

@@ -16,6 +16,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.state.AttachmentCancellationState
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
@@ -30,6 +31,7 @@ import org.junit.runner.RunWith
 import kotlin.math.roundToInt
 
 /** Platform rendering and accessibility evidence; HTTP and native acknowledgement use the separate held-body probe. */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class AttachmentProgressDeviceTest {
     @get:Rule

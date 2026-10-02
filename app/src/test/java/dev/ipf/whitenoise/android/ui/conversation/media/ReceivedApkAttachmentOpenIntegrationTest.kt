@@ -454,7 +454,8 @@ class ReceivedApkAttachmentOpenIntegrationTest {
             ),
         )
         assertTrue(normalizedBubble.contains("AttachmentDispatchGuard("))
-        assertTrue(normalizedBubble.contains("appState.attachmentOpens.isVisible(request)"))
+        assertTrue(normalizedBubble.contains("appState.attachmentOpens.captureDispatchGuard(request)"))
+        assertTrue(normalizedBubble.contains("canDispatch().also { visible ->"))
         assertTrue(mainShell.contains("appState.attachmentOpens.setDestination("))
         assertTrue(mainShell.contains("mutableLongStateOf(newAttachmentOpenNavigationGeneration())"))
         assertTrue(
