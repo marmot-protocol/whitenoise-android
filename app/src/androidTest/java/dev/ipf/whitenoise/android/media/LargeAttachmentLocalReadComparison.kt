@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.media
 
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
+import dev.ipf.whitenoise.android.state.DISK_MEDIA_CACHE_MAX_ENTRY_BYTES
 import dev.ipf.whitenoise.android.state.NativeAttachmentLocalAccess
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
@@ -40,6 +41,7 @@ internal object LargeAttachmentLocalReadComparison {
             DiskByteCache(
                 File(root, "held-outgoing-host-cache"),
                 maxBytes = 64L * 1024 * 1024,
+                maxEntryBytes = DISK_MEDIA_CACHE_MAX_ENTRY_BYTES,
                 keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 19 }, "AES") },
                 afterEncryptedWrite = hold::awaitRelease,
             )

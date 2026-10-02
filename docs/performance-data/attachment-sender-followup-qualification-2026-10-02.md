@@ -19,7 +19,7 @@ Both flavors pass **340 focused tests** with zero failures, errors or skips. The
 
 ## Android qualification
 
-The generated 32 MiB send uses the shipping Android controller and genuine MDK outgoing retention. A fixture-only encrypted host copy is deliberately held before promotion. Availability and streaming SHA-256 readback must finish through native retention while that copy remains pending, with a 10-second assertion deadline; this is a controlled local-access check, not a production SLO. The copy is then released and independently verified. This new held-host-copy Android test is compiled but has not yet run for this follow-up. The earlier received-read ABBA comparison, HTTP ledger, small-file restart/cancellation and API 36 results are evidence for the linked prior cohort, not qualification of these new changes.
+The generated 32 MiB send uses the shipping Android controller and genuine MDK outgoing retention. A fixture-only encrypted host copy is deliberately held before promotion. Availability and streaming SHA-256 readback must finish through native retention while that copy remains pending, with a 10-second assertion deadline; this is a controlled local-access check, not a production SLO. The copy is then released and independently verified. At this report’s source cohort, the new held-host-copy Android test was compiled but had not run. Subsequent Android qualification and the fixture capacity correction are recorded in the [32 MiB fixture report](attachment-large-fixture-qualification-2026-10-02.md). The earlier received-read ABBA comparison, HTTP ledger, small-file restart/cancellation and API 36 results are evidence for the linked prior cohort, not qualification of these new changes.
 
 ## Provenance and limits
 
