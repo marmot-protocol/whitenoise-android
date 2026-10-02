@@ -5,6 +5,8 @@ import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.PollOptionResultFfi
+import dev.ipf.marmotkit.PollProjectionFfi
+import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.marmotkit.PollVoteFfi
 import dev.ipf.marmotkit.PollVotePageFfi
 import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
@@ -449,6 +451,75 @@ class PollVotesPagerTest {
             pager.loadMore()
             assertEquals(3, calls)
         }
+
+    /** A cancelled refresh stops counting as in flight, so Load more works again afterwards. */
+    @Test
+    fun loadMoreWorksAfterAGatedRefreshIsCancelled() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            var calls = 0
+            val pager =
+                PollVotesPager(
+                    reader = { _, _, _ ->
+                        when (calls++) {
+                            0 -> PollVotePageFfi(listOf(vote(1, "a")), true)
+                            1 -> {
+                                gate.await()
+                                PollVotePageFfi(listOf(vote(1, "b")), true)
+                            }
+                            else -> PollVotePageFfi(listOf(vote(2, "c")), false)
+                        }
+                    },
+                    isCurrent = { true },
+                )
+            pager.refresh()
+            val reload = launch { pager.refresh() }
+            runCurrent()
+
+            reload.cancel()
+            reload.join()
+            pager.loadMore()
+
+            assertEquals(3, calls)
+            assertEquals(listOf("a", "c"), pager.votes.map { it.optionIds.single() })
+            assertEquals(PollVotesPhase.READY, pager.phase)
+        }
+
+    /** A deleted or removed poll ends the sheet, while an edit-style upsert or an invalidated removal does not. */
+    @Test
+    fun deletedOrPrunedPollEndsTheSheet() {
+        fun upsert(
+            poll: Boolean = true,
+            deleted: Boolean = false,
+        ) = listOf(
+            TimelineMessageChangeFfi.Upsert(
+                TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                record("poll").copy(deleted = deleted, poll = if (poll) livePoll() else null),
+            ),
+        )
+
+        fun remove(reason: TimelineRemoveReasonFfi) = listOf(TimelineMessageChangeFfi.Remove("poll", reason))
+
+        fun ended(changes: List<TimelineMessageChangeFfi>): Boolean {
+            val event = projectionEvent(changes = changes)
+            return pollProjectionEnded(event, "acct", "grp", "poll")
+        }
+
+        assertTrue(ended(upsert(deleted = true)))
+        assertTrue(ended(upsert(poll = false)))
+        assertFalse(ended(upsert()))
+        assertTrue(ended(remove(TimelineRemoveReasonFfi.PRUNED)))
+        assertTrue(ended(remove(TimelineRemoveReasonFfi.CLEARED)))
+        assertFalse(ended(remove(TimelineRemoveReasonFfi.INVALIDATED)))
+        val pruned = projectionEvent(changes = remove(TimelineRemoveReasonFfi.PRUNED))
+        assertFalse(pollProjectionEnded(pruned, "x", "grp", "poll"))
+    }
+
+    /** A minimal live poll projection, so a record counts as still being a poll. */
+    private fun livePoll(): PollProjectionFfi {
+        val type = PollTypeFfi.SINGLE_CHOICE
+        return PollProjectionFfi("Q?", emptyList(), type, 0uL, emptyList(), "c", null, true)
+    }
 
     /** The watcher reports only touching events and stops when the stream ends. */
     @Test

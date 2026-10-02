@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.state.PollVotesPager
 import dev.ipf.whitenoise.android.state.PollVotesPhase
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.observePollProjection
+import dev.ipf.whitenoise.android.state.pollProjectionEnded
 import dev.ipf.whitenoise.android.state.pollProjectionTouched
 import dev.ipf.whitenoise.android.state.pollVoteRows
 import dev.ipf.whitenoise.android.state.pollVotesPage
@@ -68,6 +69,7 @@ internal fun PollVotesSheet(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     onDismissRequest: () -> Unit,
+    onPollEnded: () -> Unit = onDismissRequest,
 ) {
     val pager =
         remember(owner, controller) {
@@ -81,7 +83,7 @@ internal fun PollVotesSheet(
     var reprojections by remember(pager) { mutableIntStateOf(0) }
     // A changed projection or a poll-touching event re-reads from the first page, keeping the list visible.
     LaunchedEffect(pager, poll, reprojections) { pager.refresh() }
-    PollProjectionWatch(appState, owner) { reprojections++ }
+    PollProjectionWatch(appState, owner, onEnded = onPollEnded) { reprojections++ }
     val scope = rememberCoroutineScope()
     val blockedUsers = appState.runtimeMirrors.blocks
     val rows = remember(pager.votes, poll.options) { pollVoteRows(pager.votes, poll.options) }
@@ -106,15 +108,20 @@ internal fun PollVotesSheet(
     }
 }
 
-/** Counts each event that reprojected this poll while the sheet is open, so MDK's guide re-read happens. */
+/**
+ * Counts each event that reprojected this poll while the sheet is open, so MDK's guide re-read happens, and
+ * reports one that deleted or removed the poll, so the sheet never keeps showing a gone poll's voters.
+ */
 @Composable
 @Suppress("FunctionNaming")
 private fun PollProjectionWatch(
     appState: WhiteNoiseAppState,
     owner: PollMessageActionOwner,
+    onEnded: () -> Unit,
     onTouched: () -> Unit,
 ) {
     val currentOnTouched by rememberUpdatedState(onTouched)
+    val currentOnEnded by rememberUpdatedState(onEnded)
     LaunchedEffect(owner) {
         while (true) {
             val subscription = runCatchingCancellable { appState.marmotIo { subscribeEvents() } }.getOrNull()
@@ -124,6 +131,8 @@ private fun PollProjectionWatch(
                         nextEvent = { withContext(Dispatchers.IO) { subscription.next() } },
                         touched = { pollProjectionTouched(it, owner.accountRef, owner.groupId, owner.messageId) },
                         onTouched = { currentOnTouched() },
+                        ended = { pollProjectionEnded(it, owner.accountRef, owner.groupId, owner.messageId) },
+                        onEnded = { currentOnEnded() },
                     )
                 }
             } finally {

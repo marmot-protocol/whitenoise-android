@@ -8,6 +8,8 @@ import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollVoteFfi
 import dev.ipf.marmotkit.PollVotePageFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelineRemoveReasonFfi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 
@@ -147,15 +149,24 @@ internal fun pollVoteRows(
     return votes.map { vote -> PollVoteRow(vote.voterAccountIdHex, vote.optionIds.mapNotNull(labels::get)) }
 }
 
-/** Forwards each projection event that touched the poll to [onTouched] until the stream ends or is cancelled. */
+/**
+ * Forwards each projection event that ended the poll to [onEnded], and each other one that touched it to
+ * [onTouched], until the stream ends or is cancelled.
+ */
 internal suspend fun observePollProjection(
     nextEvent: suspend () -> MarmotEventFfi?,
     touched: (MarmotEventFfi) -> Boolean,
     onTouched: () -> Unit,
+    ended: (MarmotEventFfi) -> Boolean = { false },
+    onEnded: () -> Unit = {},
 ) {
     while (currentCoroutineContext().isActive) {
         val event = nextEvent() ?: return
-        if (touched(event)) onTouched()
+        if (ended(event)) {
+            onEnded()
+        } else if (touched(event)) {
+            onTouched()
+        }
     }
 }
 
@@ -184,4 +195,33 @@ internal fun pollProjectionTouched(
                     }
                 }
         )
+}
+
+/**
+ * Whether [event] says the poll [pollEventId] of [groupIdHex] is gone for the account [accountRef]: it was
+ * upserted as deleted or without a poll, or removed as pruned, cleared or no longer matching. An invalidated
+ * removal is excluded because the row may be reprojected, which [pollProjectionTouched] handles.
+ */
+internal fun pollProjectionEnded(
+    event: MarmotEventFfi,
+    accountRef: String?,
+    groupIdHex: String,
+    pollEventId: String,
+): Boolean {
+    val runtime = (event as? MarmotEventFfi.ProjectionUpdated)?.update ?: return false
+    val update = runtime.update
+    val sameScope = accountRef != null && runtime.accountLabel == accountRef && update.groupIdHex == groupIdHex
+    val gone = { message: TimelineMessageRecordFfi ->
+        message.messageIdHex == pollEventId && (message.deleted || message.poll == null)
+    }
+    val removedOrDeleted =
+        update.messages.any(gone) ||
+            update.changes.any { change ->
+                when (change) {
+                    is TimelineMessageChangeFfi.Upsert -> gone(change.message)
+                    is TimelineMessageChangeFfi.Remove ->
+                        change.messageIdHex == pollEventId && change.reason != TimelineRemoveReasonFfi.INVALIDATED
+                }
+            }
+    return sameScope && removedOrDeleted
 }

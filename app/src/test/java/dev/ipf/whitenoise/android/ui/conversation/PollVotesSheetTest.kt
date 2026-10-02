@@ -25,6 +25,7 @@ import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineRemoveReasonFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -251,6 +252,9 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         val unrelated = item.copy(record = item.record.copy(messageIdHex = "dd".repeat(32)))
 
         projectionEvents.put(touchingEvent(unrelated))
+        composeRule.waitUntil(timeoutMillis = 5_000) { projectionEvents.isEmpty() }
+        composeRule.waitForIdle()
+        assertEquals(1, recordedCalls().count { it.first == "pollVotes" })
         projectionEvents.put(touchingEvent(item))
         composeRule.waitUntil(timeoutMillis = 5_000) {
             recordedCalls().count { it.first == "pollVotes" } >= 2
@@ -287,4 +291,75 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
 
     /** One voter's native page, for tests that only need the sheet populated. */
     private fun singleVoterPage() = PollVotePageFfi(listOf(PollVoteFfi(voterA, listOf("a"), 10uL)), false)
+
+    /** A deleted upsert for the open poll closes the sheet, even with the row off screen. */
+    @Test
+    fun deletedPollUpsertClosesTheSheet() {
+        val item = votedPoll()
+        pollVotesResponder = { singleVoterPage() }
+        render(item)
+        openSheet()
+        awaitTag("poll-voter-$voterA")
+
+        projectionEvents.put(upsertEvent(item, deleted = true))
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
+
+    /** A pruned removal of the open poll closes the sheet when its row is not composed. */
+    @Test
+    fun prunedPollRemovalClosesTheSheetWithTheRowOffScreen() {
+        val item = votedPoll()
+        pollVotesResponder = { singleVoterPage() }
+        retain(item)
+        var rowShown by mutableStateOf(true)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                ConversationHost {
+                    if (rowShown) PollMessageContent(item, pollController, pollState, canVote = true)
+                }
+            }
+        }
+        openSheet()
+        awaitTag("poll-voter-$voterA")
+        rowShown = false
+        composeRule.waitForIdle()
+
+        projectionEvents.put(removeEvent(item, TimelineRemoveReasonFfi.PRUNED))
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
+
+    /** Builds a projection event upserting [item]'s poll record as deleted or live. */
+    private fun upsertEvent(
+        item: TimelineMessage,
+        deleted: Boolean,
+    ) = projectionEventOf(
+        TimelineMessageChangeFfi.Upsert(
+            TimelineUpdateTriggerFfi.NEW_MESSAGE,
+            checkNotNull(item.projected).copy(deleted = deleted),
+        ),
+    )
+
+    /** Builds a projection event removing [item]'s poll with [reason]. */
+    private fun removeEvent(
+        item: TimelineMessage,
+        reason: TimelineRemoveReasonFfi,
+    ) = projectionEventOf(TimelineMessageChangeFfi.Remove(item.record.messageIdHex, reason))
+
+    /** Wraps one change in a projection update for the fixture's account and group. */
+    private fun projectionEventOf(change: TimelineMessageChangeFfi) =
+        MarmotEventFfi.ProjectionUpdated(
+            RuntimeProjectionUpdateFfi(
+                "ff".repeat(32),
+                "personal",
+                TimelineProjectionUpdateFfi(
+                    pollController.group.groupIdHex,
+                    emptyList(),
+                    listOf(change),
+                    null,
+                    ChatListUpdateTriggerFfi.NEW_GROUP,
+                ),
+            ),
+        )
 }

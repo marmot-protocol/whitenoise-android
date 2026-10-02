@@ -40,6 +40,11 @@ internal class PollVotesHostState {
         open?.takeIf { it.owner == owner && it.poll != poll }?.let { open = it.copy(poll = poll) }
     }
 
+    /** Closes the sheet only when it shows the poll of [owner], so another poll's sheet is left alone. */
+    fun dismissIf(owner: PollMessageActionOwner) {
+        if (open?.owner == owner) open = null
+    }
+
     /** Closes the sheet. */
     fun dismiss() {
         open = null
@@ -58,5 +63,12 @@ internal fun PollVotesHost(
     appState: WhiteNoiseAppState,
 ) {
     val open = host.open ?: return
-    PollVotesSheet(open.poll, open.owner, controller, appState, onDismissRequest = host::dismiss)
+    PollVotesSheet(
+        open.poll,
+        open.owner,
+        controller,
+        appState,
+        onDismissRequest = host::dismiss,
+        onPollEnded = host::dismiss,
+    )
 }

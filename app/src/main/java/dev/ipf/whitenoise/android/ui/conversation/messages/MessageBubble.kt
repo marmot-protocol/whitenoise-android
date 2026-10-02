@@ -134,6 +134,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutR
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
 import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
+import dev.ipf.whitenoise.android.ui.conversation.LocalPollVotesHost
 import dev.ipf.whitenoise.android.ui.conversation.PollCard
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageActionOwner
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageContent
@@ -2175,6 +2176,12 @@ internal fun MessageBubble(
                     }
                 val visiblePoll =
                     item.projected?.poll.takeIf { isPollRecord && !deleted && !persistedFailure }
+                // A deleted, failed or expired poll takes its open votes sheet down, as the row used to.
+                val pollVotesHost = LocalPollVotesHost.current
+                val pollGone = isPollRecord && visiblePoll == null
+                LaunchedEffect(pollGone, pollOwner, pollVotesHost) {
+                    if (pollGone) pollVotesHost?.dismissIf(pollOwner)
+                }
                 val pollTimestampColor =
                     if (visiblePoll != null) {
                         messageBubbleFooterColor(
