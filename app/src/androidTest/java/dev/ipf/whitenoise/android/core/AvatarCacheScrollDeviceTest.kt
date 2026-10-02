@@ -147,6 +147,10 @@ class AvatarCacheScrollDeviceTest {
         val reverse = measureDirectPass("small_reverse", listState, down = false)
         val repeated = measureDirectPass("small_repeat", listState, down = true)
         AvatarCacheDiagnostics.stop()
+        assertTrue("small fixture never filled profile cache", cold.delta.profile.fetchCalls > 16)
+        assertTrue("small fixture never filled group cache", cold.delta.group.fetchCalls > 16)
+        assertTrue("256 px profile images should remain cached", reverse.delta.profile.fetchCalls == 0L && repeated.delta.profile.fetchCalls == 0L)
+        assertTrue("256 px group images should remain cached", reverse.delta.group.fetchCalls == 0L && repeated.delta.group.fetchCalls == 0L)
         Log.i(AVATAR_BENCH_TAG, "small_completed cold=$cold reverse=$reverse repeated=$repeated")
     }
 
