@@ -6,8 +6,7 @@ from pathlib import Path
 ROOT = Path.cwd()
 OUT = Path(os.environ['RUNNER_TEMP']) / 'tooling-startup-measurement'
 SEED = OUT / 'dependency-seed'
-INIT = '''gradle.startParameter.profile = true
-System.err.println("TOOLING_PROBE pid=" + ProcessHandle.current().pid() +
+INIT = '''System.err.println("TOOLING_PROBE pid=" + ProcessHandle.current().pid() +
     " preview=" + System.getenv("PR_PREVIEW_CHANNEL") + " number=" + System.getenv("PR_NUMBER"))
 '''
 PROPERTIES = '''org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8
@@ -110,14 +109,14 @@ def measure(phase_name):
             shutil.move(str(report_directory), str(directory / 'prior-profiles'))
         calls = [gradle(api_command, env, directory / 'api.log')]
         calls.append(gradle(['./gradlew', ':app:tasks', '--all', '--console=plain',
-                             flag, '--stacktrace'], env, directory / 'discovery.log'))
+                             flag, '--profile', '--stacktrace'], env, directory / 'discovery.log'))
         discovery = Path(calls[-1]['log']).read_text()
         discovered = re.findall(r'^process[A-Z]\w+ManifestForPackage$', discovery, re.M)
         assert len(discovered) == 12 and all(t.removeprefix(':app:') in discovered for t in manifest_tasks)
         manifest_hashes = {}
         for channel in ['stable', 'isolated']:
             channel_env = dict(env, PR_PREVIEW_CHANNEL=channel)
-            calls.append(gradle(['./gradlew', *manifest_tasks, flag, '--stacktrace'],
+            calls.append(gradle(['./gradlew', *manifest_tasks, flag, '--profile', '--stacktrace'],
                                 channel_env, directory / (channel + '.log')))
             for variant in variants:
                 manifest = labels.packaged_manifest(ROOT / 'app/build/intermediates/packaged_manifests', variant)
