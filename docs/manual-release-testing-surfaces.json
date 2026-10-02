@@ -9632,6 +9632,12 @@
         "test_ids": ["MSG-032"]
       },
       {
+        "surface": "PollParticipantsRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "private fun PollParticipantsRow(",
+        "test_ids": ["MSG-032"]
+      },
+      {
         "surface": "PollVotesSheet",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
         "anchor": "internal fun PollVotesSheet(",
