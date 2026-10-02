@@ -109,6 +109,58 @@ test('ignores declarations hidden in comments, code fences or split lines', () =
   assert.deepEqual(parseDeclaration('Invariant gate: A, B').gates, ['A', 'B'])
 })
 
+test('keeps a declaration hidden behind a shorter or annotated inner fence', () => {
+  const hidden = [
+    '````md\n```kotlin\nInvariant gate: StalenessGuardCoverageTest\n```\n````',
+    '````\n``` not a closer\nInvariant gate: StalenessGuardCoverageTest\n````',
+    '~~~~\n~~~ trailing text\nInvariant gate: StalenessGuardCoverageTest',
+    '```\nInvariant gate: StalenessGuardCoverageTest\n~~~',
+  ]
+  for (const body of hidden) assert.equal(gate({ body }).status, 'fail', body)
+  const closed = '````\n```\ninner\n```\n````\n\nInvariant gate: StalenessGuardCoverageTest'
+  assert.equal(gate({ body: closed }).status, 'pass')
+})
+
+test('run follows closing-issue pages and full label lists before deciding a PR closes no bug', async () => {
+  const pages = [
+    { nodes: [feature], pageInfo: { hasNextPage: true, endCursor: 'page-2' } },
+    {
+      nodes: [{
+        number: 9,
+        repository: { owner: { login: 'marmot' }, name: 'base' },
+        issueType: { name: 'Task' },
+        labels: { nodes: [{ name: 'area' }], pageInfo: { hasNextPage: true } },
+      }],
+      pageInfo: { hasNextPage: false, endCursor: null },
+    },
+  ]
+  const cursors = []
+  const labelRequests = []
+  const failures = []
+  const github = {
+    graphql: async (_query, variables) => {
+      cursors.push(variables.after)
+      const closingIssuesReferences = pages[cursors.length - 1]
+      return { repository: { pullRequest: { body: 'Summary', closingIssuesReferences } } }
+    },
+    paginate: async (method, request) => {
+      if (method !== github.rest.issues.listLabelsOnIssue) return [productionFile]
+      labelRequests.push(request)
+      return [{ name: 'area' }, { name: 'bug' }]
+    },
+    rest: { pulls: { listFiles: () => {} }, issues: { listLabelsOnIssue: () => {} } },
+  }
+  const context = { payload: { pull_request: { number: 42 } }, repo: { owner: 'marmot', repo: 'base' } }
+  const core = { info: () => {}, setFailed: message => failures.push(message) }
+
+  const outcome = await run({ github, context, core, registryMarkdown: REGISTRY })
+
+  assert.deepEqual(cursors, [null, 'page-2'])
+  assert.deepEqual(labelRequests, [{ owner: 'marmot', repo: 'base', issue_number: 9, per_page: 100 }])
+  assert.equal(outcome.status, 'fail')
+  assert.match(failures[0], /closes bug #9/)
+})
+
 test('does not apply to feature-only pull requests or pull requests without closing issues', () => {
   assert.equal(gate({ closingIssues: [feature] }).status, 'not-applicable')
   assert.equal(gate({ closingIssues: [] }).status, 'not-applicable')
@@ -121,7 +173,7 @@ async function runWith({ closingIssues, files, body }) {
   const infos = []
   const github = {
     graphql: async (_query, variables) => {
-      assert.deepEqual(variables, { owner: 'marmot', repo: 'base', number: 42 })
+      assert.deepEqual(variables, { owner: 'marmot', repo: 'base', number: 42, after: null })
       return { repository: { pullRequest: { body, closingIssuesReferences: { nodes: closingIssues } } } }
     },
     paginate: async () => files,
