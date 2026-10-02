@@ -2238,7 +2238,6 @@
     <string name="diagnostics_clear_confirm_title">Очистить диагностические журналы?</string>
     <string name="diagnostics_clear_confirm_body">Это навсегда удалит с этого устройства диагностические журналы всех профилей. Ваши настройки передачи данных не изменятся.</string>
     <string name="diagnostics_clear_confirm_action">Очистить журналы</string>
-    <string name="usage_diagnostics_prompt_intro">Помогите нам понять, как используется White Noise, и сделать обмен сообщениями надёжнее.</string>
     <string name="donate_open_failed">Не удалось открыть страницу пожертвований. Попробуйте снова или вернитесь в настройки.</string>
     <string name="export_audit_logs_confirm_body">Диагностические журналы содержат технические идентификаторы и сведения об активности. Делитесь ими только с теми, кому доверяете.</string>
     <string name="export_audit_logs">Экспортировать диагностические журналы</string>
@@ -2266,4 +2265,7 @@
     <string name="onboarding_share_usage_summary">Использование функций и работа приложения.</string>
     <string name="onboarding_share_logs_title">Делиться журналами диагностики</string>
     <string name="onboarding_share_logs_summary">Технические данные об обмене сообщениями.</string>
+    <string name="onboarding_details_accessibility">%1$s: %2$s</string>
+    <string name="onboarding_details_expanded">Развёрнуто</string>
+    <string name="onboarding_details_collapsed">Свёрнуто</string>
 </resources>

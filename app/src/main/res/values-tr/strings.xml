@@ -2168,7 +2168,6 @@
     <string name="diagnostics_clear_confirm_title">Tanılama günlükleri temizlensin mi?</string>
     <string name="diagnostics_clear_confirm_body">Bu işlem, tüm profillere ait tanılama günlüklerini bu cihazdan kalıcı olarak siler. Paylaşım ayarlarınız değişmez.</string>
     <string name="diagnostics_clear_confirm_action">Günlükleri Temizle</string>
-    <string name="usage_diagnostics_prompt_intro">White Noise’un nasıl kullanıldığını anlamamıza ve mesajlaşmayı daha güvenilir hâle getirmemize yardımcı olun.</string>
     <string name="donate_open_failed">Bağış sayfası açılamadı. Tekrar deneyin veya Ayarlar’a dönün.</string>
     <string name="export_audit_logs_confirm_body">Tanılama günlükleri teknik tanımlayıcılar ve etkinlik ayrıntıları içerir. Bunları yalnızca güvendiğiniz kişilerle paylaşın.</string>
     <string name="export_audit_logs">Tanılama Günlüklerini Dışa Aktar</string>
@@ -2196,4 +2195,7 @@
     <string name="onboarding_share_usage_summary">Özellik kullanımı ve uygulama performansı.</string>
     <string name="onboarding_share_logs_title">Tanılama günlüklerini paylaş</string>
     <string name="onboarding_share_logs_summary">Mesajlaşmayla ilgili teknik veriler.</string>
+    <string name="onboarding_details_accessibility">%1$s: %2$s</string>
+    <string name="onboarding_details_expanded">Genişletildi</string>
+    <string name="onboarding_details_collapsed">Daraltıldı</string>
 </resources>

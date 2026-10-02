@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 
@@ -35,7 +36,12 @@ internal fun DiagnosticsChoiceDetails(
     choice: @Composable () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val action = stringResource(if (expanded) R.string.setup_hide_details else R.string.details)
+    val action = stringResource(if (expanded) R.string.setup_hide_details else R.string.setup_details)
+    val label = stringResource(R.string.onboarding_details_accessibility, title, action)
+    val state =
+        stringResource(
+            if (expanded) R.string.onboarding_details_expanded else R.string.onboarding_details_collapsed,
+        )
     Column(Modifier.fillMaxWidth()) {
         choice()
         TextButton(
@@ -44,7 +50,10 @@ internal fun DiagnosticsChoiceDetails(
                 Modifier
                     .padding(horizontal = 8.dp)
                     .testTag(tag)
-                    .semantics { contentDescription = "$title, $action" },
+                    .semantics {
+                        contentDescription = label
+                        stateDescription = state
+                    },
         ) {
             Text(action)
             Icon(

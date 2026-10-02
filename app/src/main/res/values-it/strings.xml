@@ -2170,7 +2170,6 @@
     <string name="diagnostics_clear_confirm_title">Cancellare i log diagnostici?</string>
     <string name="diagnostics_clear_confirm_body">Questa operazione elimina definitivamente da questo dispositivo i log diagnostici di tutti i profili. Le tue impostazioni di condivisione non cambiano.</string>
     <string name="diagnostics_clear_confirm_action">Cancella i log</string>
-    <string name="usage_diagnostics_prompt_intro">Aiutaci a capire come viene usato White Noise e a rendere la messaggistica più affidabile.</string>
     <string name="donate_open_failed">Impossibile aprire la pagina delle donazioni. Riprova o torna alle impostazioni.</string>
     <string name="export_audit_logs_confirm_body">I log diagnostici contengono identificatori tecnici e dettagli delle attività. Condividili solo con persone di cui ti fidi.</string>
     <string name="export_audit_logs">Esporta log diagnostici</string>
@@ -2198,4 +2197,7 @@
     <string name="onboarding_share_usage_summary">Uso delle funzioni e prestazioni dell’app.</string>
     <string name="onboarding_share_logs_title">Condividi log diagnostici</string>
     <string name="onboarding_share_logs_summary">Dati tecnici sulla messaggistica.</string>
+    <string name="onboarding_details_accessibility">%1$s: %2$s</string>
+    <string name="onboarding_details_expanded">Espanso</string>
+    <string name="onboarding_details_collapsed">Compresso</string>
 </resources>

@@ -10258,6 +10258,30 @@
     ],
     "settings_controls": [
       {
+        "surface": "string:onboarding_details_accessibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsChoiceDetails.kt",
+        "anchor": "R.string.onboarding_details_accessibility",
+        "test_ids": [
+          "SEC-016"
+        ]
+      },
+      {
+        "surface": "string:onboarding_details_expanded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsChoiceDetails.kt",
+        "anchor": "R.string.onboarding_details_expanded",
+        "test_ids": [
+          "SEC-016"
+        ]
+      },
+      {
+        "surface": "string:onboarding_details_collapsed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsChoiceDetails.kt",
+        "anchor": "R.string.onboarding_details_collapsed",
+        "test_ids": [
+          "SEC-016"
+        ]
+      },
+      {
         "surface": "string:onboarding_share_usage_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
         "anchor": "R.string.onboarding_share_usage_title",
@@ -10296,7 +10320,7 @@
       {
         "surface": "onboarding:diagnostics_details",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsChoiceDetails.kt",
-        "anchor": "R.string.details",
+        "anchor": "R.string.setup_details",
         "test_ids": [
           "SEC-016",
           "SEC-012"

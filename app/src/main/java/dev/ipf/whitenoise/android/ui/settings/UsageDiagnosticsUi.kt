@@ -39,7 +39,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.launch
 
-/** Shows the actual collection scope wherever a user can grant the expanded MDK receipt. */
+/** Full settings disclosure; onboarding offers the same information in each choice's Details section. */
 @Composable
 internal fun UsageDiagnosticsDisclosure() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -200,18 +200,20 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
                     title = stringResource(R.string.onboarding_share_logs_title),
                     tag = "diagnostics.logs.details",
                     details =
-                        listOfNotNull(
+                        listOf(
                             R.string.audit_upload_subtitle,
                             R.string.diagnostics_group_disclosure,
                             R.string.diagnostics_existing_logs,
                             R.string.diagnostics_retention,
                             R.string.diagnostics_disable_disclosure,
-                            R.string.audit_upload_renew.takeIf { appState.auditUploadConsentRequired },
                         ),
                 ) { IndependentAuditLogChoice(appState, loggingBusy, onLoggingBusyChange) }
             }
         }
         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (appState.auditUploadConsentRequired) {
+                Text(stringResource(R.string.audit_upload_renew), style = MaterialTheme.typography.bodySmall)
+            }
             UsageDiagnosticsFeedback(appState)
         }
     }

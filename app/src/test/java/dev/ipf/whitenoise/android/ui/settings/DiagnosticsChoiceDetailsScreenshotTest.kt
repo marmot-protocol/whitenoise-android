@@ -2,6 +2,9 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.app.Application
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.isToggleable
@@ -111,7 +114,19 @@ class DiagnosticsChoiceDetailsScreenshotTest {
         }
         composeRule.onNodeWithText(usageDisclosure).assertDoesNotExist()
         composeRule.onNodeWithText(logsDisclosure).assertDoesNotExist()
+        composeRule.onNodeWithTag(tag).assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                context.getString(R.string.onboarding_details_collapsed),
+            ),
+        )
         composeRule.onNodeWithTag(tag).performClick()
+        composeRule.onNodeWithTag(tag).assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                context.getString(R.string.onboarding_details_expanded),
+            ),
+        )
         composeRule.onNodeWithText(text).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(if (logs) usageDisclosure else logsDisclosure).assertDoesNotExist()
         val suffix = if (logs) "logs" else "usage"

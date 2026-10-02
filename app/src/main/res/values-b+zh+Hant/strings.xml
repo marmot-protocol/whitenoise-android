@@ -2138,7 +2138,6 @@
     <string name="diagnostics_clear_confirm_title">清除診斷日誌？</string>
     <string name="diagnostics_clear_confirm_body">此操作會從此裝置永久刪除所有個人檔案的診斷日誌。你的分享設定不會改變。</string>
     <string name="diagnostics_clear_confirm_action">清除日誌</string>
-    <string name="usage_diagnostics_prompt_intro">協助我們了解 White Noise 的使用情況，並提高訊息傳遞的可靠性。</string>
     <string name="donate_open_failed">無法開啟捐款頁面。請重試或返回設定。</string>
     <string name="export_audit_logs_confirm_body">診斷日誌包含技術識別碼和活動詳情。請僅與您信任的人分享。</string>
     <string name="export_audit_logs">匯出診斷日誌</string>
@@ -2166,4 +2165,7 @@
     <string name="onboarding_share_usage_summary">功能使用情況和應用程式效能。</string>
     <string name="onboarding_share_logs_title">分享診斷日誌</string>
     <string name="onboarding_share_logs_summary">有關訊息傳遞的技術資料。</string>
+    <string name="onboarding_details_accessibility">%1$s：%2$s</string>
+    <string name="onboarding_details_expanded">已展開</string>
+    <string name="onboarding_details_collapsed">已收合</string>
 </resources>
