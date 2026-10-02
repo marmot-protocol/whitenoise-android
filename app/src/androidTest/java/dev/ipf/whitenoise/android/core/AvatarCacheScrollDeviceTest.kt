@@ -56,7 +56,6 @@ private const val AVATAR_FIXTURE_COUNT = 48
 private const val AVATAR_BENCH_TAG = "WNAvatarBench"
 
 /** Bounded, synthetic list-scroll measurement of both real avatar loaders on a physical device. */
-@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class AvatarCacheScrollDeviceTest {
     @get:Rule
@@ -98,6 +97,7 @@ class AvatarCacheScrollDeviceTest {
 
     /** Repeats the stress fixture with physical touch timing and matched traversal endpoints. */
     @Test
+    @ManualDeviceFixture
     fun overCapacityDirectTouchScroll() {
         val imageBytes = syntheticAvatarPng()
         AvatarImageLoader.clear()
@@ -120,6 +120,7 @@ class AvatarCacheScrollDeviceTest {
 
     /** Measures the same list and gestures without image fetch or decode work. */
     @Test
+    @ManualDeviceFixture
     fun directTouchScrollWithoutAvatars() {
         lateinit var listState: LazyListState
         composeRule.setContent {
@@ -134,6 +135,7 @@ class AvatarCacheScrollDeviceTest {
 
     /** Estimates the cache and frame effect of decoding chat-row images at 256 px. */
     @Test
+    @ManualDeviceFixture
     fun smallerSourceDirectTouchScroll() {
         val imageBytes = syntheticAvatarPng(256)
         AvatarImageLoader.clear()
