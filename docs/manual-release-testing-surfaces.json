@@ -3,6 +3,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "observeConversationVisibleReads",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVisibleReads.kt",
+        "anchor": "internal fun observeConversationVisibleReads(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
         "surface": "QuarantinedGroupsScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
         "anchor": "fun QuarantinedGroupsScreen(",
@@ -24289,6 +24297,46 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Settled visible-read retry on resume and manual-reminder changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "observeConversationVisibleReads(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Visible conversation read eligibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationReadVisibility.kt",
+        "anchor": "fun WhiteNoiseAppState.isConversationReadVisible(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "First settled conversation read at the saved watermark",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private var lastSubmittedReadMessageId: String? = null",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Native manual reminder lookup for visible-read dedupe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal fun hasManualUnreadReminder(groupIdHex: String)",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Native manual unread reminder bypasses an older retained-controller read dedupe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationReadVisibility.kt",
+        "anchor": "internal fun WhiteNoiseAppState.hasManualUnreadReminder(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
       {
         "surface": "Quarantined group recovery: R.string.quarantined_groups",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",

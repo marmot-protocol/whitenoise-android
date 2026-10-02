@@ -3875,6 +3875,14 @@ class ChatsController private constructor(
             .toList()
     }
 
+    /** Read-request dedupe reads the native flag without constructing a display item. */
+    internal fun hasManualUnreadReminder(groupIdHex: String): Boolean? {
+        val row =
+            chatRowsByGroup[chatRowKey(groupIdHex)]
+                ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+        return row?.manuallyMarkedUnread
+    }
+
     fun chatItemForGroup(groupIdHex: String): ChatListItem? {
         val row = chatRowsByGroup[chatRowKey(groupIdHex)] ?: chatRows.firstOrNull { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
         return row?.let { projectChatRow(it) }
@@ -4821,8 +4829,9 @@ class ChatsController private constructor(
 
     /**
      * Mark the chat's unread count to zero by advancing the read pointer to
-     * its latest projected message. No-op when the chat has no unread or no
-     * known last-message id. Called from the long-press "Mark as read"
+     * its latest projected message. Without a known message id, the explicit
+     * action can still ask MDK to clear a manual reminder; MDK preserves any
+     * actual unread count and watermark. Called from the long-press "Mark as read"
      * action — the per-conversation scroll-driven path remains the
      * normal mechanism while a chat is open.
      */
@@ -4832,9 +4841,17 @@ class ChatsController private constructor(
             item.projection
                 ?.lastMessage
                 ?.messageIdHex
-                ?.takeIf { it.isNotBlank() } ?: return false
+                ?.takeIf { it.isNotBlank() }
+        if (lastId == null && item.projection?.manuallyMarkedUnread != true) return false
         return runCatchingCancellable {
-            val row = appState.marmotIo { markTimelineMessageRead(account, item.group.groupIdHex, lastId) }
+            val row =
+                appState.marmotIo {
+                    if (lastId != null) {
+                        markTimelineMessageRead(account, item.group.groupIdHex, lastId)
+                    } else {
+                        setChatManuallyUnread(account, item.group.groupIdHex, false)
+                    }
+                }
             row?.let(::applyChatListRow)
             appState.dismissConversationNotifications(account, item.group.groupIdHex)
             true
@@ -6416,14 +6433,23 @@ class ConversationController(
     // so indexes and messageById cannot grow without bound (#1163).
     internal val protectedTimelineMessageIds = mutableSetOf<String>()
 
-    // Last message id we successfully marked as read on the Rust side.
-    // Dedupes scroll-driven [markReadUpTo] calls so settling on the same row
-    // doesn't issue redundant FFI hops. Compose-observable so UI (the
-    // jump-to-mention chip) can derive unread state off the engine read
+    // Read watermark seeded from MDK, then updated by visible read requests.
+    // Compose-observable so the jump-to-mention chip follows the engine
     // watermark rather than the scroll position.
     var lastReadMessageId: String? by
         mutableStateOf(initialChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() })
         private set
+
+    // A persisted watermark is not a read performed during this visit. The
+    // first settled visible message must reach MDK even when the watermark
+    // stays unchanged: MDK also clears manual unread attention on that read.
+    private var lastSubmittedReadMessageId: String? = null
+    private var manualUnreadReminderConsumed = false
+    private var nextReadRequestId = 0L
+    private var lastReadRequestId = 0L
+    private val pendingReadRequestIds = mutableSetOf<Long>()
+    private var lastSuccessfulReadRequestId = 0L
+    private var successfulReadWithoutRow: Pair<ChatListRowFfi?, String>? = null
 
     // Persisted read watermark from the chat-list projection / mark-read FFI.
     // Drives read-anchored disappearing-message deferral (#797).
@@ -7394,12 +7420,21 @@ class ConversationController(
         groupIdHex: String,
     ): Boolean = conversationAccountRef == accountRef && group.groupIdHex == groupIdHex
 
-    /** Applies the chat-list subscription's current row to this mounted conversation. */
+    /** Applies a matching native row and invalidates any null-result acknowledgement superseded by that row. */
     internal fun applyAuthoritativeChatListRow(
         accountRef: String?,
         row: ChatListRowFfi,
     ) {
         if (!matchesConversation(accountRef, row.groupIdHex)) return
+        // A new native row supersedes a null-result acknowledgement, including
+        // a new reminder whose preceding manual=false echo was not observed.
+        if (successfulReadWithoutRow?.let { it.first !== row } == true) {
+            successfulReadWithoutRow = null
+            manualUnreadReminderConsumed = false
+        }
+        if (!row.manuallyMarkedUnread || latestChatListRow?.manuallyMarkedUnread != true) {
+            manualUnreadReminderConsumed = false
+        }
         latestChatListRow = row
     }
 
@@ -11732,47 +11767,108 @@ class ConversationController(
      * chat-list unread count decrement incrementally during the session
      * instead of being zeroed out on chat open.
      *
-     * Reuses the controller's [lastReadMessageId] dedupe so a quiet scroll
+     * Dedupes requests submitted by this controller so a quiet scroll
      * (settled on the same row) doesn't issue redundant FFI hops.
+     * Invalid/optimistic IDs and hidden, locked or differently owned conversations are ignored.
+     * A stored watermark alone does not dedupe the first visible read of a new visit.
      */
     suspend fun markReadUpTo(messageId: String) {
-        val trimmed = messageId.takeIf { it.isNotBlank() } ?: return
-        // Optimistic messages carry a Kotlin UUID as their messageIdHex
-        // ("xxxxxxxx-xxxx-..."). The FFI rejects anything that isn't a 64-char
-        // hex blob (InvalidHex at the first '-'). Skip — the projection will
-        // call markReadUpTo again with the confirmed hex id once it echoes.
-        if (!HEX_MESSAGE_ID.matches(trimmed)) return
-        if (trimmed == lastReadMessageId) return
+        // Optimistic UUIDs and missing anchors cannot reach native read commands.
+        val trimmed = messageId.takeIf { it.isNotBlank() && HEX_MESSAGE_ID.matches(it) } ?: return
         val account = conversationAccountRef ?: return
-        val previous = lastReadMessageId
+        if (appState.isConversationReadVisible(account, group.groupIdHex)) {
+            submitVisibleReadUpTo(account, trimmed)
+        }
+    }
+
+    /**
+     * Submits the visit's visible cursor to MDK, including a saved cursor with pending manual attention.
+     * Successful rows fold monotonically; after failures, only the latest remaining request restores display state.
+     * A latest failure clears request dedupe for retry, and cancellation is rethrown. A null success acknowledges
+     * this row instance until a new native row arrives. Already-confirmed reads do not restart retention deadlines.
+     */
+    private suspend fun submitVisibleReadUpTo(
+        account: String,
+        trimmed: String,
+    ) {
+        val consumeManualReminder = shouldConsumeManualUnreadReminder(account)
+        if (trimmed == lastSubmittedReadMessageId && !consumeManualReminder) return
+        val readWasAlreadyConfirmed = trimmed == latestChatListRow?.lastReadMessageIdHex
+        val requestId = ++nextReadRequestId
+        lastReadRequestId = requestId
+        pendingReadRequestIds += requestId
         lastReadMessageId = trimmed
+        lastSubmittedReadMessageId = trimmed
         val markReadResult =
             runCatching {
                 appState.marmotIo { markTimelineMessageRead(account, group.groupIdHex, trimmed) }
             }
+        pendingReadRequestIds -= requestId
         val markReadFailure = markReadResult.exceptionOrNull()
         if (markReadFailure != null) {
-            if (lastReadMessageId == trimmed) lastReadMessageId = previous
+            restoreFailedReadRequest(requestId)
             if (markReadFailure is CancellationException) throw markReadFailure
             if (BuildConfig.DEBUG) Log.w("DMConversation", "mark read failed", markReadFailure)
             return
         }
-        markReadResult.getOrNull()?.let { row ->
-            persistedLastReadTimelineAt =
-                foldMarkReadReturnedRow(
-                    row = row,
-                    persistedLastReadTimelineAt = persistedLastReadTimelineAt,
-                    applyChatListRow = { appState.applyChatListRowFromMarkRead(account, it) },
-                )
+        markReadResult.getOrNull()?.let { row -> foldVisibleReadRow(account, row) }
+        if (requestId > lastSuccessfulReadRequestId) {
+            lastSuccessfulReadRequestId = requestId
+            successfulReadWithoutRow = if (markReadResult.getOrNull() == null) latestChatListRow to trimmed else null
         }
-        val anchoredAtSeconds = (clockMillis() / 1_000L).toULong()
-        anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
+        if (lastReadRequestId == requestId) {
+            lastReadMessageId = confirmedReadMessageId()
+            lastSubmittedReadMessageId = trimmed
+            if (consumeManualReminder) manualUnreadReminderConsumed = true
+        }
+        // A visit-level attention acknowledgement must not restart an
+        // already-confirmed message's disappearing deadline after reopening.
+        if (!readWasAlreadyConfirmed) {
+            val anchoredAtSeconds = (clockMillis() / 1_000L).toULong()
+            anchorReadExpiryUpTo(trimmed, anchoredAtSeconds)
+        }
         runCatchingCancellable {
             appState.dismissConversationNotifications(account, group.groupIdHex)
         }.onFailure {
             if (BuildConfig.DEBUG) Log.w("DMConversation", "dismiss read notifications failed", it)
         }
     }
+
+    /** Restores only the latest failed request; finished requests never regain ownership or suppress retries. */
+    private fun restoreFailedReadRequest(requestId: Long) {
+        if (lastReadRequestId != requestId) return
+        lastReadMessageId = confirmedReadMessageId()
+        manualUnreadReminderConsumed = false
+        lastSubmittedReadMessageId = null
+        lastReadRequestId = pendingReadRequestIds.maxOrNull() ?: 0L
+    }
+
+    /** Uses the native cursor, or a successful null-result cursor only while its original row remains current. */
+    private fun confirmedReadMessageId(): String? =
+        successfulReadWithoutRow?.takeIf { it.first === latestChatListRow }?.second
+            ?: latestChatListRow?.lastReadMessageIdHex?.takeIf { it.isNotBlank() }
+
+    /** Folds MDK's read result into the matching list, or monotonically into this conversation if no list is bound. */
+    private fun foldVisibleReadRow(
+        accountRef: String,
+        row: ChatListRowFfi,
+    ) {
+        persistedLastReadTimelineAt =
+            foldMarkReadReturnedRow(row, persistedLastReadTimelineAt) { incoming ->
+                if (!appState.applyChatListRowFromMarkRead(accountRef, incoming)) {
+                    val folded =
+                        latestChatListRow?.let { current ->
+                            reduceSubscriptionChatListRow(current, incoming, ChatListUpdateTriggerFfi.UNREAD_CHANGED)
+                        } ?: incoming
+                    applyAuthoritativeChatListRow(accountRef, folded)
+                }
+            }
+    }
+
+    /** Retries an unconsumed native manual reminder only while this account's conversation is visibly owned. */
+    private fun shouldConsumeManualUnreadReminder(accountRef: String): Boolean =
+        !manualUnreadReminderConsumed &&
+            appState.hasManualUnreadReminder(accountRef, group.groupIdHex, latestChatListRow)
 
     private fun anchorReadExpiryUpTo(
         messageId: String,
