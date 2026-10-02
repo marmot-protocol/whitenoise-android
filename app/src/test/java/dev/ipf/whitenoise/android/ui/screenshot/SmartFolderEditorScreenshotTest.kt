@@ -111,7 +111,7 @@ class SmartFolderEditorScreenshotTest {
                                 archivedOnly = false,
                                 manualChatCount = 0,
                                 peopleCount = 1,
-                                previewCount = 8,
+                                previewCount = if (empty) 0 else 8,
                                 canSave = true,
                             ),
                         onUnreadOnlyChange = {},
