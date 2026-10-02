@@ -43,7 +43,8 @@ class IdentityCreationFlowTest {
 
         assertTrue(body.contains("createIdentityWithBootstrapRelays"))
         assertTrue(body.contains("val relays = MarmotClient.bootstrapRelays"))
-        assertTrue(body.contains("createIdentity(relays, relays)"))
+        // NIP-65 gets the account defaults; the bootstrap route and inbox stay on bootstrapRelays.
+        assertTrue(body.contains("createIdentity(MarmotClient.accountRelays, relays, relays)"))
         assertFalse(body.contains("take(1)"))
     }
 

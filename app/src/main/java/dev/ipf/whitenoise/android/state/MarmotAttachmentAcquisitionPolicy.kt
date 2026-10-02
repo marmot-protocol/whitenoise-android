@@ -42,7 +42,10 @@ internal suspend fun MarmotInterface.listAccountsWithAppAttachmentPolicy(): List
     return accounts
 }
 
-/** Creates an identity with White Noise's full bootstrap relay set and returns its durable native receipt. */
+/**
+ * Creates an identity and returns its durable native receipt. Its NIP-65 list declares
+ * [MarmotClient.accountRelays]; publication and the inbox list use the full bootstrap relay set.
+ */
 internal suspend fun MarmotInterface.createIdentityWithBootstrapRelays(): AccountSummaryFfi {
     val relays = MarmotClient.bootstrapRelays
     return createIdentity(MarmotClient.accountRelays, relays, relays)
