@@ -96,6 +96,7 @@ internal fun NewMessageContent(
     actions: NewMessageActions,
     isValidNpub: (String) -> Boolean,
     retryableIdentifier: Boolean = false,
+    identifierLookupFailed: Boolean = false,
 ) {
     val query = queryState.text.toString()
     val busy = creatingHex != null
@@ -131,6 +132,7 @@ internal fun NewMessageContent(
                     onRetry = actions.retrySearch,
                     onInvite = actions.invite,
                     retryableIdentifier = retryableIdentifier,
+                    lookupFailed = identifierLookupFailed,
                 )
             }
             val groups =
@@ -262,11 +264,12 @@ internal fun NewMessageSearchFeedback(
     onRetry: () -> Unit,
     onInvite: () -> Unit,
     retryableIdentifier: Boolean = false,
+    lookupFailed: Boolean = false,
 ) {
-    val hasStatus = searching || failed || incomplete
+    val hasStatus = searching || failed || incomplete || lookupFailed
     if (!hasStatus && !empty) return
     val retryableEmpty = empty && retryableIdentifier
-    val retryAvailable = failed || incomplete || retryableEmpty
+    val retryAvailable = failed || incomplete || retryableEmpty || lookupFailed
     Column(
         Modifier
             .fillMaxWidth()
@@ -276,6 +279,7 @@ internal fun NewMessageSearchFeedback(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (searching) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (lookupFailed) Text(stringResource(R.string.user_search_address_unverified))
         when {
             searching -> Text(stringResource(R.string.user_search_searching))
             failed -> Text(stringResource(R.string.user_search_failed))
@@ -288,7 +292,7 @@ internal fun NewMessageSearchFeedback(
                 )
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (!searching && retryAvailable) {
+            if ((!searching || lookupFailed) && retryAvailable) {
                 TextButton(onClick = onRetry, enabled = !busy, modifier = Modifier.testTag("people.retry")) {
                     Text(stringResource(R.string.retry))
                 }

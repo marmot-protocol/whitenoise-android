@@ -111,6 +111,28 @@ class NewMessagePresentationTest {
         assertEquals(listOf("retrySearch"), calls)
     }
 
+    /** A failed HTTPS lookup remains retryable even when ordinary directory matches exist. */
+    @Test fun addressLookupFailureKeepsRowAndRetry() {
+        show(identifier = true, query = "ada@example.com", lookupFailed = true)
+        composeRule.onNodeWithTag("creation.person.${person.accountIdHex}").assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.user_search_address_unverified)).assertExists()
+        composeRule.onNodeWithTag("people.retry").performClick()
+        assertEquals(listOf("retrySearch"), calls)
+    }
+
+    /** Continuing discovery does not hide retry for an already-failed address lookup. */
+    @Test fun addressLookupRetryRemainsAvailableDuringDiscovery() {
+        show(
+            identifier = true,
+            query = "ada@example.com",
+            lookupFailed = true,
+            search = RecipientUserSearchState(isSearching = true),
+        )
+        composeRule.onNodeWithText(context.getString(R.string.user_search_address_unverified)).assertExists()
+        composeRule.onNodeWithTag("people.retry").performClick()
+        assertEquals(listOf("retrySearch"), calls)
+    }
+
     /** An unresolved address offers a deliberate retry without implying it is a valid recipient. */
     @Test fun unresolvedAddressOffersRetry() {
         composeRule.setContent {
@@ -199,6 +221,7 @@ class NewMessagePresentationTest {
         identifier: Boolean = false,
         resolving: Boolean = false,
         query: String = "Ada",
+        lookupFailed: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -224,6 +247,7 @@ class NewMessagePresentationTest {
                         {},
                     ),
                     isValidNpub = { true },
+                    identifierLookupFailed = lookupFailed,
                 )
             }
         }

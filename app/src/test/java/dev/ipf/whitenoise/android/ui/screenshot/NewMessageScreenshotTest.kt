@@ -94,14 +94,14 @@ class NewMessageScreenshotTest {
             resolving = true,
         )
 
-    /** Discovery failure retains actionable people and retry, including large RTL presentation. */
+    /** Failed address verification retains labeled directory results and retry, including large RTL. */
     @Test fun addressFailed() =
         capture(
             "new_message_address_failed.png",
             query = "ada@example.com",
             people = addressPeople(),
             identifier = true,
-            search = RecipientUserSearchState(failed = true),
+            lookupFailed = true,
         )
 
     @Test fun addressFailedLargeRtl() =
@@ -111,7 +111,7 @@ class NewMessageScreenshotTest {
             query = "ada@example.com",
             people = addressPeople(),
             identifier = true,
-            search = RecipientUserSearchState(failed = true),
+            lookupFailed = true,
         )
 
     /** Canonical creation recovery exposes Open chat and safe diagnostic copying. */
@@ -148,6 +148,7 @@ class NewMessageScreenshotTest {
         error: StartChatErrorUiState? = null,
         identifier: Boolean = false,
         resolving: Boolean = false,
+        lookupFailed: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -165,6 +166,7 @@ class NewMessageScreenshotTest {
                         error,
                         NewMessageActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}),
                         isValidNpub = { true },
+                        identifierLookupFailed = lookupFailed,
                     )
                 }
             }
@@ -191,7 +193,7 @@ class NewMessageScreenshotTest {
                     ),
             )
         return recipientDirectoryMatches("ada@example.com", null, emptyList(), listOf(candidate), null)
-            .map { NewMessagePerson(it, "npub1ada…2kz", null) }
+            .map { NewMessagePerson(it, "Search result", null) }
     }
 
     /** Synthetic render-only people cover each supported provenance with stable public-key labels. */

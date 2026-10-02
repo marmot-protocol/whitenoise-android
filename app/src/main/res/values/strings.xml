@@ -1694,6 +1694,7 @@
     <string name="user_search_failed">Couldn’t search the network. Check your connection and try again.</string>
     <string name="user_search_you_follow">You follow</string>
     <string name="user_search_result">Search result</string>
+    <string name="user_search_address_unverified">Couldn’t verify this address.</string>
     <string name="start_chat">Start chat</string>
     <string name="coming_soon">Coming soon</string>
     <string name="quick_action_audio">Audio</string>

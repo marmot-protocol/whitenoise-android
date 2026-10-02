@@ -465,6 +465,7 @@ private fun NewMessageAccountScreen(
             deriveRecipientCandidates(appState, activeHex)
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
+    val addressQuery = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05
     val resolution =
         rememberRecipientResolution(query, appState, retryKey = searchRetry) { stage ->
             when (stage) {
@@ -662,7 +663,12 @@ private fun NewMessageAccountScreen(
         displayedCandidates.map { candidate ->
             NewMessagePerson(
                 candidate = candidate,
-                subtitle = appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() },
+                subtitle =
+                    if (addressQuery && resolution.resolvedHex == null) {
+                        stringResource(R.string.user_search_result)
+                    } else {
+                        appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
+                    },
                 avatarUrl =
                     appState.avatarUrl(candidate.accountIdHex)
                         ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
@@ -716,7 +722,8 @@ private fun NewMessageAccountScreen(
             connectQrEnabled = myQrContent != null,
             creatingHex = creatingHex,
             error = startChatError,
-            retryableIdentifier = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05,
+            retryableIdentifier = addressQuery,
+            identifierLookupFailed = addressQuery && resolution.state == RecipientPreviewState.Invalid,
             actions =
                 NewMessageActions(
                     back = { leaveScreen(onBack) },
