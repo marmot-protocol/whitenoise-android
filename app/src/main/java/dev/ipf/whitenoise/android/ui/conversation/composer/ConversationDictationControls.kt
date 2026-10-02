@@ -151,9 +151,7 @@ internal fun ConversationDictationCompactActions(
             if (state.hasActiveRecognitionActions) {
                 ConversationDictationActiveActions(controller, actionColors)
             } else {
-                if (state is ConversationDictationState.Failed &&
-                    state.reason == ConversationDictationFailure.SendBlocked
-                ) {
+                if (state.hasRecoverableTranscript) {
                     IconButton(onClick = controller::paste, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
                     }
@@ -209,6 +207,13 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Listening ||
             this is ConversationDictationState.Processing
 
+/** An unsent prefix remains accessible even when sealed PCM also needs retrying. */
+private val ConversationDictationState.hasRecoverableTranscript: Boolean
+    get() =
+        this is ConversationDictationState.Failed &&
+            reason != ConversationDictationFailure.DeliveryUnknown &&
+            !retainedTranscript.isNullOrBlank()
+
 /** Reserves either the listening pulse or processing-only action width without shifting controls. */
 private fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
     when (this) {
@@ -217,7 +222,7 @@ private fun ConversationDictationState.compactActionsWidth(captureInProgress: Bo
         is ConversationDictationState.Processing,
         -> if (captureInProgress) DICTATION_ACTIVE_ACTIONS_WIDTH else DICTATION_PROCESSING_ACTIONS_WIDTH
         is ConversationDictationState.Failed ->
-            if (reason == ConversationDictationFailure.SendBlocked) 144.dp else 96.dp
+            if (hasRecoverableTranscript) 144.dp else 96.dp
         else -> 96.dp
     }
 

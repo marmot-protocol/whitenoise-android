@@ -348,6 +348,32 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
     }
 
+    /** A failed Paste tail keeps its recognized prefix accessible alongside audio Retry and Dismiss. */
+    @Test
+    fun failedAudioPrefixOffersPasteAtLargeRtl() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            fontScale = 2f,
+            rtl = true,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.NoSpeech,
+                    "Recognized prefix",
+                    recognitionIncomplete = true,
+                ),
+        )
+        listOf("Paste", "Retry", "Dismiss").forEach { label ->
+            val bounds = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.bottom - bounds.top >= 48.dp)
+        }
+    }
+
     /** Provider settings remain available while the unsent prefix requires an explicit review choice. */
     @Test
     fun partialProviderFailureOffersRetrySendAndSettingsInConfirmation() {

@@ -40,12 +40,34 @@ class ConversationDictationRecoveryScreenshotTest {
     @Test
     fun largeRtlDark() = capture("dictation_partial_send_large_rtl_dark.png", dark = true, scale = 2f, rtl = true)
 
+    @Test
+    fun retryAudioLight() =
+        capture(
+            "dictation_partial_send_retry_light.png",
+            dark = false,
+            scale = 1f,
+            rtl = false,
+            retryAudio = true,
+        )
+
+    @Test
+    fun retryAudioLargeRtlDark() =
+        capture(
+            "dictation_partial_send_retry_large_rtl_dark.png",
+            dark = true,
+            scale = 2f,
+            rtl = true,
+            retryAudio = true,
+        )
+
     private fun capture(
         name: String,
         dark: Boolean,
         scale: Float,
         rtl: Boolean,
+        retryAudio: Boolean = false,
     ) {
+        val recoveryLabel = if (retryAudio) "Retry" else "Open the speech service"
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
@@ -59,7 +81,7 @@ class ConversationDictationRecoveryScreenshotTest {
                             onSend = {},
                             onPaste = {},
                             onOpenSettings = {},
-                            settingsLabel = "Open the speech service",
+                            settingsLabel = recoveryLabel,
                         )
                     }
                 }
@@ -73,7 +95,7 @@ class ConversationDictationRecoveryScreenshotTest {
         }
         assertWholeAction("Send recognized text")
         assertWholeAction("Paste")
-        assertWholeAction("Open the speech service")
+        assertWholeAction(recoveryLabel)
         composeRule.onNodeWithTag("dictation-partial-send-dialog").captureRoboImage("src/test/snapshots/$name")
     }
 

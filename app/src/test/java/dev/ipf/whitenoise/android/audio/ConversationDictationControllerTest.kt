@@ -3683,6 +3683,10 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.hasDurableSession)
             val failed = fixture.controller.state as ConversationDictationState.Failed
             assertEquals("first", failed.retainedTranscript)
+            assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+            assertEquals(ConversationDictationFailure.NoSpeech, failed.cause)
+            assertTrue(failed.recognitionIncomplete)
+            assertTrue(fixture.controller.canRetryRetainedAudio)
 
             fixture.controller.retry()
             fixture.scheduler.runDelay(500L)
@@ -3694,6 +3698,98 @@ class ConversationDictationControllerTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
             assertFalse(fixture.controller.hasDurableSession)
         }
+
+    /** A confirmed prefix sends once without retranscribing the tail that repeatedly failed. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun confirmedRecognizedPrefixBypassesFailedTailWithoutChangingItsOrigin() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(draft = TextFieldValue(""), targetValidationScope = this, sendTranscriptIfOriginUnchanged = {
+                    sent += it.payload
+                    true
+                })
+            failRecognizedTail(fixture, send = true)
+            val generations = fixture.platform.sessions.size
+            fixture.platform.tracksCallerAudioDisposal = true
+            fixture.controller.sendRecognizedText()
+            fixture.controller.sendRecognizedText()
+            advanceUntilIdle()
+            assertEquals(listOf("first"), sent)
+            assertEquals(generations, fixture.platform.sessions.size)
+            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertFalse(fixture.platform.pendingCallerAudio)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            assertFalse(fixture.controller.hasDurableSession)
+        }
+
+    /** Explicit Paste can recover a prefix from either failed completion choice without another recognizer. */
+    @Test
+    fun recognizedPrefixPasteRemainsAvailableWhileFailedTailIsRetained() {
+        listOf(false, true).forEach { send ->
+            val fixture = fixture(draft = TextFieldValue(""))
+            failRecognizedTail(fixture, send)
+            val generations = fixture.platform.sessions.size
+            fixture.platform.tracksCallerAudioDisposal = true
+            fixture.controller.paste()
+            assertEquals("first", fixture.drafts.getValue(key()).text)
+            assertEquals(generations, fixture.platform.sessions.size)
+            assertFalse(fixture.platform.pendingCallerAudio)
+            assertFalse(fixture.controller.hasDurableSession)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+    }
+
+    /** Choosing recognized text cannot absorb someone else's changed draft or revive expired recovery. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun recognizedPrefixSendPreservesDraftFenceAndElapsedExpiry() =
+        runTest {
+            listOf(false, true).forEach { expired ->
+                val sent = mutableListOf<String>()
+                val fixture =
+                    fixture(
+                        draft = TextFieldValue(""),
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = {
+                            sent += it.payload
+                            true
+                        },
+                    )
+                failRecognizedTail(fixture, send = true)
+                if (expired) {
+                    fixture.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
+                } else {
+                    fixture.drafts[key()] = TextFieldValue("Another writer")
+                }
+                fixture.controller.sendRecognizedText()
+                advanceUntilIdle()
+                assertTrue(sent.isEmpty())
+                assertEquals(if (expired) "" else "Another writer", fixture.drafts.getValue(key()).text)
+                if (expired) assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            }
+        }
+
+    /** Reproduces a recognized segment followed by a provider-rejected nonzero tail. */
+    private fun failRecognizedTail(
+        fixture: Fixture,
+        send: Boolean,
+    ) {
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(500L)
+        if (send) fixture.controller.send() else fixture.controller.paste()
+        repeat(2) {
+            fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+            fixture.scheduler.runDelay(500L)
+        }
+        fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
+        assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+        assertTrue(fixture.platform.pendingCallerAudio)
+        assertEquals("first", (fixture.controller.state as ConversationDictationState.Failed).retainedTranscript)
+    }
 
     /** A resolved chunk cannot consume the retry budget of the next caller-audio chunk. */
     @Test

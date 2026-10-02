@@ -672,6 +672,13 @@ internal class ConversationDictationController internal constructor(
                 null
             }
 
+    /** Whether recovery can retranscribe sealed audio without reopening capture. */
+    val canRetryRetainedAudio: Boolean
+        get() =
+            state is ConversationDictationState.Failed &&
+                finishRequested &&
+                runCatching(platform::callerAudioHasPending).getOrDefault(false)
+
     /** The speech service package a provider failure's recovery action has to open. */
     val speechProviderPackage: String?
         get() = runCatching(platform::speechProviderPackage).getOrNull()
@@ -936,15 +943,43 @@ internal class ConversationDictationController internal constructor(
     fun paste() {
         if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed
-        if (failed?.reason == ConversationDictationFailure.SendBlocked && !failed.retainedTranscript.isNullOrBlank()) {
-            completionIntent.reset()
-            completionIntent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
-            finishRequested = true
-            state = ConversationDictationState.Processing(failed.sessionId, failed.target)
-            validateAndDeliverTranscript(failed.sessionId, failed.target, failed.retainedTranscript)
+        if (failed != null &&
+            failed.reason != ConversationDictationFailure.DeliveryUnknown &&
+            !failed.retainedTranscript.isNullOrBlank()
+        ) {
+            deliverRetainedTranscript(failed, ConversationDictationDeliveryMode.PasteIntoDraft)
         } else {
             stopWithDeliveryMode(ConversationDictationDeliveryMode.PasteIntoDraft)
         }
+    }
+
+    /** An explicit confirmation may send only the recognized prefix instead of retrying failed PCM. */
+    fun sendRecognizedText() {
+        if (expireRetainedRecoveryIfDue()) return
+        val failed = state as? ConversationDictationState.Failed ?: return
+        if (failed.reason != ConversationDictationFailure.SendBlocked ||
+            failed.retainedTranscript.isNullOrBlank()
+        ) {
+            return
+        }
+        deliverRetainedTranscript(failed, ConversationDictationDeliveryMode.SendOnFinish)
+    }
+
+    /** Preserves origin validation while the user explicitly chooses what to do with recovered text. */
+    private fun deliverRetainedTranscript(
+        failed: ConversationDictationState.Failed,
+        mode: ConversationDictationDeliveryMode,
+    ) {
+        recoveryTimeoutHandle?.cancel()
+        recoveryTimeoutHandle = null
+        recoveryDeadlineElapsedMillis = null
+        pendingForegroundRecoverySessionId = null
+        notificationActionGeneration += 1L
+        completionIntent.reset()
+        completionIntent.choose(mode)
+        finishRequested = true
+        state = ConversationDictationState.Processing(failed.sessionId, failed.target)
+        validateAndDeliverTranscript(failed.sessionId, failed.target, requireNotNull(failed.retainedTranscript))
     }
 
     /** Stops recognition and sends only after the existing origin/draft safety checks pass. */
@@ -1295,9 +1330,10 @@ internal class ConversationDictationController internal constructor(
         state = ConversationDictationState.Starting(failed.sessionId, failed.target)
         armCallerAudioDrainTimeout(failed.sessionId, failed.target)
         retainedCallerAudioRetries = 0
-        retainedCallerAudioCapacityRetries = if (failed.reason.hasProviderCapacityBackoff) 1 else 0
+        val failure = failed.cause ?: failed.reason
+        retainedCallerAudioCapacityRetries = if (failure.hasProviderCapacityBackoff) 1 else 0
         val delayMillis =
-            failed.reason.retainedCallerAudioRetryDelayMillis(retainedCallerAudioCapacityRetries)
+            failure.retainedCallerAudioRetryDelayMillis(retainedCallerAudioCapacityRetries)
         conversationDictationDiagnostic(
             "event=caller_audio_retry_requested source=failure delay_ms=$delayMillis",
         )
@@ -2302,8 +2338,21 @@ internal class ConversationDictationController internal constructor(
             ConversationDictationState.Failed(
                 sessionId = sessionId,
                 target = target,
-                reason = failure,
+                reason =
+                    if (requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish &&
+                        accumulatedTranscript.isNotBlank()
+                    ) {
+                        ConversationDictationFailure.SendBlocked
+                    } else {
+                        failure
+                    },
                 retainedTranscript = accumulatedTranscript.trim().ifBlank { null },
+                cause =
+                    failure.takeIf {
+                        requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish &&
+                            accumulatedTranscript.isNotBlank()
+                    },
+                recognitionIncomplete = true,
             )
         state = failed
         notificationActionGeneration += 1L

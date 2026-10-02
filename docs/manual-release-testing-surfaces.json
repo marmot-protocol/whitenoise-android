@@ -28849,6 +28849,14 @@
         "test_ids": [
           "MSG-026"
         ]
+      },
+      {
+        "surface": "Dictation recognized-prefix recovery alongside sealed audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "fun sendRecognizedText()",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ],
     "notification_content_contracts": [

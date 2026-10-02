@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -91,34 +92,46 @@ private fun ConversationDictationSendConfirmation(
         onDismiss = onDismiss,
         onSend = {
             onDismiss()
-            if (controller.state === state) controller.retry()
+            if (controller.state === state) controller.sendRecognizedText()
         },
         onPaste = {
             onDismiss()
             if (controller.state === state) controller.paste()
         },
-        onOpenSettings =
-            if (recovery == ConversationDictationRecovery.Retry) {
-                null
-            } else {
-                {
-                    when (recovery) {
-                        ConversationDictationRecovery.AppSettings -> openDictationAppSettings(context)
-                        ConversationDictationRecovery.SpeechProviderSetup ->
-                            openSpeechProviderSetup(context, controller.speechProviderPackage)
-                        ConversationDictationRecovery.Retry -> Unit
-                    }
-                }
-            },
+        onOpenSettings = confirmationRecoveryAction(state, controller, recovery, context, onDismiss),
         settingsLabel =
             stringResource(
-                if (recovery == ConversationDictationRecovery.SpeechProviderSetup) {
+                if (recovery == ConversationDictationRecovery.Retry) {
+                    R.string.retry
+                } else if (recovery == ConversationDictationRecovery.SpeechProviderSetup) {
                     R.string.dictation_open_speech_service
                 } else {
                     R.string.open_app_settings
                 },
             ),
     )
+}
+
+/** Recovery keeps sealed-audio Retry distinct from the explicit choice to send only recognized text. */
+private fun confirmationRecoveryAction(
+    state: ConversationDictationState.Failed,
+    controller: ConversationDictationController,
+    recovery: ConversationDictationRecovery,
+    context: Context,
+    onDismiss: () -> Unit,
+): (() -> Unit)? {
+    if (recovery == ConversationDictationRecovery.Retry && !controller.canRetryRetainedAudio) return null
+    return {
+        if (controller.state === state) {
+            onDismiss()
+            when (recovery) {
+                ConversationDictationRecovery.AppSettings -> openDictationAppSettings(context)
+                ConversationDictationRecovery.SpeechProviderSetup ->
+                    openSpeechProviderSetup(context, controller.speechProviderPackage)
+                ConversationDictationRecovery.Retry -> controller.retry()
+            }
+        }
+    }
 }
 
 /** Requires an explicit choice before sending a prefix after transcription ended unsuccessfully. */
