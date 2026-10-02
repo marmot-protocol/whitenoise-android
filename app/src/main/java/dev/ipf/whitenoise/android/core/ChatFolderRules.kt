@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core
 
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import java.util.Locale
 
 /**
@@ -37,6 +38,7 @@ import java.util.Locale
  *     from rule matches; manual members are the user's explicit choice and
  *     are never filtered here.
  */
+@Suppress("ReturnCount") // Invalid/unsupported payloads must reject the whole automatic rule before evaluation.
 internal fun chatFolderChatIds(
     items: List<ChatListItem>,
     manualChatIds: Set<String>,
@@ -46,6 +48,20 @@ internal fun chatFolderChatIds(
     displayTitle: (ChatListItem) -> String,
 ): Set<String> {
     if (rule == null) return manualChatIds
+    rule.smartFilter?.let { payload ->
+        val filter = SmartFolderCodec.decode(payload)?.takeIf(SmartFolderCodec::valid) ?: return manualChatIds
+        return manualChatIds +
+            items
+                .filter {
+                    smartFolderMatches(
+                        filter,
+                        it,
+                        displayTitle,
+                    ) == FolderTruth.TRUE
+                }.map {
+                    it.foldedId
+                }
+    }
     val criteria =
         FolderRuleCriteria(
             rule = rule,

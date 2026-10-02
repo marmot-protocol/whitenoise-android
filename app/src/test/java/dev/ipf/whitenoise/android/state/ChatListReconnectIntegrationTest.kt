@@ -21,6 +21,7 @@ import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
+import dev.ipf.whitenoise.android.ui.chats.returnSmartFolderWindowsToTop
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -606,67 +607,6 @@ class ChatListReconnectIntegrationTest {
         }
     }
 
-    /** Builds a numeric-only diagnostics collector without enabling logcat output. */
-    private fun testRecoveryDiagnostics(): NotificationNetworkRecoveryDiagnostics =
-        NotificationNetworkRecoveryDiagnostics(
-            traceFactory = { null },
-            traceRecorder = { _, _, _, _, _, _, _ -> },
-        )
-
-    /** Builds an app state whose live chat-list sources are fully controlled by this test. */
-    private fun chatListTestAppState(
-        diagnostics: NotificationNetworkRecoveryDiagnostics,
-        chatList: ChatListWindowHandle,
-        chats: ChatsSubscriptionHandle,
-    ): WhiteNoiseAppState =
-        chatListTestAppState(
-            diagnostics = diagnostics,
-            liveSubscriptions =
-                ChatListLiveSubscriptions(
-                    openChatListWindow = { _, view ->
-                        if (view == ChatListViewFfi.CHATS) chatList else TerminatingChatListSubscription(view)
-                    },
-                    openChats = { _, _ -> chats },
-                ),
-        )
-
-    /** Builds an app state with lifecycle-aware live sources and optional catch-up observation. */
-    private fun chatListTestAppState(
-        diagnostics: NotificationNetworkRecoveryDiagnostics,
-        liveSubscriptions: ChatListLiveSubscriptions,
-        marmotAccessObserver: (() -> Unit)? = null,
-    ): WhiteNoiseAppState =
-        WhiteNoiseAppState(
-            context = ApplicationProvider.getApplicationContext<Context>(),
-            draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
-            accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ConversationTimelineTestIds.ACCOUNT_REF,
-                        accountIdHex = ConversationTimelineTestIds.ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
-                ),
-            activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
-            notificationNetworkRecoveryDiagnostics = diagnostics,
-            marmotAccessObserver = marmotAccessObserver,
-        ).also { state ->
-            state.liveSubscriptionOverrides.chatList = liveSubscriptions
-        }
-
-    /** Builds the controller used by lifecycle-only subscription tests. */
-    private fun testChatsController(appState: WhiteNoiseAppState): ChatsController =
-        ChatsController(
-            appState = appState,
-            initialAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
-            memberSnapshotRetryDelay = { Long.MAX_VALUE },
-            memberSnapshotLoader = { _, _ -> emptyList() },
-        )
-
     /** Supplies a rendered empty target projection before live streams open. */
     private fun emptyLocalSnapshot(): AccountSwitchLocalSnapshot =
         AccountSwitchLocalSnapshot(
@@ -694,7 +634,108 @@ private fun awaitChatListCondition(condition: () -> Boolean) {
     throw AssertionError("Chat-list condition not met within 5 simulated seconds")
 }
 
-/** Controllable chat-list subscription used by the recovery integration test. */
+/** Exercises the native window adapter used on advanced-folder entry. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class SmartFolderWindowResetTest {
+    /** Advanced-folder entry restores the newest active and archived rows after a shifted window. */
+    @Test
+    fun smartFolderEntryRestoresBothLoadedWindows() {
+        val older = notificationChatListRow().copy(groupIdHex = "aa".repeat(32))
+        val newest = notificationChatListRow().copy(groupIdHex = "bb".repeat(32))
+        val archived = newest.copy(groupIdHex = "cc".repeat(32), archived = true)
+        val subscriptions = DroppedChatSubscriptions(older, newest)
+        val controller =
+            testChatsController(
+                chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions),
+            )
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
+            subscriptions.groupProjection = null
+            subscriptions.first.emitRows(listOf(older))
+            awaitChatListCondition { controller.items.map { it.id } == listOf(older.groupIdHex) }
+            subscriptions.pinnedProjection = null
+            subscriptions.groupProjection = newest
+            subscriptions.first.commandRows = listOf(newest)
+            subscriptions.archived.commandRows = listOf(archived)
+            val command = bindScope.launch { controller.returnSmartFolderWindowsToTop() }
+            awaitChatListCondition {
+                command.isCompleted &&
+                    controller.items.map { it.id } == listOf(newest.groupIdHex) &&
+                    controller.archivedItems.map { it.id } == listOf(archived.groupIdHex)
+            }
+        } finally {
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+}
+
+/** Builds a numeric-only diagnostics collector without enabling logcat output. */
+private fun testRecoveryDiagnostics(): NotificationNetworkRecoveryDiagnostics =
+    NotificationNetworkRecoveryDiagnostics(
+        traceFactory = { null },
+        traceRecorder = { _, _, _, _, _, _, _ -> },
+    )
+
+/** Builds an app state whose live chat-list sources are fully controlled by this test. */
+private fun chatListTestAppState(
+    diagnostics: NotificationNetworkRecoveryDiagnostics,
+    chatList: ChatListWindowHandle,
+    chats: ChatsSubscriptionHandle,
+): WhiteNoiseAppState =
+    chatListTestAppState(
+        diagnostics = diagnostics,
+        liveSubscriptions =
+            ChatListLiveSubscriptions(
+                openChatListWindow = { _, view ->
+                    if (view == ChatListViewFfi.CHATS) chatList else TerminatingChatListSubscription(view)
+                },
+                openChats = { _, _ -> chats },
+            ),
+    )
+
+/** Builds an app state with lifecycle-aware live sources and optional catch-up observation. */
+private fun chatListTestAppState(
+    diagnostics: NotificationNetworkRecoveryDiagnostics,
+    liveSubscriptions: ChatListLiveSubscriptions,
+    marmotAccessObserver: (() -> Unit)? = null,
+): WhiteNoiseAppState =
+    WhiteNoiseAppState(
+        context = ApplicationProvider.getApplicationContext<Context>(),
+        draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
+        accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = ConversationTimelineTestIds.ACCOUNT_REF,
+                    accountIdHex = ConversationTimelineTestIds.ACCOUNT_ID,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                ),
+            ),
+        activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+        notificationNetworkRecoveryDiagnostics = diagnostics,
+        marmotAccessObserver = marmotAccessObserver,
+    ).also { state ->
+        state.liveSubscriptionOverrides.chatList = liveSubscriptions
+    }
+
+/** Builds the controller used by lifecycle-only subscription tests. */
+private fun testChatsController(appState: WhiteNoiseAppState): ChatsController =
+    ChatsController(
+        appState = appState,
+        initialAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
+        memberSnapshotRetryDelay = { Long.MAX_VALUE },
+        memberSnapshotLoader = { _, _ -> emptyList() },
+    )
+
 private class ScriptedChatListSubscription(
     private val initialRows: List<ChatListRowFfi>,
     private val view: ChatListViewFfi = ChatListViewFfi.CHATS,

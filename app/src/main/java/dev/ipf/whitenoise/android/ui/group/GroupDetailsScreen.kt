@@ -1558,13 +1558,20 @@ internal fun GroupDetailsScreen(
                     remember(
                         folderStoreState,
                         appState.chatListItems,
+                        appState.archivedChatListItems,
                         appState.profileRevisionForCompose,
                         folderAccountRef,
                         chatIdLower,
                         groupTitleCopy,
                     ) {
                         val accountRef = folderAccountRef ?: return@remember emptyList()
-                        val thisChatRow = appState.chatListItems.filter { it.id.equals(chatIdLower, ignoreCase = true) }
+                        val thisChatRow =
+                            (appState.chatListItems + appState.archivedChatListItems).filter {
+                                it.id.equals(
+                                    chatIdLower,
+                                    ignoreCase = true,
+                                )
+                            }
                         appState.chatFolderPreferences
                             .foldersFor(accountRef)
                             .mapNotNull { folder ->
