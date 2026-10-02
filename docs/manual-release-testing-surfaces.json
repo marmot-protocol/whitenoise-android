@@ -311,6 +311,14 @@
         "test_ids": ["MSG-017"]
       },
       {
+        "surface": "KeyPackage deletion DNS deadline and account cancellation boundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/KeyPackageDeletionResult.kt",
+        "anchor": "internal suspend fun deleteKeyPackageThroughSafeSourceRelays(",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
         "surface": "Key package inventory load failure toast",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackageInventory.kt",
         "anchor": "R.string.toast_couldnt_load_key_packages",
