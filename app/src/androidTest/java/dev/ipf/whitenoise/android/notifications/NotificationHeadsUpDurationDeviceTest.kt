@@ -23,6 +23,7 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -41,6 +42,7 @@ import org.junit.runner.RunWith
  * a separate explicit opt-in and the isolated local preview package. Listener
  * callbacks establish card lifecycle, never rendered banner duration.
  */
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = Build.VERSION_CODES.R, maxSdkVersion = 37)
 class NotificationHeadsUpDurationDeviceTest {

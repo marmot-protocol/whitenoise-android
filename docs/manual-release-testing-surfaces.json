@@ -24628,6 +24628,7 @@
     ],
     "source_coverage": [
       {
+<<<<<<< HEAD
         "surface": "chat_folder_archived_only",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
         "anchor": "R.string.chat_folder_archived_only",
@@ -25160,6 +25161,15 @@
         "anchor": "R.string.smart_folder_prototype",
         "test_ids": [
           "FLD-004"
+=======
+        "surface": "Android 11 notification reply history re-post",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/RemoteInputHistoryCompat.kt",
+        "anchor": "internal fun Notification.withoutApi30RemoteInputHistoryItems(",
+        "test_ids": [
+          "NTF-016",
+          "NTF-017",
+          "NTF-029"
+>>>>>>> origin/master
         ]
       },
       {

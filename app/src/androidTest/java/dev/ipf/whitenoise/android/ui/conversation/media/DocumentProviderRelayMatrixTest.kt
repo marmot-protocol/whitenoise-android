@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.core.MessageAttachments
@@ -36,6 +37,7 @@ import java.security.MessageDigest
 import java.util.UUID
 
 /** Opt-in exact-head SAF, viewer, and relay matrix on a fresh disposable preview emulator. */
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class DocumentProviderRelayMatrixTest {
     @Test

@@ -13,6 +13,7 @@ import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.core.MarmotClient
 import dev.ipf.whitenoise.android.state.AttachmentDownloadGate
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
@@ -52,6 +53,7 @@ import kotlin.math.ceil
 import kotlin.random.Random
 
 /** Opt-in component timings using generated images and a separate disposable native store. */
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class MediaAttachmentLatencyProbe {
     /** Opt-in controlled received-message probe; public endpoints are never used by this entry point. */

@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -14,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /** Opt-in relay test on a disposable preview package with one prepared local-signing account. */
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class AppReviewDemoEndToEndTest {
     @get:Rule

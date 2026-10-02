@@ -12,6 +12,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -87,6 +88,7 @@ class InboundShareTaskReuseDeviceTest {
      * prior in-memory route on committed Back.
      */
     @Test
+    @ManualDeviceFixture
     fun warmTextAndMultipleFileSharesDrawPickerFirstAndCancelToThePriorRoute() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val targetContext = ApplicationProvider.getApplicationContext<Context>()
