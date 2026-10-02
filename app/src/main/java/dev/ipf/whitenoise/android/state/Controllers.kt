@@ -11633,13 +11633,13 @@ class ConversationController(
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
         pruneRetainedTimelineRows(prepared)
-        installWindowFrame(installed?.frame)
-        // A replacement rebuilt every row, so every tally is stale. An extended window only changed
-        // the rows it added, altered or dropped.
+        val reactionReferenceChanges = installWindowFrame(installed?.frame)
+        // A replacement rebuilt every row, so every tally is stale. An extended window only changed the
+        // rows it added, altered or dropped, plus rows whose sidecar reactions moved under them (#2990).
         if (prepared.mode == WindowApplyMode.REPLACE) {
             recomputeReactions()
         } else {
-            recomputeReactions(commitPlan.touchedIds)
+            recomputeReactions(commitPlan.touchedIds + reactionReferenceChanges)
         }
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the

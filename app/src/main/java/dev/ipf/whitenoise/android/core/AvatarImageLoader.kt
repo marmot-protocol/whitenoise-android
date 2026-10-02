@@ -347,6 +347,25 @@ object AvatarImageLoader {
         }
     }
 
+    /**
+     * Republishes stored-avatar pixels an account-switch handoff decoded before [clearStoredAvatars] ran.
+     * Only `marmot-avatar:` keys are accepted, and those keys carry their owning account, so another
+     * account's pixels can never be restored under this one. An entry already present is left alone.
+     */
+    internal fun restoreStoredAvatar(
+        key: String,
+        image: ImageBitmap,
+        animatedSource: ByteArray?,
+    ) {
+        if (!isStoredAvatarKey(key)) return
+        synchronized(lock) {
+            if (cache.get(key) != null) return
+            cache.put(key, image)
+            failureExpiresAt.remove(key)
+            publishAnimatedSourceLocked(key, animatedSource)
+        }
+    }
+
     /** Test-only injection of a banner-variant entry, for deterministic first-frame coverage. */
     internal fun putCachedBanner(
         url: String,

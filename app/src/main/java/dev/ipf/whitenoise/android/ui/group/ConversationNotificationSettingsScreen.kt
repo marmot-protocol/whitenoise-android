@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
+import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
@@ -120,19 +121,12 @@ internal fun ConversationNotificationSettingsScreen(
             item {
                 SettingsGroup {
                     row("mute") { rowContext ->
-                        SettingsSwitch(
-                            context = rowContext,
-                            title = stringResource(R.string.mute),
-                            checked = isMuted,
-                            onCheckedChange = onToggleMute,
-                            modifier = Modifier.testTag(MUTE_SWITCH_ROW_TAG),
-                            subtitle =
-                                when {
-                                    isMuted && muteExpiryMillis != null -> mutedUntilLabel(muteExpiryMillis)
-                                    isMuted -> stringResource(R.string.notify_nothing_while_muted)
-                                    else -> stringResource(R.string.notification_mute_detail)
-                                },
-                            enabled = !muteCommandPending,
+                        ConversationMuteSettingsSwitch(
+                            rowContext = rowContext,
+                            isMuted = isMuted,
+                            muteExpiryMillis = muteExpiryMillis,
+                            muteCommandPending = muteCommandPending,
+                            onToggleMute = onToggleMute,
                         )
                     }
                     row("notify_for") { rowContext ->
@@ -384,6 +378,31 @@ private fun mutedUntilLabel(expiryMillis: Long): String =
         R.string.notify_muted_until,
         IdentityFormatter.clockTime((expiryMillis / MILLIS_PER_SECOND).toULong()),
     )
+
+/** Renders the durable mute switch with the direct-mention exception visible in every state. */
+@Composable
+internal fun ConversationMuteSettingsSwitch(
+    rowContext: SettingsRowContext,
+    isMuted: Boolean,
+    muteExpiryMillis: Long?,
+    muteCommandPending: Boolean,
+    onToggleMute: (Boolean) -> Unit,
+) {
+    SettingsSwitch(
+        context = rowContext,
+        title = stringResource(R.string.mute),
+        checked = isMuted,
+        onCheckedChange = onToggleMute,
+        modifier = Modifier.testTag(MUTE_SWITCH_ROW_TAG),
+        subtitle =
+            when {
+                isMuted && muteExpiryMillis != null -> mutedUntilLabel(muteExpiryMillis)
+                isMuted -> stringResource(R.string.notify_nothing_while_muted)
+                else -> stringResource(R.string.notification_mute_detail)
+            },
+        enabled = !muteCommandPending,
+    )
+}
 
 @Composable
 internal fun notificationModeLabel(mode: ChatNotifyMode): String =

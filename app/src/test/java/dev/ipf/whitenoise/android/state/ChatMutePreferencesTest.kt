@@ -40,6 +40,21 @@ class ChatMutePreferencesTest {
         assertEquals(ChatNotifyMode.ALL, ChatMutePreferences(context).mode("account", "group"))
     }
 
+    /** A command-only mute does not replace the preference restored after durable unmute. */
+    @Test
+    fun muteCommandDoesNotReplaceSavedMentionsPreference() {
+        val context = RuntimeEnvironment.getApplication()
+        clear(context)
+        val preferences = ChatMutePreferences(context)
+        preferences.setNotifyForMode("account", "group", ChatNotifyMode.MENTIONS_ONLY)
+
+        preferences.setMode("account", "group", ChatNotifyMode.NONE)
+
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, ChatMutePreferences(context).mode("account", "group"))
+        preferences.setNotifyForMode("account", "group", ChatNotifyMode.ALL)
+        assertEquals(ChatNotifyMode.ALL, ChatMutePreferences(context).mode("account", "group"))
+    }
+
     @Test
     fun legacyMuteRemainsUntilMdkConfirmation() {
         val context = RuntimeEnvironment.getApplication()

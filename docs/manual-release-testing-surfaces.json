@@ -5934,6 +5934,14 @@
         ]
       },
       {
+        "surface": "ConversationMuteSettingsSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "fun ConversationMuteSettingsSwitch(",
+        "test_ids": [
+          "NTF-028"
+        ]
+      },
+      {
         "surface": "LoadedNotificationCategories",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "fun LoadedNotificationCategories(",
@@ -25808,6 +25816,14 @@
         ]
       },
       {
+        "surface": "Incoming reaction references update the chips of an open conversation live",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+        "anchor": "fun reactionReferenceChanges(",
+        "test_ids": [
+          "MSG-031"
+        ]
+      },
+      {
         "surface": "A text or reply send publishes with one engine call and reads no draft",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DraftSend.kt",
         "anchor": "internal suspend fun MarmotInterface.sendComposerText(",
@@ -29057,6 +29073,32 @@
         "test_ids": [
           "NAV-006",
           "NAV-005"
+        ]
+      },
+      {
+        "surface": "A restored or switched-to chat list decodes stored peer avatars before its first frame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDurableAvatars.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(",
+        "test_ids": [
+          "CHL-023"
+        ]
+      },
+      {
+        "surface": "Startup and account-switch snapshots carry MDK's stored per-row presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "prewarmFirstFrameDurableAvatars(accountRef, presentedRows)",
+        "test_ids": [
+          "CHL-023",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "An account switch reinstalls the destination's decoded stored avatars after clearing the previous account's",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AccountSwitchLocalSnapshot.kt",
+        "anchor": "snapshot?.installFirstFrameDurableAvatars()",
+        "test_ids": [
+          "CHL-023",
+          "NAV-006"
         ]
       },
       {

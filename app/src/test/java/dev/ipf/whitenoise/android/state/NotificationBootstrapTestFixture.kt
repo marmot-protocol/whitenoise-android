@@ -12,6 +12,8 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.AvatarBytesFfi
 import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -123,6 +125,9 @@ internal class NotificationBootstrapTestFixture(
     private val onChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
     // Separate activation's presented-row boundary from concurrent raw unread folds.
     private val onPresentedChatList: ((accountRef: String) -> List<ChatListRowFfi>)? = null,
+    // Whole presented rows (with stored avatar assets) and their stored bytes, for first-frame avatar tests.
+    private val onPresentedRows: ((accountRef: String) -> List<PresentedChatRowFfi>?)? = null,
+    private val onReadAvatarAssets: ((accountRef: String, references: List<String>) -> List<AvatarBytesFfi>)? = null,
     private val onGroupMemberIdsPage: ((groupIds: List<String>) -> List<AppGroupMemberIdsFfi>)? = null,
     private val onMarkTimelineMessageRead: (() -> ChatListRowFfi?)? = null,
     private val onSetChatManuallyUnread: ((Boolean) -> ChatListRowFfi?)? = null,
@@ -134,6 +139,7 @@ internal class NotificationBootstrapTestFixture(
     private val onClearPushRegistration: ((accountRef: String) -> PushRegistrationShareOutcomeFfi)? = null,
     private val onUpsertPushRegistration: ((accountRef: String) -> Unit)? = null,
     private val onNotificationSettings: ((accountRef: String) -> NotificationSettingsFfi)? = null,
+    private val onChatNotificationSettings: ((String, String) -> ChatNotificationSettingsFfi)? = null,
     nativePushFallbackPlatform: NativePushFallbackPlatform = AndroidNativePushFallbackPlatform(context),
     pushServerConfigProvider: () -> PushServerConfig? = PushServerConfig::current,
     nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability = {
@@ -165,7 +171,7 @@ internal class NotificationBootstrapTestFixture(
     private val emittedPostStartUpdate = AtomicBoolean(false)
     private val runtimeStarted = AtomicBoolean(false)
     private val notificationDispatchGate =
-        PostStartNotificationDispatchGate(runtimeStarted).takeIf {
+        PostStartNotificationDispatchGate(runtimeStarted, delegate = notificationDispatcher).takeIf {
             delayFirstNotificationDispatchAfterRuntimeStart
         }
     private val subscriptionFailures = AtomicBoolean(initiallyFailSubscriptions)
@@ -302,15 +308,19 @@ internal class NotificationBootstrapTestFixture(
                     AuditLogSettingsFfi(enabled = false)
                 }
                 "setAuditLogSettings" -> arguments?.first()
-                "chatNotificationSettings" ->
-                    ChatNotificationSettingsFfi(
-                        accountRef = arguments?.get(0) as String,
-                        accountIdHex = "account-a",
-                        groupIdHex = arguments[1] as String,
-                        muted = false,
-                        mutedUntilMs = null,
-                        updatedAtMs = 0L,
-                    )
+                "chatNotificationSettings" -> {
+                    val accountRef = arguments?.get(0) as String
+                    val groupIdHex = arguments[1] as String
+                    onChatNotificationSettings?.invoke(accountRef, groupIdHex)
+                        ?: ChatNotificationSettingsFfi(
+                            accountRef = accountRef,
+                            accountIdHex = "account-a",
+                            groupIdHex = groupIdHex,
+                            muted = false,
+                            mutedUntilMs = null,
+                            updatedAtMs = 0L,
+                        )
+                }
                 "groupRecoveryStatus" ->
                     GroupRecoveryStatusFfi(
                         groupIdHex = arguments?.get(1) as String,
@@ -445,10 +455,18 @@ internal class NotificationBootstrapTestFixture(
                 "presentedChatList" -> {
                     directChatListCalls.incrementAndGet()
                     val accountRef = arguments?.get(0) as String
-                    presentedChatListSnapshot(
+                    onPresentedRows?.invoke(accountRef)?.let { rows ->
+                        presentedChatListSnapshot(emptyList()).copy(rows = rows)
+                    } ?: presentedChatListSnapshot(
                         onPresentedChatList?.invoke(accountRef) ?: onChatList?.invoke(accountRef) ?: chatListRows,
                     )
                 }
+                "readAvatarAssets" -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val references = arguments?.get(1) as List<String>
+                    onReadAvatarAssets?.invoke(arguments[0] as String, references) ?: emptyList<AvatarBytesFfi>()
+                }
+                "requestAvatarAssets" -> emptyList<AvatarAssetFfi>()
                 "timelineMessages" -> {
                     notificationTimelineCalls.incrementAndGet()
                     timelinePage

@@ -159,18 +159,67 @@ class LocalNotificationPolicyTest {
         )
     }
 
+    /** A durable mute passes a typed direct mention without rewriting the saved host mode. */
     @Test
-    fun engineMutedConversationIsSuppressedEvenForMentions() {
-        // The engine's durable mute converges from other devices and is a full
-        // mute: it must win over a permissive local mode, mentions included.
-        assertFalse(
+    fun engineMutedConversationAllowsDirectMentionWithoutChangingSavedMode() {
+        assertTrue(
             LocalNotificationPolicy.shouldPost(
                 update(groupIdHex = "muted-group", accountRef = "account-a", isMention = true),
                 appInForeground = false,
                 activeConversationGroupIdHex = null,
                 activeConversationAccountRef = null,
                 appLockScreenVisible = false,
-                conversationNotifyMode = { _, _ -> ChatNotifyMode.ALL },
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.MENTIONS_ONLY },
+                engineMuted = true,
+            ),
+        )
+    }
+
+    /** Whole-chat mute still rejects ordinary traffic, self-sends, and non-message events. */
+    @Test
+    fun engineMuteStillSuppressesOrdinarySelfAndNonMessageUpdates() {
+        val updates =
+            listOf(
+                update(groupIdHex = "muted-group", isMention = false),
+                update(groupIdHex = "muted-group", isMention = true, isFromSelf = true),
+                update(groupIdHex = "muted-group", isMention = true, trigger = NotificationTriggerFfi.MADE_ADMIN),
+            )
+        updates.forEach { candidate ->
+            assertFalse(
+                LocalNotificationPolicy.shouldPost(
+                    update = candidate,
+                    appInForeground = false,
+                    activeConversationGroupIdHex = null,
+                    activeConversationAccountRef = null,
+                    appLockScreenVisible = false,
+                    engineMuted = true,
+                ),
+            )
+        }
+    }
+
+    /** The mention exception never overrides per-member mute or the app lock. */
+    @Test
+    fun engineMutedDirectMentionStillRespectsMemberMuteAndAppLock() {
+        val mention = update(groupIdHex = "muted-group", accountRef = "account-a", isMention = true)
+        assertFalse(
+            LocalNotificationPolicy.shouldPost(
+                update = mention,
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                engineMuted = true,
+                senderMutedInGroup = mutedMember(groupIdHex = "muted-group"),
+            ),
+        )
+        assertFalse(
+            LocalNotificationPolicy.shouldPost(
+                update = mention,
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = true,
                 engineMuted = true,
             ),
         )
@@ -442,6 +491,7 @@ class LocalNotificationPolicyTest {
             appLockScreenVisible = false,
         )
 
+    /** Builds a typed native update with explicit sender and self-origin fields for policy cases. */
     private fun update(
         groupIdHex: String,
         accountRef: String = "account",
@@ -450,6 +500,7 @@ class LocalNotificationPolicyTest {
         isDm: Boolean = false,
         senderIdHex: String = DEFAULT_SENDER_ID,
         reactionEmoji: String? = null,
+        isFromSelf: Boolean = false,
     ) = NotificationUpdateFfi(
         isMention = isMention,
         notificationKey = "message:$accountRef:message",
@@ -468,7 +519,7 @@ class LocalNotificationPolicyTest {
         reactionEmoji = reactionEmoji,
         reactedToPreview = null,
         timestampMs = 1234,
-        isFromSelf = false,
+        isFromSelf = isFromSelf,
     )
 
     private fun user(

@@ -8,6 +8,13 @@ import dev.ipf.whitenoise.android.state.ChatNotifyMode
 typealias GroupSenderMutePredicate = (accountRef: String, groupIdHex: String, senderIdHex: String) -> Boolean
 
 object LocalNotificationPolicy {
+    /**
+     * Applies local conversation and sender policy to one MDK-classified update.
+     *
+     * A durable whole-chat mute admits only a direct mention; app lock, active
+     * conversation, and member mute can still suppress it. Android permission
+     * and channel eligibility remain the notification presenter's decision.
+     */
     fun shouldPost(
         update: NotificationUpdateFfi,
         appInForeground: Boolean,
@@ -32,17 +39,10 @@ object LocalNotificationPolicy {
         // Membership events belong to an app-wide OS channel. A conversation
         // mute controls its content, not the safety-critical fact that this
         // account can no longer participate in the group.
-        if (!isGlobalMembershipEvent) {
-            // The engine's durable mute converges across a user's devices, so a
-            // conversation muted elsewhere stays quiet here even before local
-            // preferences learn about it. It is a full mute: the most restrictive
-            // of it and the local notify mode wins (mentions included).
-            if (engineMuted) return false
-            when (conversationNotifyMode(update.accountRef, update.groupIdHex)) {
-                ChatNotifyMode.ALL -> Unit
-                ChatNotifyMode.MENTIONS_ONLY -> if (!update.isMention) return false
-                ChatNotifyMode.NONE -> return false
-            }
+        if (!isGlobalMembershipEvent &&
+            !conversationMuteAllowsUpdate(update, engineMuted, conversationNotifyMode)
+        ) {
+            return false
         }
         if (isSenderMutedForUpdate(update, senderMutedInGroup)) return false
 
@@ -56,6 +56,22 @@ object LocalNotificationPolicy {
                 activeConversationAccountRef == update.accountRef &&
                 activeConversationGroupIdHex == update.groupIdHex
         )
+    }
+
+    /** MDK mute admits direct mentions; otherwise the saved host mode decides. */
+    private fun conversationMuteAllowsUpdate(
+        update: NotificationUpdateFfi,
+        engineMuted: Boolean,
+        conversationNotifyMode: (accountRef: String, groupIdHex: String) -> ChatNotifyMode,
+    ): Boolean {
+        if (engineMuted) {
+            return update.trigger == NotificationTriggerFfi.NEW_MESSAGE && update.isMention && !update.isFromSelf
+        }
+        return when (conversationNotifyMode(update.accountRef, update.groupIdHex)) {
+            ChatNotifyMode.ALL -> true
+            ChatNotifyMode.MENTIONS_ONLY -> update.isMention
+            ChatNotifyMode.NONE -> false
+        }
     }
 
     /**
