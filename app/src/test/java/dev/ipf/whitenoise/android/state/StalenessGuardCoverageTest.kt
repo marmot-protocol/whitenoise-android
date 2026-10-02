@@ -41,7 +41,7 @@ class StalenessGuardCoverageTest {
                         "groupRecoveryLifetime",
                     ),
                 "AccountUnreadStore.kt" to listOf("refreshes"),
-                "AttachmentOpenCoordinator.kt" to listOf("openRequests"),
+                "AttachmentOpenCoordinator.kt" to listOf("dispatchLifetimes", "userActions"),
                 "AttachmentTransferCoordinator.kt" to listOf("terminalLifetimes", "refreshLifetimes"),
                 "ConversationInitialPresentationWarm.kt" to listOf("preparations"),
                 "ConversationCardPostSynchronizer.kt" to listOf("dismissals", "shows"),
