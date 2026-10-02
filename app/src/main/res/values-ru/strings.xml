@@ -1602,6 +1602,7 @@
     <string name="custom_emoji_too_large">Изображение больше 1 МБ.</string>
     <string name="custom_emoji_not_image">Этот файл не в формате, который White Noise может отправлять как эмодзи. Используйте PNG, GIF, WebP или JPEG.</string>
     <string name="custom_emoji_save_failed">Не удалось сохранить эмодзи.</string>
+    <string name="custom_emoji_unsendable">Только отображение, отправить нельзя. Нажмите, чтобы удалить.</string>
     <string name="action_color">Цвет действия</string>
     <string name="action_color_no_active_account">Выберите активную учётную запись, прежде чем настраивать её акцентный цвет.</string>
     <string name="bubble_color_preview">Предпросмотр</string>

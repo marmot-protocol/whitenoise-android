@@ -14,6 +14,8 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.core.Nip30Emoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -22,6 +24,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.resume
 
 class CustomEmojiSendTest {
     @get:Rule
@@ -105,15 +111,40 @@ class CustomEmojiSendTest {
         assertTrue(readLocalEmojiArtwork(folder.root.resolve("missing"), listOf(":party:")).isEmpty())
     }
 
-    /** A leftover unsendable `party.img` never shadows the sendable `party.png` beside it. */
+    /** A directory that lists [names] in exactly that order, whatever order the filesystem would use. */
+    private fun directoryListing(
+        directory: File,
+        vararg names: String,
+    ): File =
+        object : File(directory.path) {
+            /** The fixed listing, so the test never depends on the filesystem's own order. */
+            override fun listFiles(): Array<File> = names.map { File(directory, it) }.toTypedArray()
+        }
+
+    /** A legacy `party.img` listed ahead of `party.png` never shadows it, whatever order the files list in. */
     @Test
     fun staleUnsendableFileDoesNotShadowTheSendableOne() {
         val directory = folder.newFolder("emoji")
         directory.resolve("party.img").writeBytes(byteArrayOf(8))
         directory.resolve("party.png").writeBytes(byteArrayOf(1, 2))
-        val read = readLocalEmojiArtwork(directory, listOf(":party:")).single()
+        val listed = directoryListing(directory, "party.img", "party.png")
+        assertEquals("party.img", listed.listFiles()!!.first().name)
+        val read = readLocalEmojiArtwork(listed, listOf(":party:")).single()
         assertEquals("party.png", read.fileName)
         assertArrayEquals(byteArrayOf(1, 2), read.bytes)
+    }
+
+    /** An oversized first match falls through to the next sendable file, as the picker does. */
+    @Test
+    fun oversizedFirstMatchFallsThroughToTheNextSendableFile() {
+        val directory = folder.newFolder("emoji")
+        directory.resolve("party.gif").writeBytes(ByteArray(CustomEmojiStore.MAX_BYTES + 1))
+        directory.resolve("party.png").writeBytes(byteArrayOf(1, 2))
+        val listed = directoryListing(directory, "party.png", "party.gif")
+        val read = readLocalEmojiArtwork(listed, listOf(":party:")).single()
+        assertEquals("party.png", read.fileName)
+        directory.resolve("party.png").writeBytes(ByteArray(CustomEmojiStore.MAX_BYTES + 1))
+        assertTrue(readLocalEmojiArtwork(listed, listOf(":party:")).isEmpty())
     }
 
     /** A second read after the file changed returns the new bytes and digest, so nothing stale is sent. */
@@ -217,6 +248,69 @@ class CustomEmojiSendTest {
             assertTrue(failure is EmojiChatChangedException)
             assertEquals(2, failing.count { it.first == "sendTaggedMedia" })
         }
+
+    /**
+     * Chat A uses cached X plus new Y. While A's upload of Y is held, chat B fills the 64-entry cache and
+     * evicts X. A must still publish exactly once more, because it captured X before the upload began.
+     */
+    @Test
+    fun anotherChatEvictingACachedReferenceDoesNotFailAnInFlightSend() =
+        runTest {
+            val sends = mutableListOf<String>()
+            val held = mutableListOf<Continuation<Any?>>()
+            val engine =
+                nativeBoundary { method, args ->
+                    when (method) {
+                        "uploadMedia" -> {
+                            val request = args[2] as MediaUploadRequestFfi
+                            if (args[1] == "chat-a" && request.attachments.any { it.fileName == "y.png" }) {
+                                @Suppress("UNCHECKED_CAST")
+                                held += args.last() as Continuation<Any?>
+                                COROUTINE_SUSPENDED
+                            } else {
+                                uploaded(request)
+                            }
+                        }
+                        "sendTaggedMedia" -> {
+                            sends += args[1] as String
+                            sent
+                        }
+                        else -> error(method)
+                    }
+                }
+            val cache = EmojiUploadCache()
+            val x = artwork("x", byteArrayOf(1, 1))
+            val y = artwork("y", byteArrayOf(2, 2))
+
+            /** Sends `hi` with [emoji] in [group] through the shared cache. */
+            suspend fun sendIn(
+                group: String,
+                emoji: List<LocalEmojiArtwork>,
+            ) = engine.sendTextWithCustomEmoji("a", group, "hi", emoji, cache, { 7uL })
+
+            sendIn("chat-a", listOf(x))
+            val inFlight = async { sendIn("chat-a", listOf(x, y)) }
+            runCurrent()
+            assertEquals(1, held.size)
+
+            sendIn("chat-b", (0 until 64).map { artwork("b$it", byteArrayOf(it.toByte(), 9)) })
+            held.single().resume(
+                MediaUploadResultFfi(
+                    listOf(MediaUploadAttachmentResultFfi(reference("https://blob/y.png"), 1uL)),
+                    null,
+                ),
+            )
+
+            assertEquals(sent, inFlight.await())
+            assertEquals(listOf("chat-a", "chat-b", "chat-a"), sends)
+        }
+
+    /** The upload result the fake blob server returns for [request]: one stored reference per image. */
+    private fun uploaded(request: MediaUploadRequestFfi) =
+        MediaUploadResultFfi(
+            request.attachments.map { MediaUploadAttachmentResultFfi(reference("https://blob/${it.fileName}"), 1uL) },
+            null,
+        )
 
     /** Eviction never removes a reference the current send needs, even when it is the oldest cached one. */
     @Test
@@ -365,5 +459,5 @@ class CustomEmojiSendTest {
 }
 
 /** The text MDK gives an `InvalidMediaReference` for a reference from an earlier epoch. */
-private const val STALE_EPOCH_DETAILS =
+internal const val STALE_EPOCH_DETAILS =
     "media reference was encrypted at epoch 3 but the group is at epoch 4; upload it again"

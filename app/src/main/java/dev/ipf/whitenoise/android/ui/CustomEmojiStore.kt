@@ -21,7 +21,11 @@ import java.io.File
 import java.io.IOException
 import java.util.Locale
 
-/** One user-defined emoji: `:code:`, the file it lives in, and its decoded artwork. */
+/**
+ * One user-defined emoji: `:code:`, the file it lives in, and its decoded artwork. A file saved by an
+ * earlier version in a format that cannot be sent (`<code>.img`) is not [sendable]: it still renders
+ * and can be removed, but it is never offered for composing and never uploaded.
+ */
 @Immutable
 internal class CustomEmoji(
     val shortcode: String,
@@ -29,6 +33,9 @@ internal class CustomEmoji(
     val image: ImageBitmap,
 ) {
     val art = EmojiArt.Decoded(image)
+
+    /** Whether the file has an extension the sender can upload. */
+    val sendable: Boolean = CustomEmojiStore.hasSendableExtension(file)
 }
 
 /** The user's emoji in shortcode order. */
@@ -38,6 +45,10 @@ internal class CustomEmojiSet(
 ) {
     private val byShortcode = entries.associateBy { it.shortcode }
 
+    /** The emoji that can be composed and sent, leaving out render-only legacy files. */
+    val sendable: List<CustomEmoji> = entries.filter { it.sendable }
+
+    /** Any emoji with this code, sendable or not, so existing artwork keeps rendering. */
     operator fun get(shortcode: String): CustomEmoji? = byShortcode[shortcode]
 
     companion object {
@@ -103,11 +114,11 @@ internal class CustomEmojiStore(
         return rejected ?: mutex.withLock { withContext(Dispatchers.IO) { store(code, bytes) } }
     }
 
-    /** Deletes the file behind [shortcode]. */
+    /** Deletes every file behind [shortcode], including a legacy file a sendable one shadows. */
     suspend fun remove(shortcode: String) {
         mutex.withLock {
             withContext(Dispatchers.IO) {
-                emoji[shortcode]?.file?.delete()
+                filesFor(shortcode.trim(':')).forEach(File::delete)
                 emoji = scan()
                 loaded = true
             }
@@ -157,12 +168,17 @@ internal class CustomEmojiStore(
         return files.filter { it.isFile && it.nameWithoutExtension == code }
     }
 
+    /**
+     * Every decodable emoji file, legacy formats included so they stay visible and removable. A sendable
+     * file sorts ahead of a legacy one with the same code, so the legacy file never shadows it.
+     */
     private fun scan(): CustomEmojiSet {
         val entries =
             directory
                 .listFiles()
                 .orEmpty()
-                .filter { it.isFile && !it.name.startsWith('.') && hasSendableExtension(it) }
+                .filter { it.isFile && !it.name.startsWith('.') }
+                .sortedWith(compareBy({ !hasSendableExtension(it) }, { it.name }))
                 .mapNotNull { file ->
                     val code = file.name.substringBeforeLast('.')
                     if (code.isEmpty() || sanitizeEmojiCode(code) != code || file.length() > MAX_BYTES) {

@@ -926,6 +926,100 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(MessageStatus.Failed, controller.timeline.single().status)
         }
 
+    /**
+     * Mimics the real emoji sender's two attempts: each runs [publishLock] around a publish that MDK
+     * rejects as a stale epoch, [betweenAttempts] runs after the first rejection, and a second
+     * rejection is reported as a changed chat.
+     */
+    private suspend fun staleEpochTwice(
+        ensureCurrent: suspend () -> Unit,
+        publishLock: EmojiPublishLock,
+        betweenAttempts: suspend () -> Unit = {},
+        onPublish: () -> Unit = {},
+    ): SendSummaryFfi {
+        var last: MarmotKitException? = null
+        repeat(2) { attempt ->
+            if (attempt == 1) betweenAttempts()
+            try {
+                return publishLock {
+                    ensureCurrent()
+                    onPublish()
+                    throw MarmotKitException.InvalidMediaReference(STALE_EPOCH_DETAILS)
+                }
+            } catch (rejection: MarmotKitException.InvalidMediaReference) {
+                last = rejection
+            }
+        }
+        throw EmojiChatChangedException(checkNotNull(last))
+    }
+
+    /** Two stale-epoch rejections published nothing, so the row ends Failed rather than Pending forever. */
+    @Test
+    fun twiceStaleEmojiPublishEndsFailedNotPending() =
+        runTest {
+            var publishes = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { listOf(partyArtwork()) },
+                    customEmojiSender = { _, _, _, ensureCurrent, publishLock ->
+                        staleEpochTwice(ensureCurrent, publishLock, onPublish = { publishes += 1 })
+                    },
+                )
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(2, publishes)
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /** A stale-epoch rejection leaves the send pre-acceptance, so a cancel between the two attempts succeeds. */
+    @Test
+    fun cancelBetweenStaleEmojiAttemptsSucceedsAndPublishesNothingMore() =
+        runTest {
+            val betweenAttempts = CompletableDeferred<Unit>()
+            val resume = CompletableDeferred<Unit>()
+            var publishes = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { listOf(partyArtwork()) },
+                    customEmojiSender = { _, _, _, ensureCurrent, publishLock ->
+                        staleEpochTwice(
+                            ensureCurrent,
+                            publishLock,
+                            betweenAttempts = {
+                                betweenAttempts.complete(Unit)
+                                resume.await()
+                            },
+                            onPublish = { publishes += 1 },
+                        )
+                    },
+                )
+
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    appState.sendConversationText(controller, "hi :party:")
+                }
+            betweenAttempts.await()
+            val pending = controller.timeline.single().record
+
+            assertTrue(withTimeout(5_000) { controller.deleteMessage(pending, presentFailure = false) })
+            assertTrue(controller.timeline.isEmpty())
+
+            resume.complete(Unit)
+            send.await()
+
+            assertEquals(1, publishes)
+            assertTrue(controller.timeline.isEmpty())
+        }
+
     /** A connectivity failure during upload is retried by the recovery loop and then sends once. */
     @Test
     fun customEmojiUploadConnectivityFailureIsRetried() =

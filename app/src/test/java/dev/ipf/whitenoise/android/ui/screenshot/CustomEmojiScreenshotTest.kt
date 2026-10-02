@@ -73,6 +73,15 @@ class CustomEmojiScreenshotTest {
 
     @Test fun settingsLargeRtl() = captureSettings(Variant.LargeRtl, userEmoji(), "populated")
 
+    /** The settings list with a render-only legacy emoji, light theme. */
+    @Test fun settingsLegacyLight() = captureSettings(Variant.Light, legacyEmoji(), "legacy")
+
+    /** The settings list with a render-only legacy emoji, dark theme. */
+    @Test fun settingsLegacyDark() = captureSettings(Variant.Dark, legacyEmoji(), "legacy")
+
+    /** The settings list with a render-only legacy emoji, large font and right-to-left. */
+    @Test fun settingsLegacyLargeRtl() = captureSettings(Variant.LargeRtl, legacyEmoji(), "legacy")
+
     @Test fun pickerLight() = capturePicker(Variant.Light)
 
     @Test fun pickerDark() = capturePicker(Variant.Dark)
@@ -109,6 +118,15 @@ class CustomEmojiScreenshotTest {
                 CustomEmoji(":ship_it:", File("ship_it.png"), artwork(0xFF3F51B5.toInt(), 0xFFFFFFFF.toInt())),
                 // A user file overrides the built-in artwork of the same code.
                 CustomEmoji(":wn:", File("wn.png"), artwork(0xFF009688.toInt(), 0xFF000000.toInt())),
+            ),
+        )
+
+    /** One sendable emoji beside a render-only legacy `.img` one saved by an earlier version. */
+    private fun legacyEmoji() =
+        CustomEmojiSet(
+            listOf(
+                CustomEmoji(":old_wave:", File("old_wave.img"), artwork(0xFF795548.toInt(), 0xFFFFC107.toInt())),
+                CustomEmoji(":party:", File("party.png"), artwork(0xFFE91E63.toInt(), 0xFFFFEB3B.toInt())),
             ),
         )
 

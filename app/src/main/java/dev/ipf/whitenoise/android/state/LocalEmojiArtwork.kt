@@ -35,28 +35,37 @@ private val EMOJI_MEDIA_TYPES =
 /**
  * The user's emoji files for [shortcodes] in [directory], in the order asked. A shortcode without
  * a readable, supported, sendable image file is left out, so it stays literal text instead of
- * failing a send.
+ * failing a send. When several sendable files share a code, the first by name that is within
+ * [CustomEmojiStore.MAX_BYTES] and readable wins, the same fall-through the picker applies.
  */
 internal fun readLocalEmojiArtwork(
     directory: File,
     shortcodes: List<String>,
 ): List<LocalEmojiArtwork> {
-    // The same extension rule as the picker, so a stale party.img can never shadow party.png.
+    // The same extension rule as the picker, so a legacy party.img can never shadow party.png.
     val files =
         directory
             .listFiles()
             .orEmpty()
             .filter { it.isFile && !it.name.startsWith('.') && CustomEmojiStore.hasSendableExtension(it) }
+            .sortedBy { it.name }
     return shortcodes.mapNotNull { shortcode ->
+        if (!Nip30Emoji.isSendable(shortcode)) return@mapNotNull null
         val code = shortcode.trim(':')
-        val file = files.firstOrNull { it.nameWithoutExtension == code } ?: return@mapNotNull null
-        val mediaType = EMOJI_MEDIA_TYPES[file.extension.lowercase(Locale.ROOT)] ?: return@mapNotNull null
-        if (!Nip30Emoji.isSendable(shortcode) || file.length() > CustomEmojiStore.MAX_BYTES) {
-            return@mapNotNull null
-        }
-        val bytes = runCatching { file.readBytes() }.getOrNull() ?: return@mapNotNull null
-        LocalEmojiArtwork(shortcode, file.name, mediaType, bytes)
+        files
+            .filter { it.nameWithoutExtension == code && it.length() <= CustomEmojiStore.MAX_BYTES }
+            .firstNotNullOfOrNull { file -> readEmojiFile(shortcode, file) }
     }
+}
+
+/** [file] as sendable artwork for [shortcode], or null when its type is unknown or it cannot be read. */
+private fun readEmojiFile(
+    shortcode: String,
+    file: File,
+): LocalEmojiArtwork? {
+    val mediaType = EMOJI_MEDIA_TYPES[file.extension.lowercase(Locale.ROOT)]
+    val bytes = if (mediaType == null) null else runCatching { file.readBytes() }.getOrNull()
+    return if (mediaType == null || bytes == null) null else LocalEmojiArtwork(shortcode, file.name, mediaType, bytes)
 }
 
 /** The user's own emoji that [text] uses, read off the main thread, or empty when it uses none. */
@@ -122,7 +131,12 @@ internal class EmojiUploadCache {
         group: String,
     ): Mutex = synchronized(locks) { locks.getOrPut(account to group) { Mutex() } }
 
-    /** One reference per distinct image in [artwork], uploading only those not already cached. */
+    /**
+     * One reference per distinct image in [artwork], uploading only those not already cached. The
+     * cached references are captured under the same monitor that finds the missing ones, so another
+     * chat evicting them while this upload runs cannot fail a valid send. The result is assembled from
+     * that snapshot plus the fresh uploads, and only then is the shared cache touched and trimmed.
+     */
     suspend fun referencesFor(
         engine: MarmotInterface,
         account: String,
@@ -133,26 +147,31 @@ internal class EmojiUploadCache {
         lockFor(account, group).withLock {
             val epoch = currentEpoch()
 
-            fun key(emoji: LocalEmojiArtwork) = EmojiUploadKey(account, group, emoji.sha256, epoch)
+            /** The cache key of the image with digest [sha] under the epoch this send was prepared in. */
+            fun key(sha: String) = EmojiUploadKey(account, group, sha, epoch)
             val distinct = artwork.distinctBy { it.sha256 }
-            val missing = synchronized(references) { distinct.filter { key(it) !in references } }
+            val cached = HashMap<String, MediaAttachmentReferenceFfi>()
+            val missing =
+                synchronized(references) {
+                    distinct.filter { emoji ->
+                        val hit = references[key(emoji.sha256)]
+                        if (hit != null) cached[emoji.sha256] = hit
+                        hit == null
+                    }
+                }
             val uploaded = if (missing.isEmpty()) emptyList() else engine.uploadEmojiArtwork(account, group, missing)
+            val fresh = missing.zip(uploaded) { emoji, reference -> emoji.sha256 to reference }.toMap()
+            // Build the result first from the snapshot, so no eviction can remove a reference this send needs.
+            val result = artwork.associate { it.sha256 to (fresh[it.sha256] ?: cached.getValue(it.sha256)) }
             synchronized(references) {
-                missing.zip(uploaded).forEach { (emoji, reference) -> references[key(emoji)] = reference }
-                // Another chat's eviction may have removed an entry seen as cached before the upload, so
-                // re-check under this lock and fail as an upload problem rather than with a missing key.
-                check(distinct.all { key(it) in references }) { "cached emoji reference was evicted" }
-                // Build the result first, then evict, so eviction can never remove a reference this send needs.
-                val result = artwork.associate { it.sha256 to references.getValue(key(it)) }
                 // Touch the batch so it is the newest, then drop the oldest entries beyond the limit.
                 result.forEach { (sha, reference) ->
-                    val touched = EmojiUploadKey(account, group, sha, epoch)
-                    references.remove(touched)
-                    references[touched] = reference
+                    references.remove(key(sha))
+                    references[key(sha)] = reference
                 }
                 while (references.size > MAX_ENTRIES) references.remove(references.keys.first())
-                result
             }
+            result
         }
 
     /** Forgets every reference for [account] and [group], so the next send re-encrypts under the current epoch. */

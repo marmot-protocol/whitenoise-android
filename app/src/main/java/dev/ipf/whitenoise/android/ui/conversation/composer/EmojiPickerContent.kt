@@ -128,7 +128,7 @@ private fun rememberEmojiPickerModel(
     val customEmoji = LocalCustomEmoji.current
     val custom =
         remember(customEmoji, purpose) {
-            if (purpose == EmojiPickerPurpose.GROUP_IMAGE) emptyList() else customEmoji.entries.map { it.shortcode }
+            if (purpose == EmojiPickerPurpose.GROUP_IMAGE) emptyList() else customEmoji.sendable.map { it.shortcode }
         }
     val recents =
         remember(recentEmojis, purpose) {
