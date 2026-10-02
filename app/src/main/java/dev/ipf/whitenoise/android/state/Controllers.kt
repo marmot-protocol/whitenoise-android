@@ -7508,8 +7508,10 @@ class ConversationController(
     ): Boolean = conversationAccountRef == accountRef && group.groupIdHex == groupIdHex
 
     /** Rejects UI callbacks after their conversation or account lifecycle has ended. */
-    internal fun acceptsConversationActionOwner(accountRef: String?, groupIdHex: String): Boolean =
-        !controllerCleared && !isAccountTeardownRequested() && matchesConversation(accountRef, groupIdHex)
+    internal fun acceptsConversationActionOwner(
+        accountRef: String?,
+        groupIdHex: String,
+    ): Boolean = !controllerCleared && !isAccountTeardownRequested() && matchesConversation(accountRef, groupIdHex)
 
     /** Applies a matching native row and invalidates any null-result acknowledgement superseded by that row. */
     internal fun applyAuthoritativeChatListRow(
