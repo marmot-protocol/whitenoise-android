@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.os.Looper
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
+import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import kotlinx.coroutines.runBlocking
@@ -172,6 +173,28 @@ class ConversationTimelinePagingTest {
 
                 controller.loadOlderPageInternal(anchorId = SEED_ID)
 
+                assertEquals(listOf(SEED_ID), subscription.anchorReports)
+                assertEquals(
+                    listOf("setVisibleAnchor", "paginateBackwards"),
+                    subscription.lifecycleEventOrder.filter { it in ANCHOR_THEN_PAGE },
+                )
+            }
+        }
+
+    /** A search jump to an older match anchors each page at the oldest held row, so a capped window moves (#2873). */
+    @Test
+    fun searchJumpToAnOlderMatchAnchorsAtTheOldestHeldRow() =
+        runBlocking {
+            val subscription = subscriptionWith(olderPage())
+            withController(subscription) { controller ->
+                settle()
+
+                val reached =
+                    controller.loadSearchResultMessageAvailable(
+                        ConversationSearchMatch(messageIdHex = OLDER_ID, timelineAt = 100uL),
+                    )
+
+                assertTrue(reached)
                 assertEquals(listOf(SEED_ID), subscription.anchorReports)
                 assertEquals(
                     listOf("setVisibleAnchor", "paginateBackwards"),

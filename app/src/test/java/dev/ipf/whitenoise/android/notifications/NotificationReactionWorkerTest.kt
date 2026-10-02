@@ -37,6 +37,9 @@ class NotificationReactionWorkerTest {
     @Volatile
     private var reactionFailure: Throwable? = null
 
+    @Volatile
+    private var reactionDisposition = SendAcceptDispositionFfi.PUBLISHED
+
     private lateinit var fixture: NotificationBootstrapTestFixture
     private lateinit var workerContext: NotificationWorkerTestApplication
 
@@ -122,6 +125,39 @@ class NotificationReactionWorkerTest {
                 fixture.markReadCalls.get() >= 1,
             )
         }
+
+    /** MDK-owned accepted-pending and unknown-completion reactions finish without a duplicate send (#2928). */
+    @Test
+    fun acceptedButUnpublishedReactionsCompleteWithoutResending() =
+        runTest {
+            fixture.bootstrap()
+            listOf(SendAcceptDispositionFfi.ACCEPTED_PENDING, SendAcceptDispositionFfi.COMPLETION_UNKNOWN)
+                .forEachIndexed { index, disposition ->
+                    reactionDisposition = disposition
+                    val workId = UUID.randomUUID()
+                    val worker = buildWorker(inputData = reactionInput(requestId = workId), id = workId)
+
+                    assertEquals(Result.success(), pumpingMainLooper { worker.doWork() })
+                    assertEquals("one MDK send per accepted reaction", index + 1, fixture.reactToMessageCalls.get())
+                }
+        }
+
+    /** The worker outcome reports MDK's accept disposition rather than always claiming publication. */
+    @Test
+    fun reactionOutcomeFollowsTheAcceptDisposition() {
+        assertEquals(
+            NotificationReactionSendOutcome.Sent,
+            notificationReactionOutcome(SendAcceptDispositionFfi.PUBLISHED),
+        )
+        assertEquals(
+            NotificationReactionSendOutcome.AcceptedPending,
+            notificationReactionOutcome(SendAcceptDispositionFfi.ACCEPTED_PENDING),
+        )
+        assertEquals(
+            NotificationReactionSendOutcome.CompletionUnknown,
+            notificationReactionOutcome(SendAcceptDispositionFfi.COMPLETION_UNKNOWN),
+        )
+    }
 
     @Test
     fun transientSendFailuresRetryUpToTheCapThenFailTerminally() =
@@ -244,11 +280,12 @@ class NotificationReactionWorkerTest {
         return builder.build()
     }
 
+    /** Builds the summary MDK returns for the configured accept disposition. */
     private fun sentSummary() =
         SendSummaryFfi(
             published = 1u,
             messageIds = listOf("ab".repeat(32)),
-            acceptDisposition = SendAcceptDispositionFfi.PUBLISHED,
+            acceptDisposition = reactionDisposition,
             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
         )
 

@@ -319,6 +319,14 @@
         "test_ids": ["MSG-017"]
       },
       {
+        "surface": "KeyPackage deletion DNS deadline and account cancellation boundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/KeyPackageDeletionResult.kt",
+        "anchor": "internal suspend fun deleteKeyPackageThroughSafeSourceRelays(",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
         "surface": "Key package inventory load failure toast",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateKeyPackageInventory.kt",
         "anchor": "R.string.toast_couldnt_load_key_packages",
@@ -1275,7 +1283,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
         "anchor": "fun ConversationSearchNavBar(",
         "test_ids": [
-          "FIND-001"
+          "FIND-001",
+          "FIND-011"
         ]
       },
       {
@@ -12521,10 +12530,11 @@
       },
       {
         "surface": "setting:error_conversation_membership_unavailable",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupRosterReadRecovery.kt",
         "anchor": "R.string.error_conversation_membership_unavailable",
         "test_ids": [
-          "NTF-009"
+          "NTF-009",
+          "NTF-027"
         ]
       },
       {
@@ -24494,6 +24504,24 @@
     ],
     "source_coverage": [
       {
+        "surface": "Account teardown notification lifecycle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun stopNotificationListenerForAccountTeardown()",
+        "test_ids": [
+          "ACC-014",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "Runtime listener resource cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppRuntimeListenerTeardownOwner.kt",
+        "anchor": "class AppRuntimeListenerTeardownOwner(",
+        "test_ids": [
+          "ACC-014",
+          "NTF-011"
+        ]
+      },
+      {
         "surface": "Settled visible-read retry on resume and manual-reminder changes",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "observeConversationVisibleReads(",
@@ -26625,6 +26653,62 @@
         "test_ids": [
           "FIND-003",
           "CON-001"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_loading",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_incomplete",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_match_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_match_count",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_match_count_loaded_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_match_count_loaded_only",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_no_matches",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_search_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListTopBar.kt",
+        "anchor": "R.string.conversation_search_retry",
+        "test_ids": [
+          "FIND-011"
+        ]
+      },
+      {
+        "surface": "R.string.error_conversation_membership_inconsistent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupRosterReadRecovery.kt",
+        "anchor": "R.string.error_conversation_membership_inconsistent",
+        "test_ids": [
+          "NTF-027"
         ]
       },
       {

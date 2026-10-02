@@ -61,6 +61,7 @@
     <string name="error_loaded_content_may_be_out_of_date">I contenuti caricati sono ancora disponibili, ma potrebbero non essere aggiornati. Nuovo tentativo…</string>
     <string name="error_loaded_content_kept">Impossibile caricare altri contenuti. I tuoi messaggi sono ancora disponibili; riprova quando vuoi.</string>
     <string name="error_conversation_membership_unavailable">Impossibile verificare i membri di questa conversazione. Riprova per mostrare i tuoi messaggi.</string>
+    <string name="error_conversation_membership_inconsistent">L\'elenco dei membri di questa conversazione non corrisponde a questo account, quindi i messaggi restano nascosti. Riprova per controllare di nuovo.</string>
     <string name="refresh">Aggiorna dump</string>
     <string name="retry">Riprova</string>
     <string name="creating_identity_title">Creazione identità</string>
@@ -1294,6 +1295,10 @@
     <string name="conversation_search_next">Risultato successivo</string>
     <string name="conversation_search_match_count">%1$d/%2$d</string>
     <string name="conversation_search_no_matches">Nessun risultato</string>
+    <string name="conversation_search_loading">Ricerca in tutti i messaggi…</string>
+    <string name="conversation_search_incomplete">Impossibile cercare nei messaggi meno recenti</string>
+    <string name="conversation_search_match_count_loaded_only">%1$d/%2$d nei messaggi caricati</string>
+    <string name="conversation_search_retry">Riprova la ricerca</string>
     <string name="message_read_more">Leggi tutto</string>
     <string name="message_react">Reagisci</string>
     <string name="sign_out">Esci</string>
