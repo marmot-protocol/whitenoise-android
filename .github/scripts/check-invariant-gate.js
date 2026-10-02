@@ -1,10 +1,9 @@
 // Bug-fix invariant gate. A pull request that closes a bug must change a gate
 // registered in docs/invariant-gates.md, name an applicable registered gate, or
 // declare an allowed exemption with a reason. Everything else passes untouched.
-// The check only reads GitHub API metadata, so it needs no secrets and works
-// for fork pull requests with the default read-only token.
-const fs = require('node:fs')
-const path = require('node:path')
+// The check only reads GitHub API metadata, including the proposed registry as
+// raw text, so it never runs pull-request code, needs no secrets and works for
+// fork pull requests with a read-only token.
 
 const REGISTRY_PATH = 'docs/invariant-gates.md'
 const REGISTRY_START = '<!-- invariant-gates:start -->'
@@ -16,24 +15,59 @@ const EXEMPTION_REASON = /^`?([a-z][a-z-]*)`?[ \t]*(?:[—–:-][ \t]*)?(.*)$/i
 const EXEMPTION_REASONS = ['one-off', 'upstream', 'non-production']
 const MIN_EXPLANATION_LENGTH = 10
 const DOCS = 'docs/invariant-gates.md#bug-fix-requirement'
+const TEST_SOURCE_ROOTS = ['app/src/test/', 'app/src/androidTest/']
+// An opening or closing HTML tag whose quoted attribute values may span lines (CommonMark raw HTML).
+const HTML_TAG =
+  /<\/?[A-Za-z][A-Za-z0-9-]*(?:\s+[^\s"'<>=/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*\s*\/?>/g
+// A link reference definition, `[label]: destination "title"`, whose destination or title may continue on the
+// next lines. A title cannot contain a blank line, matching CommonMark.
+const LINK_TITLE = String.raw`(?:"(?:[^"\n]|\n(?![ \t]*\n))*"|'(?:[^'\n]|\n(?![ \t]*\n))*'|\((?:[^()\n]|\n(?![ \t]*\n))*\))`
+const LINK_REFERENCE_DEFINITION = new RegExp(
+  String.raw`^ {0,3}\[[^\]\n]+\]:[ \t]*\n?[ \t]*\S+(?:[ \t]*\n?[ \t]*${LINK_TITLE})?[ \t]*$`,
+  'gm',
+)
+// Characters that render as nothing: whitespace, format characters such as zero-width spaces, and controls.
+const INVISIBLE = /[\s\p{Cf}\p{Zs}\p{Cc}]/gu
+const GATE_EXPLANATION_SEPARATOR = /\s+[—–-]\s+/
 
-/** Maps each registered gate name to its repository-relative test path, read from the marked registry table. */
+/**
+ * True when [file] is a Kotlin test under a test source set (`app/src/test` or `app/src/androidTest`), with no
+ * `..` segment that could step outside it. Only such files can be gates, mirroring `InvariantGateRow.kt`.
+ */
+function isTestSourcePath(file) {
+  return TEST_SOURCE_ROOTS.some(root => file.startsWith(root)) &&
+    file.endsWith('.kt') &&
+    !file.split('/').includes('..')
+}
+
+/**
+ * Maps each registered gate name to its repository-relative test path, read from the marked registry table.
+ * Rows that point outside a test source set are dropped, so they can be neither named nor counted as gate changes.
+ */
 function parseRegistry(markdown) {
-  const text = markdown || ''
+  const text = (markdown || '').replace(/\r\n?/g, '\n')
   const start = text.indexOf(REGISTRY_START)
   const end = text.indexOf(REGISTRY_END)
   const gates = new Map()
   if (start === -1 || end <= start) return gates
   for (const line of text.slice(start, end).split('\n')) {
     const match = REGISTRY_ROW.exec(line.trim())
-    if (match) gates.set(match[1], match[2])
+    if (match && isTestSourcePath(match[2])) gates.set(match[1], match[2])
   }
   return gates
 }
 
-/** Returns the description without fenced code or HTML comments, so hidden text cannot satisfy the gate. */
+/**
+ * Returns the description as GitHub would show it, minus text it never renders: fenced code, HTML comments
+ * (including the short `<!-->` and `<!--->` forms), `<script>`/`<style>` blocks, HTML tags with their attributes
+ * (even across lines), and link reference definitions with their titles. Best effort, not a full renderer.
+ */
 function visibleProse(body) {
-  return withoutFencedCode(body || '').replace(/<!--[\s\S]*?(?:-->|$)/g, '')
+  return withoutFencedCode((body || '').replace(/\r\n?/g, '\n'))
+    .replace(/<!--(?:-?>|[\s\S]*?(?:-->|$))/g, '')
+    .replace(/<(script|style)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, '')
+    .replace(HTML_TAG, '')
+    .replace(LINK_REFERENCE_DEFINITION, '')
 }
 
 /**
@@ -60,12 +94,15 @@ function withoutFencedCode(text) {
   return kept.join('\n')
 }
 
-/** Collects the gate names and exemption declarations written as single visible lines in the description. */
+/**
+ * Collects the gate names and exemption declarations written as single visible lines in the description. A gate
+ * line may end with ` — explanation`, and each name may be wrapped in backticks or a Markdown link.
+ */
 function parseDeclaration(body) {
   const prose = visibleProse(body)
   const gates = [...prose.matchAll(GATE_LINE)]
-    .flatMap(match => match[1].split(','))
-    .map(name => name.trim().replace(/^[`*]+|[`*.]+$/g, ''))
+    .flatMap(match => match[1].split(GATE_EXPLANATION_SEPARATOR)[0].split(','))
+    .map(name => name.trim().replace(/^\[([^\]]*)\]\([^)]*\)$/, '$1').replace(/^[`*]+|[`*.]+$/g, ''))
     .filter(name => name.length > 0)
   const exemptions = [...prose.matchAll(EXEMPTION_LINE)].map(match => {
     const reason = EXEMPTION_REASON.exec(match[1].trim())
@@ -82,6 +119,15 @@ function isBugIssue(issue) {
   return issue.issueType?.name === 'Bug' || labels.includes('bug')
 }
 
+/**
+ * True when an exemption explanation has at least ten visible characters once whitespace, zero-width and other
+ * format or control characters are removed, and contains at least one letter or digit (not punctuation alone).
+ */
+function isMeaningfulExplanation(explanation) {
+  const visible = explanation.replace(INVISIBLE, '')
+  return [...visible].length >= MIN_EXPLANATION_LENGTH && /[\p{L}\p{N}]/u.test(visible)
+}
+
 /** Lists problems with the declared gates and exemptions; an empty list means every declaration is valid. */
 function declarationErrors(declaration, registry) {
   const errors = declaration.gates
@@ -90,7 +136,7 @@ function declarationErrors(declaration, registry) {
   for (const { reason, explanation } of declaration.exemptions) {
     if (!EXEMPTION_REASONS.includes(reason)) {
       errors.push(`Exemption reason "${reason}" is not one of: ${EXEMPTION_REASONS.join(', ')}.`)
-    } else if (explanation.length < MIN_EXPLANATION_LENGTH) {
+    } else if (!isMeaningfulExplanation(explanation)) {
       errors.push(`Exemption "${reason}" needs an explanation of why no reusable gate applies.`)
     }
   }
@@ -138,6 +184,7 @@ const PULL_REQUEST_QUERY = `query($owner: String!, $repo: String!, $number: Int!
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
       body
+      headRefOid
       closingIssuesReferences(first: 100, after: $after) {
         pageInfo { hasNextPage endCursor }
         nodes {
@@ -158,12 +205,14 @@ const PULL_REQUEST_QUERY = `query($owner: String!, $repo: String!, $number: Int!
 async function loadPullRequest(github, { owner, repo, number }) {
   const closingIssues = []
   let body = ''
+  let headSha = ''
   let after = null
   do {
     const result = await github.graphql(PULL_REQUEST_QUERY, { owner, repo, number, after })
     const pullRequest = result.repository.pullRequest
     const references = pullRequest.closingIssuesReferences
     body = pullRequest.body
+    headSha = pullRequest.headRefOid
     closingIssues.push(...references.nodes)
     after = references.pageInfo?.hasNextPage ? references.pageInfo.endCursor : null
   } while (after)
@@ -177,17 +226,41 @@ async function loadPullRequest(github, { owner, repo, number }) {
     })
     issue.labels = { nodes: labels }
   }
-  return { body, closingIssues }
+  return { body, headSha, closingIssues }
 }
 
-/** Loads the pull request's live description, closing issues and files, then fails the job on a gate violation. */
-async function run({ github, context, core, registryMarkdown, registryPath }) {
+/**
+ * Fetches the pull request's proposed registry as raw text through the contents API at its head commit. Pull
+ * request commits, including fork commits, are addressable by SHA in the base repository, so no pull-request code
+ * is checked out or executed. A registry absent at that commit reads as an empty table.
+ */
+async function fetchRegistry(github, { owner, repo, headSha }) {
+  try {
+    const { data } = await github.rest.repos.getContent({
+      owner,
+      repo,
+      path: REGISTRY_PATH,
+      ref: headSha,
+      mediaType: { format: 'raw' },
+    })
+    return typeof data === 'string' ? data : ''
+  } catch (error) {
+    if (error.status === 404) return ''
+    throw error
+  }
+}
+
+/**
+ * Loads the pull request's live description, closing issues, files and proposed registry, then fails the job on a
+ * gate violation. Tests may pass [registryMarkdown] to skip the registry fetch.
+ */
+async function run({ github, context, core, registryMarkdown }) {
   const owner = context.repo.owner
   const repo = context.repo.repo
   const number = context.payload.pull_request.number
-  const { body, closingIssues } = await loadPullRequest(github, { owner, repo, number })
+  const { body, headSha, closingIssues } = await loadPullRequest(github, { owner, repo, number })
   const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: number, per_page: 100 })
-  const registry = parseRegistry(registryMarkdown ?? readRegistry(registryPath))
+  const registry = parseRegistry(registryMarkdown ?? await fetchRegistry(github, { owner, repo, headSha }))
   const outcome = evaluate({ closingIssues, files, body, registry })
   if (outcome.status === 'fail') {
     core.setFailed(outcome.message)
@@ -195,14 +268,6 @@ async function run({ github, context, core, registryMarkdown, registryPath }) {
     core.info(outcome.message)
   }
   return outcome
-}
-
-/**
- * Reads the pull-request head's registry as data from [file] (default: the working directory's copy), or returns
- * an empty table when it is absent.
- */
-function readRegistry(file = path.join(process.cwd(), REGISTRY_PATH)) {
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
 }
 
 module.exports = {
