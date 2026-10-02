@@ -3746,28 +3746,44 @@ class ConversationDictationControllerTest {
     @Test
     fun recognizedPrefixSendPreservesDraftFenceAndElapsedExpiry() =
         runTest {
-            listOf(false, true).forEach { expired ->
+            listOf("draft", "validation", "expiry").forEach { mode ->
                 val sent = mutableListOf<String>()
                 val fixture =
                     fixture(
                         draft = TextFieldValue(""),
                         targetValidationScope = this,
+                        targetValidator = { _, _ ->
+                            if (mode == "validation") {
+                                ConversationDictationTargetValidation.Indeterminate
+                            } else {
+                                ConversationDictationTargetValidation.Available
+                            }
+                        },
                         sendTranscriptIfOriginUnchanged = {
                             sent += it.payload
                             true
                         },
                     )
                 failRecognizedTail(fixture, send = true)
-                if (expired) {
-                    fixture.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
-                } else {
-                    fixture.drafts[key()] = TextFieldValue("Another writer")
+                fixture.platform.tracksCallerAudioDisposal = true
+                when (mode) {
+                    "expiry" -> fixture.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
+                    "draft" -> fixture.drafts[key()] = TextFieldValue("Another writer")
                 }
                 fixture.controller.sendRecognizedText()
                 advanceUntilIdle()
                 assertTrue(sent.isEmpty())
-                assertEquals(if (expired) "" else "Another writer", fixture.drafts.getValue(key()).text)
-                if (expired) assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+                assertEquals(if (mode == "draft") "Another writer" else "", fixture.drafts.getValue(key()).text)
+                assertFalse(fixture.platform.pendingCallerAudio)
+                if (mode == "expiry") {
+                    assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+                } else {
+                    val failed = fixture.controller.state as ConversationDictationState.Failed
+                    assertEquals("first", failed.retainedTranscript)
+                    assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+                    // The user confirmed this prefix; its remaining failure concerns delivery validation.
+                    assertFalse(failed.recognitionIncomplete)
+                }
             }
         }
 
