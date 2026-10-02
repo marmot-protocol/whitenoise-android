@@ -2477,7 +2477,13 @@ internal fun ConversationScreen(
         if (navigationState.searchQuery.isBlank()) return@LaunchedEffect
         delay(HISTORY_SEARCH_DEBOUNCE_MILLIS)
         val launchedForQuery = navigationState.searchQuery
-        val scan = searchConversationHistoryMatches(appState, controller.group.groupIdHex, launchedForQuery)
+        val scan =
+            searchConversationHistoryMatches(
+                appState = appState,
+                accountRef = controller.boundAccountRef,
+                groupIdHex = controller.group.groupIdHex,
+                query = launchedForQuery,
+            )
         // Only publish if this is still the current query. Cancellation already
         // propagates from the scan, so this only guards a scan that completed
         // in the gap before the effect restarted for a newer keystroke. A null

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -58,21 +59,29 @@ internal fun ConversationSearchScanStatus.allowsSearchSteps(matchCount: Int): Bo
  * text contains the needle, and the same body gating the chat-list search uses
  * drops reactions, deletes, and system rows the store query cannot filter.
  * Returns null on a failed page read — callers fall back to the loaded-window
- * matches rather than presenting a partial set as the total.
+ * matches rather than presenting a partial set as the total. [accountRef] is the
+ * conversation's bound account, so a notification-opened conversation whose
+ * account switch has not landed yet still searches its own store (#2873).
  */
 internal suspend fun searchConversationHistoryMatches(
     appState: WhiteNoiseAppState,
+    accountRef: String?,
     groupIdHex: String,
     query: String,
+    readPage: HistoryPageReader = { account, pageQuery ->
+        appState.marmotIo { timelineMessages(account, pageQuery) }
+    },
 ): List<ConversationSearchMatch>? {
-    val account = appState.activeAccountRef
     val needle = query.trim()
     return when {
-        account == null -> null
+        accountRef == null -> null
         needle.isEmpty() -> emptyList()
-        else -> scanHistoryForNeedle(appState, account, groupIdHex, needle)
+        else -> scanHistoryForNeedle(accountRef, groupIdHex, needle, readPage)
     }
 }
+
+/** Reads one store page for the conversation's own account. */
+internal typealias HistoryPageReader = suspend (account: String, query: TimelineMessageQueryFfi) -> TimelinePageFfi
 
 /** One scanned page reduced to what cursor paging needs: eligible body
  *  matches as (timelineAt, id), the oldest row for the next cursor, and
@@ -85,30 +94,29 @@ internal data class HistoryScanPage(
 
 internal typealias HistoryPageFetcher = suspend (before: ULong?, beforeMessageId: String?) -> HistoryScanPage?
 
+/** Pages backward through one account's stored history for [needle]. */
 private suspend fun scanHistoryForNeedle(
-    appState: WhiteNoiseAppState,
     account: String,
     groupIdHex: String,
     needle: String,
+    readPage: HistoryPageReader,
 ): List<ConversationSearchMatch>? {
     val ciNeedle = needle.lowercase(Locale.ROOT)
     return paginateHistoryMatches { cursorBefore, cursorMessageId ->
         val page =
             runCatching {
-                appState.marmotIo {
-                    timelineMessages(
-                        account,
-                        TimelineMessageQueryFfi(
-                            groupIdHex = groupIdHex,
-                            search = needle,
-                            before = cursorBefore,
-                            beforeMessageId = cursorMessageId,
-                            after = null,
-                            afterMessageId = null,
-                            limit = HISTORY_SEARCH_PAGE_SIZE,
-                        ),
-                    )
-                }
+                readPage(
+                    account,
+                    TimelineMessageQueryFfi(
+                        groupIdHex = groupIdHex,
+                        search = needle,
+                        before = cursorBefore,
+                        beforeMessageId = cursorMessageId,
+                        after = null,
+                        afterMessageId = null,
+                        limit = HISTORY_SEARCH_PAGE_SIZE,
+                    ),
+                )
             }.getOrElse { throwable ->
                 // A cancelled scan must propagate, not resolve to a value the
                 // caller could publish over a newer query's results.
