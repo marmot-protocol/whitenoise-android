@@ -10,6 +10,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -2536,10 +2537,17 @@ class WhiteNoiseAppState private constructor(
     // drift across the separate places that update them (issue #821).
     @Volatile
     private var suppression = NotificationSuppression()
+    private val conversationReadVisibilityState = mutableStateOf(suppression)
 
+    /** Read-only Compose view of notification suppression's foreground and conversation ownership. */
+    internal val conversationReadVisibility: State<NotificationSuppression>
+        get() = conversationReadVisibilityState
+
+    /** Publishes shared visibility to notifications, visible reads and dictation diagnostics. */
     private fun updateNotificationSuppression(next: NotificationSuppression) {
         if (next != suppression) notificationPostEpoch.advance()
         suppression = next
+        conversationReadVisibilityState.value = next
         dictationDiagnosticLifecycle.originVisibility({ conversationDictation }) {
             isConversationDictationOriginVisible(it.accountRef, it.groupIdHex)
         }
@@ -3367,6 +3375,9 @@ class WhiteNoiseAppState private constructor(
         boundController?.applyChatListRow(projected)
         return boundController != null
     }
+
+    /** Returns only the mounted list bound to this account. */
+    internal fun boundChats(owner: String): ChatsController? = chatsController?.takeIf { it.boundAccountRef == owner }
 
     internal fun rollbackOptimisticSentPreview(
         accountRef: String?,
@@ -7880,6 +7891,7 @@ class WhiteNoiseAppState private constructor(
         }
         if (foreground) {
             dictationDiagnosticLifecycle.foreground { conversationDictation }
+            NotificationStreamForegroundService.onAppForegrounded(initializedConversationDictation())
             appLockTtsBoundaryJob?.cancel()
             appLockTtsBoundaryJob = null
             maybeShowAppLockForForeground()

@@ -1,0 +1,14 @@
+# Instrumented cases the post-merge full connected suite must execute.
+#
+# One `fully.qualified.Class#method` per line. After the full suite runs,
+# scripts/check_instrumented_required_cases.py fails when a listed case is
+# missing from the JUnit results (for example filtered out by @SdkSuppress on
+# the runner's API level), skipped, or failed. Runner success alone does not
+# prove these regressions executed. Pull-request smoke runs select only
+# @PullRequestDeviceSmoke classes and are not checked against this list.
+#
+# Intentionally restricted cases stay out of this list: hardware-, network- or
+# manual-only suites, the opt-in real-relay and provider matrices, and legacy-API
+# coverage gated by @SdkSuppress(maxSdkVersion) below the runner's API level.
+
+dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePreparationAndroidTest#recipientRemainsActionableWhileProfilePrewarmAndLookupAreDelayed

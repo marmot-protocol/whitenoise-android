@@ -45,6 +45,7 @@ private const val POST_ACTION_CAPTURE_DRAIN_READS = 6
 
 /** Bounds the tail drain even when recorder reads take longer than their nominal 100 ms. */
 private const val POST_ACTION_CAPTURE_DRAIN_MILLIS = 750L
+private const val FORCED_CAPTURE_SEAL_GRACE_MILLIS = 750L
 
 /** A terminal capture condition that must be surfaced to the owning recognition session. */
 internal enum class ConversationDictationCallerAudioFailure {
@@ -127,6 +128,10 @@ internal class ConversationDictationCallerAudio internal constructor(
     private val postActionReadsRemaining = AtomicInteger(0)
     private val postActionDrainDeadline = AtomicLong(Long.MAX_VALUE)
     private val captureClosed = AtomicBoolean(false)
+    private val recorderReleasing = AtomicBoolean(false)
+    private val recorderReleased = AtomicBoolean(false)
+    private val captureSealed = AtomicBoolean(false)
+    private val captureThreadStarted = AtomicBoolean(false)
     private val discarded = AtomicBoolean(false)
     private val captureClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
     private val activeStream = AtomicReference<ConversationDictationCallerAudioStream?>(null)
@@ -155,6 +160,7 @@ internal class ConversationDictationCallerAudio internal constructor(
             "event=caller_audio_started sample_rate=$CALLER_AUDIO_SAMPLE_RATE_HZ " +
                 "channels=$CALLER_AUDIO_CHANNEL_COUNT encoding=pcm16 chunk_seconds=10-30 buffer_seconds=90",
         )
+        captureThreadStarted.set(true)
         thread(name = "dictation-caller-audio-capture", isDaemon = true, block = ::capture)
         return true
     }
@@ -195,6 +201,37 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
     }
 
+    /** Interrupts a recorder that exceeded its tail deadline, preserving all completed reads. */
+    fun forceFinish(onClosed: () -> Unit) {
+        onCaptureClosed(onClosed)
+        finishing.set(true)
+        postActionReadsRemaining.set(0)
+        postActionDrainDeadline.set(0L)
+        recording.set(false)
+        thread(name = "dictation-caller-audio-close", isDaemon = true) {
+            runCatching(device::stop)
+            val noProducer = !captureThreadStarted.get()
+            if (noProducer) buffer.finish()
+            releaseRecorder(sealed = noProducer)
+            sealReleasedRecorderAfterGrace()
+        }
+    }
+
+    /** Native release proves microphone closure even if a broken driver never returns its read. */
+    private fun sealReleasedRecorderAfterGrace() {
+        if (captureSealed.get() || !recorderReleased.get()) return
+        if (runCatching { Thread.sleep(FORCED_CAPTURE_SEAL_GRACE_MILLIS) }.isFailure) return
+        synchronized(this) {
+            if (!captureSealed.get() && recorderReleased.get()) {
+                // Preserve every read completed during the grace period. Later driver completions
+                // are outside the bounded tail and cannot mutate the sealed recovery buffer.
+                if (!discarded.get()) buffer.finish()
+                conversationDictationDiagnostic("event=caller_audio_forced_seal reason=read_timeout")
+                releaseRecorder()
+            }
+        }
+    }
+
     /** Destroys volatile PCM after cancellation or logical-session completion. */
     @Synchronized
     fun discard(onClosed: () -> Unit = {}) {
@@ -206,12 +243,8 @@ internal class ConversationDictationCallerAudio internal constructor(
         finishing.set(true)
         postActionReadsRemaining.set(0)
         postActionDrainDeadline.set(0L)
-        val wasRecording = recording.getAndSet(false)
-        if (wasRecording) {
-            runCatching(device::stop)
-        } else {
-            releaseRecorder()
-        }
+        // Native stop/release can block; discard must never block the controller's main looper.
+        forceFinish {}
     }
 
     /** Includes partial, queued, and in-flight audio until acknowledged or discarded. */
@@ -254,9 +287,12 @@ internal class ConversationDictationCallerAudio internal constructor(
                 if (read <= 0) {
                     progress.stopReason = "read=$read"
                 } else {
-                    currentChunkHasSpeech =
-                        appendCapturedAudio(samples, read, encoded, progress, currentChunkHasSpeech)
                     synchronized(this) {
+                        if (captureSealed.get()) return@synchronized
+                        // A native read already in progress can return samples after stop().
+                        // Preserve completed reads until normal sealing or the forced-close grace expires.
+                        currentChunkHasSpeech =
+                            appendCapturedAudio(samples, read, encoded, progress, currentChunkHasSpeech)
                         if (
                             finishing.get() &&
                             (
@@ -270,6 +306,8 @@ internal class ConversationDictationCallerAudio internal constructor(
                 }
             }
         } finally {
+            samples.fill(0)
+            encoded.fill(0)
             recording.set(false)
             if (!discarded.get()) buffer.finish()
             runCatching(device::stop)
@@ -326,10 +364,21 @@ internal class ConversationDictationCallerAudio internal constructor(
     }
 
     /** Releases the device and delivers closure observers once across stop and cancellation races. */
-    private fun releaseRecorder() {
-        runCatching(device::release)
-        if (!captureClosed.compareAndSet(false, true)) return
-        while (true) captureClosedCallbacks.poll()?.invoke() ?: return
+    private fun releaseRecorder(sealed: Boolean = true) {
+        if (sealed) captureSealed.set(true)
+        if (recorderReleasing.compareAndSet(false, true)) {
+            val released = runCatching(device::release).isSuccess
+            if (!released) {
+                recorderReleasing.set(false)
+                conversationDictationDiagnostic("event=caller_audio_release_failed")
+                return
+            }
+            recorderReleased.set(true)
+        }
+        // The last read must be sealed, and native release must have returned, before
+        // completion can drop microphone ownership or deliver the final transcript.
+        if (!captureSealed.get() || !recorderReleased.get() || !captureClosed.compareAndSet(false, true)) return
+        while (captureClosedCallbacks.isNotEmpty()) captureClosedCallbacks.poll()?.invoke()
     }
 
     companion object {

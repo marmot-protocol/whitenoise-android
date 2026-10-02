@@ -21,13 +21,22 @@ import java.io.File
  * without relying on a posted OS notification.
  */
 class MarkReadChatListProjectionTest {
+    /**
+     * Checks the visible-read entry point reaches MDK and folds successful rows independently of notification mute
+     * state.
+     */
     @Test
     fun markReadUpTo_foldsReturnedChatListRowIntoChatsController() {
-        val body = controllersSource().readText().kotlinFunctionBody("markReadUpTo")
+        val source = controllersSource().readText()
+        val entry = source.kotlinFunctionBody("markReadUpTo")
+        val body = source.kotlinFunctionBody("submitVisibleReadUpTo")
+        val fold = source.kotlinFunctionBody("foldVisibleReadRow")
 
+        assertTrue("visible mark-read must reach the native command", "submitVisibleReadUpTo" in entry)
+        assertTrue("successful mark-read must fold the returned row", "foldVisibleReadRow" in body)
         assertTrue(
             "markReadUpTo must apply markTimelineMessageRead's returned ChatListRowFfi to the chat list",
-            "applyChatListRowFromMarkRead" in body || "foldMarkReadReturnedRow" in body,
+            "applyChatListRowFromMarkRead" in fold && "foldMarkReadReturnedRow" in fold,
         )
         assertFalse(
             "mark-read projection refresh must not depend on mute state",
@@ -35,9 +44,10 @@ class MarkReadChatListProjectionTest {
         )
     }
 
+    /** Checks an unchanged display watermark cannot suppress folding an authoritative native read result. */
     @Test
     fun markReadUpTo_successPathDoesNotGateRowFoldOnLastReadMessageId() {
-        val body = controllersSource().readText().kotlinFunctionBody("markReadUpTo")
+        val body = controllersSource().readText().kotlinFunctionBody("submitVisibleReadUpTo")
 
         assertFalse(
             "success path must not gate row fold on trimmed != lastReadMessageId",

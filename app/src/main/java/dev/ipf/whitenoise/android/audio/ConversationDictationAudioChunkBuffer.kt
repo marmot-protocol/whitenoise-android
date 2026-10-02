@@ -156,6 +156,9 @@ internal class ConversationDictationAudioChunkBuffer(
     /** Clears volatile audio after cancellation or an unrecoverable provider failure. */
     @Synchronized
     fun discard() {
+        queued.forEach { it.pcm.fill(0) }
+        inFlight.values.forEach { it.pcm.fill(0) }
+        current.fill(0)
         queued.clear()
         inFlight.clear()
         currentSize = 0

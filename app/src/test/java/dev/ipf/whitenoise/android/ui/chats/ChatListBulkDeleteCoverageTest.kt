@@ -58,6 +58,25 @@ class ChatListBulkDeleteCoverageTest {
         )
     }
 
+    /** The screen keeps native eligibility, captured origin and concurrent deletion separate. */
+    @Test
+    fun departureWiringRetainsItsEligibilityAndOriginGuards() {
+        val source = chatsScreenSource().readText()
+        val menu = source.requiredSection("onLeaveAndDelete =", "onDismiss =")
+        assertTrue("!item.isDm()" in menu)
+        assertTrue("!item.group.leaveRequestPending" in menu)
+        assertTrue("item.projection?.leaveRequestPending != true" in menu)
+        val departure = source.requiredSection("pendingLeaveAndDelete?.let", "pendingBulkDelete?.let")
+        assertTrue("controller.leaveAndDeleteFromChatList(groupId)" in departure)
+        assertTrue("leavingAndDeleting.add(groupId)" in departure)
+        assertTrue("leavingAndDeleting.remove(groupId)" in departure)
+        assertTrue("appState.activeAccountRef != originAccount" in departure)
+        assertTrue("appState.runtimeGeneration != originRuntime" in departure)
+        assertTrue("appState.signOutInProgress || appState.wipeInProgress" in departure.replace(Regex("\\s+"), " "))
+        val localDelete = source.requiredSection("pendingBulkDelete?.let", "onDismiss = { pendingBulkDelete = null }")
+        assertTrue("it.group.groupIdHex in leavingAndDeleting" in localDelete)
+    }
+
     private fun chatsScreenSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt"),

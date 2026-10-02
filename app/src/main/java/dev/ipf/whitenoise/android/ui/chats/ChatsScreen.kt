@@ -214,6 +214,13 @@ internal fun ChatsScreen(
         if (appState.signOutInProgress || appState.wipeInProgress) folderManagerOpen = false
     }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
+    var pendingLeaveAndDelete by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<ChatListItem?>(null)
+    }
+    val leavingAndDeleting =
+        remember(appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateSetOf<String>()
+        }
     val selectionMode = selectedChatIds.isNotEmpty()
     val searchOpen = globalSearchState.isOpen
     val searchQuery = globalSearchState.query
@@ -1252,7 +1259,8 @@ internal fun ChatsScreen(
     val anotherSheetVisible =
         actionSheetChatId != null ||
             folderHandoff.pickerChatIds != null ||
-            pendingBulkDelete != null
+            pendingBulkDelete != null ||
+            pendingLeaveAndDelete != null
     if (!anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
         diagnosticsPrompt()
     }
@@ -1392,6 +1400,15 @@ internal fun ChatsScreen(
                                 selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
                             },
                             onDelete = { pendingBulkDelete = listOf(item) },
+                            onLeaveAndDelete =
+                                if (!item.isDm() &&
+                                    !item.group.leaveRequestPending &&
+                                    item.projection?.leaveRequestPending != true
+                                ) {
+                                    { pendingLeaveAndDelete = item }
+                                } else {
+                                    null
+                                },
                             onDismiss = {
                                 if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
                                     actionSheetChatId = null
@@ -1403,7 +1420,10 @@ internal fun ChatsScreen(
                             modifier = Modifier.testTag("chat.menu.$rowId"),
                             canRunAction = {
                                 val ownsMenu = actionSheetChatId == rowId && rowId in visibleChatIds
-                                ownsMenu && actionMenuOwner.isCurrent(menuToken) && menuActionsCurrent()
+                                ownsMenu &&
+                                    item.group.groupIdHex !in leavingAndDeleting &&
+                                    actionMenuOwner.isCurrent(menuToken) &&
+                                    menuActionsCurrent()
                             },
                             actions = item.actions,
                         )
@@ -1490,7 +1510,9 @@ internal fun ChatsScreen(
                     ChatListSelectionControls(
                         count = selectedChatIds.size,
                         archiveAction = bulkArchiveAction,
-                        actionsEnabled = selectedChatIds.isNotEmpty(),
+                        actionsEnabled =
+                            selectedVisibleItems.isNotEmpty() &&
+                                selectedVisibleItems.none { it.group.groupIdHex in leavingAndDeleting },
                         allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
                         showMarkRead =
                             singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
@@ -1515,6 +1537,9 @@ internal fun ChatsScreen(
                             archiveChats(selected, archive)
                         },
                         onDelete = {
+                            if (selectedVisibleItems.any { it.group.groupIdHex in leavingAndDeleting }) {
+                                return@ChatListSelectionControls
+                            }
                             pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
                         },
                         onAddToFolder = {
@@ -1875,11 +1900,37 @@ internal fun ChatsScreen(
         )
     }
 
+    pendingLeaveAndDelete?.let { item ->
+        val originAccount = appState.activeAccountRef
+        val originRuntime = appState.runtimeGeneration
+        ChatLeaveAndDeleteConfirmationDialog(
+            onConfirm = {
+                pendingLeaveAndDelete = null
+                val groupId = item.group.groupIdHex
+                if (!leavingAndDeleting.add(groupId)) return@ChatLeaveAndDeleteConfirmationDialog
+                appState.launchMutation {
+                    try {
+                        val originChanged =
+                            appState.activeAccountRef != originAccount || appState.runtimeGeneration != originRuntime
+                        if (originChanged || appState.signOutInProgress || appState.wipeInProgress) {
+                            return@launchMutation
+                        }
+                        controller.leaveAndDeleteFromChatList(groupId)
+                    } finally {
+                        leavingAndDeleting.remove(groupId)
+                    }
+                }
+            },
+            onDismiss = { pendingLeaveAndDelete = null },
+        )
+    }
+
     pendingBulkDelete?.let { items ->
         ChatDeleteConfirmationDialog(
             count = items.size,
             onConfirm = {
                 pendingBulkDelete = null
+                if (items.any { it.group.groupIdHex in leavingAndDeleting }) return@ChatDeleteConfirmationDialog
                 clearSelection()
                 appState.launchMutation {
                     var succeeded = 0

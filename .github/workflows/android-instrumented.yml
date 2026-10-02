@@ -60,6 +60,8 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/ControlledAttachmentProbe.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaAttachmentLatencyProbe.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt'
+      - 'scripts/check_instrumented_required_cases.py'
+      - 'config/instrumented-required-cases.txt'
 
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.

@@ -147,7 +147,6 @@ import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
-import dev.ipf.whitenoise.android.state.reportVisibleMessage
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
@@ -3288,25 +3287,11 @@ internal fun ConversationScreen(
         showTransientMessageHighlight(target)
     }
 
-    // Scroll-driven read pointer advance. Watches the shared read anchor
-    // (`readAnchorMessageId`) so the FFI only sees IDs that strictly advance
-    // the pointer — scroll-up cannot regress the count. Settle-gated
-    // (`!isScrollInProgress`) avoids per-frame FFI hops while scrolling.
-    LaunchedEffect(listState, controller) {
-        snapshotFlow {
-            if (!initialTimelineAnchored || listState.isScrollInProgress) {
-                null
-            } else {
-                readAnchorMessageId
-            }
-        }.filterNotNull()
-            .distinctUntilChanged()
-            .collect { messageId ->
-                if (messageId.isNotBlank()) {
-                    controller.markReadUpTo(messageId)
-                    controller.reportVisibleMessage(messageId)
-                }
-            }
+    // A settled visible anchor submits its first read even at the saved watermark
+    // so MDK can clear manual attention. The controller deduplicates later reads;
+    // MDK keeps the durable pointer monotonic. Settling avoids per-frame FFI hops.
+    observeConversationVisibleReads(appState, controller, resumeLifecycleOwner) {
+        readAnchorMessageId.takeIf { initialTimelineAnchored && !listState.isScrollInProgress }
     }
 
     // Own prepared files above the details early return so staged media
