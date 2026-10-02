@@ -71,6 +71,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -865,6 +867,7 @@ internal fun MediaVideoBubble(
                                                                     )
                                                                 failed = false
                                                             } catch (t: Throwable) {
+                                                                currentCoroutineContext().ensureActive()
                                                                 if (t is CancellationException) throw t
                                                                 failed = true
                                                                 localFile = null
@@ -1295,6 +1298,7 @@ internal fun VideoViewerPage(
                                         )
                                     playbackInvalidated = false
                                 } catch (t: Throwable) {
+                                    currentCoroutineContext().ensureActive()
                                     if (t is CancellationException) throw t
                                     playbackInvalidated = true
                                 } finally {
