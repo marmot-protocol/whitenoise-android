@@ -20,6 +20,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class FreshActivitySameProcessFirstUsefulFrameTest {
     @get:Rule

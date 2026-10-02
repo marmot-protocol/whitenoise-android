@@ -11,6 +11,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.OnboardingActionFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -24,6 +25,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /** Opt-in real UI/native/relay journey. Never runs against a personal package or a supplied real identity. */
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class AccountSetupEndToEndTest {
     @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()

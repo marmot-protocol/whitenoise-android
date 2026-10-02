@@ -19,6 +19,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -30,6 +31,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 private const val REAL_AVATAR_PROBE_TAG = "WNAvatarRealProbe"
 
 /** Opt-in, identifier-free avatar-cache measurement on an existing authenticated chat list. */
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class RealChatListAvatarProbe {
     @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()

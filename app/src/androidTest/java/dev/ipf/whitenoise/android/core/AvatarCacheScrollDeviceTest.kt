@@ -42,6 +42,7 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -55,6 +56,7 @@ private const val AVATAR_FIXTURE_COUNT = 48
 private const val AVATAR_BENCH_TAG = "WNAvatarBench"
 
 /** Bounded, synthetic list-scroll measurement of both real avatar loaders on a physical device. */
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class AvatarCacheScrollDeviceTest {
     @get:Rule
