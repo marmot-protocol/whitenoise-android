@@ -5,6 +5,20 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
+## Prepare before publication
+
+Start the consumer work while the MDK release is being prepared: review its
+integration guide, identify changed constructors and host calls, and validate
+those already available in a published immutable snapshot. Keep that snapshot's
+complete lock until the formal Android archive is published. A release PR SHA,
+an Actions candidate, or a version-only edit does not establish the final pin.
+
+Record the remaining publication steps and consuming-app acceptance checks in
+the adoption PR. For the current transition, see the
+[MDK 0.12.0 adoption checklist](mdk-0.12-adoption.md). Once the release appears,
+follow the steps below against its actual archive; earlier snapshot CI does not
+qualify different release bytes.
+
 ## 1. Select and inspect the release
 
 Prefer a formal `marmotkit-v<version>` release. Record its exact tag, asset URL,
