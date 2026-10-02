@@ -54,14 +54,14 @@ class ChatFolderPillsScreenshotTest {
     /** Chats total is present with another folder selected. */
     @Test fun chatsUnreadInFolder() = capture("folder_pills_chats_unread_folder", selected = "unread", unread = 12uL)
 
-    /** High totals cap visually in dark theme. */
+    /** Totals from 1,000 cap visually at `999+` in dark theme (#2970). */
     @Test
     fun chatsUnreadCappedDark() =
         capture(
             "folder_pills_chats_unread_amoled",
             dark = true,
             amoled = true,
-            unread = 100uL,
+            unread = 1000uL,
         )
 
     /** RTL large text retains the permanent total. */
