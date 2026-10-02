@@ -36,10 +36,15 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.FolderTruth
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.core.smartFolderMatches
 import dev.ipf.whitenoise.android.state.ChatFolderRule
+import dev.ipf.whitenoise.android.state.SmartFolderCodec
+import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
@@ -65,7 +70,12 @@ internal fun ChatFolderEditScreen(
     onClose: () -> Unit,
     initialManualChatIds: Set<String> = emptySet(),
 ) {
-    if (appState.signOutInProgress || appState.wipeInProgress || appState.activeAccountRef != accountRef) return
+    if (appState.signOutInProgress ||
+        appState.wipeInProgress ||
+        appState.activeAccountRef != accountRef
+    ) {
+        return
+    }
     key(accountRef, folderId, appState.runtimeGeneration) {
         ChatFolderEditSession(appState, accountRef, folderId, onClose, initialManualChatIds)
     }
@@ -111,6 +121,17 @@ private fun ChatFolderEditSession(
     val name = rememberTextFieldState(prefillName)
     val description = rememberTextFieldState(existing?.description.orEmpty())
     val keyword = rememberTextFieldState(existingRule?.keyword.orEmpty())
+    val initialSmart =
+        remember {
+            existingRule?.smartFilter ?: if (folderId == null) {
+                SmartFolderCodec.encode(SmartFolderFilter.Group())
+            } else {
+                null
+            }
+        }
+    var smartPayload by rememberSaveable { mutableStateOf(initialSmart) }
+    val smartRoot = remember(smartPayload) { smartPayload?.let(SmartFolderCodec::decode) }
+
     var unreadOnly by rememberSaveable { mutableStateOf(existingRule?.unreadOnly ?: false) }
     var includeMuted by rememberSaveable { mutableStateOf(existingRule?.includeMuted ?: false) }
     var groupsOnly by rememberSaveable { mutableStateOf(existingRule?.groupsOnly ?: false) }
@@ -148,8 +169,10 @@ private fun ChatFolderEditSession(
             unreadMentionsOnly = unreadMentionsOnly,
             directChatsOnly = directChatsOnly,
             pinnedOnly = pinnedOnly,
+            smartFilter = smartPayload,
         )
-    val initialRule = existingRule ?: ChatFolderRule()
+    val initialRule = (existingRule ?: ChatFolderRule()).copy(smartFilter = initialSmart)
+    val smartRuleValid = smartPayload == null || smartRoot?.let(SmartFolderCodec::valid) == true
     val missing = folderId != null && existing == null
     val dirty =
         name.text.toString() != prefillName ||
@@ -171,7 +194,7 @@ private fun ChatFolderEditSession(
     /** Saves the folder, failing if it vanished meanwhile. */
     @Suppress("ReturnCount") // Early exits preserve route ownership and reject invalid or superseded actions.
     fun save() {
-        if (!canMutate() || submitted) return
+        if (!canMutate() || submitted || !smartRuleValid) return
         if (folderId != null && store.foldersFor(accountRef).none { it.id == folderId }) {
             failed = true
             return
@@ -230,10 +253,10 @@ private fun ChatFolderEditSession(
     val groupTitleCopy = rememberGroupTitleCopy()
     val activeHex = appState.activeAccount?.accountIdHex
     val profileRevision = appState.profileRevisionForCompose
-    val source = if (archivedOnly) appState.archivedChatListItems else appState.chatListItems
+    val source = chatFolderSource(rule, appState.chatListItems, appState.archivedChatListItems)
     val chatRows =
-        remember(appState.chatListItems, profileRevision, groupTitleCopy) {
-            appState.chatListItems.map { item ->
+        remember(source, profileRevision, groupTitleCopy) {
+            source.map { item ->
                 WhiteNoisePickerItem(
                     id = item.id.lowercase(Locale.ROOT),
                     title = chatListItemDisplayTitle(item, appState, groupTitleCopy),
@@ -291,7 +314,12 @@ private fun ChatFolderEditSession(
                 manualChatCount = manualChatIds.size,
                 peopleCount = memberHexes.size,
                 previewCount = previewRows.size,
-                canSave = name.text.isNotBlank() && !missing && !submitted && canMutate(),
+                canSave =
+                    name.text.isNotBlank() &&
+                        !missing &&
+                        !submitted &&
+                        canMutate() &&
+                        smartRuleValid,
                 canDelete = folderId != null && !missing && !submitted && canMutate(),
                 error =
                     when {
@@ -313,6 +341,62 @@ private fun ChatFolderEditSession(
             if (it) groupsOnly = false
         },
         onPinnedOnlyChange = { pinnedOnly = it },
+        rulesContent = {
+            val unresolved =
+                smartRoot?.let { tree ->
+                    source.count { item ->
+                        smartFolderMatches(
+                            tree,
+                            item,
+                        ) {
+                            chatListItemDisplayTitle(
+                                it,
+                                appState,
+                                groupTitleCopy,
+                            )
+                        } ==
+                            FolderTruth.UNKNOWN
+                    }
+                }
+                    ?: 0
+            SmartFolderRulePanel(
+                state = SmartFolderPanelState(smartPayload != null, smartRoot, unresolved),
+                people = memberRows,
+                resolveKey = { input -> appState.accountIdHex(input).takeIf { canMutate() } },
+                onStart = { if (canMutate()) smartPayload = SmartFolderCodec.encode(defaultSmartFolder()) },
+                onChange = { tree -> if (canMutate()) smartPayload = SmartFolderCodec.encode(tree) },
+                legacyControls = {
+                    LegacyFolderRuleControls(
+                        keyword,
+                        unreadOnly,
+                        includeMuted,
+                        groupsOnly,
+                        archivedOnly,
+                        unreadMentionsOnly,
+                        directChatsOnly,
+                        pinnedOnly,
+                        memberHexes.size,
+                        onUnread = { unreadOnly = it },
+                        onMuted = { includeMuted = it },
+                        onGroups = {
+                            groupsOnly = it
+                            if (it) directChatsOnly = false
+                        },
+                        onArchived = { archivedOnly = it },
+                        onMentions = { unreadMentionsOnly = it },
+                        onDirect = {
+                            directChatsOnly = it
+                            if (it) {
+                                groupsOnly =
+                                    false
+                            }
+                        },
+                        onPinned = { pinnedOnly = it },
+                        onPeople = { picker = FolderPicker.People },
+                    )
+                },
+            )
+        },
         onArchivedOnlyChange = { archivedOnly = it },
         onOpenManualChats = { picker = FolderPicker.Chats },
         onOpenPeople = { picker = FolderPicker.People },
@@ -412,6 +496,7 @@ internal fun ChatFolderEditContent(
     onUnreadMentionsOnlyChange: (Boolean) -> Unit,
     onDirectChatsOnlyChange: (Boolean) -> Unit,
     onPinnedOnlyChange: (Boolean) -> Unit,
+    rulesContent: (@Composable () -> Unit)? = null,
 ) {
     SettingsScaffold(
         title = stringResource(if (state.isNew) R.string.folder_new_title else R.string.folder_edit),
@@ -467,65 +552,78 @@ internal fun ChatFolderEditContent(
                     }
                 }
                 SettingsExplainer(stringResource(R.string.folder_manual_hint))
-                SettingsSection(stringResource(R.string.folder_rules))
-                SettingsGroup {
-                    row("people") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.chat_folder_people),
-                            onClick = onOpenPeople,
-                            value = state.peopleCount.toString(),
+            }
+            if (rulesContent != null) {
+                item { rulesContent() }
+            } else {
+                item {
+                    SettingsSection(stringResource(R.string.folder_rules))
+                    SettingsGroup {
+                        row("people") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.chat_folder_people),
+                                onClick = onOpenPeople,
+                                value = state.peopleCount.toString(),
+                            )
+                        }
+                    }
+                }
+                item {
+                    Column(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.CompactScreenMargin)) {
+                        WhiteNoiseTextField(
+                            state = state.keyword,
+                            modifier = Modifier.fillMaxWidth().testTag("folder.keyword"),
+                            label = { Text(stringResource(R.string.chat_folder_keyword_label)) },
+                            supportingText = { Text(stringResource(R.string.folder_keyword_hint)) },
+                            lineLimits = TextFieldLineLimits.SingleLine,
                         )
                     }
                 }
-            }
-            item {
-                Column(Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.CompactScreenMargin)) {
-                    WhiteNoiseTextField(
-                        state = state.keyword,
-                        modifier = Modifier.fillMaxWidth().testTag("folder.keyword"),
-                        label = { Text(stringResource(R.string.chat_folder_keyword_label)) },
-                        supportingText = { Text(stringResource(R.string.folder_keyword_hint)) },
-                        lineLimits = TextFieldLineLimits.SingleLine,
-                    )
+                item {
+                    SettingsGroup {
+                        row("unread") { context ->
+                            val title = stringResource(R.string.chat_folder_unread_only)
+                            SettingsSwitch(context, title, state.unreadOnly, onUnreadOnlyChange)
+                        }
+                        row("mentions") { context ->
+                            val title = stringResource(R.string.chat_folder_unread_mentions_only)
+                            SettingsSwitch(
+                                context,
+                                title,
+                                state.unreadMentionsOnly,
+                                onUnreadMentionsOnlyChange,
+                            )
+                        }
+                        row("pinned") { context ->
+                            val title = stringResource(R.string.chat_folder_pinned_only)
+                            SettingsSwitch(context, title, state.pinnedOnly, onPinnedOnlyChange)
+                        }
+                    }
+                }
+                item {
+                    SettingsGroup {
+                        row("groups") { context ->
+                            val title = stringResource(R.string.chat_folder_groups_only)
+                            SettingsSwitch(context, title, state.groupsOnly, onGroupsOnlyChange)
+                        }
+                        row("direct") { context ->
+                            val title = stringResource(R.string.chat_folder_direct_chats_only)
+                            SettingsSwitch(context, title, state.directChatsOnly, onDirectChatsOnlyChange)
+                        }
+                        row("archived") { context ->
+                            val title = stringResource(R.string.chat_folder_archived_only)
+                            SettingsSwitch(context, title, state.archivedOnly, onArchivedOnlyChange)
+                        }
+                        row("muted") { context ->
+                            val title = stringResource(R.string.chat_folder_include_muted)
+                            SettingsSwitch(context, title, state.includeMuted, onIncludeMutedChange)
+                        }
+                    }
+                    SettingsExplainer(stringResource(R.string.folder_rule_hint))
                 }
             }
             item {
-                SettingsGroup {
-                    row("unread") { context ->
-                        val title = stringResource(R.string.chat_folder_unread_only)
-                        SettingsSwitch(context, title, state.unreadOnly, onUnreadOnlyChange)
-                    }
-                    row("mentions") { context ->
-                        val title = stringResource(R.string.chat_folder_unread_mentions_only)
-                        SettingsSwitch(context, title, state.unreadMentionsOnly, onUnreadMentionsOnlyChange)
-                    }
-                    row("pinned") { context ->
-                        val title = stringResource(R.string.chat_folder_pinned_only)
-                        SettingsSwitch(context, title, state.pinnedOnly, onPinnedOnlyChange)
-                    }
-                }
-            }
-            item {
-                SettingsGroup {
-                    row("groups") { context ->
-                        val title = stringResource(R.string.chat_folder_groups_only)
-                        SettingsSwitch(context, title, state.groupsOnly, onGroupsOnlyChange)
-                    }
-                    row("direct") { context ->
-                        val title = stringResource(R.string.chat_folder_direct_chats_only)
-                        SettingsSwitch(context, title, state.directChatsOnly, onDirectChatsOnlyChange)
-                    }
-                    row("archived") { context ->
-                        val title = stringResource(R.string.chat_folder_archived_only)
-                        SettingsSwitch(context, title, state.archivedOnly, onArchivedOnlyChange)
-                    }
-                    row("muted") { context ->
-                        val title = stringResource(R.string.chat_folder_include_muted)
-                        SettingsSwitch(context, title, state.includeMuted, onIncludeMutedChange)
-                    }
-                }
-                SettingsExplainer(stringResource(R.string.folder_rule_hint))
                 SettingsSection(stringResource(R.string.folder_preview))
                 SettingsGroup {
                     row("preview") { context ->
@@ -534,11 +632,15 @@ internal fun ChatFolderEditContent(
                             title = stringResource(R.string.folder_preview),
                             onClick = onOpenPreview,
                             subtitle =
-                                pluralStringResource(
-                                    R.plurals.chat_folder_chat_count,
-                                    state.previewCount,
-                                    state.previewCount,
-                                ),
+                                if (rulesContent != null) {
+                                    stringResource(R.string.smart_folder_loaded_count, state.previewCount)
+                                } else {
+                                    pluralStringResource(
+                                        R.plurals.chat_folder_chat_count,
+                                        state.previewCount,
+                                        state.previewCount,
+                                    )
+                                },
                         )
                     }
                 }

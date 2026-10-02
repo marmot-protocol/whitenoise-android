@@ -95,6 +95,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
+import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.collectGlobalAttachments
 import dev.ipf.whitenoise.android.state.hasEarlierChats
 import dev.ipf.whitenoise.android.state.loadEarlierChats
@@ -271,8 +272,7 @@ internal fun ChatsScreen(
                         // An archived-only folder draws from the archived
                         // list; every other folder from the active one.
                         val rule = appState.chatFolderPreferences.folderRule(accountRef, folderId)
-                        val archivedSource = rule?.archivedOnly == true
-                        val sourceItems = if (archivedSource) controller.archivedItems else controller.items
+                        val sourceItems = chatFolderSource(rule, controller.items, controller.archivedItems)
                         val engineMutedChatIds =
                             sourceItems
                                 .asSequence()
@@ -298,7 +298,8 @@ internal fun ChatsScreen(
         }
     // An archived-only folder is a view switch as well as a filter: it swaps
     // the source list to archived chats (replacing the old Archived chip).
-    val showArchived = selectedFolderRule?.archivedOnly == true
+    val advancedFolder = selectedFolderRule?.smartFilter != null
+    val showArchived = !advancedFolder && selectedFolderRule?.archivedOnly == true
     // A confirmation still holding the previous account's or list variant's rows must not survive
     // into the next one, where those rows are not even addressable.
     var pendingBulkDelete by
@@ -396,8 +397,8 @@ internal fun ChatsScreen(
 
     // Archived-only folder rules swap the source list; every other view reads the active native rows.
     val sourceList =
-        remember(controller.items, controller.archivedItems, showArchived) {
-            if (showArchived) controller.archivedItems else controller.items
+        remember(controller.items, controller.archivedItems, selectedFolderRule) {
+            chatFolderSource(selectedFolderRule, controller.items, controller.archivedItems)
         }
     LaunchedEffect(controller, controller.recoveryProjectionGeneration, sourceList) {
         val generation = controller.recoveryProjectionGeneration
@@ -453,7 +454,14 @@ internal fun ChatsScreen(
     // Deleted folders and chats outside the folder / type scope leave the filters (prototype `reconcile`).
     LaunchedEffect(globalSearchState.isOpen, accountFolders, folderTypeScopedList) {
         if (!globalSearchState.isOpen) return@LaunchedEffect
-        val folderIds = if (appState.activeAccountRef == null) null else accountFolders.mapTo(mutableSetOf()) { it.id }
+        val folderIds =
+            if (appState.activeAccountRef == null) {
+                null
+            } else {
+                accountFolders.mapTo(mutableSetOf()) {
+                    it.id
+                }
+            }
         val chatIds =
             if (sourceList.isEmpty()) {
                 null
@@ -695,7 +703,7 @@ internal fun ChatsScreen(
                 )
             }
         }
-    val ordinaryActiveList = !showArchived && !searchActive
+    val ordinaryActiveList = !advancedFolder && !showArchived && !searchActive
     var nextHeadDemotionTransactionId by remember { mutableLongStateOf(0L) }
     var pendingHeadDemotion by
         remember(
@@ -732,7 +740,7 @@ internal fun ChatsScreen(
         justCreated: Boolean,
     ) {
         val visibleHeadId =
-            if (showArchived) null else visibleItems.firstOrNull()?.id
+            if (showArchived || advancedFolder) null else visibleItems.firstOrNull()?.id
         onOpenGroup(item, focusMessageId, justCreated, visibleHeadId)
     }
 
@@ -751,7 +759,7 @@ internal fun ChatsScreen(
     /** Presents a profile from the visible list, remembering the list head for the return scroll. */
     fun presentProfileFromVisibleList(npub: String) {
         val visibleHeadId =
-            if (showArchived) null else visibleItems.firstOrNull()?.id
+            if (showArchived || advancedFolder) null else visibleItems.firstOrNull()?.id
         onPresentProfile(npub, visibleHeadId)
     }
     LaunchedEffect(visibleChatIds, selectionMode) {
@@ -1016,7 +1024,7 @@ internal fun ChatsScreen(
     val currentVisibleItems by rememberUpdatedState(visibleItems)
     val currentVisibleChatIds by rememberUpdatedState(visibleChatIds)
     val currentSearchActive by rememberUpdatedState(searchActive)
-    val hasEarlierChats = controller.hasEarlierChats(chatListWindowView)
+    val hasEarlierChats = !advancedFolder && controller.hasEarlierChats(chatListWindowView)
     LaunchedEffect(chatListState, controller, chatListWindowView, hasEarlierChats) {
         snapshotFlow { chatListState.firstVisibleItemIndex }
             .distinctUntilChanged()
@@ -1056,10 +1064,14 @@ internal fun ChatsScreen(
                 }
             }
     }
-    LaunchedEffect(chatListState, controller, chatListWindowView) {
-        collectChatListForwardPaging(listState = chatListState) { controller.loadMoreChats(chatListWindowView) }
+    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder) {
+        if (advancedFolder) return@LaunchedEffect
+        collectChatListForwardPaging(listState = chatListState) {
+            controller.loadMoreChats(chatListWindowView)
+        }
     }
-    LaunchedEffect(chatListState, controller, chatListWindowView) {
+    LaunchedEffect(chatListState, controller, chatListWindowView, advancedFolder) {
+        if (advancedFolder) return@LaunchedEffect
         collectChatListVisibleAnchor(
             listState = chatListState,
             searchActive = { currentSearchActive },
@@ -1175,7 +1187,7 @@ internal fun ChatsScreen(
                 .mapNotNullTo(mutableSetOf()) { folder ->
                     val accountRef = appState.activeAccountRef ?: return@mapNotNullTo null
                     val rule = appState.chatFolderPreferences.folderRule(accountRef, folder.id)
-                    val source = if (rule?.archivedOnly == true) controller.archivedItems else controller.items
+                    val source = chatFolderSource(rule, controller.items, controller.archivedItems)
                     folder.id.takeIf { memberBasedFolderPending(rule, source) }
                 }
         }
@@ -1621,7 +1633,18 @@ internal fun ChatsScreen(
                     )
                 }
             }
-            if (shouldShowGlobalSearchFilterControls(searchState = globalSearchState, selectionMode = selectionMode)) {
+            if (advancedFolder) {
+                Text(
+                    stringResource(R.string.smart_folder_prototype),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            if (shouldShowGlobalSearchFilterControls(
+                    searchState = globalSearchState,
+                    selectionMode = selectionMode,
+                )
+            ) {
                 GlobalSearchFilterControlsRow(
                     state = globalSearchState,
                     folderNames = globalSearchFolderNames,
@@ -1930,7 +1953,12 @@ internal fun ChatsScreen(
             count = items.size,
             onConfirm = {
                 pendingBulkDelete = null
-                if (items.any { it.group.groupIdHex in leavingAndDeleting }) return@ChatDeleteConfirmationDialog
+                if (items.any {
+                        it.group.groupIdHex in leavingAndDeleting
+                    }
+                ) {
+                    return@ChatDeleteConfirmationDialog
+                }
                 clearSelection()
                 appState.launchMutation {
                     var succeeded = 0

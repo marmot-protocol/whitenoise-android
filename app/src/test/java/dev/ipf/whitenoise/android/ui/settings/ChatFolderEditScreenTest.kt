@@ -146,6 +146,8 @@ class ChatFolderEditScreenTest {
         val appState = appState()
         appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
         renderEditor(appState, onClose = {})
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.legacyEdit"))
+        composeRule.onNodeWithTag("folder.legacyEdit").performClick()
 
         fun toggle(label: Int) {
             val text = app.getString(label)
@@ -180,6 +182,8 @@ class ChatFolderEditScreenTest {
         appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
         var closed = false
         renderEditor(appState, onClose = { closed = true })
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.legacyEdit"))
+        composeRule.onNodeWithTag("folder.legacyEdit").performClick()
         val label = app.getString(R.string.chat_folder_unread_mentions_only)
         composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(label))
         composeRule.onNodeWithText(label).performClick()

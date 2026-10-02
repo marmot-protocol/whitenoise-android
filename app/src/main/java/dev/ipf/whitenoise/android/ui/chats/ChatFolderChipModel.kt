@@ -3,7 +3,11 @@ package dev.ipf.whitenoise.android.ui.chats
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.FolderField
+import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SystemFolderKind
+import dev.ipf.whitenoise.android.state.chatFolderSource
+import dev.ipf.whitenoise.android.state.references
 
 /**
  * One renderable chat-list chip. `All` is not modeled here: it is the
@@ -42,7 +46,7 @@ internal fun chatFolderChipModels(
     folders
         .sortedBy { it.order }
         .mapNotNull { folder ->
-            val source = if (ruleOf(folder.id)?.archivedOnly == true) archivedItems else activeItems
+            val source = chatFolderSource(ruleOf(folder.id), activeItems, archivedItems)
             val ids = membershipOf(folder.id)
             // One pass per folder: the chip needs only "does anything match"
             // and the matched unread count, so neither the intermediate member
@@ -73,6 +77,15 @@ internal fun chatFolderChipModels(
 internal fun memberBasedFolderPending(
     rule: ChatFolderRule?,
     items: Iterable<ChatListItem>,
-): Boolean =
-    rule?.includeMemberPubkeys?.isNotEmpty() == true &&
-        items.any { it.memberSnapshot == null }
+): Boolean {
+    val participants =
+        if (rule?.smartFilter != null) {
+            SmartFolderCodec
+                .decode(rule.smartFilter)
+                ?.takeIf(SmartFolderCodec::valid)
+                ?.references(FolderField.PARTICIPANTS) == true
+        } else {
+            rule?.includeMemberPubkeys?.isNotEmpty() == true
+        }
+    return participants && items.any { it.memberSnapshot == null }
+}
