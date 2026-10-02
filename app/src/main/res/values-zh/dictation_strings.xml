@@ -22,7 +22,7 @@
     <string name="dictation_send_blocked">未发送</string>
     <string name="dictation_retry_send">重试发送</string>
     <string name="dictation_recovery_title">语音输入需要处理</string>
-    <string name="dictation_recovery_text">打开 White Noise 以恢复语音输入。未完成的语音输入最多保留 30 分钟。</string>
+    <string name="dictation_recovery_text">打开 White Noise 以恢复语音输入。未完成的语音输入可在 30 分钟内恢复。</string>
     <string name="dictation_recovery_open">打开应用</string>
     <string name="dictation_recovery_expired_title">语音输入恢复已过期</string>
     <string name="dictation_recovery_expired_text">未完成的语音输入已从此设备清除。</string>

@@ -128,6 +128,13 @@ internal enum class ConversationDictationFailure {
     Unknown,
 }
 
+/** Distinguishes completed text from recognition interrupted before its final result. */
+private enum class DictationFailureCapture {
+    Complete,
+    Cancel,
+    CancelIncomplete,
+}
+
 /** The enabled external-media policy cannot be honored, so capture must not begin. */
 internal class ConversationDictationAudioFocusDenied : RuntimeException()
 
@@ -213,6 +220,7 @@ internal sealed interface ConversationDictationState {
         val reason: ConversationDictationFailure,
         val retainedTranscript: String? = null,
         val cause: ConversationDictationFailure? = null,
+        val recognitionIncomplete: Boolean = false,
     ) : ConversationDictationState
 }
 
@@ -297,6 +305,9 @@ internal enum class ConversationDictationMicrophoneAccess {
 }
 
 internal interface ConversationDictationPlatform {
+    /** Separates recorder ownership from a discarded capture belonging to an older gesture. */
+    fun beginCaptureSession() = Unit
+
     /** Resolves and pins a new gesture; false asks for a provider before microphone access. */
     fun prepareProviderSelection(): Boolean = true
 
@@ -770,6 +781,7 @@ internal class ConversationDictationController internal constructor(
         clearRecognitionSession(cancel = true)
         resetTranscriptSession()
         captureClosureGeneration += 1L
+        platform.beginCaptureSession()
         foregroundMicrophoneRequired = true
         notificationActionGeneration += 1L
         if (state.sessionId != null) conversationDictationDiagnostic("event=session_finished outcome=replaced")
@@ -1172,7 +1184,7 @@ internal class ConversationDictationController internal constructor(
                 active.sessionId,
                 active.target,
                 ConversationDictationFailure.Unknown,
-                cancelSession = true,
+                captureEnd = DictationFailureCapture.Cancel,
                 retainedTranscript = recognized,
             )
             return
@@ -1298,7 +1310,7 @@ internal class ConversationDictationController internal constructor(
                     sessionId,
                     target,
                     ConversationDictationFailure.Unknown,
-                    cancelSession = true,
+                    captureEnd = DictationFailureCapture.Cancel,
                     retainedTranscript = transcript,
                 )
             }
@@ -1988,7 +2000,7 @@ internal class ConversationDictationController internal constructor(
                             sessionId,
                             target,
                             ConversationDictationFailure.Unknown,
-                            cancelSession = true,
+                            captureEnd = DictationFailureCapture.Cancel,
                             retainedTranscript = accumulatedTranscript.trim(),
                         )
                         return
@@ -2706,13 +2718,14 @@ internal class ConversationDictationController internal constructor(
         failureCause: ConversationDictationFailure? = null,
     ) {
         if (transcript.isBlank()) {
-            fail(sessionId, target, ConversationDictationFailure.NoSpeech, cancelSession = true)
+            fail(sessionId, target, ConversationDictationFailure.NoSpeech, captureEnd = DictationFailureCapture.Cancel)
         } else if (requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
             fail(
                 sessionId,
                 target,
                 failureCause ?: ConversationDictationFailure.SendBlocked,
-                cancelSession = true,
+                captureEnd =
+                    if (failureCause == null) DictationFailureCapture.Cancel else DictationFailureCapture.CancelIncomplete,
                 retainedTranscript = transcript,
             )
         } else {
@@ -2737,7 +2750,7 @@ internal class ConversationDictationController internal constructor(
         } else if (accumulatedTranscript.isNotBlank()) {
             preserveTranscriptInLatestDraft(sessionId, target, accumulatedTranscript, failureCause = reason)
         } else {
-            fail(sessionId, target, reason, cancelSession = true)
+            fail(sessionId, target, reason, captureEnd = DictationFailureCapture.Cancel)
         }
     }
 
@@ -2762,7 +2775,7 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         target: ConversationDictationTarget,
         reason: ConversationDictationFailure,
-        cancelSession: Boolean = false,
+        captureEnd: DictationFailureCapture = DictationFailureCapture.Complete,
         retainedTranscript: String? = null,
     ) {
         if (state.sessionId != sessionId) return
@@ -2777,7 +2790,10 @@ internal class ConversationDictationController internal constructor(
             }
         conversationDictationDiagnostic("event=session_failed failure=${failure.name}")
         val recoverable = !retainedTranscript.isNullOrBlank() && failure != ConversationDictationFailure.DeliveryUnknown
-        clearRecognitionSession(cancel = cancelSession, releaseDurableSession = !recoverable)
+        clearRecognitionSession(
+            cancel = captureEnd != DictationFailureCapture.Complete,
+            releaseDurableSession = !recoverable,
+        )
         resetTranscriptSession()
         state =
             ConversationDictationState.Failed(
@@ -2786,6 +2802,7 @@ internal class ConversationDictationController internal constructor(
                 failure,
                 retainedTranscript,
                 cause = reason.takeIf { failure != it },
+                recognitionIncomplete = captureEnd == DictationFailureCapture.CancelIncomplete,
             )
         notificationActionGeneration += 1L
         (state as ConversationDictationState.Failed)
@@ -3706,6 +3723,8 @@ internal class AndroidConversationDictationPlatform(
     private var providerPrepared = false
     private var sessionProviderCanRecord = false
     private val dictationPreferences by lazy { ConversationDictationPreferences(context) }
+
+    override fun beginCaptureSession() = callerAudio.beginSession()
 
     /**
      * Remembers what each provider build answered about caller-supplied audio.

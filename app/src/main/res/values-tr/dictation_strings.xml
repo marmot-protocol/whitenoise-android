@@ -22,7 +22,7 @@
     <string name="dictation_send_blocked">Gönderilmedi</string>
     <string name="dictation_retry_send">Yeniden gönder</string>
     <string name="dictation_recovery_title">Dikte için işlem gerekiyor</string>
-    <string name="dictation_recovery_text">Dikteyi kurtarmak için White Noise uygulamasını açın. Tamamlanmamış dikte en fazla 30 dakika saklanır.</string>
+    <string name="dictation_recovery_text">Dikteyi kurtarmak için White Noise uygulamasını açın. Tamamlanmamış dikte en fazla 30 dakika boyunca kurtarılabilir.</string>
     <string name="dictation_recovery_open">Uygulamayı aç</string>
     <string name="dictation_recovery_expired_title">Dikte kurtarma süresi doldu</string>
     <string name="dictation_recovery_expired_text">Tamamlanmamış dikte bu cihazdan temizlendi.</string>

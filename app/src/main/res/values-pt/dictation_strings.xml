@@ -22,7 +22,7 @@
     <string name="dictation_send_blocked">Não enviado</string>
     <string name="dictation_retry_send">Tentar enviar novamente</string>
     <string name="dictation_recovery_title">O ditado precisa de atenção</string>
-    <string name="dictation_recovery_text">Abra o White Noise para recuperar o ditado. Ditados inacabados são mantidos por até 30 minutos.</string>
+    <string name="dictation_recovery_text">Abra o White Noise para recuperar o ditado. Ditados inacabados podem ser recuperados por até 30 minutos.</string>
     <string name="dictation_recovery_open">Abrir app</string>
     <string name="dictation_recovery_expired_title">A recuperação do ditado expirou</string>
     <string name="dictation_recovery_expired_text">O ditado inacabado foi apagado deste dispositivo.</string>

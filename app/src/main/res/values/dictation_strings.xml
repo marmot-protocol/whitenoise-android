@@ -13,7 +13,7 @@
     <string name="dictation_send_blocked">Not sent</string>
     <string name="dictation_retry_send">Retry Send</string>
     <string name="dictation_recovery_title">Dictation needs attention</string>
-    <string name="dictation_recovery_text">Open White Noise to recover dictation. Unfinished dictation is kept for up to 30 minutes.</string>
+    <string name="dictation_recovery_text">Open White Noise to recover dictation. Unfinished dictation can be recovered for up to 30 minutes.</string>
     <string name="dictation_recovery_open">Open app</string>
     <string name="dictation_recovery_expired_title">Dictation recovery expired</string>
     <string name="dictation_recovery_expired_text">Unfinished dictation was cleared from this device.</string>

@@ -69,6 +69,9 @@ one ordinary dismissible notice. The recovery deadline uses elapsed time, includ
 deep sleep. Timer delivery, foreground return, native closure and recovery actions
 check that deadline before reattaching or accessing retained data. Cleanup runs
 when a callback executes; no wake lock or exact-alarm permission is added.
+The deadline limits recovery access, rather than promising an exact-time memory
+wipe while the CPU is asleep. Data cleanup and notification expiry run on the next
+callback after wake; expired data can never be used in that interval.
 Retry transcribes the sealed recording without
 opening a new microphone. If Android destroyed the service, a foreground return
 can reattach recovery; a rejected reattach preserves the existing failure/data. Every native closure acknowledgment uses the same logical-session fence. Returning before closure defers recovery reattachment and leaves the watchdog armed; leaving the foreground cancels that deferred request.

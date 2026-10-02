@@ -42,7 +42,7 @@ internal fun ConversationDictationFailureAction(
     IconButton(
         onClick =
             when {
-                retrySend && state.cause != null -> ({ confirmPartialSend = true })
+                retrySend && state.recognitionIncomplete -> ({ confirmPartialSend = true })
                 retrySend -> controller::retry
                 recovery == ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
                 recovery == ConversationDictationRecovery.SpeechProviderSetup ->

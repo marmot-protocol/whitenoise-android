@@ -22,7 +22,7 @@
     <string name="dictation_send_blocked">No enviado</string>
     <string name="dictation_retry_send">Reintentar envío</string>
     <string name="dictation_recovery_title">El dictado necesita atención</string>
-    <string name="dictation_recovery_text">Abre White Noise para recuperar el dictado. Los dictados sin terminar se conservan hasta 30 minutos.</string>
+    <string name="dictation_recovery_text">Abre White Noise para recuperar el dictado. Los dictados sin terminar se pueden recuperar durante un máximo de 30 minutos.</string>
     <string name="dictation_recovery_open">Abrir app</string>
     <string name="dictation_recovery_expired_title">La recuperación del dictado caducó</string>
     <string name="dictation_recovery_expired_text">El dictado sin terminar se eliminó de este dispositivo.</string>

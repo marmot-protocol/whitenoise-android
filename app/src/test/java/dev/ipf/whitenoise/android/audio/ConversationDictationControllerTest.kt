@@ -942,6 +942,7 @@ class ConversationDictationControllerTest {
                 assertEquals("Keep", fixture.drafts.getValue(key()).text)
                 val failure = fixture.controller.state as ConversationDictationState.Failed
                 assertEquals("recover me", failure.retainedTranscript)
+                assertFalse(failure.recognitionIncomplete)
             }
         }
 
@@ -2926,6 +2927,7 @@ class ConversationDictationControllerTest {
         fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
         val failed = fixture.controller.state as ConversationDictationState.Failed
         assertEquals("first segment", failed.retainedTranscript)
+        assertTrue(failed.recognitionIncomplete)
         assertTrue(fixture.controller.hasDurableSession)
         assertTrue(fixture.controller.foregroundMicrophoneRequired)
         fixture.scheduler.advanceBy(1_000L)
@@ -2933,6 +2935,21 @@ class ConversationDictationControllerTest {
         assertFalse(fixture.controller.foregroundMicrophoneRequired)
         assertTrue(fixture.controller.state === failed)
         fixture.controller.dismissFailure()
+    }
+
+    /** Recognition generations share capture ownership, but a new gesture cannot inherit it. */
+    @Test
+    fun captureBoundaryStartsOncePerLogicalGesture() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        assertEquals(1, fixture.platform.captureSessionsStarted)
+        fixture.platform.listener.onResult("first segment")
+        fixture.scheduler.runDelay(500L)
+        assertEquals(1, fixture.platform.captureSessionsStarted)
+        fixture.controller.cancel()
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        assertEquals(2, fixture.platform.captureSessionsStarted)
+        fixture.controller.cancel()
     }
 
     /** Bounded recovery expires once and clears PCM without silently writing a draft. */
@@ -5954,6 +5971,11 @@ class ConversationDictationControllerTest {
         var discardClosureCallback: (() -> Unit)? = null
         var discardCaptureActive = false
         var forceCaptureFailure: RuntimeException? = null
+        var captureSessionsStarted = 0
+
+        override fun beginCaptureSession() {
+            captureSessionsStarted += 1
+        }
 
         /** Simulates a platform that cannot even start the question, such as a recognizer refusal. */
         var callerAudioProbeFailure: RuntimeException? = null

@@ -22,7 +22,7 @@
     <string name="dictation_send_blocked">Не отправлено</string>
     <string name="dictation_retry_send">Повторить отправку</string>
     <string name="dictation_recovery_title">Диктовка требует внимания</string>
-    <string name="dictation_recovery_text">Откройте White Noise, чтобы восстановить диктовку. Незавершённая диктовка хранится до 30 минут.</string>
+    <string name="dictation_recovery_text">Откройте White Noise, чтобы восстановить диктовку. Незавершённую диктовку можно восстановить в течение 30 минут.</string>
     <string name="dictation_recovery_open">Открыть приложение</string>
     <string name="dictation_recovery_expired_title">Срок восстановления диктовки истёк</string>
     <string name="dictation_recovery_expired_text">Незавершённая диктовка удалена с этого устройства.</string>

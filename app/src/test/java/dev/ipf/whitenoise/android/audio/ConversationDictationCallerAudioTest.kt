@@ -83,12 +83,19 @@ class ConversationDictationCallerAudioTest {
             assertFalse(discarded.get())
             assertFalse(forced.get())
             assertFalse(owner.hasPending())
+            // A replacement whose provider records itself must use its own closure callback.
+            owner.beginSession()
+            val replacementClosed = AtomicBoolean(false)
+            assertFalse(owner.finish { replacementClosed.set(true) })
+            assertFalse(owner.forceClose { replacementClosed.set(true) })
+            assertFalse(owner.discard { replacementClosed.set(true) })
             returnRelease.countDown()
             await {
                 shadowOf(Looper.getMainLooper()).idle()
                 discarded.get() && forced.get()
             }
             assertEquals(1, releases.get())
+            assertFalse(replacementClosed.get())
             assertFalse(owner.forceClose {})
         } finally {
             returnRelease.countDown()

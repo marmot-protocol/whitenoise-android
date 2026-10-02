@@ -7,6 +7,11 @@ internal class ConversationDictationCaptureOwner(
     private var current: ConversationDictationCallerAudio? = null
     private var closing: ConversationDictationCallerAudio? = null
 
+    /** Old closure callbacks remain registered, but cannot claim a replacement session. */
+    fun beginSession() {
+        closing = null
+    }
+
     fun acquire(): ConversationDictationCallerAudio? = current ?: create().also { current = it }
 
     fun hasPending(): Boolean = current?.hasPending() == true
