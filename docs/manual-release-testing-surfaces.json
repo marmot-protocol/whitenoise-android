@@ -29282,12 +29282,11 @@
         ]
       },
       {
-        "surface": "Reaction emoji artwork lookup by reaction event",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationEmojiLookups.kt",
-        "anchor": "internal suspend fun ConversationController.reactionArtwork(",
+        "surface": "Custom emoji excluded from shared media and the viewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
+        "anchor": "internal fun TimelineMessage.mediaAttachments(",
         "test_ids": [
-          "MSG-024",
-          "MSG-035"
+          "MSG-034"
         ]
       }
     ],

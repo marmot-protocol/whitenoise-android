@@ -1123,6 +1123,7 @@
     <string name="toast_send_failed">Send failed</string>
     <string name="toast_send_connection_failed">Couldn’t reach the relay. Check your connection and try again.</string>
     <string name="toast_send_queue_full">This chat has too many messages waiting to send, so yours wasn\'t sent. Try again once it catches up.</string>
+    <string name="toast_send_chat_changed">The chat changed while your message was sending, so it wasn\'t sent. Try again.</string>
     <string name="toast_chat_still_loading">This chat is still loading. Try again in a moment.</string>
     <string name="toast_send_membership_verifying">Checking your group membership — your message wasn\'t sent. It\'s kept in the box; try again in a moment.</string>
     <string name="toast_reaction_failed">Reaction failed</string>
@@ -1783,14 +1784,14 @@
 
     <string name="chat_bubble_colors">Chat bubble colors</string>
     <string name="custom_emoji">Custom emoji</string>
-    <string name="custom_emoji_detail">Images you add here become :shortcode: emoji in messages and reactions. They are stored on this device. When you send a message that uses one, its image is uploaded, encrypted, to that chat so its members can see it. Reactions send only the shortcode.</string>
+    <string name="custom_emoji_detail">Images you add here become :shortcode: emoji in messages and reactions. They are stored on this device. When you send a new message (not a reply) that uses one, its image is uploaded, encrypted, to that chat so its members can see it. Reactions and replies send only the shortcode.</string>
     <string name="custom_emoji_empty">No custom emoji yet.</string>
     <string name="custom_emoji_name_title">Name this emoji</string>
     <string name="custom_emoji_name_label">Shortcode</string>
     <string name="custom_emoji_name_help">Letters, numbers and underscores.</string>
     <string name="custom_emoji_replaces">Replaces your current %1$s.</string>
     <string name="custom_emoji_remove_title">Remove %1$s?</string>
-    <string name="custom_emoji_remove_detail">The image is deleted from this device. Messages keep the shortcode as text.</string>
+    <string name="custom_emoji_remove_detail">The image is deleted from this device. Messages you already sent keep the image they uploaded.</string>
     <string name="custom_emoji_too_large">That image is larger than 1 MB.</string>
     <string name="custom_emoji_not_image">That file isn’t an image White Noise can show.</string>
     <string name="custom_emoji_save_failed">Couldn’t save that emoji.</string>

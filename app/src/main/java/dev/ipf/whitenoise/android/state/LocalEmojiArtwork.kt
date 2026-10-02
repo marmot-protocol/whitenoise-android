@@ -9,24 +9,33 @@ import dev.ipf.whitenoise.android.core.Nip30Emoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.security.MessageDigest
 import java.util.Locale
 
 /** One of the user's own emoji images, read from its device-local file and ready to upload. */
-internal class LocalEmojiArtwork(
+class LocalEmojiArtwork(
     val shortcode: String,
     val fileName: String,
     val mediaType: String,
     val bytes: ByteArray,
-)
+) {
+    /** Lowercase hex SHA-256 of the image bytes, the identity of an upload. */
+    val sha256: String by lazy {
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+    }
+}
 
 private val EMOJI_MEDIA_TYPES =
     mapOf("png" to "image/png", "gif" to "image/gif", "webp" to "image/webp", "jpg" to "image/jpeg")
 
 /**
  * The user's emoji files for [shortcodes] in [directory], in the order asked. A shortcode without
- * a readable, supported image file is left out, so it stays literal text instead of failing a send.
+ * a readable, supported, sendable image file is left out, so it stays literal text instead of
+ * failing a send.
  */
 internal fun readLocalEmojiArtwork(
     directory: File,
@@ -37,13 +46,15 @@ internal fun readLocalEmojiArtwork(
         val code = shortcode.trim(':')
         val file = files.firstOrNull { it.nameWithoutExtension == code } ?: return@mapNotNull null
         val mediaType = EMOJI_MEDIA_TYPES[file.extension.lowercase(Locale.ROOT)] ?: return@mapNotNull null
-        if (file.length() > CustomEmojiStore.MAX_BYTES) return@mapNotNull null
+        if (!Nip30Emoji.isSendable(shortcode) || file.length() > CustomEmojiStore.MAX_BYTES) {
+            return@mapNotNull null
+        }
         val bytes = runCatching { file.readBytes() }.getOrNull() ?: return@mapNotNull null
         LocalEmojiArtwork(shortcode, file.name, mediaType, bytes)
     }
 }
 
-/** The user's own emoji that [text] uses, read off the main thread; empty when it uses none. */
+/** The user's own emoji that [text] uses, read off the main thread, or empty when it uses none. */
 internal suspend fun WhiteNoiseAppState.localEmojiArtworkIn(text: String): List<LocalEmojiArtwork> {
     val shortcodes = Nip30Emoji.shortcodesIn(text)
     if (shortcodes.isEmpty()) return emptyList()
@@ -53,9 +64,90 @@ internal suspend fun WhiteNoiseAppState.localEmojiArtworkIn(text: String): List<
 }
 
 /**
+ * Which emoji a send carries: only a plain, non-reply text send does, and only when the app did not
+ * inject its own publisher. Replies and injected publishers send plain text.
+ */
+internal fun emojiSendApplies(
+    replyTarget: String?,
+    customPublisherInjected: Boolean,
+): Boolean = replyTarget == null && !customPublisherInjected
+
+/**
+ * Refuses a send that MDK would reject for its tag rows, before any image is uploaded. The row
+ * count is one emoji tag per shortcode. The byte limit is checked again once the URLs are known.
+ */
+internal fun precheckEmojiSend(artwork: List<LocalEmojiArtwork>) {
+    if (artwork.size > Nip30Emoji.MAX_TAGS) {
+        throw EmojiSendLimitException("too many custom emoji: ${artwork.size} of ${Nip30Emoji.MAX_TAGS}")
+    }
+    artwork.firstOrNull { !Nip30Emoji.isSendable(it.shortcode) }?.let {
+        throw EmojiSendLimitException("shortcode cannot be sent as an emoji tag")
+    }
+}
+
+/** Refuses tag rows whose combined values exceed MDK's byte limit, before they are sent. */
+internal fun checkEmojiTagBytes(tags: List<List<String>>) {
+    val bytes = tags.sumOf { row -> row.sumOf { it.toByteArray(Charsets.UTF_8).size } }
+    if (bytes > Nip30Emoji.MAX_TAG_VALUE_BYTES) {
+        throw EmojiSendLimitException("emoji tag values are $bytes bytes of ${Nip30Emoji.MAX_TAG_VALUE_BYTES}")
+    }
+}
+
+private data class EmojiUploadKey(
+    val account: String,
+    val group: String,
+    val plaintextSha256: String,
+    val epoch: ULong,
+)
+
+/**
+ * Uploaded emoji references, reused while the group's epoch is the one they were encrypted under.
+ * One lock serializes uploads, so a retry or a concurrent send waits for the in-flight upload and
+ * then reuses it instead of uploading the same image twice. Only references live here, never
+ * plaintext, and a rejected reference is dropped with [invalidate].
+ */
+internal class EmojiUploadCache {
+    private val lock = Mutex()
+    private val references = LinkedHashMap<EmojiUploadKey, MediaAttachmentReferenceFfi>()
+
+    /** One reference per distinct image in [artwork], uploading only those not already cached. */
+    suspend fun referencesFor(
+        engine: MarmotInterface,
+        account: String,
+        group: String,
+        artwork: List<LocalEmojiArtwork>,
+        currentEpoch: suspend () -> ULong,
+    ): Map<String, MediaAttachmentReferenceFfi> =
+        lock.withLock {
+            val epoch = currentEpoch()
+
+            fun key(emoji: LocalEmojiArtwork) = EmojiUploadKey(account, group, emoji.sha256, epoch)
+            val missing = artwork.distinctBy { it.sha256 }.filter { key(it) !in references }
+            if (missing.isNotEmpty()) {
+                val uploaded = engine.uploadEmojiArtwork(account, group, missing)
+                missing.zip(uploaded).forEach { (emoji, reference) -> references[key(emoji)] = reference }
+                while (references.size > MAX_ENTRIES) references.remove(references.keys.first())
+            }
+            artwork.associate { it.sha256 to references.getValue(key(it)) }
+        }
+
+    /** Forgets every reference for [account] and [group], so the next send re-encrypts under the current epoch. */
+    suspend fun invalidate(
+        account: String,
+        group: String,
+    ) {
+        lock.withLock { references.keys.removeAll { it.account == account && it.group == group } }
+    }
+
+    private companion object {
+        const val MAX_ENTRIES = 64
+    }
+}
+
+/**
  * Encrypts and uploads [artwork] without sending anything, returning one reference per image in
- * order. Upload-only (`send = false`), so the references can be named by the message or reaction
- * tags that MDK validates when it publishes them.
+ * order. Upload-only (`send = false`), so the references can be named by the message tags that
+ * MDK validates when it publishes them.
  */
 internal suspend fun MarmotInterface.uploadEmojiArtwork(
     account: String,
@@ -77,43 +169,101 @@ internal suspend fun MarmotInterface.uploadEmojiArtwork(
     return references
 }
 
-/** `["emoji", code, url]` rows naming each uploaded image by its first locator, in upload order. */
+/**
+ * `["emoji", code, url]` rows naming each emoji by the first locator of its image, in text order.
+ * Aliases of one image share a reference, so [referenceBySha] is keyed by image digest.
+ */
 internal fun emojiTags(
     artwork: List<LocalEmojiArtwork>,
-    references: List<MediaAttachmentReferenceFfi>,
+    referenceBySha: Map<String, MediaAttachmentReferenceFfi>,
 ): List<List<String>> =
-    artwork.zip(references).map { (emoji, reference) ->
-        Nip30Emoji.tag(emoji.shortcode, reference.locators.first().value)
+    artwork.map { emoji ->
+        val url =
+            referenceBySha
+                .getValue(emoji.sha256)
+                .locators
+                .first()
+                .value
+        check(url.isNotBlank()) { "uploaded emoji has no locator" }
+        Nip30Emoji.tag(emoji.shortcode, url)
     }
 
 /**
- * The upload stage of a custom-emoji send failed, so nothing was published. Wrapping the cause keeps
- * a connection reset during upload from being read as an uncertain delivery: it is a definite
- * failure the user can retry.
+ * Uploads (or reuses) the images, wrapping any failure as [EmojiUploadFailure] because nothing has
+ * been published at that point. Cancellation passes through.
  */
-internal class EmojiUploadFailure(
-    cause: Throwable,
-) : Exception("emoji upload failed before publication", cause)
+private suspend fun MarmotInterface.uploadStage(
+    cache: EmojiUploadCache,
+    account: String,
+    group: String,
+    artwork: List<LocalEmojiArtwork>,
+    currentEpoch: suspend () -> ULong,
+): Map<String, MediaAttachmentReferenceFfi> =
+    try {
+        cache.referencesFor(this, account, group, artwork, currentEpoch)
+    } catch (cancel: CancellationException) {
+        throw cancel
+    } catch (
+        @Suppress("TooGenericExceptionCaught") failure: Exception,
+    ) {
+        throw EmojiUploadFailure(failure)
+    }
 
 /**
- * Sends [text] as a chat message carrying the images of the emoji it uses: upload-only first,
- * then one tagged media send whose caption is the text.
+ * One upload-then-publish pass. A reference MDK rejects drops the cache and surfaces as
+ * [EmojiChatChangedException], and any other publish failure propagates unchanged.
  */
+@Suppress("LongParameterList")
+private suspend fun MarmotInterface.attemptEmojiSend(
+    account: String,
+    group: String,
+    text: String,
+    artwork: List<LocalEmojiArtwork>,
+    cache: EmojiUploadCache,
+    currentEpoch: suspend () -> ULong,
+    ensureCurrent: () -> Unit,
+): SendSummaryFfi {
+    val referenceBySha = uploadStage(cache, account, group, artwork, currentEpoch)
+    ensureCurrent()
+    val tags = emojiTags(artwork, referenceBySha)
+    checkEmojiTagBytes(tags)
+    val attachments = artwork.map { it.sha256 }.distinct().map { referenceBySha.getValue(it) }
+    return try {
+        sendTaggedMedia(account, group, attachments, text, tags)
+    } catch (
+        @Suppress("TooGenericExceptionCaught") failure: Exception,
+    ) {
+        if (failure is CancellationException || !isStaleEmojiReference(failure)) throw failure
+        cache.invalidate(account, group)
+        throw EmojiChatChangedException(failure)
+    }
+}
+
+/**
+ * Sends [text] as a chat message carrying the images of the emoji it uses: upload-only first, then
+ * one tagged media send whose caption is the text. Limits are checked before any upload. An upload
+ * failure is an [EmojiUploadFailure] (nothing published). A reference MDK rejects is re-uploaded
+ * once, then reported as [EmojiChatChangedException]. [ensureCurrent] runs after the upload and
+ * throws when the account, chat or send was cancelled meanwhile. A failure of the send itself
+ * propagates unchanged, because the event may have reached a relay.
+ */
+@Suppress("LongParameterList")
 internal suspend fun MarmotInterface.sendTextWithCustomEmoji(
     account: String,
     group: String,
     text: String,
     artwork: List<LocalEmojiArtwork>,
+    cache: EmojiUploadCache,
+    currentEpoch: suspend () -> ULong = { groupMlsState(account, group).epoch },
+    ensureCurrent: () -> Unit = {},
 ): SendSummaryFfi {
-    val references =
+    precheckEmojiSend(artwork)
+    var attempt = 1
+    while (true) {
         try {
-            uploadEmojiArtwork(account, group, artwork)
-        } catch (cancel: CancellationException) {
-            throw cancel
-        } catch (
-            @Suppress("TooGenericExceptionCaught") failure: Exception,
-        ) {
-            throw EmojiUploadFailure(failure)
+            return attemptEmojiSend(account, group, text, artwork, cache, currentEpoch, ensureCurrent)
+        } catch (stale: EmojiChatChangedException) {
+            if (attempt++ >= 2) throw stale
         }
-    return sendTaggedMedia(account, group, references, text, emojiTags(artwork, references))
+    }
 }

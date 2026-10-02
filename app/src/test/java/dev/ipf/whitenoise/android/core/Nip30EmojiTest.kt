@@ -95,6 +95,24 @@ class Nip30EmojiTest {
         assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("no codes: here, 10:30 :: ::"))
     }
 
+    /** Codes inside inline code and fenced blocks are literal, so they never attach artwork. */
+    @Test
+    fun shortcodesInsideCodeAreIgnored() {
+        assertEquals(listOf(":real:"), Nip30Emoji.shortcodesIn("`:span:` and :real: and ``:double:``"))
+        assertEquals(listOf(":after:"), Nip30Emoji.shortcodesIn("```\n:fenced:\n```\n:after:"))
+        assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("~~~\n:tilde:\n~~~"))
+    }
+
+    /** Only the NIP-30 alphabet MDK accepts for a sent tag, up to 62 characters, can be sent. */
+    @Test
+    fun sendableShortcodesUseTheStrictAlphabet() {
+        assertTrue(Nip30Emoji.isSendable(":party_1:"))
+        assertTrue(Nip30Emoji.isSendable(":" + "a".repeat(62) + ":"))
+        assertFalse(Nip30Emoji.isSendable(":" + "a".repeat(63) + ":"))
+        assertFalse(Nip30Emoji.isSendable(":ship-it:"))
+        assertFalse(Nip30Emoji.isSendable("::"))
+    }
+
     /** The emitted row names the attachment by its first locator, with the shortcode unwrapped. */
     @Test
     fun tagNamesTheShortcodeWithoutColonsAndTheUrl() {

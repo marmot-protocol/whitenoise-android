@@ -789,6 +789,7 @@
     <string name="toast_send_failed">Envío fallido</string>
     <string name="toast_send_connection_failed">No se pudo conectar con el relé. Comprueba tu conexión e inténtalo de nuevo.</string>
     <string name="toast_send_queue_full">Este chat tiene demasiados mensajes esperando para enviarse, así que el tuyo no se envió. Inténtalo de nuevo cuando se ponga al día.</string>
+    <string name="toast_send_chat_changed">El chat cambió mientras se enviaba tu mensaje, así que no se envió. Inténtalo de nuevo.</string>
     <string name="toast_chat_still_loading">Este chat todavía se está cargando. Inténtalo de nuevo en un momento.</string>
     <string name="toast_send_membership_verifying">Verificando tu pertenencia al grupo — tu mensaje no se envió. Se conservó en el cuadro de texto; inténtalo de nuevo en un momento.</string>
     <string name="toast_reaction_failed">La reacción falló</string>
@@ -1522,14 +1523,14 @@
 
     <string name="chat_bubble_colors">Colores de las burbujas</string>
     <string name="custom_emoji">Emoji personalizados</string>
-    <string name="custom_emoji_detail">Las imágenes que añadas aquí se convierten en emoji :código: en mensajes y reacciones. Se guardan en este dispositivo. Cuando envías un mensaje que usa una, su imagen se sube cifrada a ese chat para que sus miembros la vean. Las reacciones solo envían el código.</string>
+    <string name="custom_emoji_detail">Las imágenes que añadas aquí se convierten en emoji :código: en mensajes y reacciones. Se guardan en este dispositivo. Cuando envías un mensaje nuevo (no una respuesta) que usa una, su imagen se sube cifrada a ese chat para que sus miembros la vean. Las reacciones y respuestas solo envían el código.</string>
     <string name="custom_emoji_empty">Aún no hay emoji personalizados.</string>
     <string name="custom_emoji_name_title">Nombra este emoji</string>
     <string name="custom_emoji_name_label">Código</string>
     <string name="custom_emoji_name_help">Letras, números y guiones bajos.</string>
     <string name="custom_emoji_replaces">Sustituye tu %1$s actual.</string>
     <string name="custom_emoji_remove_title">¿Quitar %1$s?</string>
-    <string name="custom_emoji_remove_detail">La imagen se elimina de este dispositivo. Los mensajes conservan el código como texto.</string>
+    <string name="custom_emoji_remove_detail">La imagen se elimina de este dispositivo. Los mensajes que ya enviaste conservan la imagen que subiste.</string>
     <string name="custom_emoji_too_large">Esa imagen supera 1 MB.</string>
     <string name="custom_emoji_not_image">Ese archivo no es una imagen que White Noise pueda mostrar.</string>
     <string name="custom_emoji_save_failed">No se pudo guardar ese emoji.</string>

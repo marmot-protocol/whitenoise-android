@@ -5957,6 +5957,10 @@ class ConversationController(
         appState.marmotIo { dismissHistoryNotice(account, noticeId) }
     },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
+    // Test seams: the user's own emoji a text uses, and the send that carries them.
+    private val customEmojiReader: suspend (String) -> List<LocalEmojiArtwork> = { appState.localEmojiArtworkIn(it) },
+    private val customEmojiSender: (suspend (String, String, List<LocalEmojiArtwork>, () -> Unit) -> SendSummaryFfi)? =
+        null,
     private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
     },
@@ -8082,25 +8086,36 @@ class ConversationController(
         isTransientRelaySendError(throwable) ||
             (textPublisher == null && isTransientRuntimeWorkerError(throwable))
 
-    /** The user's own emoji a plain, non-reply text send must carry; replies and injected publishers carry none. */
+    /** The user's own emoji a plain, non-reply text send must carry, or none when this send carries none. */
     private suspend fun emojiArtworkForSend(
         replyTarget: String?,
         text: String,
     ): List<LocalEmojiArtwork> {
-        val plainSend = replyTarget == null && textPublisher == null
-        return if (plainSend) appState.localEmojiArtworkIn(text) else emptyList()
+        val applies = emojiSendApplies(replyTarget, textPublisher != null)
+        return if (applies) customEmojiReader(text) else emptyList()
     }
 
-    /** Admission failures retry only for plain text, because an emoji send uploads non-idempotent blobs. */
+    /**
+     * Admission failures retry for plain text. An emoji send retries only an upload-stage failure,
+     * because nothing was published then, and never a failure of the publish itself.
+     */
     private fun isRetryableComposerSend(
         emojiArtwork: List<LocalEmojiArtwork>,
         throwable: Throwable,
-    ): Boolean = emojiArtwork.isEmpty() && isRetryableTextAdmissionError(throwable)
+    ): Boolean =
+        if (emojiArtwork.isEmpty()) {
+            isRetryableTextAdmissionError(throwable)
+        } else {
+            isRetryableEmojiUploadFailure(throwable)
+        }
 
     /**
      * One native publication of the composer text: the durable token-bound send, or, when the text
-     * uses the user's own emoji, upload-only images followed by one tagged media send.
+     * uses the user's own emoji, upload-only images followed by one tagged media send. The account
+     * and the optimistic send are re-checked after the upload, so a result for a replaced scope is
+     * never published.
      */
+    @Suppress("LongParameterList")
     private suspend fun publishComposerTextOnce(
         account: String,
         replyTarget: String?,
@@ -8108,14 +8123,30 @@ class ConversationController(
         clientToken: String,
         probeExistingAdmission: Boolean,
         emojiArtwork: List<LocalEmojiArtwork>,
-    ): dev.ipf.marmotkit.SendSummaryFfi =
-        if (emojiArtwork.isEmpty()) {
-            publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
-        } else {
-            appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
-                sendTextWithCustomEmoji(account, group.groupIdHex, text, emojiArtwork)
-            }
+        optimisticKey: String,
+    ): dev.ipf.marmotkit.SendSummaryFfi {
+        val ensureCurrent = {
+            check(conversationAccountRef == account) { "account changed while sending custom emoji" }
+            requireOptimisticSendNotCancelled(optimisticKey)
         }
+        val injected = customEmojiSender
+        return when {
+            emojiArtwork.isEmpty() ->
+                publishDurableComposerText(account, replyTarget, text, clientToken, probeExistingAdmission)
+            injected != null -> injected(account, text, emojiArtwork, ensureCurrent)
+            else ->
+                appState.marmotIo(MarmotTraceSection.TEXT_SEND) {
+                    sendTextWithCustomEmoji(
+                        account,
+                        group.groupIdHex,
+                        text,
+                        emojiArtwork,
+                        appState.emojiUploads,
+                        ensureCurrent = ensureCurrent,
+                    )
+                }
+        }
+    }
 
     /** Keeps accepted-pending settlement alive when navigation disposes this conversation's visible route. */
     private suspend fun convergeAcceptedPendingTextSend(
@@ -8217,6 +8248,7 @@ class ConversationController(
                                     clientToken,
                                     attempt > 1,
                                     emojiArtwork,
+                                    optimisticKey,
                                 )
                         recordOptimisticSendAcceptance(optimisticKey, summary)
                         sendTrace(

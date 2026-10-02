@@ -13,10 +13,7 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.messageTags
-import dev.ipf.whitenoise.android.state.reactionArtwork
 import dev.ipf.whitenoise.android.ui.EmojiArt
-import dev.ipf.whitenoise.android.ui.EmojiShortcodes
-import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.ReceivedEmoji
 import dev.ipf.whitenoise.android.ui.conversation.media.imageAttachmentBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.shouldMaterializeAttachmentAutomatically
@@ -28,7 +25,7 @@ import kotlinx.coroutines.withContext
 private val ShortcodeInText = Regex(":[A-Za-z0-9_-]{1,64}:")
 
 /**
- * NIP-30 emoji one message and its reactions define. Artwork comes through the attachment download
+ * NIP-30 emoji one message defines. Artwork comes through the attachment download
  * path under the automatic image policy and lives only as long as this composition.
  */
 @Composable
@@ -66,9 +63,9 @@ internal fun rememberReceivedEmoji(
                     }?.let { shortcode to it }
                 }.toMap()
     }
-    val reactionArt = rememberReactionEmojiArt(controller, record.messageIdHex, messageArt, allowNetwork)
-    return remember(defined, messageArt, reactionArt) {
-        ReceivedEmoji(art = reactionArt + messageArt, attachmentIndexes = defined.keys)
+    // Reaction chips stay literal `:code:` text until MDK can resolve a reaction's attachment (mdk#2151).
+    return remember(defined, messageArt) {
+        ReceivedEmoji(art = messageArt, attachmentIndexes = defined.keys)
     }
 }
 
@@ -98,46 +95,19 @@ private fun rememberDefinedEmoji(
 }
 
 /**
- * Artwork for `:code:` reactions on this message that nothing local or in the message defines.
- * MDK names each chip's artwork event (`reactionMessageIdHex`), so a reaction update or removal
- * changes the keys below and the lookup restarts for exactly that chip.
+ * Whether a reaction's artwork may be fetched automatically. The reactor sent it, never the viewer's
+ * own message, so the message's authorship must not widen the policy. Reaction artwork is gated off
+ * until MDK can resolve a kind-7 attachment per message (mdk#2151), so nothing calls this yet.
  */
-@Composable
-private fun rememberReactionEmojiArt(
-    controller: ConversationController,
-    messageIdHex: String,
-    messageArt: Map<String, EmojiArt>,
-    allowNetwork: Boolean,
-): Map<String, EmojiArt> {
-    val custom = LocalCustomEmoji.current
-    val reactionEvents =
-        controller.reactions[messageIdHex]
-            .orEmpty()
-            .filter {
-                EmojiShortcodes.isShortcode(it.emoji) && EmojiShortcodes.art(it.emoji, custom, messageArt) == null
-            }.mapNotNull { tally -> tally.reactionMessageIdHex?.let { tally.emoji to it } }
-            .toMap()
-    val reactionArt by produceState(emptyMap(), messageIdHex, reactionEvents, allowNetwork) {
-        val attachments = controller.reactionArtwork(reactionEvents)
-        value =
-            attachments
-                .mapNotNull { (shortcode, found) ->
-                    val (eventIdHex, attachment) = found
-                    emojiArt {
-                        imageAttachmentBytes(
-                            controller = controller,
-                            messageIdHex = eventIdHex,
-                            attachmentIndex = attachment.index,
-                            reference = attachment.value,
-                            mine = false,
-                            priority = AttachmentDownloadPriority.Automatic,
-                            allowNetwork = allowNetwork,
-                        )
-                    }?.let { shortcode to it }
-                }.toMap()
-    }
-    return reactionArt
-}
+internal fun reactionArtworkAutoDownloadAllowed(
+    mediaAutoDownloadAllowed: Boolean,
+    automaticDownloadsPaused: Boolean,
+): Boolean =
+    shouldMaterializeAttachmentAutomatically(
+        mine = false,
+        mediaAutoDownloadAllowed = mediaAutoDownloadAllowed,
+        automaticDownloadsPaused = automaticDownloadsPaused,
+    )
 
 /** Decoded artwork, or null when the bytes are unavailable under policy or do not decode. */
 private suspend fun emojiArt(bytes: suspend () -> ByteArray?): EmojiArt? {

@@ -725,6 +725,87 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(MessageStatus.Failed, controller.timeline.single().status)
         }
 
+    /** A controller whose text uses one custom emoji and whose emoji send runs [send] instead of a native call. */
+    private fun emojiController(
+        appState: WhiteNoiseAppState,
+        send: suspend () -> SendSummaryFfi,
+    ) = ConversationController(
+        appState = appState,
+        initialGroup = group(),
+        initialMemberSnapshot = memberSnapshot(),
+        customEmojiReader = { listOf(LocalEmojiArtwork(":party:", "party.png", "image/png", byteArrayOf(1))) },
+        customEmojiSender = { _, _, _, _ -> send() },
+    )
+
+    /** An upload-stage failure published nothing, so the bubble ends Failed and never stays Pending. */
+    @Test
+    fun customEmojiUploadFailureEndsFailedNotPending() =
+        runTest {
+            var sends = 0
+            val appState = appState()
+            val controller =
+                emojiController(appState) {
+                    sends += 1
+                    throw EmojiUploadFailure(IllegalStateException("blob server rejected the image"))
+                }
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(1, sends)
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /** A publish-stage connection loss may have reached a relay, so the bubble stays Pending and is not resent. */
+    @Test
+    fun customEmojiPublishLossStaysPending() =
+        runTest {
+            var sends = 0
+            val appState = appState()
+            val controller =
+                emojiController(appState) {
+                    sends += 1
+                    throw MarmotKitException.TransportClosed()
+                }
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(1, sends)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
+    /** A changed chat is a definite failure the user can retry, not an uncertain delivery. */
+    @Test
+    fun customEmojiChatChangedEndsFailed() =
+        runTest {
+            val appState = appState()
+            val controller =
+                emojiController(appState) {
+                    throw EmojiChatChangedException(MarmotKitException.InvalidMediaReference("stale"))
+                }
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /** A connectivity failure during upload is retried by the recovery loop and then sends once. */
+    @Test
+    fun customEmojiUploadConnectivityFailureIsRetried() =
+        runTest {
+            var sends = 0
+            val appState = appState()
+            val controller =
+                emojiController(appState) {
+                    sends += 1
+                    if (sends == 1) throw EmojiUploadFailure(MarmotKitException.TransportClosed())
+                    successfulSendSummary()
+                }
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(2, sends)
+        }
+
     @Test
     fun successfulManualRetryClearsTheDraftCapturedByTheInitialSend() =
         runTest {

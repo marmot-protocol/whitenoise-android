@@ -6,10 +6,12 @@ import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaRecordFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
+/** Tag-to-locator matching for reaction artwork, kept ready for the per-message MDK query (mdk#2151). */
 class ConversationEmojiLookupsTest {
+    private val none = emptyMap<String, EmojiAttachment>()
+
     /** A media row for [messageIdHex] with a single [mediaType] attachment at [index] and [epoch]. */
     private fun media(
         messageIdHex: String,
@@ -77,11 +79,10 @@ class ConversationEmojiLookupsTest {
     fun missingOrUnmatchedTagStaysLiteral() {
         val media = listOf(media("r1", "https://a/party"))
         val events = mapOf(":party:" to "r1")
-        val none = emptyMap<String, EmojiAttachment>()
-        assertEquals(none, reactionEmojiAttachmentsFrom(media, events, tags("r1")))
-        assertEquals(none, reactionEmojiAttachmentsFrom(media, events, emptyMap()))
         val otherUrl = tags("r1", listOf("emoji", "party", "https://a/x"))
         val otherCode = tags("r1", listOf("emoji", "wave", "https://a/party"))
+        assertEquals(none, reactionEmojiAttachmentsFrom(media, events, tags("r1")))
+        assertEquals(none, reactionEmojiAttachmentsFrom(media, events, emptyMap()))
         assertEquals(none, reactionEmojiAttachmentsFrom(media, events, otherUrl))
         assertEquals(none, reactionEmojiAttachmentsFrom(media, events, otherCode))
     }
@@ -90,7 +91,6 @@ class ConversationEmojiLookupsTest {
     @Test
     fun missingArtworkStaysLiteral() {
         val media = listOf(media("r1", "https://a/doc", mediaType = "application/pdf"))
-        val none = emptyMap<String, EmojiAttachment>()
         val row = tags("r1", listOf("emoji", "party", "https://a/doc"))
         assertEquals(none, reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r1"), row))
         assertEquals(none, reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "gone"), row))
@@ -111,57 +111,56 @@ class ConversationEmojiLookupsTest {
         assertEquals(0, found.second.index)
     }
 
-    /** Identical shortcodes on different messages resolve through their own events and never swap art. */
+    /** Identical shortcodes on different reactions resolve through their own events and never swap art. */
     @Test
     fun repeatedShortcodesKeepTheirOwnArtwork() {
         val media = listOf(media("r1", "https://a/first"), media("r2", "https://a/second"))
         val row =
             tags("r1", listOf("emoji", "party", "https://a/first")) +
                 tags("r2", listOf("emoji", "party", "https://a/second"))
-        val first = reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r1"), row).getValue(":party:")
-        val second = reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r2"), row).getValue(":party:")
+        val both = reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r1", ":wave:" to "r2"), row)
         assertEquals(
             "https://a/first",
-            first.second.value.locators
+            both
+                .getValue(":party:")
+                .second.value.locators
+                .single()
+                .value,
+        )
+        assertEquals(setOf(":party:"), both.keys)
+    }
+
+    /** A chip resolves through the event MDK now names, and a stale event id resolves to nothing. */
+    @Test
+    fun artworkFollowsTheEventMdkNamesAndAStaleIdMatchesNothing() {
+        val media = listOf(media("r1", "https://a/first"), media("r2", "https://a/second"))
+        val row =
+            tags("r1", listOf("emoji", "party", "https://a/first")) +
+                tags("r2", listOf("emoji", "party", "https://a/second"))
+        val before = reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r1"), row).getValue(":party:")
+        val after = reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r2"), row).getValue(":party:")
+        assertEquals(
+            "https://a/first",
+            before.second.value.locators
                 .single()
                 .value,
         )
         assertEquals(
             "https://a/second",
-            second.second.value.locators
+            after.second.value.locators
                 .single()
                 .value,
         )
+        assertEquals(none, reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r3"), row))
+        assertEquals(none, reactionEmojiAttachmentsFrom(media, emptyMap(), row))
     }
 
-    /** A removed reaction leaves no chip to look up, and the lookup is empty for it. */
+    /** The stored source epoch survives the match, so a later epoch change cannot break decryption. */
     @Test
-    fun removedReactionHasNoArtwork() {
-        val media = listOf(media("r1", "https://a/party"))
-        assertNull(reactionEmojiAttachmentsFrom(media, emptyMap(), null)[":party:"])
-    }
-
-    /** Without tags the lookup only reports candidates, which gates the second native read. */
-    @Test
-    fun candidateModeReportsAnyImageOnTheEvent() {
-        val media = listOf(media("r1", "https://a/party"))
-        assertEquals(setOf(":party:"), reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r1"), null).keys)
-        assertEquals(emptySet<String>(), reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r9"), null).keys)
-    }
-
-    /** Rebuilding after a restart gives the same result, and the stored source epoch survives for decryption. */
-    @Test
-    fun lookupIsStableAcrossRestartAndKeepsTheSourceEpoch() {
+    fun matchKeepsTheSourceEpoch() {
         val media = listOf(media("r1", "https://a/party", epoch = 2uL))
         val row = tags("r1", listOf("emoji", "party", "https://a/party"))
-        val before = reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r1"), row)
-        val after = reactionEmojiAttachmentsFrom(media.toList(), mapOf(":party:" to "r1"), row)
-        assertEquals(before, after)
-        assertEquals(
-            2uL,
-            after
-                .getValue(":party:")
-                .second.value.sourceEpoch,
-        )
+        val found = reactionEmojiAttachmentsFrom(media, mapOf(":party:" to "r1"), row).getValue(":party:")
+        assertEquals(2uL, found.second.value.sourceEpoch)
     }
 }
