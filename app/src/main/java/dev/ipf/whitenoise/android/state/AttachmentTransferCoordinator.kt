@@ -27,6 +27,9 @@ internal enum class AttachmentTransferState {
     Cancelled,
 }
 
+/** Native cancellation remains pending until acknowledged; an unconfirmed result never claims success. */
+internal enum class AttachmentCancellationState { None, Pending, Unconfirmed }
+
 /** True while a transfer is queued or running and can still be cancelled. */
 internal fun AttachmentTransferState.isTransferInProgress(): Boolean =
     when (this) {
@@ -41,18 +44,10 @@ internal fun AttachmentTransferState.isTransferInProgress(): Boolean =
         -> false
     }
 
-/**
- * Marks a cancellation the user asked for, so the transfer owner can publish
- * [AttachmentTransferState.Cancelled] while scope teardown keeps restoring the
- * pre-download state.
- */
+/** Detaches the host waiter for a user cancellation; native acknowledgement owns the Cancelled state. */
 internal class AttachmentTransferCancelledByUserException : CancellationException(CANCELLED_BY_USER)
 
 private const val CANCELLED_BY_USER = "attachment transfer cancelled by user"
-
-private fun cancelledByUser(cause: Throwable?): Boolean =
-    generateSequence(cause) { it.cause }
-        .any { it is AttachmentTransferCancelledByUserException }
 
 /**
  * Owns the UI-facing lifecycle of attachment downloads for one conversation.
@@ -74,6 +69,8 @@ internal class AttachmentTransferCoordinator(
     private val terminalLifetimes = mutableMapOf<String, StalenessGuard>()
     private val refreshLifetimes = mutableMapOf<String, StalenessGuard>()
     private val observerCounts = mutableMapOf<String, Int>()
+    private val cancellations = mutableMapOf<String, Any>()
+    private val cancellationStates = mutableMapOf<String, MutableStateFlow<AttachmentCancellationState>>()
 
     private data class RefreshClaim(
         val terminalLifetime: StalenessGuard,
@@ -106,6 +103,12 @@ internal class AttachmentTransferCoordinator(
     ): StateFlow<AttachmentTransferState> =
         synchronized(lock) {
             stateFlow(key, initiallyAvailable).asStateFlow()
+        }
+
+    /** Returns presentation-only cancellation acknowledgement for an observed attachment. */
+    fun cancellationState(key: String): StateFlow<AttachmentCancellationState> =
+        synchronized(lock) {
+            cancellationFlow(key).asStateFlow()
         }
 
     /** Waits for a fresh retained/cache-confirmed completion for exactly one attachment key. */
@@ -155,6 +158,7 @@ internal class AttachmentTransferCoordinator(
             // never let that stale result overwrite the completion state.
             val state = currentStateForRefresh(key, claim.terminalLifetime, claim.terminalToken) ?: return
             state.value = refreshedState(state.value, available)
+            if (available == true) cancellationFlow(key).value = AttachmentCancellationState.None
             availabilitySignals.onRefresh(key, available)
         }
     }
@@ -176,6 +180,10 @@ internal class AttachmentTransferCoordinator(
                 active[key]?.takeUnless { it.isCompleted }?.let { return@synchronized it }
                 val state = stateFlow(key)
                 val stateBeforeDownload = state.value
+                cancellations.remove(key)
+                cancellationFlow(key).value = AttachmentCancellationState.None
+                val lifetime = terminalLifetime(key)
+                val token = lifetime.advance()
                 if (stateBeforeDownload != AttachmentTransferState.Available) {
                     state.value = AttachmentTransferState.Downloading
                 }
@@ -187,21 +195,25 @@ internal class AttachmentTransferCoordinator(
                             // receiving an empty result violates that contract.
                             check(bytes.isNotEmpty()) { "attachment download returned empty plaintext" }
                             val retained = probeAvailability(availableAfterLoad)
-                            publishTerminalState(
+                            publishOwnedTerminalState(
                                 key,
                                 state,
+                                lifetime,
+                                token,
                                 attachmentStateAfterRetention(retained),
                             )
                             bytes
                         } catch (cancellation: CancellationException) {
-                            publishTerminalState(
+                            publishOwnedTerminalState(
                                 key,
                                 state,
-                                cancellationTerminalState(cancellation, stateBeforeDownload),
+                                lifetime,
+                                token,
+                                cancellationTerminalState(stateBeforeDownload),
                             )
                             throw cancellation
                         } catch (exception: Exception) {
-                            publishTerminalState(key, state, AttachmentTransferState.Failed)
+                            publishOwnedTerminalState(key, state, lifetime, token, AttachmentTransferState.Failed)
                             throw exception
                         }
                     }.also {
@@ -210,17 +222,8 @@ internal class AttachmentTransferCoordinator(
                     }
             }
         if (created) {
-            deferred.invokeOnCompletion { cause ->
+            deferred.invokeOnCompletion {
                 synchronized(lock) {
-                    // A user cancel that lands before the lazy owner body runs
-                    // never reaches the catch above, so publish here too. The
-                    // in-progress guard keeps this idempotent and stops it from
-                    // overwriting a terminal state the owner already published.
-                    if (cancelledByUser(cause)) {
-                        states[key]
-                            ?.takeIf { it.value.isTransferInProgress() }
-                            ?.let { publishTerminalState(key, it, AttachmentTransferState.Cancelled) }
-                    }
                     if (active[key] === deferred) {
                         active.remove(key)
                         retireStateIfUnused(key)
@@ -233,32 +236,70 @@ internal class AttachmentTransferCoordinator(
     }
 
     /**
-     * Cancels the transfer for [key] on the user's behalf.
-     *
-     * A live owner is cancelled with the user marker so its cancellation branch
-     * publishes [AttachmentTransferState.Cancelled]; a key that is queued
-     * without a live owner is published directly so the fencing generation
-     * still advances and a late refresh cannot reopen it. A transfer that has
-     * already published a terminal state wins the race and is left alone.
-     *
-     * MDK's `download_media` is all-or-nothing today (marmot-protocol/mdk#1437),
-     * so this detaches the UI and the durable intent. A network fetch already in
-     * flight may still complete and publish to the encrypted cache, which
-     * [refresh] then surfaces as [AttachmentTransferState.Available].
+     * Stops host delivery immediately; only the returned native acknowledgement publishes Cancelled.
+     * An unconfirmed result publishes Failed, while a newer retry or verified local availability wins.
      */
-    fun cancel(key: String) {
+    fun cancel(
+        key: String,
+        nativeActive: Boolean = false,
+    ): (Boolean) -> Unit {
+        val claim = Any()
         val owner =
             synchronized(lock) {
+                val state = states[key]
+                val eligible =
+                    state?.let {
+                        val cancellable = nativeActive || it.value.isTransferInProgress()
+                        it.value != AttachmentTransferState.Available && cancellable
+                    } == true
+                if (!eligible) return {}
+                requireNotNull(state)
+                state.value = AttachmentTransferState.Downloading
+                cancellations[key] = claim
+                cancellationFlow(key).value = AttachmentCancellationState.Pending
+                terminalLifetime(key).advance()
                 active[key]?.takeUnless { it.isCompleted }
-                    ?: run {
-                        states[key]
-                            ?.takeIf { it.value.isTransferInProgress() }
-                            ?.let { publishTerminalState(key, it, AttachmentTransferState.Cancelled) }
-                        return
-                    }
             }
-        owner.cancel(AttachmentTransferCancelledByUserException())
+        owner?.cancel(AttachmentTransferCancelledByUserException())
+        return { confirmed ->
+            synchronized(lock) {
+                if (cancellations[key] === claim) {
+                    states[key]?.takeUnless { it.value == AttachmentTransferState.Available }?.let { state ->
+                        cancellationFlow(key).value =
+                            if (confirmed) {
+                                AttachmentCancellationState.None
+                            } else {
+                                AttachmentCancellationState.Unconfirmed
+                            }
+                        publishTerminalState(
+                            key,
+                            state,
+                            if (confirmed) AttachmentTransferState.Cancelled else AttachmentTransferState.Failed,
+                        )
+                    }
+                }
+            }
+        }
     }
+
+    /** A cancelled or superseded host owner cannot publish a late terminal result. */
+    private fun publishOwnedTerminalState(
+        key: String,
+        state: MutableStateFlow<AttachmentTransferState>,
+        lifetime: StalenessGuard,
+        token: Long,
+        value: AttachmentTransferState,
+    ) {
+        synchronized(lock) {
+            if (terminalLifetimes[key] === lifetime && states[key] === state) {
+                lifetime.runIfCurrent(token) { publishTerminalState(key, state, value) }
+            }
+        }
+    }
+
+    /** Allocates acknowledgement state only for the lifetime of the visible attachment. */
+    private fun cancellationFlow(key: String): MutableStateFlow<AttachmentCancellationState> =
+        cancellationStates.getOrPut(key) { MutableStateFlow(AttachmentCancellationState.None) }
 
     /** Returns mutable state only when no newer terminal publication superseded the probe. */
     private fun currentStateForRefresh(
@@ -306,6 +347,8 @@ internal class AttachmentTransferCoordinator(
             terminalLifetimes.remove(key)
             refreshLifetimes.remove(key)
             states.remove(key)
+            cancellations.remove(key)
+            cancellationStates.remove(key)
             availabilitySignals.retire(key)
         }
     }
@@ -406,12 +449,8 @@ private suspend fun probeForRefresh(probe: suspend () -> Boolean): Boolean? =
         null
     }
 
-private fun cancellationTerminalState(
-    cancellation: CancellationException,
-    stateBeforeDownload: AttachmentTransferState,
-): AttachmentTransferState =
+private fun cancellationTerminalState(stateBeforeDownload: AttachmentTransferState): AttachmentTransferState =
     when {
-        cancelledByUser(cancellation) -> AttachmentTransferState.Cancelled
         stateBeforeDownload == AttachmentTransferState.Available -> AttachmentTransferState.Available
         else -> AttachmentTransferState.Remote
     }

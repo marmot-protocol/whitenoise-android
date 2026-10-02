@@ -50,11 +50,11 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     reference: MediaAttachmentReferenceFfi,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     persistInteractiveIntent: Boolean = true,
-    allowExplicitRetry: Boolean = true,
+    demandIntent: AttachmentDemandIntent = AttachmentDemandIntent.Join,
 ): AttachmentPlaintext {
     val diagnostics = AttachmentFetchDiagnostics.begin(priority)
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
-    promoteQueuedAttachmentAcquisition(cacheKey, priority, allowExplicitRetry)
+    promoteQueuedAttachmentAcquisition(cacheKey, priority, demandIntent)
     return diagnostics.recordAttachmentFetchOutcome {
         resolveAttachmentPlaintext(
             loadMemory = {
@@ -102,7 +102,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
                         request = request,
                         priority = priority,
                         persistInteractiveIntent = persistInteractiveIntent,
-                        allowExplicitRetry = allowExplicitRetry,
+                        demandIntent = demandIntent,
                         diagnostics = diagnostics,
                     )
                 }
@@ -141,11 +141,11 @@ private suspend fun AttachmentFetchDiagnostics?.recordAttachmentFetchOutcome(
 private fun WhiteNoiseAppState.promoteQueuedAttachmentAcquisition(
     cacheKey: String,
     priority: AttachmentDownloadPriority,
-    allowExplicitRetry: Boolean,
+    demandIntent: AttachmentDemandIntent,
 ) {
     if (
         priority == AttachmentDownloadPriority.Interactive &&
-        allowExplicitRetry &&
+        demandIntent != AttachmentDemandIntent.Observe &&
         hasActiveAttachmentAcquisition(cacheKey)
     ) {
         promoteAdmittedAttachmentAcquisition(cacheKey)
@@ -185,16 +185,16 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     request: AttachmentTransferRequest,
     priority: AttachmentDownloadPriority,
     persistInteractiveIntent: Boolean,
-    allowExplicitRetry: Boolean,
+    demandIntent: AttachmentDemandIntent,
     diagnostics: AttachmentFetchDiagnostics?,
 ): AttachmentPlaintext {
-    promoteActiveAttachmentAcquisition(cacheKey, request, priority, allowExplicitRetry)
+    promoteActiveAttachmentAcquisition(cacheKey, request, priority, demandIntent)
     val resolved =
         memoizedAttachmentAcquisition(cacheKey, request, priority) {
             val target = resolveNativeAttachmentTarget(request) ?: throw AttachmentReferenceNotReadyException()
             val qualifiedRequest = request.copy(sourceMessageIdHex = target.sourceMessageIdHex)
             if (!hasNativeAttachment(qualifiedRequest)) {
-                acquireNativeAttachment(qualifiedRequest, priority, allowExplicitRetry, diagnostics)
+                acquireNativeAttachment(qualifiedRequest, priority, demandIntent, diagnostics)
             }
             AttachmentAcquisitionOutcome.NativeRetained(qualifiedRequest)
         }.await()
@@ -207,16 +207,16 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     )
 }
 
-/** Promotes an existing automatic native job when an explicit caller joins it. */
+/** Promotes an existing automatic native job without resetting its retry budget or backoff. */
 private suspend fun WhiteNoiseAppState.promoteActiveAttachmentAcquisition(
     cacheKey: String,
     request: AttachmentTransferRequest,
     priority: AttachmentDownloadPriority,
-    allowExplicitRetry: Boolean,
+    demandIntent: AttachmentDemandIntent,
 ) {
     val shouldPromote =
         priority == AttachmentDownloadPriority.Interactive &&
-            allowExplicitRetry &&
+            demandIntent != AttachmentDemandIntent.Observe &&
             hasActiveAttachmentAcquisition(cacheKey)
     if (!shouldPromote) return
     val admitted = promoteAdmittedAttachmentAcquisition(cacheKey)
@@ -228,7 +228,7 @@ private suspend fun WhiteNoiseAppState.promoteActiveAttachmentAcquisition(
         // Promotion is advisory. The joined automatic owner remains authoritative
         // even when native priority escalation is temporarily unavailable.
         runCatchingCancellable {
-            marmotIo { downloadAttachmentAgain(request.accountRef, request.groupIdHex, target.toFfi()) }
+            marmotIo { requestExplicitAttachment(request.accountRef, request.groupIdHex, target.toFfi()) }
         }
     }
 }

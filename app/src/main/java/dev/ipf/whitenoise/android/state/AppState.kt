@@ -2333,6 +2333,8 @@ class WhiteNoiseAppState private constructor(
             }
         }
 
+    internal val attachmentUserActions = AttachmentUserActions(mutationsScope)
+
     internal val attachmentOpens =
         AttachmentOpenCoordinator(
             intentStore = attachmentDownloadIntents,
@@ -4274,8 +4276,6 @@ class WhiteNoiseAppState private constructor(
         priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Automatic,
     ) {
         if (priority == AttachmentDownloadPriority.Interactive) {
-            // An explicit request outranks an earlier cancel of the same file.
-            attachmentDownloadIntents.restoreAutomatic(request)
             attachmentDownloadIntents.setInteractive(request, interactive = true)
             attachmentDownloadGate.promote(request.cacheKey())
         } else if (attachmentDownloadIntents.isAutomaticSuppressed(request)) {
@@ -4297,15 +4297,35 @@ class WhiteNoiseAppState private constructor(
      * worker retry and process death, and so recreating the card cannot let the
      * automatic policy restart what the user just stopped.
      */
-    internal fun cancelAttachmentDownload(request: AttachmentTransferRequest) {
+    internal fun cancelAttachmentDownload(
+        request: AttachmentTransferRequest,
+        onNativeResult: (Boolean) -> Unit = {},
+    ) {
         attachmentDownloadIntents.suppressAutomatic(request)
         attachmentDownloadIntents.setInteractive(request, interactive = false)
         AttachmentDownloadWorker.cancelForRequest(appContext, request)
         cancelMemoizedAttachmentDownload(request)
         inFlightAttachmentAcquisitions.cancel(request.cacheKey(), AttachmentTransferCancelledByUserException())
-        mutationsScope.launch { cancelNativeAttachmentBounded(request) }
+        attachmentUserActions.cancel(request.cacheKey(), { cancelNativeAttachmentBounded(request) }, onNativeResult)
         attachmentDownloadPolicyRevision += 1
     }
+
+    /** Only an accepted fresh Retry clears cancellation suppression and permits viewer/platform delivery. */
+    internal fun retryAttachmentDownload(
+        request: AttachmentTransferRequest,
+        onAccepted: () -> Unit,
+        onFailure: (Throwable) -> Unit,
+    ): Boolean =
+        attachmentUserActions.retry(
+            key = request.cacheKey(),
+            admit = { requestAttachmentRetry(request) },
+            onAccepted = {
+                attachmentDownloadIntents.restoreAutomatic(request)
+                attachmentDownloadPolicyRevision += 1
+                onAccepted()
+            },
+            onFailure = onFailure,
+        )
 
     /** True while the user's cancel of this exact attachment still blocks automatic work. */
     internal fun automaticAttachmentDownloadSuppressed(request: AttachmentTransferRequest): Boolean {
@@ -4353,7 +4373,6 @@ class WhiteNoiseAppState private constructor(
     internal suspend fun downloadAttachmentForDurableWork(
         request: AttachmentTransferRequest,
         priority: AttachmentDownloadPriority,
-        allowExplicitRetry: Boolean = true,
     ): Boolean {
         val match = findNativeAttachment(request) ?: throw AttachmentReferenceNotReadyException()
         val resolved = request.copy(sourceMessageIdHex = match.target.sourceMessageIdHex)
@@ -4361,7 +4380,7 @@ class WhiteNoiseAppState private constructor(
             request = resolved,
             reference = match.reference,
             priority = priority,
-            allowExplicitRetry = allowExplicitRetry,
+            demandIntent = AttachmentDemandIntent.Observe,
         ).use { }
         return hasCachedAttachmentAfterHydration(resolved)
     }

@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,10 +39,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.AttachmentCancellationState
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 import dev.ipf.whitenoise.android.state.isTransferInProgress
 import dev.ipf.whitenoise.android.ui.conversation.messages.OutgoingMessageStatusIcon
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
@@ -57,6 +61,7 @@ private val FileCardPadding = 6.dp
 private val FileCardSlotSpacing = 8.dp
 private val FileCardTrailingGlyph = 20.dp
 private const val FILE_CARD_SECONDARY_ALPHA = 0.72f
+private const val WAITING_TRACK_ALPHA = 0.24f
 
 internal enum class FileTransferDirection {
     Download,
@@ -75,13 +80,21 @@ internal fun MediaFileBubbleContent(
     status: MessageStatus = MessageStatus.Received,
     footerWarningText: String? = null,
     onCancelTransfer: (() -> Unit)? = null,
+    nativeProgress: NativeAttachmentProgress? = null,
+    cancellationState: AttachmentCancellationState = AttachmentCancellationState.None,
 ) {
+    val progressDescription =
+        when (cancellationState) {
+            AttachmentCancellationState.Pending -> stringResource(R.string.media_cancelling_download)
+            AttachmentCancellationState.Unconfirmed -> stringResource(R.string.media_cancel_unconfirmed)
+            AttachmentCancellationState.None -> nativeProgressDescription(nativeProgress, transferState)
+        }
     FileBubbleContent(
         fileName = reference.fileName,
         presentation = presentation,
         transferState = transferState,
         openPending = openPending,
-        metadataText = attachmentTypeLabel(presentation),
+        metadataText = progressDescription ?: attachmentTypeLabel(presentation),
         metadataIsError = transferState == AttachmentTransferState.Failed,
         trailingMetadataText = timestampText,
         trailingMetadataIsError = false,
@@ -90,7 +103,16 @@ internal fun MediaFileBubbleContent(
         loadingDescription = stringResource(R.string.media_downloading),
         openingDescription = stringResource(R.string.media_opening),
         transferDirection = FileTransferDirection.Download,
-        onCancelTransfer = onCancelTransfer,
+        onCancelTransfer = onCancelTransfer.takeUnless { cancellationState == AttachmentCancellationState.Pending },
+        progressDescription = progressDescription,
+        progressFraction = nativeProgress?.fraction.takeIf { cancellationState == AttachmentCancellationState.None },
+        animateIndeterminate =
+            nativeProgress?.phase !in
+                setOf(
+                    AttachmentTransferStateFfi.QUEUED,
+                    AttachmentTransferStateFfi.RETRY_SCHEDULED,
+                    AttachmentTransferStateFfi.PAUSED,
+                ),
     )
 }
 
@@ -111,6 +133,9 @@ internal fun FileBubbleContent(
     openingDescription: String = stringResource(R.string.media_opening),
     transferDirection: FileTransferDirection,
     onCancelTransfer: (() -> Unit)? = null,
+    progressDescription: String? = null,
+    progressFraction: Float? = null,
+    animateIndeterminate: Boolean = true,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -125,6 +150,9 @@ internal fun FileBubbleContent(
             openPending = openPending,
             openingDescription = openingDescription,
             onCancelTransfer = onCancelTransfer,
+            progressDescription = progressDescription,
+            progressFraction = progressFraction,
+            animateIndeterminate = animateIndeterminate,
         )
         Column(
             verticalArrangement = Arrangement.SpaceBetween,
@@ -274,6 +302,9 @@ internal fun FileTransferControl(
     openPending: Boolean = false,
     openingDescription: String = stringResource(R.string.media_opening),
     onCancelTransfer: (() -> Unit)? = null,
+    progressDescription: String? = null,
+    progressFraction: Float? = null,
+    animateIndeterminate: Boolean = true,
 ) {
     val cancelAction =
         onCancelTransfer.takeIf {
@@ -282,11 +313,12 @@ internal fun FileTransferControl(
     val colors = fileTransferControlColors(transferState)
     val cancelDescription = stringResource(R.string.media_cancel_download)
     val stateDescription =
-        if (openPending) {
-            openingDescription
-        } else {
-            fileTransferStateDescription(transferState, loadingDescription, presentation.iconCategory)
-        }
+        progressDescription
+            ?: if (openPending) {
+                openingDescription
+            } else {
+                fileTransferStateDescription(transferState, loadingDescription, presentation.iconCategory)
+            }
     Box(
         contentAlignment = Alignment.Center,
         modifier =
@@ -319,6 +351,8 @@ internal fun FileTransferControl(
                     contentColor = colors.content,
                     openPending = openPending,
                     showCancelGlyph = cancelAction != null,
+                    progressFraction = progressFraction,
+                    animateIndeterminate = animateIndeterminate,
                 )
             }
         }
@@ -375,11 +409,13 @@ private fun FileTransferIcon(
     contentColor: Color,
     openPending: Boolean,
     showCancelGlyph: Boolean,
+    progressFraction: Float?,
+    animateIndeterminate: Boolean,
 ) {
     // A tap-to-open download is the commonest cancellable case, so the cancel
     // glyph must win over the generic opening chrome; without this the only
     // discoverable affordance would be the TalkBack click label.
-    if (openPending && !showCancelGlyph) {
+    if (openPending && !showCancelGlyph && progressFraction == null) {
         CircularProgressIndicator(
             modifier = Modifier.size(FileTransferControlSurfaceSize),
             strokeWidth = 2.5.dp,
@@ -396,11 +432,7 @@ private fun FileTransferIcon(
         AttachmentTransferState.Resolving,
         AttachmentTransferState.Downloading,
         -> {
-            CircularProgressIndicator(
-                modifier = Modifier.size(FileTransferControlSurfaceSize),
-                strokeWidth = 2.5.dp,
-                color = contentColor,
-            )
+            FileBodyProgressIndicator(progressFraction, contentColor, animateIndeterminate)
             Icon(
                 imageVector =
                     when {
@@ -420,5 +452,37 @@ private fun FileTransferIcon(
         -> Icon(Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(21.dp))
         AttachmentTransferState.Available ->
             Icon(fileIconFor(presentation.iconCategory), contentDescription = null, modifier = Modifier.size(24.dp))
+    }
+}
+
+/** Body percentage remains determinate only while native supplies a valid size; other phases stay indeterminate. */
+@Composable
+private fun FileBodyProgressIndicator(
+    fraction: Float?,
+    color: Color,
+    animateIndeterminate: Boolean,
+) {
+    if (fraction == null && animateIndeterminate) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(FileTransferControlSurfaceSize),
+            strokeWidth = 2.5.dp,
+            color = color,
+        )
+    } else if (fraction != null) {
+        CircularProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.size(FileTransferControlSurfaceSize),
+            strokeWidth = 2.5.dp,
+            color = color,
+        )
+    } else {
+        Box(
+            modifier =
+                Modifier.size(FileTransferControlSurfaceSize).border(
+                    2.5.dp,
+                    color.copy(alpha = WAITING_TRACK_ALPHA),
+                    CircleShape,
+                ),
+        )
     }
 }

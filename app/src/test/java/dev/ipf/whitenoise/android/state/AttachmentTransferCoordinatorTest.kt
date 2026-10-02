@@ -328,20 +328,20 @@ class AttachmentTransferCoordinatorTest {
         try {
             val coordinator = AttachmentTransferCoordinator(scope)
             coordinator.acquireState("resolving", initiallyAvailable = false)
-            coordinator.cancel("resolving")
+            coordinator.cancel("resolving")(true)
             assertEquals(AttachmentTransferState.Cancelled, coordinator.state("resolving", false).value)
 
             coordinator.acquireState("remote", initiallyAvailable = false)
             runBlocking { coordinator.refresh("remote") { false } }
             assertEquals(AttachmentTransferState.Remote, coordinator.state("remote", false).value)
-            coordinator.cancel("remote")
+            coordinator.cancel("remote")(true)
             assertEquals(
                 "a key that is not transferring has nothing to cancel",
                 AttachmentTransferState.Remote,
                 coordinator.state("remote", false).value,
             )
 
-            coordinator.cancel("never-seen")
+            coordinator.cancel("never-seen")(true)
             assertEquals(AttachmentTransferState.Resolving, coordinator.acquireState("never-seen", false).value)
         } finally {
             scope.cancel()
@@ -366,7 +366,7 @@ class AttachmentTransferCoordinatorTest {
                     assertSame(transfer, joiner)
                     assertEquals(AttachmentTransferState.Downloading, coordinator.state("file", false).value)
 
-                    coordinator.cancel("file")
+                    coordinator.cancel("file")(true)
 
                     val failure = runCatching { transfer.await() }.exceptionOrNull()
                     assertTrue(failure is CancellationException)
@@ -384,6 +384,58 @@ class AttachmentTransferCoordinatorTest {
             }
         }
 
+    /** Host detachment does not imply cancellation; native failure remains explicit. */
+    @Test
+    fun cancellationWaitsForNativeAcknowledgement() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            try {
+                val coordinator = AttachmentTransferCoordinator(scope)
+                val state = coordinator.acquireState("file", false)
+                val transfer =
+                    coordinator.request("file", {
+                        CompletableDeferred<Unit>().await()
+                        byteArrayOf(1)
+                    }) { true }
+                val acknowledge = coordinator.cancel("file")
+                assertTrue(runCatching { transfer.await() }.exceptionOrNull() is CancellationException)
+                assertEquals(AttachmentTransferState.Downloading, state.value)
+                acknowledge(false)
+                assertEquals(AttachmentTransferState.Failed, state.value)
+                acknowledge(true)
+                assertEquals(AttachmentTransferState.Cancelled, state.value)
+            } finally {
+                scope.cancel()
+            }
+        }
+
+    /** An old native cancellation callback cannot cancel a later deliberate retry. */
+    @Test
+    fun lateCancellationAcknowledgementCannotOverwriteRetry() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            try {
+                val coordinator = AttachmentTransferCoordinator(scope)
+                val state = coordinator.acquireState("file", false)
+                val acknowledge = coordinator.cancel("file")
+                val release = CompletableDeferred<Unit>()
+                val retry =
+                    coordinator.request("file", {
+                        release.await()
+                        byteArrayOf(2)
+                    }) { true }
+                acknowledge(true)
+                assertEquals(AttachmentTransferState.Downloading, state.value)
+                release.complete(Unit)
+                retry.await()
+                assertEquals(AttachmentTransferState.Available, state.value)
+                acknowledge(false)
+                assertEquals(AttachmentTransferState.Available, state.value)
+            } finally {
+                scope.cancel()
+            }
+        }
+
     @Test
     fun cancelAfterCompletionLeavesTheCompletedTerminalStateAlone() =
         runBlocking {
@@ -395,7 +447,7 @@ class AttachmentTransferCoordinatorTest {
                     coordinator.request("file", load = { byteArrayOf(9) }) { true }.await()
                     assertEquals(AttachmentTransferState.Available, coordinator.state("file", false).value)
 
-                    coordinator.cancel("file")
+                    coordinator.cancel("file")(true)
 
                     assertEquals(
                         "a completion that published first wins the cancel race",
@@ -428,7 +480,7 @@ class AttachmentTransferCoordinatorTest {
                         }
                     probeStarted.await()
 
-                    coordinator.cancel("file")
+                    coordinator.cancel("file")(true)
                     assertEquals(AttachmentTransferState.Cancelled, coordinator.state("file", false).value)
 
                     releaseProbe.complete(Unit)

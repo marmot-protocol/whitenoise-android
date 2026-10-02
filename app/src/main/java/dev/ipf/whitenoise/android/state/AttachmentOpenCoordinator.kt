@@ -24,6 +24,7 @@ internal class AttachmentOpenCoordinator(
     private var destination: AttachmentOpenDestination? = null
 
     private val openRequests = StalenessGuard()
+    private val userActions = StalenessGuard()
 
     // staleness-exempt: observable open-intent version consumed by Compose.
     var revision by mutableIntStateOf(0)
@@ -31,6 +32,7 @@ internal class AttachmentOpenCoordinator(
 
     fun setDestination(next: AttachmentOpenDestination?) {
         if (destination == next) return
+        userActions.advance()
         destination = next
         revision += 1
         AttachmentOpenTrace.cancelOutside(next)
@@ -40,6 +42,12 @@ internal class AttachmentOpenCoordinator(
             }
         }
     }
+
+    /** Reserves the newest viewer gesture while native admission runs, without creating a persisted open intent. */
+    fun beginUserAction(): Long = userActions.advance()
+
+    /** A newer tap or navigation invalidates delayed admission callbacks from older gestures. */
+    fun isCurrentUserAction(token: Long): Boolean = userActions.isCurrent(token)
 
     /** Binds a transfer request to the currently visible destination generation. */
     fun openRequest(request: AttachmentTransferRequest): AttachmentOpenRequest? =
@@ -52,6 +60,7 @@ internal class AttachmentOpenCoordinator(
         val openRequest = openRequest(request) ?: return false
         // A fresh tap supersedes a cancel whose durable revocation has not
         // reached disk yet, so that revocation must not remove this new intent.
+        userActions.advance()
         openRequests.advance()
         AttachmentOpenTrace.begin(openRequest)
         intentStore.markOpenIntent(openRequest)

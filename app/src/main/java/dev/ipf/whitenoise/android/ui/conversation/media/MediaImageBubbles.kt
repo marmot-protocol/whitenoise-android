@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
@@ -374,7 +375,12 @@ internal fun MediaImageBubble(
                                 icon = Icons.Default.Refresh,
                                 contentDescription = stringResource(R.string.media_tap_to_retry),
                                 onClick = {
-                                    controller.requestAttachmentOpen(key, attachmentIndex)
+                                    controller.retryAttachmentTransfer(
+                                        key,
+                                        attachmentIndex,
+                                        onAccepted = { controller.requestAttachmentOpen(key, attachmentIndex) },
+                                        onFailure = { failed = true },
+                                    )
                                 },
                             )
                         !startDownload ->
@@ -734,10 +740,16 @@ internal fun MediaImageGridTile(
                 //   - Bytes pending: tap persists interactive open intent, so
                 //     the promoted transfer opens once after verified decode.
                 onClick = {
-                    if (presentation != null) {
-                        onTap()
-                    } else {
-                        controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                    when {
+                        failed ->
+                            controller.retryAttachmentTransfer(
+                                messageIdHex,
+                                attachmentIndex,
+                                onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                                onFailure = { failed = true },
+                            )
+                        presentation != null -> onTap()
+                        else -> controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                     }
                 },
             ),
@@ -775,7 +787,12 @@ internal fun MediaImageGridTile(
                             icon = Icons.Default.Refresh,
                             contentDescription = stringResource(R.string.media_tap_to_retry),
                             onClick = {
-                                controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
+                                controller.retryAttachmentTransfer(
+                                    messageIdHex,
+                                    attachmentIndex,
+                                    onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                                    onFailure = { failed = true },
+                                )
                             },
                         )
                     !startDownload ->

@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
+import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -491,6 +492,13 @@ internal fun MediaVoiceBubble(
         onLongPress = onLongPress,
         onActionClick = {
             when {
+                failed ->
+                    controller.retryAttachmentTransfer(
+                        messageIdHex,
+                        attachmentIndex,
+                        onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                        onFailure = { failed = true },
+                    )
                 loading || localFile == null ->
                     controller.requestAttachmentOpen(messageIdHex, attachmentIndex)
                 isPlayingThis -> {

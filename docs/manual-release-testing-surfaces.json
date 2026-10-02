@@ -313,6 +313,30 @@
         "test_ids": ["MED-019", "MED-020"]
       },
       {
+        "surface": "Interactive attachment demand and post-admission native state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentDemand.kt",
+        "anchor": "internal suspend fun MarmotInterface.requestNativeInteractiveAttachment(",
+        "test_ids": ["MED-024"]
+      },
+      {
+        "surface": "FileBodyProgressIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "private fun FileBodyProgressIndicator(",
+        "test_ids": ["MED-025"]
+      },
+      {
+        "surface": "Native attachment progress and acknowledged cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "internal fun nativeProgressDescription(",
+        "test_ids": ["MED-025"]
+      },
+      {
+        "surface": "Promotion of an already admitted attachment acquisition",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt",
+        "anchor": "private suspend fun WhiteNoiseAppState.promoteActiveAttachmentAcquisition(",
+        "test_ids": ["MED-024"]
+      },
+      {
         "surface": "Durable caller-correlated composer admission",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DurableLocalSends.kt",
         "anchor": "sendComposerTextWithToken(",

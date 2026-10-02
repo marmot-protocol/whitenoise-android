@@ -75,6 +75,7 @@ import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
@@ -968,7 +969,14 @@ internal fun ViewerPage(
                     thumbhashImage = thumbhashImage,
                     displayName = MediaPipeline.safeDisplayName(reference.fileName),
                     failed = viewerFailed,
-                    onRetry = { viewerReloadToken += 1 },
+                    onRetry = {
+                        controller.retryAttachmentTransfer(
+                            messageIdHex,
+                            attachmentIndex,
+                            onAccepted = { viewerReloadToken += 1 },
+                            onFailure = { viewerFailed = true },
+                        )
+                    },
                 )
         }
     }

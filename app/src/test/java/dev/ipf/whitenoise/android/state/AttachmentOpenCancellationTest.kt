@@ -80,6 +80,48 @@ class AttachmentOpenCancellationTest {
             }
         }
 
+    /** Reserving native Retry must not rescue an older cancelled intent before any new intent exists. */
+    @Test
+    fun pendingRetryReservationDoesNotPreventOldIntentRevocation() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val scope = CoroutineScope(SupervisorJob() + dispatcher)
+            try {
+                val store = AttachmentDownloadIntentStore(preferences)
+                val coordinator = coordinator(store, scope, dispatcher)
+                coordinator.setDestination(DESTINATION)
+                coordinator.requestOpen(REQUEST)
+                coordinator.cancelOpen(openRequest())
+                val pending = coordinator.beginUserAction()
+                testScheduler.advanceUntilIdle()
+                assertTrue(coordinator.isCurrentUserAction(pending))
+                assertFalse(store.hasOpenIntent(openRequest()))
+            } finally {
+                scope.cancel()
+            }
+        }
+
+    /** A newer file tap or navigation fences delayed retry handoff from the older gesture. */
+    @Test
+    fun delayedRetryCannotSupersedeANewerOpenOrDestination() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            val scope = CoroutineScope(SupervisorJob() + dispatcher)
+            try {
+                val store = AttachmentDownloadIntentStore(preferences)
+                val coordinator = coordinator(store, scope, dispatcher)
+                coordinator.setDestination(DESTINATION)
+                val older = coordinator.beginUserAction()
+                assertTrue(coordinator.requestOpen(REQUEST.copy(messageIdHex = "ef".repeat(32))))
+                assertFalse(coordinator.isCurrentUserAction(older))
+                val latest = coordinator.beginUserAction()
+                coordinator.setDestination(DESTINATION.copy(navigationGeneration = 2L))
+                assertFalse(coordinator.isCurrentUserAction(latest))
+            } finally {
+                scope.cancel()
+            }
+        }
+
     /** Explicit transfer cancellation also revokes the app-scoped APK handoff. */
     @Test
     fun cancellingATransferRevokesItsInstallerHandoff() =
