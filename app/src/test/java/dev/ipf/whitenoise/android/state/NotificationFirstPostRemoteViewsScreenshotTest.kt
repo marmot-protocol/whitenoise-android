@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
 import android.graphics.Color
+import android.os.Looper
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
@@ -18,6 +19,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationCardOp
 import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
 import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -31,6 +33,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -102,6 +105,8 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
                 senderPictureUrl = AVATAR_URL.takeIf { cachedAvatar },
                 delayFirstNotificationDispatchAfterRuntimeStart = true,
                 notificationFirstPostTimingObserver = events::add,
+                // Render with one controlled Android looper, not a race against an IO worker.
+                notificationDispatcher = Dispatchers.Main.immediate,
             )
         fixture.appState.applyAccountSwitchProfileSeed(
             AccountSwitchProfileSeed(
@@ -171,10 +176,15 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         fixture.appState.parseMarkdownOrEmpty("**parser warm-up**")
         beforeDispatch()
         fixture.releaseNotificationDispatch()
-        // Advance Robolectric's paused clock so the production notification
-        // pacer can refill after earlier captures in this class. Rendering is
-        // still deterministic because assertAlignedHeaderClock resets the
-        // framework clock to the actual post time before capture.
+        // Rendering resolves before the deadline by construction. Deadline and IO fallback
+        // behaviour are covered by NotificationFirstPostContentCoordinatorTest and
+        // NotificationFirstPostIntegrationTest. After resolution, advance time for the platform pacer.
+        withTimeout(WRITE_AWAIT_TIMEOUT_MS) {
+            while (events.none { it.stage == NotificationFirstPostTimingStage.ContentComplete }) {
+                shadowOf(Looper.getMainLooper()).idle()
+                delay(1L)
+            }
+        }
         fixture.awaitNotificationPosted()
         withTimeout(WRITE_AWAIT_TIMEOUT_MS) {
             while (writes.get() < 1) delay(1L)

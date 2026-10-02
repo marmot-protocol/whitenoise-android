@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -74,7 +75,12 @@ private fun NewGroupRecipientAccountScreen(
     var scannerSession by remember { mutableStateOf<Long?>(null) }
     var nextScannerSession by remember { mutableLongStateOf(0L) }
     val resolution = rememberRecipientResolution(query, appState, retry)
-    val search by rememberRecipientUserSearchState(query, appState, retry)
+    val addressFallback =
+        ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05 &&
+            resolution.resolvedHex == null
+    val addressResultLabel = stringResource(R.string.user_search_address_result)
+    val directoryQuery = query.takeIf { resolution.resolvedHex == null }.orEmpty()
+    val search by rememberRecipientUserSearchState(directoryQuery, appState, retry)
     val activeHex = appState.activeAccount?.accountIdHex
     val candidates =
         remember(appState.chatListItems, activeHex, appState.profileRevisionForCompose) {
@@ -83,33 +89,38 @@ private fun NewGroupRecipientAccountScreen(
     val identifier = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
     val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, true) }
     val matches =
-        if (identifier) {
+        if (identifier && resolution.resolvedHex != null) {
             resolvedHex
                 ?.let { hex ->
                     listOf(RecipientSearch.Candidate(hex, appState.displayName(hex), appState.npub(hex)))
                 }.orEmpty()
         } else {
-            RecipientSearch.mergeAndBrowse(
+            recipientDirectoryMatches(
                 query,
+                resolution.resolvedHex,
                 candidates,
                 search.candidates,
                 activeHex,
                 followedAccountIds = search.followedAccountIds,
+                accountIdHex = appState::accountIdHexForMention,
             )
         }
 
     /** Maps a search candidate to a selectable group person with its resolved display name. */
-    fun person(candidate: RecipientSearch.Candidate) =
-        GroupCreationPerson(
-            candidate.copy(displayName = selectedMemberDisplayName(candidate, appState)),
-            when {
-                candidate.isFollowing -> followedLabel
-                candidate.searchProfile != null -> resultLabel
-                else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
-            },
-            appState.avatarUrl(candidate.accountIdHex)
-                ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
-        )
+    fun person(
+        candidate: RecipientSearch.Candidate,
+        addressMatch: Boolean = false,
+    ) = GroupCreationPerson(
+        candidate.copy(displayName = selectedMemberDisplayName(candidate, appState)),
+        when {
+            addressMatch -> addressResultLabel
+            candidate.isFollowing -> followedLabel
+            candidate.searchProfile != null -> resultLabel
+            else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
+        },
+        appState.avatarUrl(candidate.accountIdHex)
+            ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
+    )
 
     /** Adds or removes a candidate, never the active account itself. */
     fun toggle(candidate: RecipientSearch.Candidate) {
@@ -150,11 +161,11 @@ private fun NewGroupRecipientAccountScreen(
     } else {
         NewGroupRecipientContent(
             queryState,
-            matches.map(::person),
-            selected.map(::person),
-            searching = if (identifier) resolution.state == RecipientPreviewState.Resolving else search.isSearching,
-            failed = !identifier && search.failed,
-            incomplete = !identifier && search.isIncomplete,
+            matches.map { person(it, addressFallback) },
+            selected.map { person(it) },
+            searching = resolution.state == RecipientPreviewState.Resolving || search.isSearching,
+            failed = search.failed,
+            incomplete = search.isIncomplete,
             actions =
                 NewGroupRecipientActions(
                     back = { leave(onBack) },
@@ -177,6 +188,7 @@ private fun NewGroupRecipientAccountScreen(
                     },
                 ),
             isValidNpub = { npub -> appState.accountIdHexForMention(npub) != null },
+            addressLookupFailed = recipientAddressLookupFailed(query, resolution.state),
         )
     }
     scannerSession?.takeIf { owner.isCurrent() }?.let { token ->

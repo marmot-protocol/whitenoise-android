@@ -175,7 +175,7 @@ jobs:
 
       - name: Prepare MarmotKit API signature
         if: matrix.phase == 'tooling'
-        run: ./gradlew :app:stageMarmotKitApiSignature --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:stageMarmotKitApiSignature --build-cache --profile --daemon --stacktrace
 
       - name: Upload MarmotKit API signature
         if: matrix.phase == 'tooling'
@@ -188,7 +188,10 @@ jobs:
 
       - name: Verify packaged system labels for every app variant
         if: matrix.phase == 'tooling'
-        run: ./scripts/test-system-labels.sh
+        run: |
+          ./scripts/test-system-labels.sh
+          # This runner owns the lightweight daemon; free its heap before isolated builds.
+          ./gradlew --stop
 
       - name: Verify production signing and bundle task isolation
         if: matrix.phase == 'tooling'

@@ -562,11 +562,11 @@
     <string name="notification_scope_custom_chat">Bu sohbet için özel</string>
     <string name="notification_custom_for_chat_control">Bu sohbet için %1$s ayarını özelleştir</string>
     <string name="open_notification_category_settings">%1$s Android ayarlarını aç</string>
-    <string name="notification_notify_restore">“Bildirim al” seçimin sessizdeyken korunur ve sessiz süresi bitince geri gelir.</string>
-    <string name="notification_mute_detail">“Bildirim al” seçimini değiştirmeden bildirimleri duraklat.</string>
+    <string name="notification_notify_restore">Sessizdeyken doğrudan bahsetmeler yine bildirim gönderebilir. Sessiz bitince “Bildirim al” seçimin yeniden geçerli olur.</string>
+    <string name="notification_mute_detail">Normal mesajları sessize al. Doğrudan bahsetmeler yine bildirim gönderebilir.</string>
     <string name="notification_scope_switch_detail">Yeniden genel varsayılanı kullanmak için kapat.</string>
     <string name="notification_chat_categories_detail">Mesaj bildirimleri bu sohbetin ayarlarını kullanır. Diğer kategoriler genel varsayılanları veya bu sohbete özel ayarları kullanabilir.</string>
-    <string name="notify_nothing_while_muted">Sessizdeyken hiçbir şey.</string>
+    <string name="notify_nothing_while_muted">Sessizdeyken yalnızca doğrudan bahsetmeler.</string>
     <string name="notification_categories_loading">Bildirim kategorileri yükleniyor…</string>
     <string name="toast_notification_scope_update_failed">Bu bildirim ayarı güncellenemedi</string>
     <string name="toast_notification_settings_unavailable">Bildirim ayarları açılamadı</string>
@@ -1450,7 +1450,7 @@
     <string name="notify_all_messages">Tüm mesajlar</string>
     <string name="notify_only_mentions">Yalnızca bahsetmeler</string>
     <string name="notify_nothing">Hiçbiri</string>
-    <string name="notify_muted_until">%1$s tarihine kadar sessiz</string>
+    <string name="notify_muted_until">%1$s tarihine kadar sessiz; doğrudan bahsetmeler bildirim gönderebilir.</string>
     <string name="vibration_pattern">Titreşim deseni</string>
     <string name="vibration_pattern_description">Bu sohbetteki yeni mesajlar için bir desen seçin. Önizleme bir kez oynatılır.</string>
     <string name="vibration_pattern_system_default">Sistem varsayılanı</string>
@@ -2168,4 +2168,6 @@
     <string name="couldnt_check_invitation">Davet kontrol edilemedi</string>
     <string name="toast_leave_not_confirmed_history_kept">Ayrılma doğrulanmadı. Geçmiş korundu.</string>
     <string name="delete_local_does_not_leave">Bu işlem sohbetten ayrılmanıza neden olmaz.</string>
+    <string name="user_search_address_unverified">Bu adres doğrulanamadı.</string>
+    <string name="user_search_address_result">Adres doğrulanmadı</string>
 </resources>

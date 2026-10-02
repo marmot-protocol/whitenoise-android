@@ -548,11 +548,11 @@
     <string name="notification_scope_custom_chat">为此聊天自定义</string>
     <string name="notification_custom_for_chat_control">为此聊天自定义%1$s</string>
     <string name="open_notification_category_settings">打开%1$s的 Android 设置</string>
-    <string name="notification_notify_restore">静音期间会保留你的“通知范围”选择，静音结束后恢复。</string>
-    <string name="notification_mute_detail">暂停通知，但不更改你的“通知范围”选择。</string>
+    <string name="notification_notify_restore">静音期间直接提及你时仍可通知；静音结束后恢复你的“通知范围”选择。</string>
+    <string name="notification_mute_detail">将普通消息静音，直接提及你时仍可通知。</string>
     <string name="notification_scope_switch_detail">关闭后重新使用全局默认设置。</string>
     <string name="notification_chat_categories_detail">消息通知使用此聊天的设置。其他类别可以使用全局默认设置或此聊天的自定义设置。</string>
-    <string name="notify_nothing_while_muted">静音期间不通知。</string>
+    <string name="notify_nothing_while_muted">静音期间仅直接提及你时通知。</string>
     <string name="notification_categories_loading">正在加载通知类别…</string>
     <string name="toast_notification_scope_update_failed">无法更新此通知设置</string>
     <string name="toast_notification_settings_unavailable">无法打开通知设置</string>
@@ -1424,7 +1424,7 @@
     <string name="notify_all_messages">所有消息</string>
     <string name="notify_only_mentions">仅提及</string>
     <string name="notify_nothing">无</string>
-    <string name="notify_muted_until">静音至 %1$s</string>
+    <string name="notify_muted_until">静音至 %1$s；直接提及你时仍可通知。</string>
     <string name="vibration_pattern">振动模式</string>
     <string name="vibration_pattern_description">为此聊天中的新消息选择振动模式。预览只播放一次。</string>
     <string name="vibration_pattern_system_default">系统默认</string>
@@ -2138,4 +2138,6 @@
     <string name="couldnt_check_invitation">无法检查邀请</string>
     <string name="toast_leave_not_confirmed_history_kept">尚未确认退出。历史记录已保留。</string>
     <string name="delete_local_does_not_leave">此操作不会退出对话。</string>
+    <string name="user_search_address_unverified">无法验证此地址。</string>
+    <string name="user_search_address_result">地址未验证</string>
 </resources>

@@ -36,14 +36,15 @@ class IdentityCreationFlowTest {
             assertEquals(1, accepts)
         }
 
-    /** Identity creation still supplies the full bootstrap set to both engine relay parameters. */
+    /** Identity creation declares public NIP-65 defaults while retaining White Noise bootstrap and inbox routes. */
     @Test
     fun creationKeepsTheFullRelaySetOnTheEngineCall() {
         val body = appStateSource("MarmotAttachmentAcquisitionPolicy.kt").readText()
 
         assertTrue(body.contains("createIdentityWithBootstrapRelays"))
         assertTrue(body.contains("val relays = MarmotClient.bootstrapRelays"))
-        assertTrue(body.contains("createIdentity(relays, relays)"))
+        // NIP-65 gets the account defaults; the bootstrap route and inbox stay on bootstrapRelays.
+        assertTrue(body.contains("createIdentity(MarmotClient.accountRelays, relays, relays)"))
         assertFalse(body.contains("take(1)"))
     }
 

@@ -1807,6 +1807,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
         "anchor": "fun ContactPickerScreen(",
         "test_ids": [
+          "NCH-003",
           "NCH-001",
           "GRP-005"
         ]
@@ -1876,6 +1877,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
         "anchor": "fun NewMessageAccountScreen(",
         "test_ids": [
+          "NCH-003",
           "NCH-001",
           "NCH-002",
           "ACC-003",
@@ -1946,6 +1948,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
         "anchor": "fun NewGroupRecipientAccountScreen(",
         "test_ids": [
+          "NCH-003",
           "NCH-002",
           "ACC-017"
         ]
@@ -2095,6 +2098,14 @@
           "NCH-002",
           "ACC-003",
           "ACC-017"
+        ]
+      },
+      {
+        "surface": "RecipientAddressLookupFeedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientAddressLookupFeedback.kt",
+        "anchor": "fun RecipientAddressLookupFeedback(",
+        "test_ids": [
+          "NCH-003"
         ]
       },
       {
@@ -5371,7 +5382,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
         "anchor": "fun MessageDetailsContentCard(",
         "test_ids": [
-          "MSG-001"
+          "MSG-001",
+          "MSG-021"
         ]
       },
       {
@@ -5379,8 +5391,15 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
         "anchor": "fun MessageDetailsScreen(",
         "test_ids": [
-          "MSG-001"
+          "MSG-001",
+          "MSG-021"
         ]
+      },
+      {
+        "surface": "Poll label in message details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "R.string.poll_preview",
+        "test_ids": ["MSG-021"]
       },
       {
         "surface": "MessageFactsSection",
@@ -5969,6 +5988,14 @@
         "anchor": "fun ConversationNotificationSettingsScreen(",
         "test_ids": [
           "GRP-001"
+        ]
+      },
+      {
+        "surface": "ConversationMuteSettingsSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "fun ConversationMuteSettingsSwitch(",
+        "test_ids": [
+          "NTF-028"
         ]
       },
       {
@@ -9656,15 +9683,45 @@
         "test_ids": ["MSG-021"]
       },
       {
-        "surface": "PollSenderAvatar",
+        "surface": "PollMessageContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
-        "anchor": "private fun PollSenderAvatar(",
+        "anchor": "fun PollMessageContent(",
         "test_ids": ["MSG-021"]
       },
       {
-        "surface": "PollTimelineRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
-        "anchor": "internal fun PollTimelineRow(",
+        "surface": "Poll interaction classification in streaming debug",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MessageDebugStyle.kt",
+        "anchor": "MessageProjector.isPollKind(record.kind) -> TimelineRowKind.Bubble",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "PollMessageActionOwner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActionOwner.kt",
+        "anchor": "internal data class PollMessageActionOwner(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Delayed reaction target admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ReactionMutation.kt",
+        "anchor": "internal data class ReactionMutationTarget(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "currentPollActionTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActionOwner.kt",
+        "anchor": "internal fun currentPollActionTarget(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "pollMessageActionsEligible",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActionOwner.kt",
+        "anchor": "internal fun pollMessageActionsEligible(",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "submitOwnedPollVote",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollMessageActionOwner.kt",
+        "anchor": "internal suspend fun submitOwnedPollVote(",
         "test_ids": ["MSG-021"]
       },
       {
@@ -9935,12 +9992,6 @@
         "surface": "string:poll_single_choice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
         "anchor": "R.string.poll_single_choice",
-        "test_ids": ["MSG-021"]
-      },
-      {
-        "surface": "string:poll_preview",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
-        "anchor": "R.string.poll_preview",
         "test_ids": ["MSG-021"]
       },
       {
@@ -11744,6 +11795,54 @@
         "test_ids": [
           "NCH-002",
           "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:user_search_address_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.user_search_address_result",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:user_search_address_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "R.string.user_search_address_result",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:user_search_address_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "R.string.user_search_address_result",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:user_search_address_unverified",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.user_search_address_unverified",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientAddressLookupFeedback.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:user_search_address_unverified",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientAddressLookupFeedback.kt",
+        "anchor": "R.string.user_search_address_unverified",
+        "test_ids": [
+          "NCH-003"
         ]
       },
       {
@@ -26299,6 +26398,14 @@
         ]
       },
       {
+        "surface": "Incoming reaction references update the chips of an open conversation live",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+        "anchor": "fun reactionReferenceChanges(",
+        "test_ids": [
+          "MSG-031"
+        ]
+      },
+      {
         "surface": "A text or reply send publishes with one engine call and reads no draft",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DraftSend.kt",
         "anchor": "internal suspend fun MarmotInterface.sendComposerText(",
@@ -29475,7 +29582,7 @@
         ]
       },
       {
-        "surface": "MarmotKit SDK pin: backed-up in-place upgrade across the 0.11.0 recovery migrations, responsive startup comparison recovery, sign-in, replicated attachment download, and all Android-applicable performance-registry compatibility",
+        "surface": "MarmotKit SDK pin: backed-up in-place upgrade across the 0.11.0 recovery and 0.12.0 attachment migrations 99–101, retained sent files, responsive startup comparison recovery, sign-in, replicated attachment download, and all Android-applicable performance-registry compatibility",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "mdk-sha=",
         "test_ids": [
@@ -29548,6 +29655,32 @@
         "test_ids": [
           "NAV-006",
           "NAV-005"
+        ]
+      },
+      {
+        "surface": "A restored or switched-to chat list decodes stored peer avatars before its first frame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDurableAvatars.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(",
+        "test_ids": [
+          "CHL-023"
+        ]
+      },
+      {
+        "surface": "Startup and account-switch snapshots carry MDK's stored per-row presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "prewarmFirstFrameDurableAvatars(accountRef, presentedRows)",
+        "test_ids": [
+          "CHL-023",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "An account switch reinstalls the destination's decoded stored avatars after clearing the previous account's",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AccountSwitchLocalSnapshot.kt",
+        "anchor": "snapshot?.installFirstFrameDurableAvatars()",
+        "test_ids": [
+          "CHL-023",
+          "NAV-006"
         ]
       },
       {
@@ -29685,6 +29818,32 @@
         "anchor": "fun sendRecognizedText()",
         "test_ids": [
           "DIC-002"
+        ]
+      },
+      {
+        "surface": "New-account and import relay defaults",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MarmotClient.kt",
+        "anchor": "val accountRelays = bootstrapRelays + generalPurposeRelays",
+        "test_ids": [
+          "ONB-026"
+        ]
+      },
+      {
+        "surface": "Generated identity relay-list split",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "createIdentity(MarmotClient.accountRelays, relays, relays)",
+        "test_ids": [
+          "ONB-003",
+          "ONB-026"
+        ]
+      },
+      {
+        "surface": "Imported-account per-list recommended relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupCoordinator.kt",
+        "anchor": "internal fun setupOptions() =",
+        "test_ids": [
+          "ONB-023",
+          "ONB-026"
         ]
       }
     ],

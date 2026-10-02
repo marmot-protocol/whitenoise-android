@@ -350,6 +350,22 @@ class RelayUrlsTest {
         assertEquals(emptyList<String>(), MarmotClient.bootstrapRelays.filterNot { isAcceptableRelayUrl(it) })
     }
 
+    /** New NIP-65 defaults retain both messaging relays and add only acceptable public relay URLs. */
+    @Test
+    fun accountRelaysAddGeneralPurposeRelaysToTheBootstrapSet() {
+        assertEquals(
+            listOf(
+                "wss://relay.us.whitenoise.chat",
+                "wss://relay.eu.whitenoise.chat",
+                "wss://nos.lol",
+                "wss://relay.primal.net",
+                "wss://whitenoise.nostrdev.com",
+            ),
+            MarmotClient.accountRelays,
+        )
+        assertEquals(emptyList<String>(), MarmotClient.accountRelays.filterNot { isAcceptableRelayUrl(it) })
+    }
+
     @Test
     fun bootstrapRelaysUseOnlyWhiteNoiseRegionalRelays() {
         assertEquals(

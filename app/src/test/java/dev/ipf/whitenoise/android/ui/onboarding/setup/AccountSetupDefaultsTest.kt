@@ -44,9 +44,11 @@ class AccountSetupDefaultsTest {
     /** Imported identities use public discovery sources as well as messaging relays. */
     @Test fun discoveryIncludesIndexers() {
         val options = setupOptions()
-        assertEquals(dev.ipf.whitenoise.android.core.MarmotClient.bootstrapRelays, options.defaultRelays)
+        val messagingRelays = dev.ipf.whitenoise.android.core.MarmotClient.bootstrapRelays
+        assertEquals(dev.ipf.whitenoise.android.core.MarmotClient.accountRelays, options.defaultRelays)
+        assertEquals(messagingRelays, options.inboxRelays)
         assertEquals(
-            options.defaultRelays +
+            messagingRelays +
                 listOf(
                     "wss://purplepag.es",
                     "wss://relay.vertexlab.io",

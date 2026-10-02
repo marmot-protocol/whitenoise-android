@@ -562,11 +562,11 @@
     <string name="notification_scope_custom_chat">Personalizado para esta conversa</string>
     <string name="notification_custom_for_chat_control">Personalizar %1$s para esta conversa</string>
     <string name="open_notification_category_settings">Abrir configurações do Android para %1$s</string>
-    <string name="notification_notify_restore">Sua escolha em “Notificar para” é mantida enquanto silenciado e restaurada quando o silêncio termina.</string>
-    <string name="notification_mute_detail">Pause as notificações sem alterar sua escolha em “Notificar para”.</string>
+    <string name="notification_notify_restore">Menções diretas ainda podem gerar notificações durante o silêncio. Sua escolha em “Notificar para” volta a valer quando ele termina.</string>
+    <string name="notification_mute_detail">Silencie mensagens comuns. Menções diretas ainda podem gerar notificações.</string>
     <string name="notification_scope_switch_detail">Desative para voltar a usar o padrão global.</string>
     <string name="notification_chat_categories_detail">As notificações de mensagens usam as configurações deste chat. As outras categorias podem usar os padrões globais ou configurações personalizadas para este chat.</string>
-    <string name="notify_nothing_while_muted">Nada enquanto silenciado.</string>
+    <string name="notify_nothing_while_muted">Somente menções diretas durante o silêncio.</string>
     <string name="notification_categories_loading">Carregando categorias de notificações…</string>
     <string name="toast_notification_scope_update_failed">Não foi possível atualizar esta configuração de notificação</string>
     <string name="toast_notification_settings_unavailable">Não foi possível abrir as configurações de notificações</string>
@@ -1452,7 +1452,7 @@
     <string name="notify_all_messages">Todas as mensagens</string>
     <string name="notify_only_mentions">Apenas menções</string>
     <string name="notify_nothing">Nada</string>
-    <string name="notify_muted_until">Silenciado até %1$s</string>
+    <string name="notify_muted_until">Silenciado até %1$s; menções diretas ainda podem gerar notificações.</string>
     <string name="vibration_pattern">Padrão de vibração</string>
     <string name="vibration_pattern_description">Escolha um padrão para novas mensagens nesta conversa. A pré-visualização é reproduzida uma vez.</string>
     <string name="vibration_pattern_system_default">Padrão do sistema</string>
@@ -2170,4 +2170,6 @@
     <string name="couldnt_check_invitation">Não foi possível verificar o convite</string>
     <string name="toast_leave_not_confirmed_history_kept">Saída não confirmada. Histórico mantido.</string>
     <string name="delete_local_does_not_leave">Isso não faz você sair da conversa.</string>
+    <string name="user_search_address_unverified">Não foi possível verificar este endereço.</string>
+    <string name="user_search_address_result">Endereço não verificado</string>
 </resources>

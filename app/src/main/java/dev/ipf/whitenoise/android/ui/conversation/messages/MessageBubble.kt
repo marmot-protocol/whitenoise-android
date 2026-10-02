@@ -7,6 +7,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -133,6 +134,9 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutR
 import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutSink
 import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
+import dev.ipf.whitenoise.android.ui.conversation.PollCard
+import dev.ipf.whitenoise.android.ui.conversation.PollMessageActionOwner
+import dev.ipf.whitenoise.android.ui.conversation.PollMessageContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.BlockedDmComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -143,6 +147,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerSheet
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
+import dev.ipf.whitenoise.android.ui.conversation.currentPollActionTarget
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.media.messageHasShareablePayload
@@ -371,6 +376,12 @@ internal fun MessageBubble(
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
 ) {
     val record = item.record
+    val isPollRecord = MessageProjector.isPollKind(record.kind)
+    val pollOwner =
+        remember(controller, record.messageIdHex) {
+            PollMessageActionOwner(controller.boundAccountRef, controller.group.groupIdHex, record.messageIdHex)
+        }
+    val actionsReadOnly = readOnly || (isPollRecord && currentPollActionTarget(controller, pollOwner) == null)
     val protocolAttachments =
         rememberMessageAttachments(
             tags = record.tags,
@@ -976,6 +987,14 @@ internal fun MessageBubble(
             messageShareInFlight = false
         }
     }
+    LaunchedEffect(actionsReadOnly, isPollRecord) {
+        if (isPollRecord && actionsReadOnly) {
+            if (isActionMenuOpen) onActionMenuOpenChange(false)
+            emojiPickerOpen = false
+            reactionSheetOpen = false
+            if (controller.replyingTo?.messageIdHex == record.messageIdHex) controller.replyingTo = null
+        }
+    }
     LaunchedEffect(deleteCapability.canDeleteAtAll) {
         if (!deleteCapability.canDeleteAtAll) deleteDialogOpen = false
     }
@@ -990,8 +1009,9 @@ internal fun MessageBubble(
     }
 
     fun beginReply() {
-        if (deleted || readOnly) return
-        controller.replyingTo = record
+        if (deleted || actionsReadOnly) return
+        val target = if (isPollRecord) currentPollActionTarget(controller, pollOwner)?.record ?: return else record
+        controller.replyingTo = target
         onActionMenuOpenChange(false)
     }
 
@@ -1047,9 +1067,19 @@ internal fun MessageBubble(
         // Chokepoint guard: never react to a deleted message, whatever path
         // (menu, emoji picker) called in — even if that surface was open when
         // the delete landed.
-        if (deleted || readOnly) return
+        if (deleted || actionsReadOnly) return
         // Route via launchMutation: same survives-navigation rationale as delete/send.
-        appState.launchMutation { controller.toggleReaction(emoji, record) }
+        appState.launchMutation {
+            val target =
+                if (isPollRecord) {
+                    currentPollActionTarget(controller, pollOwner)?.record ?: return@launchMutation
+                } else {
+                    record
+                }
+            controller.toggleReaction(emoji, target) {
+                !isPollRecord || currentPollActionTarget(controller, pollOwner) != null
+            }
+        }
     }
 
     fun copyMessageText() {
@@ -1310,7 +1340,7 @@ internal fun MessageBubble(
     }
 
     fun beginForward() {
-        if (deleted || readOnly || forwardPayload == null) return
+        if (deleted || actionsReadOnly || forwardPayload == null) return
         onActionMenuOpenChange(false)
         forwardSheetOpen = true
     }
@@ -1333,7 +1363,8 @@ internal fun MessageBubble(
             record.tags.count { it.values.firstOrNull() == "imeta" } - receivedEmoji.attachmentIndexes.size
         }
     val canShareMessage =
-        !deleted &&
+        !isPollRecord &&
+            !deleted &&
             !invalidated &&
             !persistedFailure &&
             !messageShareInFlight &&
@@ -1420,7 +1451,7 @@ internal fun MessageBubble(
                 maxWidth = bubbleColumnMaxWidth,
             )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
-        val replySwipeUnavailable = deleted || readOnly || textSelectionMode
+        val replySwipeUnavailable = deleted || actionsReadOnly || textSelectionMode
 
         // Drawn under the row so the bubble uncovers it as it slides away.
         if (!replySwipeUnavailable) {
@@ -2142,7 +2173,56 @@ internal fun MessageBubble(
                     } else {
                         null
                     }
-                if (hasMedia) {
+                val visiblePoll =
+                    item.projected?.poll.takeIf { isPollRecord && !deleted && !persistedFailure }
+                val pollTimestampColor =
+                    if (visiblePoll != null) {
+                        messageBubbleFooterColor(
+                            mine = mine,
+                            persistedFailure = false,
+                            bubbleBackgroundColor = MaterialTheme.colorScheme.surfaceVariant,
+                            bubbleContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        timestampColor
+                    }
+                if (visiblePoll != null) {
+                    Column(
+                        Modifier.fillMaxWidth().then(actionAnchorBoundsModifier),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        senderNameLabel(false)
+                        replyPreviewCard(false)
+                        PollMessageContent(
+                            item,
+                            controller,
+                            appState,
+                            canVote = !actionsReadOnly && !selectionMode,
+                            modifier = Modifier.testTag("poll-message-card"),
+                            footer = {
+                                Column(horizontalAlignment = Alignment.End) {
+                                    invalidationWarning?.let { warning ->
+                                        MessageBubbleInvalidationWarning(
+                                            warning = warning,
+                                            color = pollTimestampColor,
+                                            modifier = Modifier.testTag("poll-message-warning"),
+                                        )
+                                    }
+                                    MessageInlineFooter(
+                                        timeText = rememberedMessageBubbleTime(record.recordedAt),
+                                        color = pollTimestampColor,
+                                        showStatus = showOutgoingStatus,
+                                        status = item.status,
+                                        editedLabel = footerLabel,
+                                        onEditedClick = null,
+                                        modifier = Modifier.testTag("poll-message-footer"),
+                                        statusContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                    )
+                                }
+                            },
+                        )
+                    }
+                } else if (hasMedia) {
                     // Media plus caption renders as one message surface. The
                     // media owns no internal corners or border when
                     // a caption is present; the shared frame owns the continuous
@@ -2408,18 +2488,19 @@ internal fun MessageBubble(
                     initiatingHoldActive = initiatingMenuHoldActive,
                     anchorBoundsInWindow = actionMenuAnchorBounds,
                     anchorWindowYPx = longPressWindowY,
-                    canReply = !deleted && !readOnly,
-                    canReact = !deleted && !readOnly,
+                    canReply = !deleted && !actionsReadOnly,
+                    canReact = !deleted && !actionsReadOnly,
                     canDelete = deleteCapability.canDeleteAtAll,
-                    canEdit = !readOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
-                    canForward = !deleted && !readOnly && forwardPayload != null,
+                    canEdit =
+                        !actionsReadOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted,
+                    canForward = !deleted && !actionsReadOnly && forwardPayload != null,
                     forwardBlockedReason =
-                        if (!deleted && !readOnly) {
+                        if (!isPollRecord && !deleted && !actionsReadOnly) {
                             (forwardEligibility as? ForwardEligibility.Blocked)?.reason
                         } else {
                             null
                         },
-                    canSelect = !deleted && !readOnly && batchSelectable,
+                    canSelect = !deleted && !actionsReadOnly && batchSelectable,
                     // Whole-message Copy keeps using its actual clipboard payload,
                     // including card-style bubbles whose body is rendered by the
                     // card rather than the text renderer. Partial selection is only
@@ -2430,9 +2511,10 @@ internal fun MessageBubble(
                     // reactions, system copy).
                     canSpeak = !deleted && canSpeakAloud,
                     canSpeakCodeLiterally = speakableProjection?.speechRoles?.isNotEmpty() == true,
-                    canSelectText = !deleted && !bodyTextToRender.isNullOrBlank(),
+                    canSelectText = !isPollRecord && !deleted && !bodyTextToRender.isNullOrBlank(),
                     canKeepOnScreen =
-                        keptMessages != null &&
+                        !isPollRecord &&
+                            keptMessages != null &&
                             keptMessageKey != null &&
                             !deleted &&
                             !keptMessages.isKept(keptMessageKey),
@@ -2448,7 +2530,7 @@ internal fun MessageBubble(
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
                     onReact = { emoji ->
-                        if (!deleted && !readOnly) {
+                        if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             onEmojiUsed(emoji)
                             reactWithEmoji(emoji)
@@ -2459,14 +2541,14 @@ internal fun MessageBubble(
                         if (keptMessageKey != null) keptMessages?.keep(keptMessageKey)
                     },
                     onOpenEmojiPicker = {
-                        if (!deleted && !readOnly) {
+                        if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             emojiPickerOpen = true
                         }
                     },
                     onReply = ::beginReply,
                     onEdit = {
-                        if (!deleted && !readOnly) {
+                        if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             // Cancel any reply-in-progress: reply and
                             // edit modes are mutually exclusive in the
@@ -2489,7 +2571,7 @@ internal fun MessageBubble(
                     onSelectText = ::beginTextSelection,
                     onForward = ::beginForward,
                     onSelect = {
-                        if (!deleted && !readOnly) {
+                        if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
                             onToggleSelection()
                         }
@@ -2545,17 +2627,30 @@ internal fun MessageBubble(
                         val previewFooter: @Composable () -> Unit = {
                             MessageInlineFooter(
                                 timeText = rememberedMessageBubbleTime(record.recordedAt),
-                                color = timestampColor,
+                                color = if (visiblePoll != null) pollTimestampColor else timestampColor,
                                 showStatus = showOutgoingStatus && !fileFooterInCard && remoteGiphyMedia == null,
                                 status = item.status,
                                 editedLabel = footerLabel.takeIf { remoteGiphyMedia == null },
                                 onEditedClick = null,
                                 showTime = !fileFooterInCard && remoteGiphyMedia == null,
-                                statusContainerColor = colorFromArgb(bubblePresentation.backgroundArgb),
+                                modifier =
+                                    if (visiblePoll != null) Modifier.testTag("poll-preview-footer") else Modifier,
+                                statusContainerColor =
+                                    if (visiblePoll != null) {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    } else {
+                                        colorFromArgb(bubblePresentation.backgroundArgb)
+                                    },
                             )
                         }
                         val mediaPreview: (@Composable () -> Unit)? =
-                            if (hasMedia) {
+                            if (visiblePoll != null) {
+                                {
+                                    Box(Modifier.testTag("poll-preview-card")) {
+                                        PollCard(visiblePoll, canVote = false, onVote = {}, footer = previewFooter)
+                                    }
+                                }
+                            } else if (hasMedia) {
                                 {
                                     FocusedRenderedMessagePreview(
                                         layer = checkNotNull(focusedMessageLayer),
@@ -2565,7 +2660,7 @@ internal fun MessageBubble(
                             } else {
                                 null
                             }
-                        if (hasMedia && !bodyOrWarningInsideBubble) {
+                        if (visiblePoll != null || (hasMedia && !bodyOrWarningInsideBubble)) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 replyPreview?.let { preview ->
                                     ReplyPreviewCard(
@@ -2602,8 +2697,10 @@ internal fun MessageBubble(
                                     )
                                 }
                                 mediaPreview?.invoke()
-                                if (!footerOnVisualMedia && !footerOnPendingVisual && remoteGiphyMedia == null) {
-                                    previewFooter()
+                                if (visiblePoll == null) {
+                                    if (!footerOnVisualMedia && !footerOnPendingVisual && remoteGiphyMedia == null) {
+                                        previewFooter()
+                                    }
                                 }
                             }
                         } else {
@@ -2678,7 +2775,7 @@ internal fun MessageBubble(
                         controller.editingMessageId?.let { id ->
                             controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                         }
-                    val canUseExpandedComposer = !deleted && !readOnly && composerGate == ComposerGate.COMPOSER
+                    val canUseExpandedComposer = !deleted && !actionsReadOnly && composerGate == ComposerGate.COMPOSER
                     val expandedBody = bodyTextToRender ?: displayedBody
                     MessageFullScreenView(
                         senderDisplayName = appState.displayName(record.sender),
@@ -2767,7 +2864,7 @@ internal fun MessageBubble(
                                         onDecline = onDeclineInvite,
                                     )
                                 ComposerGate.COMPOSER ->
-                                    if (!readOnly) {
+                                    if (!actionsReadOnly) {
                                         ComposerBar(
                                             replyingTo = controller.replyingTo,
                                             replyingToMedia =
@@ -2811,7 +2908,7 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                if (emojiPickerOpen && !deleted && !readOnly) {
+                if (emojiPickerOpen && !deleted && !actionsReadOnly) {
                     val pickingSlot = configureReactionSlot
                     EmojiPickerSheet(
                         purpose =
@@ -2987,10 +3084,10 @@ internal fun MessageBubble(
                             participants = participants,
                             appState = appState,
                             onRemoveOwnReaction =
-                                if (readOnly || deleted) {
+                                if (actionsReadOnly || deleted) {
                                     null
                                 } else {
-                                    { emoji -> appState.launchMutation { controller.toggleReaction(emoji, record) } }
+                                    ::reactWithEmoji
                                 },
                             onDismissRequest = {
                                 reactionSheetOpen = false

@@ -67,6 +67,7 @@ fun timelineRowKind(
     when {
         MessageProjector.isGroupSystem(record) -> TimelineRowKind.GroupSystem
         MessageProjector.isAgentOperation(record) -> TimelineRowKind.AgentOperation
+        MessageProjector.isPollKind(record.kind) -> TimelineRowKind.Bubble
         streamingDebugEnabled && !MessageDebugClassifier.debugStyle(record).isUserVisibleBubble ->
             TimelineRowKind.DebugRow
         else -> TimelineRowKind.Bubble

@@ -562,11 +562,11 @@
     <string name="notification_scope_custom_chat">Benutzerdefiniert für diesen Chat</string>
     <string name="notification_custom_for_chat_control">%1$s für diesen Chat anpassen</string>
     <string name="open_notification_category_settings">Android-Einstellungen für %1$s öffnen</string>
-    <string name="notification_notify_restore">Deine Auswahl unter „Benachrichtigen bei“ bleibt während der Stummschaltung erhalten und wird danach wiederhergestellt.</string>
-    <string name="notification_mute_detail">Benachrichtigungen pausieren, ohne deine Auswahl unter „Benachrichtigen bei“ zu ändern.</string>
+    <string name="notification_notify_restore">Direkte Erwähnungen können auch während der Stummschaltung benachrichtigen. Deine Auswahl unter „Benachrichtigen bei“ gilt danach wieder.</string>
+    <string name="notification_mute_detail">Normale Nachrichten stummschalten. Direkte Erwähnungen können weiterhin benachrichtigen.</string>
     <string name="notification_scope_switch_detail">Ausschalten, um wieder die globale Standardeinstellung zu verwenden.</string>
     <string name="notification_chat_categories_detail">Nachrichtenbenachrichtigungen verwenden die Einstellungen dieses Chats. Andere Kategorien können globale Standards oder eigene Einstellungen für diesen Chat verwenden.</string>
-    <string name="notify_nothing_while_muted">Nichts, solange stummgeschaltet.</string>
+    <string name="notify_nothing_while_muted">Nur direkte Erwähnungen während der Stummschaltung.</string>
     <string name="notification_categories_loading">Benachrichtigungskategorien werden geladen…</string>
     <string name="toast_notification_scope_update_failed">Diese Benachrichtigungseinstellung konnte nicht aktualisiert werden</string>
     <string name="toast_notification_settings_unavailable">Benachrichtigungseinstellungen konnten nicht geöffnet werden</string>
@@ -1450,7 +1450,7 @@
     <string name="notify_all_messages">Alle Nachrichten</string>
     <string name="notify_only_mentions">Nur Erwähnungen</string>
     <string name="notify_nothing">Nichts</string>
-    <string name="notify_muted_until">Stummgeschaltet bis %1$s</string>
+    <string name="notify_muted_until">Stummgeschaltet bis %1$s; direkte Erwähnungen können benachrichtigen.</string>
     <string name="vibration_pattern">Vibrationsmuster</string>
     <string name="vibration_pattern_description">Wähle ein Muster für neue Nachrichten in diesem Chat. Die Vorschau wird einmal abgespielt.</string>
     <string name="vibration_pattern_system_default">Systemstandard</string>
@@ -2187,4 +2187,6 @@
     <string name="couldnt_check_invitation">Einladung konnte nicht geprüft werden</string>
     <string name="toast_leave_not_confirmed_history_kept">Verlassen nicht bestätigt. Verlauf behalten.</string>
     <string name="delete_local_does_not_leave">Dadurch verlässt du den Chat nicht.</string>
+    <string name="user_search_address_unverified">Diese Adresse konnte nicht verifiziert werden.</string>
+    <string name="user_search_address_result">Adresse nicht verifiziert</string>
 </resources>

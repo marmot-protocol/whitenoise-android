@@ -220,6 +220,48 @@ class ReplyNavigationTest {
         assertEquals(-350, ReplyNavigation.centeredScrollOffset(viewportHeightPx = 1_000, itemHeightPx = estimate))
     }
 
+    /** Poll discussion retains the original typed id even when its parent is outside the window. */
+    @Test
+    fun pollParentOutsideWindowUsesOneBoundedTargetLookup() =
+        runBlocking {
+            val reply = timelineRecord(replyPreviewMessageId = "poll-parent")
+            val id = checkNotNull(ReplyNavigation.targetMessageId(message(), reply))
+            val loads = mutableListOf<Pair<String, Int>>()
+            val target =
+                ReplyNavigation.loadScrollNavigationTarget(
+                    sourceMessageIdHex = id,
+                    lookupSourceRecord = { null },
+                    loadUntilMessageAvailable = { messageId, budget ->
+                        loads += messageId to budget
+                        true
+                    },
+                )
+            assertEquals("poll-parent", target)
+            assertEquals(listOf("poll-parent" to ReplyNavigation.MaxOlderPages), loads)
+        }
+
+    /** Unavailable poll parents preserve navigation identity and stop within the normal bound. */
+    @Test
+    fun unavailablePollParentDoesNotExpandHistoryBudget() =
+        runBlocking {
+            val reply = timelineRecord(replyPreviewMessageId = null, replyToMessageIdHex = "poll-parent")
+            val targetId = checkNotNull(ReplyNavigation.targetMessageId(message(), reply))
+            var calls = 0
+            val target =
+                ReplyNavigation.loadScrollNavigationTarget(
+                    sourceMessageIdHex = targetId,
+                    lookupSourceRecord = { null },
+                    loadUntilMessageAvailable = { id, budget ->
+                        calls++
+                        assertEquals("poll-parent", id)
+                        assertEquals(ReplyNavigation.MaxOlderPages, budget)
+                        false
+                    },
+                )
+            assertNull(target)
+            assertEquals(1, calls)
+        }
+
     private fun message(
         tags: List<MessageTagFfi> = emptyList(),
         kind: ULong = 9uL,

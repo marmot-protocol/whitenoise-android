@@ -465,6 +465,7 @@ private fun NewMessageAccountScreen(
             deriveRecipientCandidates(appState, activeHex)
         }
     val identifierQuery = query.isNotBlank() && !isPlainNameQuery(query, appState::accountIdHexForMention)
+    val addressQuery = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05
     val resolution =
         rememberRecipientResolution(query, appState, retryKey = searchRetry) { stage ->
             when (stage) {
@@ -485,24 +486,23 @@ private fun NewMessageAccountScreen(
                     appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_PROFILE_REFRESH_RETURN)
             }
         }
+    val directoryQuery = query.takeIf { resolution.resolvedHex == null }.orEmpty()
     val userSearch by key(query, searchRetry, appState.relationshipRevision) {
-        rememberRecipientUserSearchState(query, appState, retryKey = searchRetry)
+        rememberRecipientUserSearchState(directoryQuery, appState, retryKey = searchRetry)
     }
     val discovered = userSearch.candidates
     val followedIds = userSearch.followedAccountIds
     val matches =
-        remember(query, candidates, discovered, followedIds, activeHex) {
-            if (identifierQuery) {
-                emptyList()
-            } else {
-                RecipientSearch.mergeAndBrowse(
-                    query = query,
-                    known = candidates,
-                    discovered = discovered,
-                    activeAccountIdHex = activeHex,
-                    followedAccountIds = followedIds,
-                )
-            }
+        remember(query, resolution.resolvedHex, candidates, discovered, followedIds, activeHex) {
+            recipientDirectoryMatches(
+                query = query,
+                resolvedHex = resolution.resolvedHex,
+                known = candidates,
+                discovered = discovered,
+                activeAccountIdHex = activeHex,
+                followedAccountIds = followedIds,
+                accountIdHex = appState::accountIdHexForMention,
+            )
         }
     SideEffect { contactsLoadAttempt.success() }
 
@@ -651,7 +651,7 @@ private fun NewMessageAccountScreen(
     }
 
     val displayedCandidates =
-        if (identifierQuery) {
+        if (identifierQuery && resolution.resolvedHex != null) {
             resolvedHex
                 ?.let {
                     listOf(RecipientSearch.Candidate(it, appState.displayName(it), appState.npub(it)))
@@ -663,7 +663,12 @@ private fun NewMessageAccountScreen(
         displayedCandidates.map { candidate ->
             NewMessagePerson(
                 candidate = candidate,
-                subtitle = appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() },
+                subtitle =
+                    if (addressQuery && resolution.resolvedHex == null) {
+                        stringResource(R.string.user_search_address_result)
+                    } else {
+                        appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
+                    },
                 avatarUrl =
                     appState.avatarUrl(candidate.accountIdHex)
                         ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
@@ -717,7 +722,9 @@ private fun NewMessageAccountScreen(
             connectQrEnabled = myQrContent != null,
             creatingHex = creatingHex,
             error = startChatError,
-            retryableIdentifier = ChatListIdentifierSearch.classify(query) is ChatListIdentifierSearch.Identifier.Nip05,
+            retryableIdentifier = addressQuery,
+            identifierLookupFailed = recipientAddressLookupFailed(query, resolution.state),
+            addressFallback = addressQuery && resolution.resolvedHex == null,
             actions =
                 NewMessageActions(
                     back = { leaveScreen(onBack) },

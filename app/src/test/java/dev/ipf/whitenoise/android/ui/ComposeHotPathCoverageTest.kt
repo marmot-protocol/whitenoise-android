@@ -79,9 +79,11 @@ class ComposeHotPathCoverageTest {
             "TimelineRow must delegate bubble rendering to a row-scoped restart scope",
             "TimelineRowMessageBubble(" in timelineRowSource,
         )
+        val bubbleScopeKey =
+            "key(controller.boundAccountRef, controller.group.groupIdHex, item.record.messageIdHex)"
         assertTrue(
-            "TimelineRow must key the row-scoped restart scope by message id",
-            "key(item.record.messageIdHex)" in timelineRowSource,
+            "TimelineRow must key the row-scoped restart scope by its owner and message id",
+            bubbleScopeKey in timelineRowSource,
         )
         assertTrue(
             "Row-scoped TTS highlight projection must filter by message id",

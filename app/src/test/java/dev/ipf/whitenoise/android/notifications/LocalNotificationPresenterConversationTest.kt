@@ -276,6 +276,18 @@ class LocalNotificationPresenterConversationTest {
     @Test
     @Config(sdk = [30, 36])
     fun coldAvatarsPostUsefulCardBeforeSilentSameKeyEnrichment() {
+        assertColdAvatarEnrichment(isMention = false)
+    }
+
+    /** A mention card keeps its channel and does not alert again when avatar enrichment replaces it. */
+    @Test
+    @Config(sdk = [30, 36])
+    fun coldMentionAvatarEnrichmentReusesCardWithoutSecondAlert() {
+        assertColdAvatarEnrichment(isMention = true)
+    }
+
+    /** Verifies the first post and the silent same-key replacement for each message class. */
+    private fun assertColdAvatarEnrichment(isMention: Boolean) {
         val posts = mutableListOf<Triple<String, Int, Notification>>()
         var pendingEnrichment: (suspend () -> Unit)? = null
         var shortcutPublishCount = 0
@@ -305,7 +317,7 @@ class LocalNotificationPresenterConversationTest {
         assertTrue(
             runBlocking {
                 twoStagePresenter.show(
-                    update(isMention = false),
+                    update(isMention = isMention),
                     previewTextOverride = "hi",
                     conversationAvatarUrl = "https://example.com/group.png",
                     senderAvatarUrl = "https://example.com/alice.png",

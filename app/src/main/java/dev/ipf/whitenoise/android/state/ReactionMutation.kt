@@ -7,6 +7,17 @@ import dev.ipf.whitenoise.android.core.ReactionTally
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
+/** Captures native identity and a presentation admission check for delayed reaction dispatch. */
+internal data class ReactionMutationTarget(
+    val account: String,
+    val messageId: String,
+    val stillAvailable: () -> Boolean,
+) {
+    fun requireAvailable() {
+        check(stillAvailable()) { "Reaction target is no longer available" }
+    }
+}
+
 /** One optimistic change to the active account's reaction on a message. */
 internal data class OptimisticReactionChange(
     val targetMessageId: String,

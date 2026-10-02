@@ -23,7 +23,11 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -73,6 +77,38 @@ class ReplyPreviewCardTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("missing-parent-id").assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(1, clicks) }
+    }
+
+    /** Both composer and received poll quotes use localized copy, never the protocol envelope. */
+    @Test
+    fun pollPreviewUsesLocalizedSafeCopyAndRemainsNavigable() {
+        val original =
+            AppMessageRecordFfi(
+                messageIdHex = "poll-id",
+                direction = "received",
+                groupIdHex = "group",
+                sender = "Alice",
+                plaintext = "{\"private-envelope\":true}",
+                contentTokens =
+                    MarkdownDocumentFfi(blocks = emptyList(), truncated = false, blankLinesBefore = byteArrayOf()),
+                kind = 1068uL,
+                tags = emptyList(),
+                sourceEpoch = null,
+                retentionSeconds = null,
+                retentionExpiresAt = null,
+                recordedAt = 1uL,
+                receivedAt = 1uL,
+            )
+        var target: String? = null
+        render(
+            senderTitle = original.sender,
+            body = MessageProjector.displayBody(original, MessageTextCopy.Default.copy(poll = "Localized poll")),
+            mediaKind = ReplyMediaKind.None,
+            onClick = { target = original.messageIdHex },
+        )
+        composeRule.onNodeWithText("Localized poll").performClick()
+        composeRule.onNodeWithText("private-envelope", substring = true).assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals("poll-id", target) }
     }
 
     /** Typed document replies share the production format resolver and filename priority. */
