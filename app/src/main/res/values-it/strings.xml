@@ -1522,7 +1522,7 @@
 
     <string name="chat_bubble_colors">Colori dei fumetti</string>
     <string name="custom_emoji">Emoji personalizzate</string>
-    <string name="custom_emoji_detail">Le immagini aggiunte qui diventano emoji :codice: nei messaggi e nelle reazioni. Restano su questo dispositivo e gli altri vedono il codice come testo.</string>
+    <string name="custom_emoji_detail">Le immagini aggiunte qui diventano emoji :codice: nei messaggi e nelle reazioni. Sono salvate su questo dispositivo. Quando invii un messaggio che ne usa una, la sua immagine viene caricata in questa chat, cifrata, così i membri possono vederla. Le reazioni inviano solo il codice.</string>
     <string name="custom_emoji_empty">Ancora nessuna emoji personalizzata.</string>
     <string name="custom_emoji_name_title">Dai un nome a questa emoji</string>
     <string name="custom_emoji_name_label">Codice breve</string>

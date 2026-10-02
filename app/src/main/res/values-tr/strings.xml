@@ -1520,7 +1520,7 @@
 
     <string name="chat_bubble_colors">Sohbet balonu renkleri</string>
     <string name="custom_emoji">Özel emoji</string>
-    <string name="custom_emoji_detail">Buraya eklediğin görseller mesajlarda ve tepkilerde :kısakod: emojisine dönüşür. Bu cihazda kalırlar; diğer kişiler kısa kodu metin olarak görür.</string>
+    <string name="custom_emoji_detail">Buraya eklediğin görseller mesajlarda ve tepkilerde :kısakod: emojisine dönüşür. Bu cihazda saklanırlar. Birini kullanan bir mesaj gönderdiğinde görseli, üyelerin görebilmesi için şifreli olarak o sohbete yüklenir. Tepkiler yalnızca kısa kodu gönderir.</string>
     <string name="custom_emoji_empty">Henüz özel emoji yok.</string>
     <string name="custom_emoji_name_title">Bu emojiye ad ver</string>
     <string name="custom_emoji_name_label">Kısa kod</string>

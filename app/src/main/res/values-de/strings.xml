@@ -1520,7 +1520,7 @@
 
     <string name="chat_bubble_colors">Farben der Chatblasen</string>
     <string name="custom_emoji">Eigene Emoji</string>
-    <string name="custom_emoji_detail">Bilder, die du hier hinzufügst, werden in Nachrichten und Reaktionen zu :kurzcode:-Emoji. Sie bleiben auf diesem Gerät, und andere sehen den Kurzcode als Text.</string>
+    <string name="custom_emoji_detail">Bilder, die du hier hinzufügst, werden in Nachrichten und Reaktionen zu :kurzcode:-Emoji. Sie werden auf diesem Gerät gespeichert. Wenn du eine Nachricht sendest, die eines verwendet, wird sein Bild verschlüsselt in diesen Chat hochgeladen, damit die Mitglieder es sehen. Reaktionen senden nur den Kurzcode.</string>
     <string name="custom_emoji_empty">Noch keine eigenen Emoji.</string>
     <string name="custom_emoji_name_title">Emoji benennen</string>
     <string name="custom_emoji_name_label">Kurzcode</string>

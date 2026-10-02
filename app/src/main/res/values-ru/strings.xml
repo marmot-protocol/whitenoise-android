@@ -1582,7 +1582,7 @@
 
     <string name="chat_bubble_colors">Цвета сообщений</string>
     <string name="custom_emoji">Свои эмодзи</string>
-    <string name="custom_emoji_detail">Добавленные здесь изображения становятся эмодзи :код: в сообщениях и реакциях. Они остаются на этом устройстве, а другие видят код как текст.</string>
+    <string name="custom_emoji_detail">Добавленные здесь изображения становятся эмодзи :код: в сообщениях и реакциях. Они хранятся на этом устройстве. Когда вы отправляете сообщение с таким эмодзи, его изображение загружается в чат в зашифрованном виде, чтобы участники могли его увидеть. В реакциях отправляется только код.</string>
     <string name="custom_emoji_empty">Своих эмодзи пока нет.</string>
     <string name="custom_emoji_name_title">Название эмодзи</string>
     <string name="custom_emoji_name_label">Код</string>

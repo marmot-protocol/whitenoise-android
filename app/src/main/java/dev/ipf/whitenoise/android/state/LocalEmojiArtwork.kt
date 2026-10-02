@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.core.Nip30Emoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -86,6 +87,15 @@ internal fun emojiTags(
     }
 
 /**
+ * The upload stage of a custom-emoji send failed, so nothing was published. Wrapping the cause keeps
+ * a connection reset during upload from being read as an uncertain delivery: it is a definite
+ * failure the user can retry.
+ */
+internal class EmojiUploadFailure(
+    cause: Throwable,
+) : Exception("emoji upload failed before publication", cause)
+
+/**
  * Sends [text] as a chat message carrying the images of the emoji it uses: upload-only first,
  * then one tagged media send whose caption is the text.
  */
@@ -95,6 +105,15 @@ internal suspend fun MarmotInterface.sendTextWithCustomEmoji(
     text: String,
     artwork: List<LocalEmojiArtwork>,
 ): SendSummaryFfi {
-    val references = uploadEmojiArtwork(account, group, artwork)
+    val references =
+        try {
+            uploadEmojiArtwork(account, group, artwork)
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (
+            @Suppress("TooGenericExceptionCaught") failure: Exception,
+        ) {
+            throw EmojiUploadFailure(failure)
+        }
     return sendTaggedMedia(account, group, references, text, emojiTags(artwork, references))
 }

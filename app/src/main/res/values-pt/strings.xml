@@ -1522,7 +1522,7 @@
 
     <string name="chat_bubble_colors">Cores dos balões</string>
     <string name="custom_emoji">Emoji personalizados</string>
-    <string name="custom_emoji_detail">As imagens adicionadas aqui viram emoji :código: em mensagens e reações. Elas ficam neste dispositivo, e outras pessoas veem o código como texto.</string>
+    <string name="custom_emoji_detail">As imagens adicionadas aqui viram emoji :código: em mensagens e reações. Elas ficam guardadas neste dispositivo. Quando você envia uma mensagem que usa uma, a imagem é enviada criptografada para essa conversa para que os membros a vejam. As reações enviam apenas o código.</string>
     <string name="custom_emoji_empty">Nenhum emoji personalizado ainda.</string>
     <string name="custom_emoji_name_title">Dê um nome a este emoji</string>
     <string name="custom_emoji_name_label">Código</string>

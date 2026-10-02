@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaLocatorFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
@@ -131,6 +132,42 @@ class CustomEmojiSendTest {
             val failure = runCatching { engine.sendTextWithCustomEmoji("a", "g", ":party:", listOf(artwork("party"))) }
             assertTrue(failure.isFailure)
             assertEquals(listOf("uploadMedia"), calls)
+        }
+
+    /** A connection loss during upload is a definite failure, never an uncertain delivery that stays pending. */
+    @Test
+    fun uploadStageTransportLossIsADefiniteFailure() =
+        runTest {
+            val engine = nativeBoundary { _, _ -> throw MarmotKitException.TransportClosed() }
+            val failure =
+                runCatching { engine.sendTextWithCustomEmoji("a", "g", ":party:", listOf(artwork("party"))) }
+                    .exceptionOrNull()
+            assertTrue(failure is EmojiUploadFailure)
+            assertFalse(isAmbiguousRelayDeliveryError(failure!!))
+        }
+
+    /** Loss of the publish call itself stays ambiguous, because the event may already have reached a relay. */
+    @Test
+    fun publicationStageTransportLossStaysUncertain() =
+        runTest {
+            val engine =
+                nativeBoundary { method, args ->
+                    when (method) {
+                        "uploadMedia" ->
+                            MediaUploadResultFfi(
+                                (args[2] as MediaUploadRequestFfi).attachments.map {
+                                    MediaUploadAttachmentResultFfi(reference("https://blob/${it.fileName}"), 1uL)
+                                },
+                                null,
+                            )
+                        else -> throw MarmotKitException.TransportClosed()
+                    }
+                }
+            val failure =
+                runCatching { engine.sendTextWithCustomEmoji("a", "g", ":party:", listOf(artwork("party"))) }
+                    .exceptionOrNull()
+            assertFalse(failure is EmojiUploadFailure)
+            assertTrue(isAmbiguousRelayDeliveryError(failure!!))
         }
 
     /** The tag always names the first locator, so a peer that joined before an epoch change resolves the same blob. */
