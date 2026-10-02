@@ -76,40 +76,22 @@ internal fun SmartFolderRulePanel(
                 TextButton(onClick = onStart) { Text(stringResource(R.string.smart_folder_start)) }
             } else {
                 SmartFolderEditor(root, people, resolveKey, onChange)
-                Text(
+                FolderChoice(
                     stringResource(R.string.smart_folder_presets),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                TextButton(
-                    onClick = {
-                        onChange(
-                            defaultSmartFolder().let {
-                                it.copy(
-                                    children =
-                                        it.children +
-                                            SmartFolderFilter.Condition(
-                                                FolderField.UNREAD,
-                                                FolderMode.NONE,
-                                            ),
-                                )
-                            },
-                        )
-                    },
-                    modifier = Modifier.testTag("folder.presetRead"),
-                ) {
-                    Text(stringResource(R.string.smart_folder_preset_read))
-                }
-                TextButton(
-                    onClick = {
-                        onChange(
-                            defaultSmartFolder().let {
-                                it.copy(children = it.children + SmartFolderFilter.Condition(FolderField.MENTIONS))
-                            },
-                        )
-                    },
-                    modifier = Modifier.testTag("folder.presetMentions"),
-                ) {
-                    Text(stringResource(R.string.smart_folder_preset_mentions))
+                    listOf(
+                        true to stringResource(R.string.smart_folder_preset_read),
+                        false to stringResource(R.string.smart_folder_preset_mentions),
+                    ),
+                    "folder.presets",
+                ) { allRead ->
+                    val preset = defaultSmartFolder()
+                    val condition =
+                        if (allRead) {
+                            SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE)
+                        } else {
+                            SmartFolderFilter.Condition(FolderField.MENTIONS)
+                        }
+                    onChange(preset.copy(children = preset.children + condition))
                 }
                 Text(
                     stringResource(R.string.smart_folder_preset_hint),

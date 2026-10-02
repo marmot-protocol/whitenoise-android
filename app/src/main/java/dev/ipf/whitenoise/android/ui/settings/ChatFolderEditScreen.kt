@@ -172,7 +172,11 @@ private fun ChatFolderEditSession(
             smartFilter = smartPayload,
         )
     val initialRule = (existingRule ?: ChatFolderRule()).copy(smartFilter = initialSmart)
-    val smartRuleValid = smartPayload == null || smartRoot?.let(SmartFolderCodec::valid) == true
+    // Preserve untouched future/invalid payloads for metadata edits; automatic matching stays disabled.
+    val smartRuleValid =
+        smartPayload == null ||
+            smartPayload == initialSmart ||
+            smartRoot?.let(SmartFolderCodec::valid) == true
     val missing = folderId != null && existing == null
     val dirty =
         name.text.toString() != prefillName ||

@@ -1558,6 +1558,7 @@ internal fun GroupDetailsScreen(
                     remember(
                         folderStoreState,
                         appState.chatListItems,
+                        appState.archivedChatListItems,
                         appState.profileRevisionForCompose,
                         folderAccountRef,
                         chatIdLower,

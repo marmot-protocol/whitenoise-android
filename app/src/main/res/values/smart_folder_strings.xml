@@ -49,9 +49,12 @@
   <string name="smart_folder_preset_mentions">Unread mentions</string>
   <string name="smart_folder_preset_hint">Add Participants to choose an agent. All read does not mean finished.</string>
   <string name="smart_folder_limit">Up to 4 levels and 64 conditions or groups.</string>
-  <string name="smart_folder_group_summary">%1$s · %2$d conditions</string>
     <string name="smart_folder_include_match">Include matches</string>
     <string name="smart_folder_edit_legacy">Edit existing rules</string>
     <string name="smart_folder_empty_group">Add a condition or remove this empty group before saving.</string>
     <string name="smart_folder_unread_hint">Includes manual Mark unread.</string>
+    <plurals name="smart_folder_group_items">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
 </resources>

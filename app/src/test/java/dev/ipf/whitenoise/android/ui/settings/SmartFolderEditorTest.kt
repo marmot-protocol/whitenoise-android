@@ -53,11 +53,8 @@ class SmartFolderEditorTest {
         assertFalse(root.value.all)
         composeRule
             .onNodeWithText(
-                context.getString(
-                    R.string.smart_folder_group_summary,
-                    context.getString(R.string.smart_folder_all),
-                    1,
-                ),
+                context.getString(R.string.smart_folder_all) + " · " +
+                    context.resources.getQuantityString(R.plurals.smart_folder_group_items, 1, 1),
             ).performClick()
         composeRule.onNodeWithTag("folder.not.0").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_not_hint)).performClick()
@@ -94,6 +91,36 @@ class SmartFolderEditorTest {
         val changed = tree.updateAt(listOf(0, 0), SmartFolderFilter.Condition(FolderField.MENTIONS))
         assertEquals(child, changed.children[1])
         assertNotEquals(child, changed.children[0])
+    }
+
+    @Test fun allReadPresetIncludesActiveAcceptedScopeAndManualUnreadPredicate() {
+        val root = mutableStateOf(SmartFolderFilter.Group())
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    SmartFolderRulePanel(
+                        SmartFolderPanelState(true, root.value),
+                        emptyList(),
+                        resolveKey = { null },
+                        onStart = {},
+                        onChange = { root.value = it },
+                        legacyControls = {},
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithTag("folder.presets").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.smart_folder_preset_read)).performClick()
+        assertTrue(root.value.all)
+        val conditions =
+            root.value.children
+                .filterIsInstance<SmartFolderFilter.Condition>()
+                .associateBy { it.field }
+        assertEquals(setOf(FolderField.ARCHIVED, FolderField.ACCEPTED, FolderField.UNREAD), conditions.keys)
+        assertEquals(FolderMode.NONE, conditions.getValue(FolderField.UNREAD).mode)
+        assertEquals(FolderMode.NONE, conditions.getValue(FolderField.ARCHIVED).mode)
+        assertEquals(FolderMode.PRESENT, conditions.getValue(FolderField.ACCEPTED).mode)
+        assertFalse(conditions.containsKey(FolderField.MUTED))
     }
 
     private fun render(initial: SmartFolderFilter.Group): MutableState<SmartFolderFilter.Group> {

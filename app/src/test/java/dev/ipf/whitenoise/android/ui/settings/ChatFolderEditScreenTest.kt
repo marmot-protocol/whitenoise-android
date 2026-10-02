@@ -203,6 +203,26 @@ class ChatFolderEditScreenTest {
         assertEquals(false, reloaded?.unreadMentionsOnly)
     }
 
+    @Test
+    fun renamingFolderPreservesUnsupportedRulesAndManualMembership() {
+        val appState = appState()
+        val store = appState.chatFolderPreferences
+        val id = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        store.foldersFor(ACCOUNT_REF)
+        val futureRule = ChatFolderRule(smartFilter = """{"version":99,"root":{}}""")
+        val manual = setOf("b".repeat(64))
+        store.commitFolderDraft(ACCOUNT_REF, id, null, "", manual, futureRule)
+        var closed = false
+        renderEditor(appState, onClose = { closed = true })
+        composeRule.onNodeWithText(app.getString(R.string.chat_list_filter_unread)).performTextReplacement("Future")
+        composeRule.onNodeWithText(app.getString(R.string.save)).performClick()
+        assertTrue(closed)
+        val reloaded = ChatFolderPreferences(app)
+        assertEquals("Future", reloaded.foldersFor(ACCOUNT_REF).first { it.id == id }.name)
+        assertEquals(futureRule, reloaded.folderRule(ACCOUNT_REF, id))
+        assertEquals(manual, reloaded.membershipFor(ACCOUNT_REF, id))
+    }
+
     private fun renderEditor(
         appState: WhiteNoiseAppState,
         onClose: () -> Unit,

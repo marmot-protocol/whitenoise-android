@@ -11,6 +11,14 @@
         ]
       },
       {
+        "surface": "FolderButtonLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "internal fun FolderButtonLabel(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
         "surface": "SmartFolderEditor",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
         "anchor": "internal fun SmartFolderEditor(",
@@ -29,8 +37,8 @@
       },
       {
         "surface": "FolderChoice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
-        "anchor": "private fun <T> FolderChoice(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+        "anchor": "internal fun <T> FolderChoice(",
         "test_ids": [
           "FLD-004"
         ]
@@ -24746,9 +24754,9 @@
         ]
       },
       {
-        "surface": "smart_folder_group_summary",
+        "surface": "smart_folder_group_items",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
-        "anchor": "R.string.smart_folder_group_summary",
+        "anchor": "R.plurals.smart_folder_group_items",
         "test_ids": [
           "FLD-004"
         ]

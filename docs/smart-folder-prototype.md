@@ -37,8 +37,9 @@ make no completion claim; add Participants to restrict one to a chosen agent.
 ## Existing folders
 
 Opening or renaming an existing folder preserves its legacy rules. Those rules
-remain editable in a collapsed section. Use advanced rules explicitly starts a
+remain editable in a collapsed section. Replace with advanced rules explicitly starts a
 new draft; its preview can be checked before Save. The previous legacy fields
-remain in the stored rule for a future explicit rollback. Save publishes folder
+remain in the stored rule for a future explicit rollback. Unsupported payloads
+remain unchanged when only the name or manual inclusions are edited. Save publishes folder
 metadata, manual inclusions and the rule payload together using the existing
 account-scoped preference transaction. Cancel persists none of the draft.

@@ -269,8 +269,7 @@ internal fun ChatsScreen(
             { folderId ->
                 appState.activeAccountRef
                     ?.let { accountRef ->
-                        // An archived-only folder draws from the archived
-                        // list; every other folder from the active one.
+                        // Advanced rules share the loaded active/archive union with counts and previews.
                         val rule = appState.chatFolderPreferences.folderRule(accountRef, folderId)
                         val sourceItems = chatFolderSource(rule, controller.items, controller.archivedItems)
                         val engineMutedChatIds =
@@ -395,7 +394,7 @@ internal fun ChatsScreen(
             }
         }
 
-    // Archived-only folder rules swap the source list; every other view reads the active native rows.
+    // Advanced folders combine loaded windows; legacy folders retain their archive-side selection.
     val sourceList =
         remember(controller.items, controller.archivedItems, selectedFolderRule) {
             chatFolderSource(selectedFolderRule, controller.items, controller.archivedItems)

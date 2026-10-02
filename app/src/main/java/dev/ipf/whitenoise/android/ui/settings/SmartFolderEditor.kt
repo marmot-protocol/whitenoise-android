@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -11,8 +12,6 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -175,9 +175,16 @@ private fun SmartFolderGroup(
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (path.isNotEmpty()) {
                 TextButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
-                    Text(
+                    FolderButtonLabel(
                         (if (group.not) stringResource(R.string.smart_folder_not) + " · " else "") +
-                            stringResource(R.string.smart_folder_group_summary, mode, group.children.size),
+                            mode + " · " +
+                            pluralStringResource(
+                                R.plurals.smart_folder_group_items,
+                                group.children.size,
+                                group.children.size,
+                            ),
+                        R.drawable.ic_expand_more,
+                        expanded,
                     )
                 }
             }
@@ -231,58 +238,38 @@ private fun SmartFolderGroup(
                                         "folder.condition." + (path + index).joinToString("."),
                                     ),
                             ) {
-                                Text(conditionSummary(child, people), modifier = Modifier.fillMaxWidth())
+                                FolderButtonLabel(conditionSummary(child, people), R.drawable.ic_edit)
                             }
                     }
                 }
-                if (path.size < SmartFolderCodec.MAX_DEPTH && root.nodeCount() < SmartFolderCodec.MAX_NODES) {
-                    TextButton(
-                        onClick = {
-                            onEdit(path, true)
-                        },
-                        modifier = Modifier.testTag("folder.add." + path.joinToString(".")),
-                    ) {
-                        Text(stringResource(R.string.smart_folder_add))
+                Row(Modifier.fillMaxWidth()) {
+                    if (path.size < SmartFolderCodec.MAX_DEPTH && root.nodeCount() < SmartFolderCodec.MAX_NODES) {
+                        TextButton(
+                            onClick = { onEdit(path, true) },
+                            modifier = Modifier.weight(1f).testTag("folder.add." + path.joinToString(".")),
+                        ) { Text(stringResource(R.string.smart_folder_add)) }
                     }
-                }
-                if (path.size < SmartFolderCodec.MAX_DEPTH - 1 &&
-                    root.nodeCount() < SmartFolderCodec.MAX_NODES - 1
-                ) {
-                    TextButton(onClick = {
-                        onChange(
-                            root.updateAt(
-                                path,
-                                group.copy(children = group.children + SmartFolderFilter.Group()),
-                            ),
-                        )
-                    }) { Text(stringResource(R.string.smart_folder_group)) }
+                    if (path.size < SmartFolderCodec.MAX_DEPTH - 1 &&
+                        root.nodeCount() < SmartFolderCodec.MAX_NODES - 1
+                    ) {
+                        TextButton(
+                            onClick = {
+                                onChange(
+                                    root.updateAt(
+                                        path,
+                                        group.copy(children = group.children + SmartFolderFilter.Group()),
+                                    ),
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                        ) { Text(stringResource(R.string.smart_folder_group)) }
+                    }
                 }
                 if (path.isNotEmpty()) {
                     TextButton(
                         onClick = { onChange(root.updateAt(path, null)) },
                     ) { Text(stringResource(R.string.smart_folder_remove_group)) }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun <T> FolderChoice(
-    label: String,
-    options: List<Pair<T, String>>,
-    tag: String,
-    onSelect: (T) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    Column {
-        TextButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth().testTag(tag)) { Text(label) }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            options.forEach { (value, title) ->
-                DropdownMenuItem(text = { Text(title) }, onClick = {
-                    open = false
-                    onSelect(value)
-                })
             }
         }
     }

@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -183,7 +185,10 @@ class ChatFolderEditScreenScreenshotTest {
         if (rules) {
             composeRule
                 .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
-                .performScrollToNode(hasText(context.getString(R.string.folder_preview)))
+                .performScrollToNode(
+                    hasText(context.getString(R.string.folder_preview)) and
+                        SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading),
+                )
         }
         if (deleteAction) {
             composeRule
