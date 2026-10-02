@@ -1848,7 +1848,7 @@
     <string name="setup_device_possible">Outro dispositivo pode estar usando esta conta. Continuar aqui pode fazer com que ele pare de receber novas conversas.</string>
     <string name="setup_device_unknown">Não foi possível determinar se existe outra instalação. Continue apenas se quiser usar este dispositivo.</string>
     <string name="setup_profile_publish_help">Salve este perfil na sua conta Nostr.</string>
-    <string name="setup_replacement_warning">Os relays que não estiverem nesta lista serão removidos. Isso também afeta seus outros apps Nostr.</string>
+    <string name="setup_replacement_warning">As recomendações mantêm todas as entradas de relays existentes, incluindo as que não aparecem aqui. Uma lista personalizada remove os relays omitidos. As alterações também afetam seus outros apps Nostr.</string>
     <string name="setup_inbox_list">Relays da caixa de entrada</string>
     <string name="setup_read_list">Relays de leitura</string>
     <string name="setup_write_list">Relays de escrita</string>

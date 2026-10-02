@@ -36,6 +36,18 @@ class AccountSetupContentScreenshotTest {
     /** Missing profile metadata offers a concise edit-or-skip decision. */
     @Test fun profileInput() = capture("profile", AccountSetupState(snapshot = setupSnapshot()))
 
+    /** Missing on the checked sources now stops for consent instead of silently publishing defaults. */
+    @Test fun missingRelayConsent() {
+        val snapshot =
+            setupSnapshot(
+                OnboardingStepFfi.RELAYS,
+                listOf(OnboardingActionFfi.USE_RECOMMENDED_RELAYS, OnboardingActionFfi.EDIT_DISCOVERY_RELAYS),
+            )
+        snapshot.steps.first { it.step == OnboardingStepFfi.RELAYS }.findings =
+            listOf(OnboardingFindingFfi(OnboardingIssueFfi.MISSING, null))
+        capture("missing_relays", AccountSetupState(snapshot = snapshot))
+    }
+
     /** Records the profile form with existing draft values and its review action. */
     @Test fun profileEditor() =
         capture(
@@ -108,8 +120,17 @@ class AccountSetupContentScreenshotTest {
     @Config(qualifiers = "en-w780dp-h360dp-mdpi")
     fun landscapeDevice() = capture("landscape_device", AccountSetupState(snapshot = deviceSnapshot()))
 
-    /** Records exact relay capabilities and the replacement warning before approval. */
-    @Test fun relayProposal() {
+    /** Relay approval explains preservation and replacement without assuming a proposal mode. */
+    @Test fun relayProposal() = capture("relay_proposal", relayProposalState())
+
+    @Test fun relayProposalDark() = capture("relay_proposal_dark", relayProposalState(), dark = true)
+
+    @Test
+    fun relayProposalRtlLarge() {
+        capture("relay_proposal_rtl_large", relayProposalState(), rtl = true, fontScale = 2f)
+    }
+
+    private fun relayProposalState(): AccountSetupState {
         val snapshot =
             setupSnapshot(
                 OnboardingStepFfi.RELAYS,
@@ -123,12 +144,12 @@ class AccountSetupContentScreenshotTest {
                 OnboardingStepFfi.RELAYS,
                 3uL,
                 "existing-relay-record",
-                listOf("wss://read.example"),
-                listOf("wss://write.example"),
+                listOf("wss://read.example", "wss://relay.eu.whitenoise.chat", "wss://relay.us.whitenoise.chat"),
+                listOf("wss://write.example", "wss://relay.eu.whitenoise.chat", "wss://relay.us.whitenoise.chat"),
                 null,
                 null,
             )
-        capture("relay_proposal", AccountSetupState(snapshot = snapshot))
+        return AccountSetupState(snapshot = snapshot)
     }
 
     /** Covers the signer-recovery decision using the dark application theme. */

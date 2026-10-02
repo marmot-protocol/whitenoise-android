@@ -1848,7 +1848,7 @@
     <string name="setup_device_possible">Otro dispositivo podría estar usando esta cuenta. Si continúas aquí, puede dejar de recibir chats nuevos.</string>
     <string name="setup_device_unknown">No pudimos determinar si existe otra instalación. Continúa solo si quieres usar este dispositivo.</string>
     <string name="setup_profile_publish_help">Guarda este perfil en tu cuenta de Nostr.</string>
-    <string name="setup_replacement_warning">Se eliminarán los relays que no estén en esta lista. Esto también afecta a tus otras apps de Nostr.</string>
+    <string name="setup_replacement_warning">Las recomendaciones conservan todas las entradas de relays existentes, incluso las que no se muestran aquí. Una lista personalizada elimina los relays omitidos. Los cambios también afectan a tus otras apps de Nostr.</string>
     <string name="setup_inbox_list">Relés de bandeja de entrada</string>
     <string name="setup_read_list">Relés de lectura</string>
     <string name="setup_write_list">Relés de escritura</string>
