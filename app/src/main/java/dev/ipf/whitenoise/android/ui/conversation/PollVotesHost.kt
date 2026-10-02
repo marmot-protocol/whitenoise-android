@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -8,6 +9,7 @@ import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import kotlinx.coroutines.delay
 
 /** The poll whose per-voter sheet is open, with the latest projection the card showed for it. */
 internal data class OpenPollVotes(
@@ -63,12 +65,25 @@ internal fun PollVotesHost(
     appState: WhiteNoiseAppState,
 ) {
     val open = host.open ?: return
+    // Expired disappearing polls leave the timeline without an engine event, so watch the deadline here.
+    // Absence from the bounded window is not expiry, so only the retained row decides.
+    LaunchedEffect(open.owner, open.poll) {
+        val id = open.owner.messageId
+        while (true) {
+            if (controller.isRetainedRowGone(id)) {
+                host.dismissIf(open.owner)
+                return@LaunchedEffect
+            }
+            val wait = controller.retainedRowExpiryDelayMillis(id)?.takeIf { it > 0L } ?: return@LaunchedEffect
+            delay(wait)
+        }
+    }
     PollVotesSheet(
         open.poll,
         open.owner,
         controller,
         appState,
         onDismissRequest = host::dismiss,
-        onPollEnded = host::dismiss,
+        onPollEnded = { host.dismissIf(open.owner) },
     )
 }

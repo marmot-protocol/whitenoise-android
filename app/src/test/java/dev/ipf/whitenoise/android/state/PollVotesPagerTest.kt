@@ -409,6 +409,7 @@ class PollVotesPagerTest {
     fun upsertAndWindowMessageProjectionsTouchThePoll() {
         val trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE
 
+        /** An upsert of the record [id] as a live message. */
         fun upsert(id: String) = listOf(TimelineMessageChangeFfi.Upsert(trigger, record(id)))
 
         assertTrue(pollProjectionTouched(projectionEvent(changes = upsert("poll")), "acct", "grp", "poll"))
@@ -488,6 +489,7 @@ class PollVotesPagerTest {
     /** A deleted or removed poll ends the sheet, while an edit-style upsert or an invalidated removal does not. */
     @Test
     fun deletedOrPrunedPollEndsTheSheet() {
+        /** An upsert of the poll record, deleted or poll-less on request. */
         fun upsert(
             poll: Boolean = true,
             deleted: Boolean = false,
@@ -498,8 +500,10 @@ class PollVotesPagerTest {
             ),
         )
 
+        /** A removal of the poll with [reason]. */
         fun remove(reason: TimelineRemoveReasonFfi) = listOf(TimelineMessageChangeFfi.Remove("poll", reason))
 
+        /** Whether the poll watch treats these changes as ending the poll. */
         fun ended(changes: List<TimelineMessageChangeFfi>): Boolean {
             val event = projectionEvent(changes = changes)
             return pollProjectionEnded(event, "acct", "grp", "poll")

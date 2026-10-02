@@ -43,6 +43,9 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
     /** Answers `pollVotes` with the fixture's scripted per-voter page; the default is an empty page. */
     protected var pollVotesResponder: (List<Any?>) -> PollVotePageFfi = { PollVotePageFfi(emptyList(), false) }
 
+    /** The controller's wall clock, so disappearing-message deadlines can be crossed deterministically. */
+    protected var pollClockMillis: Long = 1_000_000_000_000L
+
     /** Runtime events the fixture's `subscribeEvents` stream delivers in order. */
     protected val projectionEvents = LinkedBlockingQueue<MarmotEventFfi>()
     private val projectionStreamClosed = AtomicBoolean(false)
@@ -145,6 +148,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
             initialGroup = group(),
             initialMemberSnapshot = memberSnapshot(),
             groupRosterReader = { _, _ -> authoritativeRoster() },
+            clockMillis = { pollClockMillis },
         )
     private val composerTextState = ComposerTextState(TextFieldValue(""))
 

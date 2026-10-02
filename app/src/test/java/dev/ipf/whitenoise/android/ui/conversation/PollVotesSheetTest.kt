@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -362,4 +363,78 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
                 ),
             ),
         )
+
+    /** A votedPoll whose engine deadline is [seconds] after the fixture clock. */
+    private fun expiringPoll(seconds: Long): TimelineMessage {
+        val item = votedPoll()
+        val deadline = (pollClockMillis / 1_000L + seconds).toULong()
+        // Received rows defer send-time expiry until read, so the deadline is exercised on an own poll.
+        return item.copy(record = item.record.copy(direction = "sent", retentionExpiresAt = deadline))
+    }
+
+    /** Mounts the poll row, opens its sheet with the compose clock paused, and returns once voters show. */
+    private fun openWithPausedClock(item: TimelineMessage): MutableState<Boolean> {
+        val rowShown = mutableStateOf(true)
+        retain(item)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                ConversationHost {
+                    if (rowShown.value) PollMessageContent(item, pollController, pollState, canVote = true)
+                }
+            }
+        }
+        openSheet()
+        awaitTag("poll-voter-$voterA")
+        composeRule.mainClock.autoAdvance = false
+        return rowShown
+    }
+
+    /** A disappearing poll that passes its deadline closes the sheet even though no engine event arrives. */
+    @Test
+    fun expiredPollClosesTheSheet() {
+        pollVotesResponder = { singleVoterPage() }
+        val rowShown = openWithPausedClock(expiringPoll(60))
+        rowShown.value = false
+
+        pollClockMillis += 120_000L
+        composeRule.mainClock.advanceTimeBy(61_000L)
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
+
+    /** A live row trimmed out of the bounded window is unknown, not expired, so the sheet stays open. */
+    @Test
+    fun trimmedLiveRowDoesNotCloseTheSheet() {
+        pollVotesResponder = { singleVoterPage() }
+        val item = expiringPoll(600)
+        val rowShown = openWithPausedClock(item)
+        rowShown.value = false
+        pollController.timelineItemsById.remove(item.record.messageIdHex)
+
+        pollClockMillis += 120_000L
+        composeRule.mainClock.advanceTimeBy(700_000L)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(POLL_VOTES_SHEET_TAG).assertExists()
+    }
+
+    /** Recomposing a visible poll row as deleted, with no projection event, closes its open sheet. */
+    @Test
+    fun visibleRowDeletedClosesTheSheetWithoutAnEvent() {
+        pollVotesResponder = { singleVoterPage() }
+        val item = votedPoll()
+        retain(item)
+        val shown = mutableStateOf(item)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                ConversationHost { RealPollMessage(shown.value, false) {} }
+            }
+        }
+        openSheet()
+        awaitTag("poll-voter-$voterA")
+
+        shown.value = item.copy(projected = checkNotNull(item.projected).copy(deleted = true))
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
 }

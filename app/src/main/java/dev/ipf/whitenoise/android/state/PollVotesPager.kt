@@ -200,7 +200,9 @@ internal fun pollProjectionTouched(
 /**
  * Whether [event] says the poll [pollEventId] of [groupIdHex] is gone for the account [accountRef]: it was
  * upserted as deleted or without a poll, or removed as pruned, cleared or no longer matching. An invalidated
- * removal is excluded because the row may be reprojected, which [pollProjectionTouched] handles.
+ * removal is excluded because the row may be reprojected, which [pollProjectionTouched] handles. In MDK
+ * 0.12.0 only INVALIDATED removals actually arrive on this stream, so the other reasons are forward-compatible.
+ * Deleted rows and local retention expiry are covered by the row and the host, not by this event.
  */
 internal fun pollProjectionEnded(
     event: MarmotEventFfi,

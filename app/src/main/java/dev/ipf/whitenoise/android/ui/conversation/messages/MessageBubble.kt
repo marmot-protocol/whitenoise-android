@@ -2177,10 +2177,12 @@ internal fun MessageBubble(
                 val visiblePoll =
                     item.projected?.poll.takeIf { isPollRecord && !deleted && !persistedFailure }
                 // A deleted, failed or expired poll takes its open votes sheet down, as the row used to.
-                val pollVotesHost = LocalPollVotesHost.current
-                val pollGone = isPollRecord && visiblePoll == null
-                LaunchedEffect(pollGone, pollOwner, pollVotesHost) {
-                    if (pollGone) pollVotesHost?.dismissIf(pollOwner)
+                if (isPollRecord) {
+                    val pollVotesHost = LocalPollVotesHost.current
+                    val pollGone = visiblePoll == null
+                    LaunchedEffect(pollGone, pollOwner, pollVotesHost) {
+                        if (pollGone) pollVotesHost?.dismissIf(pollOwner)
+                    }
                 }
                 val pollTimestampColor =
                     if (visiblePoll != null) {
