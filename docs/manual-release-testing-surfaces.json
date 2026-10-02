@@ -280,6 +280,14 @@
         ]
       },
       {
+        "surface": "Custom emoji send refused because the chat changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "R.string.toast_send_chat_changed",
+        "test_ids": [
+          "MSG-034"
+        ]
+      },
+      {
         "surface": "Generic send failure notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
         "anchor": "R.string.toast_send_failed",
