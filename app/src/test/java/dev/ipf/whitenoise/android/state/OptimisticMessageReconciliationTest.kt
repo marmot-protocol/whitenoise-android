@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
@@ -10,6 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
+@Suppress("LargeClass") // One fixture set covers every optimistic-to-projected reconciliation matcher.
 class OptimisticMessageReconciliationTest {
     @Test
     fun retryEmptySummaryRetainsTempKeyedSentBubbleAndMessageById() {
@@ -261,6 +263,49 @@ class OptimisticMessageReconciliationTest {
                 activeAccountIdHex = "alice",
             ),
         )
+    }
+
+    /** MDK's copy of an emoji send carries imeta and emoji rows the typed optimistic copy lacks. */
+    private val emojiProjectionTags =
+        listOf(
+            MessageTagFfi(listOf("imeta", "url https://blob/party.png", "m image/png")),
+            MessageTagFfi(listOf("emoji", "party", "https://blob/party.png")),
+        )
+
+    /** A retracted MDK row of an emoji send is found for the retained Failed bubble, so no duplicate shows. */
+    @Test
+    fun invalidatedEmojiProjectionMatchesTheFailedOptimisticBubble() {
+        val failed = timelineMessage("temp", MessageStatus.Failed, plaintext = "hi :party:")
+        val projected = message("mdk-row", plaintext = "hi :party:").copy(tags = emojiProjectionTags)
+        assertEquals("temp", failedOptimisticMessageIdForInvalidatedProjection(listOf(failed), projected))
+
+        val invalidated =
+            timelineRecord("mdk-row", "hi :party:", invalidationStatus = "LosingBranch", tags = emojiProjectionTags)
+        assertEquals(
+            listOf("mdk-row"),
+            invalidatedProjectionIdsMatchingMessage(mapOf("mdk-row" to invalidated), message("temp", "hi :party:")),
+        )
+        val unpublished = timelineRecord("local", "hi :party:", tags = emojiProjectionTags)
+        assertEquals(
+            listOf("local"),
+            unpublishedProjectionIdsMatchingMessage(
+                mapOf("local" to unpublished),
+                message("temp", "hi :party:"),
+                activeAccountIdHex = "alice",
+            ),
+        )
+    }
+
+    /** After a stale-epoch re-upload the URLs differ, and the match still holds on reply identity alone. */
+    @Test
+    fun emojiTagUrlsDoNotAffectTheSendShapeMatch() {
+        val first = listOf(MessageTagFfi(listOf("emoji", "party", "https://blob/one")))
+        val second = listOf(MessageTagFfi(listOf("emoji", "party", "https://blob/two")))
+        assertEquals(true, sameRenderableSendTags(first, second))
+        assertEquals(true, sameRenderableSendTags(emptyList(), first))
+        val reply = listOf(MessageTagFfi(listOf("e", "parent")))
+        assertEquals(false, sameRenderableSendTags(reply, first))
+        assertEquals(false, sameRenderableSendTags(listOf(MessageTagFfi(listOf("t", "x"))), emptyList()))
     }
 
     @Test
@@ -588,6 +633,7 @@ class OptimisticMessageReconciliationTest {
             receivedAt = 1uL,
         )
 
+    /** A projected timeline row for the given identity, text and tags, with every other field neutral. */
     private fun timelineRecord(
         messageIdHex: String,
         plaintext: String,
@@ -595,6 +641,7 @@ class OptimisticMessageReconciliationTest {
         recordedAt: ULong = 1uL,
         invalidationStatus: String? = null,
         sender: String = "alice",
+        tags: List<MessageTagFfi> = emptyList(),
     ): TimelineMessageRecordFfi =
         TimelineMessageRecordFfi(
             clientToken = null,
@@ -611,7 +658,7 @@ class OptimisticMessageReconciliationTest {
                     blankLinesBefore = ByteArray(0),
                 ),
             kind = 9uL,
-            tags = emptyList(),
+            tags = tags,
             timelineAt = recordedAt,
             receivedAt = recordedAt,
             replyToMessageIdHex = null,

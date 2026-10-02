@@ -280,6 +280,22 @@
         ]
       },
       {
+        "surface": "Custom emoji send refused because the chat changed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "R.string.toast_send_chat_changed",
+        "test_ids": [
+          "MSG-034"
+        ]
+      },
+      {
+        "surface": "Custom emoji send refused for too many emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "R.string.toast_send_emoji_limit",
+        "test_ids": [
+          "MSG-034"
+        ]
+      },
+      {
         "surface": "Generic send failure notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
         "anchor": "R.string.toast_send_failed",
@@ -29382,6 +29398,31 @@
         "test_ids": [
           "ONB-023",
           "ONB-026"
+        ]
+      },
+      {
+        "surface": "Custom emoji image read for sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalEmojiArtwork.kt",
+        "anchor": "internal fun readLocalEmojiArtwork(",
+        "test_ids": [
+          "MSG-034",
+          "MSG-035"
+        ]
+      },
+      {
+        "surface": "Chat message carrying custom emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalEmojiArtwork.kt",
+        "anchor": "internal suspend fun MarmotInterface.sendTextWithCustomEmoji(",
+        "test_ids": [
+          "MSG-034"
+        ]
+      },
+      {
+        "surface": "Custom emoji excluded from shared media and the viewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
+        "anchor": "internal fun TimelineMessage.mediaAttachments(",
+        "test_ids": [
+          "MSG-034"
         ]
       }
     ],

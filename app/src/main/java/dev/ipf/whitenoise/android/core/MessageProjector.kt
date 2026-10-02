@@ -8,10 +8,16 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import java.util.Locale
 
+/**
+ * One reaction chip. [reactionMessageIdHex] is MDK's earliest active kind-7 carrying [emoji], the
+ * message whose attachment is the artwork of a NIP-30 `:shortcode:` reaction, or null when MDK
+ * named none (raw-record projections, optimistic additions).
+ */
 data class ReactionTally(
     val emoji: String,
     val count: Int,
     val mine: Boolean,
+    val reactionMessageIdHex: String? = null,
 )
 
 /**

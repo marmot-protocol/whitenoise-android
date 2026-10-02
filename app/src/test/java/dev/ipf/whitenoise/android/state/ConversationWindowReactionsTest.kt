@@ -106,6 +106,53 @@ class ConversationWindowReactionsTest {
         assertEquals(setOf("first", "second"), merged.keys)
     }
 
+    /** One `:party:` chip as MDK reports it, naming [reactionMessageIdHex] as its artwork event. */
+    private fun party(
+        reactionMessageIdHex: String?,
+        count: ULong = 1uL,
+        viewerReacted: Boolean = false,
+    ) = ConversationReactionsFfi(
+        count,
+        1uL,
+        listOf(ConversationReactionFfi(":party:", count, listOf("a"), viewerReacted, reactionMessageIdHex)),
+        0uL,
+    )
+
+    /** A custom-emoji chip carries the reaction event MDK names, the key for its artwork lookup. */
+    @Test
+    fun talliesCarryTheReactionEventThatDefinesArtwork() {
+        assertEquals(
+            listOf(ReactionTally(":party:", 1, mine = false, reactionMessageIdHex = "r1")),
+            windowReactionTallies(party("r1"), emptyList()),
+        )
+    }
+
+    /** When the earliest reaction is withdrawn MDK names the next one, so the chip's lookup key moves. */
+    @Test
+    fun reactionUpdateMovesTheArtworkEventAndRemovalDropsTheChip() {
+        val before = windowReactionTallies(party("r1", count = 2uL), emptyList())
+        val after = windowReactionTallies(party("r2"), emptyList())
+        assertEquals("r1", before.single().reactionMessageIdHex)
+        assertEquals("r2", after.single().reactionMessageIdHex)
+        assertEquals(
+            emptyList<ReactionTally>(),
+            windowReactionTallies(ConversationReactionsFfi(0uL, 0uL, emptyList(), 0uL), emptyList()),
+        )
+    }
+
+    /** The viewer's optimistic add or removal keeps the artwork event of the chip it adjusts. */
+    @Test
+    fun optimisticChangesKeepTheArtworkEvent() {
+        val added = windowReactionTallies(party("r1"), listOf(OptimisticReactionChange("m", ":party:", add = true)))
+        assertEquals(ReactionTally(":party:", 2, mine = true, reactionMessageIdHex = "r1"), added.single())
+        val removed =
+            windowReactionTallies(
+                party("r1", count = 2uL, viewerReacted = true),
+                listOf(OptimisticReactionChange("m", ":party:", add = false)),
+            )
+        assertEquals("r1", removed.single().reactionMessageIdHex)
+    }
+
     private fun referencesFor(reactions: ConversationReactionsFfi) =
         dev.ipf.marmotkit.ConversationMessageReferencesFfi(
             messageIdHex = "m",

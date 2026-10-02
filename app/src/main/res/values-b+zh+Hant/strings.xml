@@ -782,6 +782,8 @@
     <string name="toast_send_failed">發送失敗</string>
     <string name="toast_send_connection_failed">無法連線至中繼站。請檢查網路連線後再試一次。</string>
     <string name="toast_send_queue_full">此聊天有太多訊息正在等待傳送，因此你的訊息未傳送。等積壓清空後再試。</string>
+    <string name="toast_send_chat_changed">傳送期間聊天室已變更，因此訊息未送出。請再試一次。</string>
+    <string name="toast_send_emoji_limit">此訊息的自訂表情太多，因此未送出。請移除一些後再試一次。</string>
     <string name="toast_chat_still_loading">此聊天仍在載入中，稍後再試。</string>
     <string name="toast_send_membership_verifying">正在確認群組成員身分 — 訊息尚未送出。文字已保留在輸入框中，請稍後再試。</string>
     <string name="toast_reaction_failed">反應失敗</string>
@@ -1501,16 +1503,16 @@
 
     <string name="chat_bubble_colors">聊天氣泡顏色</string>
     <string name="custom_emoji">自訂表情</string>
-    <string name="custom_emoji_detail">在此新增的圖片會在訊息和回應中變成 :短代碼: 表情。它們只保存在此裝置上，其他人看到的是短代碼文字。</string>
+    <string name="custom_emoji_detail">在此新增的圖片會在訊息和回應中變成 :my_emoji: 表情，並儲存在此裝置上。當你傳送使用它的新訊息（不含回覆）時，其圖片會以加密方式上傳到該聊天室，讓成員看得到。回應、回覆和編輯只會傳送短代碼。</string>
     <string name="custom_emoji_empty">尚無自訂表情。</string>
     <string name="custom_emoji_name_title">為此表情命名</string>
     <string name="custom_emoji_name_label">短代碼</string>
     <string name="custom_emoji_name_help">字母、數字和底線。</string>
     <string name="custom_emoji_replaces">將取代你現有的 %1$s。</string>
     <string name="custom_emoji_remove_title">移除 %1$s？</string>
-    <string name="custom_emoji_remove_detail">圖片會從此裝置刪除。訊息中的短代碼會保留為文字。</string>
+    <string name="custom_emoji_remove_detail">圖片會從此裝置刪除。已傳送的訊息會保留當時上傳的圖片。</string>
     <string name="custom_emoji_too_large">該圖片超過 1 MB。</string>
-    <string name="custom_emoji_not_image">該檔案不是 White Noise 可以顯示的圖片。</string>
+    <string name="custom_emoji_not_image">此檔案不是 White Noise 能以表情傳送的圖片格式。請使用 PNG、GIF、WebP 或 JPEG。</string>
     <string name="custom_emoji_save_failed">無法儲存該表情。</string>
     <string name="action_color">動作顏色</string>
     <string name="action_color_no_active_account">設定應用程式強調色前，請先選擇一個使用中的帳戶。</string>

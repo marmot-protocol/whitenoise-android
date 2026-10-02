@@ -63,6 +63,8 @@ internal fun sendFailureMessageRes(throwable: Throwable): Int =
     when (throwable) {
         is MarmotKitException.GroupSendQueueFull -> R.string.toast_send_queue_full
         is MarmotKitException.GroupHydrationPending -> R.string.toast_chat_still_loading
+        is EmojiChatChangedException -> R.string.toast_send_chat_changed
+        is EmojiSendLimitException -> R.string.toast_send_emoji_limit
         else ->
             if (isTransientRelaySendError(throwable)) {
                 R.string.toast_send_connection_failed
