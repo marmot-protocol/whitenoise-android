@@ -11,7 +11,7 @@ the production primitive or boundary it protects.
 
 A pull request that closes a bug (an issue with the native `Bug` type or the
 `bug` label) must do one of the following, stated in its description as a single
-line of visible prose (not inside code blocks or HTML comments):
+line of visible prose at the start of a line:
 
 1. **Add or extend a gate.** Change a test registered below, or add a new
    `*CoverageTest.kt` and its registry row. The changed registered test file
@@ -19,10 +19,25 @@ line of visible prose (not inside code blocks or HTML comments):
    `Invariant gate: FooCoverageTest`.
 2. **Name an already-applicable gate.** When an existing registered gate already
    enforces the invariant the fix restores, name it:
-   `Invariant gate: FooCoverageTest` (several names may be comma-separated).
+   `Invariant gate: FooCoverageTest` (several names may be comma-separated, and
+   each may be in backticks or a Markdown link). To add an explanation, separate
+   it with a spaced dash: `Invariant gate: FooCoverageTest — already covers this`.
+   Any other trailing text becomes part of the name and fails as unregistered.
    Every name must be a registered gate.
 3. **Declare an allowed exemption** with one reason key and an explanation:
-   `Invariant gate exemption: <reason> — <why no reusable gate applies>`.
+   `Invariant gate exemption: <reason> — <why no reusable gate applies>`. The
+   explanation needs at least ten visible characters once whitespace and
+   zero-width or other invisible characters are removed, and it cannot be
+   punctuation alone.
+
+The checker reads the description as GitHub renders it, as a best effort rather
+than a full Markdown renderer. It ignores text GitHub does not show: fenced code
+blocks, HTML comments (including the short `<!-->` form), `<script>` and
+`<style>` blocks, HTML tags and their attributes (even when an attribute spans
+lines), and link reference definitions with their titles. Text inside an
+expandable `<details>` block counts, because readers can open it. Write the
+declaration as a plain line; a list marker, blockquote, bold label or indented
+code block in front of it is not recognised.
 
 | Reason key | When it applies |
 | --- | --- |
@@ -37,12 +52,27 @@ unknown reason key fails the check.
 The `Invariant gate` workflow
 ([`invariant-gate.yml`](../.github/workflows/invariant-gate.yml)) runs
 [`check-invariant-gate.js`](../.github/scripts/check-invariant-gate.js) on every
-pull request to `master`, including description edits. The checker runs from the
-trusted base revision, so a pull request cannot rewrite the check that judges it,
-and the pull request's registry is read only as data. It reads the closing issue
+pull request to `master`, including description edits. It reads the closing issue
 references through the GitHub API, so it needs no secrets and runs on fork pull
 requests. Pull requests that close no bug, such as feature-only work, pass
-without a declaration. The check is separate from, and does not change, the
+without a declaration.
+
+What is protected, and how:
+
+- **Checker script and its tests:** run from the base revision, so a pull request
+  cannot change the code that judges it. The one exception is bootstrap, when the
+  base does not have the checker yet (only the pull request that adds it). In
+  that case the job runs the proposed checker and logs a warning.
+- **Registry:** the pull request's `docs/invariant-gates.md` is fetched through the
+  API at its head commit and parsed as text, never executed. Only Kotlin tests
+  under `app/src/test` or `app/src/androidTest` count as gates, both here and in
+  `InvariantGateRegistryTest`.
+- **Workflow file:** the job uses the `pull_request` event, so a pull request's
+  own copy of `invariant-gate.yml` decides what runs. Changes to it are
+  protected only by review. [`CODEOWNERS`](../.github/CODEOWNERS) requests an owner
+  for `.github/` and this registry. Admins can make the check enforceable with
+  branch protection: require `Bug-fix invariant gate` and require code-owner
+  review. The check is separate from, and does not change, the
 visual-evidence gate in [Screenshot tests](../README.md#screenshot-tests).
 
 ## Maintaining the registry
@@ -50,8 +80,11 @@ visual-evidence gate in [Screenshot tests](../README.md#screenshot-tests).
 [`InvariantGateRegistryTest`](../app/src/test/java/dev/ipf/whitenoise/android/InvariantGateRegistryTest.kt)
 runs in the ordinary unit suite and fails when a `*CoverageTest.kt` file is not
 registered, when a gate name or path is registered twice, when a registered path
-no longer exists, when a row's name differs from its file name, or when a row
-leaves its invariant or owner blank. Keep the table sorted by gate name.
+no longer exists or is not a Kotlin test under `app/src/test` or `app/src/androidTest`,
+when a row's name differs from its file name, or when a row leaves its invariant or
+owner blank. The registry is a declared Gradle input of every unit-test task, so a
+registry-only edit re-runs the suite instead of reusing cached results. Keep the
+table sorted by gate name.
 
 - **Add:** create the test, then add one row in the same pull request. Link the
   gate name to the test path relative to this page, state the invariant as a rule

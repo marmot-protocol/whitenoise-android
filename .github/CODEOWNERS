@@ -1,0 +1,5 @@
+# Workflows and CI scripts run with repository credentials, and the invariant-gate
+# workflow runs from the pull request itself, so changes to them need an owner's
+# review. Requiring code-owner review is a branch-protection setting.
+/.github/ @erskingardner
+/docs/invariant-gates.md @erskingardner
