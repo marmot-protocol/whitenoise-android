@@ -3,10 +3,6 @@ package dev.ipf.whitenoise.android.state
 /**
  * Chat-list ordering: the comparator the visible list is sorted by, and the
  * per-row keys it reads.
- *
- * Extracted from `Controllers.kt` so the sort is one readable unit and so new
- * work here lands outside the file `StateSourceSizeCeilingTest` is holding
- * down. Same package, so nothing that calls these changed.
  */
 
 internal fun sortChatListItems(
