@@ -859,6 +859,7 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
                     lastReadTimelineAt = records.last().timelineAt,
                 )
         val appState = conversationTimelineTestAppState(scripted.subscriptions, accountRef = accountRef)
+        installVoiceRetryAdmissionFixture(appState)
         val controller =
             ConversationController(
                 appState = appState,
@@ -1192,7 +1193,10 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
 
         /** Waits until production reaches the selected materialization attempt. */
         fun awaitMaterializationAttempt(index: Int) {
-            composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) { attemptStarted[index].isCompleted }
+            composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
+                shadowOf(Looper.getMainLooper()).idle()
+                attemptStarted[index].isCompleted
+            }
         }
 
         /** Releases one controlled attempt into the real cache-publication boundary. */

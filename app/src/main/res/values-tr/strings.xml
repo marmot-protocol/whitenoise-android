@@ -1024,7 +1024,7 @@
     <string name="media_tap_to_download">İndirmek için dokunun</string>
     <string name="media_preparing_download">İndirme hazırlanıyor</string>
     <string name="media_preparing_attachment">Ek hazırlanıyor</string>
-    <string name="media_download_policy_blocked">İndirme ilke nedeniyle engellendi</string>
+    <string name="media_download_policy_blocked">İndirme ilkesi nedeniyle engellendi</string>
     <string name="media_attachment_unavailable">Ek kullanılamıyor</string>
     <string name="media_cancelling_download">İndirme iptal ediliyor</string>
     <string name="media_cancel_unconfirmed">İptal doğrulanamadı. Yeniden denemek için dokunun</string>

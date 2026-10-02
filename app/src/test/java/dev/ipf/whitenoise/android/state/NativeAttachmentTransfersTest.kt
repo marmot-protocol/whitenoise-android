@@ -66,7 +66,9 @@ class NativeAttachmentTransfersTest {
         assertFalse("cancelNativeAttachment(" in acquisition)
         assertTrue("cancelNativeAttachmentBounded(request)" in explicitCancellation)
         assertTrue("withContext(NonCancellable)" in source)
-        assertTrue("withTimeoutOrNull(NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS)" in source)
+        val bounded = cancellationSource().readText().substringBefore("/** Cancels the current native job")
+        assertTrue("withContext(NonCancellable)" in bounded)
+        assertTrue("withTimeoutOrNull(NATIVE_ATTACHMENT_CANCEL_TIMEOUT_MILLIS)" in bounded)
     }
 
     /** Cancellation after native subscribe returns still closes the newly owned feed. */
@@ -106,6 +108,57 @@ class NativeAttachmentTransfersTest {
         assertFalse(shouldRetryAttachmentDownloadWork(runAttemptCount = 0, failure = failure))
     }
 
+    /** A canonical pre-admission snapshot proves cancellation needs no native command. */
+    @Test
+    fun cancellationBeforeAdmissionIsConfirmedWithoutACommand() =
+        runBlocking {
+            assertEquals(
+                NativeAttachmentCancellationOutcome.NoWork,
+                nativeAttachmentCancellationOutcome(status(AttachmentTransferStateFfi.NOT_REQUESTED)) {
+                    error("No acquisition exists")
+                },
+            )
+        }
+
+    /** Missing identity or snapshot cannot establish that an actual native job has stopped. */
+    @Test
+    fun missingReferenceIsUnconfirmedExceptForCanonicalNoWork() =
+        runBlocking {
+            assertEquals(
+                NativeAttachmentCancellationOutcome.Unconfirmed,
+                nativeAttachmentCancellationOutcome(null) {
+                    error("No identity exists")
+                },
+            )
+            val phases = AttachmentTransferStateFfi.entries.filter { it != AttachmentTransferStateFfi.NOT_REQUESTED }
+            for (phase in phases) {
+                assertEquals(
+                    NativeAttachmentCancellationOutcome.Unconfirmed,
+                    nativeAttachmentCancellationOutcome(status(phase)) {
+                        error("No reference exists")
+                    },
+                )
+            }
+        }
+
+    /** The actual native command's Boolean remains authoritative when acquisition has a reference. */
+    @Test
+    fun nativeCancellationRejectionCannotClaimSuccess() =
+        runBlocking {
+            val current = status(AttachmentTransferStateFfi.DOWNLOADING).copy(reference = "native-body")
+            assertEquals(
+                NativeAttachmentCancellationOutcome.Acknowledged,
+                nativeAttachmentCancellationOutcome(current) {
+                    assertEquals("native-body", it)
+                    true
+                },
+            )
+            assertEquals(
+                NativeAttachmentCancellationOutcome.Unconfirmed,
+                nativeAttachmentCancellationOutcome(current) { false },
+            )
+        }
+
     /** Builds one transfer status fixture for presentation mapping. */
     private fun status(state: AttachmentTransferStateFfi) =
         AttachmentTransferStatusFfi(
@@ -130,4 +183,11 @@ class NativeAttachmentTransfersTest {
             File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
             File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
         ).firstOrNull(File::exists) ?: error("Missing AppState.kt")
+
+    /** Locates the cancellation owner after acquisition and control responsibilities were separated. */
+    private fun cancellationSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentCancellation.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentCancellation.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing NativeAttachmentCancellation.kt")
 }

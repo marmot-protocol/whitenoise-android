@@ -16,7 +16,7 @@ class CancellationCheckerTest(unittest.TestCase):
         self.metrics = [
             {"phase": "held-body-cancellation", "success": True, "ack_elapsed_ms": 10,
              "socket_close_elapsed_ms": 20, "quiet_seconds": 30, "ordinary_terminal_joins": 10, "active_joins": 10,
-             "deliberate_retry_exact_bytes": True},
+             "deliberate_retry_exact_bytes": True, "no_work_cancel_confirmed": True},
             {"phase": "held-body-cancellation-overall", "success": True, "elapsed_ms": 31000,
              "java_peak_bytes": 10_000_000, "native_peak_bytes": 80_000_000},
         ]
@@ -61,6 +61,11 @@ class CancellationCheckerTest(unittest.TestCase):
 
     def test_claimed_quiet_interval_needs_server_time(self):
         self.events[8]["at_ns"] = 29_024_000_000
+        self.assertFalse(self.check()["passed"])
+
+    def test_missing_no_work_cancellation_proof_cannot_qualify(self):
+        """The physical held-body fixture also proves cancellation before admission without starting HTTP."""
+        del self.metrics[0]["no_work_cancel_confirmed"]
         self.assertFalse(self.check()["passed"])
 
     def test_missing_join_proof_cannot_qualify(self):

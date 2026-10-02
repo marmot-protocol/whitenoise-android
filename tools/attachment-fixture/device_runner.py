@@ -71,6 +71,8 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         raise ValueError("install the isolated measurement APK in place before running")
     if budget_profile not in PROFILES:
         raise ValueError("unknown attachment budget profile")
+    if held_cancellation and not android_send_controller:
+        raise ValueError("held cancellation requires the Android send controller")
     if held_cancellation and process_restart:
         raise ValueError("cancellation and process-restart scenarios require separate ledgers")
     session = str(uuid.uuid4()) if process_restart else None

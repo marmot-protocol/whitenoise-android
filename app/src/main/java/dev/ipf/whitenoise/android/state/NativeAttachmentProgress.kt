@@ -57,7 +57,11 @@ internal class NativeAttachmentProgressReducer {
 /** Observes presentation without requesting, restarting or cancelling acquisition. */
 internal fun WhiteNoiseAppState.nativeProgress(request: AttachmentTransferRequest): Flow<NativeAttachmentProgress?> =
     nativeAttachmentProgressFlow {
-        resolveNativeAttachmentTarget(request)?.let { openNativeAttachmentFeed(request, it) }
+        if (hasHostCachedAttachmentAfterHydration(request)) {
+            null
+        } else {
+            resolveNativeAttachmentTarget(request)?.let { openNativeAttachmentFeed(request, it) }
+        }
     }
 
 /** Clears the previous source on replacement and drops stale phases when its observer ends or fails. */

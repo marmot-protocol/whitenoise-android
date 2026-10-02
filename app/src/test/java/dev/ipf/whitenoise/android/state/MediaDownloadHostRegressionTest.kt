@@ -200,6 +200,7 @@ class MediaDownloadHostRegressionTest {
             assertEquals(1, fixture.calls.size)
             assertEquals(1, fixture.automaticDemands.get())
             assertEquals(1, fixture.explicitDemands.get())
+            assertEquals(0, fixture.retryDemands.get())
         }
 
     /** Failed priority escalation still joins the healthy automatic owner instead of failing the tap. */
@@ -284,11 +285,16 @@ class MediaDownloadHostRegressionTest {
                 assertTrue(repeated is NativeAttachmentTerminalException)
                 assertEquals(index + 1, fixture.calls.size)
             }
-            val retry = async { download(0, AttachmentDownloadPriority.Interactive) }
+            val retry =
+                async {
+                    fixture.state.requestAttachmentRetry(request(0))
+                    download(0, AttachmentDownloadPriority.Interactive)
+                }
             val expected = bytes(reference(0).fileName)
             fixture.entered.receive().succeed(expected)
             assertArrayEquals(expected, retry.await())
             assertEquals(3, fixture.calls.size)
+            assertEquals(1, fixture.retryDemands.get())
         }
 
     /** Immediate terminal snapshots and later observation errors remain distinct native outcomes. */

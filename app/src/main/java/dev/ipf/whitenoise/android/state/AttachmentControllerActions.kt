@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
@@ -33,9 +34,21 @@ internal fun ConversationController.retryAttachmentTransfer(
             val current = appState.attachmentOpens.isCurrentUserAction(token)
             if (current && appState.attachmentOpens.isVisible(destination)) onAccepted()
         },
-        onFailure = {
+        onFailure = { failure ->
             val current = appState.attachmentOpens.isCurrentUserAction(token)
-            if (current && appState.attachmentOpens.isVisible(destination)) onFailure()
+            if (current && appState.attachmentOpens.isVisible(destination)) {
+                deliverAttachmentRetryFailure(
+                    failure,
+                    reopen = { requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                    notify = {
+                        appState.present(
+                            appState.appContext.getString(R.string.media_couldnt_load),
+                            copyable = true,
+                        )
+                    },
+                )
+                onFailure()
+            }
         },
     )
 }
@@ -110,3 +123,12 @@ internal fun attachmentFilePresentationState(
                     native.retryAt,
                 ).toPresentationState()
     }
+
+/** An unresolved projection needs the existing open/reload path; other failures remain visible to the user. */
+internal fun deliverAttachmentRetryFailure(
+    failure: Throwable,
+    reopen: () -> Boolean,
+    notify: () -> Unit,
+) {
+    if (failure !is AttachmentReferenceNotReadyException || !reopen()) notify()
+}

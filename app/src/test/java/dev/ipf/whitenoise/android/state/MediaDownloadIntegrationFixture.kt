@@ -52,6 +52,7 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
     val cancellationObserved = CompletableDeferred<Unit>()
     val automaticDemands = AtomicInteger()
     val explicitDemands = AtomicInteger()
+    val retryDemands = AtomicInteger()
     val active = AtomicInteger()
     val peak = AtomicInteger()
     var onDownload: (Call) -> Unit = {}
@@ -160,12 +161,19 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                     subscription(
                         key(args!![0] as String, args[1] as String, targets(args).single()),
                     )
-                "requestAutomaticAttachment", "downloadAttachmentAgain" -> {
+                "requestAutomaticAttachment", "requestExplicitAttachment", "downloadAttachmentAgain" -> {
                     val key = key(args!![0] as String, args[1] as String, args[2] as AttachmentLocalTargetFfi)
                     val automatic = method.name.substringBefore('-') == "requestAutomaticAttachment"
-                    if (automatic) automaticDemands.incrementAndGet() else explicitDemands.incrementAndGet()
+                    val retry = method.name.substringBefore('-') == "downloadAttachmentAgain"
+                    if (automatic) {
+                        automaticDemands.incrementAndGet()
+                    } else if (retry) {
+                        retryDemands.incrementAndGet()
+                    } else {
+                        explicitDemands.incrementAndGet()
+                    }
                     if (!automatic && jobs[key] != null) explicitDemandFailure?.let { throw it }
-                    admit(args, key, explicit = !automatic)
+                    admit(args, key, explicit = retry)
                     if (automatic) {
                         AutomaticAttachmentRequestFfi(status(key), true)
                     } else {

@@ -325,6 +325,118 @@
         "test_ids": ["MED-025"]
       },
       {
+        "surface": "R.string.media_attachment_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_attachment_unavailable",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_decrypting_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_decrypting_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_download_body_known",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_download_body_known",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_download_body_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_download_body_unknown",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_download_paused",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_download_paused",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_download_policy_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_download_policy_blocked",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_download_queued",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_download_queued",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_download_retry_scheduled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_download_retry_scheduled",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_preparing_attachment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_preparing_attachment",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_preparing_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_preparing_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_verifying_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_verifying_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_cancel_unconfirmed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "R.string.media_cancel_unconfirmed",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_cancelling_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "R.string.media_cancelling_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "Attachment retry admission failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentControllerActions.kt",
+        "anchor": "R.string.media_couldnt_load",
+        "test_ids": [
+          "MED-024"
+        ]
+      },
+      {
         "surface": "Native attachment progress and acknowledged cancellation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
         "anchor": "internal fun nativeProgressDescription(",
@@ -25410,7 +25522,7 @@
       },
       {
         "surface": "Native attachment status and cancellation share one IO bridge turn",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentCancellation.kt",
         "anchor": "internal suspend fun WhiteNoiseAppState.cancelNativeAttachment(",
         "test_ids": ["MED-020"]
       },

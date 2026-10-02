@@ -79,7 +79,7 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
         composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo(0.5f, 0f..1f))).assertCountEquals(1)
         composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertCountEquals(5)
         composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo(0f, 0f..1f))).assertCountEquals(0)
-        composeRule.onNodeWithText("512 of 1024 bytes").assertExists()
+        composeRule.onNodeWithText("512 of 1,024 bytes").assertExists()
         composeRule.onNodeWithText("512 bytes received").assertExists()
         composeRule.onNodeWithText("Download blocked by policy").assertExists()
         composeRule.onNodeWithText("Attachment unavailable").assertExists()

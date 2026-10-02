@@ -83,6 +83,16 @@ class BudgetContractTest(unittest.TestCase):
                                       budget_profile=profile, physical_fixture_serial=opt_in)
             adb.assert_not_called()
 
+    def test_held_cancellation_cannot_claim_a_controller_send_without_selecting_it(self):
+        """Reject the unsupported mode before starting any HTTP fixture services."""
+        with tempfile.TemporaryDirectory() as directory, patch.object(device_runner, "adb_command") as adb:
+            adb.side_effect = ["1", "package:" + device_runner.APP]
+            with self.assertRaisesRegex(ValueError, "requires the Android send controller"), \
+                    patch.object(device_runner, "FixtureServer") as server:
+                device_runner.run("adb", "emulator-5554", Path(directory), Path(directory) / "report.json",
+                                  held_cancellation=True)
+            server.assert_not_called()
+
     def run_real_http(self, data, missing_event=None, controller_required=False):
         """Keep real transport intact while independently controlling metrics or a missing ledger event."""
         owned = {}

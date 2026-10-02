@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.state.AttachmentDemandIntent
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.cancelNativeAttachmentBounded
 import dev.ipf.whitenoise.android.state.downloadAttachmentPlaintextSource
 import dev.ipf.whitenoise.android.state.nativeProgress
 import dev.ipf.whitenoise.android.state.requestNativeInteractiveAttachment
@@ -38,6 +39,7 @@ internal object HeldAttachmentCancellationProbe {
         port: Int,
         bytes: ByteArray,
     ) = coroutineScope {
+        assertNoWorkCancellation(state, request)
         control(port, "/__hold-acquisition")
         val cold = async { runCatching { read(state, request, reference).close() } }
         val progress =
@@ -139,10 +141,33 @@ internal object HeldAttachmentCancellationProbe {
                         .put("quiet_seconds", 30)
                         .put("ordinary_terminal_joins", 10)
                         .put("active_joins", 10)
+                        .put("no_work_cancel_confirmed", true)
                         .put("deliberate_retry_exact_bytes", true)
                         .toString(),
                 )
             },
+        )
+    }
+
+    /** A canonical pre-admission snapshot proves that successful cancellation means no active native work. */
+    private suspend fun assertNoWorkCancellation(
+        state: WhiteNoiseAppState,
+        request: AttachmentTransferRequest,
+    ) {
+        val target =
+            AttachmentLocalTargetFfi(
+                request.messageIdHex,
+                requireNotNull(request.sourceMessageIdHex),
+                request.attachmentIndex.toUInt(),
+            )
+        val beforeAdmission =
+            state.marmotIo {
+                attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(target)).items.single().state
+            }
+        assertEquals(AttachmentTransferStateFfi.NOT_REQUESTED, beforeAdmission)
+        assertTrue(
+            "canonical pre-admission cancellation was not confirmed",
+            state.cancelNativeAttachmentBounded(request),
         )
     }
 

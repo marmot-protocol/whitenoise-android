@@ -1,11 +1,13 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
+import java.text.NumberFormat
 
 /** Uses native phase names and real body bytes, without presenting ciphertext completion as a ready file. */
 @Composable
@@ -39,13 +41,18 @@ private fun nativeActiveProgressDescription(progress: NativeAttachmentProgress):
         AttachmentTransferStateFfi.QUEUED -> stringResource(R.string.media_download_queued)
         AttachmentTransferStateFfi.DOWNLOADING ->
             if (progress.fraction != null) {
+                val format = NumberFormat.getIntegerInstance(LocalConfiguration.current.locales[0])
                 stringResource(
                     R.string.media_download_body_known,
-                    progress.received.toString(),
-                    progress.total.toString(),
+                    format.format(progress.received.toString().toBigInteger()),
+                    format.format(requireNotNull(progress.total).toString().toBigInteger()),
                 )
             } else {
-                stringResource(R.string.media_download_body_unknown, progress.received.toString())
+                val format = NumberFormat.getIntegerInstance(LocalConfiguration.current.locales[0])
+                stringResource(
+                    R.string.media_download_body_unknown,
+                    format.format(progress.received.toString().toBigInteger()),
+                )
             }
         AttachmentTransferStateFfi.VERIFYING_CIPHERTEXT,
         AttachmentTransferStateFfi.VERIFYING_PLAINTEXT,

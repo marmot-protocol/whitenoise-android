@@ -4360,14 +4360,17 @@ class WhiteNoiseAppState private constructor(
         attachmentDownloadPolicyRevision += 1
     }
 
-    /** True for retained plaintext in L1 or the authenticated encrypted L2 index. */
-    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean =
+    /** Checks host retention without crossing MDK or hydrating a plaintext payload. */
+    internal suspend fun hasHostCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean =
         resolveAttachmentCacheAvailability(
             cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) },
             memoryContains = { cachedMediaPlaintext(it) != null },
             diskContains = diskMediaCache::containsAfterHydration,
-        ) ||
-            hasNativeAttachment(request)
+        )
+
+    /** True for host-retained or native-retained verified plaintext. */
+    internal suspend fun hasCachedAttachmentAfterHydration(request: AttachmentTransferRequest): Boolean =
+        hasHostCachedAttachmentAfterHydration(request) || hasNativeAttachment(request)
 
     /** Ensures durable work consumes large cache hits as leases instead of full heap copies. */
     internal suspend fun downloadAttachmentForDurableWork(

@@ -17,6 +17,8 @@ def check_cancellation(metrics, events, environment, expected_environment):
         p, m = proof[0], measured[0]
         if p.get("success") is not True or p.get("deliberate_retry_exact_bytes") is not True:
             violations.append("cancellation and exact-byte retry must both pass")
+        if p.get("no_work_cancel_confirmed") is not True:
+            violations.append("missing confirmed canonical pre-admission cancellation")
         for key in ("ack_elapsed_ms", "socket_close_elapsed_ms"):
             value = p.get(key)
             if not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= 5000:
