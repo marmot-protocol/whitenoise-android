@@ -131,10 +131,11 @@ class FirstFrameDurableAvatarsTest {
         assertEquals(FIRST_FRAME_DURABLE_AVATAR_ROWS, firstFrameDurableAvatarAssets(rows).size)
     }
 
-    /** Stored bytes are decoded before publication, so the first frame seeds the stored avatar. */
+    /** Pre-existing stored bytes are decoded before publication, so the first frame seeds the avatar. */
     @Test
     fun restoredDirectRowSeedsTheStoredAvatarOnItsFirstFrame() {
-        val fixture = NativeAvatars { listOf(payload()) }
+        val storedBytes = payload()
+        val fixture = NativeAvatars { listOf(storedBytes) }
         val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
 
         runBlocking { fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored)) }
