@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
 import android.graphics.Color
+import android.os.Looper
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
@@ -32,6 +33,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -174,10 +176,16 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         fixture.appState.parseMarkdownOrEmpty("**parser warm-up**")
         beforeDispatch()
         fixture.releaseNotificationDispatch()
-        // Drain immediate Android work without spending the content budget by
-        // advancing simulated time while a resolver is queued. Deadline and
-        // fallback behaviour remain covered by the coordinator/integration tests.
-        fixture.awaitNotificationPosted(advanceMainClock = false)
+        // Keep simulated time paused until content resolution finishes; deadline
+        // behaviour is covered by the coordinator/integration tests. Then the
+        // existing post wait can advance time to refill the shared platform pacer.
+        withTimeout(WRITE_AWAIT_TIMEOUT_MS) {
+            while (events.none { it.stage == NotificationFirstPostTimingStage.ContentComplete }) {
+                shadowOf(Looper.getMainLooper()).idle()
+                delay(1L)
+            }
+        }
+        fixture.awaitNotificationPosted()
         withTimeout(WRITE_AWAIT_TIMEOUT_MS) {
             while (writes.get() < 1) delay(1L)
         }
