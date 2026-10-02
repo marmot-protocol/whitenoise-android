@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.core.HostSafety
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -14,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /** Opt-in platform DNS coverage; no account is opened and no relay event is published or deleted. */
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class KeyPackageDeletionDnsDeviceTest {
     /** Exercises the production adapter and its real platform callbacks within the deletion deadline. */

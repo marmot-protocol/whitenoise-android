@@ -14,6 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.whitenoise.android.MainActivity
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
@@ -36,6 +37,7 @@ import org.junit.runner.RunWith
  * text once in durable history and Compose, exercises foreground, background,
  * and repeated-flap recovery, and reports numeric phase percentiles.
  */
+@ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class OfflineRecoveryLatencyDeviceTest {
     @get:Rule

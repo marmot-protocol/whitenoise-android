@@ -25,14 +25,17 @@ fi
 # testInstrumentationRunnerArguments.class value to `am instrument` truncated at the
 # first comma, so a list silently ran just its first class.
 smoke_annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke
+manual_fixture_annotation=dev.ipf.whitenoise.android.ManualDeviceFixture
 
 if [[ "$event_name" == "pull_request" ]]; then
   ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
     -Pandroid.testInstrumentationRunnerArguments.annotation="$smoke_annotation" \
+    -Pandroid.testInstrumentationRunnerArguments.notAnnotation="$manual_fixture_annotation" \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
 else
   ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
+    -Pandroid.testInstrumentationRunnerArguments.notAnnotation="$manual_fixture_annotation" \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
   # A green full suite can still hide a required regression that @SdkSuppress or a

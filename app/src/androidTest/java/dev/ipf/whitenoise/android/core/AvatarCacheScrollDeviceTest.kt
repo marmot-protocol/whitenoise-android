@@ -42,6 +42,7 @@ import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -96,6 +97,7 @@ class AvatarCacheScrollDeviceTest {
 
     /** Repeats the stress fixture with physical touch timing and matched traversal endpoints. */
     @Test
+    @ManualDeviceFixture
     fun overCapacityDirectTouchScroll() {
         val imageBytes = syntheticAvatarPng()
         AvatarImageLoader.clear()
@@ -118,6 +120,7 @@ class AvatarCacheScrollDeviceTest {
 
     /** Measures the same list and gestures without image fetch or decode work. */
     @Test
+    @ManualDeviceFixture
     fun directTouchScrollWithoutAvatars() {
         lateinit var listState: LazyListState
         composeRule.setContent {
@@ -132,6 +135,7 @@ class AvatarCacheScrollDeviceTest {
 
     /** Estimates the cache and frame effect of decoding chat-row images at 256 px. */
     @Test
+    @ManualDeviceFixture
     fun smallerSourceDirectTouchScroll() {
         val imageBytes = syntheticAvatarPng(256)
         AvatarImageLoader.clear()
