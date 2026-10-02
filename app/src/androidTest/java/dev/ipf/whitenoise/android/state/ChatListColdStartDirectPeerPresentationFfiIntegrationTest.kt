@@ -35,19 +35,24 @@ import java.io.File
 import java.util.UUID
 
 /**
- * #2149: an established, unnamed direct chat keeps its last-known peer title across process death. The
- * fixture establishes the chat through an in-process loopback relay with two generated identities, closes
- * the native runtime, takes the relay away, and reopens the same MDK state the way a relaunched process
- * does: offline, with network profile refresh and roster hydration blocked. The first published chat-list
- * frame must come from MDK's stored presentation alone; nothing is seeded into an Android cache first.
+ * #2149 boundary coverage for the stored title and the membership separation, against the real generated
+ * MarmotKit runtime. It does not cover the avatar, and it passes on master as well: it guards the MDK
+ * contract this issue depends on rather than proving this PR's avatar change. The class and method names
+ * are the ones the issue's acceptance criteria name.
  *
- * The stored-avatar half of the first frame is covered by `FirstFrameDurableAvatarsTest`: MDK only acquires
- * HTTPS profile pictures, which a loopback fixture cannot serve.
+ * The fixture establishes an unnamed direct chat through an in-process loopback relay with two generated
+ * identities, closes the native runtime, takes the relay away, and reopens the same MDK state the way a
+ * relaunched process does: offline, with network profile refresh and roster hydration blocked. The first
+ * published chat-list frame must take its title from MDK's stored presentation alone, with nothing seeded
+ * into an Android cache first, and that presentation must not fill any membership field.
+ *
+ * The stored-avatar half is covered by `FirstFrameDurableAvatarsTest`, `AccountSwitchFirstFrameDurableAvatarTest`
+ * and the emulator recordings. MDK only acquires HTTPS profile pictures, which a loopback fixture cannot serve.
  */
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class ChatListColdStartDirectPeerPresentationFfiIntegrationTest {
-    /** Process recreation renders the stored peer title on the first frame, without membership authority. */
+    /** Process recreation shows the stored peer title on the first frame and fills no membership field. */
     @Test
     @Suppress("LongMethod") // One auditable sequence: establish, go offline, reopen, assert, dispose.
     fun processRecreation_unnamedDirectChat_rendersDurablePeerPresentationOnFirstFrame() =

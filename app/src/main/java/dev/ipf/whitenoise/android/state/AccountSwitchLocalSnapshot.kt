@@ -261,6 +261,8 @@ internal data class AccountSwitchLocalSnapshot(
     internal val profiles: List<AccountSwitchProfileSeed>,
     /** Atomic 0.9.20 row/presentation pairs for the target account's first frame. */
     val presentedRows: List<PresentedChatRowFfi>? = null,
+    /** Stored avatars decoded for the first frame; [AccountSwitchLocalSnapshotHandoff.publish] reinstalls them. */
+    val firstFrameAvatars: List<FirstFrameDurableAvatar> = emptyList(),
 )
 
 internal data class AccountSwitchProfileSeed(
@@ -325,11 +327,18 @@ internal class AccountSwitchLocalSnapshotHandoff {
     /** Captures the current switch generation for account-scoped suspended work. */
     fun capture(): Long = requests.capture()
 
-    /** Publishes [snapshot] only while its originating switch remains current. */
+    /**
+     * Publishes [snapshot] only while its originating switch remains current, and reinstalls its decoded
+     * first-frame avatars there, after the switch has cleared the previous account's stored pixels.
+     */
     fun publish(
         requestGeneration: Long,
         snapshot: AccountSwitchLocalSnapshot?,
-    ): Boolean = requests.runIfCurrent(requestGeneration) { pending = snapshot }
+    ): Boolean =
+        requests.runIfCurrent(requestGeneration) {
+            snapshot?.installFirstFrameDurableAvatars()
+            pending = snapshot
+        }
 
     /** Consumes the one-shot handoff only for its target account and always clears the slot. */
     fun consume(accountRef: String?): AccountSwitchLocalSnapshot? {

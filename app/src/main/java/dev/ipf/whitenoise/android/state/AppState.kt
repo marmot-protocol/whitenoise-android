@@ -5454,9 +5454,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Reads the target account's authoritative local chat rows before publishing
-     * the new active account. The first target composition receives these rows
-     * instead of a loading placeholder; its controller owns full group and live
+     * Reads the target account's local chat rows, and decodes their stored first-frame
+     * avatars, before publishing the new active account. The first target composition gets
+     * these rows instead of a loading placeholder; its controller owns full group and live
      * subscription admission after that seeded frame is visible.
      */
     private suspend fun loadAccountSwitchLocalSnapshot(
@@ -5470,7 +5470,7 @@ class WhiteNoiseAppState private constructor(
                     presentedChatList(accountRef, includeArchived = true)
                 }.rows
             val rows = presentedRows.map { it.row }
-            prewarmFirstFrameDurableAvatars(accountRef, presentedRows)
+            val firstFrameAvatars = prewarmFirstFrameDurableAvatars(accountRef, presentedRows)
             ensureAccountSwitchRequestIsCurrent(generation)
             recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
             val presentation =
@@ -5490,6 +5490,7 @@ class WhiteNoiseAppState private constructor(
                 memberIds = presentation.memberIds,
                 profiles = presentation.profiles,
                 presentedRows = presentedRows,
+                firstFrameAvatars = firstFrameAvatars,
             ).also { snapshot ->
                 if (plan.includePresentationSeeds) recordAccountSwitchIdentityState(accountRef, snapshot)
             }

@@ -29067,6 +29067,15 @@
         ]
       },
       {
+        "surface": "An account switch reinstalls the destination's decoded stored avatars after clearing the previous account's",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AccountSwitchLocalSnapshot.kt",
+        "anchor": "snapshot?.installFirstFrameDurableAvatars()",
+        "test_ids": [
+          "CHL-023",
+          "NAV-006"
+        ]
+      },
+      {
         "surface": "Durable push recovery callbacks",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/MarmotFirebaseMessagingService.kt",
         "anchor": "override fun onDeletedMessages()",
