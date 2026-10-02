@@ -79,9 +79,12 @@ Each static-analysis job runs its Android lint variant; the tooling job owns
 the flavor-independent ktlint and detekt checks. Unit jobs run the complete suite
 once, and the Zapstore job also enforces all Kover ratchets. Screenshot jobs keep
 the established committed-baseline allowlist and run beside the full suite instead
-of extending its critical path. Both test jobs
+of extending its critical path. The tooling phase and both test jobs
 reuse one runner-local Gradle daemon across sequential invocations, avoiding
-repeated JVM startup and warm-up. Unit suites use three isolated 1 GiB workers;
+repeated JVM startup and warm-up. System-label checks read each invocation's
+stable or isolated preview environment. Baseline packaging, fresh Compose
+reports and independent reproducibility builds retain their process isolation.
+Unit suites use three isolated 1 GiB workers;
 local tests stay serial unless `-PciTestForks=3` is set. Coverage reports run only
 after a successful unit step, so a
 failed suite cannot trigger a second full test execution. The existing

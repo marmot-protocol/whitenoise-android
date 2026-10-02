@@ -175,7 +175,7 @@ jobs:
 
       - name: Prepare MarmotKit API signature
         if: matrix.phase == 'tooling'
-        run: ./gradlew :app:stageMarmotKitApiSignature --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:stageMarmotKitApiSignature --build-cache --profile --daemon --stacktrace
 
       - name: Upload MarmotKit API signature
         if: matrix.phase == 'tooling'
@@ -196,11 +196,11 @@ jobs:
 
       - name: Compile (Kotlin)
         if: matrix.phase == 'tooling'
-        run: ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --daemon --stacktrace
 
       - name: ktlint and detekt
         if: matrix.phase == 'tooling'
-        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck :app:detekt --build-cache --profile --no-daemon --stacktrace
+        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck :app:detekt --build-cache --profile --daemon --stacktrace
 
       # Package on a separate runner so release compilation overlaps tooling checks.
       - name: Assemble app for Baseline Profile verification

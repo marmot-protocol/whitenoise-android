@@ -242,12 +242,24 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)', root_build)
         self.assertIn('outputs.doNotCacheIf("CI test assertions must execute")', root_build)
 
-    def test_sequential_analysis_and_test_builds_reuse_the_gradle_daemon(self):
+    def test_sequential_tooling_and_test_builds_reuse_the_gradle_daemon(self):
         """Multi-invocation jobs avoid a fresh Gradle JVM for every phase."""
         invocations = self.gradle_steps(self.tests_job)
         self.assertGreaterEqual(len(invocations), 3)
-        self.assertTrue(all(' --daemon ' in step for step in invocations))
-        self.assertTrue(all(' --no-daemon ' not in step for step in invocations))
+        tooling = [step for step in self.gradle_steps(self.build_contracts)
+                   if "if: matrix.phase == 'tooling'" in step]
+        self.assertEqual(len(tooling), 3)
+        self.assertTrue(all(' --daemon ' in step for step in invocations + tooling))
+        self.assertTrue(all(' --no-daemon ' not in step for step in invocations + tooling))
+
+        baseline = self.named_step(self.build_contracts,
+                                   'Assemble app for Baseline Profile verification')
+        self.assertIn(' --no-daemon ', baseline)
+        self.assertNotIn(' --daemon ', baseline)
+        labels = (WORKFLOW.parents[2] / 'scripts/test-system-labels.sh').read_text()
+        self.assertIn('common_args=(--daemon --stacktrace)', labels)
+        self.assertIn('PR_PREVIEW_CHANNEL=stable', labels)
+        self.assertIn('PR_PREVIEW_CHANNEL=isolated', labels)
 
     def test_all_successful_jobs_pass(self):
         """A complete green matrix permits the existing required check to pass."""
