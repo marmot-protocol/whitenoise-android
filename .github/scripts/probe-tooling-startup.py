@@ -39,12 +39,20 @@ def run(command, env, path, timeout):
 
 def gradle(command, env, path):
     # GitHub's disposable runner; no Hermes shared-host admission wrapper.
-    return run(command, env, path, 240)
+    result = run(command, env, path, 240)
+    # Native profile filenames have second resolution; preserve each invocation
+    # immediately so two fast reused-daemon calls cannot overwrite evidence.
+    reports = re.findall(r'profiling report at: file://([^\r\n]+\.html)', path.read_text())
+    assert len(reports) == 1, reports
+    report = Path(reports[0])
+    assert report.is_relative_to(ROOT / 'build/reports/profile') and not report.is_symlink()
+    shutil.copy2(report, path.with_suffix('.profile.html'))
+    return result
 
 
-def profiles():
+def profiles(directory):
     result = []
-    for path in sorted((ROOT / 'build/reports/profile').glob('*.html')):
+    for path in sorted(directory.glob('*.profile.html')):
         rows = []
         for row in re.findall(r'<tr\b[^>]*>(.*?)</tr>', path.read_text(), re.S):
             cells = [html.unescape(re.sub(r'<[^>]+>', '', c)).strip()
@@ -127,7 +135,7 @@ def measure(phase_name):
                 shutil.copy2(manifest, target)
         shutil.copytree(report_directory, directory / 'profiles')
         data = {'name': name, 'home': str(current_home), 'calls': calls,
-                'profiles': profiles(), 'source_head': subprocess.check_output(
+                'profiles': profiles(directory), 'source_head': subprocess.check_output(
                     ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()}
         data['pids'] = [int(pid) for call in calls for pid in re.findall(
             r'TOOLING_PROBE pid=(\d+)', Path(call['log']).read_text())]
