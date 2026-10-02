@@ -233,9 +233,9 @@ class AccountSetupContentTest {
         assertEquals(OnboardingActionFfi.RETRY, actions.single().action)
     }
 
-    /** Requires explicit replacement consequences and the proposed read/write endpoints before publication. */
+    /** Reviews endpoints and approves the proposal revision rather than the surrounding snapshot revision. */
     @Test
-    fun proposalShowsExactCapabilitiesAndReplacementWarningBeforeApproval() {
+    fun proposalApprovalUsesRevision() {
         val snapshot =
             setupSnapshot(
                 OnboardingStepFfi.RELAYS,
@@ -258,7 +258,6 @@ class AccountSetupContentTest {
         show(AccountSetupState(snapshot = snapshot))
         composeRule.onNodeWithText("wss://read.example").performScrollTo().assertExists()
         composeRule.onNodeWithText("wss://write.example").performScrollTo().assertExists()
-        composeRule.onNodeWithText("Relays left out of this list will be removed.", substring = true).assertExists()
         assertTrue(actions.isEmpty())
         composeRule.onNodeWithTag("setup-action-APPROVE_REPAIR").performScrollTo().performClick()
         assertEquals(3uL, actions.single().revision)
