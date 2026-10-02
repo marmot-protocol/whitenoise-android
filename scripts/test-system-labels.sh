@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 preview_number=42
-common_args=(--no-daemon --stacktrace)
+common_args=(--daemon --stacktrace)
 mapfile -t manifest_task_names < <(
   PR_NUMBER="$preview_number" PR_PREVIEW_CHANNEL=stable \
     ./gradlew :app:tasks --all --console=plain "${common_args[@]}" |

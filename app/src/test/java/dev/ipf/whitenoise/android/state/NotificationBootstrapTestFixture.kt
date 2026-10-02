@@ -171,7 +171,7 @@ internal class NotificationBootstrapTestFixture(
     private val emittedPostStartUpdate = AtomicBoolean(false)
     private val runtimeStarted = AtomicBoolean(false)
     private val notificationDispatchGate =
-        PostStartNotificationDispatchGate(runtimeStarted).takeIf {
+        PostStartNotificationDispatchGate(runtimeStarted, delegate = notificationDispatcher).takeIf {
             delayFirstNotificationDispatchAfterRuntimeStart
         }
     private val subscriptionFailures = AtomicBoolean(initiallyFailSubscriptions)

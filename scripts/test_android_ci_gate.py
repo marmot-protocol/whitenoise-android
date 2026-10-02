@@ -258,12 +258,36 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('providers.gradleProperty("ciTestForks").map(String::toInt).getOrElse(1)', root_build)
         self.assertIn('outputs.doNotCacheIf("CI test assertions must execute")', root_build)
 
-    def test_sequential_analysis_and_test_builds_reuse_the_gradle_daemon(self):
-        """Multi-invocation jobs avoid a fresh Gradle JVM for every phase."""
+    def test_lightweight_tooling_and_test_builds_reuse_the_gradle_daemon(self):
+        """Measured lightweight steps reuse a JVM; heavier tooling stays isolated."""
         invocations = self.gradle_steps(self.tests_job)
         self.assertGreaterEqual(len(invocations), 3)
-        self.assertTrue(all(' --daemon ' in step for step in invocations))
-        self.assertTrue(all(' --no-daemon ' not in step for step in invocations))
+        tooling = [step for step in self.gradle_steps(self.build_contracts)
+                   if "if: matrix.phase == 'tooling'" in step]
+        self.assertEqual(len(tooling), 4)
+        label_step = self.named_step(self.build_contracts,
+                                     'Verify packaged system labels for every app variant')
+        self.assertIn('./scripts/test-system-labels.sh', label_step)
+        self.assertIn('./gradlew --stop', label_step)
+        self.assertLess(label_step.index('./scripts/test-system-labels.sh'),
+                        label_step.index('./gradlew --stop'))
+        self.assertLess(self.build_contracts.index(label_step),
+                        self.build_contracts.index('      - name: Compile (Kotlin)'))
+        self.assertLess(self.build_contracts.index(label_step),
+                        self.build_contracts.index('      - name: Verify production signing and bundle task isolation'))
+        api = self.named_step(self.build_contracts, 'Prepare MarmotKit API signature')
+        self.assertTrue(all(' --daemon ' in step for step in invocations + [api]))
+        self.assertTrue(all(' --no-daemon ' not in step for step in invocations + [api]))
+
+        for name in ('Compile (Kotlin)', 'ktlint and detekt',
+                     'Assemble app for Baseline Profile verification'):
+            isolated = self.named_step(self.build_contracts, name)
+            self.assertIn(' --no-daemon ', isolated)
+            self.assertNotIn(' --daemon ', isolated)
+        labels = (WORKFLOW.parents[2] / 'scripts/test-system-labels.sh').read_text()
+        self.assertIn('common_args=(--daemon --stacktrace)', labels)
+        self.assertIn('PR_PREVIEW_CHANNEL=stable', labels)
+        self.assertIn('PR_PREVIEW_CHANNEL=isolated', labels)
 
     def test_all_successful_jobs_pass(self):
         """A complete green matrix permits the existing required check to pass."""
