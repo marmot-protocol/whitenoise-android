@@ -14,6 +14,7 @@ execution ledgers link GitHub work rather than becoming another backlog.
   and cause before publication. Update the canonical scope instead of duplicating it.
 - Draft exact title/body, native type, labels, Project fields and relationships.
   Begin with `## Summary`; include source paths, acceptance criteria and regression tests.
+  Bug drafts name the applicable [invariant gate](../docs/invariant-gates.md) or exemption.
 - Obtain source-grounded independent review of the exact artifact under workspace
   policy. Publish from the reviewed body; read back issue and Project metadata.
 
