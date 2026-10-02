@@ -10950,6 +10950,15 @@
         ]
       },
       {
+        "surface": "setting:custom_emoji_unsendable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.custom_emoji_unsendable",
+        "test_ids": [
+          "SET-030",
+          "MSG-034"
+        ]
+      },
+      {
         "surface": "setting:remove",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
         "anchor": "R.string.remove",

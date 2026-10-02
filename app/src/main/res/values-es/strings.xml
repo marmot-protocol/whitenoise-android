@@ -1542,6 +1542,7 @@
     <string name="custom_emoji_too_large">Esa imagen supera 1 MB.</string>
     <string name="custom_emoji_not_image">Ese archivo no tiene un formato de imagen que White Noise pueda enviar como emoji. Usa PNG, GIF, WebP o JPEG.</string>
     <string name="custom_emoji_save_failed">No se pudo guardar ese emoji.</string>
+    <string name="custom_emoji_unsendable">Solo visible, no se puede enviar. Toca para quitarla.</string>
     <string name="action_color">Color de acción</string>
     <string name="action_color_no_active_account">Selecciona una cuenta activa antes de configurar su color de acento.</string>
     <string name="bubble_color_preview">Vista previa</string>

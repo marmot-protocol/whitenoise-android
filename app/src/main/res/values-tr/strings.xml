@@ -1540,6 +1540,7 @@
     <string name="custom_emoji_too_large">Bu görsel 1 MB’tan büyük.</string>
     <string name="custom_emoji_not_image">Bu dosya, White Noise\'ın emoji olarak gönderebileceği bir görsel biçimi değil. PNG, GIF, WebP veya JPEG kullan.</string>
     <string name="custom_emoji_save_failed">Emoji kaydedilemedi.</string>
+    <string name="custom_emoji_unsendable">Yalnızca görüntülenir, gönderilemez. Kaldırmak için dokunun.</string>
     <string name="action_color">Eylem rengi</string>
     <string name="action_color_no_active_account">Uygulama vurgu rengini ayarlamadan önce etkin bir hesap seçin.</string>
     <string name="bubble_color_preview">Önizleme</string>

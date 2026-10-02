@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -49,7 +50,7 @@ class CustomEmojiStoreTest {
         assertEquals("", emojiCodeForFileName(".gif"))
     }
 
-    /** An uppercase extension is listed like the sender reads it, and an unsendable type is not listed. */
+    /** An uppercase extension is sendable like the sender reads it, and a legacy type is listed but not sendable. */
     @Test
     fun scanMatchesExtensionsCaseInsensitively() =
         runBlocking {
@@ -58,7 +59,55 @@ class CustomEmojiStoreTest {
             directory.resolve("legacy.img").writeBytes(image(Bitmap.CompressFormat.PNG))
             val store = CustomEmojiStore(directory)
             store.load()
-            assertEquals(listOf(":party:"), store.emoji.entries.map { it.shortcode })
+            assertEquals(listOf(":legacy:", ":party:"), store.emoji.entries.map { it.shortcode })
+            assertEquals(listOf(":party:"), store.emoji.sendable.map { it.shortcode })
+        }
+
+    /** A valid legacy `.img` file stays loaded, renders, is not sendable, and can be removed. */
+    @Test
+    fun legacyImageFileStaysVisibleAndRemovable() =
+        runBlocking {
+            val directory = folder.newFolder("emoji")
+            directory.resolve("old.img").writeBytes(image(Bitmap.CompressFormat.PNG))
+            val store = CustomEmojiStore(directory).apply { load() }
+
+            val legacy = store.emoji[":old:"]!!
+            assertFalse(legacy.sendable)
+            assertTrue(legacy.image.width > 0)
+            assertTrue(EmojiShortcodes.art(":old:", store.emoji, emptyMap()) is EmojiArt.Decoded)
+            assertTrue(store.emoji.sendable.isEmpty())
+
+            store.remove(":old:")
+            assertTrue(store.emoji.entries.isEmpty())
+            assertEquals(emptyList<String>(), directory.list()!!.toList())
+        }
+
+    /** A legacy file never shadows a sendable one of the same code, and removing the code deletes both. */
+    @Test
+    fun legacyFileDoesNotShadowTheSendableOneAndRemoveDeletesBoth() =
+        runBlocking {
+            val directory = folder.newFolder("emoji")
+            directory.resolve("party.img").writeBytes(image(Bitmap.CompressFormat.PNG))
+            directory.resolve("party.png").writeBytes(image(Bitmap.CompressFormat.PNG))
+            val store = CustomEmojiStore(directory).apply { load() }
+            assertEquals(listOf("party.png"), store.emoji.entries.map { it.file.name })
+            assertTrue(store.emoji[":party:"]!!.sendable)
+
+            store.remove(":party:")
+            assertTrue(store.emoji.entries.isEmpty())
+            assertEquals(emptyList<String>(), directory.list()!!.toList())
+        }
+
+    /** Saving over a legacy code replaces the legacy file with a sendable one. */
+    @Test
+    fun savingOverALegacyCodeReplacesIt() =
+        runBlocking {
+            val directory = folder.newFolder("emoji")
+            directory.resolve("old.img").writeBytes(image(Bitmap.CompressFormat.PNG))
+            val store = CustomEmojiStore(directory).apply { load() }
+            assertEquals(CustomEmojiSaveResult.Saved, store.save("old", image(Bitmap.CompressFormat.PNG)))
+            assertEquals(listOf("old.png"), directory.list()!!.toList())
+            assertTrue(store.emoji[":old:"]!!.sendable)
         }
 
     @Test

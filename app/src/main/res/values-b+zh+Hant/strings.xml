@@ -1514,6 +1514,7 @@
     <string name="custom_emoji_too_large">該圖片超過 1 MB。</string>
     <string name="custom_emoji_not_image">此檔案不是 White Noise 能以表情傳送的圖片格式。請使用 PNG、GIF、WebP 或 JPEG。</string>
     <string name="custom_emoji_save_failed">無法儲存該表情。</string>
+    <string name="custom_emoji_unsendable">僅供顯示，無法傳送。點一下即可移除。</string>
     <string name="action_color">動作顏色</string>
     <string name="action_color_no_active_account">設定應用程式強調色前，請先選擇一個使用中的帳戶。</string>
     <string name="bubble_color_preview">預覽</string>

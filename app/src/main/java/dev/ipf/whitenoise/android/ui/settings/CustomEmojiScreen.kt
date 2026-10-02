@@ -189,7 +189,10 @@ internal fun CustomEmojiContent(
                                 SettingsAction(
                                     context = context,
                                     title = entry.shortcode,
-                                    subtitle = stringResource(R.string.remove),
+                                    subtitle =
+                                        stringResource(
+                                            if (entry.sendable) R.string.remove else R.string.custom_emoji_unsendable,
+                                        ),
                                     onClick = { onRemove(entry) },
                                     leading = {
                                         EmojiArtImage(
