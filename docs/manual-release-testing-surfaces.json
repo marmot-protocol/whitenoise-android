@@ -11693,6 +11693,54 @@
         ]
       },
       {
+        "surface": "setting:user_search_address_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+        "anchor": "R.string.user_search_address_result",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:user_search_address_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "R.string.user_search_address_result",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:user_search_address_result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientPickerScreen.kt",
+        "anchor": "R.string.user_search_address_result",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:user_search_address_unverified",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.user_search_address_unverified",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientAddressLookupFeedback.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
+        "surface": "setting:user_search_address_unverified",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/RecipientAddressLookupFeedback.kt",
+        "anchor": "R.string.user_search_address_unverified",
+        "test_ids": [
+          "NCH-003"
+        ]
+      },
+      {
         "surface": "setting:group_continue",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientContent.kt",
         "anchor": "R.string.group_continue",

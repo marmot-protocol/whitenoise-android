@@ -2168,4 +2168,6 @@
     <string name="couldnt_check_invitation">Davet kontrol edilemedi</string>
     <string name="toast_leave_not_confirmed_history_kept">Ayrılma doğrulanmadı. Geçmiş korundu.</string>
     <string name="delete_local_does_not_leave">Bu işlem sohbetten ayrılmanıza neden olmaz.</string>
+    <string name="user_search_address_unverified">Bu adres doğrulanamadı.</string>
+    <string name="user_search_address_result">Adres doğrulanmadı</string>
 </resources>

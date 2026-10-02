@@ -2170,4 +2170,6 @@
     <string name="couldnt_check_invitation">Impossible de vérifier l’invitation</string>
     <string name="toast_leave_not_confirmed_history_kept">Départ non confirmé. Historique conservé.</string>
     <string name="delete_local_does_not_leave">Cela ne quitte pas la conversation.</string>
+    <string name="user_search_address_unverified">Impossible de vérifier cette adresse.</string>
+    <string name="user_search_address_result">Adresse non vérifiée</string>
 </resources>

@@ -2170,4 +2170,6 @@
     <string name="couldnt_check_invitation">Impossibile verificare l’invito</string>
     <string name="toast_leave_not_confirmed_history_kept">Uscita non confermata. Cronologia conservata.</string>
     <string name="delete_local_does_not_leave">Questa azione non abbandona la chat.</string>
+    <string name="user_search_address_unverified">Impossibile verificare questo indirizzo.</string>
+    <string name="user_search_address_result">Indirizzo non verificato</string>
 </resources>

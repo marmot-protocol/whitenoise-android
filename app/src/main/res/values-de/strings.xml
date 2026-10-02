@@ -2187,4 +2187,6 @@
     <string name="couldnt_check_invitation">Einladung konnte nicht geprüft werden</string>
     <string name="toast_leave_not_confirmed_history_kept">Verlassen nicht bestätigt. Verlauf behalten.</string>
     <string name="delete_local_does_not_leave">Dadurch verlässt du den Chat nicht.</string>
+    <string name="user_search_address_unverified">Diese Adresse konnte nicht verifiziert werden.</string>
+    <string name="user_search_address_result">Adresse nicht verifiziert</string>
 </resources>

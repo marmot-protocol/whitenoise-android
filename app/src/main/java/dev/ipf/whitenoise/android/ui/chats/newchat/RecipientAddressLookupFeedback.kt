@@ -8,6 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
@@ -24,7 +27,11 @@ internal fun recipientAddressLookupFailed(
 @Composable
 @Suppress("FunctionNaming") // Compose naming follows the framework convention.
 internal fun RecipientAddressLookupFeedback(busy: Boolean, onRetry: () -> Unit) {
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
         Text(stringResource(R.string.user_search_address_unverified))
         TextButton(onClick = onRetry, enabled = !busy, modifier = Modifier.testTag("address.retry")) {
             Text(stringResource(R.string.retry))

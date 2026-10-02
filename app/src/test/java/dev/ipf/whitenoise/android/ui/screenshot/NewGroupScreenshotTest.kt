@@ -49,9 +49,20 @@ class NewGroupScreenshotTest {
 
     @Test fun addressFailedDark() = picker("new_group_address_failed_dark.png", addressFailed = true, dark = true)
 
-    @Test fun addressFailedAmoled() = picker("new_group_address_failed_amoled.png", addressFailed = true, dark = true, amoled = true)
+    @Test fun addressFailedAmoled() =
+        picker(
+            "new_group_address_failed_amoled.png",
+            addressFailed = true,
+            dark = true,
+            amoled = true,
+        )
 
-    @Test fun addressFailedLargeRtl() = picker("new_group_address_failed_large_rtl.png", addressFailed = true, largeRtl = true)
+    @Test fun addressFailedLargeRtl() =
+        picker(
+            "new_group_address_failed_large_rtl.png",
+            addressFailed = true,
+            largeRtl = true,
+        )
 
     /** Large RTL chips and field retain scrolling and native directionality. */
     @Test fun selectedLargeRtl() = picker("new_group_selected_large_rtl.png", selected = true, largeRtl = true)

@@ -107,18 +107,20 @@ private fun NewGroupRecipientAccountScreen(
         }
 
     /** Maps a search candidate to a selectable group person with its resolved display name. */
-    fun person(candidate: RecipientSearch.Candidate) =
-        GroupCreationPerson(
-            candidate.copy(displayName = selectedMemberDisplayName(candidate, appState)),
-            when {
-                addressFallback -> addressResultLabel
-                candidate.isFollowing -> followedLabel
-                candidate.searchProfile != null -> resultLabel
-                else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
-            },
-            appState.avatarUrl(candidate.accountIdHex)
-                ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
-        )
+    fun person(
+        candidate: RecipientSearch.Candidate,
+        addressMatch: Boolean = false,
+    ) = GroupCreationPerson(
+        candidate.copy(displayName = selectedMemberDisplayName(candidate, appState)),
+        when {
+            addressMatch -> addressResultLabel
+            candidate.isFollowing -> followedLabel
+            candidate.searchProfile != null -> resultLabel
+            else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
+        },
+        appState.avatarUrl(candidate.accountIdHex)
+            ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
+    )
 
     /** Adds or removes a candidate, never the active account itself. */
     fun toggle(candidate: RecipientSearch.Candidate) {
@@ -159,8 +161,8 @@ private fun NewGroupRecipientAccountScreen(
     } else {
         NewGroupRecipientContent(
             queryState,
-            matches.map(::person),
-            selected.map(::person),
+            matches.map { person(it, addressFallback) },
+            selected.map { person(it) },
             searching = resolution.state == RecipientPreviewState.Resolving || search.isSearching,
             failed = search.failed,
             incomplete = search.isIncomplete,
