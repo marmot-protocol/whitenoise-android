@@ -18,5 +18,15 @@
     <string name="dictation_result_paste_description">Relire ou modifier le texte avant l’envoi</string>
     <string name="dictation_result_send">Envoyer le message</string>
     <string name="dictation_result_send_description">N’envoie que si la discussion et le brouillon sont inchangés</string>
-    <string name="dictation_send_safety_note">Si la discussion ou le brouillon change avant l’envoi du message, le texte reste dans votre brouillon pour que vous puissiez le vérifier.</string>
+    <string name="dictation_send_safety_note">Si la discussion ou le brouillon change avant l’envoi, la dictée reste non envoyée. Réessayez l’envoi ou choisissez Coller pour relire le texte.</string>
+    <string name="dictation_send_blocked">Non envoyé</string>
+    <string name="dictation_retry_send">Réessayer l’envoi</string>
+    <string name="dictation_recovery_title">La dictée nécessite votre attention</string>
+    <string name="dictation_recovery_text">Ouvrez White Noise pour récupérer la dictée. Les dictées inachevées peuvent être récupérées pendant 30 minutes maximum.</string>
+    <string name="dictation_recovery_open">Ouvrir l’application</string>
+    <string name="dictation_recovery_expired_title">La récupération de la dictée a expiré</string>
+    <string name="dictation_recovery_expired_text">La dictée inachevée a été effacée de cet appareil.</string>
+    <string name="dictation_incomplete_title">Dictée incomplète</string>
+    <string name="dictation_incomplete_text">La transcription s’est arrêtée avant la fin. Vous pouvez envoyer le texte reconnu ou le coller pour le vérifier.</string>
+    <string name="dictation_send_recognized_text">Envoyer le texte reconnu</string>
 </resources>

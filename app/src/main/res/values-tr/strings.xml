@@ -130,10 +130,14 @@
     <string name="chat_row_action_delete_group">Grubu sil</string>
     <string name="chat_row_action_delete_chat">Sohbeti sil</string>
     <string name="delete_chat_dialog_title">Sohbet silinsin mi?</string>
-    <string name="delete_chat_dialog_message">Bu sohbet bu cihazdan kaldırılsın mı? Hâlâ üyeyseniz önce sohbetten çıkarsınız.</string>
+    <string name="delete_chat_dialog_message">Bu sohbet bu cihazdan silinsin mi?</string>
     <string name="delete_group_dialog_title">Grup silinsin mi?</string>
-    <string name="delete_group_dialog_message">Bu grup bu cihazdan kaldırılsın mı? Hâlâ üyeyseniz önce gruptan çıkarsınız.</string>
+    <string name="delete_group_dialog_message">Bu grup bu cihazdan silinsin mi?</string>
     <string name="delete_group_confirm">Sil</string>
+    <string name="delete_from_device">Bu cihazdan sil</string>
+    <string name="leave_and_delete">Ayrıl ve sil</string>
+    <string name="leave_and_delete_message">Bu gruptan ayrılıp geçmişini bu cihazdan silmek istiyor musunuz?</string>
+    <string name="toast_left_chat_delete_failed">Gruptan ayrıldınız. Yerel silme başarısız.</string>
     <string name="group_reset_action">Sıfırla ve yeni davet bekle</string>
     <string name="group_reset_dialog_title">Bu grup bu cihazda sıfırlansın mı?</string>
     <string name="group_reset_dialog_message">White Noise bu grubun geçmişini ve şifreleme durumunu yalnızca bu cihazda siler. Gruba hiçbir şey gönderilmez. Yalnızca bir yönetici bu sıfırlamadan sonra oluşturulmuş yeni bir davet gönderdiğinde yeniden katılırsınız.</string>
@@ -166,8 +170,8 @@
     </plurals>
     <string name="message_selection_action_delete">Seçili mesajları sil</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">Bu cihazdan %1$d sohbet silinsin mi?</item>
-        <item quantity="other">Bu cihazdan %1$d sohbet silinsin mi?</item>
+        <item quantity="one">%1$d sohbet silinsin mi? Bu işlem sohbetten ayrılmanıza neden olmaz.</item>
+        <item quantity="other">%1$d sohbet silinsin mi? Bu işlem sohbetlerden ayrılmanıza neden olmaz.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d sohbet arşivlendi</item>
@@ -2157,4 +2161,6 @@
     <string name="dictation_audio_focus_unavailable">Diğer sesler duraklatılamadı. Tekrar deneyin veya Dikte ayarlarında bu seçeneği kapatın.</string>
     <string name="checking_invitation">Davet kontrol ediliyor…</string>
     <string name="couldnt_check_invitation">Davet kontrol edilemedi</string>
+    <string name="toast_leave_not_confirmed_history_kept">Ayrılma doğrulanmadı. Geçmiş korundu.</string>
+    <string name="delete_local_does_not_leave">Bu işlem sohbetten ayrılmanıza neden olmaz.</string>
 </resources>

@@ -23,8 +23,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -153,6 +151,11 @@ internal fun ConversationDictationCompactActions(
             if (state.hasActiveRecognitionActions) {
                 ConversationDictationActiveActions(controller, actionColors)
             } else {
+                if (state.hasRecoverableTranscript) {
+                    IconButton(onClick = controller::paste, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.ContentPaste, contentDescription = stringResource(R.string.paste))
+                    }
+                }
                 ConversationDictationPrimaryAction(
                     state = state,
                     controller = controller,
@@ -204,6 +207,13 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Listening ||
             this is ConversationDictationState.Processing
 
+/** An unsent prefix remains accessible even when sealed PCM also needs retrying. */
+private val ConversationDictationState.hasRecoverableTranscript: Boolean
+    get() =
+        this is ConversationDictationState.Failed &&
+            reason != ConversationDictationFailure.DeliveryUnknown &&
+            !retainedTranscript.isNullOrBlank()
+
 /** Reserves either the listening pulse or processing-only action width without shifting controls. */
 private fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
     when (this) {
@@ -211,6 +221,8 @@ private fun ConversationDictationState.compactActionsWidth(captureInProgress: Bo
         is ConversationDictationState.Listening,
         is ConversationDictationState.Processing,
         -> if (captureInProgress) DICTATION_ACTIVE_ACTIONS_WIDTH else DICTATION_PROCESSING_ACTIONS_WIDTH
+        is ConversationDictationState.Failed ->
+            if (hasRecoverableTranscript) 144.dp else 96.dp
         else -> 96.dp
     }
 
@@ -253,7 +265,11 @@ private fun ConversationDictationActiveActions(
         }
     }
     if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
-        IconButton(onClick = controller::send, enabled = false, modifier = Modifier.size(48.dp)) {
+        IconButton(
+            onClick = controller::send,
+            enabled = controller.completionActionsEnabled,
+            modifier = Modifier.size(48.dp),
+        ) {
             CircularProgressIndicator(
                 modifier =
                     Modifier
@@ -354,43 +370,6 @@ private fun ConversationDictationPrimaryAction(
     }
 }
 
-/** Chooses the settings page that can actually clear a failure, and retry for the rest. */
-@Composable
-private fun ConversationDictationFailureAction(
-    state: ConversationDictationState.Failed,
-    controller: ConversationDictationController,
-) {
-    val context = LocalContext.current
-    val recovery = dictationFailureRecovery(state.reason)
-    IconButton(
-        onClick =
-            when (recovery) {
-                ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
-                ConversationDictationRecovery.SpeechProviderSetup ->
-                    ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
-                ConversationDictationRecovery.Retry -> controller::retry
-            },
-        modifier = Modifier.size(48.dp),
-    ) {
-        Icon(
-            imageVector =
-                if (recovery == ConversationDictationRecovery.Retry) {
-                    Icons.Default.Refresh
-                } else {
-                    Icons.Default.Settings
-                },
-            contentDescription =
-                stringResource(
-                    when (recovery) {
-                        ConversationDictationRecovery.AppSettings -> R.string.open_app_settings
-                        ConversationDictationRecovery.SpeechProviderSetup -> R.string.dictation_open_speech_service
-                        ConversationDictationRecovery.Retry -> R.string.retry
-                    },
-                ),
-        )
-    }
-}
-
 /** Keeps terminal discard/dismiss semantics separate from active-session cancellation. */
 @Composable
 private fun ConversationDictationDismissAction(
@@ -435,7 +414,14 @@ private fun dictationStatusLabel(
             stringResource(
                 if (captureInProgress) R.string.dictation_listening else R.string.dictation_processing,
             )
-        is ConversationDictationState.Failed -> dictationFailureLabel(state.reason)
+        is ConversationDictationState.Failed -> {
+            val failureLabel = dictationFailureLabel(state.cause ?: state.reason)
+            if (state.reason == ConversationDictationFailure.SendBlocked && state.cause != null) {
+                "${stringResource(R.string.dictation_send_blocked)} · $failureLabel"
+            } else {
+                failureLabel
+            }
+        }
         is ConversationDictationState.Idle -> ""
     }
 
@@ -458,6 +444,7 @@ private fun dictationFailureLabel(reason: ConversationDictationFailure): String 
             ConversationDictationFailure.RecognizerBusy -> R.string.dictation_recognizer_busy
             ConversationDictationFailure.AudioBufferFull -> R.string.dictation_audio_buffer_full
             ConversationDictationFailure.TimedOut -> R.string.dictation_timed_out
+            ConversationDictationFailure.SendBlocked -> R.string.dictation_send_blocked
             ConversationDictationFailure.DeliveryUnknown -> R.string.delivery_not_confirmed
             ConversationDictationFailure.Unknown -> R.string.dictation_failed
         },

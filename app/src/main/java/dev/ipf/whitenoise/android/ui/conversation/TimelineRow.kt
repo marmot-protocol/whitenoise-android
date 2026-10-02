@@ -141,6 +141,7 @@ internal fun TimelineRow(
                         groupSystem = item.projected?.groupSystem,
                         onWave = onWave,
                         waveAccountRef = controller.boundAccountRef,
+                        onOpenProfile = { subjectHex -> appState.presentProfile(appState.npub(subjectHex)) },
                         onDeleteForMe =
                             if (controller.group.pendingConfirmation) {
                                 null

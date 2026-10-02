@@ -185,6 +185,12 @@ internal object DictationDiagnosticSchema {
         )
     private val allowedCategoryValues =
         setOf(
+            "automatic",
+            "explicit",
+            "SendBlocked",
+            "PasteIntoDraft",
+            "SendOnFinish",
+            "Done",
             "Idle",
             "ProviderSelectionRequired",
             "DisclosureRequired",

@@ -10,4 +10,14 @@
     <string name="dictation_provider_window">Opens provider window</string>
     <string name="dictation_provider_keyboard">Keyboard only</string>
     <string name="dictation_provider_unknown">In-app support not verified</string>
+    <string name="dictation_send_blocked">Not sent</string>
+    <string name="dictation_retry_send">Retry Send</string>
+    <string name="dictation_recovery_title">Dictation needs attention</string>
+    <string name="dictation_recovery_text">Open White Noise to recover dictation. Unfinished dictation can be recovered for up to 30 minutes.</string>
+    <string name="dictation_recovery_open">Open app</string>
+    <string name="dictation_recovery_expired_title">Dictation recovery expired</string>
+    <string name="dictation_recovery_expired_text">Unfinished dictation was cleared from this device.</string>
+    <string name="dictation_incomplete_title">Incomplete dictation</string>
+    <string name="dictation_incomplete_text">Transcription stopped before it finished. You can send the recognized text, or paste it to review.</string>
+    <string name="dictation_send_recognized_text">Send recognized text</string>
 </resources>

@@ -32,13 +32,17 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.PresentationTextFfi
+import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentedRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -148,6 +152,41 @@ class ShareChatPickerFullScreenTest {
         }
 
         composeRule.onNodeWithText("Cached person").assertIsDisplayed()
+        composeRule.onNodeWithText(app.getString(R.string.share_no_chats)).assertDoesNotExist()
+    }
+
+    /** Chats MDK holds beyond the retained window are listed under the retained rows (#2618). */
+    @Test
+    fun chatsBeyondTheRetainedWindowJoinTheRecipientList() {
+        val appState = emptyAppState(profiles = mutableMapOf(PEER_A to profile(displayName = "Cached person")))
+        appState.liveSubscriptionOverrides.chatList =
+            ChatListLiveSubscriptions(
+                openChatListWindow = { _, _ -> error("no live window in this test") },
+                openChats = { _, _ -> error("no live window in this test") },
+                presentedChatList = { _, _ ->
+                    listOf(presentedRow(GROUP_A), presentedGroup(GROUP_B, "Beyond the window"))
+                },
+            )
+        val controller = ChatsController(appState, ACCOUNT_REF) { _, _ -> emptyList() }
+        controller.applyLocalDirectChat(GROUP_A, ACCOUNT_HEX, PEER_A)
+        appState.attachChatsController(controller)
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = { _, _ -> true },
+                )
+            }
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithText("Beyond the window").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Cached person").assertIsDisplayed()
+        composeRule.onNodeWithText("Beyond the window").assertIsDisplayed()
         composeRule.onNodeWithText(app.getString(R.string.share_no_chats)).assertDoesNotExist()
     }
 
@@ -570,6 +609,7 @@ class ShareChatPickerFullScreenTest {
             .assertIsDisplayed()
     }
 
+    /** Delivers a window-inset change with the IME occupying [bottomPx] from the bottom. */
     private fun dispatchImeBottom(bottomPx: Int) {
         composeRule.runOnUiThread {
             val insets =
@@ -583,5 +623,18 @@ class ShareChatPickerFullScreenTest {
         composeRule.waitForIdle()
     }
 
+    /** A 64-character hex identifier built from one repeated byte. */
     private fun hexId(byte: Int): String = byte.toString(16).padStart(2, '0').repeat(32)
+
+    /** A presented group row outside the retained window whose prepared title is [title]. */
+    private fun presentedGroup(
+        groupIdHex: String,
+        title: String,
+    ): PresentedChatRowFfi =
+        presentedRow(groupIdHex).let { presented ->
+            presented.copy(
+                row = presented.row.copy(title = title, groupName = title),
+                presentation = presented.presentation.copy(title = PresentationTextFfi.Literal(title)),
+            )
+        }
 }

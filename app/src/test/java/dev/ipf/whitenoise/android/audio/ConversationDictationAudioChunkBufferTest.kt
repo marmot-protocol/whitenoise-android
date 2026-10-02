@@ -104,6 +104,24 @@ class ConversationDictationAudioChunkBufferTest {
         assertTrue(speech.hasSpeech)
     }
 
+    /** Recovery disposal wipes both queued and in-flight buffers, including held chunk references. */
+    @Test
+    fun discardWipesRecoverablePcmAndRejectsFurtherWrites() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 7L, chunkBytes = 4, maxBufferedBytes = 12)
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8), 8, hasSpeech = true))
+        val first = checkNotNull(buffer.poll())
+        assertTrue(buffer.retry(first.chunkId))
+        assertArrayEquals(byteArrayOf(1, 2, 3, 4), first.pcm)
+        val inFlight = checkNotNull(buffer.poll())
+        buffer.discard()
+        assertArrayEquals(ByteArray(4), inFlight.pcm)
+        assertArrayEquals(ByteArray(4), first.pcm)
+        assertEquals(0, buffer.bufferedBytes)
+        assertFalse(buffer.hasPending)
+        assertNull(buffer.poll())
+        assertFalse(buffer.append(byteArrayOf(9, 10), 2, hasSpeech = true))
+    }
+
     /** A rejected read must leave earlier queued and partial PCM intact for recovery. */
     @Test
     fun overflowRejectsTheWholeWriteWithoutSilentlyChangingBufferedAudio() {

@@ -18,5 +18,15 @@
     <string name="dictation_result_paste_description">Revisar o editar el texto antes de enviarlo</string>
     <string name="dictation_result_send">Enviar mensaje</string>
     <string name="dictation_result_send_description">Solo se envía si el chat y el borrador no han cambiado</string>
-    <string name="dictation_send_safety_note">Si el chat o el borrador cambian antes de que se envíe el mensaje, el texto se queda en tu borrador para que puedas revisarlo.</string>
+    <string name="dictation_send_safety_note">Si el chat o el borrador cambia antes del envío, el dictado quedará sin enviar. Reintenta el envío o elige Pegar para revisar el texto.</string>
+    <string name="dictation_send_blocked">No enviado</string>
+    <string name="dictation_retry_send">Reintentar envío</string>
+    <string name="dictation_recovery_title">El dictado necesita atención</string>
+    <string name="dictation_recovery_text">Abre White Noise para recuperar el dictado. Los dictados sin terminar se pueden recuperar durante un máximo de 30 minutos.</string>
+    <string name="dictation_recovery_open">Abrir app</string>
+    <string name="dictation_recovery_expired_title">La recuperación del dictado caducó</string>
+    <string name="dictation_recovery_expired_text">El dictado sin terminar se eliminó de este dispositivo.</string>
+    <string name="dictation_incomplete_title">Dictado incompleto</string>
+    <string name="dictation_incomplete_text">La transcripción se detuvo antes de terminar. Puedes enviar el texto reconocido o pegarlo para revisarlo.</string>
+    <string name="dictation_send_recognized_text">Enviar texto reconocido</string>
 </resources>

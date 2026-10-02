@@ -16,6 +16,7 @@ import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupSystemEvents
+import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.MediaPreviewFallback
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -373,10 +374,14 @@ data class ChatListItem(
     /** Projected conversation kind first, presentation headcount heuristic as fallback. */
     fun isDm(): Boolean = GroupProjector.isDm(projection?.conversationKind, presentationMemberCount, group.name)
 
-    /** Converts the latest native projection to chat-list copy without rendering poll wire data. */
+    /**
+     * Converts the latest native projection to chat-list copy without rendering poll wire data. [groupSystemNames]
+     * lets a membership row name the member it affected; without it the row keeps its name-free passive form.
+     */
     fun projectedPreviewText(
         copy: MessageTextCopy = MessageTextCopy.Default,
         empty: String = "No messages yet",
+        groupSystemNames: GroupSystemPreviewNames? = null,
     ): String {
         val preview = projection?.lastMessage ?: return MessageProjector.previewText(latest, copy, empty)
         return when {
@@ -392,7 +397,12 @@ data class ChatListItem(
             // Before the generic plaintext arm: a kind-1210 last message would
             // otherwise leak its raw JSON content into the chat list.
             MessageProjector.isGroupSystemKind(preview.kind) ->
-                GroupSystemEvents.previewText(preview.plaintext, copy.groupSystem, preview.groupSystem)
+                GroupSystemEvents.previewText(
+                    plaintext = preview.plaintext,
+                    copy = copy.groupSystem,
+                    structured = preview.groupSystem,
+                    names = groupSystemNames,
+                )
             MessageProjector.isChatKind(preview.kind) && RemoteGiphyMedia.isEnvelopeText(preview.plaintext) ->
                 copy.giphyMedia
             preview.plaintext.isNotBlank() -> preview.plaintext

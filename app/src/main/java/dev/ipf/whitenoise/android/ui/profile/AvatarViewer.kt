@@ -67,9 +67,12 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarByteFetchResult
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.MAX_ANIMATED_PROFILE_AVATAR_EDGE
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
+import dev.ipf.whitenoise.android.core.profileAvatarAnimationSource
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.common.AnimatedProfileAvatarLayer
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissResult
 import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissState
@@ -245,6 +248,7 @@ internal fun rememberAvatarViewerImageState(
         state
     }
 
+/** Renders the viewer state: progress, initials, warm local pixels, or the full image (animated for a GIF). */
 @Composable
 @Suppress("FunctionNaming")
 private fun BoxScope.AvatarViewerImageContent(
@@ -283,8 +287,10 @@ private fun BoxScope.AvatarViewerImageContent(
             )
         is AvatarViewerImageState.Ready -> {
             val image = remember(state.bitmap) { state.bitmap.asImageBitmap() }
+            val animatedSource = remember(state.bytes) { profileAvatarAnimationSource(state.bytes) }
             ZoomableAvatarImage(
                 image = image,
+                animatedSource = animatedSource,
                 bitmapWidth = state.bitmap.width,
                 bitmapHeight = state.bitmap.height,
                 contentDescription = title,
@@ -409,9 +415,11 @@ internal fun AvatarViewerFrame(
     }
 }
 
+/** Pinch/pan/double-tap viewer image; a GIF [animatedSource] plays over the decoded first frame. */
 @Composable
 private fun ZoomableAvatarImage(
     image: ImageBitmap,
+    animatedSource: ByteArray? = null,
     bitmapWidth: Int,
     bitmapHeight: Int,
     contentDescription: String,
@@ -426,10 +434,7 @@ private fun ZoomableAvatarImage(
     val latestOnScaleChange by rememberUpdatedState(onScaleChange)
     val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
 
-    Image(
-        bitmap = image,
-        contentDescription = contentDescription,
-        contentScale = ContentScale.Fit,
+    Box(
         modifier =
             modifier
                 .pointerInput(image) {
@@ -488,7 +493,22 @@ private fun ZoomableAvatarImage(
                     translationX = offset.x,
                     translationY = offset.y,
                 ),
-    )
+    ) {
+        Image(
+            bitmap = image,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
+        if (animatedSource != null) {
+            AnimatedProfileAvatarLayer(
+                source = animatedSource,
+                maxEdgePx = MAX_ANIMATED_PROFILE_AVATAR_EDGE,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
 }
 
 private fun avatarViewerFileName(url: String): String {

@@ -55,6 +55,13 @@ on:
       - 'scripts/prepare_marmotkit_artifact.py'
       - 'scripts/test_prepare_marmotkit_artifact.py'
       - 'scripts/run-android-instrumented-tests.sh'
+      - 'scripts/run-controlled-attachment-fixture.sh'
+      - 'tools/attachment-fixture/**'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/ControlledAttachmentProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaAttachmentLatencyProbe.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt'
+      - 'scripts/check_instrumented_required_cases.py'
+      - 'config/instrumented-required-cases.txt'
 
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
@@ -66,6 +73,43 @@ permissions:
   contents: read
 
 jobs:
+  attachment-fixture:
+    name: Controlled attachment fixture (${{ matrix.distribution }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        distribution: [Play, Zapstore]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64
+      - name: Preserve redacted ledger and measurements on success or failure
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: attachment-fixture-${{ matrix.distribution }}
+          path: app/build/reports/attachment-fixture/
+          if-no-files-found: error
+          retention-days: 7
+
   instrumented:
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest

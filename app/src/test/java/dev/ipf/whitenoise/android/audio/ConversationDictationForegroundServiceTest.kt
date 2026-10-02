@@ -5,22 +5,16 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.ComponentName
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
-import android.widget.Button
-import android.widget.FrameLayout
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.input.TextFieldValue
-import dev.ipf.whitenoise.android.MainActivity
-import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
-import kotlinx.coroutines.CoroutineScope
+import dev.ipf.whitenoise.android.notifications.ForegroundStartTrigger
+import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -37,68 +31,26 @@ import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
-class ConversationDictationForegroundServiceTest {
-    private class RejectingForegroundStartContext(
-        base: Context,
-    ) : ContextWrapper(base) {
-        /** Simulates Android rejecting a foreground-service launch before service creation. */
-        override fun startForegroundService(service: Intent): ComponentName? = throw IllegalStateException("blocked")
-    }
-
-    private class Harness(
-        scope: CoroutineScope? = null,
-        preference: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
-        autoReady: Boolean = true,
-    ) : ConversationDictationServiceHost {
-        val platform = FakePlatform()
-        var draft = TextFieldValue("")
-        var revision = 0L
-        val sent = mutableListOf<String>()
-        override val conversationDictation =
-            ConversationDictationController(
-                platform = platform,
-                readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
-                writeDraft = { _, _, expected, value ->
-                    if (expected != revision) {
-                        false
-                    } else {
-                        draft = value
-                        revision += 1
-                        true
-                    }
-                },
-                disclosureAccepted = { true },
-                markDisclosureAccepted = {},
-                targetValidationScope = scope,
-                startDurableSession = { _, ready ->
-                    if (autoReady) ready()
-                    true
-                },
-                stopDurableSession = {
-                    ConversationDictationForegroundService.stop(RuntimeEnvironment.getApplication())
-                },
-                silenceDeliveryMode = { preference },
-                sendTranscriptIfOriginUnchanged = { request ->
-                    request.beginDispatch().also { if (it) sent += request.payload }
-                },
-            )
-
-        init {
-            conversationDictation.requestStart("account", "group", TextFieldValue(""))
-        }
-
-        /** Terminates controller ownership before a queued service start is delivered. */
-        fun failRecognition() {
-            platform.listener.onError(ConversationDictationFailure.Network)
-        }
-    }
-
-    /** Restores process-wide service seams so each Robolectric case starts isolated. */
-    @After
-    fun restoreResolver() {
+internal class ConversationDictationForegroundServiceTest : ConversationDictationForegroundTestCase() {
+    /** A stale PendingIntent in a new process cannot initialize MDK or a speech controller. */
+    @Test
+    @Config(application = WhiteNoiseApplication::class)
+    fun unownedCompletionCommandKeepsApplicationStateLazy() {
         ConversationDictationForegroundService.hostResolver = defaultResolver
-        ConversationDictationForegroundService.foregroundPromoter = defaultForegroundPromoter
-        BackgroundConnectionNotification.markForegroundStopped()
+        val application = RuntimeEnvironment.getApplication() as WhiteNoiseApplication
+        assertNull(application.initializedAppState())
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(
+            Intent(service, service::class.java)
+                .setAction(ConversationDictationForegroundService.ACTION_SEND)
+                .putExtra(ConversationDictationForegroundService.EXTRA_SESSION_TOKEN, "old-process:1"),
+            0,
+            1,
+        )
+        assertNull(application.initializedAppState())
+        lifecycle.destroy()
+        assertNull(application.initializedAppState())
     }
 
     /** App-wide denial and a disabled dictation channel both hide drawer controls. */
@@ -126,7 +78,7 @@ class ConversationDictationForegroundServiceTest {
     fun serviceTraceCorrelatesTheRequestedSession() {
         ShadowLog.clear()
         val harness = installHost()
-        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         try {
             val service = lifecycle.get()
             service.onStartCommand(startIntent(service, harness), 0, 1)
@@ -136,17 +88,11 @@ class ConversationDictationForegroundServiceTest {
         }
     }
 
-    private fun assertCorrelatedServiceTrace() {
-        val trace = ShadowLog.getLogsForTag("WNDictation").mapNotNull { DictationDiagnosticSchema.fields(it.msg) }
-        assertTrue(trace.any { it["event"] == "foreground_service_on_start" && it["callback_session"] == 1L })
-        assertTrue(trace.any { it["event"] == "foreground_service_promoted" && it["callback_session"] == 1L })
-    }
-
     /** Verifies active capture uses a metadata-free notification whose actions reach the controller. */
     @Test
     fun activeSessionUsesGenericForegroundNotificationAndRoutesActions() {
         val harness = installHost()
-        val serviceController = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val serviceController = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = serviceController.get()
 
         service.onStartCommand(startIntent(service, harness), 0, 1)
@@ -198,7 +144,7 @@ class ConversationDictationForegroundServiceTest {
 
         val sendHarness = installHost()
         val sendServiceController =
-            Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+            Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val sendService = sendServiceController.get()
         sendService.onStartCommand(startIntent(sendService, sendHarness), 0, 1)
         sendService.onStartCommand(
@@ -214,11 +160,11 @@ class ConversationDictationForegroundServiceTest {
     @Test
     fun backgroundRefreshPreservesTheSingleDictationControlNotification() {
         val harness = installHost()
-        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
         service.onStartCommand(startIntent(service, harness), 0, 1)
 
-        val backgroundRefresh = BackgroundConnectionNotification.build(service)
+        val backgroundRefresh = service.foreground.foregroundNotification()
         assertEquals("Dictation active", backgroundRefresh.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
         assertTrue(backgroundRefresh.actions.isNullOrEmpty())
         assertNull(backgroundRefresh.bigContentView)
@@ -229,13 +175,13 @@ class ConversationDictationForegroundServiceTest {
     /** Ending dictation restores the normal connection display if that foreground service remains active. */
     @Test
     fun endingDictationRestoresBackgroundConnectionPresentation() {
-        BackgroundConnectionNotification.markForegroundActive()
         val harness = installHost()
-        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
+        service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
         service.onStartCommand(startIntent(service, harness), 0, 1)
 
-        lifecycle.destroy()
+        harness.conversationDictation.cancel()
         shadowOf(android.os.Looper.getMainLooper()).idle()
 
         val restored =
@@ -248,13 +194,14 @@ class ConversationDictationForegroundServiceTest {
             "White Noise is connected",
             restored.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
         )
+        lifecycle.destroy()
     }
 
     /** Once dictation ends without a connection owner, its shared notification ID is removed. */
     @Test
     fun endingDictationWithoutBackgroundConnectionRemovesNotification() {
         val harness = installHost()
-        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
         service.onStartCommand(startIntent(service, harness), 0, 1)
         Snapshot.sendApplyNotifications()
@@ -278,17 +225,17 @@ class ConversationDictationForegroundServiceTest {
     /** A completed result removes controls without waiting for a service-destruction callback. */
     @Test
     fun pasteCompletionRestoresConnectionBeforeServiceDestruction() {
-        BackgroundConnectionNotification.markForegroundActive()
         val harness = installHost()
-        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
+        service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
         service.onStartCommand(startIntent(service, harness), 0, 1)
 
         harness.conversationDictation.paste()
         harness.platform.listener.onResult("completed transcript")
 
         assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        assertFalse(shadowOf(service as Service).isForegroundStopped)
         assertNull(ConversationDictationForegroundService.activeNotificationOrNull())
         val restored =
             service
@@ -304,7 +251,7 @@ class ConversationDictationForegroundServiceTest {
     @Test
     fun cancelDuringFirstStartNeverPromotesNotification() {
         val harness = installHost()
-        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
 
         service.onStartCommand(
@@ -319,52 +266,6 @@ class ConversationDictationForegroundServiceTest {
         lifecycle.destroy()
     }
 
-    private fun assertExplicitNotificationDestinations(
-        service: ConversationDictationForegroundService,
-        notification: Notification,
-    ) {
-        assertEquals(
-            ComponentName(service, MainActivity::class.java),
-            shadowOf(notification.contentIntent).savedIntent.component,
-        )
-        notificationActions.forEach { action ->
-            assertEquals(
-                ComponentName(service, ConversationDictationForegroundService::class.java),
-                shadowOf(service.actionIntent(action, "test-token")).savedIntent.component,
-            )
-        }
-    }
-
-    /** Inflates the actual collapsed RemoteViews, including its enable-state actions. */
-    private fun assertCompactButtonsEnabled(
-        service: ConversationDictationForegroundService,
-        notification: Notification,
-    ) {
-        val compact = notification.contentView.apply(service, FrameLayout(service))
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_cancel).isEnabled)
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_paste).isEnabled)
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_send).isEnabled)
-    }
-
-    private fun assertCompactCompletionButtonsDisabled(
-        service: ConversationDictationForegroundService,
-        notification: Notification,
-    ) {
-        val compact = notification.contentView.apply(service, FrameLayout(service))
-        assertTrue(compact.findViewById<Button>(R.id.dictation_notification_cancel).isEnabled)
-        assertFalse(compact.findViewById<Button>(R.id.dictation_notification_paste).isEnabled)
-        assertFalse(compact.findViewById<Button>(R.id.dictation_notification_send).isEnabled)
-    }
-
-    private fun actionCommand(
-        service: ConversationDictationForegroundService,
-        harness: Harness,
-        action: String,
-    ): Intent =
-        shadowOf(
-            service.actionIntent(action, requireNotNull(harness.conversationDictation.notificationSessionToken)),
-        ).savedIntent
-
     /** Real notification intents produce the selected outcome regardless of the stored default. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -372,10 +273,10 @@ class ConversationDictationForegroundServiceTest {
         runTest {
             ConversationDictationDeliveryMode.entries.forEach { preference ->
                 (0..2).forEach { actionIndex ->
-                    val harness = Harness(this, preference)
+                    val harness = DictationForegroundTestHost(this, preference)
                     ConversationDictationForegroundService.hostResolver = { harness }
                     val lifecycle =
-                        Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+                        Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
                     val service = lifecycle.get()
                     service.onStartCommand(startIntent(service, harness), 0, 1)
                     val action =
@@ -409,15 +310,45 @@ class ConversationDictationForegroundServiceTest {
             }
         }
 
+    /** Hiding the drawer card is presentation only: explicit in-app completion still owns the session. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    @Config(sdk = [34, 35])
+    fun dismissedNotificationDoesNotCancelCaptureOrChangeSendToPaste() =
+        runTest {
+            listOf(false, true).forEach { send ->
+                val harness = DictationForegroundTestHost(scope = this)
+                ConversationDictationForegroundService.hostResolver = { harness }
+                val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+                val service = lifecycle.get()
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                val manager = service.getSystemService(NotificationManager::class.java)
+                val notification = manager.activeNotifications.single().notification
+                // Android invokes no cancellation callback when the user hides an ongoing card.
+                assertNull(notification.deleteIntent)
+                manager.cancel(BackgroundConnectionNotification.NOTIFICATION_ID)
+                assertTrue(harness.conversationDictation.hasDurableSession)
+                assertTrue(harness.conversationDictation.ownsMicrophone)
+                if (send) harness.conversationDictation.send() else harness.conversationDictation.paste()
+                harness.platform.listener.onResult("after notification dismissal")
+                runCurrent()
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+                assertEquals(if (send) listOf("after notification dismissal") else emptyList<String>(), harness.sent)
+                assertEquals(if (send) "" else "after notification dismissal", harness.draft.text)
+                assertTrue(manager.activeNotifications.isEmpty())
+                lifecycle.destroy()
+            }
+        }
+
     /** Delayed notification taps cannot send, paste, or cancel a replacement session. */
     @Test
     fun oldAndUnboundNotificationActionsCannotAffectAnotherSession() {
         val harness = installHost()
-        val serviceController = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val serviceController = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = serviceController.get()
         service.onStartCommand(startIntent(service, harness), 0, 1)
         val oldToken = requireNotNull(harness.conversationDictation.notificationSessionToken)
-        val oldActions = notificationActions.map { service.actionIntent(it, oldToken) }
+        val oldActions = notificationActions.map { service.foreground.dictation.actionIntent(it, oldToken) }
         harness.conversationDictation.cancel()
         harness.conversationDictation.requestStart("account", "replacement", TextFieldValue(""))
         service.onStartCommand(startIntent(service, harness), 0, 2)
@@ -427,7 +358,7 @@ class ConversationDictationForegroundServiceTest {
         oldActions.forEachIndexed { index, action ->
             service.onStartCommand(shadowOf(action).savedIntent, 0, 3 + index)
             assertEquals(replacement, harness.conversationDictation.state)
-            assertFalse(action == service.actionIntent(notificationActions[index], newToken))
+            assertFalse(action == service.foreground.dictation.actionIntent(notificationActions[index], newToken))
         }
         service.onStartCommand(
             Intent(service, service::class.java).setAction(ConversationDictationForegroundService.ACTION_SEND),
@@ -442,12 +373,96 @@ class ConversationDictationForegroundServiceTest {
         assertTrue(recreated.conversationDictation.state is ConversationDictationState.Starting)
         serviceController.destroy()
     }
+}
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+internal class ConversationDictationForegroundServiceStartTest : ConversationDictationForegroundTestCase() {
+    /** A terminal retained-audio failure removes microphone controls without discarding Retry data. */
+    @Test
+    fun retainedAudioFailureReplacesControlsWithBoundedRecoveryWithAndWithoutConnection() {
+        listOf(false, true).forEach { connected ->
+            listOf(
+                ConversationDictationForegroundService.ACTION_PASTE,
+                ConversationDictationForegroundService.ACTION_SEND,
+            ).forEach { action ->
+                val harness = installHost()
+                val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+                val service = lifecycle.get()
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                if (connected) service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+                harness.platform.pendingCallerAudio = true
+                service.onStartCommand(actionCommand(service, harness, action), 0, 2)
+                harness.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Failed)
+                Snapshot.sendApplyNotifications()
+                shadowOf(android.os.Looper.getMainLooper()).idle()
+                assertTrue(harness.conversationDictation.hasDurableSession)
+                assertFalse(harness.conversationDictation.foregroundMicrophoneRequired)
+                assertTrue(service.foreground.dictation.hasForegroundLease)
+                val notification =
+                    service
+                        .getSystemService(NotificationManager::class.java)
+                        .activeNotifications
+                        .single()
+                        .notification
+                assertEquals(
+                    "Dictation needs attention",
+                    notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+                )
+                assertNull(notification.contentView)
+                assertEquals(1, notification.actions.size)
+                assertEquals(
+                    "Open app",
+                    notification.actions
+                        .single()
+                        .title
+                        .toString(),
+                )
+                service.onStartCommand(actionCommand(service, harness, action), 0, 3)
+                service.onStartCommand(
+                    actionCommand(service, harness, ConversationDictationForegroundService.ACTION_CANCEL),
+                    0,
+                    4,
+                )
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Failed)
+                assertTrue(harness.platform.pendingCallerAudio)
+                lifecycle.destroy()
+                assertTrue(harness.platform.pendingCallerAudio)
+                harness.conversationDictation.dismissFailure()
+            }
+        }
+    }
+
+    /** A stale cancel/send/paste from before a failure cannot act on the same session after Retry. */
+    @Test
+    fun notificationActionGenerationFencesFailureAndRetainedRetry() {
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        val old = notificationActions.map { actionCommand(service, harness, it) }
+        harness.platform.pendingCallerAudio = true
+        harness.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        old.forEach { service.onStartCommand(it, 0, 2) }
+        assertTrue(harness.conversationDictation.state is ConversationDictationState.Failed)
+        harness.conversationDictation.retry()
+        val retryState = harness.conversationDictation.state
+        old.forEach { service.onStartCommand(it, 0, 3) }
+        assertEquals(retryState, harness.conversationDictation.state)
+        assertTrue(harness.platform.pendingCallerAudio)
+        assertEquals("", harness.draft.text)
+        assertTrue(harness.sent.isEmpty())
+        harness.conversationDictation.cancel()
+        lifecycle.destroy()
+    }
 
     /** Verifies recents removal preserves explicit capture but service destruction fails it closed. */
     @Test
     fun recentsSwipeKeepsCaptureButServiceDestructionCancelsIt() {
         val harness = installHost()
-        val serviceController = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val serviceController = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = serviceController.get()
         service.onStartCommand(startIntent(service, harness), 0, 1)
 
@@ -473,7 +488,7 @@ class ConversationDictationForegroundServiceTest {
         harness.failRecognition()
         assertTrue(harness.conversationDictation.hasPendingSession)
         assertFalse(harness.conversationDictation.hasDurableSession)
-        val serviceController = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val serviceController = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = serviceController.get()
 
         val result = service.onStartCommand(startIntent(service, harness), 0, 1)
@@ -491,11 +506,12 @@ class ConversationDictationForegroundServiceTest {
             SecurityException("blocked"),
             ForegroundServiceStartNotAllowedException("blocked"),
         ).forEach { failure ->
-            val harness = installHost()
-            ConversationDictationForegroundService.foregroundPromoter = { _, _ -> throw failure }
+            val harness = DictationForegroundTestHost(autoReady = false)
+            ConversationDictationForegroundService.hostResolver = { harness }
+            ConversationDictationForegroundService.foregroundPromoter = { _, _, _ -> throw failure }
             val serviceController =
                 Robolectric
-                    .buildService(ConversationDictationForegroundService::class.java)
+                    .buildService(NotificationStreamForegroundService::class.java)
                     .create()
             val service = serviceController.get()
 
@@ -511,12 +527,12 @@ class ConversationDictationForegroundServiceTest {
 
     @Test
     fun ownershipLostDuringPromotionCannotBePublishedOrStartCapture() {
-        val harness = Harness(autoReady = false)
+        val harness = DictationForegroundTestHost(autoReady = false)
         ConversationDictationForegroundService.hostResolver = { harness }
-        ConversationDictationForegroundService.foregroundPromoter = { _, _ ->
+        ConversationDictationForegroundService.foregroundPromoter = { _, _, _ ->
             harness.conversationDictation.cancel()
         }
-        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
 
         service.onStartCommand(startIntent(service, harness), 0, 1)
@@ -530,14 +546,14 @@ class ConversationDictationForegroundServiceTest {
     /** Native capture begins strictly after foreground promotion returns, never on enqueue alone. */
     @Test
     fun deferredCaptureStartsOnlyAfterSuccessfulPromotion() {
-        val harness = Harness(autoReady = false)
+        val harness = DictationForegroundTestHost(autoReady = false)
         ConversationDictationForegroundService.hostResolver = { harness }
-        ConversationDictationForegroundService.foregroundPromoter = { service, notification ->
+        ConversationDictationForegroundService.foregroundPromoter = { service, notification, type ->
             assertEquals(0, harness.platform.sessionsCreated)
             assertFalse(harness.conversationDictation.ownsMicrophone)
-            defaultForegroundPromoter(service, notification)
+            defaultForegroundPromoter(service, notification, type)
         }
-        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
         service.onStartCommand(startIntent(service, harness), 0, 1)
         assertEquals(1, harness.platform.sessionsCreated)
@@ -548,11 +564,15 @@ class ConversationDictationForegroundServiceTest {
     /** An unbound queued start cannot acknowledge the current session or leave an orphan FGS. */
     @Test
     fun unboundQueuedStartStopsWithoutOpeningMicrophone() {
-        val harness = Harness(autoReady = false)
+        val harness = DictationForegroundTestHost(autoReady = false)
         ConversationDictationForegroundService.hostResolver = { harness }
-        val lifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
-        service.onStartCommand(Intent(service, service::class.java), 0, 1)
+        service.onStartCommand(
+            Intent(service, service::class.java).setAction(ConversationDictationForegroundService.ACTION_START),
+            0,
+            1,
+        )
         assertEquals(0, harness.platform.sessionsCreated)
         assertNull(shadowOf(service as Service).lastForegroundNotification)
         assertTrue(shadowOf(service).isStoppedBySelf)
@@ -565,12 +585,12 @@ class ConversationDictationForegroundServiceTest {
     @Test
     fun staleServiceDestructionCannotCancelReplacement() {
         val harness = installHost()
-        val oldLifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val oldLifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val oldService = oldLifecycle.get()
         oldService.onStartCommand(startIntent(oldService, harness), 0, 1)
         harness.conversationDictation.cancel()
         harness.conversationDictation.requestStart("account", "replacement", TextFieldValue(""))
-        val newLifecycle = Robolectric.buildService(ConversationDictationForegroundService::class.java).create()
+        val newLifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val newService = newLifecycle.get()
         newService.onStartCommand(startIntent(newService, harness), 0, 1)
         oldLifecycle.destroy()
@@ -605,60 +625,5 @@ class ConversationDictationForegroundServiceTest {
                 .nextStartedService
                 .getStringExtra(ConversationDictationForegroundService.EXTRA_SESSION_TOKEN),
         )
-    }
-
-    /** Installs a fresh process-owner harness into the service resolver seam. */
-    private fun installHost(): Harness =
-        Harness().also { installed ->
-            ConversationDictationForegroundService.hostResolver = { installed }
-        }
-
-    private fun startIntent(
-        service: Service,
-        harness: Harness,
-    ): Intent =
-        Intent(service, service::class.java)
-            .putExtra(
-                ConversationDictationForegroundService.EXTRA_SESSION_TOKEN,
-                requireNotNull(harness.conversationDictation.notificationSessionToken),
-            )
-
-    private class FakePlatform : ConversationDictationPlatform {
-        var sessionsCreated = 0
-
-        lateinit var listener: ConversationDictationRecognitionListener
-
-        /** Test sessions always begin with record-audio permission. */
-        override fun hasRecordAudioPermission(): Boolean = true
-
-        /** Test sessions always expose an in-process recognizer. */
-        override fun recognitionAvailable(): Boolean = true
-
-        /** Captures the listener and returns a no-op provider generation. */
-        @Suppress("MaxLineLength")
-        override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
-            this.listener = listener
-            sessionsCreated++
-            return object : ConversationDictationRecognitionSession {
-                override fun start() = Unit
-
-                override fun stop() = Unit
-
-                override fun cancel() = Unit
-
-                override fun destroy() = Unit
-            }
-        }
-    }
-
-    private companion object {
-        val notificationActions =
-            listOf(
-                ConversationDictationForegroundService.ACTION_CANCEL,
-                ConversationDictationForegroundService.ACTION_PASTE,
-                ConversationDictationForegroundService.ACTION_SEND,
-            )
-        val defaultResolver = ConversationDictationForegroundService.hostResolver
-        val defaultForegroundPromoter = ConversationDictationForegroundService.foregroundPromoter
     }
 }

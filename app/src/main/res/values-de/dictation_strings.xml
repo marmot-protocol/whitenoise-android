@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="dictation_send_blocked">Nicht gesendet</string>
+    <string name="dictation_retry_send">Erneut senden</string>
+    <string name="dictation_recovery_title">Diktat benötigt Aufmerksamkeit</string>
+    <string name="dictation_recovery_text">Öffne White Noise, um das Diktat wiederherzustellen. Unfertige Diktate können bis zu 30 Minuten lang wiederhergestellt werden.</string>
+    <string name="dictation_recovery_open">App öffnen</string>
+    <string name="dictation_recovery_expired_title">Diktatwiederherstellung abgelaufen</string>
+    <string name="dictation_recovery_expired_text">Das unfertige Diktat wurde von diesem Gerät gelöscht.</string>
+    <string name="dictation_incomplete_title">Unvollständiges Diktat</string>
+    <string name="dictation_incomplete_text">Die Transkription wurde vorzeitig beendet. Du kannst den erkannten Text senden oder zur Prüfung einfügen.</string>
+    <string name="dictation_send_recognized_text">Erkannten Text senden</string>
+</resources>

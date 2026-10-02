@@ -72,7 +72,7 @@ class ChatActionSheetTest {
         composeRule.onNodeWithText(string(R.string.chat_row_action_unpin)).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.chat_row_action_unarchive)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.chat_row_action_unmute)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.delete)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.delete_from_device)).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.select)).performClick()
 
         assertEquals(1, dismisses)
@@ -222,7 +222,7 @@ class ChatActionSheetTest {
         }
 
         composeRule
-            .onNodeWithText(string(R.string.delete))
+            .onNodeWithText(string(R.string.delete_from_device))
             .performScrollTo()
             .assertIsDisplayed()
     }

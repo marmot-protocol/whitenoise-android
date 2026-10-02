@@ -44,17 +44,25 @@ internal class ComposerDraftExpansionBridge(
         groupIdHex: String,
         expectedRevision: Long,
         value: TextFieldValue,
-    ): Boolean {
+    ): Boolean = writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value) != null
+
+    /** Returns this write's own generation, never a later sample owned by another producer. */
+    fun writeDraftIfCurrent(
+        accountRef: String,
+        groupIdHex: String,
+        expectedRevision: Long,
+        value: TextFieldValue,
+    ): Long? {
         val generation =
             draftWriter.submitIfCurrent(
                 accountRef = accountRef,
                 groupIdHex = groupIdHex,
                 expected = MessageDraftGeneration(expectedRevision),
                 content = value.text,
-            ) ?: return false
+            ) ?: return null
         draftStore.set(accountRef, groupIdHex, value)
         expansionRetention.onDraftGenerationAdvanced(accountRef, groupIdHex, generation.value)
-        return true
+        return generation.value
     }
 
     /** Returns the generation an explicit resize must capture for this exact draft owner. */

@@ -37,6 +37,35 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class MediaDownloadHostRegressionTest {
+    /** Retained Open stays usable while every acquisition slot is occupied by unrelated files. */
+    @Test
+    fun canonicalRetainedReadDoesNotWaitForSaturatedAcquisitionGate() =
+        runTest(dispatcher) {
+            val first = async { download(0) }
+            val completed = fixture.entered.receive()
+            val expected = bytes(reference(0).fileName)
+            completed.succeed(expected)
+            assertArrayEquals(expected, first.await())
+
+            val backlog = (1..3).map { index -> async { download(index) } }
+            val held = List(3) { fixture.entered.receive() }
+            assertEquals(3, fixture.active.get())
+            try {
+                val retained = async { download(0, AttachmentDownloadPriority.Interactive) }
+                // Timeout is only a deadlock guard. All three permits remain held until after this read.
+                assertArrayEquals(
+                    expected,
+                    withContext(Dispatchers.Default) { withTimeout(5_000L) { retained.await() } },
+                )
+                assertEquals(3, fixture.active.get())
+                assertEquals(0, fixture.explicitDemands.get())
+                assertEquals(4, fixture.calls.size)
+            } finally {
+                held.forEach { it.succeed(bytes(it.reference.fileName)) }
+                backlog.awaitAll()
+            }
+        }
+
     private val dispatcher = StandardTestDispatcher()
     private lateinit var fixture: MediaDownloadIntegrationFixture
 

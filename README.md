@@ -189,10 +189,13 @@ test-JVM flags, not a screenshot mismatch; do not re-record baselines for it.
 
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
 runs `:app:verifyRoborazziDevZapstoreDebug` and
-`:app:verifyRoborazziDevPlayDebug` in parallel jobs, filtered to the established
-committed-baseline owners. Tests named `*ScreenshotTest` are included
-automatically; a mixed-name test that owns committed baselines must also be added
-to the `--tests` allowlist in `.github/workflows/android-ci.yml`. On a mismatch,
+`:app:verifyRoborazziDevPlayDebug` in parallel jobs, filtered to the
+committed-baseline owners in `config/screenshot-baseline-owners.txt`. Tests named
+`*ScreenshotTest` are included automatically; a mixed-name test that owns
+committed baselines must list its golden-producing methods there (its other
+assertions already run in the full unit job). `scripts/check_screenshot_baseline_owners.py`
+fails the tooling job when a class calls `captureRoboImage` without a registered
+owner, and fails the screenshot job when any committed PNG was not compared. On a mismatch,
 the build fails and diff/compare images are uploaded in
 `android-ci-reports-screenshots-Zapstore` and
 `android-ci-reports-screenshots-Play`.

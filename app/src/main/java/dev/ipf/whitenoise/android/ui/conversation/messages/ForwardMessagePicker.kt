@@ -646,6 +646,7 @@ private fun ForwardTargetRow(
         avatarSeed = avatarAccount ?: item.group.groupIdHex,
         avatarUrl = avatar.pictureUrl,
         avatarImage = avatar.image,
+        avatarAnimationKey = avatar.animationKey,
         modifier = Modifier.semantics { this.selected = selected },
         onClick = { onToggle(item.group.groupIdHex) },
         trailing = { SelectionIndicator(selected = selected) },

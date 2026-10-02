@@ -3,6 +3,46 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "observeConversationVisibleReads",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationVisibleReads.kt",
+        "anchor": "internal fun observeConversationVisibleReads(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "QuarantinedGroupsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "fun QuarantinedGroupsScreen(",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "QuarantinedGroupsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "fun QuarantinedGroupsContent(",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Developer quarantined group navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "row(\"quarantined_groups\")",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group reason and recovery guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "fun quarantineGuidance(",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
         "surface": "Modifier.conversationScrollIndicator",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollIndicatorWindow.kt",
         "anchor": "fun Modifier.conversationScrollIndicator(",
@@ -445,6 +485,98 @@
         ]
       },
       {
+        "surface": "R.string.toast_left_chat_delete_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_left_chat_delete_failed",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_leave_not_confirmed_history_kept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_leave_not_confirmed_history_kept",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_group_needs_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_needs_admin",
+        "test_ids": ["CHL-012"]
+      },
+      {
+        "surface": "R.string.toast_left_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_left_chat",
+        "test_ids": ["CHL-012"]
+      },
+      {
+        "surface": "R.string.toast_make_another_admin_before_leaving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_make_another_admin_before_leaving",
+        "test_ids": ["CHL-012"]
+      },
+      {
+        "surface": "R.string.delete_local_does_not_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.string.delete_local_does_not_leave",
+        "test_ids": ["CHL-010"]
+      },
+      {
+        "surface": "Portuguese local deletion keeps the user in the conversation",
+        "source": "app/src/main/res/values-pt/strings.xml",
+        "anchor": "<string name=\"delete_local_does_not_leave\">",
+        "test_ids": ["CHL-010"]
+      },
+      {
+        "surface": "Turkish local deletion keeps the user in the conversation",
+        "source": "app/src/main/res/values-tr/strings.xml",
+        "anchor": "<string name=\"delete_local_does_not_leave\">",
+        "test_ids": ["CHL-010"]
+      },
+      {
+        "surface": "Turkish bulk local deletion keeps the user in the conversations",
+        "source": "app/src/main/res/values-tr/strings.xml",
+        "anchor": "<plurals name=\"chat_list_bulk_delete_confirm\">",
+        "test_ids": ["CHL-010"]
+      },
+      {
+        "surface": "R.string.delete_from_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.string.delete_from_device",
+        "test_ids": ["CHL-010"]
+      },
+      {
+        "surface": "R.string.leave_and_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.string.leave_and_delete",
+        "test_ids": ["CHL-012"]
+      },
+      {
+        "surface": "R.string.leave_and_delete_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "R.string.leave_and_delete_message",
+        "test_ids": ["CHL-012"]
+      },
+      {
+        "surface": "explicit single-group leave and delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "suspend fun leaveAndDeleteFromChatList(",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "ChatLeaveAndDeleteConfirmationDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatActionSheet.kt",
+        "anchor": "fun ChatLeaveAndDeleteConfirmationDialog(",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
         "surface": "toast couldnt delete chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_couldnt_delete_chat",
@@ -579,6 +711,14 @@
         "anchor": "fun MarkdownBodyText(",
         "test_ids": [
           "RDR-001"
+        ]
+      },
+      {
+        "surface": "Bare www autolink destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun markdownAutolinkDestination(",
+        "test_ids": [
+          "MSG-029"
         ]
       },
       {
@@ -922,7 +1062,8 @@
         "anchor": "fun ProfileSwitcherSheet(",
         "test_ids": [
           "NAV-004",
-          "NAV-006"
+          "NAV-006",
+          "CHL-022"
         ]
       },
       {
@@ -1320,7 +1461,8 @@
         "test_ids": [
           "CHL-001",
           "SEC-012",
-          "CHL-018"
+          "CHL-018",
+          "CHL-021"
         ]
       },
       {
@@ -1958,7 +2100,24 @@
         "anchor": "fun Avatar(",
         "test_ids": [
           "AXY-001",
-          "INT-011"
+          "INT-011",
+          "PRO-006"
+        ]
+      },
+      {
+        "surface": "AnimatedProfileAvatarOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarOverlay(",
+        "test_ids": [
+          "PRO-006"
+        ]
+      },
+      {
+        "surface": "AnimatedProfileAvatarLayer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarLayer(",
+        "test_ids": [
+          "PRO-006"
         ]
       },
       {
@@ -1990,7 +2149,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Badges.kt",
         "anchor": "fun UnreadCountBadge(",
         "test_ids": [
-          "AXY-001"
+          "AXY-001",
+          "CHL-022"
         ]
       },
       {
@@ -2015,7 +2175,8 @@
         "anchor": "fun GroupAvatar(",
         "test_ids": [
           "GRP-003",
-          "INT-011"
+          "INT-011",
+          "PRO-006"
         ]
       },
       {
@@ -2593,8 +2754,15 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
         "anchor": "fun ConversationJumpToNewestButton(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CHL-022"
         ]
+      },
+      {
+        "surface": "Jump to newest accessibility text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
+        "anchor": "R.string.jump_to_newest",
+        "test_ids": ["CON-001", "CHL-022"]
       },
       {
         "surface": "ConversationMediaDraftContent",
@@ -2642,8 +2810,33 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
         "anchor": "fun GroupSystemRow(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "CON-026"
         ]
+      },
+      {
+        "surface": "Affected member's name links to their profile in add/remove history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+        "anchor": "internal fun groupSystemSummaryText(",
+        "test_ids": ["CON-026"]
+      },
+      {
+        "surface": "Subject profile link targets the authenticated member and drops stale-account taps",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/GroupSystemSubjectLink.kt",
+        "anchor": "object GroupSystemSubjectLink",
+        "test_ids": ["CON-026"]
+      },
+      {
+        "surface": "Membership chat-list preview names the affected member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListItem.kt",
+        "anchor": "groupSystemNames: GroupSystemPreviewNames? = null,",
+        "test_ids": ["CHL-020"]
+      },
+      {
+        "surface": "Chat row resolves the membership preview subject's name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "GroupSystemPreviewNames(activeAccountIdHex, appState::chatMemberTitle)",
+        "test_ids": ["CHL-020"]
       },
       {
         "surface": "PinnedDayRibbonLabel",
@@ -2763,7 +2956,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
         "anchor": "fun ConversationTopBar(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "PRO-006"
         ]
       },
       {
@@ -3326,8 +3520,38 @@
         ]
       },
       {
+        "surface": "string:dictation_incomplete_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_incomplete_title",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_incomplete_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_incomplete_text",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_send_recognized_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_send_recognized_text",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "ConversationDictationSendConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "fun ConversationDictationSendConfirmation(",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "ConversationDictationPartialSendDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "fun ConversationDictationPartialSendDialog(",
+        "test_ids": ["DIC-002"]
+      },
+      {
         "surface": "ConversationDictationFailureAction",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "fun ConversationDictationFailureAction(",
         "test_ids": [
           "DIC-001",
@@ -3871,6 +4095,12 @@
           "MSG-013",
           "MSG-015"
         ]
+      },
+      {
+        "surface": "Canonical retained attachment resolution before acquisition admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(",
+        "test_ids": ["MED-009", "MED-017", "MED-023"]
       },
       {
         "surface": "Persisted file open terminal download settlement",
@@ -4658,7 +4888,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
         "anchor": "fun ForwardMessagePickerContent(",
         "test_ids": [
-          "MSG-010"
+          "MSG-010",
+          "MSG-030"
         ]
       },
       {
@@ -4682,7 +4913,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
         "anchor": "fun ForwardTargetList(",
         "test_ids": [
-          "MSG-010"
+          "MSG-010",
+          "MSG-030"
         ]
       },
       {
@@ -5137,7 +5369,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
         "anchor": "fun MessageFullScreenView(",
         "test_ids": [
-          "MSG-013"
+          "MSG-013",
+          "MSG-026"
         ]
       },
       {
@@ -6922,7 +7155,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
         "anchor": "fun ZoomableAvatarImage(",
         "test_ids": [
-          "PRO-001"
+          "PRO-001",
+          "PRO-006"
         ]
       },
       {
@@ -7000,7 +7234,8 @@
         "anchor": "fun ProfileAvatar(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "PRO-006"
         ]
       },
       {
@@ -7133,7 +7368,8 @@
         "anchor": "fun ProfileEditScreen(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "PRO-007"
         ]
       },
       {
@@ -7142,7 +7378,9 @@
         "anchor": "fun ProfileHeroHeader(",
         "test_ids": [
           "PRO-001",
-          "PRO-002"
+          "PRO-002",
+          "PRO-006",
+          "PRO-007"
         ]
       },
       {
@@ -9140,7 +9378,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
         "anchor": "fun ShareChatPickerTargetList(",
         "test_ids": [
-          "SYS-001"
+          "SYS-001",
+          "MSG-030"
         ]
       },
       {
@@ -9804,22 +10043,88 @@
       {
         "surface": "Dictation completion command avoids queued foreground repost",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
-        "anchor": "override fun onStartCommand(",
+        "anchor": "fun onStartCommand(",
         "test_ids": [
           "DIC-002"
         ]
       },
       {
-        "surface": "Connection service orders restoration after queued dictation controls",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationStreamForegroundService.kt",
-        "anchor": "fun restoreIfForeground(context: Context)",
+        "surface": "string:notification_channel_dictation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "R.string.notification_channel_dictation",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:paste",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.paste",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_title",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_text",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_open",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_expired_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_expired_title",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_recovery_expired_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_expired_text",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "Single foreground host releases dictation while preserving connection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationForegroundRecord.kt",
+        "anchor": "fun releaseDictation(",
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "string:dictation_send_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_send_blocked",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_retry_send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_retry_send",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "string:dictation_notification_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_notification_title",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "Explicit dictation choice overrides automatic completion before delivery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCompletionIntent.kt",
+        "anchor": "fun choose(",
+        "test_ids": ["DIC-002"]
       },
       {
         "surface": "string:dictation_notification_text",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.dictation_notification_text",
         "test_ids": [
           "DIC-001",
@@ -9828,7 +10133,7 @@
       },
       {
         "surface": "string:dictation_processing",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.dictation_processing",
         "test_ids": [
           "DIC-001",
@@ -9837,7 +10142,7 @@
       },
       {
         "surface": "string:dictation_starting",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.dictation_starting",
         "test_ids": [
           "DIC-001",
@@ -9846,7 +10151,7 @@
       },
       {
         "surface": "string:message_status_pending",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.message_status_pending",
         "test_ids": [
           "DIC-001",
@@ -12459,7 +12764,7 @@
       },
       {
         "surface": "string:dictation_open_speech_service",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "R.string.dictation_open_speech_service",
         "test_ids": [
           "DIC-002"
@@ -12493,7 +12798,7 @@
       },
       {
         "surface": "string:open_app_settings",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "R.string.open_app_settings",
         "test_ids": [
           "DIC-002"
@@ -12510,7 +12815,7 @@
       },
       {
         "surface": "string:retry",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
         "anchor": "R.string.retry",
         "test_ids": [
           "DIC-002"
@@ -24189,6 +24494,198 @@
     ],
     "source_coverage": [
       {
+        "surface": "Settled visible-read retry on resume and manual-reminder changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "observeConversationVisibleReads(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Visible conversation read eligibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationReadVisibility.kt",
+        "anchor": "fun WhiteNoiseAppState.isConversationReadVisible(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "First settled conversation read at the saved watermark",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private var lastSubmittedReadMessageId: String? = null",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Native manual reminder lookup for visible-read dedupe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal fun hasManualUnreadReminder(groupIdHex: String)",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Native manual unread reminder bypasses an older retained-controller read dedupe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationReadVisibility.kt",
+        "anchor": "internal fun WhiteNoiseAppState.hasManualUnreadReminder(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantined_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+        "anchor": "R.string.quarantined_groups",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_count",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_empty",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_explanation",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_group",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_group_record",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_group_record",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_load_failed",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_loading",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_member_validation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_member_validation",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_missing_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_missing_state",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_pending_commit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_pending_commit",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_recovered",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_recovered",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_refresh",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_retry",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_retry_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_retry_failed",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_still_quarantined",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_still_quarantined",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_stored_state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_stored_state",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantine_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantine_unavailable",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
+        "surface": "Quarantined group recovery: R.string.quarantined_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+        "anchor": "R.string.quarantined_groups",
+        "test_ids": [
+          "SET-031"
+        ]
+      },
+      {
         "surface": "Continuous retained-window position and layout ownership",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollIndicatorWindow.kt",
         "anchor": "fun conversationScrollPosition(",
@@ -24677,9 +25174,15 @@
         ]
       },
       {
-        "surface": "User-initiated attachment job restart keeps cancellation and completion ownership",
+        "surface": "User-initiated attachment job restart and terminal notification cleanup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadJobRuns.kt",
         "anchor": "internal class AttachmentDownloadJobRuns(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Cancelled shared attachment fetch finishes its active worker and notification",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "attachment_fetch_cancelled",
         "test_ids": ["MED-022"]
       },
       {
@@ -28522,6 +29025,22 @@
         "anchor": "internal object AvatarCacheDiagnostics",
         "test_ids": [
           "CHL-017"
+        ]
+      },
+      {
+        "surface": "Bounded reader viewport during native edge drags",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "internal const val MESSAGE_FULL_SCREEN_VIEWPORT_TAG",
+        "test_ids": [
+          "MSG-026"
+        ]
+      },
+      {
+        "surface": "Dictation recognized-prefix recovery alongside sealed audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "fun sendRecognizedText()",
+        "test_ids": [
+          "DIC-002"
         ]
       }
     ],

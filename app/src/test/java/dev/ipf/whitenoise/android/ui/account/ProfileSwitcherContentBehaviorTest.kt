@@ -25,11 +25,13 @@ import org.robolectric.annotation.Config
 class ProfileSwitcherContentBehaviorTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** Inactive counts cap and manual unread remain independent. */
+    /** Inactive counts are exact through 999 and `999+` from 1,000 (#2970); manual unread stays independent. */
     @Test fun inactiveCountsCapAndManualUnreadRemainIndependent() {
         render()
         composeRule.onNodeWithTag("profile_switcher.profile.a").assertIsSelected()
-        composeRule.onNodeWithText("99+").assertExists()
+        composeRule.onNodeWithText("999+").assertExists()
+        composeRule.onNodeWithText("999").assertExists()
+        composeRule.onNodeWithText("99+").assertDoesNotExist()
         composeRule.onNodeWithText("10").assertDoesNotExist()
         val context = ApplicationProvider.getApplicationContext<Context>()
         composeRule
@@ -60,7 +62,7 @@ class ProfileSwitcherContentBehaviorTest {
         onAdd: () -> Unit = {},
         onSettings: () -> Unit = {},
     ) {
-        val accounts = listOf("a", "b", "c").map { AccountSummaryFfi(it, it.repeat(64), true, false, false, true) }
+        val accounts = listOf("a", "b", "c", "d").map { AccountSummaryFfi(it, it.repeat(64), true, false, false, true) }
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
@@ -72,7 +74,8 @@ class ProfileSwitcherContentBehaviorTest {
                         unreadCountForAccount = {
                             when (it) {
                                 "a" -> 10uL
-                                "b" -> 100uL
+                                "b" -> 1000uL
+                                "d" -> 999uL
                                 else -> 0uL
                             }
                         },

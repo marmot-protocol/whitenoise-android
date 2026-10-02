@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -23,7 +24,14 @@ internal class AttachmentDownloadJobRuns(
     ): Job {
         val run =
             scope.launch(start = CoroutineStart.LAZY) {
-                download()
+                try {
+                    download()
+                } catch (expectedCancellation: CancellationException) {
+                    // A cancelled shared fetch is terminal for this transfer. Only
+                    // cancellation of the Android run itself should skip jobFinished
+                    // and leave retry/notification ownership with the scheduler.
+                    currentCoroutineContext().ensureActive()
+                }
                 currentCoroutineContext().ensureActive()
                 val owner = currentCoroutineContext().job
                 synchronized(lock) {

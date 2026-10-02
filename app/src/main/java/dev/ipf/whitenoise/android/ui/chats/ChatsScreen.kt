@@ -122,10 +122,7 @@ import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.Locale
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold as Scaffold
@@ -217,6 +214,13 @@ internal fun ChatsScreen(
         if (appState.signOutInProgress || appState.wipeInProgress) folderManagerOpen = false
     }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
+    var pendingLeaveAndDelete by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<ChatListItem?>(null)
+    }
+    val leavingAndDeleting =
+        remember(appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateSetOf<String>()
+        }
     val selectionMode = selectedChatIds.isNotEmpty()
     val searchOpen = globalSearchState.isOpen
     val searchQuery = globalSearchState.query
@@ -1053,35 +1057,18 @@ internal fun ChatsScreen(
             }
     }
     LaunchedEffect(chatListState, controller, chatListWindowView) {
-        snapshotFlow {
-            val info = chatListState.layoutInfo
-            (info.visibleItemsInfo.lastOrNull()?.index ?: -1) to info.totalItemsCount
-        }.distinctUntilChanged()
-            .collect { (lastVisibleIndex, totalItems) ->
-                if (totalItems > 0 && lastVisibleIndex >= totalItems - CHAT_LIST_WINDOW_PREFETCH_ROWS) {
-                    controller.loadMoreChats(chatListWindowView)
-                }
-            }
+        collectChatListForwardPaging(listState = chatListState) { controller.loadMoreChats(chatListWindowView) }
     }
-    // The list also holds the inline load-error row, the pinned boundary and search headers, so the
-    // settled row is resolved by its item key rather than by index. Search rows are a filtered projection
-    // of the window and are never reported as its anchor.
     LaunchedEffect(chatListState, controller, chatListWindowView) {
-        snapshotFlow {
-            val settledRowId =
-                chatListState.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { visible ->
-                    (visible.key as? String)?.takeIf(currentVisibleChatIds::contains)
-                }
-            Triple(chatListState.isScrollInProgress, currentSearchActive, settledRowId)
-        }.filter { (scrolling, searching, _) -> !scrolling && !searching }
-            .map { (_, _, rowId) -> rowId }
-            .filterNotNull()
-            .distinctUntilChanged()
-            .collect { rowId ->
-                currentVisibleItems.firstOrNull { it.id == rowId }?.group?.groupIdHex?.let { groupIdHex ->
-                    controller.reportVisibleChat(groupIdHex, chatListWindowView)
-                }
+        collectChatListVisibleAnchor(
+            listState = chatListState,
+            searchActive = { currentSearchActive },
+            chatRowKey = { key -> (key as? String)?.takeIf(currentVisibleChatIds::contains) },
+        ) { rowId ->
+            currentVisibleItems.firstOrNull { it.id == rowId }?.group?.groupIdHex?.let { groupIdHex ->
+                controller.reportVisibleChat(groupIdHex, chatListWindowView)
             }
+        }
     }
     // Keep a new chat-list head flush at the top when live activity reorders
     // keyed items (issues #541 / #1313 / #1651). LazyColumn otherwise pins the
@@ -1272,7 +1259,8 @@ internal fun ChatsScreen(
     val anotherSheetVisible =
         actionSheetChatId != null ||
             folderHandoff.pickerChatIds != null ||
-            pendingBulkDelete != null
+            pendingBulkDelete != null ||
+            pendingLeaveAndDelete != null
     if (!anotherSheetVisible && !globalSearchPresentationState.filterSheetOpen) {
         diagnosticsPrompt()
     }
@@ -1412,6 +1400,15 @@ internal fun ChatsScreen(
                                 selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
                             },
                             onDelete = { pendingBulkDelete = listOf(item) },
+                            onLeaveAndDelete =
+                                if (!item.isDm() &&
+                                    !item.group.leaveRequestPending &&
+                                    item.projection?.leaveRequestPending != true
+                                ) {
+                                    { pendingLeaveAndDelete = item }
+                                } else {
+                                    null
+                                },
                             onDismiss = {
                                 if (actionMenuOwner.isCurrent(menuToken) && actionSheetChatId == rowId) {
                                     actionSheetChatId = null
@@ -1423,7 +1420,10 @@ internal fun ChatsScreen(
                             modifier = Modifier.testTag("chat.menu.$rowId"),
                             canRunAction = {
                                 val ownsMenu = actionSheetChatId == rowId && rowId in visibleChatIds
-                                ownsMenu && actionMenuOwner.isCurrent(menuToken) && menuActionsCurrent()
+                                ownsMenu &&
+                                    item.group.groupIdHex !in leavingAndDeleting &&
+                                    actionMenuOwner.isCurrent(menuToken) &&
+                                    menuActionsCurrent()
                             },
                             actions = item.actions,
                         )
@@ -1510,7 +1510,9 @@ internal fun ChatsScreen(
                     ChatListSelectionControls(
                         count = selectedChatIds.size,
                         archiveAction = bulkArchiveAction,
-                        actionsEnabled = selectedChatIds.isNotEmpty(),
+                        actionsEnabled =
+                            selectedVisibleItems.isNotEmpty() &&
+                                selectedVisibleItems.none { it.group.groupIdHex in leavingAndDeleting },
                         allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
                         showMarkRead =
                             singleSelectedItem?.effectiveHasUnread(appState.activeAccount?.accountIdHex) == true,
@@ -1535,6 +1537,9 @@ internal fun ChatsScreen(
                             archiveChats(selected, archive)
                         },
                         onDelete = {
+                            if (selectedVisibleItems.any { it.group.groupIdHex in leavingAndDeleting }) {
+                                return@ChatListSelectionControls
+                            }
                             pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
                         },
                         onAddToFolder = {
@@ -1895,11 +1900,37 @@ internal fun ChatsScreen(
         )
     }
 
+    pendingLeaveAndDelete?.let { item ->
+        val originAccount = appState.activeAccountRef
+        val originRuntime = appState.runtimeGeneration
+        ChatLeaveAndDeleteConfirmationDialog(
+            onConfirm = {
+                pendingLeaveAndDelete = null
+                val groupId = item.group.groupIdHex
+                if (!leavingAndDeleting.add(groupId)) return@ChatLeaveAndDeleteConfirmationDialog
+                appState.launchMutation {
+                    try {
+                        val originChanged =
+                            appState.activeAccountRef != originAccount || appState.runtimeGeneration != originRuntime
+                        if (originChanged || appState.signOutInProgress || appState.wipeInProgress) {
+                            return@launchMutation
+                        }
+                        controller.leaveAndDeleteFromChatList(groupId)
+                    } finally {
+                        leavingAndDeleting.remove(groupId)
+                    }
+                }
+            },
+            onDismiss = { pendingLeaveAndDelete = null },
+        )
+    }
+
     pendingBulkDelete?.let { items ->
         ChatDeleteConfirmationDialog(
             count = items.size,
             onConfirm = {
                 pendingBulkDelete = null
+                if (items.any { it.group.groupIdHex in leavingAndDeleting }) return@ChatDeleteConfirmationDialog
                 clearSelection()
                 appState.launchMutation {
                     var succeeded = 0
@@ -2050,9 +2081,6 @@ private val FAB_SNACKBAR_INSET = 80.dp
 // deeper than SNAP rows down we hard-jump to SNAP first, then animate the final
 // stretch, so a tap from hundreds of rows deep isn't a multi-second crawl.
 private const val CHAT_LIST_JUMP_TO_TOP_SHOW_INDEX = 5
-
-/** Rows from the end of the loaded window at which the next MarmotKit page is requested. */
-private const val CHAT_LIST_WINDOW_PREFETCH_ROWS = 10
 
 private const val CHAT_LIST_JUMP_TO_TOP_HIDE_INDEX = 2
 

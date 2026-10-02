@@ -130,10 +130,14 @@
     <string name="chat_row_action_delete_group">Gruppe löschen</string>
     <string name="chat_row_action_delete_chat">Chat löschen</string>
     <string name="delete_chat_dialog_title">Chat löschen?</string>
-    <string name="delete_chat_dialog_message">Diesen Chat von diesem Gerät entfernen? Wenn du noch Mitglied bist, verlässt du zuerst den Chat.</string>
+    <string name="delete_chat_dialog_message">Diesen Chat auf diesem Gerät löschen?</string>
     <string name="delete_group_dialog_title">Gruppe löschen?</string>
-    <string name="delete_group_dialog_message">Diese Gruppe von diesem Gerät entfernen? Wenn du noch Mitglied bist, verlässt du zuerst die Gruppe.</string>
+    <string name="delete_group_dialog_message">Diese Gruppe auf diesem Gerät löschen?</string>
     <string name="delete_group_confirm">Löschen</string>
+    <string name="delete_from_device">Auf diesem Gerät löschen</string>
+    <string name="leave_and_delete">Verlassen und löschen</string>
+    <string name="leave_and_delete_message">Diese Gruppe verlassen und ihren Verlauf auf diesem Gerät löschen?</string>
+    <string name="toast_left_chat_delete_failed">Gruppe verlassen. Lokales Löschen fehlgeschlagen.</string>
     <string name="group_reset_action">Zurücksetzen und auf neue Einladung warten</string>
     <string name="group_reset_dialog_title">Diese Gruppe auf diesem Gerät zurücksetzen?</string>
     <string name="group_reset_dialog_message">White Noise löscht den Verlauf und den Verschlüsselungszustand dieser Gruppe nur auf diesem Gerät. An die Gruppe wird nichts gesendet. Du trittst erst wieder bei, wenn ein Admin nach diesem Zurücksetzen eine neue Einladung sendet.</string>
@@ -166,8 +170,8 @@
     </plurals>
     <string name="message_selection_action_delete">Ausgewählte Nachrichten löschen</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">%1$d Chat von diesem Gerät löschen?</item>
-        <item quantity="other">%1$d Chats von diesem Gerät löschen?</item>
+        <item quantity="one">%1$d Chat löschen? Dadurch verlässt du ihn nicht.</item>
+        <item quantity="other">%1$d Chats löschen? Dadurch verlässt du sie nicht.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d Chat archiviert</item>
@@ -1837,7 +1841,7 @@
     <string name="dictation_result_paste_description">Text vor dem Senden prüfen oder bearbeiten</string>
     <string name="dictation_result_send">Nachricht senden</string>
     <string name="dictation_result_send_description">Sendet nur, wenn Chat und Entwurf unverändert sind</string>
-    <string name="dictation_send_safety_note">Ändert sich der Chat oder der Entwurf vor dem Senden, bleibt der Text in deinem Entwurf, damit du ihn prüfen kannst.</string>
+    <string name="dictation_send_safety_note">Ändert sich der Chat oder Entwurf vor dem Senden, bleibt das Diktat ungesendet. Versuche das Senden erneut oder wähle Einfügen, um es zu prüfen.</string>
     <string name="dictation_microphone_muted">Mikrofonzugriff ist deaktiviert</string>
     <string name="dictation_microphone_muted_help">Aktiviere den Mikrofonzugriff in den Android-Datenschutzeinstellungen oder den Schnelleinstellungen und versuche das Diktieren erneut.</string>
     <!-- Imported-account preflight (#2519). -->
@@ -2176,4 +2180,6 @@
     <string name="dictation_audio_focus_unavailable">Andere Audioinhalte konnten nicht pausiert werden. Versuche es erneut oder deaktiviere diese Option in den Diktiereinstellungen.</string>
     <string name="checking_invitation">Einladung wird geprüft…</string>
     <string name="couldnt_check_invitation">Einladung konnte nicht geprüft werden</string>
+    <string name="toast_leave_not_confirmed_history_kept">Verlassen nicht bestätigt. Verlauf behalten.</string>
+    <string name="delete_local_does_not_leave">Dadurch verlässt du den Chat nicht.</string>
 </resources>

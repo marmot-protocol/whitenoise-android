@@ -183,10 +183,14 @@
     <string name="chat_row_action_delete_group">Delete group</string>
     <string name="chat_row_action_delete_chat">Delete chat</string>
     <string name="delete_chat_dialog_title">Delete chat?</string>
-    <string name="delete_chat_dialog_message">Remove this chat from this device? If you\'re still a member, you\'ll leave the chat first.</string>
+    <string name="delete_chat_dialog_message">Delete this chat from this device?</string>
     <string name="delete_group_dialog_title">Delete group?</string>
-    <string name="delete_group_dialog_message">Remove this group from this device? If you\'re still a member, you\'ll leave the group first.</string>
+    <string name="delete_group_dialog_message">Delete this group from this device?</string>
     <string name="delete_group_confirm">Delete</string>
+    <string name="delete_from_device">Delete from this device</string>
+    <string name="leave_and_delete">Leave and delete</string>
+    <string name="leave_and_delete_message">Leave this group and delete its history from this device?</string>
+    <string name="toast_left_chat_delete_failed">Left group. Local deletion failed.</string>
     <string name="group_reset_action">Reset and wait for a new invite</string>
     <string name="group_reset_dialog_title">Reset this group on this device?</string>
     <string name="group_reset_dialog_message">White Noise erases this group’s history and encryption state on this device only. Nothing is sent to the group. You’ll rejoin only when an admin sends a new invite created after this reset.</string>
@@ -219,8 +223,8 @@
     </plurals>
     <string name="message_selection_action_delete">Delete selected messages</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="one">Delete %1$d chat from this device?</item>
-        <item quantity="other">Delete %1$d chats from this device?</item>
+        <item quantity="one">Delete %1$d chat? This does not leave it.</item>
+        <item quantity="other">Delete %1$d chats? This does not leave them.</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="one">%1$d chat archived</item>
@@ -1081,7 +1085,7 @@
     <string name="tts_playback_action_stop">Stop</string>
     <string name="tts_playback_action_previous_sentence">Previous sentence</string>
     <string name="tts_playback_action_next_sentence">Next sentence</string>
-    <string name="background_connection_special_use_subtype" translatable="false">Restart the user-enabled encrypted message background connection after device boot or app update.</string>
+    <string name="background_connection_special_use_subtype" translatable="false">User-enabled encrypted message connection, user-initiated dictation and transcription, and bounded on-device recovery of unfinished dictation.</string>
     <string name="toast_identity_created">Identity created</string>
     <string name="toast_couldnt_create_identity">Couldn\'t create identity</string>
     <string name="toast_identity_imported">Identity imported</string>
@@ -1591,7 +1595,7 @@
     <string name="dictation_result_paste_description">Review or edit the text before sending</string>
     <string name="dictation_result_send">Send message</string>
     <string name="dictation_result_send_description">Sends only if the chat and draft haven’t changed</string>
-    <string name="dictation_send_safety_note">If the chat or draft changes before the message sends, the text stays in your draft so you can review it.</string>
+    <string name="dictation_send_safety_note">If the chat or draft changes before sending, the dictation stays unsent. Retry Send or choose Paste to review it.</string>
     <string name="voice_message_play">Play voice message</string>
     <string name="voice_message_pause">Pause voice message</string>
     <string name="voice_message_speed">Playback speed %1$s</string>
@@ -2315,4 +2319,6 @@
     <string name="donate_open_failed">Couldn’t open the donation page. Try again or return to Settings.</string>
     <string name="checking_invitation">Checking invitation…</string>
     <string name="couldnt_check_invitation">Couldn’t check invitation</string>
+    <string name="toast_leave_not_confirmed_history_kept">Leave not confirmed. History kept.</string>
+    <string name="delete_local_does_not_leave">This does not leave the chat.</string>
 </resources>

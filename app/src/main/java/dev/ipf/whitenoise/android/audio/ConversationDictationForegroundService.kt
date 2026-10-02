@@ -7,21 +7,15 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
-import android.os.IBinder
-import android.os.Looper
-import android.widget.RemoteViews
 import androidx.compose.runtime.snapshotFlow
-import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
-import dev.ipf.whitenoise.android.notifications.BackgroundConnectionNotification
+import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,34 +29,55 @@ internal interface ConversationDictationServiceHost {
 }
 
 /**
- * Keeps an explicitly started composer-dictation session alive while White
- * Noise is backgrounded or removed from recents. The notification is public
+ * Owns the dictation lease inside White Noise's single foreground-service host.
+ * Capture survives backgrounding and removal from recents. The notification is public
  * but deliberately contains no account, conversation, draft, or transcript
  * data. The controller remains the only owner of target and recognition state.
  */
-class ConversationDictationForegroundService : Service() {
+internal class ConversationDictationForegroundService(
+    private val service: NotificationStreamForegroundService,
+) : ContextWrapper(service) {
     private val notificationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var notificationObserver: Job? = null
     private var promotedController: ConversationDictationController? = null
     private var promotedSessionToken: String? = null
     private var foregroundPromoted = false
 
+    val hasForegroundLease: Boolean
+        get() = foregroundPromoted
+
+    val foregroundServiceType: Int
+        get() = if (foregroundPromoted) requireNotNull(promotedController).foregroundServiceType else 0
+
+    /** Refreshes a remaining microphone lease after connection ownership changes. */
+    fun refreshNotification() {
+        val controller = promotedController ?: return
+        val token = promotedSessionToken ?: return
+        if (controller.hasDurableSession && controller.notificationSessionToken == token) {
+            updateNotificationOrAbort(controller, token)
+        } else {
+            removeForegroundNotification()
+        }
+    }
+
+    fun notificationOrNull(): Notification? =
+        promotedController
+            ?.takeIf {
+                foregroundPromoted && it.hasDurableSession && it.notificationSessionToken == promotedSessionToken
+            }?.let { controller -> buildConversationDictationNotification(this, controller, ::actionIntent) }
+
     private val conversationDictationDiagnostic: (String) -> Unit = { event ->
         val session = promotedSessionToken?.substringAfterLast(':')?.toLongOrNull() ?: 0L
         DictationDiagnostics.record("$event session=$session")
     }
 
-    /** Dictation is command-only and never exposes a bound service interface. */
-    override fun onBind(intent: Intent?): IBinder? = null
-
     /** Routes session commands without re-posting controls that may complete synchronously. */
     @Suppress("CyclomaticComplexMethod", "ReturnCount") // Early returns reject stale ownership commands.
-    override fun onStartCommand(
+    fun onStartCommand(
         intent: Intent?,
-        flags: Int,
         startId: Int,
     ): Int {
-        val controller = hostResolver(this)?.conversationDictation
+        val controller = hostResolver(service)?.conversationDictation
         val callbackSession = intent?.getStringExtra(EXTRA_SESSION_TOKEN)?.substringAfterLast(':')?.toLongOrNull() ?: 0L
         conversationDictationDiagnostic(
             "event=foreground_service_on_start has_controller=${controller != null} " +
@@ -70,7 +85,7 @@ class ConversationDictationForegroundService : Service() {
         )
         if (controller == null || !controller.hasDurableSession) {
             removeForegroundNotification()
-            stopSelfResult(startId)
+            service.foreground.releaseDictation(startId)
         } else {
             val sessionToken = intent?.getStringExtra(EXTRA_SESSION_TOKEN)
             if (sessionToken == null || sessionToken != controller.notificationSessionToken) {
@@ -78,9 +93,17 @@ class ConversationDictationForegroundService : Service() {
                 // Never stop a service that currently authorizes a different live session.
                 val owner = promotedController
                 if (owner?.hasDurableSession != true || owner.notificationSessionToken != promotedSessionToken) {
-                    stopSelfResult(startId)
+                    service.foreground.releaseDictation(startId)
                 }
-                return START_NOT_STICKY
+                return Service.START_NOT_STICKY
+            }
+            if (intent.action in setOf(ACTION_CANCEL, ACTION_PASTE, ACTION_SEND) &&
+                (
+                    controller.state is ConversationDictationState.Failed ||
+                        intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L) != controller.notificationActionGeneration
+                )
+            ) {
+                return Service.START_NOT_STICKY
             }
             when (intent.action) {
                 ACTION_CANCEL -> controller.cancel()
@@ -91,32 +114,47 @@ class ConversationDictationForegroundService : Service() {
             // or open the microphone. Android posts foreground notifications asynchronously.
             if (!controller.hasDurableSession || controller.notificationSessionToken != sessionToken) {
                 removeForegroundNotification()
-                stopSelfResult(startId)
-                return START_NOT_STICKY
+                service.foreground.releaseDictation(startId)
+                return Service.START_NOT_STICKY
             }
             ensureChannel(this)
+            if (controller.state !is ConversationDictationState.Failed) {
+                service.getSystemService(NotificationManager::class.java).cancel(
+                    DICTATION_RECOVERY_NOTIFICATION_TAG,
+                    DICTATION_RECOVERY_NOTIFICATION_ID,
+                )
+            }
             val alreadyPromoted =
                 foregroundPromoted && promotedController === controller && promotedSessionToken == sessionToken
             if (alreadyPromoted || promoteOrCancel(controller, sessionToken, startId)) {
                 // Promotion may synchronously cancel or replace the controller in tests or platform hooks.
                 if (!controller.hasDurableSession || controller.notificationSessionToken != sessionToken) {
                     removeForegroundNotification()
-                    stopSelfResult(startId)
-                    return START_NOT_STICKY
+                    service.foreground.releaseDictation(startId)
+                    return Service.START_NOT_STICKY
                 }
-                promotedController = controller
-                promotedSessionToken = sessionToken
-                activeService = this
-                controller.onDurableServiceReady(sessionToken)
-                if (controller.hasDurableSession && controller.notificationSessionToken == sessionToken) {
-                    observeNotification(controller, sessionToken)
-                } else {
-                    removeForegroundNotification()
-                    stopSelfResult(startId)
-                }
+                publishPromotedController(controller, sessionToken, startId)
             }
         }
-        return START_NOT_STICKY
+        return Service.START_NOT_STICKY
+    }
+
+    /** A ready callback can finish immediately; observe only its surviving promoted owner. */
+    private fun publishPromotedController(
+        controller: ConversationDictationController,
+        sessionToken: String,
+        startId: Int,
+    ) {
+        promotedController = controller
+        promotedSessionToken = sessionToken
+        activeService = this
+        controller.onDurableServiceReady(sessionToken)
+        if (controller.hasDurableSession && controller.notificationSessionToken == sessionToken) {
+            observeNotification(controller, sessionToken)
+        } else {
+            removeForegroundNotification()
+            service.foreground.releaseDictation(startId)
+        }
     }
 
     /** Promotes an active capture or cancels it when Android rejects foreground microphone ownership. */
@@ -127,7 +165,11 @@ class ConversationDictationForegroundService : Service() {
         startId: Int,
     ): Boolean =
         try {
-            foregroundPromoter(this, buildNotification(controller))
+            foregroundPromoter(
+                service,
+                buildConversationDictationNotification(this, controller, ::actionIntent),
+                controller.foregroundServiceType,
+            )
             foregroundPromoted = true
             val callbackSession = sessionToken.substringAfterLast(':').toLongOrNull() ?: 0L
             conversationDictationDiagnostic("event=foreground_service_promoted callback_session=$callbackSession")
@@ -152,70 +194,26 @@ class ConversationDictationForegroundService : Service() {
         startId: Int,
     ) {
         controller.onDurableServiceStartFailed(sessionToken)
-        stopSelfResult(startId)
+        service.foreground.releaseDictation(startId)
     }
 
     /** Fails capture closed when Android removes the service that authorized background microphone use. */
-    override fun onDestroy() {
+    fun onDestroy() {
         notificationScope.cancel()
         conversationDictationDiagnostic("event=foreground_service_destroyed")
         promotedSessionToken?.let { token -> promotedController?.onDurableServiceDestroyed(token) }
         removeForegroundNotification()
-        super.onDestroy()
-        // notify() may have refreshed the shared ID after foreground promotion.
-        // A replacement dictation may also have claimed it before this callback.
-        Handler(Looper.getMainLooper()).post { restoreDictationNotification(this) }
     }
 
     /** Removes completed controls before Android asynchronously destroys the service. */
     private fun removeForegroundNotification() {
         notificationObserver?.cancel()
         notificationObserver = null
-        if (foregroundPromoted) {
-            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-            foregroundPromoted = false
-        }
+        foregroundPromoted = false
         promotedController = null
         promotedSessionToken = null
         if (activeService === this) activeService = null
-        restoreDictationNotification(this)
-    }
-
-    /** Builds a public but metadata-free notification with the only actions valid off-screen. */
-    private fun buildNotification(controller: ConversationDictationController): Notification =
-        Notification
-            .Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_whitenoise)
-            .setContentTitle(getString(R.string.dictation_notification_title))
-            .setContentText(getString(dictationNotificationStatus(controller)))
-            // An indeterminate progress bar made the notification look stuck during
-            // normal recognizer restarts; the status text already names the phase.
-            .setContentIntent(openAppIntent())
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setShowWhen(false)
-            .setStyle(Notification.DecoratedCustomViewStyle())
-            .setCustomContentView(compactControls(controller))
-            .build()
-
-    /** Keeps safe actions on the compact surface even when Android chooses not to expand a notification. */
-    private fun compactControls(controller: ConversationDictationController): RemoteViews {
-        val token = requireNotNull(controller.notificationSessionToken)
-        return RemoteViews(packageName, R.layout.notification_dictation_compact).apply {
-            val cancelEnabled = !controller.deliveryInProgress
-            val completionEnabled = controller.completionActionsEnabled
-            setBoolean(R.id.dictation_notification_cancel, "setEnabled", cancelEnabled)
-            setBoolean(R.id.dictation_notification_paste, "setEnabled", completionEnabled)
-            setBoolean(R.id.dictation_notification_send, "setEnabled", completionEnabled)
-            if (cancelEnabled) {
-                setOnClickPendingIntent(R.id.dictation_notification_cancel, actionIntent(ACTION_CANCEL, token))
-            }
-            if (completionEnabled) {
-                setOnClickPendingIntent(R.id.dictation_notification_paste, actionIntent(ACTION_PASTE, token))
-                setOnClickPendingIntent(R.id.dictation_notification_send, actionIntent(ACTION_SEND, token))
-            }
-        }
+        service.foreground.releaseDictation()
     }
 
     /** Keeps system controls truthful when capture becomes finalization or an irrevocable dispatch. */
@@ -227,29 +225,58 @@ class ConversationDictationForegroundService : Service() {
         notificationObserver =
             notificationScope.launch {
                 snapshotFlow {
-                    Triple(controller.state, controller.deliveryInProgress, controller.completionActionsEnabled)
+                    listOf(
+                        controller.state,
+                        controller.deliveryInProgress,
+                        controller.completionActionsEnabled,
+                        controller.foregroundMicrophoneRequired,
+                        controller.notificationActionGeneration,
+                        controller.foregroundRefreshRevision,
+                    )
                 }.collect {
                     if (controller.hasDurableSession && controller.notificationSessionToken == sessionToken) {
-                        getSystemService(NotificationManager::class.java)
-                            .notify(NOTIFICATION_ID, buildNotification(controller))
+                        updateNotificationOrAbort(controller, sessionToken)
                     } else {
                         removeForegroundNotification()
-                        stopSelf()
                     }
                 }
             }
+    }
+
+    /** Foreground permission can disappear while capture is already live. */
+    @Suppress("TooGenericExceptionCaught") // Android's foreground-start rejection is a RuntimeException on API 31+.
+    private fun updateNotificationOrAbort(
+        controller: ConversationDictationController,
+        sessionToken: String,
+    ) {
+        try {
+            service.foreground.updateDictationNotification(
+                buildConversationDictationNotification(this, controller, ::actionIntent),
+            )
+        } catch (_: SecurityException) {
+            controller.onDurableServiceDestroyed(sessionToken)
+            removeForegroundNotification()
+        } catch (error: RuntimeException) {
+            if (!error.isForegroundServiceStartRejection()) throw error
+            controller.onDurableServiceDestroyed(sessionToken)
+            removeForegroundNotification()
+        }
     }
 
     /** Returns a stable PendingIntent for a notification action owned by this service. */
     internal fun actionIntent(
         action: String,
         sessionToken: String,
-    ): PendingIntent =
-        PendingIntent.getService(
+    ): PendingIntent {
+        val actionGeneration =
+            (promotedController ?: hostResolver(service)?.conversationDictation)
+                ?.takeIf { it.notificationSessionToken == sessionToken }
+                ?.notificationActionGeneration ?: 0L
+        return PendingIntent.getService(
             this,
             action.hashCode(),
             Intent()
-                .setClass(this, ConversationDictationForegroundService::class.java)
+                .setClass(this, NotificationStreamForegroundService::class.java)
                 .setAction(action)
                 .setData(
                     Uri
@@ -258,43 +285,37 @@ class ConversationDictationForegroundService : Service() {
                         .authority("session")
                         .appendPath(sessionToken)
                         .appendPath(action)
+                        .appendPath(actionGeneration.toString())
                         .build(),
-                ).putExtra(EXTRA_SESSION_TOKEN, sessionToken),
+                ).putExtra(EXTRA_SESSION_TOKEN, sessionToken)
+                .putExtra(EXTRA_ACTION_GENERATION, actionGeneration),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-
-    /** Reopens the existing White Noise task without exposing the dictation target in intent extras. */
-    private fun openAppIntent(): PendingIntent =
-        PendingIntent.getActivity(
-            this,
-            0,
-            Intent()
-                .setClass(this, MainActivity::class.java)
-                .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
+    }
 
     companion object {
         internal const val CHANNEL_ID = "composer_dictation"
-        private const val NOTIFICATION_ID = BackgroundConnectionNotification.NOTIFICATION_ID
 
         @Volatile
         private var activeService: ConversationDictationForegroundService? = null
 
-        /** Lets a background-connection refresh preserve active dictation controls. */
+        /** Exposes the current microphone lease's presentation for lifecycle assertions. */
         internal fun activeNotificationOrNull(): Notification? =
             activeService?.let { service ->
                 val controller = service.promotedController
                 val token = service.promotedSessionToken
                 controller
                     ?.takeIf { token != null && it.hasDurableSession && it.notificationSessionToken == token }
-                    ?.let(service::buildNotification)
+                    ?.let { controller ->
+                        buildConversationDictationNotification(service, controller, service::actionIntent)
+                    }
             }
 
         internal const val ACTION_CANCEL = "dev.ipf.whitenoise.android.dictation.CANCEL"
         internal const val ACTION_PASTE = "dev.ipf.whitenoise.android.dictation.PASTE"
         internal const val ACTION_SEND = "dev.ipf.whitenoise.android.dictation.SEND"
         internal const val EXTRA_SESSION_TOKEN = "dictation_session_token"
+        internal const val EXTRA_ACTION_GENERATION = "dictation_action_generation"
 
         /** A foreground service can run even when Android hides all of its drawer actions. */
         internal fun notificationControlsAvailable(context: Context): Boolean {
@@ -305,24 +326,19 @@ class ConversationDictationForegroundService : Service() {
 
         /** Test seam for resolving the process-owned controller. */
         internal var hostResolver: (Service) -> ConversationDictationServiceHost? = { service ->
-            (service.application as? WhiteNoiseApplication)?.appState?.let { appState ->
-                object : ConversationDictationServiceHost {
-                    override val conversationDictation: ConversationDictationController
-                        get() = appState.conversationDictation
+            (service.application as? WhiteNoiseApplication)
+                ?.initializedAppState()
+                ?.initializedConversationDictation()
+                ?.let { controller ->
+                    object : ConversationDictationServiceHost {
+                        override val conversationDictation = controller
+                    }
                 }
-            }
         }
 
         /** Test seam for simulating platform rejection of foreground promotion. */
-        internal var foregroundPromoter: (ConversationDictationForegroundService, Notification) -> Unit =
-            { service, notification ->
-                ServiceCompat.startForeground(
-                    service,
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
-                )
-            }
+        internal var foregroundPromoter: (NotificationStreamForegroundService, Notification, Int) -> Unit =
+            { service, notification, type -> service.foreground.promoteDictation(notification, type) }
 
         /** Starts the microphone service while the initiating composer is visible. */
         fun start(
@@ -332,7 +348,8 @@ class ConversationDictationForegroundService : Service() {
             runCatching {
                 ContextCompat.startForegroundService(
                     context,
-                    Intent(context, ConversationDictationForegroundService::class.java)
+                    Intent(context, NotificationStreamForegroundService::class.java)
+                        .setAction(ACTION_START)
                         .putExtra(EXTRA_SESSION_TOKEN, sessionToken),
                 )
                 true
@@ -342,25 +359,23 @@ class ConversationDictationForegroundService : Service() {
                 )
             }.getOrDefault(false)
 
-        /** Stops the service after the controller has released recognition ownership. */
+        /** Releases only dictation; connection work keeps the shared host alive. */
+        @Suppress("UNUSED_PARAMETER") // Existing controller API accepts its application context.
         fun stop(context: Context) {
-            activeService?.let { service ->
-                if (service.promotedController?.hasDurableSession != true) {
-                    service.removeForegroundNotification()
-                }
-            }
-            val result =
-                runCatching {
-                    context.stopService(Intent(context, ConversationDictationForegroundService::class.java))
-                }
-            conversationDictationDiagnostic(
-                "event=foreground_service_stop accepted=${result.getOrDefault(false)} " +
-                    "error=${result.exceptionOrNull()?.javaClass?.simpleName ?: "none"}",
-            )
+            activeService
+                ?.takeIf { it.promotedController?.hasDurableSession != true }
+                ?.removeForegroundNotification()
+            conversationDictationDiagnostic("event=foreground_service_stop accepted=true")
         }
 
+        internal const val ACTION_START = "dev.ipf.whitenoise.android.dictation.START"
+
+        internal fun isCommand(intent: Intent?): Boolean =
+            intent?.action in setOf(ACTION_START, ACTION_CANCEL, ACTION_PASTE, ACTION_SEND) ||
+                intent?.hasExtra(EXTRA_SESSION_TOKEN) == true
+
         /** Creates the low-importance, badge-free channel once per installation. */
-        private fun ensureChannel(context: Context) {
+        internal fun ensureChannel(context: Context) {
             val manager = context.getSystemService(NotificationManager::class.java) ?: return
             if (manager.getNotificationChannel(CHANNEL_ID) != null) return
             manager.createNotificationChannel(
@@ -377,35 +392,6 @@ class ConversationDictationForegroundService : Service() {
     }
 }
 
-/** Describes actual readiness/finalization, never a model download or invented percentage. */
-private fun dictationNotificationStatus(controller: ConversationDictationController): Int =
-    when {
-        controller.deliveryInProgress -> R.string.message_status_pending
-        controller.state is ConversationDictationState.Starting -> R.string.dictation_starting
-        controller.state is ConversationDictationState.Processing -> R.string.dictation_processing
-        else -> R.string.dictation_notification_text
-    }
-
 /** Recognizes API 31+'s explicit foreground-start rejection without resolving that class on older Android. */
-private fun Throwable.isForegroundServiceStartRejection(): Boolean =
+internal fun Throwable.isForegroundServiceStartRejection(): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && this is ForegroundServiceStartNotAllowedException
-
-/** Preserves a newer dictation or a connection owner of the shared notification ID. */
-private fun restoreDictationNotification(context: Context) {
-    val replacement = ConversationDictationForegroundService.activeNotificationOrNull()
-    val notificationId = BackgroundConnectionNotification.NOTIFICATION_ID
-    val manager = context.getSystemService(NotificationManager::class.java)
-    when {
-        replacement != null -> {
-            manager?.notify(notificationId, replacement)
-            conversationDictationDiagnostic("event=foreground_notification_closed outcome=replaced")
-        }
-        BackgroundConnectionNotification.restoreIfForeground(context.applicationContext) -> {
-            conversationDictationDiagnostic("event=foreground_notification_closed outcome=connection_restored")
-        }
-        else -> {
-            manager?.cancel(notificationId)
-            conversationDictationDiagnostic("event=foreground_notification_closed outcome=removed")
-        }
-    }
-}

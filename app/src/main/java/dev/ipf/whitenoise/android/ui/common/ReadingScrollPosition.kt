@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -66,7 +67,7 @@ internal fun Modifier.readerScrollIndicator(
 ): Modifier {
     val alpha = rememberReadingIndicatorAlpha(owner, enabled) { state.isScrollInProgress }
     val color = MaterialTheme.colorScheme.onSurfaceVariant
-    return drawWithContent {
+    return clipToBounds().drawWithContent {
         drawContent()
         if (enabled) {
             readerScrollPosition(state.value, state.maxValue, state.viewportSize)?.let {

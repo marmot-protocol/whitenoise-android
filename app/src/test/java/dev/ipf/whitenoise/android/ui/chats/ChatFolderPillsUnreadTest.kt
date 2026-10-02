@@ -54,7 +54,9 @@ class ChatFolderPillsUnreadTest {
             .onNodeWithTag(CHAT_LIST_FILTER_CHIP_ALL_TAG)
             .assertContentDescriptionEquals("Chats, 99 unread messages")
         composeRule.runOnIdle { count = 100uL }
-        assertTrue(chatsPillVisibleCount(100uL) == "99+")
+        assertTrue(chatsPillVisibleCount(100uL) == "100")
+        assertTrue(chatsPillVisibleCount(999uL) == "999")
+        assertTrue(chatsPillVisibleCount(1000uL) == "999+")
         composeRule
             .onNodeWithTag(CHAT_LIST_FILTER_CHIP_ALL_TAG)
             .assertContentDescriptionEquals("Chats, 100 unread messages")
@@ -68,7 +70,7 @@ class ChatFolderPillsUnreadTest {
         val description = chatsPillAccessibleDescription(resources, "Chats", ULong.MAX_VALUE)
         assertTrue(description.contains("18,446,744,073,709,551,615"))
         assertTrue(description.endsWith("unread messages"))
-        assertTrue(chatsPillVisibleCount(ULong.MAX_VALUE) == "99+")
+        assertTrue(chatsPillVisibleCount(ULong.MAX_VALUE) == "999+")
         assertTrue(R.plurals.chat_folder_chat_count != R.plurals.chat_pill_unread_messages_count)
     }
 

@@ -206,6 +206,58 @@ class ConversationDictationPersistentControlTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
+    /** The visible retry for a blocked Send sends retained text instead of pasting or recording again. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun blockedSendOffersExplicitPasteAndRetrySend() =
+        runTest {
+            var accepted = false
+            val sent = mutableListOf<String>()
+            val fixture =
+                fixture(
+                    TextFieldValue("Draft", TextRange(5)),
+                    deliveryScope = this,
+                    send = { request ->
+                        if (accepted && request.beginDispatch()) {
+                            sent += request.payload
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+            fixture.controller.send()
+            fixture.platform.listener.onResult("dictated")
+            runCurrent()
+            render(fixture)
+            assertEquals("Draft", fixture.draft.text)
+            composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
+            composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
+            accepted = true
+            composeRule.onNodeWithContentDescription("Retry Send").performClick()
+            runCurrent()
+            assertEquals(listOf("Draft dictated"), sent)
+            assertEquals("", fixture.draft.text)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        }
+
+    /** Recovery into a changed draft requires an actual Paste gesture. */
+    @Test
+    fun blockedSendExplicitPasteRecoversIntoChangedDraftWithoutSending() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        fixture.controller.send()
+        fixture.edit(TextFieldValue("Updated", TextRange(7)))
+        fixture.platform.listener.onResult("dictated")
+        render(fixture)
+        assertEquals("Updated", fixture.draft.text)
+        composeRule.onNodeWithContentDescription("Paste").performClick()
+        assertEquals("Updated dictated", fixture.draft.text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
     /** Verifies provider-readiness feedback and cancellation fit at large font in RTL. */
     @Test
     fun readinessFeedbackFitsTheRootBarAtLargeFontRtl() {
@@ -261,10 +313,140 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithContentDescription("Open the speech service").assertIsDisplayed()
     }
 
+    /** Recognition failure keeps the unsent outcome explicit and offers review through Paste. */
+    @Test
+    fun partialSendFailureNamesBothUnsentOutcomeAndCause() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            fontScale = 2f,
+            rtl = true,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Recognized prefix",
+                    cause = ConversationDictationFailure.Network,
+                    recognitionIncomplete = true,
+                ),
+        )
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val status =
+            context.getString(R.string.dictation_send_blocked) + " · " +
+                context.getString(R.string.dictation_network_error)
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
+        )
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onNodeWithText("Incomplete dictation").assertIsDisplayed()
+        composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
+    }
+
+    /** A failed Paste tail keeps its recognized prefix accessible alongside audio Retry and Dismiss. */
+    @Test
+    fun failedAudioPrefixOffersPasteAtLargeRtl() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            fontScale = 2f,
+            rtl = true,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.NoSpeech,
+                    "Recognized prefix",
+                    recognitionIncomplete = true,
+                ),
+        )
+        listOf("Paste", "Retry", "Dismiss").forEach { label ->
+            val bounds = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
+            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.bottom - bounds.top >= 48.dp)
+        }
+    }
+
+    /** Provider settings remain available while the unsent prefix requires an explicit review choice. */
+    @Test
+    fun partialProviderFailureOffersRetrySendAndSettingsInConfirmation() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Recognized prefix",
+                    cause = ConversationDictationFailure.ProviderUnavailable,
+                    recognitionIncomplete = true,
+                ),
+        )
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onNodeWithText("Open the speech service").assertIsDisplayed()
+        composeRule.onNodeWithText("Paste").assertIsDisplayed()
+    }
+
+    /** Completed recognition that failed validation must not be described as interrupted speech. */
+    @Test
+    fun completedSendValidationDoesNotShowIncompleteDictation() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Completed transcript",
+                    cause = ConversationDictationFailure.Unknown,
+                ),
+        )
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onAllNodesWithText("Incomplete dictation").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+    }
+
+    /** Unknown recognition failures still require explicit consent before sending a prefix. */
+    @Test
+    fun unknownRecognitionFailureStillRequiresPartialSendConfirmation() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Recognized prefix",
+                    cause = ConversationDictationFailure.Unknown,
+                    recognitionIncomplete = true,
+                ),
+        )
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onNodeWithText("Incomplete dictation").assertIsDisplayed()
+        composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
+    }
+
     private fun render(
         fixture: Fixture,
         fontScale: Float = 1f,
         rtl: Boolean = false,
+        displayedState: ConversationDictationState? = null,
     ) {
         composeRule.setContent {
             val density = LocalDensity.current
@@ -275,7 +457,7 @@ class ConversationDictationPersistentControlTest {
                 WhiteNoiseTheme {
                     Box(Modifier.width(268.dp).testTag(ROOT_TAG)) {
                         ConversationDictationPersistentControl(
-                            state = fixture.controller.state,
+                            state = displayedState ?: fixture.controller.state,
                             controller = fixture.controller,
                         )
                     }
@@ -299,11 +481,11 @@ class ConversationDictationPersistentControlTest {
                 readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
                 writeDraft = { _, _, expected, value ->
                     if (expected != revision) {
-                        false
+                        null
                     } else {
                         draft = value
                         revision += 1L
-                        true
+                        revision
                     }
                 },
                 disclosureAccepted = { true },

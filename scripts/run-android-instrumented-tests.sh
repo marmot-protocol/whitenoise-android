@@ -35,6 +35,9 @@ else
   ./gradlew :app:connectedDevZapstoreDebugAndroidTest \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
     --no-daemon --stacktrace
+  # A green full suite can still hide a required regression that @SdkSuppress or a
+  # rename filtered out. Require each declared case to have executed and passed.
+  python3 scripts/check_instrumented_required_cases.py app/build/outputs/androidTest-results/connected
 fi
 
 # PRs and master run native correctness only. Timing is a manual physical-device

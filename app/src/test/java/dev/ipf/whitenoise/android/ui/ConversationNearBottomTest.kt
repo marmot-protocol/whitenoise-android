@@ -231,7 +231,7 @@ class ConversationNearBottomTest {
             }
         }
         composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel, substring = true).assertDoesNotExist()
 
         val viewportHeight =
             listState.layoutInfo.viewportEndOffset - listState.layoutInfo.viewportStartOffset
@@ -247,7 +247,7 @@ class ConversationNearBottomTest {
         assertEquals(tailTimelineIndex, nearTail.index)
         assertTrue(nearTailDistanceFromViewport in 1 until viewportHeight / 4)
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel, substring = true).assertDoesNotExist()
 
         val farTailOffset = viewportHeight / 2 + beforePadding
         scrollTo(listState, tailTimelineIndex, farTailOffset)
@@ -257,13 +257,13 @@ class ConversationNearBottomTest {
         assertEquals(tailTimelineIndex, lastVisible.index)
         assertTrue(tailDistanceFromViewport > viewportHeight / 4)
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel, substring = true).assertIsDisplayed()
 
-        composeRule.onNodeWithContentDescription(jumpToNewestLabel).performClick()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel, substring = true).performClick()
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel, substring = true).assertDoesNotExist()
         composeRule.runOnIdle {
             assertFalse(
                 "Jump to newest must reach the physical end of the list",
@@ -325,15 +325,15 @@ class ConversationNearBottomTest {
         // history before the jump affordance has anything to return from.
         scrollTo(listState, 30)
         composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel, substring = true).assertIsDisplayed()
         composeRule.onNodeWithText("3").assertIsDisplayed()
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertDoesNotExist()
 
-        composeRule.onNodeWithContentDescription(jumpToNewestLabel).performClick()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel, substring = true).performClick()
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag(TAIL_ROW_TAG).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(jumpToNewestLabel).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(jumpToNewestLabel, substring = true).assertDoesNotExist()
         composeRule.runOnIdle {
             assertTrue(coordinatorHolder[0]!!.isFollowingTail)
         }

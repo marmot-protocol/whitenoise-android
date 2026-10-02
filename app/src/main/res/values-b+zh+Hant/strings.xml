@@ -126,10 +126,14 @@
     <string name="chat_row_action_delete_group">刪除群組</string>
     <string name="chat_row_action_delete_chat">刪除對話</string>
     <string name="delete_chat_dialog_title">刪除對話？</string>
-    <string name="delete_chat_dialog_message">從此裝置移除此對話？如果你仍是成員，將先退出對話。</string>
+    <string name="delete_chat_dialog_message">從此裝置刪除此對話？</string>
     <string name="delete_group_dialog_title">刪除群組？</string>
-    <string name="delete_group_dialog_message">從此裝置移除此群組？如果你仍是成員，將先退出群組。</string>
+    <string name="delete_group_dialog_message">從此裝置刪除此群組？</string>
     <string name="delete_group_confirm">刪除</string>
+    <string name="delete_from_device">從此裝置刪除</string>
+    <string name="leave_and_delete">退出並刪除</string>
+    <string name="leave_and_delete_message">退出此群組並從此裝置刪除聊天記錄？</string>
+    <string name="toast_left_chat_delete_failed">已退出群組，但本機刪除失敗。</string>
     <string name="group_reset_action">重設並等待新邀請</string>
     <string name="group_reset_dialog_title">要在此裝置上重設此群組嗎？</string>
     <string name="group_reset_dialog_message">White Noise 只會在此裝置上清除該群組的歷史紀錄與加密狀態，不會傳送任何內容給群組。只有當管理員在此次重設後傳送新的邀請時，你才會重新加入。</string>
@@ -160,7 +164,7 @@
     </plurals>
     <string name="message_selection_action_delete">刪除所選訊息</string>
     <plurals name="chat_list_bulk_delete_confirm">
-        <item quantity="other">從此裝置刪除 %1$d 個聊天？</item>
+        <item quantity="other">刪除 %1$d 個對話？此操作不會退出對話。</item>
     </plurals>
     <plurals name="toast_chat_list_chats_archived">
         <item quantity="other">已封存 %1$d 個聊天</item>
@@ -2127,4 +2131,6 @@
     <string name="dictation_audio_focus_unavailable">無法暫停其他音訊。請重試，或在聽寫設定中關閉「暫停其他音訊」。</string>
     <string name="checking_invitation">正在檢查邀請…</string>
     <string name="couldnt_check_invitation">無法檢查邀請</string>
+    <string name="toast_leave_not_confirmed_history_kept">尚未確認退出。歷史記錄已保留。</string>
+    <string name="delete_local_does_not_leave">此操作不會退出對話。</string>
 </resources>

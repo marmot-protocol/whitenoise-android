@@ -13,6 +13,8 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.loadAccountWideForwardTargets
+import dev.ipf.whitenoise.android.state.mergeForwardTargets
 
 internal data class ShareChatPickerDataSource(
     val controller: ChatsController?,
@@ -68,6 +70,10 @@ internal fun rememberShareChatPickerSelectionState(
     )
 }
 
+/**
+ * The picker's target source for [selectedAccountRef]: the active account's controller, or a picker-owned
+ * controller bound to another account, each merged with the one account-wide read behind the open picker.
+ */
 @Composable
 internal fun rememberShareChatPickerDataSource(
     appState: WhiteNoiseAppState,
@@ -89,6 +95,12 @@ internal fun rememberShareChatPickerDataSource(
             controllerBinder(accountController, selectedAccountRef)
         }
     }
+    val accountWideTargets =
+        rememberAccountWideForwardTargets(
+            appState = appState,
+            accountController = accountController,
+            selectedAccountRef = selectedAccountRef,
+        )
 
     return when {
         selectedAccountRef == null ->
@@ -104,7 +116,7 @@ internal fun rememberShareChatPickerDataSource(
         accountController != null ->
             ShareChatPickerDataSource(
                 controller = accountController,
-                targets = accountController.forwardTargets(),
+                targets = mergeForwardTargets(accountController.forwardTargets(), accountWideTargets),
                 isLoading = accountController.isLoading,
                 error = accountController.error,
                 memberSnapshotsRevision = accountController.memberSnapshotsRevision,
@@ -114,7 +126,7 @@ internal fun rememberShareChatPickerDataSource(
         else ->
             ShareChatPickerDataSource(
                 controller = null,
-                targets = appState.forwardTargets(),
+                targets = mergeForwardTargets(appState.forwardTargets(), accountWideTargets),
                 isLoading = appState.forwardTargetsLoading,
                 error = appState.forwardTargetsError,
                 memberSnapshotsRevision = appState.forwardTargetMembersRevision,
@@ -122,4 +134,36 @@ internal fun rememberShareChatPickerDataSource(
                 retryLoad = appState::retryForwardTargets,
             )
     }
+}
+
+/**
+ * The one account-wide MDK read behind an open picker (#2618): chats beyond the retained window for
+ * [selectedAccountRef], or null until it lands or when it is unavailable. The read is keyed to the account
+ * the source controller is actually bound to, so switching accounts cancels it and a late result for the
+ * previous account is never merged into the next one; the controller rejects a result whose binding
+ * changed while the read ran.
+ */
+@Composable
+private fun rememberAccountWideForwardTargets(
+    appState: WhiteNoiseAppState,
+    accountController: ChatsController?,
+    selectedAccountRef: String?,
+): List<ChatListItem>? {
+    // The controller has no account to read for until its bind has started, which is when it publishes
+    // boundAccountRef; the merge prefers retained rows, so reading before the first window frame is safe.
+    val boundAccountRef = accountController?.boundAccountRef ?: appState.activeAccountRef
+    val targets = remember(accountController, selectedAccountRef) { mutableStateOf<List<ChatListItem>?>(null) }
+    LaunchedEffect(accountController, selectedAccountRef, boundAccountRef) {
+        targets.value = null
+        if (selectedAccountRef == null || boundAccountRef != selectedAccountRef) return@LaunchedEffect
+        // A bound controller is authoritative for its account: a null read must not fall back to the active
+        // account's rows, which would list another account's chats under this selection.
+        targets.value =
+            if (accountController != null) {
+                accountController.loadAccountWideForwardTargets()
+            } else {
+                appState.loadAccountWideForwardTargets()
+            }
+    }
+    return targets.value
 }

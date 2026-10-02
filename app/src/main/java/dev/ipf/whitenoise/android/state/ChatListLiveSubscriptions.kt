@@ -161,6 +161,8 @@ internal class ChatListLiveSubscriptions(
     val openPresentedChatList: (suspend (account: String) -> ChatListWindowHandle)? = null,
     /** Keyed MDK read used only when a replacement omits an active row that should still fit in its window. */
     val presentedRowByGroup: (suspend (account: String, groupIdHex: String) -> PresentedChatRowFfi?)? = null,
+    /** Account-wide MDK read for pickers that must offer every chat, not only the retained window (#2618). */
+    val presentedChatList: (suspend (account: String, includeArchived: Boolean) -> List<PresentedChatRowFfi>)? = null,
 ) {
     companion object {
         /** Binds the seam to the production MarmotKit runtime. */
@@ -188,6 +190,11 @@ internal class ChatListLiveSubscriptions(
                 },
                 presentedRowByGroup = { account, groupIdHex ->
                     appState.marmotIo { presentedChatListRow(account, groupIdHex) }
+                },
+                presentedChatList = { account, includeArchived ->
+                    appState.marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
+                        presentedChatList(account, includeArchived).rows
+                    }
                 },
             )
     }

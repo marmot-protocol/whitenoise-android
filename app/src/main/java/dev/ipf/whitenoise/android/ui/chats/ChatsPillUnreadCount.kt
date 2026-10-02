@@ -5,20 +5,15 @@ import android.icu.number.NumberFormatter
 import android.icu.text.PluralRules
 import android.os.Build
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.unreadBadgeLabel
 import java.math.BigDecimal
 
-private const val CHAT_PILL_VISUAL_COUNT_CAP = 99
 private const val MAX_EXACT_DOUBLE_INTEGER = 9_007_199_254_740_992uL
 private const val LARGE_COUNT_MODULUS = 1_000_000_000uL
 private const val LARGE_COUNT_BASE = 1_000_000_000_000uL
 
-/** Visual pill count; accessibility still receives the uncapped native total. */
-internal fun chatsPillVisibleCount(count: ULong): String? =
-    when {
-        count == 0uL -> null
-        count > CHAT_PILL_VISUAL_COUNT_CAP.toULong() -> "$CHAT_PILL_VISUAL_COUNT_CAP+"
-        else -> count.toString()
-    }
+/** Visual pill count, exact through 999 and `999+` beyond; accessibility still receives the uncapped native total. */
+internal fun chatsPillVisibleCount(count: ULong): String? = if (count == 0uL) null else unreadBadgeLabel(count)
 
 /** Formats the full native ULong with its locale plural category, including values above Int.MAX_VALUE. */
 internal fun chatsPillAccessibleDescription(

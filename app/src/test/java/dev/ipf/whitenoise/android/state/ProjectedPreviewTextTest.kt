@@ -10,9 +10,12 @@ import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
+import dev.ipf.marmotkit.GroupSystemEventFfi
+import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.MediaPreviewFallback
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
@@ -232,7 +235,113 @@ class ProjectedPreviewTextTest {
         assertEquals("custom empty", item.projectedPreviewText(copy, empty = "custom empty"))
     }
 
+    /** A member removal previews the removed member's local name, never the admin who removed them (#1581). */
+    @Test
+    fun membershipPreviewNamesTheAffectedSubjectNotTheActor() {
+        val item = membershipItem(membershipEvent("member_removed"))
+
+        assertEquals("Bob was removed", item.projectedPreviewText(copy, groupSystemNames = previewNames()))
+    }
+
+    /** Each membership and admin type names its own subject with the localized passive form. */
+    @Test
+    fun everyMembershipTypeNamesItsSubject() {
+        assertEquals("Bob was added", membershipPreview("member_added"))
+        assertEquals("Bob was made an admin", membershipPreview("admin_added"))
+        assertEquals("Bob is no longer an admin", membershipPreview("admin_removed"))
+    }
+
+    /** The reader's own membership change takes the self form rather than a profile label. */
+    @Test
+    fun selfSubjectUsesTheSelfForm() {
+        val names = previewNames(self = SUBJECT)
+
+        assertEquals("You were added", membershipPreview("member_added", names))
+        assertEquals("You were removed", membershipPreview("member_removed", names))
+    }
+
+    /** An identity-only local label yields to MDK's prepared name, and with neither the shortened npub shows. */
+    @Test
+    fun unresolvedProfileFallsBackToPreparedLabelThenNpub() {
+        val npubOnly = previewNames(resolve = { SHORT_NPUB })
+        val prepared = membershipItem(membershipEvent("member_added", subjectDisplayName = "Bobby"))
+        val unprepared = membershipItem(membershipEvent("member_added", subjectDisplayName = null))
+
+        assertEquals("Bobby was added", prepared.projectedPreviewText(copy, groupSystemNames = npubOnly))
+        assertEquals("$SHORT_NPUB was added", unprepared.projectedPreviewText(copy, groupSystemNames = npubOnly))
+    }
+
+    /** A profile that loads after the first frame replaces the fallback on the next render. */
+    @Test
+    fun hydratedProfileReplacesTheFallback() {
+        var loaded: String? = null
+        val names = previewNames(resolve = { loaded ?: SHORT_NPUB })
+        val item = membershipItem(membershipEvent("member_added", subjectDisplayName = null))
+
+        assertEquals("$SHORT_NPUB was added", item.projectedPreviewText(copy, groupSystemNames = names))
+        loaded = "Bob"
+        assertEquals("Bob was added", item.projectedPreviewText(copy, groupSystemNames = names))
+    }
+
+    /** A member-authored kind-1210 row stays neutral and never asks for the payload-claimed subject's name. */
+    @Test
+    fun memberAuthoredMembershipRowStaysNeutral() {
+        val asked = mutableListOf<String>()
+        val names =
+            previewNames(resolve = {
+                asked += it
+                "Bob"
+            })
+        val event = membershipEvent("member_removed").copy(provenance = GroupSystemEventProvenanceFfi.MEMBER_AUTHORED)
+
+        val text = membershipItem(event).projectedPreviewText(copy, groupSystemNames = names)
+
+        assertEquals(copy.groupSystem.fallback, text)
+        assertEquals(emptyList<String>(), asked)
+    }
+
+    /** Callers that pass no names, such as search, keep the name-free passive preview. */
+    @Test
+    fun withoutNamesThePreviewStaysNameFree() {
+        val item = membershipItem(membershipEvent("member_removed"))
+
+        assertEquals("Someone was removed", item.projectedPreviewText(copy))
+    }
+
     // ---- helpers ------------------------------------------------------------
+
+    /** A chat-list item whose latest projected message is the typed kind-1210 [event]. */
+    private fun membershipItem(event: GroupSystemEventFfi) = item(preview("", 1210uL, groupSystem = event))
+
+    /** The preview text of an authenticated [systemType] row rendered with [names]. */
+    private fun membershipPreview(
+        systemType: String,
+        names: GroupSystemPreviewNames = previewNames(),
+    ) = membershipItem(membershipEvent(systemType)).projectedPreviewText(copy, groupSystemNames = names)
+
+    /** An authenticated membership event in which [ACTOR] acted on [SUBJECT]. */
+    private fun membershipEvent(
+        systemType: String,
+        subjectDisplayName: String? = "Prepared Bob",
+    ) = GroupSystemEventFfi(
+        provenance = GroupSystemEventProvenanceFfi.AUTHENTICATED_GROUP_STATE,
+        actorDisplayName = "Alice",
+        subjectDisplayName = subjectDisplayName,
+        systemType = systemType,
+        text = "",
+        actorAccountIdHex = ACTOR,
+        subjectAccountIdHex = SUBJECT,
+        name = null,
+        oldName = null,
+        oldRetentionSeconds = null,
+        newRetentionSeconds = null,
+    )
+
+    /** Preview names for reader [self] that resolve [SUBJECT] to "Bob" and anyone else to "Alice" by default. */
+    private fun previewNames(
+        self: String? = READER,
+        resolve: (String) -> String? = { id -> if (id == SUBJECT) "Bob" else "Alice" },
+    ) = GroupSystemPreviewNames(self, resolve)
 
     private fun item(
         preview: ChatListMessagePreviewFfi?,
@@ -255,6 +364,7 @@ class ProjectedPreviewTextTest {
         plaintext: String = "",
     ) = preview(plaintext = plaintext, attachmentKind = kind, attachmentCount = count)
 
+    /** A projected chat-list preview row; [groupSystem] carries MDK's typed kind-1210 event when set. */
     private fun preview(
         plaintext: String,
         kind: ULong = 9uL,
@@ -262,6 +372,7 @@ class ProjectedPreviewTextTest {
         attachmentKind: ChatListAttachmentKindFfi? = null,
         attachmentCount: UInt = 0u,
         deliveryState: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        groupSystem: GroupSystemEventFfi? = null,
     ) = ChatListMessagePreviewFfi(
         retentionSeconds = null,
         retentionExpiresAt = null,
@@ -276,7 +387,7 @@ class ProjectedPreviewTextTest {
         deletionSource = DeletionSourceFfi.UNKNOWN,
         attachmentKind = attachmentKind,
         attachmentCount = attachmentCount,
-        groupSystem = null,
+        groupSystem = groupSystem,
         deliveryState = deliveryState,
     )
 
@@ -375,4 +486,11 @@ class ProjectedPreviewTextTest {
             allowedLocatorKinds = listOf("blossom-v1"),
             defaultBlobEndpoints = listOf(AppBlobEndpointFfi(locatorKind = "blossom-v1", baseUrl = "https://blossom.primal.net")),
         )
+
+    private companion object {
+        val ACTOR = "a1".repeat(32)
+        val SUBJECT = "b2".repeat(32)
+        val READER = "c3".repeat(32)
+        const val SHORT_NPUB = "npub1qy352…r4ttmx"
+    }
 }

@@ -53,12 +53,14 @@ import dev.ipf.marmotkit.ChatListAttachmentKindFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.MessageBodyMatch
 import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.messagePreviewForRetention
+import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
@@ -329,6 +331,7 @@ internal fun ChatRow(
                     fallbackPictureUrl = avatarAccount?.let { item.selectedAvatarUrl ?: appState.avatarUrl(it) },
                     firstFrameAvatar = item.firstFrameAvatar,
                     durableAvatar = item.selectedAvatarAsset,
+                    durableAvatarIsPersonPicture = item.selectedAvatarIsPersonPicture,
                 )
                 if (pinned) {
                     Surface(
@@ -402,6 +405,9 @@ internal fun ChatRow(
                                 item.projectedPreviewText(
                                     copy = messageTextCopy,
                                     empty = stringResource(R.string.no_messages_yet),
+                                    // Names the affected member and refreshes when their profile loads (#1581).
+                                    groupSystemNames =
+                                        GroupSystemPreviewNames(activeAccountIdHex, appState::chatMemberTitle),
                                 )
                         },
                     )
