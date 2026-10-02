@@ -65,6 +65,7 @@ internal fun PollMessageContent(
         remember(controller, item.record.messageIdHex) {
             PollMessageActionOwner(controller.boundAccountRef, controller.group.groupIdHex, item.record.messageIdHex)
         }
+    var ownerAvailable by remember(controller, owner) { mutableStateOf(true) }
     var deadlineReached by remember(owner, poll.endsAt) {
         mutableStateOf(pollDeadlineReached(poll.endsAt, System.currentTimeMillis()))
     }
@@ -83,12 +84,15 @@ internal fun PollMessageContent(
             PollVotingCard(
                 poll = poll,
                 voteKey = owner.accountRef to owner.messageId,
-                canVote = canVote && !deadlineReached,
+                canVote = canVote && ownerAvailable && !deadlineReached,
                 open = poll.open && !deadlineReached,
                 footer = footer,
                 submitVote = { replacement, onCompleted ->
                     appState.launchMutation {
-                        submitOwnedPollVote(controller, owner, replacement, onCompleted)
+                        submitOwnedPollVote(controller, owner, replacement) { outcome ->
+                            ownerAvailable = controller.acceptsConversationActionOwner(owner.accountRef, owner.groupId)
+                            onCompleted(outcome)
+                        }
                     }
                 },
             )
