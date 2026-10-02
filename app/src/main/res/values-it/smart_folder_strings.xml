@@ -38,7 +38,10 @@
     <string name="smart_folder_keyword_hint">Ricerca nel titolo senza distinzione tra maiuscole e minuscole</string>
     <string name="smart_folder_pending_hint">Il SDK attuale non può confermare che non ci siano messaggi in uscita in attesa. Solo un ultimo messaggio in attesa ne dimostra la presenza; le altre chat restano indeterminate.</string>
     <string name="smart_folder_negate_condition">Escludi corrispondenze (NON)</string>
-    <string name="smart_folder_loaded_count">%1$d corrispondenze caricate</string>
+    <plurals name="smart_folder_loaded_count">
+        <item quantity="one">%1$d corrispondenza caricata</item>
+        <item quantity="other">%1$d corrispondenze caricate</item>
+    </plurals>
     <string name="smart_folder_unresolved">%1$d chat caricate hanno dati delle regole indeterminati.</string>
     <string name="smart_folder_invalid">Queste regole non sono valide o non sono supportate. Le corrispondenze automatiche sono disattivate; sostituiscile per modificarle.</string>
     <string name="smart_folder_presets">Inizia da un modello</string>

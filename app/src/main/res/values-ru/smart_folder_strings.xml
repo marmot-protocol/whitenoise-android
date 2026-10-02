@@ -38,7 +38,12 @@
     <string name="smart_folder_keyword_hint">Поиск в заголовке без учёта регистра</string>
     <string name="smart_folder_pending_hint">Текущий SDK не может подтвердить отсутствие ожидающих исходящих сообщений. Только последнее ожидающее сообщение доказывает их наличие; остальные чаты остаются неопределёнными.</string>
     <string name="smart_folder_negate_condition">Исключать совпадения (НЕ)</string>
-    <string name="smart_folder_loaded_count">Загруженные совпадения: %1$d</string>
+    <plurals name="smart_folder_loaded_count">
+        <item quantity="one">%1$d загруженное совпадение</item>
+        <item quantity="few">%1$d загруженных совпадения</item>
+        <item quantity="many">%1$d загруженных совпадений</item>
+        <item quantity="other">%1$d загруженного совпадения</item>
+    </plurals>
     <string name="smart_folder_unresolved">У %1$d загруженных чатов данные для правил не определены.</string>
     <string name="smart_folder_invalid">Эти правила недопустимы или не поддерживаются. Автоматический отбор отключён; замените правила для редактирования.</string>
     <string name="smart_folder_presets">Начать с шаблона</string>

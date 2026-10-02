@@ -38,7 +38,10 @@
     <string name="smart_folder_keyword_hint">Buscar en el título sin distinguir mayúsculas</string>
     <string name="smart_folder_pending_hint">El SDK actual no puede confirmar que no haya mensajes salientes pendientes. Solo un último mensaje pendiente demuestra su presencia; los demás chats quedan sin determinar.</string>
     <string name="smart_folder_negate_condition">Excluir coincidencias (NO)</string>
-    <string name="smart_folder_loaded_count">%1$d coincidencias cargadas</string>
+    <plurals name="smart_folder_loaded_count">
+        <item quantity="one">%1$d coincidencia cargada</item>
+        <item quantity="other">%1$d coincidencias cargadas</item>
+    </plurals>
     <string name="smart_folder_unresolved">%1$d chats cargados tienen datos de reglas sin determinar.</string>
     <string name="smart_folder_invalid">Estas reglas no son válidas o no son compatibles. Las coincidencias automáticas están desactivadas; reemplázalas para editarlas.</string>
     <string name="smart_folder_presets">Empezar con una plantilla</string>

@@ -38,7 +38,10 @@
   <string name="smart_folder_keyword_hint">Case-insensitive title match</string>
   <string name="smart_folder_pending_hint">The current SDK cannot verify that no outgoing message is pending. Only a pending latest message proves presence; other rows stay unresolved.</string>
   <string name="smart_folder_negate_condition">Exclude matches (NOT)</string>
-  <string name="smart_folder_loaded_count">%1$d loaded matches</string>
+    <plurals name="smart_folder_loaded_count">
+        <item quantity="one">%1$d loaded match</item>
+        <item quantity="other">%1$d loaded matches</item>
+    </plurals>
   <string name="smart_folder_unresolved">%1$d loaded chats have unresolved rule data.</string>
   <string name="smart_folder_invalid">This rule set is unsupported or invalid. Automatic matching is disabled; replace it to edit.</string>
   <string name="smart_folder_presets">Start from a preset</string>

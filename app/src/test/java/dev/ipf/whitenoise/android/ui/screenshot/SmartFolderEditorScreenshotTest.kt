@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.settings.CHAT_FOLDER_EDIT_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditContent
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditFormState
+import dev.ipf.whitenoise.android.ui.settings.LegacyFolderRuleControls
 import dev.ipf.whitenoise.android.ui.settings.SmartFolderPanelState
 import dev.ipf.whitenoise.android.ui.settings.SmartFolderRulePanel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -47,6 +48,14 @@ class SmartFolderEditorScreenshotTest {
 
     @Test fun manualFolder() = capture("smart_folder_manual")
 
+    @Test fun singleMatch() = capture("smart_folder_single_match")
+
+    @Test fun simpleExpanded() = capture("smart_folder_simple_expanded")
+
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
+    fun simpleExpandedRtlLarge() = capture("smart_folder_simple_rtl_large", rtl = true)
+
     @Test fun empty() = capture("smart_folder_empty", empty = true)
 
     @Test
@@ -68,7 +77,8 @@ class SmartFolderEditorScreenshotTest {
         rtl: Boolean = false,
         rules: Boolean = false,
     ) {
-        val manual = name == "smart_folder_manual"
+        val simpleExpanded = name.startsWith("smart_folder_simple_")
+        val manual = name == "smart_folder_manual" || simpleExpanded
         val conditions =
             listOf(
                 SmartFolderFilter.Condition(
@@ -103,20 +113,7 @@ class SmartFolderEditorScreenshotTest {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
                     ChatFolderEditContent(
                         state =
-                            ChatFolderEditFormState(
-                                isNew = true,
-                                name = TextFieldState(if (manual) "Personal" else "Agent chats"),
-                                description = TextFieldState(if (manual) "" else "All read"),
-                                keyword = TextFieldState(),
-                                unreadOnly = false,
-                                includeMuted = true,
-                                groupsOnly = false,
-                                archivedOnly = false,
-                                manualChatCount = 0,
-                                peopleCount = if (manual) 0 else 1,
-                                previewCount = if (empty || manual) 0 else 8,
-                                canSave = true,
-                            ),
+                            formState(name, manual, empty),
                         onUnreadOnlyChange = {},
                         onIncludeMutedChange = {},
                         onGroupsOnlyChange = {},
@@ -142,18 +139,74 @@ class SmartFolderEditorScreenshotTest {
                                 },
                                 onStart = {},
                                 onChange = {},
-                                legacyControls = {},
+                                legacyControls = {
+                                    LegacyFolderRuleControls(
+                                        keyword = TextFieldState(),
+                                        unread = false,
+                                        muted = true,
+                                        groups = false,
+                                        archived = false,
+                                        mentions = false,
+                                        direct = false,
+                                        pinned = false,
+                                        peopleCount = 0,
+                                        onUnread = {},
+                                        onMuted = {},
+                                        onGroups = {},
+                                        onArchived = {},
+                                        onMentions = {},
+                                        onDirect = {},
+                                        onPinned = {},
+                                        onPeople = {},
+                                    )
+                                },
                             )
                         },
                     )
                 }
             }
         }
+        if (simpleExpanded) expandSimple(rtl)
         if (rules) {
             composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.group."))
         }
         if (dialog) composeRule.onNodeWithTag("folder.condition.1").performClick()
         val target = if (dialog) composeRule.onNode(isDialog()) else composeRule.onRoot()
         target.captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    private fun formState(
+        name: String,
+        manual: Boolean,
+        empty: Boolean,
+    ): ChatFolderEditFormState =
+        ChatFolderEditFormState(
+            isNew = true,
+            name = TextFieldState(if (manual) "Personal" else "Agent chats"),
+            description = TextFieldState(if (manual) "" else "All read"),
+            keyword = TextFieldState(),
+            unreadOnly = false,
+            includeMuted = true,
+            groupsOnly = false,
+            archivedOnly = false,
+            manualChatCount = 0,
+            peopleCount = if (manual) 0 else 1,
+            previewCount =
+                if (empty || manual) {
+                    0
+                } else if (name == "smart_folder_single_match") {
+                    1
+                } else {
+                    8
+                },
+            advancedRules = !manual,
+            canSave = true,
+        )
+
+    private fun expandSimple(rtl: Boolean) {
+        val content = composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+        content.performScrollToNode(hasTestTag("folder.legacyEdit"))
+        composeRule.onNodeWithTag("folder.legacyEdit").performClick()
+        if (rtl) content.performScrollToNode(hasTestTag("folder.keyword"))
     }
 }

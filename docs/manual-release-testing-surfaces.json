@@ -29787,7 +29787,7 @@
       {
         "surface": "smart_folder_loaded_count",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.smart_folder_loaded_count",
+        "anchor": "R.plurals.smart_folder_loaded_count",
         "test_ids": [
           "FLD-004"
         ]
@@ -30077,6 +30077,18 @@
         "test_ids": [
           "GRP-011"
         ]
+      },
+      {
+        "surface": "Simple folder keyword help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.folder_keyword_hint",
+        "test_ids": ["FLD-003", "FLD-004"]
+      },
+      {
+        "surface": "Simple folder combination help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LegacyFolderRuleControls.kt",
+        "anchor": "R.string.folder_rule_hint",
+        "test_ids": ["FLD-003", "FLD-004"]
       }
     ]
   },

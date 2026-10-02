@@ -607,8 +607,6 @@ class ChatListReconnectIntegrationTest {
         }
     }
 
-    /** Builds a numeric-only diagnostics collector without enabling logcat output. */
-
     /** Supplies a rendered empty target projection before live streams open. */
     private fun emptyLocalSnapshot(): AccountSwitchLocalSnapshot =
         AccountSwitchLocalSnapshot(
@@ -635,8 +633,6 @@ private fun awaitChatListCondition(condition: () -> Boolean) {
     }
     throw AssertionError("Chat-list condition not met within 5 simulated seconds")
 }
-
-/** Controllable chat-list subscription used by the recovery integration test. */
 
 /** Exercises the native window adapter used on advanced-folder entry. */
 @RunWith(RobolectricTestRunner::class)
@@ -679,6 +675,7 @@ class SmartFolderWindowResetTest {
     }
 }
 
+/** Builds a numeric-only diagnostics collector without enabling logcat output. */
 private fun testRecoveryDiagnostics(): NotificationNetworkRecoveryDiagnostics =
     NotificationNetworkRecoveryDiagnostics(
         traceFactory = { null },

@@ -38,7 +38,9 @@
     <string name="smart_folder_keyword_hint">Başlıkta büyük/küçük harfe duyarsız arama</string>
     <string name="smart_folder_pending_hint">Mevcut SDK, bekleyen giden mesaj olmadığını doğrulayamaz. Yalnızca bekleyen bir son mesaj varlığı kanıtlar; diğer sohbetler belirsiz kalır.</string>
     <string name="smart_folder_negate_condition">Eşleşmeleri hariç tut (DEĞİL)</string>
-    <string name="smart_folder_loaded_count">%1$d yüklenen eşleşme</string>
+    <plurals name="smart_folder_loaded_count">
+        <item quantity="other">%1$d yüklenen eşleşme</item>
+    </plurals>
     <string name="smart_folder_unresolved">%1$d yüklenen sohbetin kural verileri belirsiz.</string>
     <string name="smart_folder_invalid">Bu kurallar geçersiz veya desteklenmiyor. Otomatik eşleştirme devre dışı; düzenlemek için değiştirin.</string>
     <string name="smart_folder_presets">Bir ön ayarla başla</string>

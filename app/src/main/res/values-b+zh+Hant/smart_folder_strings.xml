@@ -38,7 +38,9 @@
     <string name="smart_folder_keyword_hint">標題比對不區分大小寫</string>
     <string name="smart_folder_pending_hint">目前 SDK 無法確認沒有待傳送訊息。只有最後一則訊息處於待傳送狀態時才能證明其存在；其他聊天仍無法確定。</string>
     <string name="smart_folder_negate_condition">排除比對結果（非）</string>
-    <string name="smart_folder_loaded_count">%1$d 個已載入的比對結果</string>
+    <plurals name="smart_folder_loaded_count">
+        <item quantity="other">%1$d 個已載入的比對結果</item>
+    </plurals>
     <string name="smart_folder_unresolved">%1$d 個已載入聊天的規則資料無法確定。</string>
     <string name="smart_folder_invalid">此規則集無效或不受支援。自動比對已停用；請取代規則集以編輯。</string>
     <string name="smart_folder_presets">從預設開始</string>

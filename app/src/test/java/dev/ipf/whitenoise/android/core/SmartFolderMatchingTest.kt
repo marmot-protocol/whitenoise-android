@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.state.allLoadedFolderChats
 import dev.ipf.whitenoise.android.state.chatFolderSource
+import dev.ipf.whitenoise.android.ui.settings.smartFolderUnresolvedCount
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -39,6 +40,28 @@ class SmartFolderMatchingTest {
         filter: SmartFolderFilter,
         row: ChatListItem,
     ) = smartFolderMatches(filter, row) { "Release Team" }
+
+    @Test fun emptyAndIncompleteRulesDoNotReportMissingData() {
+        val source = listOf(item("g"))
+        assertEquals(0, smartFolderUnresolvedCount(null, source) { "Team" })
+        assertEquals(0, smartFolderUnresolvedCount(SmartFolderFilter.Group(), source) { "Team" })
+        val unfinished = SmartFolderFilter.Group(children = listOf(SmartFolderFilter.Group()))
+        assertEquals(0, smartFolderUnresolvedCount(unfinished, source) { "Team" })
+        val unknown =
+            SmartFolderFilter.Group(
+                children =
+                    listOf(
+                        condition(
+                            FolderField.PARTICIPANTS,
+                            values = setOf(agent),
+                            mode = FolderMode.ANY_OF,
+                        ),
+                    ),
+            )
+        assertEquals(1, smartFolderUnresolvedCount(unknown, source) { "Team" })
+        val known = SmartFolderFilter.Group(children = listOf(condition(FolderField.UNREAD)))
+        assertEquals(0, smartFolderUnresolvedCount(known, source) { "Team" })
+    }
 
     @Test fun nestedAllAnyAndNotHaveDifferentTruthTables() {
         val allRead = condition(FolderField.UNREAD, FolderMode.NONE)

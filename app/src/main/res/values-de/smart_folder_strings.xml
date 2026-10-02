@@ -38,7 +38,10 @@
     <string name="smart_folder_keyword_hint">Titelvergleich ohne Beachtung der Großschreibung</string>
     <string name="smart_folder_pending_hint">Das aktuelle SDK kann nicht bestätigen, dass keine ausgehende Nachricht aussteht. Nur eine ausstehende letzte Nachricht bestätigt das Vorhandensein; andere Chats bleiben ungeklärt.</string>
     <string name="smart_folder_negate_condition">Treffer ausschließen (NICHT)</string>
-    <string name="smart_folder_loaded_count">%1$d geladene Treffer</string>
+    <plurals name="smart_folder_loaded_count">
+        <item quantity="one">%1$d geladener Treffer</item>
+        <item quantity="other">%1$d geladene Treffer</item>
+    </plurals>
     <string name="smart_folder_unresolved">Bei %1$d geladenen Chats sind Regeldaten ungeklärt.</string>
     <string name="smart_folder_invalid">Dieser Regelsatz ist ungültig oder wird nicht unterstützt. Automatische Zuordnung ist deaktiviert; ersetze ihn zum Bearbeiten.</string>
     <string name="smart_folder_presets">Mit einer Vorlage beginnen</string>

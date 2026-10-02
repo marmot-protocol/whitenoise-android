@@ -6,6 +6,8 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
@@ -34,6 +36,8 @@ internal fun LegacyFolderRuleControls(
 ) {
     WhiteNoiseTextField(
         state = keyword,
+        modifier = Modifier.testTag("folder.keyword"),
+        supportingText = { Text(stringResource(R.string.folder_keyword_hint)) },
         label = {
             Text(stringResource(R.string.chat_folder_keyword_label))
         },
@@ -105,4 +109,5 @@ internal fun LegacyFolderRuleControls(
             )
         }
     }
+    SettingsExplainer(stringResource(R.string.folder_rule_hint))
 }

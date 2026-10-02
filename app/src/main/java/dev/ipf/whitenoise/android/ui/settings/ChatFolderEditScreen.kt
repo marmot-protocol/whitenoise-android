@@ -36,10 +36,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.FolderTruth
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
-import dev.ipf.whitenoise.android.core.smartFolderMatches
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -316,6 +314,7 @@ private fun ChatFolderEditSession(
                 manualChatCount = manualChatIds.size,
                 peopleCount = memberHexes.size,
                 previewCount = previewRows.size,
+                advancedRules = smartPayload != null,
                 canSave =
                     name.text.isNotBlank() &&
                         !missing &&
@@ -345,22 +344,9 @@ private fun ChatFolderEditSession(
         onPinnedOnlyChange = { pinnedOnly = it },
         rulesContent = {
             val unresolved =
-                smartRoot?.let { tree ->
-                    source.count { item ->
-                        smartFolderMatches(
-                            tree,
-                            item,
-                        ) {
-                            chatListItemDisplayTitle(
-                                it,
-                                appState,
-                                groupTitleCopy,
-                            )
-                        } ==
-                            FolderTruth.UNKNOWN
-                    }
+                smartFolderUnresolvedCount(smartRoot, source) {
+                    chatListItemDisplayTitle(it, appState, groupTitleCopy)
                 }
-                    ?: 0
             SmartFolderRulePanel(
                 state = SmartFolderPanelState(smartPayload != null, smartRoot, unresolved),
                 people = memberRows,
@@ -478,6 +464,7 @@ internal data class ChatFolderEditFormState(
     val unreadMentionsOnly: Boolean = false,
     val directChatsOnly: Boolean = false,
     val pinnedOnly: Boolean = false,
+    val advancedRules: Boolean = false,
 )
 
 /** The form without any store access, so tests can render every draft. */
@@ -634,8 +621,12 @@ internal fun ChatFolderEditContent(
                             title = stringResource(R.string.folder_preview),
                             onClick = onOpenPreview,
                             subtitle =
-                                if (rulesContent != null) {
-                                    stringResource(R.string.smart_folder_loaded_count, state.previewCount)
+                                if (state.advancedRules) {
+                                    pluralStringResource(
+                                        R.plurals.smart_folder_loaded_count,
+                                        state.previewCount,
+                                        state.previewCount,
+                                    )
                                 } else {
                                     pluralStringResource(
                                         R.plurals.chat_folder_chat_count,

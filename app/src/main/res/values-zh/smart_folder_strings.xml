@@ -38,7 +38,9 @@
     <string name="smart_folder_keyword_hint">标题匹配不区分大小写</string>
     <string name="smart_folder_pending_hint">当前 SDK 无法确认没有待发送消息。只有最后一条消息处于待发送状态时才能证明其存在；其他聊天仍无法确定。</string>
     <string name="smart_folder_negate_condition">排除匹配项（非）</string>
-    <string name="smart_folder_loaded_count">%1$d 个已加载的匹配项</string>
+    <plurals name="smart_folder_loaded_count">
+        <item quantity="other">%1$d 个已加载的匹配项</item>
+    </plurals>
     <string name="smart_folder_unresolved">%1$d 个已加载聊天的规则数据无法确定。</string>
     <string name="smart_folder_invalid">此规则集无效或不受支持。自动匹配已禁用；请替换规则集以编辑。</string>
     <string name="smart_folder_presets">从预设开始</string>

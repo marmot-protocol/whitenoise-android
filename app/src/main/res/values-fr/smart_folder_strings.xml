@@ -38,7 +38,10 @@
     <string name="smart_folder_keyword_hint">Recherche dans le titre sans distinction de casse</string>
     <string name="smart_folder_pending_hint">Le SDK actuel ne peut pas confirmer l’absence de messages sortants en attente. Seul un dernier message en attente prouve leur présence ; les autres conversations restent indéterminées.</string>
     <string name="smart_folder_negate_condition">Exclure les correspondances (NON)</string>
-    <string name="smart_folder_loaded_count">%1$d correspondances chargées</string>
+    <plurals name="smart_folder_loaded_count">
+        <item quantity="one">%1$d correspondance chargée</item>
+        <item quantity="other">%1$d correspondances chargées</item>
+    </plurals>
     <string name="smart_folder_unresolved">Les données des règles restent indéterminées pour %1$d conversations chargées.</string>
     <string name="smart_folder_invalid">Ces règles sont invalides ou non prises en charge. Le filtrage automatique est désactivé ; remplacez-les pour les modifier.</string>
     <string name="smart_folder_presets">Commencer avec un modèle</string>
