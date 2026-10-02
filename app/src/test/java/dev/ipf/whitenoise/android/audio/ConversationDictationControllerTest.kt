@@ -2915,7 +2915,10 @@ class ConversationDictationControllerTest {
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         fixture.platform.listener.onResult("first segment")
         fixture.scheduler.runDelay(500L)
+        fixture.platform.listener.onBeginningOfSpeech()
         fixture.controller.send()
+        assertTrue(fixture.controller.state is ConversationDictationState.Processing)
+        assertTrue(fixture.controller.foregroundMicrophoneRequired)
         fixture.platform.tracksCallerAudioDisposal = true
         fixture.platform.discardCaptureActive = true
         fixture.platform.deferDiscardClosure = true
