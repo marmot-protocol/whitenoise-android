@@ -217,7 +217,7 @@ private fun SetupSingleDeviceNotice(discovered: OnboardingDeviceDiscoveryFfi?) {
     }
 }
 
-/** Shows the complete replacement before publication, including separate read/write capabilities. */
+/** Shows usable relay routes and explains recommendation preservation versus custom replacement. */
 @Composable
 private fun SetupProposalContent(proposal: OnboardingRepairProposalFfi) {
     if (proposal.step == OnboardingStepFfi.PROFILE) {

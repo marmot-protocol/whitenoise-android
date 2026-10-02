@@ -1910,7 +1910,7 @@
     <string name="setup_device_possible">Этот аккаунт может использоваться на другом устройстве. Если продолжить здесь, оно может перестать получать новые чаты.</string>
     <string name="setup_device_unknown">Не удалось определить, существует ли другая установка. Продолжайте, только если хотите использовать это устройство.</string>
     <string name="setup_profile_publish_help">Сохраните этот профиль в аккаунте Nostr.</string>
-    <string name="setup_replacement_warning">Ретрансляторы, которых нет в этом списке, будут удалены. Это также повлияет на другие приложения Nostr.</string>
+    <string name="setup_replacement_warning">Рекомендации сохраняют все существующие записи ретрансляторов, включая не показанные здесь. Пользовательский список удаляет пропущенные ретрансляторы. Изменения также влияют на другие приложения Nostr.</string>
     <string name="setup_inbox_list">Реле входящих сообщений</string>
     <string name="setup_read_list">Реле для чтения</string>
     <string name="setup_write_list">Реле для записи</string>

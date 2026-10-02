@@ -1,5 +1,6 @@
 """Execute the workflow's aggregate gate against GitHub dependency outcomes."""
 
+import io
 import json
 import os
 from pathlib import Path
@@ -7,6 +8,8 @@ import re
 import subprocess
 import textwrap
 import unittest
+
+from scripts.check_runtime_listener_coverage import OWNER, check_coverage
 
 
 WORKFLOW = Path(__file__).resolve().parents[1] / '.github/workflows/android-ci.yml'
@@ -167,6 +170,19 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPropertyName("roborazziSnapshots")', self.app_build)
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
+    def test_teardown_floor_reuses_report_and_propagates_report_failure(self):
+        floor = self.named_step(self.tests_job, 'Runtime listener teardown coverage floor')
+        self.assertIn("matrix.flavor == 'Zapstore'", floor)
+        self.assertIn("steps.unit_tests.outcome == 'success'", floor)
+        self.assertIn('COVERAGE_REPORT_OUTCOME: ${{ steps.coverage_report.outcome }}', floor)
+        self.assertIn('test "$COVERAGE_REPORT_OUTCOME" = success', floor)
+        self.assertIn('scripts/check_runtime_listener_coverage.py', floor)
+        self.assertIn('app/build/reports/kover/reportDevZapstoreDebug.xml', floor)
+        self.assertNotIn('continue-on-error:', floor)
+        self.assertNotIn('./gradlew', floor)
+        self.assertIn('        id: coverage_report\n',
+                      self.named_step(self.tests_job, 'Coverage report (Kover)'))
+
     def test_screenshot_owners_come_from_the_checked_registry(self):
         """Both flavors verify the registered owners, then prove every golden was compared."""
         self.assertIn("name: Curated screenshot verification (${{ matrix.flavor }})", self.screenshots)
@@ -313,6 +329,46 @@ class AndroidCiGateTest(unittest.TestCase):
         outcomes = self.successful_outcomes()
         outcomes[self.dependencies[0]] = {'outputs': {}}
         self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+
+
+class RuntimeListenerCoverageTest(unittest.TestCase):
+    """Reject missing coverage and prove pure cancellation tests are insufficient."""
+
+    def report(self, counters, extra=''):
+        classes = ''.join(
+            f'<class name="{name}"><counter type="LINE" covered="{covered}" missed="{missed}"/>'
+            f'{extra}</class>' for name, covered, missed in counters
+        )
+        return io.StringIO(f'<report><package name="state">{classes}</package></report>')
+
+    def test_measured_production_coverage_passes_without_double_counting_methods(self):
+        report = self.report([(OWNER, 15, 1), (OWNER + '$cleanup', 1, 0)],
+                             '<method><counter type="LINE" covered="0" missed="999"/></method>')
+        self.assertEqual(check_coverage(report), (16, 17))
+
+    def test_pure_owner_tests_do_not_satisfy_resource_coverage(self):
+        with self.assertRaisesRegex(ValueError, '10/17'):
+            check_coverage(self.report([(OWNER, 10, 6), (OWNER + '$cleanup', 0, 1)]))
+
+    def test_missing_empty_or_generated_only_owner_is_rejected(self):
+        for counters in ([], [(OWNER, 0, 0)], [(OWNER + '$cleanup', 1, 0)],
+                         [(OWNER + 'Unrelated', 100, 0)]):
+            with self.subTest(counters=counters), self.assertRaises(ValueError):
+                check_coverage(self.report(counters))
+
+    def test_unrelated_classes_cannot_inflate_coverage(self):
+        with self.assertRaises(ValueError):
+            check_coverage(self.report([(OWNER, 9, 8), (OWNER + 'Unrelated', 1000, 0)]))
+
+    def test_invalid_or_missing_class_counters_are_rejected(self):
+        for covered in ('-1', '1.5', '', 'NaN'):
+            with self.subTest(covered=covered), self.assertRaises(ValueError):
+                check_coverage(self.report([(OWNER, covered, 1)]))
+        for counter in ('', '<counter type="LINE" covered="16" missed="1"/>' * 2):
+            with self.subTest(counter=counter), self.assertRaises(ValueError):
+                check_coverage(io.StringIO(
+                    f'<report><package><class name="{OWNER}">{counter}</class></package></report>'
+                ))
 
 
 if __name__ == '__main__':

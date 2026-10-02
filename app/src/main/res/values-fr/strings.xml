@@ -1848,7 +1848,7 @@
     <string name="setup_device_possible">Un autre appareil utilise peut-être ce compte. Continuer ici pourrait l’empêcher de recevoir de nouvelles discussions.</string>
     <string name="setup_device_unknown">Nous n’avons pas pu déterminer si une autre installation existe. Continuez uniquement si vous souhaitez utiliser cet appareil.</string>
     <string name="setup_profile_publish_help">Enregistrez ce profil dans votre compte Nostr.</string>
-    <string name="setup_replacement_warning">Les relais absents de cette liste seront supprimés. Cela affecte aussi vos autres applications Nostr.</string>
+    <string name="setup_replacement_warning">Les recommandations conservent toutes les entrées de relais existantes, même celles qui ne sont pas affichées ici. Une liste personnalisée supprime les relais omis. Les changements affectent aussi vos autres applications Nostr.</string>
     <string name="setup_inbox_list">Relais de réception</string>
     <string name="setup_read_list">Relais de lecture</string>
     <string name="setup_write_list">Relais d’écriture</string>

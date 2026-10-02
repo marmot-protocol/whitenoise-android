@@ -32,14 +32,15 @@ import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.CustomEmoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiSet
 import dev.ipf.whitenoise.android.ui.EmojiArt
+import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.ReceivedEmoji
-import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_GRID_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_SUGGESTIONS_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiShortcodeSuggestions
+import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCategoryTestTag
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReaderSelectablePlainText
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import dev.ipf.whitenoise.android.ui.settings.CustomEmojiContent
@@ -165,7 +166,10 @@ class CustomEmojiScreenshotTest {
             }
         }
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithTag(EMOJI_PICKER_GRID_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
+            composeRule
+                .onAllNodesWithTag(emojiPickerCategoryTestTag(EmojiCategory.SmileysAndPeople))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
         }
         composeRule
             .onNodeWithTag("custom-emoji-picker")

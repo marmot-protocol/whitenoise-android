@@ -1846,7 +1846,7 @@
     <string name="setup_device_possible">Başka bir cihaz bu hesabı kullanıyor olabilir. Burada devam ederseniz o cihaz yeni sohbetleri alamayabilir.</string>
     <string name="setup_device_unknown">Başka bir kurulum olup olmadığını belirleyemedik. Yalnızca bu cihazı kullanmak istiyorsanız devam edin.</string>
     <string name="setup_profile_publish_help">Bu profili Nostr hesabınıza kaydedin.</string>
-    <string name="setup_replacement_warning">Bu listede yer almayan aktarıcılar kaldırılacak. Bu, diğer Nostr uygulamalarınızı da etkiler.</string>
+    <string name="setup_replacement_warning">Öneriler, burada gösterilmeyenler dahil mevcut tüm aktarıcı kayıtlarını korur. Özel bir liste, dışarıda bırakılan aktarıcıları kaldırır. Değişiklikler diğer Nostr uygulamalarınızı da etkiler.</string>
     <string name="setup_inbox_list">Gelen kutusu röleleri</string>
     <string name="setup_read_list">Okuma röleleri</string>
     <string name="setup_write_list">Yazma röleleri</string>
