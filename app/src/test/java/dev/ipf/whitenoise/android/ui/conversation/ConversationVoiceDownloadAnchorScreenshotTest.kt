@@ -1193,8 +1193,7 @@ internal abstract class ConversationVoiceDownloadAnchorTestBase {
 
         /** Waits until production reaches the selected materialization attempt. */
         fun awaitMaterializationAttempt(index: Int) {
-            composeRule.waitUntil(timeoutMillis = PHASE_TIMEOUT_MILLIS) {
-                shadowOf(Looper.getMainLooper()).idle()
+            awaitMountedConversationCondition("voice materialization attempt $index for $messageId") {
                 attemptStarted[index].isCompleted
             }
         }
