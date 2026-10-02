@@ -128,7 +128,7 @@ class MessageMultiSelectCoverageTest {
         assertTrue(source.contains("messageBubbleSelectionGutterWidth"))
         assertTrue(source.contains("if (mine) Spacer(Modifier.weight(1f))"))
         assertTrue(!source.contains(".matchParentSize()"))
-        assertTrue(source.contains("canSelect = !deleted && !readOnly && batchSelectable"))
+        assertTrue(source.contains("canSelect = !deleted && !actionsReadOnly && batchSelectable"))
     }
 
     @Test

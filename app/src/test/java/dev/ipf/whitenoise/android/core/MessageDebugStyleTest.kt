@@ -68,6 +68,13 @@ class MessageDebugStyleTest {
     }
 
     @Test
+    fun pollRemainsInteractiveBubbleWithStreamingDebugEnabled() {
+        val record = message(id = "poll", plaintext = "{\"private-envelope\":true}", kind = 1068uL)
+        assertEquals(TimelineRowKind.Bubble, timelineRowKind(record, streamingDebugEnabled = false))
+        assertEquals(TimelineRowKind.Bubble, timelineRowKind(record, streamingDebugEnabled = true))
+    }
+
+    @Test
     fun reactionBecomesDebugRowOnlyWhenDebugOn() {
         val record = reaction(id = "r1", sender = "alice", target = "m1", emoji = "👍", at = 1u)
 

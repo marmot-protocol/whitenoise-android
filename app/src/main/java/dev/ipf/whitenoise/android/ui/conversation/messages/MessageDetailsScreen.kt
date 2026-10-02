@@ -46,6 +46,7 @@ import androidx.core.os.ConfigurationCompat
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -117,6 +118,12 @@ internal fun MessageDetailsScreen(
     canDismissReports: Boolean = false,
     onDismissReport: (ContentReportFfi) -> Unit = {},
 ) {
+    val contentText =
+        if (MessageProjector.isPollKind(record.kind)) {
+            stringResource(R.string.poll_preview)
+        } else {
+            record.plaintext
+        }
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -151,7 +158,7 @@ internal fun MessageDetailsScreen(
                             .testTag(MESSAGE_DETAILS_LIST_TAG),
                     verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
                 ) {
-                    MessageDetailsContentCard(record.plaintext, attachmentLabels)
+                    MessageDetailsContentCard(contentText, attachmentLabels)
                     MessageFactsSection(record, status, mine, senderNpub, onCopy)
                     if (reactions.isNotEmpty()) MessageReactionsSection(reactions)
                     if (reports != null) {

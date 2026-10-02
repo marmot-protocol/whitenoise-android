@@ -56,10 +56,13 @@ class LongMessageFullScreenComposerCoverageTest {
                 "RemovedMemberComposerNotice()" in fullScreenCall &&
                 "InvitationActions(" in fullScreenCall,
         )
+        val expandedComposerGate =
+            "val canUseExpandedComposer = !deleted && !actionsReadOnly && " +
+                "composerGate == ComposerGate.COMPOSER"
         assertTrue(
             "expanded reader reply/react actions must require a live message and an active shared composer",
             "if (expandedFullView && !deleted)" in body &&
-                "val canUseExpandedComposer = !deleted && !readOnly && composerGate == ComposerGate.COMPOSER" in body &&
+                expandedComposerGate in body &&
                 "canReply = canUseExpandedComposer" in fullScreenCall &&
                 "canReact = canUseExpandedComposer" in fullScreenCall,
         )

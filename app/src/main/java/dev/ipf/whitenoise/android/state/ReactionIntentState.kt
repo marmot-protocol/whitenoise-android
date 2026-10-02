@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.ConversationMessageReferencesFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+
 /** Stable map key for the latest optimistic state of one message and emoji. */
 internal fun reactionIntentOverlayId(
     target: String,
@@ -42,3 +45,33 @@ internal fun knownReactionEventIds(
                 ?.let { put(emoji, it) }
             authoritativeEventIds?.let(::putAll)
         }
+
+/** Uses the current window summary first, falling back to legacy timeline reaction records. */
+internal fun projectedOwnReactionEmojis(
+    references: ConversationMessageReferencesFfi?,
+    record: TimelineMessageRecordFfi?,
+    accountIdHex: String,
+): MutableSet<String> =
+    references
+        ?.reactions
+        ?.items
+        ?.filter { it.viewerReacted }
+        ?.mapTo(linkedSetOf()) { it.emoji }
+        ?: record
+            ?.reactions
+            ?.userReactions
+            .orEmpty()
+            .filter { it.sender.equals(accountIdHex, ignoreCase = true) }
+            .mapTo(linkedSetOf()) { it.emoji }
+
+/** Retains only the active account's usable reaction event ids from legacy timeline rows. */
+internal fun projectedOwnReactionEventIds(
+    record: TimelineMessageRecordFfi?,
+    accountIdHex: String,
+): Map<String, String> =
+    record
+        ?.reactions
+        ?.userReactions
+        .orEmpty()
+        .filter { it.sender.equals(accountIdHex, ignoreCase = true) && it.reactionMessageIdHex.isNotBlank() }
+        .associate { it.emoji to it.reactionMessageIdHex }
