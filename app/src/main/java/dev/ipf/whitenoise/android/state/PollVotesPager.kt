@@ -66,28 +66,40 @@ internal class PollVotesPager(
 
     private var generation = 0
 
+    /** The generation of the first-page read in flight, or null when none is, so paging cannot supersede it. */
+    private var refreshGeneration: Int? = null
+
     /**
      * Reads the first page again and supersedes any in-flight read. Votes already shown stay visible until
      * the new page replaces them, so a reprojection does not blank the list or lose the scroll position.
      */
     suspend fun refresh() {
         val mine = ++generation
+        refreshGeneration = mine
         val hadVotes = votes.isNotEmpty()
         if (!hadVotes) {
             hasMore = false
             phase = PollVotesPhase.LOADING
         }
-        read(mine, cursor = null)?.let { page ->
-            votes = page.votes
-            hasMore = page.hasMoreAfter && page.votes.isNotEmpty()
-            phase = PollVotesPhase.READY
-        } ?: failIfCurrent(mine, if (hadVotes) PollVotesPhase.READY else PollVotesPhase.FAILED)
+        try {
+            read(mine, cursor = null)?.let { page ->
+                votes = page.votes
+                hasMore = page.hasMoreAfter && page.votes.isNotEmpty()
+                phase = PollVotesPhase.READY
+            } ?: failIfCurrent(mine, if (hadVotes) PollVotesPhase.READY else PollVotesPhase.FAILED)
+        } finally {
+            if (refreshGeneration == mine) refreshGeneration = null
+        }
     }
 
-    /** Appends the next page; ignored while a read is in flight or when nothing follows. */
+    /**
+     * Appends the next page. Ignored while a read is in flight, including a refresh that keeps the phase
+     * READY, and when nothing follows, so paging never drops a newer first page as stale.
+     */
     suspend fun loadMore() {
         val last = votes.lastOrNull()
-        val idle = phase == PollVotesPhase.READY || phase == PollVotesPhase.MORE_FAILED
+        val settled = phase == PollVotesPhase.READY || phase == PollVotesPhase.MORE_FAILED
+        val idle = settled && refreshGeneration != generation
         if (!hasMore || !idle || last == null) return
         val mine = ++generation
         phase = PollVotesPhase.LOADING_MORE
@@ -148,19 +160,20 @@ internal suspend fun observePollProjection(
 }
 
 /**
- * Whether [event] reprojected the poll [pollEventId] of [groupIdHex] for [accountIdHex]. MDK says to re-read
+ * Whether [event] reprojected the poll [pollEventId] of [groupIdHex] for the account [accountRef], matched by the
+ * update's own account label so no separate account lookup can leave the watch silent. MDK says to re-read
  * per-voter results from the start then, and a same-option re-vote changes only `votedAt`, which the
  * poll row in the window never shows.
  */
 internal fun pollProjectionTouched(
     event: MarmotEventFfi,
-    accountIdHex: String?,
+    accountRef: String?,
     groupIdHex: String,
     pollEventId: String,
 ): Boolean {
     val runtime = (event as? MarmotEventFfi.ProjectionUpdated)?.update ?: return false
     val update = runtime.update
-    val sameScope = runtime.accountIdHex.equals(accountIdHex, ignoreCase = true) && update.groupIdHex == groupIdHex
+    val sameScope = accountRef != null && runtime.accountLabel == accountRef && update.groupIdHex == groupIdHex
     return sameScope &&
         (
             update.messages.any { it.messageIdHex == pollEventId } ||

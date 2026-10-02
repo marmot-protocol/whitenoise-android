@@ -1,5 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
@@ -10,9 +16,15 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.ipf.marmotkit.BlockListSnapshotFfi
 import dev.ipf.marmotkit.BlockedUserFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollVoteFfi
 import dev.ipf.marmotkit.PollVotePageFfi
+import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
+import dev.ipf.marmotkit.TimelineRemoveReasonFfi
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -37,6 +49,7 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
 
     /** Releases the controller so no screen job outlives the test. */
     @After fun clearController() {
+        closeProjectionStream()
         pollController.onCleared()
     }
 
@@ -66,10 +79,38 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         retain(item)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
-                PollMessageContent(item, pollController, pollState, canVote = true)
+                ConversationHost { PollMessageContent(item, pollController, pollState, canVote = true) }
             }
         }
     }
+
+    /** Provides the conversation-level votes host the way the screen does, around the poll [row]. */
+    @Composable
+    private fun ConversationHost(row: @Composable () -> Unit) {
+        val host = remember { PollVotesHostState() }
+        CompositionLocalProvider(LocalPollVotesHost provides host) {
+            row()
+            PollVotesHost(host, pollController, pollState)
+        }
+    }
+
+    /** Builds a projection event for the fixture's account and group that reprojects [item]'s poll. */
+    private fun touchingEvent(item: TimelineMessage) =
+        MarmotEventFfi.ProjectionUpdated(
+            RuntimeProjectionUpdateFfi(
+                "ff".repeat(32),
+                "personal",
+                TimelineProjectionUpdateFfi(
+                    pollController.group.groupIdHex,
+                    emptyList(),
+                    listOf(
+                        TimelineMessageChangeFfi.Remove(item.record.messageIdHex, TimelineRemoveReasonFfi.INVALIDATED),
+                    ),
+                    null,
+                    ChatListUpdateTriggerFfi.NEW_GROUP,
+                ),
+            ),
+        )
 
     /** Opens the sheet from the card's View votes action. */
     private fun openSheet() {
@@ -198,4 +239,52 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         composeRule.onNodeWithTag("poll-voter-$voterA").assertTextContains("Salad", substring = true)
         assertEquals(1, composeRule.countTagged("poll-voter-$voterA"))
     }
+
+    /** A projection event for the open poll re-reads the first page, and an unrelated one does not. */
+    @Test
+    fun touchingProjectionEventRefreshesTheOpenSheet() {
+        val item = votedPoll()
+        pollVotesResponder = { PollVotePageFfi(listOf(PollVoteFfi(voterA, listOf("a"), 10uL)), false) }
+        render(item)
+        openSheet()
+        awaitTag("poll-voter-$voterA")
+        val unrelated = item.copy(record = item.record.copy(messageIdHex = "dd".repeat(32)))
+
+        projectionEvents.put(touchingEvent(unrelated))
+        projectionEvents.put(touchingEvent(item))
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            recordedCalls().count { it.first == "pollVotes" } >= 2
+        }
+
+        assertEquals(2, recordedCalls().count { it.first == "pollVotes" })
+        composeRule.onNodeWithTag("poll-voter-$voterA").assertExists()
+    }
+
+    /** The sheet is hosted above the poll row, so disposing the row does not close it or lose its votes. */
+    @Test
+    fun sheetSurvivesTheRowLeavingTheComposition() {
+        val item = votedPoll()
+        pollVotesResponder = { singleVoterPage() }
+        retain(item)
+        var rowShown by mutableStateOf(true)
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                ConversationHost {
+                    if (rowShown) PollMessageContent(item, pollController, pollState, canVote = true)
+                }
+            }
+        }
+        openSheet()
+        awaitTag("poll-voter-$voterA")
+
+        rowShown = false
+        composeRule.waitForIdle()
+
+        assertEquals(0, composeRule.countTagged(POLL_VIEW_VOTES_TAG))
+        composeRule.onNodeWithTag(POLL_VOTES_SHEET_TAG).assertExists()
+        composeRule.onNodeWithTag("poll-voter-$voterA").assertExists()
+    }
+
+    /** One voter's native page, for tests that only need the sheet populated. */
+    private fun singleVoterPage() = PollVotePageFfi(listOf(PollVoteFfi(voterA, listOf("a"), 10uL)), false)
 }

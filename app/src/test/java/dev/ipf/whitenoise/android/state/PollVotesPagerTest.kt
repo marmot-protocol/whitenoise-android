@@ -1,14 +1,19 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.DeletionSourceFfi
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollVoteFfi
 import dev.ipf.marmotkit.PollVotePageFfi
 import dev.ipf.marmotkit.RuntimeProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
+import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineRemoveReasonFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -334,29 +339,116 @@ class PollVotesPagerTest {
             assertEquals(PollVotesPhase.READY, pager.phase)
         }
 
-    /** Only a projection update for this account, group and poll counts as touching it. */
+    /** A timeline record with only the identity fields the poll watch reads. */
+    private fun record(messageId: String) =
+        TimelineMessageRecordFfi(
+            clientToken = null,
+            messageIdHex = messageId,
+            sourceMessageIdHex = null,
+            direction = "received",
+            groupIdHex = "grp",
+            sender = "sender",
+            plaintext = "",
+            contentTokens =
+                MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0)),
+            kind = 1068uL,
+            tags = emptyList(),
+            timelineAt = 1uL,
+            receivedAt = 1uL,
+            replyToMessageIdHex = null,
+            replyPreview = null,
+            mediaJson = null,
+            media = emptyList(),
+            agentTextStreamJson = null,
+            poll = null,
+            groupSystem = null,
+            hasReports = false,
+            edit = null,
+            reactions = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList()),
+            deleted = false,
+            deletionSource = DeletionSourceFfi.UNKNOWN,
+            deletedByMessageIdHex = null,
+            invalidationStatus = null,
+            sourceEpoch = null,
+            retentionSeconds = null,
+            retentionExpiresAt = null,
+        )
+
+    /** Builds a projection event for the [account] label and [group] carrying the given messages and changes. */
+    private fun projectionEvent(
+        account: String = "acct",
+        group: String = "grp",
+        messages: List<TimelineMessageRecordFfi> = emptyList(),
+        changes: List<TimelineMessageChangeFfi> = emptyList(),
+    ) = MarmotEventFfi.ProjectionUpdated(
+        RuntimeProjectionUpdateFfi(
+            "ff".repeat(32),
+            account,
+            TimelineProjectionUpdateFfi(group, messages, changes, null, ChatListUpdateTriggerFfi.NEW_GROUP),
+        ),
+    )
+
+    /** Only a projection update for this account label, group and poll counts as touching it. */
     @Test
     fun onlyMatchingProjectionUpdatesTouchThePoll() {
-        fun update(
-            account: String = "acct",
-            group: String = "grp",
-            changes: List<TimelineMessageChangeFfi>,
-        ) = MarmotEventFfi.ProjectionUpdated(
-            RuntimeProjectionUpdateFfi(
-                account,
-                "label",
-                TimelineProjectionUpdateFfi(group, emptyList(), changes, null, ChatListUpdateTriggerFfi.NEW_GROUP),
-            ),
-        )
         val remove = listOf(TimelineMessageChangeFfi.Remove("poll", TimelineRemoveReasonFfi.INVALIDATED))
         val other = listOf(TimelineMessageChangeFfi.Remove("other", TimelineRemoveReasonFfi.INVALIDATED))
 
-        assertTrue(pollProjectionTouched(update(changes = remove), "ACCT", "grp", "poll"))
-        assertFalse(pollProjectionTouched(update(changes = other), "acct", "grp", "poll"))
-        assertFalse(pollProjectionTouched(update(group = "x", changes = remove), "acct", "grp", "poll"))
-        assertFalse(pollProjectionTouched(update(account = "x", changes = remove), "acct", "grp", "poll"))
+        assertTrue(pollProjectionTouched(projectionEvent(changes = remove), "acct", "grp", "poll"))
+        assertFalse(pollProjectionTouched(projectionEvent(changes = other), "acct", "grp", "poll"))
+        assertFalse(pollProjectionTouched(projectionEvent(group = "x", changes = remove), "acct", "grp", "poll"))
+        assertFalse(pollProjectionTouched(projectionEvent(account = "x", changes = remove), "acct", "grp", "poll"))
+        assertFalse(pollProjectionTouched(projectionEvent(changes = remove), null, "grp", "poll"))
         assertFalse(pollProjectionTouched(MarmotEventFfi.GroupJoined("a", "b", "c"), "acct", "grp", "poll"))
     }
+
+    /** An upserted poll row, or the poll among a reprojected window's messages, touches the poll. */
+    @Test
+    fun upsertAndWindowMessageProjectionsTouchThePoll() {
+        val trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE
+
+        fun upsert(id: String) = listOf(TimelineMessageChangeFfi.Upsert(trigger, record(id)))
+
+        assertTrue(pollProjectionTouched(projectionEvent(changes = upsert("poll")), "acct", "grp", "poll"))
+        assertFalse(pollProjectionTouched(projectionEvent(changes = upsert("other")), "acct", "grp", "poll"))
+        assertTrue(pollProjectionTouched(projectionEvent(messages = listOf(record("poll"))), "acct", "grp", "poll"))
+        assertFalse(pollProjectionTouched(projectionEvent(messages = listOf(record("other"))), "acct", "grp", "poll"))
+    }
+
+    /** Load more is ignored while a refresh reads, so the refreshed first page is not dropped as stale. */
+    @Test
+    fun loadMoreIsIgnoredWhileARefreshIsInFlight() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            var calls = 0
+            val pager =
+                PollVotesPager(
+                    reader = { _, _, _ ->
+                        when (calls++) {
+                            0 -> PollVotePageFfi(listOf(vote(1, "a")), true)
+                            1 -> {
+                                gate.await()
+                                PollVotePageFfi(listOf(vote(1, "b")), true)
+                            }
+                            else -> PollVotePageFfi(listOf(vote(2, "c")), false)
+                        }
+                    },
+                    isCurrent = { true },
+                )
+            pager.refresh()
+
+            val reload = launch { pager.refresh() }
+            runCurrent()
+            pager.loadMore()
+            gate.complete(Unit)
+            reload.join()
+
+            assertEquals(2, calls)
+            assertEquals(listOf("b"), pager.votes.single().optionIds)
+            assertEquals(PollVotesPhase.READY, pager.phase)
+            pager.loadMore()
+            assertEquals(3, calls)
+        }
 
     /** The watcher reports only touching events and stops when the stream ends. */
     @Test

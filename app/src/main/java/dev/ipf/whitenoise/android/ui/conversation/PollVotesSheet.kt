@@ -116,14 +116,13 @@ private fun PollProjectionWatch(
 ) {
     val currentOnTouched by rememberUpdatedState(onTouched)
     LaunchedEffect(owner) {
-        val accountId = appState.accounts.firstOrNull { it.label == owner.accountRef }?.accountIdHex
         while (true) {
             val subscription = runCatchingCancellable { appState.marmotIo { subscribeEvents() } }.getOrNull()
             try {
                 if (subscription != null) {
                     observePollProjection(
                         nextEvent = { withContext(Dispatchers.IO) { subscription.next() } },
-                        touched = { pollProjectionTouched(it, accountId, owner.groupId, owner.messageId) },
+                        touched = { pollProjectionTouched(it, owner.accountRef, owner.groupId, owner.messageId) },
                         onTouched = { currentOnTouched() },
                     )
                 }
