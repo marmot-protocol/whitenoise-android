@@ -725,6 +725,225 @@ class ConversationSendRetryIntegrationTest {
             assertEquals(MessageStatus.Failed, controller.timeline.single().status)
         }
 
+    /** The `:party:` emoji image these tests send. */
+    private fun partyArtwork() = LocalEmojiArtwork(":party:", "party.png", "image/png", byteArrayOf(1))
+
+    /** A controller whose text uses one custom emoji and whose emoji send runs [send] instead of a native call. */
+    private fun emojiController(
+        appState: WhiteNoiseAppState,
+        send: suspend () -> SendSummaryFfi,
+    ) = ConversationController(
+        appState = appState,
+        initialGroup = group(),
+        initialMemberSnapshot = memberSnapshot(),
+        customEmojiReader = { listOf(partyArtwork()) },
+        customEmojiSender = { _, _, _, _, _ -> send() },
+    )
+
+    /**
+     * Cancelling while the emoji images upload must not wait for the upload, must publish nothing, and
+     * must not hold the group commit lock, so reactions and edits stay usable meanwhile.
+     */
+    @Test
+    fun cancellingDuringACustomEmojiUploadPublishesNothingAndDoesNotBlockMutations() =
+        runTest {
+            val uploadStarted = CompletableDeferred<Unit>()
+            val releaseUpload = CompletableDeferred<Unit>()
+            var published = 0
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { listOf(partyArtwork()) },
+                    customEmojiSender = { _, _, _, ensureCurrent, publishLock ->
+                        uploadStarted.complete(Unit)
+                        releaseUpload.await()
+                        publishLock {
+                            ensureCurrent()
+                            published += 1
+                            successfulSendSummary()
+                        }
+                    },
+                )
+
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    appState.sendConversationText(controller, "hi :party:")
+                }
+            uploadStarted.await()
+            val pending = controller.timeline.single().record
+
+            // Other group mutations take the same lock and must not wait for the upload.
+            withTimeout(5_000) { appState.withGroupCommitLock(ACCOUNT_REF, GROUP_ID) { } }
+            // Cancel must also complete without waiting for the upload.
+            withTimeout(5_000) { assertTrue(controller.deleteMessage(pending, presentFailure = false)) }
+            assertTrue(controller.timeline.isEmpty())
+
+            releaseUpload.complete(Unit)
+            send.await()
+
+            assertEquals(0, published)
+            assertTrue(controller.timeline.isEmpty())
+        }
+
+    /**
+     * A cancel that lands right after the emoji publish must not report success for a send MDK now
+     * owns. The publish and its acceptance bookkeeping share the commit lock, so the waiting cancel
+     * sees the finished send, and the yield after the lock models the hop back from the native call.
+     */
+    @Test
+    fun cancelRightAfterAnEmojiPublishDoesNotHideAPublishedSend() =
+        runTest {
+            val publishing = CompletableDeferred<Unit>()
+            val finishPublish = CompletableDeferred<Unit>()
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { listOf(partyArtwork()) },
+                    customEmojiSender = { _, _, _, ensureCurrent, publishLock ->
+                        val summary =
+                            publishLock {
+                                ensureCurrent()
+                                publishing.complete(Unit)
+                                finishPublish.await()
+                                successfulSendSummary()
+                            }
+                        yield()
+                        summary
+                    },
+                )
+
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    appState.sendConversationText(controller, "hi :party:")
+                }
+            publishing.await()
+            val pending = controller.timeline.single().record
+            val cancel = async { controller.deleteMessage(pending, presentFailure = false) }
+            runCurrent()
+            finishPublish.complete(Unit)
+
+            assertFalse("a published send must not be cancelled away", cancel.await())
+            send.await()
+            assertEquals(1, controller.timeline.size)
+        }
+
+    /** A publish that fails ambiguously may be on a relay, so it cannot be cancelled away either. */
+    @Test
+    fun cancelRightAfterAnUncertainEmojiPublishCannotRemoveTheRow() =
+        runTest {
+            val publishing = CompletableDeferred<Unit>()
+            val finishPublish = CompletableDeferred<Unit>()
+            val appState = appState()
+            val controller =
+                ConversationController(
+                    appState = appState,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    customEmojiReader = { listOf(partyArtwork()) },
+                    customEmojiSender = { _, _, _, ensureCurrent, publishLock ->
+                        try {
+                            publishLock {
+                                ensureCurrent()
+                                publishing.complete(Unit)
+                                finishPublish.await()
+                                throw MarmotKitException.TransportClosed()
+                            }
+                        } finally {
+                            yield()
+                        }
+                    },
+                )
+
+            val send =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    appState.sendConversationText(controller, "hi :party:")
+                }
+            publishing.await()
+            val pending = controller.timeline.single().record
+            val cancel = async { controller.deleteMessage(pending, presentFailure = false) }
+            runCurrent()
+            finishPublish.complete(Unit)
+
+            assertFalse("an uncertain publish must not be cancelled away", cancel.await())
+            send.await()
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
+    /** An upload-stage failure published nothing, so the bubble ends Failed and never stays Pending. */
+    @Test
+    fun customEmojiUploadFailureEndsFailedNotPending() =
+        runTest {
+            var sends = 0
+            val appState = appState()
+            val controller =
+                emojiController(appState) {
+                    sends += 1
+                    throw EmojiUploadFailure(IllegalStateException("blob server rejected the image"))
+                }
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(1, sends)
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /** A publish-stage connection loss may have reached a relay, so the bubble stays Pending and is not resent. */
+    @Test
+    fun customEmojiPublishLossStaysPending() =
+        runTest {
+            var sends = 0
+            val appState = appState()
+            val controller =
+                emojiController(appState) {
+                    sends += 1
+                    throw MarmotKitException.TransportClosed()
+                }
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(1, sends)
+            assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+        }
+
+    /** A changed chat is a definite failure the user can retry, not an uncertain delivery. */
+    @Test
+    fun customEmojiChatChangedEndsFailed() =
+        runTest {
+            val appState = appState()
+            val controller =
+                emojiController(appState) {
+                    throw EmojiChatChangedException(MarmotKitException.InvalidMediaReference("stale"))
+                }
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+        }
+
+    /** A connectivity failure during upload is retried by the recovery loop and then sends once. */
+    @Test
+    fun customEmojiUploadConnectivityFailureIsRetried() =
+        runTest {
+            var sends = 0
+            val appState = appState()
+            val controller =
+                emojiController(appState) {
+                    sends += 1
+                    if (sends == 1) throw EmojiUploadFailure(MarmotKitException.TransportClosed())
+                    successfulSendSummary()
+                }
+
+            appState.sendConversationText(controller, "hi :party:")
+
+            assertEquals(2, sends)
+        }
+
     @Test
     fun successfulManualRetryClearsTheDraftCapturedByTheInitialSend() =
         runTest {

@@ -37,7 +37,7 @@ class Nip30EmojiTest {
                 IndexedValue(2, reference("image/png", "https://a/mirror", "https://a/party")),
             )
         val tags = listOf(tag("imeta", "url https://a/party"), tag("emoji", "party", "https://a/party"))
-        assertEquals(mapOf(2 to ":party:"), Nip30Emoji.attachmentShortcodes(tags, attachments))
+        assertEquals(mapOf(2 to listOf(":party:")), Nip30Emoji.attachmentShortcodes(tags, attachments))
     }
 
     @Test
@@ -58,11 +58,12 @@ class Nip30EmojiTest {
                 tag("emoji", "clip", "https://a/v"),
                 tag("emoji", "elsewhere", "https://a/other"),
             )
-        assertEquals(emptyMap<Int, String>(), Nip30Emoji.attachmentShortcodes(tags, attachments))
+        assertEquals(emptyMap<Int, List<String>>(), Nip30Emoji.attachmentShortcodes(tags, attachments))
     }
 
+    /** The first tag per code wins, and several codes naming one attachment all map onto it. */
     @Test
-    fun firstTagWinsPerAttachmentAndPerCode() {
+    fun firstTagWinsPerCodeAndAliasesShareTheirAttachment() {
         val attachments =
             listOf(
                 IndexedValue(0, reference("image/gif", "https://a/one")),
@@ -75,7 +76,8 @@ class Nip30EmojiTest {
                 tag("emoji", "one", "https://a/two"),
                 tag("emoji", "Two-2", "https://a/two"),
             )
-        assertEquals(mapOf(0 to ":one:", 1 to ":Two-2:"), Nip30Emoji.attachmentShortcodes(tags, attachments))
+        val expected = mapOf(0 to listOf(":one:", ":again:"), 1 to listOf(":Two-2:"))
+        assertEquals(expected, Nip30Emoji.attachmentShortcodes(tags, attachments))
     }
 
     @Test
@@ -83,5 +85,58 @@ class Nip30EmojiTest {
         assertTrue(Nip30Emoji.hasEmojiTags(listOf(tag("imeta"), tag("emoji", "a", "u"))))
         assertFalse(Nip30Emoji.hasEmojiTags(listOf(tag("imeta", "url u"))))
         assertFalse(Nip30Emoji.hasEmojiTags(listOf(MessageTagFfi(emptyList()))))
+    }
+
+    /** A repeated code with another URL cannot rebind, even when its first tag named no attachment. */
+    @Test
+    fun repeatedCodeNeverRebindsToAnotherAttachment() {
+        val attachments = listOf(IndexedValue(0, reference("image/png", "https://a/one")))
+        val tags = listOf(tag("emoji", "x", "https://a/missing"), tag("emoji", "x", "https://a/one"))
+        assertEquals(emptyMap<Int, List<String>>(), Nip30Emoji.attachmentShortcodes(tags, attachments))
+    }
+
+    /** What the sender builds for two aliases of identical artwork resolves both codes on the receiver. */
+    @Test
+    fun aliasesOfIdenticalArtworkRoundTripFromSenderToReceiver() {
+        val shared = reference("image/png", "https://blob/party.png")
+        val tags =
+            listOf(":party:", ":parrot:").map { MessageTagFfi(Nip30Emoji.tag(it, shared.locators.first().value)) }
+        val attachments = listOf(IndexedValue(0, shared))
+        assertEquals(mapOf(0 to listOf(":party:", ":parrot:")), Nip30Emoji.attachmentShortcodes(tags, attachments))
+        assertEquals(setOf(0), Nip30Emoji.attachmentShortcodes(tags, attachments).keys)
+    }
+
+    /** Sending finds each distinct `:code:` once, in the order typed, and ignores lone colons. */
+    @Test
+    fun shortcodesInTextAreDistinctAndOrdered() {
+        assertEquals(
+            listOf(":party:", ":Two-2:"),
+            Nip30Emoji.shortcodesIn("hi :party: and :Two-2: then :party: at noon: ok"),
+        )
+        assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("no codes: here, 10:30 :: ::"))
+    }
+
+    /** Codes inside inline code and fenced blocks are literal, so they never attach artwork. */
+    @Test
+    fun shortcodesInsideCodeAreIgnored() {
+        assertEquals(listOf(":real:"), Nip30Emoji.shortcodesIn("`:span:` and :real: and ``:double:``"))
+        assertEquals(listOf(":after:"), Nip30Emoji.shortcodesIn("```\n:fenced:\n```\n:after:"))
+        assertEquals(emptyList<String>(), Nip30Emoji.shortcodesIn("~~~\n:tilde:\n~~~"))
+    }
+
+    /** Only the NIP-30 alphabet MDK accepts for a sent tag, up to 62 characters, can be sent. */
+    @Test
+    fun sendableShortcodesUseTheStrictAlphabet() {
+        assertTrue(Nip30Emoji.isSendable(":party_1:"))
+        assertTrue(Nip30Emoji.isSendable(":" + "a".repeat(62) + ":"))
+        assertFalse(Nip30Emoji.isSendable(":" + "a".repeat(63) + ":"))
+        assertFalse(Nip30Emoji.isSendable(":ship-it:"))
+        assertFalse(Nip30Emoji.isSendable("::"))
+    }
+
+    /** The emitted row names the attachment by its first locator, with the shortcode unwrapped. */
+    @Test
+    fun tagNamesTheShortcodeWithoutColonsAndTheUrl() {
+        assertEquals(listOf("emoji", "party", "https://a/party"), Nip30Emoji.tag(":party:", "https://a/party"))
     }
 }

@@ -4,6 +4,8 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaLocatorFfi
+import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.projectedTimelineMessage
@@ -130,6 +132,48 @@ class SharedMediaVisibilityTest {
         assertEquals("second" to 0, selection.source)
         selection.reconcile(loading = false, pages = pages.filter { it.messageIdHex == "first" })
         assertEquals(null, selection.source)
+    }
+
+    /** Builds one message whose first image is claimed by an emoji tag and whose second is a real photo. */
+    private fun emojiMessage(
+        id: String,
+        claimedUrl: String = "https://blob/party",
+        tagUrl: String = claimedUrl,
+    ): TimelineMessage {
+        val album = imageAlbum(id, recordedAt = 5uL)
+        val outcomes =
+            MessageAttachments.acceptedOutcomes(
+                listOf(
+                    reference("$id-0", "image/png").copy(locators = listOf(MediaLocatorFfi("blossom", claimedUrl))),
+                    reference("$id-1", "image/jpeg")
+                        .copy(locators = listOf(MediaLocatorFfi("blossom", "https://blob/photo"))),
+                ),
+            )
+        return album.copy(
+            record = album.record.copy(tags = listOf(MessageTagFfi(listOf("emoji", "party", tagUrl)))),
+            projected = requireNotNull(album.projected).copy(media = outcomes),
+        )
+    }
+
+    /** An image an emoji tag claims as inline artwork is not shared media, in the gallery or the viewer. */
+    @Test
+    fun emojiArtworkIsExcludedFromSharedMediaAndViewerPages() {
+        val tiles = buildVisibleSharedMediaTiles(listOf(emojiMessage("m")), null, emptySet(), emptySet(), 100uL)
+
+        assertEquals(listOf(1), tiles.visuals.map { it.attachmentIndex })
+        assertEquals(listOf(1), tiles.images.map { it.attachmentIndex })
+        assertEquals(listOf(1), tiles.visuals.toConversationViewerPages().map { it.attachmentIndex })
+        assertEquals(listOf(1), tiles.visuals.toGalleryViewerPages().map { it.attachmentIndex })
+    }
+
+    /** A tag that matches no attachment claims nothing, so every image stays shared media. */
+    @Test
+    fun unmatchedEmojiTagLeavesEveryImageShared() {
+        val message = emojiMessage("m", tagUrl = "https://blob/other")
+
+        val tiles = buildVisibleSharedMediaTiles(listOf(message), null, emptySet(), emptySet(), 100uL)
+
+        assertEquals(listOf(0, 1), tiles.visuals.map { it.attachmentIndex })
     }
 
     private fun imageMessage(

@@ -796,6 +796,8 @@
     <string name="toast_send_failed">Échec de l’envoi</string>
     <string name="toast_send_connection_failed">Impossible de joindre le relais. Vérifiez votre connexion et réessayez.</string>
     <string name="toast_send_queue_full">Trop de messages attendent d\'être envoyés dans cette discussion, le vôtre n\'a pas été envoyé. Réessayez une fois le retard rattrapé.</string>
+    <string name="toast_send_chat_changed">La conversation a changé pendant l\'envoi, votre message n\'a donc pas été envoyé. Réessayez.</string>
+    <string name="toast_send_emoji_limit">Ce message contient trop d\'emoji personnalisés, il n\'a donc pas été envoyé. Retirez-en quelques-uns et réessayez.</string>
     <string name="toast_chat_still_loading">Cette discussion est encore en cours de chargement. Réessayez dans un instant.</string>
     <string name="toast_send_membership_verifying">Vérification de votre appartenance au groupe — votre message n’a pas été envoyé. Il est conservé dans le champ ; réessayez dans un instant.</string>
     <string name="toast_reaction_failed">La réaction a échoué</string>
@@ -1529,16 +1531,16 @@
 
     <string name="chat_bubble_colors">Couleurs des bulles</string>
     <string name="custom_emoji">Emoji personnalisés</string>
-    <string name="custom_emoji_detail">Les images ajoutées ici deviennent des emoji :code: dans les messages et les réactions. Elles restent sur cet appareil, et les autres voient le code sous forme de texte.</string>
+    <string name="custom_emoji_detail">Les images ajoutées ici deviennent des emoji :code: dans les messages et les réactions. Elles sont stockées sur cet appareil. Quand vous envoyez un nouveau message (pas une réponse) qui en utilise une, son image est envoyée, chiffrée, dans cette conversation pour que ses membres la voient. Les réactions, les réponses et les modifications n\'envoient que le code.</string>
     <string name="custom_emoji_empty">Aucun emoji personnalisé pour l’instant.</string>
     <string name="custom_emoji_name_title">Nommer cet emoji</string>
     <string name="custom_emoji_name_label">Code court</string>
     <string name="custom_emoji_name_help">Lettres, chiffres et tirets bas.</string>
     <string name="custom_emoji_replaces">Remplace votre %1$s actuel.</string>
     <string name="custom_emoji_remove_title">Supprimer %1$s ?</string>
-    <string name="custom_emoji_remove_detail">L’image est supprimée de cet appareil. Les messages conservent le code sous forme de texte.</string>
+    <string name="custom_emoji_remove_detail">L\'image est supprimée de cet appareil. Les messages déjà envoyés conservent l\'image qu\'ils ont envoyée.</string>
     <string name="custom_emoji_too_large">Cette image dépasse 1 Mo.</string>
-    <string name="custom_emoji_not_image">Ce fichier n’est pas une image que White Noise peut afficher.</string>
+    <string name="custom_emoji_not_image">Ce fichier n’est pas un format d’image que White Noise peut envoyer comme emoji. Utilisez PNG, GIF, WebP ou JPEG.</string>
     <string name="custom_emoji_save_failed">Impossible d’enregistrer cet emoji.</string>
     <string name="action_color">Couleur d\'action</string>
     <string name="action_color_no_active_account">Sélectionnez un compte actif avant de définir sa couleur d’accentuation.</string>
