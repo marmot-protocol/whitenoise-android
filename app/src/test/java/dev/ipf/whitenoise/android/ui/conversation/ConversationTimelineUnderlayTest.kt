@@ -100,6 +100,10 @@ class ConversationTimelineUnderlayTest {
             assertFalse(viewport.readingLayoutInfo().visibleItemsInfo.any { it.key == 19 })
             assertTrue(viewport.readingLayoutInfo().visibleItemsInfo.any { it.key == 18 })
         }
+        // Pin the settled layout before taps start a platform ripple animation.
+        val pixels = rule.onNodeWithTag("frame").captureToImage().toPixelMap()
+        assertEquals("the existing row must paint through the composer margin", Color.Cyan, pixels[14, 440])
+        rule.onNodeWithTag("frame").captureRoboImage("src/test/snapshots/conversation_timeline_underlay.png")
         rule.onNodeWithTag("row-$COVERED_ROW_VALUE").assertDoesNotExist()
         rule.onNodeWithTag("frame").performTouchInput { click(Offset(14f, 440f)) }
         assertTrue(clickedRows.isEmpty())
@@ -107,12 +111,6 @@ class ConversationTimelineUnderlayTest {
         // value 17 two rows above the covered origin.
         rule.onNodeWithTag("row-$CLEAR_ROW_VALUE").performTouchInput { click(Offset(8f, 12f)) }
         assertEquals(listOf(CLEAR_ROW_VALUE), clickedRows)
-        // Capture the settled canvas, after the readable row's tap ripple fades.
-        rule.mainClock.advanceTimeBy(500L)
-        rule.waitForIdle()
-        val pixels = rule.onNodeWithTag("frame").captureToImage().toPixelMap()
-        assertEquals("the existing row must paint through the composer margin", Color.Cyan, pixels[14, 440])
-        rule.onNodeWithTag("frame").captureRoboImage("src/test/snapshots/conversation_timeline_underlay.png")
     }
 
     /**
