@@ -3243,10 +3243,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Cancels reconnect producers before stopping the passive notification receiver. */
     internal suspend fun stopNotificationListenerForAccountTeardown() {
-        notificationNetworkRecovery.cancelAndJoin()
-        pushWakeCatchUpDrainJob.cancelAndJoin()
-        notificationJob.cancelAndJoin()
-        unreadRefreshScheduler.cancelAndClear()
+        runtimeListenerTeardownOwner.stopForAccountTeardown()
     }
 
     /** Bridges native projection gaps for matching accounts; null retains active-controller routing. */
@@ -7494,6 +7491,15 @@ class WhiteNoiseAppState private constructor(
             diagnostics = notificationNetworkRecoveryDiagnostics,
         )
 
+    private val runtimeListenerTeardownOwner =
+        AppRuntimeListenerTeardownOwner(
+            cancelNetworkRecovery = { notificationNetworkRecovery.cancelAndJoin() },
+            cancelPushWakeDrain = { pushWakeCatchUpDrainJob.cancelAndJoin() },
+            cancelListener = { notificationJob.cancelAndJoin() },
+            clearUnreadRefresh = { unreadRefreshScheduler.cancelAndClear() },
+            receiverActive = notificationReceiverActive,
+        )
+
     /** Process-owned recovery attribution shared by projections and Compose. */
     internal val recoveryDiagnostics: NotificationNetworkRecoveryCoordinator
         get() = notificationNetworkRecovery
@@ -10902,20 +10908,12 @@ class WhiteNoiseAppState private constructor(
             val retryWakeGeneration = notificationReceiverRetryWake.value
             try {
                 val subscription = notificationSubscriber(marmot)
-                notificationReceiverActive.value = true
-                try {
+                runtimeListenerTeardownOwner.withNotificationSubscription(subscription) {
                     while (currentCoroutineContext().isActive) {
                         val update = subscription.next() ?: break
                         backoffMillis = NOTIFICATION_RETRY_INITIAL_BACKOFF_MILLIS
                         withContext(Dispatchers.Main.immediate) {
                             processNotificationUpdate(update)
-                        }
-                    }
-                } finally {
-                    notificationReceiverActive.value = false
-                    runCatching {
-                        withContext(NonCancellable + Dispatchers.IO) {
-                            subscription.close()
                         }
                     }
                 }
