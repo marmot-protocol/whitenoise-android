@@ -196,11 +196,11 @@ jobs:
 
       - name: Compile (Kotlin)
         if: matrix.phase == 'tooling'
-        run: ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --daemon --stacktrace
+        run: ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
       - name: ktlint and detekt
         if: matrix.phase == 'tooling'
-        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck :app:detekt --build-cache --profile --daemon --stacktrace
+        run: ./gradlew :app:ktlintCheck :benchmark:ktlintCheck :app:detekt --build-cache --profile --no-daemon --stacktrace
 
       # Package on a separate runner so release compilation overlaps tooling checks.
       - name: Assemble app for Baseline Profile verification

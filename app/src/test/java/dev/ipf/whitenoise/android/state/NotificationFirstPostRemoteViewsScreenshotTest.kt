@@ -176,9 +176,9 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         fixture.appState.parseMarkdownOrEmpty("**parser warm-up**")
         beforeDispatch()
         fixture.releaseNotificationDispatch()
-        // Keep simulated time paused until content resolution finishes; deadline
-        // behaviour is covered by the coordinator/integration tests. Then the
-        // existing post wait can advance time to refill the shared platform pacer.
+        // Rendering resolves before the deadline by construction. Deadline and IO fallback
+        // behaviour are covered by NotificationFirstPostContentCoordinatorTest and
+        // NotificationFirstPostIntegrationTest. After resolution, advance time for the platform pacer.
         withTimeout(WRITE_AWAIT_TIMEOUT_MS) {
             while (events.none { it.stage == NotificationFirstPostTimingStage.ContentComplete }) {
                 shadowOf(Looper.getMainLooper()).idle()
