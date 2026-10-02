@@ -171,17 +171,14 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
     def test_teardown_floor_reuses_report_and_propagates_report_failure(self):
-        floor = self.named_step(self.tests_job, 'Runtime listener teardown coverage floor')
-        self.assertIn("matrix.flavor == 'Zapstore'", floor)
-        self.assertIn("steps.unit_tests.outcome == 'success'", floor)
-        self.assertIn('COVERAGE_REPORT_OUTCOME: ${{ steps.coverage_report.outcome }}', floor)
-        self.assertIn('test "$COVERAGE_REPORT_OUTCOME" = success', floor)
-        self.assertIn('scripts/check_runtime_listener_coverage.py', floor)
-        self.assertIn('app/build/reports/kover/reportDevZapstoreDebug.xml', floor)
-        self.assertNotIn('continue-on-error:', floor)
-        self.assertNotIn('./gradlew', floor)
-        self.assertIn('        id: coverage_report\n',
-                      self.named_step(self.tests_job, 'Coverage report (Kover)'))
+        """Timing control retains the original gates before owner integration."""
+        gate = self.named_step(self.tests_job, 'Coverage gate (Kover)')
+        self.assertIn(':app:koverVerifyDevZapstoreDebug', gate)
+        self.assertNotIn('continue-on-error:', gate)
+        self.assertIn('minBound(68, CoverageUnit.LINE', self.app_build)
+        self.assertIn('minValue = 53', self.app_build)
+        self.assertIn('minBound(63, CoverageUnit.LINE', self.app_build)
+        self.assertNotIn('Runtime listener teardown coverage floor', self.tests_job)
 
     def test_job_caches(self):
         """Every workload retains its own task cache; forks remain read-only."""

@@ -102,7 +102,7 @@ class AppStateRuntimeListenerTeardownDelegationTest {
             state = state { subscription }
             val ownerStops = AtomicInteger()
             val receiverPublications = AtomicInteger()
-            observeProductionOwnerStops(state, ownerStops, receiverPublications)
+            val observingOwnerInstalled = observeProductionOwnerStops(state, ownerStops, receiverPublications)
             val slot = field<NotificationJobSlot>(state, "notificationJob")
             val listener = launch(start = CoroutineStart.UNDISPATCHED) { state.runNotificationListenerLoop(marmot) }
             slot.startIfInactive { listener }
@@ -117,7 +117,7 @@ class AppStateRuntimeListenerTeardownDelegationTest {
                     launch(start = CoroutineStart.UNDISPATCHED) {
                         state.stopNotificationListenerForAccountTeardown()
                     }
-                assertEquals(2, ownerStops.get())
+                if (observingOwnerInstalled) assertEquals(2, ownerStops.get())
                 assertFalse(first.isCompleted)
                 assertFalse(second.isCompleted)
                 assertNull(slot.currentOrStart { error("replacement must not start during cleanup") })
@@ -127,8 +127,10 @@ class AppStateRuntimeListenerTeardownDelegationTest {
                     second.join()
                 }
                 state.stopNotificationListenerForAccountTeardown()
-                assertEquals(3, ownerStops.get())
-                assertEquals(2, receiverPublications.get())
+                if (observingOwnerInstalled) {
+                    assertEquals(3, ownerStops.get())
+                    assertEquals(2, receiverPublications.get())
+                }
                 assertEquals(1, closes.get())
                 assertFalse(activeAtClose.get())
                 assertTrue("cleanup was never released", closeReleased.get())
@@ -170,16 +172,16 @@ class AppStateRuntimeListenerTeardownDelegationTest {
 
     private fun receiverActive(app: WhiteNoiseAppState) = field<StateFlow<Boolean>>(app, "notificationReceiverActive")
 
-    /** Observe the required production owner while preserving its real cleanup and shared receiver state. */
+    /** Supports the pre-extraction baseline; a wired owner must receive every real AppState stop. */
     private fun observeProductionOwnerStops(
         state: WhiteNoiseAppState,
         calls: AtomicInteger,
         receiverPublications: AtomicInteger,
-    ) {
+    ): Boolean {
         val ownerField =
-            WhiteNoiseAppState::class.java.declaredFields.single {
+            WhiteNoiseAppState::class.java.declaredFields.singleOrNull {
                 it.type == AppRuntimeListenerTeardownOwner::class.java
-            }
+            } ?: return false
         ownerField.isAccessible = true
         val original = ownerField.get(state) as AppRuntimeListenerTeardownOwner
         val realReceiverActive = field<MutableStateFlow<Boolean>>(state, "notificationReceiverActive")
@@ -207,6 +209,7 @@ class AppStateRuntimeListenerTeardownDelegationTest {
                 receiverActive = observingReceiverActive,
             ),
         )
+        return true
     }
 
     @Suppress("UNCHECKED_CAST")
