@@ -1784,7 +1784,7 @@
 
     <string name="chat_bubble_colors">Chat bubble colors</string>
     <string name="custom_emoji">Custom emoji</string>
-    <string name="custom_emoji_detail">Images you add here become :shortcode: emoji in messages and reactions. They are stored on this device. When you send a new message (not a reply) that uses one, its image is uploaded, encrypted, to that chat so its members can see it. Reactions and replies send only the shortcode.</string>
+    <string name="custom_emoji_detail">Images you add here become :shortcode: emoji in messages and reactions. They are stored on this device. When you send a new message (not a reply) that uses one, its image is uploaded, encrypted, to that chat so its members can see it. Reactions, replies and edits send only the shortcode.</string>
     <string name="custom_emoji_empty">No custom emoji yet.</string>
     <string name="custom_emoji_name_title">Name this emoji</string>
     <string name="custom_emoji_name_label">Shortcode</string>

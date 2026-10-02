@@ -1523,7 +1523,7 @@
 
     <string name="chat_bubble_colors">Colores de las burbujas</string>
     <string name="custom_emoji">Emoji personalizados</string>
-    <string name="custom_emoji_detail">Las imágenes que añadas aquí se convierten en emoji :código: en mensajes y reacciones. Se guardan en este dispositivo. Cuando envías un mensaje nuevo (no una respuesta) que usa una, su imagen se sube cifrada a ese chat para que sus miembros la vean. Las reacciones y respuestas solo envían el código.</string>
+    <string name="custom_emoji_detail">Las imágenes que añadas aquí se convierten en emoji :codigo: en mensajes y reacciones. Se guardan en este dispositivo. Cuando envías un mensaje nuevo (no una respuesta) que usa una, su imagen se sube cifrada a ese chat para que sus miembros la vean. Las reacciones, respuestas y ediciones solo envían el código.</string>
     <string name="custom_emoji_empty">Aún no hay emoji personalizados.</string>
     <string name="custom_emoji_name_title">Nombra este emoji</string>
     <string name="custom_emoji_name_label">Código</string>

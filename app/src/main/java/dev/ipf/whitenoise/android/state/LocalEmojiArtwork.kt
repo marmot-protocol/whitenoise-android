@@ -126,9 +126,17 @@ internal class EmojiUploadCache {
             if (missing.isNotEmpty()) {
                 val uploaded = engine.uploadEmojiArtwork(account, group, missing)
                 missing.zip(uploaded).forEach { (emoji, reference) -> references[key(emoji)] = reference }
-                while (references.size > MAX_ENTRIES) references.remove(references.keys.first())
             }
-            artwork.associate { it.sha256 to references.getValue(key(it)) }
+            // Build the result first, then evict, so eviction can never remove a reference this send needs.
+            val result = artwork.associate { it.sha256 to references.getValue(key(it)) }
+            // Touch the batch so it is the newest, then drop the oldest entries beyond the limit.
+            result.forEach { (sha, reference) ->
+                val touched = EmojiUploadKey(account, group, sha, epoch)
+                references.remove(touched)
+                references[touched] = reference
+            }
+            while (references.size > MAX_ENTRIES) references.remove(references.keys.first())
+            result
         }
 
     /** Forgets every reference for [account] and [group], so the next send re-encrypts under the current epoch. */

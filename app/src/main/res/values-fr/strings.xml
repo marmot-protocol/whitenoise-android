@@ -1523,7 +1523,7 @@
 
     <string name="chat_bubble_colors">Couleurs des bulles</string>
     <string name="custom_emoji">Emoji personnalisés</string>
-    <string name="custom_emoji_detail">Les images ajoutées ici deviennent des emoji :code: dans les messages et les réactions. Elles sont stockées sur cet appareil. Quand vous envoyez un nouveau message (pas une réponse) qui en utilise une, son image est envoyée, chiffrée, dans cette conversation pour que ses membres la voient. Les réactions et les réponses n\'envoient que le code.</string>
+    <string name="custom_emoji_detail">Les images ajoutées ici deviennent des emoji :code: dans les messages et les réactions. Elles sont stockées sur cet appareil. Quand vous envoyez un nouveau message (pas une réponse) qui en utilise une, son image est envoyée, chiffrée, dans cette conversation pour que ses membres la voient. Les réactions, les réponses et les modifications n\'envoient que le code.</string>
     <string name="custom_emoji_empty">Aucun emoji personnalisé pour l’instant.</string>
     <string name="custom_emoji_name_title">Nommer cet emoji</string>
     <string name="custom_emoji_name_label">Code court</string>

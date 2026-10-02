@@ -162,7 +162,7 @@ internal class CustomEmojiStore(
             directory
                 .listFiles()
                 .orEmpty()
-                .filter { it.isFile && !it.name.startsWith('.') && it.extension in SENDABLE_EXTENSIONS }
+                .filter { it.isFile && !it.name.startsWith('.') && hasSendableExtension(it) }
                 .mapNotNull { file ->
                     val code = file.name.substringBeforeLast('.')
                     if (code.isEmpty() || sanitizeEmojiCode(code) != code || file.length() > MAX_BYTES) {
@@ -178,6 +178,9 @@ internal class CustomEmojiStore(
     companion object {
         const val MAX_BYTES = 1024 * 1024
         const val DIRECTORY = "emoji"
+
+        /** Whether [file] has an emoji image extension, ignoring case like the sender does. */
+        fun hasSendableExtension(file: File): Boolean = file.extension.lowercase(Locale.ROOT) in SENDABLE_EXTENSIONS
 
         /** File extensions of emoji images that can be sent, so every listed emoji is sendable. */
         val SENDABLE_EXTENSIONS = setOf("png", "gif", "webp", "jpg")

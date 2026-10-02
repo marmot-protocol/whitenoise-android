@@ -1495,7 +1495,7 @@
 
     <string name="chat_bubble_colors">聊天氣泡顏色</string>
     <string name="custom_emoji">自訂表情</string>
-    <string name="custom_emoji_detail">在此新增的圖片會在訊息和回應中變成 :短代碼: 表情，並儲存在此裝置上。當你傳送使用它的新訊息（不含回覆）時，其圖片會以加密方式上傳到該聊天室，讓成員看得到。回應和回覆只會傳送短代碼。</string>
+    <string name="custom_emoji_detail">在此新增的圖片會在訊息和回應中變成 :my_emoji: 表情，並儲存在此裝置上。當你傳送使用它的新訊息（不含回覆）時，其圖片會以加密方式上傳到該聊天室，讓成員看得到。回應、回覆和編輯只會傳送短代碼。</string>
     <string name="custom_emoji_empty">尚無自訂表情。</string>
     <string name="custom_emoji_name_title">為此表情命名</string>
     <string name="custom_emoji_name_label">短代碼</string>

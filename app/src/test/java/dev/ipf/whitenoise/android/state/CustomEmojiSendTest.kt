@@ -194,6 +194,21 @@ class CustomEmojiSendTest {
             assertEquals(2, failing.count { it.first == "sendTaggedMedia" })
         }
 
+    /** Eviction never removes a reference the current send needs, even when it is the oldest cached one. */
+    @Test
+    fun evictionNeverRemovesAReferenceTheSendNeeds() =
+        runTest {
+            val calls = mutableListOf<Pair<String, List<Any?>>>()
+            val engine = recordingEngine(calls)
+            val cache = EmojiUploadCache()
+            val first = (0 until 64).map { artwork("old$it", byteArrayOf(it.toByte(), 1)) }
+            engine.send(first, cache)
+            val next = listOf(first.first(), artwork("fresh", byteArrayOf(99, 99)))
+            assertEquals(sent, engine.send(next, cache))
+            assertEquals(2, calls.count { it.first == "sendTaggedMedia" })
+            assertEquals(2, calls.count { it.first == "uploadMedia" })
+        }
+
     /** A send over MDK's tag limits, or with an unsendable code, fails before any native call. */
     @Test
     fun limitsAreCheckedBeforeAnyUpload() =
