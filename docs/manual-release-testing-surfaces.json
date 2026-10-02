@@ -319,6 +319,30 @@
         "test_ids": ["MED-024"]
       },
       {
+        "surface": "Localized readable attachment progress sizes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressSize.kt",
+        "anchor": "internal fun formatAttachmentProgressSize(",
+        "test_ids": ["MED-025"]
+      },
+      {
+        "surface": "Own-send pending host cache publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/OutgoingAttachmentCachePublications.kt",
+        "anchor": "internal class OutgoingAttachmentCachePublications(",
+        "test_ids": ["MED-009"]
+      },
+      {
+        "surface": "R.string.media_preparing_attachment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
+        "anchor": "R.string.media_preparing_attachment",
+        "test_ids": ["MED-025"]
+      },
+      {
+        "surface": "R.string.media_download_cancelled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
+        "anchor": "R.string.media_download_cancelled",
+        "test_ids": ["MED-025"]
+      },
+      {
         "surface": "FileBodyProgressIndicator",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
         "anchor": "private fun FileBodyProgressIndicator(",
@@ -429,9 +453,9 @@
         ]
       },
       {
-        "surface": "Attachment retry admission failure notice",
+        "surface": "Single-owner attachment retry admission failure notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentControllerActions.kt",
-        "anchor": "R.string.media_couldnt_load",
+        "anchor": "notify = onFailure",
         "test_ids": [
           "MED-024"
         ]

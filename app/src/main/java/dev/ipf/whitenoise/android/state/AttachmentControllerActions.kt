@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
@@ -26,28 +25,32 @@ internal fun ConversationController.retryAttachmentTransfer(
             ?.copy(sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex))
     val destination = attachmentOpenRequest(messageIdHex, attachmentIndex)
     val duplicate = request?.let { it.cacheKey() in appState.attachmentUserActions.pendingRetries.value } == true
-    if (request == null || destination == null || duplicate) return false
+    if (
+        request == null ||
+        !acceptsConversationActionOwner(request.accountRef, request.groupIdHex) ||
+        duplicate
+    ) {
+        return false
+    }
+    val canDeliver = {
+        acceptsConversationActionOwner(request.accountRef, request.groupIdHex) &&
+            (destination == null || appState.attachmentOpens.isVisible(destination))
+    }
     val token = appState.attachmentOpens.beginUserAction()
     return appState.retryAttachmentDownload(
         request,
         onAccepted = {
             val current = appState.attachmentOpens.isCurrentUserAction(token)
-            if (current && appState.attachmentOpens.isVisible(destination)) onAccepted()
+            if (current && canDeliver()) onAccepted()
         },
         onFailure = { failure ->
             val current = appState.attachmentOpens.isCurrentUserAction(token)
-            if (current && appState.attachmentOpens.isVisible(destination)) {
+            if (current && canDeliver()) {
                 deliverAttachmentRetryFailure(
                     failure,
-                    reopen = { requestAttachmentOpen(messageIdHex, attachmentIndex) },
-                    notify = {
-                        appState.present(
-                            appState.appContext.getString(R.string.media_couldnt_load),
-                            copyable = true,
-                        )
-                    },
+                    reopen = { destination != null && requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                    notify = onFailure,
                 )
-                onFailure()
             }
         },
     )
@@ -87,14 +90,18 @@ internal fun ConversationController.performAttachmentUserAction(
     onAccepted: () -> Unit,
     onFailure: () -> Unit,
 ) {
-    if (state in DELIBERATE_RECOVERY_STATES ||
-        automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
-    ) {
+    if (attachmentActionNeedsRetry(state, automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex))) {
         retryAttachmentTransfer(messageIdHex, attachmentIndex, onAccepted, onFailure)
     } else {
         onAccepted()
     }
 }
+
+/** Cancellation suppression blocks automatic restart without turning a verified local Open into Retry. */
+internal fun attachmentActionNeedsRetry(
+    state: AttachmentTransferState,
+    automaticSuppressed: Boolean,
+): Boolean = state != AttachmentTransferState.Available && (state in DELIBERATE_RECOVERY_STATES || automaticSuppressed)
 
 /** Exposes acknowledgement separately from host detachment so a spinner cannot falsely imply a stopped socket. */
 internal fun ConversationController.attachmentCancellationState(
@@ -109,7 +116,9 @@ internal fun attachmentFilePresentationState(
     cancellation: AttachmentCancellationState,
 ): AttachmentTransferState =
     when {
-        host == AttachmentTransferState.Available || cancellation != AttachmentCancellationState.None -> host
+        host == AttachmentTransferState.Available ||
+            host == AttachmentTransferState.Cancelled ||
+            cancellation != AttachmentCancellationState.None -> host
         native == null -> host
         native.phase == dev.ipf.marmotkit.AttachmentTransferStateFfi.READY -> host
         else ->

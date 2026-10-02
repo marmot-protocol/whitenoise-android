@@ -1,11 +1,41 @@
 package dev.ipf.whitenoise.android.state
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 
 /** Reference projection delay must remain reloadable without granting terminal retry permission. */
 class AttachmentRetryFailureTest {
+    /** A cancel that loses to verified completion cannot reset a budget or reacquire cached bytes on Open. */
+    @Test
+    fun availableOpenNeverNeedsRetryEvenWhenAutomaticWorkIsSuppressed() {
+        assertFalse(attachmentActionNeedsRetry(AttachmentTransferState.Available, automaticSuppressed = true))
+        assertTrue(attachmentActionNeedsRetry(AttachmentTransferState.Cancelled, automaticSuppressed = true))
+        assertTrue(attachmentActionNeedsRetry(AttachmentTransferState.Failed, automaticSuppressed = false))
+    }
+
+    /** A stale native phase cannot turn acknowledged host cancellation back into a failed retry icon. */
+    @Test
+    fun acknowledgedHostCancellationWinsOverStaleNativeFailure() {
+        assertEquals(
+            AttachmentTransferState.Cancelled,
+            attachmentFilePresentationState(
+                AttachmentTransferState.Cancelled,
+                NativeAttachmentProgress(
+                    dev.ipf.marmotkit.AttachmentTransferStateFfi.FAILED,
+                    1u,
+                    0u,
+                    null,
+                    null,
+                    "failure",
+                ),
+                AttachmentCancellationState.None,
+            ),
+        )
+    }
+
     /** The prior viewer/materialization reload path is retained for an unresolved native target. */
     @Test
     fun unresolvedReferenceReopensWithoutReportingAnAdmissionFailure() {

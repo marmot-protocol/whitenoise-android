@@ -48,7 +48,7 @@ class AttachmentProgressDeviceTest {
         render()
         listOf(
             AttachmentTransferStateFfi.QUEUED to "Queued for download",
-            AttachmentTransferStateFfi.DOWNLOADING to "512 of 1,024 bytes",
+            AttachmentTransferStateFfi.DOWNLOADING to "512 B of 1.0 KB",
             AttachmentTransferStateFfi.RETRY_SCHEDULED to "Waiting to retry",
             AttachmentTransferStateFfi.VERIFYING_CIPHERTEXT to "Verifying download",
             AttachmentTransferStateFfi.DECRYPTING to "Decrypting download",
@@ -63,12 +63,12 @@ class AttachmentProgressDeviceTest {
             phase.value = AttachmentTransferStateFfi.DOWNLOADING
             total.value = null
         }
-        assertControl("512 bytes received")
-        composeRule.onNodeWithContentDescription("512 bytes received").performClick()
+        assertControl("512 B received")
+        composeRule.onNodeWithContentDescription("512 B received").performClick()
         assertControl("Cancelling download")
         composeRule.onNodeWithContentDescription("Cancelling download").assertHasNoClickAction()
         composeRule.runOnIdle { cancellation.value = AttachmentCancellationState.Unconfirmed }
-        assertControl("Could not confirm cancellation. Tap to retry")
+        assertControl("Could not confirm cancellation")
         composeRule.runOnIdle { assertEquals(1, cancels) }
     }
 

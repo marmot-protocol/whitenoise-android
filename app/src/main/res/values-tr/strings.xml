@@ -1027,10 +1027,10 @@
     <string name="media_download_policy_blocked">İndirme ilkesi nedeniyle engellendi</string>
     <string name="media_attachment_unavailable">Ek kullanılamıyor</string>
     <string name="media_cancelling_download">İndirme iptal ediliyor</string>
-    <string name="media_cancel_unconfirmed">İptal doğrulanamadı. Yeniden denemek için dokunun</string>
+    <string name="media_cancel_unconfirmed">İptal doğrulanamadı</string>
     <string name="media_download_queued">İndirme kuyruğunda</string>
-    <string name="media_download_body_known">%2$s bayttan %1$s bayt</string>
-    <string name="media_download_body_unknown">%1$s bayt alındı</string>
+    <string name="media_download_body_known">%2$s içinden %1$s</string>
+    <string name="media_download_body_unknown">%1$s alındı</string>
     <string name="media_verifying_download">İndirme doğrulanıyor</string>
     <string name="media_decrypting_download">İndirmenin şifresi çözülüyor</string>
     <string name="media_download_retry_scheduled">Yeniden denemek için bekleniyor</string>

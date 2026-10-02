@@ -7,6 +7,10 @@ import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.AttachmentLocalAssetFfi
+import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
+import dev.ipf.marmotkit.AttachmentTransferStatusFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
@@ -42,11 +46,18 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
 import dev.ipf.whitenoise.android.ui.conversation.revealSentAtLiveTail
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,6 +68,95 @@ import java.lang.reflect.Proxy
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationMediaSendReconciliationIntegrationTest {
+    /** Group-details viewers can retry terminal native work without a platform-open destination. */
+    @Test
+    fun mediaLibraryRetryWithNoOpenDestinationAdmitsNativeWork() = assertLibraryRetry(accepted = true)
+
+    /** Refused native admission reaches the library failure callback exactly once, without a platform open. */
+    @Test
+    fun mediaLibraryRetryFailureWithNoOpenDestinationReportsOnce() = assertLibraryRetry(accepted = false)
+
+    /** Exercises the shipping controller through the generated native boundary with no conversation route. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // One ordered native admission retains both null-destination outcomes and cleanup.
+    private fun assertLibraryRetry(accepted: Boolean) =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = appState()
+            var nativeState = AttachmentTransferStateFfi.FAILED
+            var admissions = 0
+            val engine =
+                Proxy.newProxyInstance(
+                    MarmotInterface::class.java.classLoader,
+                    arrayOf(MarmotInterface::class.java),
+                ) { proxy, method, args ->
+                    when (val name = method.name.substringBefore('-')) {
+                        "toString" -> "library-retry-boundary"
+                        "hashCode" -> System.identityHashCode(proxy)
+                        "equals" -> proxy === args?.firstOrNull()
+                        "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                        "attachmentLocalAssets" -> listOf(AttachmentLocalAssetFfi(null, 0u))
+                        "attachmentTransferSnapshot" ->
+                            AttachmentTransferSnapshotFfi(
+                                listOf(AttachmentTransferStatusFfi("native-job", nativeState, 1u, 0u, null, null)),
+                            )
+                        "downloadAttachmentAgain" -> {
+                            admissions++
+                            if (accepted) {
+                                nativeState = AttachmentTransferStateFfi.QUEUED
+                                "new-job"
+                            } else {
+                                null
+                            }
+                        }
+                        else -> error("Unexpected library retry call: $name")
+                    }
+                } as MarmotInterface
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("marmotRuntime")
+                .apply { isAccessible = true }
+                .set(state, AppMarmotRuntime("test", engine))
+            val controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    markdownParser = { emptyMarkdownDocument() },
+                )
+            try {
+                applyProjection(controller, projectedMediaMessage(1u, mediaReference()))
+                assertNull(controller.attachmentOpenRequest(CONFIRMED_MESSAGE_ID, 0))
+                var acceptedCallbacks = 0
+                var failedCallbacks = 0
+                val result = CompletableDeferred<Unit>()
+                assertTrue(
+                    controller.retryAttachmentTransfer(
+                        CONFIRMED_MESSAGE_ID,
+                        0,
+                        onAccepted = {
+                            acceptedCallbacks++
+                            result.complete(Unit)
+                        },
+                        onFailure = {
+                            failedCallbacks++
+                            result.complete(Unit)
+                        },
+                    ),
+                )
+                result.await()
+                assertEquals(1, admissions)
+                assertEquals(if (accepted) 1 else 0, acceptedCallbacks)
+                assertEquals(if (accepted) 0 else 1, failedCallbacks)
+                assertFalse(controller.hasAttachmentOpenIntent(CONFIRMED_MESSAGE_ID, 0))
+                controller.onCleared()
+                assertFalse(controller.retryAttachmentTransfer(CONFIRMED_MESSAGE_ID, 0, {}, {}))
+            } finally {
+                controller.onCleared()
+                state.mutationsScope.cancel()
+                Dispatchers.resetMain()
+            }
+        }
+
     /** Both a file and a multi-image album reveal after durable acceptance, including a canonical echo. */
     @Test
     fun acceptedFileAndAlbumFromHistorySnapAfterCanonicalReplacement() =

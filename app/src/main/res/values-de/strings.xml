@@ -1027,10 +1027,10 @@
     <string name="media_download_policy_blocked">Download durch Richtlinie blockiert</string>
     <string name="media_attachment_unavailable">Anhang nicht verfügbar</string>
     <string name="media_cancelling_download">Download wird abgebrochen</string>
-    <string name="media_cancel_unconfirmed">Abbruch konnte nicht bestätigt werden. Zum Wiederholen tippen</string>
+    <string name="media_cancel_unconfirmed">Abbruch konnte nicht bestätigt werden</string>
     <string name="media_download_queued">In der Warteschlange für den Download</string>
-    <string name="media_download_body_known">%1$s von %2$s Bytes</string>
-    <string name="media_download_body_unknown">%1$s Bytes empfangen</string>
+    <string name="media_download_body_known">%1$s von %2$s</string>
+    <string name="media_download_body_unknown">%1$s empfangen</string>
     <string name="media_verifying_download">Download wird geprüft</string>
     <string name="media_decrypting_download">Download wird entschlüsselt</string>
     <string name="media_download_retry_scheduled">Warten auf Wiederholung</string>

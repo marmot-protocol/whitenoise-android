@@ -2,6 +2,8 @@
 
 This report covers the reduced landing scope of PR #3003. The broader #2779 plan remains open. All requests and response-body bytes below come from the controlled server ledger; retained-read checks do not infer HTTP behavior from a UI spinner.
 
+The [review follow-up report](attachment-review-followup-qualification-2026-10-02.md) records the rebased Retry/progress/publication fixes and paired 32 MiB local-read measurements. Those targeted measurements do not close the broader large-file or manual qualification gaps below.
+
 ## Sources and method
 
 - Android base: `f73b10968e168dc6bf37728a41753b992b5c8d80`; native fixture candidate: `fb076781d08d866d0a5e74a3cb2443831847d464`.

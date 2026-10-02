@@ -7,7 +7,6 @@ import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
-import java.text.NumberFormat
 
 /** Uses native phase names and real body bytes, without presenting ciphertext completion as a ready file. */
 @Composable
@@ -16,7 +15,8 @@ internal fun nativeProgressDescription(
     host: AttachmentTransferState,
 ): String? =
     when {
-        host == AttachmentTransferState.Available || host == AttachmentTransferState.Cancelled -> null
+        host == AttachmentTransferState.Available -> null
+        host == AttachmentTransferState.Cancelled -> stringResource(R.string.media_download_cancelled)
         progress?.phase == AttachmentTransferStateFfi.POLICY_BLOCKED ->
             stringResource(R.string.media_download_policy_blocked)
         progress?.phase in
@@ -41,17 +41,16 @@ private fun nativeActiveProgressDescription(progress: NativeAttachmentProgress):
         AttachmentTransferStateFfi.QUEUED -> stringResource(R.string.media_download_queued)
         AttachmentTransferStateFfi.DOWNLOADING ->
             if (progress.fraction != null) {
-                val format = NumberFormat.getIntegerInstance(LocalConfiguration.current.locales[0])
+                val locale = LocalConfiguration.current.locales[0]
                 stringResource(
                     R.string.media_download_body_known,
-                    format.format(progress.received.toString().toBigInteger()),
-                    format.format(requireNotNull(progress.total).toString().toBigInteger()),
+                    formatAttachmentProgressSize(progress.received, locale),
+                    formatAttachmentProgressSize(requireNotNull(progress.total), locale),
                 )
             } else {
-                val format = NumberFormat.getIntegerInstance(LocalConfiguration.current.locales[0])
                 stringResource(
                     R.string.media_download_body_unknown,
-                    format.format(progress.received.toString().toBigInteger()),
+                    formatAttachmentProgressSize(progress.received, LocalConfiguration.current.locales[0]),
                 )
             }
         AttachmentTransferStateFfi.VERIFYING_CIPHERTEXT,

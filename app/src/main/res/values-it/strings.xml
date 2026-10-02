@@ -1027,10 +1027,10 @@
     <string name="media_download_policy_blocked">Download bloccato dai criteri</string>
     <string name="media_attachment_unavailable">Allegato non disponibile</string>
     <string name="media_cancelling_download">Annullamento del download</string>
-    <string name="media_cancel_unconfirmed">Impossibile confermare l\'annullamento. Tocca per riprovare</string>
+    <string name="media_cancel_unconfirmed">Impossibile confermare l\'annullamento</string>
     <string name="media_download_queued">In coda per il download</string>
-    <string name="media_download_body_known">%1$s di %2$s byte</string>
-    <string name="media_download_body_unknown">%1$s byte ricevuti</string>
+    <string name="media_download_body_known">%1$s di %2$s</string>
+    <string name="media_download_body_unknown">%1$s ricevuti</string>
     <string name="media_verifying_download">Verifica del download</string>
     <string name="media_decrypting_download">Decrittazione del download</string>
     <string name="media_download_retry_scheduled">In attesa di riprovare</string>

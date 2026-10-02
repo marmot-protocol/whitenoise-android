@@ -286,6 +286,7 @@ class ReceivedFileTimestampScreenshotTest {
             .captureRoboImage("src/test/snapshots/sent_file_timestamp_dark_large_rtl.png")
     }
 
+    /** An available APK still announces local preparation while its external-open handoff is pending. */
     @Test
     fun receivedApkOpeningShowsVisiblePendingState() {
         composeRule.setContent {
@@ -301,7 +302,7 @@ class ReceivedFileTimestampScreenshotTest {
             }
         }
 
-        composeRule.onAllNodesWithContentDescription("Opening").assertCountEquals(1)
+        composeRule.onAllNodesWithContentDescription("Preparing attachment").assertCountEquals(1)
         composeRule
             .onNodeWithTag(APK_OPENING_TAG)
             .captureRoboImage("src/test/snapshots/received_apk_opening_light.png")

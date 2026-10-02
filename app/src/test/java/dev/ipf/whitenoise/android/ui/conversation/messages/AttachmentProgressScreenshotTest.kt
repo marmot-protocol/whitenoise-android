@@ -79,14 +79,15 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
         composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo(0.5f, 0f..1f))).assertCountEquals(1)
         composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate)).assertCountEquals(5)
         composeRule.onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo(0f, 0f..1f))).assertCountEquals(0)
-        composeRule.onNodeWithText("512 of 1,024 bytes").assertExists()
-        composeRule.onNodeWithText("512 bytes received").assertExists()
+        composeRule.onNodeWithText("4.0 MB of 8.0 MB").assertExists()
+        composeRule.onNodeWithText("4.0 MB received").assertExists()
         composeRule.onNodeWithText("Download blocked by policy").assertExists()
         composeRule.onNodeWithText("Attachment unavailable").assertExists()
         composeRule.onNodeWithText("Preparing attachment").assertExists()
         composeRule.onNodeWithContentDescription("Cancelling download").assertExists()
-        composeRule.onNodeWithContentDescription("Could not confirm cancellation. Tap to retry").assertExists()
-        composeRule.onAllNodesWithContentDescription("Download cancelled. Tap to download again").assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Could not confirm cancellation").assertExists()
+        composeRule.onNodeWithText("Download cancelled. Tap to download again").assertExists()
+        composeRule.onAllNodesWithContentDescription("Download cancelled. Tap to download again").assertCountEquals(1)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/attachment-progress-$name.png")
     }
 
@@ -113,14 +114,14 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
                     NativeAttachmentProgress(
                         phase,
                         1u,
-                        512u,
-                        1024uL.takeUnless { index == 2 },
+                        (4uL * 1024u * 1024u),
+                        (8uL * 1024u * 1024u).takeUnless { index == 2 },
                         null,
                         "body",
                     )
                 val host =
                     if (phase == AttachmentTransferStateFfi.READY) {
-                        AttachmentTransferState.Resolving
+                        AttachmentTransferState.Available
                     } else {
                         attachmentFilePresentationState(
                             AttachmentTransferState.Remote,
@@ -133,9 +134,16 @@ class AttachmentProgressScreenshotTest : MessageBubbleFileAttachmentFixtures() {
                     resolveAttachmentPresentation(reference.mediaType, reference.fileName),
                     host,
                     nativeProgress = progress,
+                    openPending = phase == AttachmentTransferStateFfi.READY,
                     onCancelTransfer = {},
                 )
             }
+            val cancelled = fileReference("cancelled.pdf", "application/pdf")
+            MediaFileBubbleContent(
+                cancelled,
+                resolveAttachmentPresentation(cancelled.mediaType, cancelled.fileName),
+                AttachmentTransferState.Cancelled,
+            )
             CancellationGallery()
         }
     }

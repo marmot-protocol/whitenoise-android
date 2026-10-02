@@ -87,7 +87,12 @@ internal fun MediaFileBubbleContent(
         when (cancellationState) {
             AttachmentCancellationState.Pending -> stringResource(R.string.media_cancelling_download)
             AttachmentCancellationState.Unconfirmed -> stringResource(R.string.media_cancel_unconfirmed)
-            AttachmentCancellationState.None -> nativeProgressDescription(nativeProgress, transferState)
+            AttachmentCancellationState.None ->
+                if (openPending && transferState == AttachmentTransferState.Available) {
+                    stringResource(R.string.media_preparing_attachment)
+                } else {
+                    nativeProgressDescription(nativeProgress, transferState)
+                }
         }
     FileBubbleContent(
         fileName = reference.fileName,

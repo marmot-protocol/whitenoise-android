@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -30,6 +31,7 @@ internal suspend fun sendAndroidFixtureAttachment(
     group: String,
     blobPort: Int,
     bytes: ByteArray,
+    qualifyOwnLocalCache: Boolean = false,
 ): MediaAttachmentReferenceFfi {
     check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
     val endpoint = AppBlobEndpointFfi("blossom-v1", "http://127.0.0.1:$blobPort")
@@ -56,9 +58,21 @@ internal suspend fun sendAndroidFixtureAttachment(
         withContext(Dispatchers.Main.immediate) {
             controller.retryMembers()
             check(controller.canSendMessages) { "generated sender membership not ready" }
+            if (qualifyOwnLocalCache) controller.start()
             controller.sendAttachments(listOf(PendingAttachment(bytes, "text/plain", "fixture.txt")), caption = null)
         }
-        return awaitAndroidFixtureReference(marmot, sender.label, group)
+        val (messageId, reference) = awaitAndroidFixtureReference(marmot, sender.label, group)
+        if (qualifyOwnLocalCache) {
+            // Accepted-pending sends seed the confirmed cache when the shipping live projection reconciles.
+            awaitAndroidFixtureProjection(controller, messageId)
+            LargeAttachmentLocalReadComparison.assertOwnHostCache(
+                state,
+                AttachmentTransferRequest(sender.label, group, messageId, 0),
+                reference,
+                bytes,
+            )
+        }
+        return reference
     } finally {
         withContext(Dispatchers.Main.immediate) {
             controller.onCleared()
@@ -67,14 +81,24 @@ internal suspend fun sendAndroidFixtureAttachment(
     }
 }
 
+/** Waits for the real foreground projection that exposes the confirmed own-file card. */
+private suspend fun awaitAndroidFixtureProjection(
+    controller: ConversationController,
+    messageId: String,
+) {
+    withTimeout(30_000L) {
+        while (!withContext(Dispatchers.Main.immediate) { controller.retainsTimelineRecord(messageId) }) delay(10L)
+    }
+}
+
 /** Reads the actual published source; no outgoing row, asset reference or accepted send is manufactured. */
 private suspend fun awaitAndroidFixtureReference(
     marmot: Marmot,
     sender: String,
     group: String,
-): MediaAttachmentReferenceFfi =
+): Pair<String, MediaAttachmentReferenceFfi> =
     withTimeout(30_000L) {
-        var reference: MediaAttachmentReferenceFfi? = null
+        var reference: Pair<String, MediaAttachmentReferenceFfi>? = null
         while (reference == null) {
             val read = marmot.attachmentHistoryPage(sender, group, 100u, null)
             if (read is AttachmentPageReadFfi.Page) {
@@ -82,8 +106,10 @@ private suspend fun awaitAndroidFixtureReference(
                 try {
                     reference =
                         page.entries
-                            .mapNotNull { (it.attachment as? MediaAttachmentOutcomeFfi.Accepted)?.reference }
-                            .singleOrNull { it.fileName == "fixture.txt" }
+                            .mapNotNull { entry ->
+                                val accepted = entry.attachment as? MediaAttachmentOutcomeFfi.Accepted
+                                accepted?.reference?.let { entry.messageIdHex to it }
+                            }.singleOrNull { it.second.fileName == "fixture.txt" }
                 } finally {
                     page.nextCursor?.close()
                     page.version.close()

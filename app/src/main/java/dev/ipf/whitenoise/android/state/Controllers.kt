@@ -8764,7 +8764,11 @@ class ConversationController(
                     retained.attachments.forEachIndexed { index, attachment ->
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         val confirmedKey = mediaCacheKey(account, confirmedId, index)
-                        appState.cacheMediaPlaintext(confirmedKey, attachment.plaintextBytes)
+                        appState.cacheUploadedAttachment(
+                            confirmedKey,
+                            attachment.plaintextBytes,
+                            references.getOrNull(index)?.ciphertextSha256,
+                        )
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
@@ -8772,22 +8776,6 @@ class ConversationController(
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)
-                        }
-                        val bytesToPersist = attachment.plaintextBytes
-                        val publicationToken = appState.diskMediaCache.capturePublicationToken()
-                        // Tag with the uploaded blob's ciphertext hash so the
-                        // expiry sweep can wipe this self-sent entry from disk by
-                        // hash even after a restart / when its row isn't loaded.
-                        // No hash → no durable copy: the expiry sweep evicts disk
-                        // strictly by tag, so an untagged entry would outlive its
-                        // retention window. L1 still serves this session.
-                        val ciphertextTag = references.getOrNull(index)?.ciphertextSha256
-                        if (ciphertextTag != null) {
-                            appState.launchMutation {
-                                withContext(Dispatchers.IO) {
-                                    appState.diskMediaCache.put(confirmedKey, bytesToPersist, publicationToken, ciphertextTag)
-                                }
-                            }
                         }
                     }
                 }
@@ -9877,10 +9865,14 @@ class ConversationController(
         retained.attachments.forEachIndexed { index, attachment ->
             if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
             val cacheKey = mediaCacheKey(account, projectedMessageIdHex, index)
-            appState.cacheMediaPlaintext(cacheKey, attachment.plaintextBytes)
-            // Seed the L1 plaintext synchronously above (the bit that stops the
-            // bubble's LaunchedEffect from re-downloading from Blossom), but
-            // offload the multi-MB ARGB thumbnail decode off this main-thread
+            appState.cacheUploadedAttachment(
+                cacheKey,
+                attachment.plaintextBytes,
+                retained.uploadedReferences?.getOrNull(index)?.ciphertextSha256,
+            )
+            // Register local publication before yielding, including files beyond L1 admission,
+            // so a confirmed card waits for its disk copy instead of re-downloading from Blossom.
+            // Offload the multi-MB ARGB thumbnail decode off this main-thread
             // reconcile. The main-confined thumbnail-cache put resumes on Main
             // via launchMutation's Main.immediate scope. Mirrors the
             // receive/render path in WhiteNoiseApp.
@@ -9889,20 +9881,6 @@ class ConversationController(
                 val decoded = decodeMediaThumbnailOffMain(posterSource)
                 if (decoded != null && mediaUploadSessionStillCurrent(account)) {
                     appState.cacheMediaThumbnail(cacheKey, decoded)
-                }
-            }
-            val bytesToPersist = attachment.plaintextBytes
-            val publicationToken = appState.diskMediaCache.capturePublicationToken()
-            // Tag with the uploaded blob's ciphertext hash (captured at upload)
-            // so hash-based expiry eviction reaches this entry across sessions.
-            // No hash → no durable copy: disk expiry eviction is strictly
-            // tag-scoped, so an untagged entry would outlive its window.
-            val ciphertextTag = retained.uploadedReferences?.getOrNull(index)?.ciphertextSha256
-            if (ciphertextTag != null) {
-                appState.launchMutation {
-                    withContext(Dispatchers.IO) {
-                        appState.diskMediaCache.put(cacheKey, bytesToPersist, publicationToken, ciphertextTag)
-                    }
                 }
             }
         }

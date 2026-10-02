@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AttachmentLocalAssetFfi
 import dev.ipf.marmotkit.AttachmentLocalBytesFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -85,6 +86,7 @@ class NativeAttachmentLocalAccessTest {
             source.copyTo(output)
             assertArrayEquals(bytes, output.toByteArray())
             assertTrue(limits.all { it in 1u..1_048_576u })
+            assertEquals(listOf(1_048_576u, 1_048_576u, 17u), limits)
             val leaseFile = checkNotNull(source.leaseFileForTesting())
             assertTrue(leaseFile.isFile)
             source.close()
@@ -152,6 +154,31 @@ class NativeAttachmentLocalAccessTest {
 
             assertTrue(directory.isDirectory)
             root.deleteRecursively()
+        }
+
+    /** Cancellation at a 1 MiB read boundary removes the incomplete lease before it can be opened. */
+    @Test
+    fun `cancelled bounded read deletes partial lease`() =
+        runTest {
+            val root = temporaryRoot()
+            var reads = 0
+            try {
+                NativeAttachmentLocalAccess(
+                    cacheRoot = root,
+                    queryAssets = { listOf(AttachmentLocalAssetFfi("opaque", 2_097_152u)) },
+                    readAsset = { _, _, limit ->
+                        reads++
+                        if (reads > 1) throw CancellationException("fixture cancelled")
+                        AttachmentLocalBytesFfi(true, ByteArray(limit.toInt()))
+                    },
+                ).open(listOf(target()))
+                error("cancelled read escaped")
+            } catch (_: CancellationException) {
+                assertEquals(2, reads)
+                assertTrue(File(root, "native_attachment_leases").listFiles().orEmpty().isEmpty())
+            } finally {
+                root.deleteRecursively()
+            }
         }
 
     /** Native local-access batches enforce the MarmotKit request bound. */

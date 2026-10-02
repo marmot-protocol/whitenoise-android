@@ -1400,10 +1400,10 @@
     <string name="media_download_policy_blocked">Download blocked by policy</string>
     <string name="media_attachment_unavailable">Attachment unavailable</string>
     <string name="media_cancelling_download">Cancelling download</string>
-    <string name="media_cancel_unconfirmed">Could not confirm cancellation. Tap to retry</string>
+    <string name="media_cancel_unconfirmed">Could not confirm cancellation</string>
     <string name="media_download_queued">Queued for download</string>
-    <string name="media_download_body_known">%1$s of %2$s bytes</string>
-    <string name="media_download_body_unknown">%1$s bytes received</string>
+    <string name="media_download_body_known">%1$s of %2$s</string>
+    <string name="media_download_body_unknown">%1$s received</string>
     <string name="media_verifying_download">Verifying download</string>
     <string name="media_decrypting_download">Decrypting download</string>
     <string name="media_download_retry_scheduled">Waiting to retry</string>

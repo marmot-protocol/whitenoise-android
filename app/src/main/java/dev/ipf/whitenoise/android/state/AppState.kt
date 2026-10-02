@@ -1366,6 +1366,23 @@ class WhiteNoiseAppState private constructor(
         return retained
     }
 
+    internal val outgoingAttachmentCachePublications by lazy { OutgoingAttachmentCachePublications(mutationsScope) }
+
+    /** Registers encrypted disk publication before a confirmed own-file card can observe an oversized L1 miss. */
+    internal fun cacheUploadedAttachment(
+        cacheKey: String,
+        plaintext: ByteArray,
+        ciphertextTag: String?,
+    ) {
+        cacheMediaPlaintext(cacheKey, plaintext)
+        // Disk expiry is hash-scoped; an untagged durable entry could outlive its retention window.
+        if (ciphertextTag == null) return
+        val token = diskMediaCache.capturePublicationToken()
+        outgoingAttachmentCachePublications.publish(cacheKey, listOf(token, ciphertextTag)) {
+            withContext(Dispatchers.IO) { diskMediaCache.put(cacheKey, plaintext, token, ciphertextTag) }
+        }
+    }
+
     internal fun cachedMediaThumbnail(cacheKey: String): android.graphics.Bitmap? {
         assertMainThread { "cachedMediaThumbnail" }
         return mediaThumbnailCache.get(cacheKey)
@@ -4365,7 +4382,10 @@ class WhiteNoiseAppState private constructor(
         resolveAttachmentCacheAvailability(
             cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) },
             memoryContains = { cachedMediaPlaintext(it) != null },
-            diskContains = diskMediaCache::containsAfterHydration,
+            diskContains = { key ->
+                outgoingAttachmentCachePublications.await(key)
+                diskMediaCache.containsAfterHydration(key)
+            },
         )
 
     /** True for host-retained or native-retained verified plaintext. */

@@ -49,19 +49,22 @@ class MainThreadConfinementCoverageTest {
         )
 
         mapOf(
-            "performMediaUpload" to listOf("cacheMediaPlaintext", "cacheMediaThumbnail"),
+            "performMediaUpload" to listOf("cacheUploadedAttachment", "cacheMediaThumbnail"),
             "evictExpiredMediaCaches" to listOf("removeMediaMemoryCacheEntry"),
             "hasCachedAttachment" to listOf("cachedMediaPlaintext"),
             "evictCachedAttachment" to listOf("removeMediaMemoryCacheEntry"),
             "thumbnailFor" to listOf("cachedMediaThumbnail"),
             "cacheThumbnail" to listOf("cacheMediaThumbnail"),
-            "handoffOwnMediaCacheOnReconcile" to listOf("cacheMediaPlaintext", "cacheMediaThumbnail"),
+            "handoffOwnMediaCacheOnReconcile" to listOf("cacheUploadedAttachment", "cacheMediaThumbnail"),
         ).forEach { (functionName, guardedCalls) ->
             val body = source.functionSection(functionName)
             guardedCalls.forEach { guardedCall ->
                 assertTrue("$functionName must route through $guardedCall", guardedCall in body)
             }
         }
+        val ownSend = appStateSource().readText().functionSection("cacheUploadedAttachment")
+        assertTrue("own-send publication must retain the guarded L1 boundary", "cacheMediaPlaintext(" in ownSend)
+        assertTrue("own-send publication must keep disk writes off Main", "withContext(Dispatchers.IO)" in ownSend)
         assertTrue(
             "downloadAttachment must use the shared guarded AppState boundary",
             "downloadAttachmentPlaintext" in source.functionSection("downloadAttachment"),

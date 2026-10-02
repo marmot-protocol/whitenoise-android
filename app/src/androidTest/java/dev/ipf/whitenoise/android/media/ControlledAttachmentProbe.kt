@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 /** Runs only generated peers through the unchanged Android resolver and the packaged native runtime. */
 internal object ControlledAttachmentProbe {
-    /** Publishes a genuine small attachment and measures cold then retained received reads. */
+    /** Explicit large-read comparisons leave the normal small-file baseline unchanged. */
     @Suppress("LongMethod") // One guarded sequence keeps disposable peers and measured source identity together.
     suspend fun run() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -52,6 +52,8 @@ internal object ControlledAttachmentProbe {
         assumeTrue(arguments.getString("allowControlledAttachmentProbe") == "true")
         check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
         val androidSendController = arguments.getString("fixtureUseAndroidSendController") == "true"
+        val compareLargeReads = arguments.getString("fixtureCompareLargeLocalReads") == "true"
+        val payloadBytes = LargeAttachmentLocalReadComparison.payloadBytes(compareLargeReads)
         val blobPort = requireNotNull(arguments.getString("fixtureBlobPort")).toInt()
         val relayPort = requireNotNull(arguments.getString("fixtureRelayPort")).toInt()
         require(blobPort in 1024..65535 && relayPort in 1024..65535)
@@ -73,7 +75,7 @@ internal object ControlledAttachmentProbe {
         val accounts = mutableListOf<String>()
         var fixtureState: WhiteNoiseAppState? = null
         try {
-            withTimeout(120_000L) {
+            withTimeout(LargeAttachmentLocalReadComparison.timeoutMillis(compareLargeReads)) {
                 marmot.start()
                 if (restartRole == "read") {
                     RestartAttachmentRetentionProbe.read(context, root, marmot, accounts)
@@ -86,10 +88,19 @@ internal object ControlledAttachmentProbe {
                 marmot.enforceAppOwnedAttachmentAcquisitionPolicy(listOf(receiver.label, sender.label))
                 val group = marmot.createGroup(sender.label, "Generated fixture", listOf(receiver.accountIdHex), null)
                 awaitReceivedGroup(marmot, receiver.label, group)
-                val bytes = ByteArray(1024) { (it % 251).toByte() }
+                val bytes = ByteArray(payloadBytes) { (it % 251).toByte() }
                 val reference =
                     if (androidSendController) {
-                        sendAndroidFixtureAttachment(context, root, marmot, sender, group, blobPort, bytes)
+                        sendAndroidFixtureAttachment(
+                            context,
+                            root,
+                            marmot,
+                            sender,
+                            group,
+                            blobPort,
+                            bytes,
+                            qualifyOwnLocalCache = compareLargeReads,
+                        )
                     } else {
                         val uploaded =
                             marmot.uploadMedia(
@@ -137,7 +148,7 @@ internal object ControlledAttachmentProbe {
                     }
                     return@withTimeout
                 }
-                measure("received-cold") {
+                measure("received-cold", payloadBytes) {
                     state
                         .downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false)
                         .use {
@@ -145,6 +156,10 @@ internal object ControlledAttachmentProbe {
                         }
                 }
                 denyAcquisition(blobPort)
+                if (compareLargeReads) {
+                    LargeAttachmentLocalReadComparison.run(state, request, bytes)
+                    return@withTimeout
+                }
                 repeat(10) {
                     assertNoAndroidCache(state, request)
                     measure("received-retained") {
@@ -319,6 +334,7 @@ internal object ControlledAttachmentProbe {
     /** Records absolute Java/native peaks, latency and success without identifiers or exception text. */
     internal suspend fun measure(
         phase: String,
+        payloadBytes: Int = 1024,
         block: suspend () -> Unit,
     ) {
         val started = SystemClock.elapsedRealtimeNanos()
@@ -351,7 +367,7 @@ internal object ControlledAttachmentProbe {
                     JSONObject()
                         .put("phase", phase)
                         .put("success", success)
-                        .put("payload_bytes", 1024)
+                        .put("payload_bytes", payloadBytes)
                         .put("elapsed_ms", (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0)
                         .put("java_peak_bytes", peakJava.get())
                         .put("native_peak_bytes", peakNative.get()),
@@ -362,7 +378,7 @@ internal object ControlledAttachmentProbe {
     }
 
     /** Sends closed metrics to the host runner; no synthetic identity or locator is exported. */
-    private fun report(value: JSONObject) {
+    internal fun report(value: JSONObject) {
         InstrumentationRegistry.getInstrumentation().sendStatus(
             0,
             Bundle().apply { putString("controlled_attachment_json", value.toString()) },

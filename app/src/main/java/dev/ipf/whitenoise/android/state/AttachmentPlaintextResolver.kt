@@ -18,7 +18,7 @@ import java.io.IOException
 internal suspend fun resolveAttachmentCacheAvailability(
     cacheKey: String,
     memoryContains: (String) -> Boolean,
-    diskContains: (String) -> Boolean,
+    diskContains: suspend (String) -> Boolean,
 ): Boolean =
     withContext(Dispatchers.Main.immediate) { memoryContains(cacheKey) } ||
         withContext(Dispatchers.IO) { diskContains(cacheKey) } ||
@@ -73,6 +73,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             loadDisk = { cancellationCheck, onAcquired ->
                 val startedAtMs = diagnostics?.startSpan()
                 measureHostPerformance(HostPerformanceOperationFfi.MEDIA_CACHE_READ) {
+                    outgoingAttachmentCachePublications.await(cacheKey)
                     loadAttachmentDiskPlaintext(cacheKey, cancellationCheck, onAcquired).also { cached ->
                         diagnostics?.phase(
                             phase = PerformancePhase.ATTACHMENT_DISK_LOOKUP,
