@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Redefinir filtros</string>
-    <string name="smart_folder_legacy">As regras simples continuam ativas até serem substituídas.</string>
     <string name="smart_folder_prototype">Apenas conversas carregadas são usadas. Conversas com informações ausentes não são contadas.</string>
     <string name="smart_folder_all">Atender a todos</string>
     <string name="smart_folder_any">Atender a qualquer um</string>
@@ -11,7 +10,6 @@
     <string name="smart_folder_empty">Sem correspondências automáticas. Adicione uma condição ou inclua conversas manualmente.</string>
     <string name="smart_folder_remove_group">Remover grupo</string>
     <string name="smart_folder_ignore">Remover filtro</string>
-    <string name="smart_folder_edit_condition">Editar condição</string>
     <string name="smart_folder_present">Presente</string>
     <string name="smart_folder_none">Nenhum</string>
     <string name="smart_folder_participants">Pessoas</string>
@@ -21,7 +19,7 @@
     <string name="smart_folder_pending">Mensagens de saída pendentes</string>
     <string name="smart_folder_muted">Silenciada</string>
     <string name="smart_folder_archived">Arquivada</string>
-    <string name="smart_folder_accepted">Conversas aceitas</string>
+    <string name="smart_folder_accepted">Conversas aceites</string>
     <string name="smart_folder_type">Tipo de conversa</string>
     <string name="smart_folder_title">O título contém</string>
     <string name="smart_folder_pinned">Fixada</string>
@@ -38,19 +36,14 @@
     <string name="smart_folder_keyword_hint">Pesquisa no título sem distinguir maiúsculas</string>
     <string name="smart_folder_pending_hint">Ainda não é possível verificar mensagens pendentes em algumas conversas.</string>
     <string name="smart_folder_negate_condition">Excluir correspondências (NÃO)</string>
-    <plurals name="smart_folder_loaded_count">
-        <item quantity="one">%1$d correspondência carregada</item>
-        <item quantity="other">%1$d correspondências carregadas</item>
-    </plurals>
     <string name="smart_folder_unresolved">Conversas que não foi possível verificar: %1$d</string>
     <string name="smart_folder_invalid">Estas regras são inválidas ou não são suportadas. As correspondências automáticas estão desativadas; substitua-as para editar.</string>
     <string name="smart_folder_presets">Escolher modelo</string>
     <string name="smart_folder_preset_read">Tudo lido</string>
     <string name="smart_folder_preset_mentions">Menções não lidas</string>
-    <string name="smart_folder_preset_hint">Comece com Tudo lido ou Menções não lidas e adicione Participantes. Tudo lido não significa que o agente terminou.</string>
     <string name="smart_folder_limit">Até 4 níveis e 64 condições ou grupos.</string>
     <string name="smart_folder_include_match">Incluir correspondências</string>
-    <string name="smart_folder_edit_legacy">Editar filtros salvos</string>
+    <string name="smart_folder_edit_legacy">Editar filtros guardados</string>
     <string name="smart_folder_empty_group">Adicione uma condição ou remova este grupo vazio antes de guardar.</string>
     <string name="smart_folder_unread_hint">Inclui a opção manual Marcar como não lida.</string>
     <plurals name="smart_folder_group_items">
@@ -72,6 +65,6 @@
     <string name="smart_folder_more_filters">Mais filtros</string>
     <string name="smart_folder_add_description">Adicionar descrição</string>
     <string name="smart_folder_always_include">Sempre incluir conversas</string>
-    <string name="smart_folder_loaded_only">Somente conversas carregadas</string>
+    <string name="smart_folder_loaded_only">Apenas conversas carregadas</string>
     <string name="smart_folder_read_help">Tudo lido não significa que o agente terminou.</string>
 </resources>

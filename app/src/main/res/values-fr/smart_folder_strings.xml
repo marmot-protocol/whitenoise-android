@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Réinitialiser les filtres</string>
-    <string name="smart_folder_legacy">Les règles simples restent actives jusqu’à leur remplacement.</string>
     <string name="smart_folder_prototype">Seules les discussions chargées sont utilisées. Celles dont les informations sont incomplètes ne sont pas comptées.</string>
     <string name="smart_folder_all">Tous les critères</string>
     <string name="smart_folder_any">Un des critères</string>
@@ -11,7 +10,6 @@
     <string name="smart_folder_empty">Aucune correspondance automatique. Ajoutez une condition ou incluez des conversations manuellement.</string>
     <string name="smart_folder_remove_group">Supprimer le groupe</string>
     <string name="smart_folder_ignore">Supprimer le filtre</string>
-    <string name="smart_folder_edit_condition">Modifier la condition</string>
     <string name="smart_folder_present">Présent</string>
     <string name="smart_folder_none">Aucun</string>
     <string name="smart_folder_participants">Personnes</string>
@@ -38,16 +36,11 @@
     <string name="smart_folder_keyword_hint">Recherche dans le titre sans distinction de casse</string>
     <string name="smart_folder_pending_hint">Les messages en attente ne peuvent pas encore être vérifiés dans certaines discussions.</string>
     <string name="smart_folder_negate_condition">Exclure les correspondances (NON)</string>
-    <plurals name="smart_folder_loaded_count">
-        <item quantity="one">%1$d correspondance chargée</item>
-        <item quantity="other">%1$d correspondances chargées</item>
-    </plurals>
     <string name="smart_folder_unresolved">Discussions non vérifiables : %1$d</string>
     <string name="smart_folder_invalid">Ces règles sont invalides ou non prises en charge. Le filtrage automatique est désactivé ; remplacez-les pour les modifier.</string>
     <string name="smart_folder_presets">Choisir un modèle</string>
     <string name="smart_folder_preset_read">Tout lu</string>
     <string name="smart_folder_preset_mentions">Mentions non lues</string>
-    <string name="smart_folder_preset_hint">Commencez par Tout lu ou Mentions non lues, puis ajoutez des Participants. Tout lu ne signifie pas que l’agent a terminé.</string>
     <string name="smart_folder_limit">Jusqu’à 4 niveaux et 64 conditions ou groupes.</string>
     <string name="smart_folder_include_match">Inclure les correspondances</string>
     <string name="smart_folder_edit_legacy">Modifier les filtres enregistrés</string>

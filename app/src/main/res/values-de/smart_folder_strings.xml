@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Filter zurücksetzen</string>
-    <string name="smart_folder_legacy">Einfache Regeln bleiben aktiv, bis du sie ersetzt.</string>
     <string name="smart_folder_prototype">Nur geladene Chats werden berücksichtigt. Chats mit fehlenden Angaben werden nicht gezählt.</string>
     <string name="smart_folder_all">Alle erfüllen</string>
     <string name="smart_folder_any">Eine erfüllen</string>
@@ -11,7 +10,6 @@
     <string name="smart_folder_empty">Keine automatischen Treffer. Bedingung hinzufügen oder Chats manuell aufnehmen.</string>
     <string name="smart_folder_remove_group">Gruppe entfernen</string>
     <string name="smart_folder_ignore">Filter entfernen</string>
-    <string name="smart_folder_edit_condition">Bedingung bearbeiten</string>
     <string name="smart_folder_present">Vorhanden</string>
     <string name="smart_folder_none">Keine</string>
     <string name="smart_folder_participants">Personen</string>
@@ -38,16 +36,11 @@
     <string name="smart_folder_keyword_hint">Titelvergleich ohne Beachtung der Großschreibung</string>
     <string name="smart_folder_pending_hint">Einige Chats können noch nicht auf ausstehende Nachrichten geprüft werden.</string>
     <string name="smart_folder_negate_condition">Treffer ausschließen (NICHT)</string>
-    <plurals name="smart_folder_loaded_count">
-        <item quantity="one">%1$d geladener Treffer</item>
-        <item quantity="other">%1$d geladene Treffer</item>
-    </plurals>
     <string name="smart_folder_unresolved">Nicht prüfbare Chats: %1$d</string>
     <string name="smart_folder_invalid">Dieser Regelsatz ist ungültig oder wird nicht unterstützt. Automatische Zuordnung ist deaktiviert; ersetze ihn zum Bearbeiten.</string>
     <string name="smart_folder_presets">Vorlage wählen</string>
     <string name="smart_folder_preset_read">Alles gelesen</string>
     <string name="smart_folder_preset_mentions">Ungelesene Erwähnungen</string>
-    <string name="smart_folder_preset_hint">Mit Alles gelesen oder Ungelesene Erwähnungen beginnen, dann Teilnehmer hinzufügen. Alles gelesen bedeutet nicht, dass der Agent fertig ist.</string>
     <string name="smart_folder_limit">Bis zu 4 Ebenen und 64 Bedingungen oder Gruppen.</string>
     <string name="smart_folder_include_match">Treffer einschließen</string>
     <string name="smart_folder_edit_legacy">Gespeicherte Filter bearbeiten</string>

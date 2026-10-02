@@ -73,6 +73,44 @@ class ChatFolderEditScreenTest {
     }
 
     @Test
+    fun clearingLastSavedFilterKeepsSimpleControlsEditable() {
+        val appState = appState()
+        val store = appState.chatFolderPreferences
+        val id = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        store.foldersFor(ACCOUNT_REF)
+        store.commitFolderDraft(ACCOUNT_REF, id, null, "", emptySet(), ChatFolderRule(keyword = "Before"))
+        renderEditor(appState, {})
+        val content = composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+        content.performScrollToNode(hasTestTag("folder.legacyEdit"))
+        composeRule.onNodeWithTag("folder.legacyEdit").performClick()
+        content.performScrollToNode(hasTestTag("folder.keyword"))
+        composeRule.onNodeWithTag("folder.keyword").performTextReplacement("")
+        composeRule.onNodeWithTag("folder.keyword").performTextReplacement("After")
+        composeRule.onNodeWithTag("folder.save").performClick()
+        assertEquals("After", store.folderRule(ACCOUNT_REF, id)?.keyword)
+    }
+
+    @Test
+    fun turningOffLastSavedSwitchKeepsItAvailableToTurnOnAgain() {
+        val appState = appState()
+        val store = appState.chatFolderPreferences
+        val id = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        store.foldersFor(ACCOUNT_REF)
+        store.commitFolderDraft(ACCOUNT_REF, id, null, "", emptySet(), ChatFolderRule(unreadOnly = true))
+        renderEditor(appState, {})
+        val content = composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+        content.performScrollToNode(hasTestTag("folder.legacyEdit"))
+        composeRule.onNodeWithTag("folder.legacyEdit").performClick()
+        val label = app.getString(R.string.chat_folder_unread_only)
+        content.performScrollToNode(hasText(label))
+        composeRule.onNodeWithText(label).performClick()
+        composeRule.onNodeWithText(label).assertIsOff()
+        content.performScrollToNode(hasText(label))
+        composeRule.onNodeWithText(label).performClick()
+        composeRule.onNodeWithText(label).assertIsOn()
+    }
+
+    @Test
     fun optionalDescriptionCanBeAddedAndSavedWithoutChangingManualRules() {
         val appState = appState()
         renderEditor(appState, {}, folderId = null)

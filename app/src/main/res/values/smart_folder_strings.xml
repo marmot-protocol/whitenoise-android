@@ -1,6 +1,5 @@
 <resources>
   <string name="smart_folder_start">Reset filters</string>
-  <string name="smart_folder_legacy">Simple rules stay in use until you replace them.</string>
   <string name="smart_folder_prototype">Matches loaded chats only. Chats with missing information are not counted.</string>
   <string name="smart_folder_all">Match all</string>
   <string name="smart_folder_any">Match any</string>
@@ -11,7 +10,6 @@
   <string name="smart_folder_empty">No automatic matches. Add a condition or include chats manually.</string>
   <string name="smart_folder_remove_group">Remove group</string>
   <string name="smart_folder_ignore">Remove filter</string>
-  <string name="smart_folder_edit_condition">Edit condition</string>
   <string name="smart_folder_present">Present</string>
   <string name="smart_folder_none">None</string>
   <string name="smart_folder_participants">People</string>
@@ -38,16 +36,11 @@
   <string name="smart_folder_keyword_hint">Case-insensitive title match</string>
   <string name="smart_folder_pending_hint">Some chats cannot be checked for pending messages yet.</string>
   <string name="smart_folder_negate_condition">Exclude matches (NOT)</string>
-    <plurals name="smart_folder_loaded_count">
-        <item quantity="one">%1$d loaded match</item>
-        <item quantity="other">%1$d loaded matches</item>
-    </plurals>
   <string name="smart_folder_unresolved">Chats we couldn’t check: %1$d</string>
   <string name="smart_folder_invalid">This rule set is unsupported or invalid. Automatic matching is disabled; replace it to edit.</string>
   <string name="smart_folder_presets">Choose preset</string>
   <string name="smart_folder_preset_read">All read</string>
   <string name="smart_folder_preset_mentions">Unread mentions</string>
-  <string name="smart_folder_preset_hint">Start with All read or Unread mentions, then add Participants to choose people. All read does not mean the agent has finished.</string>
   <string name="smart_folder_limit">Up to 4 levels and 64 conditions or groups.</string>
   <string name="smart_folder_include_match">Include matches</string>
   <string name="smart_folder_edit_legacy">Edit saved filters</string>

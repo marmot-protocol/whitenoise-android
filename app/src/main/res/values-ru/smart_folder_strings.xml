@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Сбросить фильтры</string>
-    <string name="smart_folder_legacy">Простые правила действуют, пока вы их не замените.</string>
     <string name="smart_folder_prototype">Учитываются только загруженные чаты. Чаты с неполными данными не учитываются.</string>
     <string name="smart_folder_all">Все условия</string>
     <string name="smart_folder_any">Любое условие</string>
@@ -11,7 +10,6 @@
     <string name="smart_folder_empty">Нет автоматических совпадений. Добавьте условие или включите чаты вручную.</string>
     <string name="smart_folder_remove_group">Удалить группу</string>
     <string name="smart_folder_ignore">Удалить фильтр</string>
-    <string name="smart_folder_edit_condition">Изменить условие</string>
     <string name="smart_folder_present">Есть</string>
     <string name="smart_folder_none">Нет</string>
     <string name="smart_folder_participants">Люди</string>
@@ -38,18 +36,11 @@
     <string name="smart_folder_keyword_hint">Поиск в заголовке без учёта регистра</string>
     <string name="smart_folder_pending_hint">В некоторых чатах пока нельзя проверить наличие ожидающих отправки сообщений.</string>
     <string name="smart_folder_negate_condition">Исключать совпадения (НЕ)</string>
-    <plurals name="smart_folder_loaded_count">
-        <item quantity="one">%1$d загруженное совпадение</item>
-        <item quantity="few">%1$d загруженных совпадения</item>
-        <item quantity="many">%1$d загруженных совпадений</item>
-        <item quantity="other">%1$d загруженного совпадения</item>
-    </plurals>
     <string name="smart_folder_unresolved">Чаты, которые не удалось проверить: %1$d</string>
     <string name="smart_folder_invalid">Эти правила недопустимы или не поддерживаются. Автоматический отбор отключён; замените правила для редактирования.</string>
     <string name="smart_folder_presets">Выбрать шаблон</string>
     <string name="smart_folder_preset_read">Всё прочитано</string>
     <string name="smart_folder_preset_mentions">Непрочитанные упоминания</string>
-    <string name="smart_folder_preset_hint">Начните с Всё прочитано или Непрочитанные упоминания, затем добавьте Участников. Всё прочитано не означает, что агент завершил работу.</string>
     <string name="smart_folder_limit">До 4 уровней и 64 условий или групп.</string>
     <string name="smart_folder_include_match">Включать совпадения</string>
     <string name="smart_folder_edit_legacy">Изменить сохранённые фильтры</string>

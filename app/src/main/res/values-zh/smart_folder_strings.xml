@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">重置筛选条件</string>
-    <string name="smart_folder_legacy">简单规则会一直生效，直到被替换。</string>
     <string name="smart_folder_prototype">仅使用已加载的聊天。信息缺失的聊天不计入匹配。</string>
     <string name="smart_folder_all">全部符合</string>
     <string name="smart_folder_any">任一符合</string>
@@ -11,7 +10,6 @@
     <string name="smart_folder_empty">没有自动匹配。请添加条件或手动加入聊天。</string>
     <string name="smart_folder_remove_group">移除组</string>
     <string name="smart_folder_ignore">移除筛选条件</string>
-    <string name="smart_folder_edit_condition">编辑条件</string>
     <string name="smart_folder_present">有</string>
     <string name="smart_folder_none">无</string>
     <string name="smart_folder_participants">联系人</string>
@@ -38,15 +36,11 @@
     <string name="smart_folder_keyword_hint">标题匹配不区分大小写</string>
     <string name="smart_folder_pending_hint">某些聊天暂时无法检查待发送消息。</string>
     <string name="smart_folder_negate_condition">排除匹配项（非）</string>
-    <plurals name="smart_folder_loaded_count">
-        <item quantity="other">%1$d 个已加载的匹配项</item>
-    </plurals>
     <string name="smart_folder_unresolved">无法检查的聊天：%1$d</string>
     <string name="smart_folder_invalid">此规则集无效或不受支持。自动匹配已禁用；请替换规则集以编辑。</string>
     <string name="smart_folder_presets">选择预设</string>
     <string name="smart_folder_preset_read">全部已读</string>
     <string name="smart_folder_preset_mentions">未读提及</string>
-    <string name="smart_folder_preset_hint">先选择全部已读或未读提及，再添加参与者。全部已读不代表代理已完成任务。</string>
     <string name="smart_folder_limit">最多 4 层和 64 个条件或组。</string>
     <string name="smart_folder_include_match">包含匹配项</string>
     <string name="smart_folder_edit_legacy">编辑已保存的筛选条件</string>

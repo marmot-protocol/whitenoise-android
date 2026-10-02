@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Restablecer filtros</string>
-    <string name="smart_folder_legacy">Las reglas simples siguen activas hasta que las reemplaces.</string>
     <string name="smart_folder_prototype">Solo se usan los chats cargados. No se cuentan los chats con información incompleta.</string>
     <string name="smart_folder_all">Cumplir todos</string>
     <string name="smart_folder_any">Cumplir cualquiera</string>
@@ -11,7 +10,6 @@
     <string name="smart_folder_empty">Sin coincidencias automáticas. Añade una condición o incluye chats manualmente.</string>
     <string name="smart_folder_remove_group">Eliminar grupo</string>
     <string name="smart_folder_ignore">Eliminar filtro</string>
-    <string name="smart_folder_edit_condition">Editar condición</string>
     <string name="smart_folder_present">Presente</string>
     <string name="smart_folder_none">Ninguno</string>
     <string name="smart_folder_participants">Personas</string>
@@ -38,16 +36,11 @@
     <string name="smart_folder_keyword_hint">Buscar en el título sin distinguir mayúsculas</string>
     <string name="smart_folder_pending_hint">Algunos chats aún no se pueden comprobar en busca de mensajes pendientes.</string>
     <string name="smart_folder_negate_condition">Excluir coincidencias (NO)</string>
-    <plurals name="smart_folder_loaded_count">
-        <item quantity="one">%1$d coincidencia cargada</item>
-        <item quantity="other">%1$d coincidencias cargadas</item>
-    </plurals>
     <string name="smart_folder_unresolved">Chats que no se pudieron comprobar: %1$d</string>
     <string name="smart_folder_invalid">Estas reglas no son válidas o no son compatibles. Las coincidencias automáticas están desactivadas; reemplázalas para editarlas.</string>
     <string name="smart_folder_presets">Elegir plantilla</string>
     <string name="smart_folder_preset_read">Todo leído</string>
     <string name="smart_folder_preset_mentions">Menciones sin leer</string>
-    <string name="smart_folder_preset_hint">Empieza con Todo leído o Menciones sin leer y añade Participantes. Todo leído no significa que el agente haya terminado.</string>
     <string name="smart_folder_limit">Hasta 4 niveles y 64 condiciones o grupos.</string>
     <string name="smart_folder_include_match">Incluir coincidencias</string>
     <string name="smart_folder_edit_legacy">Editar filtros guardados</string>

@@ -81,7 +81,7 @@ class SmartFolderEditorScreenshotTest {
 
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
-    fun rtlRulesLarge() = capture("smart_folder_rtl_rules_large", rtl = true, rules = true)
+    fun rtlRulesLarge() = capture("smart_folder_rtl_rules_large", rtl = true, rules = true, options = true)
 
     @Suppress("LongMethod") // Render one fixed full form consistently across visual configurations.
     private fun capture(

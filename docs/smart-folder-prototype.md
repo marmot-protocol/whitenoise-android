@@ -43,11 +43,13 @@ condition to exclude terminal chats whose counters may retain earlier activity.
 
 ## Existing folders
 
-New folders start in simple mode, retaining ordinary pagination for manual
-folders created from chat selections or group details. Choosing All read, Unread
+New folders start as manual folders, retaining ordinary pagination for chat
+selections or group details. New automatic filters use the composable editor;
+the simple controls are available only for editing saved simple rules. Choosing All read, Unread
 mentions or saving a first Add filter is an explicit opt-in to the loaded-window prototype. Opening or renaming an existing
 folder preserves its legacy rules. Those rules
-remain editable in a collapsed section. A preset or a completed first filter starts a
+remain editable in a collapsed section, which stays mounted when the last
+keyword or switch is cleared during editing. A preset or a completed first filter starts a
 new draft; dismissing the picker or condition dialog changes nothing. Replacing an advanced tree or non-default simple rules requires confirmation;
 cancelling keeps the draft unchanged. Public-key entry and negation are optional controls within
 each condition. The previous legacy fields
@@ -62,6 +64,7 @@ loaded active and archived chats, independent of automatic rules.
 One Add filter sheet offers People, Read status and Unread mentions first; More
 filters exposes the other fields. Selecting a field opens only its values.
 Existing filters can be edited or removed; new filters offer Save and Cancel.
+To change a filter’s property, remove it and add the desired filter.
 Presets are shown directly on empty/manual folders and move into the menu when
 filters exist. Group rules keeps nesting and exclusion available without
 repeating the Boolean editor on every row. Optional description starts collapsed

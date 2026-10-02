@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">重設篩選條件</string>
-    <string name="smart_folder_legacy">簡單規則會持續生效，直到被取代。</string>
     <string name="smart_folder_prototype">僅使用已載入的聊天。資訊缺失的聊天不計入符合項目。</string>
     <string name="smart_folder_all">全部符合</string>
     <string name="smart_folder_any">任一符合</string>
@@ -11,7 +10,6 @@
     <string name="smart_folder_empty">沒有自動比對結果。請新增條件或手動加入聊天。</string>
     <string name="smart_folder_remove_group">移除群組</string>
     <string name="smart_folder_ignore">移除篩選條件</string>
-    <string name="smart_folder_edit_condition">編輯條件</string>
     <string name="smart_folder_present">有</string>
     <string name="smart_folder_none">無</string>
     <string name="smart_folder_participants">聯絡人</string>
@@ -38,15 +36,11 @@
     <string name="smart_folder_keyword_hint">標題比對不區分大小寫</string>
     <string name="smart_folder_pending_hint">某些聊天暫時無法檢查待傳送訊息。</string>
     <string name="smart_folder_negate_condition">排除比對結果（非）</string>
-    <plurals name="smart_folder_loaded_count">
-        <item quantity="other">%1$d 個已載入的比對結果</item>
-    </plurals>
     <string name="smart_folder_unresolved">無法檢查的聊天：%1$d</string>
     <string name="smart_folder_invalid">此規則集無效或不受支援。自動比對已停用；請取代規則集以編輯。</string>
     <string name="smart_folder_presets">選擇預設</string>
     <string name="smart_folder_preset_read">全部已讀</string>
     <string name="smart_folder_preset_mentions">未讀提及</string>
-    <string name="smart_folder_preset_hint">先選擇全部已讀或未讀提及，再新增參與者。全部已讀不代表代理已完成任務。</string>
     <string name="smart_folder_limit">最多 4 層和 64 個條件或群組。</string>
     <string name="smart_folder_include_match">包含比對結果</string>
     <string name="smart_folder_edit_legacy">編輯已儲存的篩選條件</string>

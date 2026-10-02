@@ -45,6 +45,7 @@ internal fun SmartFolderRulePanel(
     onChange: (SmartFolderFilter.Group) -> Unit,
     legacyControls: @Composable () -> Unit,
 ) {
+    val editSimpleRules = rememberSaveable { state.confirmSimpleReplacement }
     var legacyExpanded by rememberSaveable { mutableStateOf(false) }
     var adding by rememberSaveable { mutableStateOf(false) }
     var pendingPayload by rememberSaveable { mutableStateOf<String?>(null) }
@@ -75,12 +76,12 @@ internal fun SmartFolderRulePanel(
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleSmall,
             )
-            if (state.advanced || state.confirmSimpleReplacement) {
+            if (state.advanced || editSimpleRules) {
                 SmartFolderPresetMenu(applyPreset)
             }
         }
         if (!state.advanced) {
-            if (!state.confirmSimpleReplacement) {
+            if (!editSimpleRules) {
                 TextButton(onClick = { applyPreset(true) }, modifier = Modifier.testTag("folder.presetRead")) {
                     Text(stringResource(R.string.smart_folder_preset_read))
                 }
@@ -91,7 +92,7 @@ internal fun SmartFolderRulePanel(
             TextButton(onClick = { adding = true }, modifier = Modifier.testTag("folder.add.")) {
                 Text(stringResource(R.string.smart_folder_add))
             }
-            if (state.confirmSimpleReplacement) {
+            if (editSimpleRules) {
                 TextButton(
                     onClick = { legacyExpanded = !legacyExpanded },
                     modifier = Modifier.testTag("folder.legacyEdit"),
