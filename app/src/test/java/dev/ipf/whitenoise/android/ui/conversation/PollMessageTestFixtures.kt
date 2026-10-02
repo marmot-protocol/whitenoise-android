@@ -4,8 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.EventsSubscription
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
+import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
@@ -25,6 +28,11 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFileAttachmentFixtures
 import java.lang.reflect.Proxy
 import java.util.Locale
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+
+private const val POLL_INTERVAL_MS = 25L
 
 /** Real bubble/controller fixtures with a bounded fake native transport, without network work. */
 open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
@@ -34,6 +42,55 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
 
     /** Answers `pollVotes` with the fixture's scripted per-voter page; the default is an empty page. */
     protected var pollVotesResponder: (List<Any?>) -> PollVotePageFfi = { PollVotePageFfi(emptyList(), false) }
+
+    /** The controller's wall clock, so disappearing-message deadlines can be crossed deterministically. */
+    protected var pollClockMillis: Long = 1_000_000_000_000L
+
+    /** Runtime events the fixture's `subscribeEvents` stream delivers in order. */
+    protected val projectionEvents = LinkedBlockingQueue<MarmotEventFfi>()
+    private val projectionStreamClosed = AtomicBoolean(false)
+
+    /** Ends the fixture's event stream so no polling thread outlives the test. */
+    protected fun closeProjectionStream() {
+        projectionStreamClosed.set(true)
+    }
+
+    /** The native event stream: replays queued events, then idles until the test closes it. */
+    private class QueuedEventsSubscription : EventsSubscription(NoPointer) {
+        private lateinit var events: LinkedBlockingQueue<MarmotEventFfi>
+        private lateinit var closed: AtomicBoolean
+
+        /** Supplies the shared queue and flag, since allocation skips the constructor. */
+        fun bind(
+            queue: LinkedBlockingQueue<MarmotEventFfi>,
+            flag: AtomicBoolean,
+        ) {
+            events = queue
+            closed = flag
+        }
+
+        /** Waits briefly for the next queued event and ends the stream once the test closed it. */
+        override suspend fun next(): MarmotEventFfi? {
+            while (!closed.get()) events.poll(POLL_INTERVAL_MS, TimeUnit.MILLISECONDS)?.let { return it }
+            return null
+        }
+
+        /** Nothing native to release. */
+        override fun close() = Unit
+    }
+
+    /**
+     * UniFFI's no-pointer constructor registers Android's cleaner, which the Robolectric JVM module boundary
+     * cannot access, so the inert subclass is allocated without running it.
+     */
+    private fun queuedEventsSubscription(): EventsSubscription {
+        val unsafeClass = Class.forName("sun.misc.Unsafe")
+        val unsafe = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
+        val allocate = unsafeClass.getMethod("allocateInstance", Class::class.java)
+        val instance = allocate.invoke(unsafe, QueuedEventsSubscription::class.java)
+        return (instance as QueuedEventsSubscription).also { it.bind(projectionEvents, projectionStreamClosed) }
+    }
+
     private val native =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -57,6 +114,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                             )
                         "replyToMessageWithClientToken" ->
                             LocalSendAcceptanceFfi(args.orEmpty()[4] as String, "bb".repeat(32))
+                        "subscribeEvents" -> queuedEventsSubscription()
                         "pollVotes" -> pollVotesResponder(args.orEmpty().toList())
                         "parseMarkdown" -> markdown(args.orEmpty().first() as String)
                         "messages" -> emptyList<dev.ipf.marmotkit.AppMessageRecordFfi>()
@@ -90,6 +148,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
             initialGroup = group(),
             initialMemberSnapshot = memberSnapshot(),
             groupRosterReader = { _, _ -> authoritativeRoster() },
+            clockMillis = { pollClockMillis },
         )
     private val composerTextState = ComposerTextState(TextFieldValue(""))
 

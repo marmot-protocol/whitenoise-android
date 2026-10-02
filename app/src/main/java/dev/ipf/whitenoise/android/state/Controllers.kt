@@ -6961,6 +6961,38 @@ class ConversationController(
         )
     }
 
+    /** The retained row's expiry input, read from the unfiltered row map the timeline filter starts from. */
+    private fun retainedExpiryRow(messageId: String): Pair<TimelineMessage, DisappearingMessageSweep.LocalExpiryRow>? {
+        val item = timelineItemsById[messageId] ?: return null
+        val order = firstMessageOrder(timelineOrder.mapNotNull { timelineItemsById[it]?.record?.messageIdHex })
+        return item to localExpiryRow(item, order)
+    }
+
+    /**
+     * Whether the retained row [messageId] is deleted or past its local disappearing-message deadline. The
+     * timeline filters expired rows out without an engine event, so UI hosted outside the row asks here. A row
+     * that is merely absent from the bounded window is unknown, not gone, and reads as false.
+     */
+    internal fun isRetainedRowGone(messageId: String): Boolean {
+        val (item, row) = retainedExpiryRow(messageId) ?: return false
+        val deleted = item.projected?.deleted == true || MessageProjector.isDeleted(messageId, deletedMessageIds)
+        return deleted || isTimelineRecordLocallyExpired(clockMillis(), item.record, row)
+    }
+
+    /** Milliseconds until the retained row [messageId] reaches its local expiry, or null without a deadline. */
+    internal fun retainedRowExpiryDelayMillis(messageId: String): Long? {
+        val seconds =
+            retainedExpiryRow(messageId)?.let { (item, row) ->
+                DisappearingMessageSweep
+                    .resolveLocalExpirySeconds(row)
+                    ?.takeIf { shouldApplyLocalDisappearingExpiry(item.record) }
+            } ?: return null
+        val expiryMillis =
+            java.util.concurrent.TimeUnit.SECONDS
+                .toMillis(seconds.coerceAtMost(Long.MAX_VALUE.toULong()).toLong())
+        return expiryMillis - clockMillis()
+    }
+
     /** Distinguishes timeout wakes from publish signals that expose due rows. */
     private fun shouldRunForegroundSweepAfterWake(wakeSignalReceived: Boolean): Boolean =
         DisappearingMessageSweep.shouldRunForegroundSweepAfterWake(

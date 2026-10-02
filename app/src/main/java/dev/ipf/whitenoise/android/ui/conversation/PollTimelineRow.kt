@@ -69,7 +69,9 @@ internal fun PollMessageContent(
             PollMessageActionOwner(controller.boundAccountRef, controller.group.groupIdHex, item.record.messageIdHex)
         }
     var ownerAvailable by remember(controller, owner) { mutableStateOf(true) }
-    var votesOpen by remember(controller, owner) { mutableStateOf(false) }
+    val votesHost = LocalPollVotesHost.current
+    // The conversation screen hosts the votes sheet, so it outlives this row when the list disposes it.
+    LaunchedEffect(votesHost, owner, poll) { votesHost?.update(owner, poll) }
     var deadlineReached by remember(owner, poll.endsAt) {
         mutableStateOf(pollDeadlineReached(poll.endsAt, System.currentTimeMillis()))
     }
@@ -91,7 +93,7 @@ internal fun PollMessageContent(
                 canVote = canVote && ownerAvailable && !deadlineReached,
                 open = poll.open && !deadlineReached,
                 footer = footer,
-                onViewVotes = { votesOpen = true },
+                onViewVotes = votesHost?.let { host -> { host.show(owner, poll) } },
                 submitVote = { replacement, onCompleted ->
                     appState.launchMutation {
                         submitOwnedPollVote(controller, owner, replacement) { outcome ->
@@ -101,9 +103,6 @@ internal fun PollMessageContent(
                     }
                 },
             )
-        }
-        if (votesOpen) {
-            PollVotesSheet(poll, owner, controller, appState, onDismissRequest = { votesOpen = false })
         }
     }
 }

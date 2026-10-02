@@ -8,6 +8,8 @@ import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollVoteFfi
 import dev.ipf.marmotkit.PollVotePageFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelineRemoveReasonFfi
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 
@@ -66,28 +68,40 @@ internal class PollVotesPager(
 
     private var generation = 0
 
+    /** The generation of the first-page read in flight, or null when none is, so paging cannot supersede it. */
+    private var refreshGeneration: Int? = null
+
     /**
      * Reads the first page again and supersedes any in-flight read. Votes already shown stay visible until
      * the new page replaces them, so a reprojection does not blank the list or lose the scroll position.
      */
     suspend fun refresh() {
         val mine = ++generation
+        refreshGeneration = mine
         val hadVotes = votes.isNotEmpty()
         if (!hadVotes) {
             hasMore = false
             phase = PollVotesPhase.LOADING
         }
-        read(mine, cursor = null)?.let { page ->
-            votes = page.votes
-            hasMore = page.hasMoreAfter && page.votes.isNotEmpty()
-            phase = PollVotesPhase.READY
-        } ?: failIfCurrent(mine, if (hadVotes) PollVotesPhase.READY else PollVotesPhase.FAILED)
+        try {
+            read(mine, cursor = null)?.let { page ->
+                votes = page.votes
+                hasMore = page.hasMoreAfter && page.votes.isNotEmpty()
+                phase = PollVotesPhase.READY
+            } ?: failIfCurrent(mine, if (hadVotes) PollVotesPhase.READY else PollVotesPhase.FAILED)
+        } finally {
+            if (refreshGeneration == mine) refreshGeneration = null
+        }
     }
 
-    /** Appends the next page; ignored while a read is in flight or when nothing follows. */
+    /**
+     * Appends the next page. Ignored while a read is in flight, including a refresh that keeps the phase
+     * READY, and when nothing follows, so paging never drops a newer first page as stale.
+     */
     suspend fun loadMore() {
         val last = votes.lastOrNull()
-        val idle = phase == PollVotesPhase.READY || phase == PollVotesPhase.MORE_FAILED
+        val settled = phase == PollVotesPhase.READY || phase == PollVotesPhase.MORE_FAILED
+        val idle = settled && refreshGeneration != generation
         if (!hasMore || !idle || last == null) return
         val mine = ++generation
         phase = PollVotesPhase.LOADING_MORE
@@ -135,32 +149,42 @@ internal fun pollVoteRows(
     return votes.map { vote -> PollVoteRow(vote.voterAccountIdHex, vote.optionIds.mapNotNull(labels::get)) }
 }
 
-/** Forwards each projection event that touched the poll to [onTouched] until the stream ends or is cancelled. */
+/**
+ * Forwards each projection event that ended the poll to [onEnded], and each other one that touched it to
+ * [onTouched], until the stream ends or is cancelled.
+ */
 internal suspend fun observePollProjection(
     nextEvent: suspend () -> MarmotEventFfi?,
     touched: (MarmotEventFfi) -> Boolean,
     onTouched: () -> Unit,
+    ended: (MarmotEventFfi) -> Boolean = { false },
+    onEnded: () -> Unit = {},
 ) {
     while (currentCoroutineContext().isActive) {
         val event = nextEvent() ?: return
-        if (touched(event)) onTouched()
+        if (ended(event)) {
+            onEnded()
+        } else if (touched(event)) {
+            onTouched()
+        }
     }
 }
 
 /**
- * Whether [event] reprojected the poll [pollEventId] of [groupIdHex] for [accountIdHex]. MDK says to re-read
+ * Whether [event] reprojected the poll [pollEventId] of [groupIdHex] for the account [accountRef], matched by the
+ * update's own account label so no separate account lookup can leave the watch silent. MDK says to re-read
  * per-voter results from the start then, and a same-option re-vote changes only `votedAt`, which the
  * poll row in the window never shows.
  */
 internal fun pollProjectionTouched(
     event: MarmotEventFfi,
-    accountIdHex: String?,
+    accountRef: String?,
     groupIdHex: String,
     pollEventId: String,
 ): Boolean {
     val runtime = (event as? MarmotEventFfi.ProjectionUpdated)?.update ?: return false
     val update = runtime.update
-    val sameScope = runtime.accountIdHex.equals(accountIdHex, ignoreCase = true) && update.groupIdHex == groupIdHex
+    val sameScope = accountRef != null && runtime.accountLabel == accountRef && update.groupIdHex == groupIdHex
     return sameScope &&
         (
             update.messages.any { it.messageIdHex == pollEventId } ||
@@ -171,4 +195,35 @@ internal fun pollProjectionTouched(
                     }
                 }
         )
+}
+
+/**
+ * Whether [event] says the poll [pollEventId] of [groupIdHex] is gone for the account [accountRef]: it was
+ * upserted as deleted or without a poll, or removed as pruned, cleared or no longer matching. An invalidated
+ * removal is excluded because the row may be reprojected, which [pollProjectionTouched] handles. In MDK
+ * 0.12.0 only INVALIDATED removals actually arrive on this stream, so the other reasons are forward-compatible.
+ * Deleted rows and local retention expiry are covered by the row and the host, not by this event.
+ */
+internal fun pollProjectionEnded(
+    event: MarmotEventFfi,
+    accountRef: String?,
+    groupIdHex: String,
+    pollEventId: String,
+): Boolean {
+    val runtime = (event as? MarmotEventFfi.ProjectionUpdated)?.update ?: return false
+    val update = runtime.update
+    val sameScope = accountRef != null && runtime.accountLabel == accountRef && update.groupIdHex == groupIdHex
+    val gone = { message: TimelineMessageRecordFfi ->
+        message.messageIdHex == pollEventId && (message.deleted || message.poll == null)
+    }
+    val removedOrDeleted =
+        update.messages.any(gone) ||
+            update.changes.any { change ->
+                when (change) {
+                    is TimelineMessageChangeFfi.Upsert -> gone(change.message)
+                    is TimelineMessageChangeFfi.Remove ->
+                        change.messageIdHex == pollEventId && change.reason != TimelineRemoveReasonFfi.INVALIDATED
+                }
+            }
+    return sameScope && removedOrDeleted
 }
