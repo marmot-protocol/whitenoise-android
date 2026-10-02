@@ -29185,6 +29185,32 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "New-account and import relay defaults",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MarmotClient.kt",
+        "anchor": "val accountRelays = bootstrapRelays + generalPurposeRelays",
+        "test_ids": [
+          "ONB-026"
+        ]
+      },
+      {
+        "surface": "Generated identity relay-list split",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "createIdentity(MarmotClient.accountRelays, relays, relays)",
+        "test_ids": [
+          "ONB-003",
+          "ONB-026"
+        ]
+      },
+      {
+        "surface": "Imported-account per-list recommended relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupCoordinator.kt",
+        "anchor": "internal fun setupOptions() =",
+        "test_ids": [
+          "ONB-023",
+          "ONB-026"
+        ]
       }
     ],
     "notification_content_contracts": [
