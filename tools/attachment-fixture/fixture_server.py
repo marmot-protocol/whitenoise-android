@@ -86,6 +86,7 @@ class Control:
     """Bound body progress without EOF, with an explicit release independent of HTTP."""
 
     def __init__(self, header_delay=0, interval=0, hold_after=None, unknown_length=False):
+        """Validate response pacing and own interruption/release independently of replacement requests."""
         if not 0 <= header_delay <= 60 or not 0 <= interval <= 5:
             raise ValueError("fixture delay outside bounded range")
         if hold_after is not None and not 0 <= hold_after <= MAX_BYTES:
@@ -95,6 +96,8 @@ class Control:
         self.hold_after = hold_after
         self.unknown_length = unknown_length
         self.release = threading.Event()
+        self.interrupt = threading.Event()
+        self.validator_generation = 0
 
 
 class FixtureServer(ThreadingHTTPServer):
@@ -102,7 +105,11 @@ class FixtureServer(ThreadingHTTPServer):
 
     daemon_threads = True
 
-    def __init__(self, root, port=0):
+    def __init__(self, root, port=0, upload_extension=""):
+        """Select a bounded canonical locator without changing ordinary fixture upload descriptors."""
+        if upload_extension not in ("", ".bin"):
+            raise ValueError("unsupported fixture upload extension")
+        self.upload_extension = upload_extension
         self.ledger = Ledger(root)
         self.controls = {}
         self.stopping = threading.Event()
@@ -177,6 +184,24 @@ class Handler(BaseHTTPRequestHandler):
                 control.release.clear()
             self.server.ledger.event(None, "control", "hold_acquisition")
             self.reply(200, {"held_after": 1024})
+        elif self.path == "/__hold-resumable-acquisition":
+            for control in self.server.controls.values():
+                control.hold_after = 2 * 1024 * 1024
+                control.interval = 0.01
+                control.release.clear()
+            self.server.ledger.event(None, "control", "hold_resumable_acquisition")
+            self.reply(200, {"held_after": 2 * 1024 * 1024})
+        elif self.path in ("/__interrupt-acquisition", "/__interrupt-changed-validator"):
+            changed = self.path == "/__interrupt-changed-validator"
+            # Existing responses own the old control. Replacement requests must
+            # not inherit its interruption or hold, even if the retry is immediate.
+            for token, previous in list(self.server.controls.items()):
+                replacement = Control()
+                replacement.validator_generation = previous.validator_generation + int(changed)
+                self.server.controls[token] = replacement
+                previous.interrupt.set()
+            self.server.ledger.event(None, "control", "interrupt_acquisition", int(changed))
+            self.reply(200, {"interrupted": True, "validator_changed": changed})
         elif self.path == "/__release-acquisition":
             for control in self.server.controls.values():
                 control.release.set()
@@ -232,7 +257,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.ledger.register(token, locator, size)
                 self.server.controls[token] = Control()
             self.server.ledger.event(request, token, "upload_complete")
-            self.reply(200, {"url": f"{self.server.url}/{locator}", "sha256": locator,
+            self.reply(200, {"url": f"{self.server.url}/{locator}{self.server.upload_extension}", "sha256": locator,
                              "size": size, "type": "application/octet-stream",
                              "uploaded": int(time.time())})
         except (OSError, TimeoutError):
@@ -264,7 +289,7 @@ class Handler(BaseHTTPRequestHandler):
         """Keep waits interruptible by peer close, server shutdown or explicit release."""
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
-            if self.server.stopping.is_set() or self.disconnected():
+            if self.server.stopping.is_set() or self.disconnected() or (control is not None and control.interrupt.is_set()):
                 raise ConnectionResetError()
             if control is not None and control.release.is_set():
                 return
@@ -273,6 +298,8 @@ class Handler(BaseHTTPRequestHandler):
     def download(self, head=False):
         """Record attempt, offset, headers, successful writes and a truthful terminal reason."""
         key = self.path[1:]
+        if key.endswith(".bin") and HASH.fullmatch(key[:-4]):
+            key = key[:-4]
         blob = self.server.ledger.blob(key) if TOKEN.fullmatch(key) or HASH.fullmatch(key) else None
         token, locator, size = blob or ("missing", "", 0)
         ledger = self.server.ledger
@@ -288,10 +315,16 @@ class Handler(BaseHTTPRequestHandler):
             ledger.event(request, token, "complete")
             return
         control = self.server.controls.get(token, Control())
-        validator = f'"{locator}"'
+        validator = f'"{locator}-{control.validator_generation}"'
         offset = 0
         ranged = False
         range_header = self.headers.get("Range")
+        if range_header:
+            match = re.fullmatch(r"bytes=(\d+)-", range_header)
+            if match:
+                ledger.event(request, token, "range_requested_offset", int(match[1]))
+            # Retain only the comparison outcome, never opaque HTTP validators.
+            ledger.event(request, token, "if_range_match", int(self.headers.get("If-Range") == validator))
         if range_header and self.headers.get("If-Range", validator) == validator:
             match = re.fullmatch(r"bytes=(\d+)-", range_header)
             if not match or int(match[1]) >= size:
@@ -306,7 +339,7 @@ class Handler(BaseHTTPRequestHandler):
             ranged = True
         ledger.event(request, token, "range_offset", offset)
         try:
-            self.wait(control.header_delay)
+            self.wait(control.header_delay, control)
             status = 206 if ranged else 200
             self.send_response(status)
             self.send_header("Content-Type", "application/octet-stream")
@@ -342,7 +375,7 @@ class Handler(BaseHTTPRequestHandler):
                         ledger.event(request, token, "body_bytes", len(chunk))
                         offset += len(chunk)
                         if offset < size:
-                            self.wait(control.interval)
+                            self.wait(control.interval, control)
             ledger.event(request, token, "complete")
         except (OSError, TimeoutError):
             ledger.event(request, token, "disconnect")

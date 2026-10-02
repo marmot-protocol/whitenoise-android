@@ -53,7 +53,10 @@ internal object ControlledAttachmentProbe {
         check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
         val androidSendController = arguments.getString("fixtureUseAndroidSendController") == "true"
         val compareLargeReads = arguments.getString("fixtureCompareLargeLocalReads") == "true"
-        val payloadBytes = LargeAttachmentLocalReadComparison.payloadBytes(compareLargeReads)
+        val resumeCase = arguments.getString("fixtureTransportResume")
+        require(resumeCase == null || resumeCase in setOf("compatible", "changed-validator"))
+        require(resumeCase == null || (!compareLargeReads && androidSendController))
+        val payloadBytes = if (resumeCase != null) 4 * 1024 * 1024 else LargeAttachmentLocalReadComparison.payloadBytes(compareLargeReads)
         val blobPort = requireNotNull(arguments.getString("fixtureBlobPort")).toInt()
         val relayPort = requireNotNull(arguments.getString("fixtureRelayPort")).toInt()
         require(blobPort in 1024..65535 && relayPort in 1024..65535)
@@ -142,6 +145,12 @@ internal object ControlledAttachmentProbe {
                     }
                 fixtureState = state
                 report(JSONObject().put("phase", "fixture-stage").put("stage", "received-projected"))
+                if (resumeCase != null) {
+                    measure("transport-resume-overall", payloadBytes) {
+                        TransportResumeAttachmentProbe.run(state, request, reference, blobPort, bytes, resumeCase)
+                    }
+                    return@withTimeout
+                }
                 if (arguments.getString("fixtureCancellation") == "true") {
                     measure("held-body-cancellation-overall") {
                         HeldAttachmentCancellationProbe.run(state, request, reference, blobPort, bytes)
