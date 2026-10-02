@@ -1,16 +1,16 @@
 <resources>
-    <string name="smart_folder_start">Usar regras avançadas</string>
+    <string name="smart_folder_start">Criar regras personalizadas</string>
     <string name="smart_folder_legacy">As regras simples continuam ativas até serem substituídas.</string>
-    <string name="smart_folder_prototype">Apenas conversas carregadas. Desconhecido não significa «Nenhum».</string>
-    <string name="smart_folder_all">Corresponder a todas</string>
-    <string name="smart_folder_any">Corresponder a qualquer uma</string>
+    <string name="smart_folder_prototype">A prévia usa apenas conversas carregadas. Conversas com informações ausentes não são contadas.</string>
+    <string name="smart_folder_all">Cumprir todas as condições</string>
+    <string name="smart_folder_any">Cumprir qualquer condição</string>
     <string name="smart_folder_not">NÃO</string>
     <string name="smart_folder_not_hint">Excluir conversas que correspondam a este grupo</string>
     <string name="smart_folder_add">Adicionar condição</string>
     <string name="smart_folder_group">Adicionar grupo</string>
     <string name="smart_folder_empty">Sem correspondências automáticas. Adicione uma condição ou inclua conversas manualmente.</string>
     <string name="smart_folder_remove_group">Remover grupo</string>
-    <string name="smart_folder_ignore">Ignorar esta propriedade</string>
+    <string name="smart_folder_ignore">Remover condição</string>
     <string name="smart_folder_edit_condition">Editar condição</string>
     <string name="smart_folder_present">Presente</string>
     <string name="smart_folder_none">Nenhum</string>
@@ -44,10 +44,10 @@
     </plurals>
     <string name="smart_folder_unresolved">%1$d conversas carregadas têm dados de regras por determinar.</string>
     <string name="smart_folder_invalid">Estas regras são inválidas ou não são suportadas. As correspondências automáticas estão desativadas; substitua-as para editar.</string>
-    <string name="smart_folder_presets">Começar com um modelo</string>
+    <string name="smart_folder_presets">Substituir regras por um modelo</string>
     <string name="smart_folder_preset_read">Tudo lido</string>
     <string name="smart_folder_preset_mentions">Menções não lidas</string>
-    <string name="smart_folder_preset_hint">Adicione Participantes para escolher um agente. Tudo lido não significa concluído.</string>
+    <string name="smart_folder_preset_hint">Comece com Tudo lido ou Menções não lidas e adicione Participantes. Tudo lido não significa que o agente terminou.</string>
     <string name="smart_folder_limit">Até 4 níveis e 64 condições ou grupos.</string>
     <string name="smart_folder_include_match">Incluir correspondências</string>
     <string name="smart_folder_edit_legacy">Editar regras simples</string>
@@ -57,4 +57,13 @@
         <item quantity="one">%1$d elemento</item>
         <item quantity="other">%1$d elementos</item>
     </plurals>
+    <string name="smart_folder_replace_hint">Substituir as regras automáticas atuais? O nome da pasta e as conversas incluídas serão mantidos.</string>
+    <string name="smart_folder_has_unread">Tem mensagens não lidas</string>
+    <string name="smart_folder_no_unread">Sem mensagens não lidas</string>
+    <string name="smart_folder_has_mentions">Tem menções não lidas</string>
+    <string name="smart_folder_no_mentions">Sem menções não lidas</string>
+    <string name="smart_folder_has_draft">Tem um rascunho</string>
+    <string name="smart_folder_no_draft">Sem rascunho</string>
+    <string name="smart_folder_has_pending">Tem uma mensagem de saída pendente</string>
+    <string name="smart_folder_no_pending">Sem mensagens de saída pendentes</string>
 </resources>

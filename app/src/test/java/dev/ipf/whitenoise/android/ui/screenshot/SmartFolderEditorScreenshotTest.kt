@@ -3,15 +3,18 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
@@ -46,6 +49,10 @@ class SmartFolderEditorScreenshotTest {
 
     @Test fun absenceDialog() = capture("smart_folder_absence_dialog", dialog = true)
 
+    @Test fun moreOptions() = capture("smart_folder_options", options = true)
+
+    @Test fun presetReplacement() = capture("smart_folder_replace", replace = true)
+
     @Test fun manualFolder() = capture("smart_folder_manual")
 
     @Test fun singleMatch() = capture("smart_folder_single_match")
@@ -76,7 +83,10 @@ class SmartFolderEditorScreenshotTest {
         empty: Boolean = false,
         rtl: Boolean = false,
         rules: Boolean = false,
+        options: Boolean = false,
+        replace: Boolean = false,
     ) {
+        var mentionLabel = ""
         val simpleExpanded = name.startsWith("smart_folder_simple_")
         val manual = name == "smart_folder_manual" || simpleExpanded
         val conditions =
@@ -111,6 +121,7 @@ class SmartFolderEditorScreenshotTest {
             val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
+                    mentionLabel = stringResource(R.string.smart_folder_preset_mentions)
                     ChatFolderEditContent(
                         state =
                             formState(name, manual, empty),
@@ -170,8 +181,13 @@ class SmartFolderEditorScreenshotTest {
         if (rules) {
             composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.group."))
         }
+        if (options) composeRule.onNodeWithTag("folder.options.").performClick()
+        if (replace) {
+            composeRule.onNodeWithTag("folder.presets").performClick()
+            composeRule.onNodeWithText(mentionLabel).performClick()
+        }
         if (dialog) composeRule.onNodeWithTag("folder.condition.1").performClick()
-        val target = if (dialog) composeRule.onNode(isDialog()) else composeRule.onRoot()
+        val target = if (dialog || replace) composeRule.onNode(isDialog()) else composeRule.onRoot()
         target.captureRoboImage("src/test/snapshots/$name.png")
     }
 

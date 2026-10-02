@@ -1,16 +1,16 @@
 <resources>
-    <string name="smart_folder_start">Usa regole avanzate</string>
+    <string name="smart_folder_start">Crea regole personalizzate</string>
     <string name="smart_folder_legacy">Le regole semplici restano attive finché non le sostituisci.</string>
-    <string name="smart_folder_prototype">Solo chat caricate. Sconosciuto non significa «Nessuno».</string>
-    <string name="smart_folder_all">Soddisfa tutte</string>
-    <string name="smart_folder_any">Soddisfa almeno una</string>
+    <string name="smart_folder_prototype">L’anteprima usa solo chat caricate. Le chat con informazioni mancanti non vengono contate.</string>
+    <string name="smart_folder_all">Soddisfa tutte le condizioni</string>
+    <string name="smart_folder_any">Soddisfa almeno una condizione</string>
     <string name="smart_folder_not">NON</string>
     <string name="smart_folder_not_hint">Escludi le chat che corrispondono a questo gruppo</string>
     <string name="smart_folder_add">Aggiungi condizione</string>
     <string name="smart_folder_group">Aggiungi gruppo</string>
     <string name="smart_folder_empty">Nessuna corrispondenza automatica. Aggiungi una condizione o includi chat manualmente.</string>
     <string name="smart_folder_remove_group">Rimuovi gruppo</string>
-    <string name="smart_folder_ignore">Ignora questa proprietà</string>
+    <string name="smart_folder_ignore">Rimuovi condizione</string>
     <string name="smart_folder_edit_condition">Modifica condizione</string>
     <string name="smart_folder_present">Presente</string>
     <string name="smart_folder_none">Nessuno</string>
@@ -44,10 +44,10 @@
     </plurals>
     <string name="smart_folder_unresolved">%1$d chat caricate hanno dati delle regole indeterminati.</string>
     <string name="smart_folder_invalid">Queste regole non sono valide o non sono supportate. Le corrispondenze automatiche sono disattivate; sostituiscile per modificarle.</string>
-    <string name="smart_folder_presets">Inizia da un modello</string>
+    <string name="smart_folder_presets">Sostituisci le regole con un modello</string>
     <string name="smart_folder_preset_read">Tutto letto</string>
     <string name="smart_folder_preset_mentions">Menzioni non lette</string>
-    <string name="smart_folder_preset_hint">Aggiungi Partecipanti per scegliere un agente. Tutto letto non significa completato.</string>
+    <string name="smart_folder_preset_hint">Inizia con Tutto letto o Menzioni non lette, poi aggiungi Partecipanti. Tutto letto non significa che l’agente abbia finito.</string>
     <string name="smart_folder_limit">Fino a 4 livelli e 64 condizioni o gruppi.</string>
     <string name="smart_folder_include_match">Includi corrispondenze</string>
     <string name="smart_folder_edit_legacy">Modifica regole semplici</string>
@@ -57,4 +57,13 @@
         <item quantity="one">%1$d elemento</item>
         <item quantity="other">%1$d elementi</item>
     </plurals>
+    <string name="smart_folder_replace_hint">Sostituire le regole automatiche attuali? Il nome della cartella e le chat incluse restano invariati.</string>
+    <string name="smart_folder_has_unread">Ha messaggi non letti</string>
+    <string name="smart_folder_no_unread">Nessun messaggio non letto</string>
+    <string name="smart_folder_has_mentions">Ha menzioni non lette</string>
+    <string name="smart_folder_no_mentions">Nessuna menzione non letta</string>
+    <string name="smart_folder_has_draft">Ha una bozza</string>
+    <string name="smart_folder_no_draft">Nessuna bozza</string>
+    <string name="smart_folder_has_pending">Ha un messaggio in uscita in attesa</string>
+    <string name="smart_folder_no_pending">Nessun messaggio in uscita in attesa</string>
 </resources>

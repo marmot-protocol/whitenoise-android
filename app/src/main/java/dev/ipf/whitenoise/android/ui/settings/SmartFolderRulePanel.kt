@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -37,6 +38,17 @@ internal fun SmartFolderRulePanel(
     legacyControls: @Composable () -> Unit,
 ) {
     var legacyExpanded by rememberSaveable { mutableStateOf(false) }
+    var presetRead by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    val applyPreset: (Boolean) -> Unit = { allRead ->
+        val condition =
+            if (allRead) {
+                SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE)
+            } else {
+                SmartFolderFilter.Condition(FolderField.MENTIONS)
+            }
+        val preset = defaultSmartFolder()
+        onChange(preset.copy(children = preset.children + condition))
+    }
     SettingsSection(stringResource(R.string.folder_rules))
     Column(
         Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.CompactScreenMargin),
@@ -44,6 +56,19 @@ internal fun SmartFolderRulePanel(
     ) {
         if (!state.advanced) {
             Text(stringResource(R.string.smart_folder_legacy), style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.smart_folder_preset_hint), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { applyPreset(true) }, modifier = Modifier.testTag("folder.presetRead")) {
+                Text(stringResource(R.string.smart_folder_preset_read))
+            }
+            TextButton(onClick = { applyPreset(false) }, modifier = Modifier.testTag("folder.presetMentions")) {
+                Text(stringResource(R.string.smart_folder_preset_mentions))
+            }
+            TextButton(
+                onClick = onStart,
+                modifier = Modifier.testTag("folder.upgrade"),
+            ) {
+                Text(stringResource(R.string.smart_folder_start))
+            }
             TextButton(
                 onClick = {
                     legacyExpanded = !legacyExpanded
@@ -53,12 +78,6 @@ internal fun SmartFolderRulePanel(
                 Text(stringResource(R.string.smart_folder_edit_legacy))
             }
             if (legacyExpanded) legacyControls()
-            TextButton(
-                onClick = onStart,
-                modifier = Modifier.testTag("folder.upgrade"),
-            ) {
-                Text(stringResource(R.string.smart_folder_start))
-            }
         } else {
             Text(stringResource(R.string.smart_folder_prototype), style = MaterialTheme.typography.bodySmall)
             if (state.unresolved > 0) {
@@ -75,7 +94,6 @@ internal fun SmartFolderRulePanel(
                 Text(stringResource(R.string.smart_folder_invalid), color = MaterialTheme.colorScheme.error)
                 TextButton(onClick = onStart) { Text(stringResource(R.string.smart_folder_start)) }
             } else {
-                SmartFolderEditor(root, people, resolveKey, onChange)
                 FolderChoice(
                     stringResource(R.string.smart_folder_presets),
                     listOf(
@@ -83,21 +101,33 @@ internal fun SmartFolderRulePanel(
                         false to stringResource(R.string.smart_folder_preset_mentions),
                     ),
                     "folder.presets",
-                ) { allRead ->
-                    val preset = defaultSmartFolder()
-                    val condition =
-                        if (allRead) {
-                            SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE)
-                        } else {
-                            SmartFolderFilter.Condition(FolderField.MENTIONS)
-                        }
-                    onChange(preset.copy(children = preset.children + condition))
-                }
-                Text(
-                    stringResource(R.string.smart_folder_preset_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                ) { presetRead = it }
+                SmartFolderEditor(root, people, resolveKey, onChange)
             }
         }
+    }
+    presetRead?.let { allRead ->
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { presetRead = null },
+            title = {
+                Text(
+                    stringResource(
+                        if (allRead) R.string.smart_folder_preset_read else R.string.smart_folder_preset_mentions,
+                    ),
+                )
+            },
+            text = { Text(stringResource(R.string.smart_folder_replace_hint)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    applyPreset(allRead)
+                    presetRead = null
+                }, modifier = Modifier.testTag("folder.confirmPreset")) {
+                    Text(stringResource(R.string.reset))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { presetRead = null }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
     }
 }

@@ -1,16 +1,16 @@
 <resources>
-    <string name="smart_folder_start">Gelişmiş kuralları kullan</string>
+    <string name="smart_folder_start">Özel kurallar oluştur</string>
     <string name="smart_folder_legacy">Basit kurallar, siz değiştirene kadar etkin kalır.</string>
-    <string name="smart_folder_prototype">Yalnızca yüklenen sohbetler. Bilinmiyor, «Yok» anlamına gelmez.</string>
-    <string name="smart_folder_all">Tümü eşleşsin</string>
-    <string name="smart_folder_any">Herhangi biri eşleşsin</string>
+    <string name="smart_folder_prototype">Önizleme yalnızca yüklenen sohbetleri kullanır. Bilgileri eksik sohbetler sayılmaz.</string>
+    <string name="smart_folder_all">Tüm koşulları karşıla</string>
+    <string name="smart_folder_any">Herhangi bir koşulu karşıla</string>
     <string name="smart_folder_not">DEĞİL</string>
     <string name="smart_folder_not_hint">Bu grupla eşleşen sohbetleri hariç tut</string>
     <string name="smart_folder_add">Koşul ekle</string>
     <string name="smart_folder_group">Grup ekle</string>
     <string name="smart_folder_empty">Otomatik eşleşme yok. Koşul ekleyin veya sohbetleri elle dahil edin.</string>
     <string name="smart_folder_remove_group">Grubu kaldır</string>
-    <string name="smart_folder_ignore">Bu özelliği yok say</string>
+    <string name="smart_folder_ignore">Koşulu kaldır</string>
     <string name="smart_folder_edit_condition">Koşulu düzenle</string>
     <string name="smart_folder_present">Var</string>
     <string name="smart_folder_none">Yok</string>
@@ -44,10 +44,10 @@
     </plurals>
     <string name="smart_folder_unresolved">%1$d yüklenen sohbetin kural verileri belirsiz.</string>
     <string name="smart_folder_invalid">Bu kurallar geçersiz veya desteklenmiyor. Otomatik eşleştirme devre dışı; düzenlemek için değiştirin.</string>
-    <string name="smart_folder_presets">Bir ön ayarla başla</string>
+    <string name="smart_folder_presets">Kuralları bir ön ayarla değiştir</string>
     <string name="smart_folder_preset_read">Tümü okundu</string>
     <string name="smart_folder_preset_mentions">Okunmamış bahsetmeler</string>
-    <string name="smart_folder_preset_hint">Bir aracı seçmek için Katılımcılar ekleyin. Tümü okundu, tamamlandı anlamına gelmez.</string>
+    <string name="smart_folder_preset_hint">Tümü okundu veya Okunmamış bahsetmeler ile başlayıp Katılımcılar ekleyin. Tümü okundu, ajanın işini bitirdiği anlamına gelmez.</string>
     <string name="smart_folder_limit">En fazla 4 düzey ve 64 koşul veya grup.</string>
     <string name="smart_folder_include_match">Eşleşmeleri dahil et</string>
     <string name="smart_folder_edit_legacy">Basit kuralları düzenle</string>
@@ -57,4 +57,13 @@
         <item quantity="one">%1$d öğe</item>
         <item quantity="other">%1$d öğe</item>
     </plurals>
+    <string name="smart_folder_replace_hint">Mevcut otomatik kurallar değiştirilsin mi? Klasör adı ve dahil edilen sohbetler korunur.</string>
+    <string name="smart_folder_has_unread">Okunmamış mesaj var</string>
+    <string name="smart_folder_no_unread">Okunmamış mesaj yok</string>
+    <string name="smart_folder_has_mentions">Okunmamış bahsetme var</string>
+    <string name="smart_folder_no_mentions">Okunmamış bahsetme yok</string>
+    <string name="smart_folder_has_draft">Taslak var</string>
+    <string name="smart_folder_no_draft">Taslak yok</string>
+    <string name="smart_folder_has_pending">Bekleyen giden mesaj var</string>
+    <string name="smart_folder_no_pending">Bekleyen giden mesaj yok</string>
 </resources>

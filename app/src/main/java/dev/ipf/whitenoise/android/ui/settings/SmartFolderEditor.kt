@@ -111,7 +111,6 @@ internal fun SmartFolderEditor(
         onChange,
         onEdit = { path, add -> editing = (if (add) "+" else "") + path.joinToString(",") },
     )
-    Text(stringResource(R.string.smart_folder_limit), style = MaterialTheme.typography.bodySmall)
     editing?.let { token ->
         val add = token.startsWith("+")
         val path =
@@ -170,6 +169,7 @@ private fun SmartFolderGroup(
     onEdit: (List<Int>, Boolean) -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(path.isEmpty()) }
+    var optionsExpanded by rememberSaveable { mutableStateOf(group.not) }
     val mode = stringResource(if (group.all) R.string.smart_folder_all else R.string.smart_folder_any)
     Card(Modifier.fillMaxWidth().testTag("folder.group." + path.joinToString("."))) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -199,18 +199,9 @@ private fun SmartFolderGroup(
                 ) {
                     onChange(root.updateAt(path, group.copy(all = it)))
                 }
-                FolderChoice(
-                    if (group.not) {
-                        stringResource(R.string.smart_folder_not_hint)
-                    } else {
-                        stringResource(R.string.smart_folder_include_match)
-                    },
-                    listOf(
-                        false to stringResource(R.string.smart_folder_include_match),
-                        true to stringResource(R.string.smart_folder_not_hint),
-                    ),
-                    "folder.not." + path.joinToString("."),
-                ) { onChange(root.updateAt(path, group.copy(not = it))) }
+                if (group.not && !optionsExpanded) {
+                    Text(stringResource(R.string.smart_folder_not_hint), style = MaterialTheme.typography.bodySmall)
+                }
                 if (group.children.isEmpty()) {
                     Text(
                         stringResource(
@@ -249,6 +240,30 @@ private fun SmartFolderGroup(
                             modifier = Modifier.weight(1f).testTag("folder.add." + path.joinToString(".")),
                         ) { Text(stringResource(R.string.smart_folder_add)) }
                     }
+                    TextButton(
+                        onClick = { optionsExpanded = !optionsExpanded },
+                        modifier = Modifier.weight(1f).testTag("folder.options." + path.joinToString(".")),
+                    ) {
+                        FolderButtonLabel(
+                            stringResource(R.string.more_options),
+                            R.drawable.ic_expand_more,
+                            optionsExpanded,
+                        )
+                    }
+                }
+                if (optionsExpanded) {
+                    FolderChoice(
+                        if (group.not) {
+                            stringResource(R.string.smart_folder_not_hint)
+                        } else {
+                            stringResource(R.string.smart_folder_include_match)
+                        },
+                        listOf(
+                            false to stringResource(R.string.smart_folder_include_match),
+                            true to stringResource(R.string.smart_folder_not_hint),
+                        ),
+                        "folder.not." + path.joinToString("."),
+                    ) { onChange(root.updateAt(path, group.copy(not = it))) }
                     if (path.size < SmartFolderCodec.MAX_DEPTH - 1 &&
                         root.nodeCount() < SmartFolderCodec.MAX_NODES - 1
                     ) {
@@ -261,9 +276,12 @@ private fun SmartFolderGroup(
                                     ),
                                 )
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                         ) { Text(stringResource(R.string.smart_folder_group)) }
                     }
+                }
+                if (optionsExpanded) {
+                    Text(stringResource(R.string.smart_folder_limit), style = MaterialTheme.typography.bodySmall)
                 }
                 if (path.isNotEmpty()) {
                     TextButton(
@@ -294,9 +312,17 @@ internal fun conditionSummary(
                             }?.title ?: hex.take(KEY_PREVIEW_LENGTH) + "…"
                     }
             FolderField.TITLE -> condition.values.firstOrNull().orEmpty()
-            else -> stringResource(modeLabel(condition.mode))
+            else -> stringResource(conditionModeLabel(condition.field, condition.mode))
         }
-    return (if (condition.not) stringResource(R.string.smart_folder_not) + " · " else "") + "$field: $detail"
+    val summary =
+        when (condition.field) {
+            FolderField.UNREAD, FolderField.MENTIONS, FolderField.DRAFT,
+            FolderField.PENDING_SEND, FolderField.TYPE,
+            -> detail
+            FolderField.PARTICIPANTS -> detail
+            else -> "$field: $detail"
+        }
+    return (if (condition.not) stringResource(R.string.smart_folder_not) + " · " else "") + summary
 }
 
 @Composable
@@ -315,6 +341,7 @@ private fun SmartFolderConditionDialog(
     var field by rememberSaveable { mutableStateOf(initial.field) }
     var mode by rememberSaveable { mutableStateOf(initial.mode) }
     var not by rememberSaveable { mutableStateOf(initial.not) }
+    var optionsExpanded by rememberSaveable { mutableStateOf(initial.not) }
     var keys by rememberSaveable { mutableStateOf(initial.values.toList()) }
     val keyword =
         rememberTextFieldState(
@@ -401,9 +428,9 @@ private fun SmartFolderConditionDialog(
                     }
                     if (field != FolderField.TITLE) {
                         FolderChoice(
-                            stringResource(modeLabel(mode)),
+                            stringResource(conditionModeLabel(field, mode)),
                             modes.map {
-                                it to stringResource(modeLabel(it))
+                                it to stringResource(conditionModeLabel(field, it))
                             },
                             "folder.mode",
                         ) {
@@ -442,44 +469,46 @@ private fun SmartFolderConditionDialog(
                                     }?.title ?: hex.take(KEY_PREVIEW_LENGTH) + "…"
                             },
                         )
-                        WhiteNoiseTextField(
-                            state = publicKey,
-                            label = { Text(stringResource(R.string.smart_folder_key)) },
-                            lineLimits = TextFieldLineLimits.SingleLine,
-                        )
-                        TextButton(
-                            enabled =
-                                !resolving &&
-                                    keys.size < SmartFolderCodec.MAX_VALUES,
-                            onClick = {
-                                resolving = true
-                                val input = publicKey.text.toString()
-                                scope.launch {
-                                    val hex =
-                                        withContext(Dispatchers.IO) {
-                                            resolveKey(input)
-                                        }?.lowercase(java.util.Locale.ROOT)
-                                    invalidKey = hex == null ||
-                                        hex.length != SmartFolderCodec.PUBKEY_HEX_LENGTH ||
-                                        hex.any {
-                                            it !in '0'..'9' &&
-                                                it !in 'a'..'f'
-                                        }
-                                    val currentInput =
-                                        field == FolderField.PARTICIPANTS &&
-                                            publicKey.text.toString() == input
-                                    if (!invalidKey && hex != null && currentInput) {
-                                        keys = (keys + hex).distinct()
-                                    }
-                                    resolving = false
-                                }
-                            },
-                        ) { Text(stringResource(R.string.smart_folder_add_key)) }
-                        if (invalidKey) {
-                            Text(
-                                stringResource(R.string.smart_folder_invalid_key),
-                                color = MaterialTheme.colorScheme.error,
+                        if (optionsExpanded) {
+                            WhiteNoiseTextField(
+                                state = publicKey,
+                                label = { Text(stringResource(R.string.smart_folder_key)) },
+                                lineLimits = TextFieldLineLimits.SingleLine,
                             )
+                            TextButton(
+                                enabled =
+                                    !resolving &&
+                                        keys.size < SmartFolderCodec.MAX_VALUES,
+                                onClick = {
+                                    resolving = true
+                                    val input = publicKey.text.toString()
+                                    scope.launch {
+                                        val hex =
+                                            withContext(Dispatchers.IO) {
+                                                resolveKey(input)
+                                            }?.lowercase(java.util.Locale.ROOT)
+                                        invalidKey = hex == null ||
+                                            hex.length != SmartFolderCodec.PUBKEY_HEX_LENGTH ||
+                                            hex.any {
+                                                it !in '0'..'9' &&
+                                                    it !in 'a'..'f'
+                                            }
+                                        val currentInput =
+                                            field == FolderField.PARTICIPANTS &&
+                                                publicKey.text.toString() == input
+                                        if (!invalidKey && hex != null && currentInput) {
+                                            keys = (keys + hex).distinct()
+                                        }
+                                        resolving = false
+                                    }
+                                },
+                            ) { Text(stringResource(R.string.smart_folder_add_key)) }
+                            if (invalidKey) {
+                                Text(
+                                    stringResource(R.string.smart_folder_invalid_key),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
                         }
                     }
                     if (field == FolderField.UNREAD) {
@@ -494,20 +523,32 @@ private fun SmartFolderConditionDialog(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    FolderChoice(
-                        if (not) {
-                            stringResource(R.string.smart_folder_negate_condition)
-                        } else {
-                            stringResource(R.string.smart_folder_include_match)
-                        },
-                        listOf(
-                            false to stringResource(R.string.smart_folder_include_match),
-                            true to stringResource(R.string.smart_folder_negate_condition),
-                        ),
-                        "folder.conditionNot",
+                    TextButton(
+                        onClick = { optionsExpanded = !optionsExpanded },
+                        modifier = Modifier.testTag("folder.conditionOptions"),
                     ) {
-                        not =
-                            it
+                        FolderButtonLabel(
+                            stringResource(R.string.more_options),
+                            R.drawable.ic_expand_more,
+                            optionsExpanded,
+                        )
+                    }
+                    if (optionsExpanded) {
+                        FolderChoice(
+                            if (not) {
+                                stringResource(R.string.smart_folder_negate_condition)
+                            } else {
+                                stringResource(R.string.smart_folder_include_match)
+                            },
+                            listOf(
+                                false to stringResource(R.string.smart_folder_include_match),
+                                true to stringResource(R.string.smart_folder_negate_condition),
+                            ),
+                            "folder.conditionNot",
+                        ) {
+                            not =
+                                it
+                        }
                     }
                     TextButton(onClick = onRemove) { Text(stringResource(R.string.smart_folder_ignore)) }
                 }
@@ -553,4 +594,38 @@ private fun modeLabel(mode: FolderMode): Int =
         FolderMode.DIRECT -> R.string.smart_folder_direct
         FolderMode.GROUP -> R.string.smart_folder_chat_group
         FolderMode.CONTAINS -> R.string.smart_folder_keyword_hint
+    }
+
+private fun conditionModeLabel(
+    field: FolderField,
+    mode: FolderMode,
+): Int =
+    when (field) {
+        FolderField.UNREAD ->
+            if (mode == FolderMode.NONE) {
+                R.string.smart_folder_no_unread
+            } else {
+                R.string.smart_folder_has_unread
+            }
+        FolderField.MENTIONS ->
+            if (mode == FolderMode.NONE) {
+                R.string.smart_folder_no_mentions
+            } else {
+                R.string.smart_folder_has_mentions
+            }
+        FolderField.DRAFT ->
+            if (mode == FolderMode.NONE) {
+                R.string.smart_folder_no_draft
+            } else {
+                R.string.smart_folder_has_draft
+            }
+        FolderField.PENDING_SEND ->
+            if (mode == FolderMode.NONE) {
+                R.string.smart_folder_no_pending
+            } else {
+                R.string.smart_folder_has_pending
+            }
+        FolderField.MUTED, FolderField.ARCHIVED, FolderField.ACCEPTED, FolderField.PINNED ->
+            if (mode == FolderMode.NONE) R.string.no else R.string.yes
+        else -> modeLabel(mode)
     }

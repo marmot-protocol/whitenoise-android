@@ -1,16 +1,16 @@
 <resources>
-    <string name="smart_folder_start">使用進階規則</string>
+    <string name="smart_folder_start">建立自訂規則</string>
     <string name="smart_folder_legacy">簡單規則會持續生效，直到被取代。</string>
-    <string name="smart_folder_prototype">僅比對已載入的聊天。未知不等於「無」。</string>
-    <string name="smart_folder_all">符合全部</string>
-    <string name="smart_folder_any">符合任一</string>
+    <string name="smart_folder_prototype">預覽僅使用已載入的聊天。資訊缺失的聊天不計入符合項目。</string>
+    <string name="smart_folder_all">符合所有條件</string>
+    <string name="smart_folder_any">符合任一條件</string>
     <string name="smart_folder_not">非</string>
     <string name="smart_folder_not_hint">排除符合此群組的聊天</string>
     <string name="smart_folder_add">新增條件</string>
     <string name="smart_folder_group">新增群組</string>
     <string name="smart_folder_empty">沒有自動比對結果。請新增條件或手動加入聊天。</string>
     <string name="smart_folder_remove_group">移除群組</string>
-    <string name="smart_folder_ignore">忽略此屬性</string>
+    <string name="smart_folder_ignore">移除條件</string>
     <string name="smart_folder_edit_condition">編輯條件</string>
     <string name="smart_folder_present">有</string>
     <string name="smart_folder_none">無</string>
@@ -43,10 +43,10 @@
     </plurals>
     <string name="smart_folder_unresolved">%1$d 個已載入聊天的規則資料無法確定。</string>
     <string name="smart_folder_invalid">此規則集無效或不受支援。自動比對已停用；請取代規則集以編輯。</string>
-    <string name="smart_folder_presets">從預設開始</string>
+    <string name="smart_folder_presets">用預設取代規則</string>
     <string name="smart_folder_preset_read">全部已讀</string>
     <string name="smart_folder_preset_mentions">未讀提及</string>
-    <string name="smart_folder_preset_hint">新增參與者以選擇代理。全部已讀不代表已完成。</string>
+    <string name="smart_folder_preset_hint">先選擇全部已讀或未讀提及，再新增參與者。全部已讀不代表代理已完成任務。</string>
     <string name="smart_folder_limit">最多 4 層和 64 個條件或群組。</string>
     <string name="smart_folder_include_match">包含比對結果</string>
     <string name="smart_folder_edit_legacy">編輯簡單規則</string>
@@ -55,4 +55,13 @@
     <plurals name="smart_folder_group_items">
         <item quantity="other">%1$d 項</item>
     </plurals>
+    <string name="smart_folder_replace_hint">取代目前的自動規則？資料夾名稱和已包含的聊天將保留。</string>
+    <string name="smart_folder_has_unread">有未讀訊息</string>
+    <string name="smart_folder_no_unread">無未讀訊息</string>
+    <string name="smart_folder_has_mentions">有未讀提及</string>
+    <string name="smart_folder_no_mentions">無未讀提及</string>
+    <string name="smart_folder_has_draft">有草稿</string>
+    <string name="smart_folder_no_draft">無草稿</string>
+    <string name="smart_folder_has_pending">有待傳訊息</string>
+    <string name="smart_folder_no_pending">無待傳訊息</string>
 </resources>

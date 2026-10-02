@@ -8,8 +8,10 @@ tracks the account-wide implementation, including evaluation before pagination.
 
 ## Rule contract
 
-- Match all / Match any applies to one group; groups and conditions can use NOT.
-- Present and None require known data. Ignore removes the condition. Unknown
+- Match every condition / Match any condition applies to one group. More options
+  contains nested groups and exclusion; existing exclusions remain visible.
+- Choices such as Has unread messages / No unread messages require known data.
+  Remove condition stops checking that property. Unknown
   remains unknown under NOT and cannot grant automatic membership.
 - Participants use the current roster and resolved peer, never stale display
   identities. People can match any, all, or none of the selected public keys.
@@ -37,11 +39,13 @@ make no completion claim; add Participants to restrict one to a chosen agent.
 ## Existing folders
 
 New folders start in simple mode, retaining ordinary pagination for manual
-folders created from chat selections or group details. Use advanced rules is an
-explicit opt-in to the loaded-window prototype. Opening or renaming an existing
+folders created from chat selections or group details. Choosing All read, Unread
+mentions or Build custom rules is an explicit opt-in to the loaded-window prototype. Opening or renaming an existing
 folder preserves its legacy rules. Those rules
-remain editable in a collapsed section. Use advanced rules explicitly starts a
-new draft; its preview can be checked before Save. The previous legacy fields
+remain editable in a collapsed section. A preset or Build custom rules starts a
+new draft; its preview can be checked before Save. Replacing an advanced tree with a preset requires confirmation; cancelling keeps
+the tree unchanged. Public-key entry and negation are optional controls within
+each condition. The previous legacy fields
 remain in the stored rule for a future explicit rollback. Unsupported payloads
 remain unchanged when only the name or manual inclusions are edited. Save publishes folder
 metadata, manual inclusions and the rule payload together using the existing
