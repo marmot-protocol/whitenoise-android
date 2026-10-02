@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -48,6 +50,7 @@ import java.text.DateFormat
 import java.util.Date
 
 private const val POLL_MILLIS_PER_SECOND = 1_000L
+internal const val POLL_VIEW_VOTES_TAG = "poll-view-votes"
 
 /** Poll content inside the ordinary message action/gesture surface; voting has its own deadline. */
 @Composable
@@ -66,6 +69,7 @@ internal fun PollMessageContent(
             PollMessageActionOwner(controller.boundAccountRef, controller.group.groupIdHex, item.record.messageIdHex)
         }
     var ownerAvailable by remember(controller, owner) { mutableStateOf(true) }
+    var votesOpen by remember(controller, owner) { mutableStateOf(false) }
     var deadlineReached by remember(owner, poll.endsAt) {
         mutableStateOf(pollDeadlineReached(poll.endsAt, System.currentTimeMillis()))
     }
@@ -87,6 +91,7 @@ internal fun PollMessageContent(
                 canVote = canVote && ownerAvailable && !deadlineReached,
                 open = poll.open && !deadlineReached,
                 footer = footer,
+                onViewVotes = { votesOpen = true },
                 submitVote = { replacement, onCompleted ->
                     appState.launchMutation {
                         submitOwnedPollVote(controller, owner, replacement) { outcome ->
@@ -96,6 +101,9 @@ internal fun PollMessageContent(
                     }
                 },
             )
+        }
+        if (votesOpen) {
+            PollVotesSheet(poll, owner, controller, appState, onDismissRequest = { votesOpen = false })
         }
     }
 }
@@ -110,6 +118,7 @@ internal fun PollVotingCard(
     submitVote: (List<String>, (SendAcceptDispositionFfi?) -> Unit) -> Unit,
     open: Boolean = poll.open,
     footer: (@Composable () -> Unit)? = null,
+    onViewVotes: (() -> Unit)? = null,
 ) {
     var voting by remember(voteKey) { mutableStateOf(false) }
     var voteGeneration by remember(voteKey) { mutableStateOf(0L) }
@@ -129,6 +138,7 @@ internal fun PollVotingCard(
         open = open,
         status = if (voting && effectiveCanVote) PollVoteStatus.SUBMITTING else status,
         footer = footer,
+        onViewVotes = onViewVotes,
         onVote = vote@{ optionId ->
             if (!pollVoteCanStart(voting, effectiveCanVote, poll)) return@vote
             val replacement = replacementPollSelection(displayedPoll, optionId) ?: return@vote
@@ -182,6 +192,7 @@ internal fun PollCard(
     open: Boolean = poll.open,
     status: PollVoteStatus = PollVoteStatus.IDLE,
     footer: (@Composable () -> Unit)? = null,
+    onViewVotes: (() -> Unit)? = null,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     Surface(
@@ -219,10 +230,7 @@ internal fun PollCard(
                     onVote = onVote,
                 )
             }
-            Text(
-                pluralStringResource(R.plurals.poll_participants, poll.participants.toInt(), poll.participants.toInt()),
-                style = MaterialTheme.typography.labelSmall,
-            )
+            PollParticipantsRow(poll.participants, onViewVotes)
             val endsAt = poll.endsAt
             if (open && endsAt != null) {
                 val deadline =
@@ -235,6 +243,28 @@ internal fun PollCard(
             if (!open) Text(stringResource(R.string.poll_closed), style = MaterialTheme.typography.labelMedium)
             footer?.let { content ->
                 Box(Modifier.align(Alignment.End)) { content() }
+            }
+        }
+    }
+}
+
+/** The participant count, with View votes beside it once anyone has voted. */
+@Composable
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
+private fun PollParticipantsRow(
+    participants: ULong,
+    onViewVotes: (() -> Unit)?,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        val count = participants.toInt()
+        Text(
+            pluralStringResource(R.plurals.poll_participants, count, count),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.weight(1f),
+        )
+        if (onViewVotes != null && participants > 0uL) {
+            TextButton(onClick = onViewVotes, modifier = Modifier.testTag(POLL_VIEW_VOTES_TAG)) {
+                Text(stringResource(R.string.poll_view_votes), style = MaterialTheme.typography.labelMedium)
             }
         }
     }

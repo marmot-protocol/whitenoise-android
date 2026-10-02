@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.os.SystemClock
 import android.util.Log
 import dev.ipf.marmotkit.PollTypeFfi
+import dev.ipf.marmotkit.PollVotePageFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.R
 
@@ -99,5 +100,21 @@ internal suspend fun ConversationController.castPollVote(
             appState.presentFailure(R.string.poll_vote_failed, "POLL_VOTE", throwable)
             null
         }
+    }
+}
+
+/**
+ * Reads one page of MDK's per-voter results for [pollEventId] off the main thread. It throws when no
+ * account is bound, so the pager shows its failure state instead of an empty poll.
+ */
+internal suspend fun ConversationController.pollVotesPage(
+    pollEventId: String,
+    afterVotedAt: ULong?,
+    afterVoterAccountIdHex: String?,
+    limit: UInt,
+): PollVotePageFfi {
+    val account = checkNotNull(boundAccountRef) { "no account bound" }
+    return appState.marmotIo {
+        pollVotes(account, group.groupIdHex, pollEventId, afterVotedAt, afterVoterAccountIdHex, limit)
     }
 }

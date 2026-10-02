@@ -9626,6 +9626,120 @@
         "test_ids": ["MSG-021"]
       },
       {
+        "surface": "CenteredProgress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "private fun CenteredProgress(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "PollParticipantsRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "private fun PollParticipantsRow(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_view_votes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "R.string.poll_view_votes",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_voter_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_voter_blocked",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_empty",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_load_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_load_failed",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_load_more",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_load_more",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_not_anonymous",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_not_anonymous",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string poll_votes_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.poll_votes_title",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "Poll votes string retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "R.string.retry",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "PollProjectionWatch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "private fun PollProjectionWatch(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "PollVotesSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "fun PollVotesSheet(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "PollVotesContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "fun PollVotesContent(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "PollVotesFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "private fun PollVotesFooter(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "PollVotesFailure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "private fun PollVotesFailure(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "PollVoterItem",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "private fun PollVoterItem(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "PollVotesPager",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollVotesPager.kt",
+        "anchor": "internal class PollVotesPager(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "pollVoteRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollVotesPager.kt",
+        "anchor": "internal fun pollVoteRows(",
+        "test_ids": ["MSG-032"]
+      },
+      {
+        "surface": "pollVotesPage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollConversationActions.kt",
+        "anchor": "internal suspend fun ConversationController.pollVotesPage(",
+        "test_ids": ["MSG-032"]
+      },
+      {
         "surface": "PollMessageContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
         "anchor": "fun PollMessageContent(",
