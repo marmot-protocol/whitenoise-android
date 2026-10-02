@@ -24563,6 +24563,16 @@
     ],
     "source_coverage": [
       {
+        "surface": "Android 11 notification reply history re-post",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/RemoteInputHistoryCompat.kt",
+        "anchor": "internal fun Notification.withoutApi30RemoteInputHistoryItems(",
+        "test_ids": [
+          "NTF-016",
+          "NTF-017",
+          "NTF-029"
+        ]
+      },
+      {
         "surface": "Account teardown notification lifecycle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "internal suspend fun stopNotificationListenerForAccountTeardown()",
