@@ -1,27 +1,27 @@
 <resources>
-    <string name="smart_folder_start">Eigene Regeln erstellen</string>
+    <string name="smart_folder_start">Filter zurücksetzen</string>
     <string name="smart_folder_legacy">Einfache Regeln bleiben aktiv, bis du sie ersetzt.</string>
     <string name="smart_folder_prototype">Nur geladene Chats werden berücksichtigt. Chats mit fehlenden Angaben werden nicht gezählt.</string>
-    <string name="smart_folder_all">Alle Bedingungen erfüllen</string>
-    <string name="smart_folder_any">Eine Bedingung erfüllen</string>
+    <string name="smart_folder_all">Alle erfüllen</string>
+    <string name="smart_folder_any">Eine erfüllen</string>
     <string name="smart_folder_not">NICHT</string>
     <string name="smart_folder_not_hint">Chats ausschließen, die dieser Gruppe entsprechen</string>
-    <string name="smart_folder_add">Bedingung hinzufügen</string>
+    <string name="smart_folder_add">Filter hinzufügen</string>
     <string name="smart_folder_group">Gruppe hinzufügen</string>
     <string name="smart_folder_empty">Keine automatischen Treffer. Bedingung hinzufügen oder Chats manuell aufnehmen.</string>
     <string name="smart_folder_remove_group">Gruppe entfernen</string>
-    <string name="smart_folder_ignore">Bedingung entfernen</string>
+    <string name="smart_folder_ignore">Filter entfernen</string>
     <string name="smart_folder_edit_condition">Bedingung bearbeiten</string>
     <string name="smart_folder_present">Vorhanden</string>
     <string name="smart_folder_none">Keine</string>
-    <string name="smart_folder_participants">Teilnehmende</string>
-    <string name="smart_folder_unread">Ungelesene Nachrichten</string>
+    <string name="smart_folder_participants">Personen</string>
+    <string name="smart_folder_unread">Lesestatus</string>
     <string name="smart_folder_mentions">Ungelesene Erwähnungen</string>
     <string name="smart_folder_draft">Entwurf</string>
     <string name="smart_folder_pending">Ausstehende ausgehende Nachrichten</string>
     <string name="smart_folder_muted">Stummgeschaltet</string>
     <string name="smart_folder_archived">Archiviert</string>
-    <string name="smart_folder_accepted">Aktive, angenommene Unterhaltung</string>
+    <string name="smart_folder_accepted">Angenommene Chats</string>
     <string name="smart_folder_type">Unterhaltungstyp</string>
     <string name="smart_folder_title">Titel enthält</string>
     <string name="smart_folder_pinned">Angeheftet</string>
@@ -36,7 +36,7 @@
     <string name="smart_folder_invalid_key">Gib einen gültigen öffentlichen Schlüssel ein.</string>
     <string name="smart_folder_keyword">Schlüsselwort</string>
     <string name="smart_folder_keyword_hint">Titelvergleich ohne Beachtung der Großschreibung</string>
-    <string name="smart_folder_pending_hint">Das aktuelle SDK kann nicht bestätigen, dass keine ausgehende Nachricht aussteht. Nur eine ausstehende letzte Nachricht bestätigt das Vorhandensein; andere Chats bleiben ungeklärt.</string>
+    <string name="smart_folder_pending_hint">Einige Chats können noch nicht auf ausstehende Nachrichten geprüft werden.</string>
     <string name="smart_folder_negate_condition">Treffer ausschließen (NICHT)</string>
     <plurals name="smart_folder_loaded_count">
         <item quantity="one">%1$d geladener Treffer</item>
@@ -44,13 +44,13 @@
     </plurals>
     <string name="smart_folder_unresolved">Nicht prüfbare Chats: %1$d</string>
     <string name="smart_folder_invalid">Dieser Regelsatz ist ungültig oder wird nicht unterstützt. Automatische Zuordnung ist deaktiviert; ersetze ihn zum Bearbeiten.</string>
-    <string name="smart_folder_presets">Regeln durch eine Vorlage ersetzen</string>
+    <string name="smart_folder_presets">Vorlage wählen</string>
     <string name="smart_folder_preset_read">Alles gelesen</string>
     <string name="smart_folder_preset_mentions">Ungelesene Erwähnungen</string>
     <string name="smart_folder_preset_hint">Mit Alles gelesen oder Ungelesene Erwähnungen beginnen, dann Teilnehmer hinzufügen. Alles gelesen bedeutet nicht, dass der Agent fertig ist.</string>
     <string name="smart_folder_limit">Bis zu 4 Ebenen und 64 Bedingungen oder Gruppen.</string>
     <string name="smart_folder_include_match">Treffer einschließen</string>
-    <string name="smart_folder_edit_legacy">Einfache Regeln bearbeiten</string>
+    <string name="smart_folder_edit_legacy">Gespeicherte Filter bearbeiten</string>
     <string name="smart_folder_empty_group">Füge eine Bedingung hinzu oder entferne diese leere Gruppe vor dem Speichern.</string>
     <string name="smart_folder_unread_hint">Umfasst manuelles Als ungelesen markieren.</string>
     <plurals name="smart_folder_group_items">
@@ -67,4 +67,11 @@
     <string name="smart_folder_has_pending">Hat eine ausstehende Nachricht</string>
     <string name="smart_folder_no_pending">Keine ausstehenden Nachrichten</string>
     <string name="smart_folder_replace">Regeln ersetzen</string>
+    <string name="smart_folder_filters">Filter</string>
+    <string name="smart_folder_group_rules">Regeln gruppieren</string>
+    <string name="smart_folder_more_filters">Weitere Filter</string>
+    <string name="smart_folder_add_description">Beschreibung hinzufügen</string>
+    <string name="smart_folder_always_include">Chats immer einschließen</string>
+    <string name="smart_folder_loaded_only">Nur geladene Chats</string>
+    <string name="smart_folder_read_help">Alles gelesen bedeutet nicht, dass der Agent fertig ist.</string>
 </resources>

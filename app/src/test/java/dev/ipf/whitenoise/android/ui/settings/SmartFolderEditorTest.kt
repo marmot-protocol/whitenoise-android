@@ -47,7 +47,8 @@ class SmartFolderEditorTest {
 
     @Test fun matchAnyAndNestedNotRemainIndependent() {
         val child = SmartFolderFilter.Group(children = listOf(SmartFolderFilter.Condition(FolderField.MENTIONS)))
-        val root = render(SmartFolderFilter.Group(children = listOf(child)))
+        val second = SmartFolderFilter.Condition(FolderField.UNREAD)
+        val root = render(SmartFolderFilter.Group(children = listOf(child, second)))
         composeRule.onNodeWithTag("folder.match.").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_any)).performClick()
         assertFalse(root.value.all)
@@ -59,15 +60,14 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.options.0").performClick()
         composeRule.onNodeWithTag("folder.not.0").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_not_hint)).performClick()
-        assertTrue((root.value.children.single() as SmartFolderFilter.Group).not)
+        assertTrue((root.value.children.first() as SmartFolderFilter.Group).not)
         assertFalse(root.value.not)
     }
 
     @Test fun participantConditionRequiresSelectionBeforeSaveAndPickerPreservesChoices() {
         val root = render(SmartFolderFilter.Group())
         composeRule.onNodeWithTag("folder.add.").performClick()
-        composeRule.onNodeWithTag("folder.property").performClick()
-        composeRule.onNodeWithText(context.getString(R.string.smart_folder_participants)).performClick()
+        composeRule.onNodeWithTag("folder.addField.PARTICIPANTS").performClick()
         composeRule.onNodeWithTag("folder.conditionDone").assertIsNotEnabled()
         composeRule.onNodeWithTag("folder.choosePeople").performClick()
         composeRule.onNodeWithText("Agent").performClick()
@@ -103,7 +103,6 @@ class SmartFolderEditorTest {
                         SmartFolderPanelState(true, root.value),
                         emptyList(),
                         resolveKey = { null },
-                        onStart = {},
                         onChange = { root.value = it },
                         legacyControls = {},
                     )
@@ -146,7 +145,6 @@ class SmartFolderEditorTest {
                         SmartFolderPanelState(root.value != null, root.value),
                         emptyList(),
                         resolveKey = { null },
-                        onStart = {},
                         onChange = { root.value = it },
                         legacyControls = {},
                     )
@@ -167,9 +165,8 @@ class SmartFolderEditorTest {
         assertEquals(FolderField.MENTIONS, (root.value!!.children.last() as SmartFolderFilter.Condition).field)
     }
 
-    @Test fun replacingSimpleRulesRequiresConfirmationForPresetsAndCustomRules() {
+    @Test fun replacingSavedFiltersRequiresConfirmationAndCancelKeepsTheOriginal() {
         val root = mutableStateOf<SmartFolderFilter.Group?>(null)
-        var customStarts = 0
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
@@ -177,24 +174,49 @@ class SmartFolderEditorTest {
                         SmartFolderPanelState(root.value != null, root.value, confirmSimpleReplacement = true),
                         emptyList(),
                         resolveKey = { null },
-                        onStart = { customStarts++ },
                         onChange = { root.value = it },
                         legacyControls = {},
                     )
                 }
             }
         }
-        composeRule.onNodeWithTag("folder.presetRead").performClick()
+        composeRule.onNodeWithTag("folder.presets").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.smart_folder_preset_read)).performClick()
+        assertEquals(null, root.value)
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.onNodeWithTag("folder.addField.UNREAD").performClick()
+        composeRule.onNodeWithTag("folder.conditionDone").performClick()
         assertEquals(null, root.value)
         composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
         assertEquals(null, root.value)
-        composeRule.onNodeWithTag("folder.upgrade").performClick()
-        assertEquals(0, customStarts)
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.onNodeWithTag("folder.addField.MENTIONS").performClick()
+        composeRule.onNodeWithTag("folder.conditionDone").performClick()
         composeRule.onNodeWithTag("folder.confirmPreset").performClick()
-        assertEquals(1, customStarts)
-        composeRule.onNodeWithTag("folder.presetRead").performClick()
-        composeRule.onNodeWithTag("folder.confirmPreset").performClick()
-        assertEquals(FolderMode.NONE, (root.value!!.children.last() as SmartFolderFilter.Condition).mode)
+        assertEquals(FolderField.MENTIONS, (root.value!!.children.last() as SmartFolderFilter.Condition).field)
+    }
+
+    @Test fun addingFilterCancellationDoesNotCreateAnEmptyRuleOrOfferRemoval() {
+        val root = render(SmartFolderFilter.Group())
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.onNodeWithTag("folder.addField.DRAFT").assertDoesNotExist()
+        composeRule.onNodeWithTag("folder.moreFilters").performClick()
+        composeRule.onNodeWithTag("folder.addField.DRAFT").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.smart_folder_ignore)).assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        assertTrue(root.value.children.isEmpty())
+    }
+
+    @Test fun singleFilterHidesMatchChoiceWithoutChangingItsStoredMode() {
+        val unread = SmartFolderFilter.Condition(FolderField.UNREAD)
+        val root = render(SmartFolderFilter.Group(all = false, children = listOf(unread)))
+        composeRule.onNodeWithTag("folder.match.").assertDoesNotExist()
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.onNodeWithTag("folder.addField.MENTIONS").performClick()
+        composeRule.onNodeWithTag("folder.conditionDone").performClick()
+        composeRule.onNodeWithTag("folder.match.").assertExists()
+        assertFalse(root.value.all)
     }
 
     private fun render(initial: SmartFolderFilter.Group): MutableState<SmartFolderFilter.Group> {

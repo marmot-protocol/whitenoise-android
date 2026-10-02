@@ -101,52 +101,48 @@ internal fun SmartFolderEditor(
     resolveKey: suspend (String) -> String?,
     onChange: (SmartFolderFilter.Group) -> Unit,
 ) {
-    // '+' means append to that group; otherwise the path identifies an existing condition.
+    // Add and edit paths belong to separate dialogs; dismissing either leaves the draft untouched.
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
+    var adding by rememberSaveable { mutableStateOf<String?>(null) }
     SmartFolderGroup(
         root,
         emptyList(),
         root,
         people,
         onChange,
-        onEdit = { path, add -> editing = (if (add) "+" else "") + path.joinToString(",") },
+        onEdit = { path, add ->
+            if (add) adding = path.joinToString(",") else editing = path.joinToString(",")
+        },
     )
+    adding?.let { token ->
+        val path = token.split(',').filter(String::isNotEmpty).map(String::toInt)
+        SmartFolderAddFilter(
+            people,
+            resolveKey,
+            onDismiss = { adding = null },
+            onDone = { condition ->
+                val group = root.nodeAt(path) as? SmartFolderFilter.Group
+                if (group != null) onChange(root.updateAt(path, group.copy(children = group.children + condition)))
+                adding = null
+            },
+        )
+    }
     editing?.let { token ->
-        val add = token.startsWith("+")
-        val path =
-            token
-                .removePrefix("+")
-                .split(',')
-                .filter(String::isNotEmpty)
-                .map(String::toInt)
-        val initial =
-            if (add) {
-                SmartFolderFilter.Condition(FolderField.UNREAD)
-            } else {
-                root.nodeAt(path) as? SmartFolderFilter.Condition
-            }
+        val path = token.split(',').filter(String::isNotEmpty).map(String::toInt)
+        val initial = root.nodeAt(path) as? SmartFolderFilter.Condition
         if (initial != null) {
             key(token) {
                 SmartFolderConditionDialog(
                     initial,
                     people,
                     resolveKey,
-                    onDismiss = {
-                        editing = null
-                    },
+                    onDismiss = { editing = null },
                     onRemove = {
-                        if (!add) onChange(root.updateAt(path, null))
+                        onChange(root.updateAt(path, null))
                         editing = null
                     },
                     onDone = { condition ->
-                        val replacement =
-                            if (add) {
-                                val group = root.nodeAt(path) as? SmartFolderFilter.Group
-                                group?.copy(children = group.children + condition)
-                            } else {
-                                condition
-                            }
-                        if (replacement != null) onChange(root.updateAt(path, replacement))
+                        onChange(root.updateAt(path, condition))
                         editing = null
                     },
                 )
@@ -189,15 +185,17 @@ private fun SmartFolderGroup(
                 }
             }
             if (expanded) {
-                FolderChoice(
-                    mode,
-                    listOf(
-                        true to stringResource(R.string.smart_folder_all),
-                        false to stringResource(R.string.smart_folder_any),
-                    ),
-                    "folder.match." + path.joinToString("."),
-                ) {
-                    onChange(root.updateAt(path, group.copy(all = it)))
+                if (group.children.size > 1) {
+                    FolderChoice(
+                        mode,
+                        listOf(
+                            true to stringResource(R.string.smart_folder_all),
+                            false to stringResource(R.string.smart_folder_any),
+                        ),
+                        "folder.match." + path.joinToString("."),
+                    ) {
+                        onChange(root.updateAt(path, group.copy(all = it)))
+                    }
                 }
                 if (group.not && !optionsExpanded) {
                     Text(stringResource(R.string.smart_folder_not_hint), style = MaterialTheme.typography.bodySmall)
@@ -245,7 +243,7 @@ private fun SmartFolderGroup(
                         modifier = Modifier.weight(1f).testTag("folder.options." + path.joinToString(".")),
                     ) {
                         FolderButtonLabel(
-                            stringResource(R.string.more_options),
+                            stringResource(R.string.smart_folder_group_rules),
                             R.drawable.ic_expand_more,
                             optionsExpanded,
                         )
@@ -280,7 +278,7 @@ private fun SmartFolderGroup(
                         ) { Text(stringResource(R.string.smart_folder_group)) }
                     }
                 }
-                if (optionsExpanded) {
+                if (root.nodeCount() >= SmartFolderCodec.MAX_NODES - 1 || path.size >= SmartFolderCodec.MAX_DEPTH - 1) {
                     Text(stringResource(R.string.smart_folder_limit), style = MaterialTheme.typography.bodySmall)
                 }
                 if (path.isNotEmpty()) {
@@ -316,10 +314,19 @@ internal fun conditionSummary(
         }
     val summary =
         when (condition.field) {
-            FolderField.UNREAD, FolderField.MENTIONS, FolderField.DRAFT,
+            FolderField.PARTICIPANTS ->
+                if (condition.mode == FolderMode.ANY_OF && condition.values.size == 1) {
+                    "$field: " +
+                        condition.values.joinToString { hex ->
+                            people.firstOrNull { it.id == hex }?.title ?: hex.take(KEY_PREVIEW_LENGTH) + "…"
+                        }
+                } else {
+                    "$field: $detail"
+                }
+            FolderField.UNREAD -> "$field: $detail"
+            FolderField.MENTIONS, FolderField.DRAFT,
             FolderField.PENDING_SEND, FolderField.TYPE,
             -> detail
-            FolderField.PARTICIPANTS -> detail
             else -> "$field: $detail"
         }
     return (if (condition.not) stringResource(R.string.smart_folder_not) + " · " else "") + summary
@@ -330,15 +337,15 @@ internal fun conditionSummary(
     "LongMethod",
     "CyclomaticComplexMethod",
 ) // Transient form state and property controls share one dialog lifetime.
-private fun SmartFolderConditionDialog(
+internal fun SmartFolderConditionDialog(
     initial: SmartFolderFilter.Condition,
     people: List<WhiteNoisePickerItem>,
     resolveKey: suspend (String) -> String?,
     onDismiss: () -> Unit,
-    onRemove: () -> Unit,
+    onRemove: (() -> Unit)?,
     onDone: (SmartFolderFilter.Condition) -> Unit,
 ) {
-    var field by rememberSaveable { mutableStateOf(initial.field) }
+    val field = initial.field
     var mode by rememberSaveable { mutableStateOf(initial.mode) }
     var not by rememberSaveable { mutableStateOf(initial.not) }
     var optionsExpanded by rememberSaveable { mutableStateOf(initial.not) }
@@ -405,27 +412,12 @@ private fun SmartFolderConditionDialog(
     } else {
         WhiteNoiseAlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.smart_folder_edit_condition)) },
+            title = { Text(stringResource(fieldLabel(field))) },
             text = {
                 Column(
                     Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    FolderChoice(
-                        stringResource(fieldLabel(field)),
-                        FolderField.entries.map { it to stringResource(fieldLabel(it)) },
-                        "folder.property",
-                    ) { selected ->
-                        field = selected
-                        mode =
-                            when (selected) {
-                                FolderField.PARTICIPANTS -> FolderMode.ANY_OF
-                                FolderField.TYPE -> FolderMode.DIRECT
-                                FolderField.TITLE -> FolderMode.CONTAINS
-                                else -> FolderMode.PRESENT
-                            }
-                        keys = emptyList()
-                    }
                     if (field != FolderField.TITLE) {
                         FolderChoice(
                             stringResource(conditionModeLabel(field, mode)),
@@ -516,6 +508,10 @@ private fun SmartFolderConditionDialog(
                             stringResource(R.string.smart_folder_unread_hint),
                             style = MaterialTheme.typography.bodySmall,
                         )
+                        if (mode == FolderMode.NONE) {
+                            val hint = stringResource(R.string.smart_folder_read_help)
+                            Text(hint, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                     if (field == FolderField.PENDING_SEND) {
                         Text(
@@ -550,7 +546,9 @@ private fun SmartFolderConditionDialog(
                                 it
                         }
                     }
-                    TextButton(onClick = onRemove) { Text(stringResource(R.string.smart_folder_ignore)) }
+                    onRemove?.let { remove ->
+                        TextButton(onClick = remove) { Text(stringResource(R.string.smart_folder_ignore)) }
+                    }
                 }
             },
             confirmButton = {
@@ -569,7 +567,7 @@ private fun SmartFolderConditionDialog(
     }
 }
 
-private fun fieldLabel(field: FolderField): Int =
+internal fun fieldLabel(field: FolderField): Int =
     when (field) {
         FolderField.UNREAD -> R.string.smart_folder_unread
         FolderField.MENTIONS -> R.string.smart_folder_mentions
