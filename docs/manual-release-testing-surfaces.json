@@ -29050,6 +29050,32 @@
         ]
       },
       {
+        "surface": "A restored or switched-to chat list decodes stored peer avatars before its first frame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/FirstFrameDurableAvatars.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(",
+        "test_ids": [
+          "CHL-023"
+        ]
+      },
+      {
+        "surface": "Startup and account-switch snapshots carry MDK's stored per-row presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "prewarmFirstFrameDurableAvatars(accountRef, presentedRows)",
+        "test_ids": [
+          "CHL-023",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "An account switch reinstalls the destination's decoded stored avatars after clearing the previous account's",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AccountSwitchLocalSnapshot.kt",
+        "anchor": "snapshot?.installFirstFrameDurableAvatars()",
+        "test_ids": [
+          "CHL-023",
+          "NAV-006"
+        ]
+      },
+      {
         "surface": "Durable push recovery callbacks",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/MarmotFirebaseMessagingService.kt",
         "anchor": "override fun onDeletedMessages()",

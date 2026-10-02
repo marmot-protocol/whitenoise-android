@@ -12,3 +12,4 @@
 # coverage gated by @SdkSuppress(maxSdkVersion) below the runner's API level.
 
 dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePreparationAndroidTest#recipientRemainsActionableWhileProfilePrewarmAndLookupAreDelayed
+dev.ipf.whitenoise.android.state.ChatListColdStartDirectPeerPresentationFfiIntegrationTest#processRecreation_unnamedDirectChat_rendersDurablePeerPresentationOnFirstFrame
