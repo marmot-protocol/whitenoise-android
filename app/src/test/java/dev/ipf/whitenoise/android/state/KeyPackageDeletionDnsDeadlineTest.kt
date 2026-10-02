@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.RelayEndpointClassificationFfi
 import dev.ipf.marmotkit.RelayEndpointPolicyFfi
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -14,16 +16,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.InetAddress
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class KeyPackageDeletionDnsDeadlineTest {
     /** An unresponsive resolver must terminate with recovery before the caller's longer safety timeout. */
     @Test
     fun stalledResolutionReturnsRecoveryAndCancelsTheLookup() =
-        runBlocking {
+        runTest {
             var cancelled = false
             var deleted = false
             val result =
                 withTimeout(9_000) {
-                    deleteKeyPackageThroughSafeSourceRelays(
+                    StandardTestDispatcher(testScheduler).deleteKeyPackageThroughSafeSourceRelays(
                         sourceRelays = listOf("wss://stalled.example"),
                         classify = ::allowEveryRelay,
                         resolve = {
@@ -40,16 +43,17 @@ class KeyPackageDeletionDnsDeadlineTest {
             assertEquals(KeyPackageDeletionResult.HostVerificationUnavailable, result)
             assertEquals(true, cancelled)
             assertFalse(deleted)
+            assertEquals(2_000L, testScheduler.currentTime)
         }
 
     /** One failed host consumes only its own budget, leaving a later public source eligible. */
     @Test
     fun stalledHostDoesNotPreventTheNextUsableSource() =
-        runBlocking {
+        runTest {
             var deletedThrough: List<String>? = null
             val result =
                 withTimeout(9_000) {
-                    deleteKeyPackageThroughSafeSourceRelays(
+                    StandardTestDispatcher(testScheduler).deleteKeyPackageThroughSafeSourceRelays(
                         sourceRelays = listOf("wss://stalled.example", "wss://online.example"),
                         classify = ::allowEveryRelay,
                         resolve = { host ->
@@ -61,12 +65,13 @@ class KeyPackageDeletionDnsDeadlineTest {
 
             assertEquals(KeyPackageDeletionResult.Deleted, result)
             assertEquals(listOf("wss://online.example"), deletedThrough)
+            assertEquals(2_000L, testScheduler.currentTime)
         }
 
     /** Stalled work surrounding a public answer cannot renew the budget or discard that answer. */
     @Test
     fun totalDeadlineRetainsCompletedPublicAnswersAndCancelsOutstandingWork() =
-        runBlocking {
+        runTest {
             var started = 0
             var cancelled = 0
             var active = 0
@@ -74,7 +79,7 @@ class KeyPackageDeletionDnsDeadlineTest {
             var deletedThrough: List<String>? = null
             val result =
                 withTimeout(12_000) {
-                    deleteKeyPackageThroughSafeSourceRelays(
+                    StandardTestDispatcher(testScheduler).deleteKeyPackageThroughSafeSourceRelays(
                         sourceRelays =
                             listOf(
                                 "wss://stalled-prefix.example",
@@ -107,16 +112,17 @@ class KeyPackageDeletionDnsDeadlineTest {
             assertEquals(started, cancelled)
             assertEquals(0, active)
             assertEquals(1, maxActive)
+            assertEquals(8_000L, testScheduler.currentTime)
         }
 
     /** A total deadline with no verified source returns recovery, never a speculative native deletion. */
     @Test
     fun totalDeadlineWithoutPublicAnswersReturnsRecovery() =
-        runBlocking {
+        runTest {
             var deleted = false
             val result =
                 withTimeout(12_000) {
-                    deleteKeyPackageThroughSafeSourceRelays(
+                    StandardTestDispatcher(testScheduler).deleteKeyPackageThroughSafeSourceRelays(
                         sourceRelays = stalledRelays(),
                         classify = ::allowEveryRelay,
                         resolve = { awaitCancellation() },
@@ -126,19 +132,20 @@ class KeyPackageDeletionDnsDeadlineTest {
 
             assertEquals(KeyPackageDeletionResult.HostVerificationUnavailable, result)
             assertFalse(deleted)
+            assertEquals(8_000L, testScheduler.currentTime)
         }
 
     /** Caller cancellation while DNS is suspended must propagate and drain the in-flight lookup. */
     @Test
     fun parentCancellationDoesNotBecomeRecoveryOrDeletion() =
-        runBlocking {
+        runTest {
             val started = CompletableDeferred<Unit>()
             var cancelled = false
             var returned = false
             var deleted = false
             val caller =
                 async {
-                    deleteKeyPackageThroughSafeSourceRelays(
+                    StandardTestDispatcher(testScheduler).deleteKeyPackageThroughSafeSourceRelays(
                         sourceRelays = listOf("wss://stalled.example"),
                         classify = ::allowEveryRelay,
                         resolve = {
@@ -160,18 +167,19 @@ class KeyPackageDeletionDnsDeadlineTest {
             assertTrue(cancelled)
             assertFalse(returned)
             assertFalse(deleted)
+            assertEquals(0L, testScheduler.currentTime)
         }
 
     /** A stale account wins over timeout recovery and cannot start another host or delete. */
     @Test
     fun accountSwitchDuringStalledLookupSupersedesTimeoutRecovery() =
-        runBlocking {
+        runTest {
             var accountActive = true
             var lookups = 0
             var deleted = false
             val result =
                 withTimeout(9_000) {
-                    deleteKeyPackageThroughSafeSourceRelays(
+                    StandardTestDispatcher(testScheduler).deleteKeyPackageThroughSafeSourceRelays(
                         sourceRelays = stalledRelays(),
                         classify = ::allowEveryRelay,
                         resolve = {
@@ -187,6 +195,7 @@ class KeyPackageDeletionDnsDeadlineTest {
             assertEquals(KeyPackageDeletionResult.Superseded, result)
             assertEquals(1, lookups)
             assertFalse(deleted)
+            assertEquals(2_000L, testScheduler.currentTime)
         }
 
     /** Supplies more stalled hosts than the shared deadline can visit sequentially. */
