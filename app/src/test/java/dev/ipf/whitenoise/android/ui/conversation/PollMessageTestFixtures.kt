@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
+import dev.ipf.marmotkit.PollVotePageFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -30,6 +31,9 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
     protected val nativeCalls = mutableListOf<Pair<String, List<Any?>>>()
     protected var reactionFailure: Throwable? = null
     protected var beforeVoteReturn: (() -> Unit)? = null
+
+    /** Answers `pollVotes` with the fixture's scripted per-voter page; the default is an empty page. */
+    protected var pollVotesResponder: (List<Any?>) -> PollVotePageFfi = { PollVotePageFfi(emptyList(), false) }
     private val native =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -53,6 +57,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                             )
                         "replyToMessageWithClientToken" ->
                             LocalSendAcceptanceFfi(args.orEmpty()[4] as String, "bb".repeat(32))
+                        "pollVotes" -> pollVotesResponder(args.orEmpty().toList())
                         "parseMarkdown" -> markdown(args.orEmpty().first() as String)
                         "messages" -> emptyList<dev.ipf.marmotkit.AppMessageRecordFfi>()
                         else -> null

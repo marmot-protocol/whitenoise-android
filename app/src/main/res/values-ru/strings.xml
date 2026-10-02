@@ -44,6 +44,13 @@
     <string name="poll_duration_1_day">1 день</string>
     <string name="poll_duration_1_week">1 неделя</string>
     <string name="poll_ends_at">Завершится %1$s</string>
+    <string name="poll_view_votes">Посмотреть голоса</string>
+    <string name="poll_votes_title">Голоса</string>
+    <string name="poll_votes_not_anonymous">Опросы не анонимны. Все участники группы видят, кто выбрал каждый вариант.</string>
+    <string name="poll_votes_empty">Голосов пока нет.</string>
+    <string name="poll_votes_load_failed">Не удалось загрузить голоса.</string>
+    <string name="poll_votes_load_more">Загрузить ещё</string>
+    <string name="poll_voter_blocked">Заблокирован</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d голос</item>
         <item quantity="few">%1$d голоса</item>

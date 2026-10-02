@@ -42,6 +42,13 @@
     <string name="poll_duration_1_day">1 día</string>
     <string name="poll_duration_1_week">1 semana</string>
     <string name="poll_ends_at">Termina el %1$s</string>
+    <string name="poll_view_votes">Ver votos</string>
+    <string name="poll_votes_title">Votos</string>
+    <string name="poll_votes_not_anonymous">Las encuestas no son anónimas. Todos los miembros del grupo pueden ver quién eligió cada opción.</string>
+    <string name="poll_votes_empty">Aún no hay votos.</string>
+    <string name="poll_votes_load_failed">No se pudieron cargar los votos.</string>
+    <string name="poll_votes_load_more">Cargar más</string>
+    <string name="poll_voter_blocked">Bloqueado</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d voto</item>
         <item quantity="other">%1$d votos</item>

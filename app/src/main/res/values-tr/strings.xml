@@ -42,6 +42,13 @@
     <string name="poll_duration_1_day">1 gün</string>
     <string name="poll_duration_1_week">1 hafta</string>
     <string name="poll_ends_at">Bitiş: %1$s</string>
+    <string name="poll_view_votes">Oyları gör</string>
+    <string name="poll_votes_title">Oylar</string>
+    <string name="poll_votes_not_anonymous">Anketler anonim değildir. Grubun tüm üyeleri hangi seçeneği kimin seçtiğini görebilir.</string>
+    <string name="poll_votes_empty">Henüz oy yok.</string>
+    <string name="poll_votes_load_failed">Oylar yüklenemedi.</string>
+    <string name="poll_votes_load_more">Daha fazla yükle</string>
+    <string name="poll_voter_blocked">Engellendi</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d oy</item>
         <item quantity="other">%1$d oy</item>
