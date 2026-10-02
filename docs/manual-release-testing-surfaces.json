@@ -24466,7 +24466,6 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "internal suspend fun stopNotificationListenerForAccountTeardown()",
         "test_ids": [
-          "ACC-013",
           "ACC-014",
           "NTF-011"
         ]
@@ -24476,7 +24475,6 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppRuntimeListenerTeardownOwner.kt",
         "anchor": "class AppRuntimeListenerTeardownOwner(",
         "test_ids": [
-          "ACC-013",
           "ACC-014",
           "NTF-011"
         ]
