@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationCardOp
 import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
 import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.ui.chats.AvatarScreenshotFixtures
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -102,6 +103,8 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
                 senderPictureUrl = AVATAR_URL.takeIf { cachedAvatar },
                 delayFirstNotificationDispatchAfterRuntimeStart = true,
                 notificationFirstPostTimingObserver = events::add,
+                // Render with one controlled Android looper, not a race against an IO worker.
+                notificationDispatcher = Dispatchers.Main.immediate,
             )
         fixture.appState.applyAccountSwitchProfileSeed(
             AccountSwitchProfileSeed(
@@ -171,11 +174,10 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         fixture.appState.parseMarkdownOrEmpty("**parser warm-up**")
         beforeDispatch()
         fixture.releaseNotificationDispatch()
-        // Advance Robolectric's paused clock so the production notification
-        // pacer can refill after earlier captures in this class. Rendering is
-        // still deterministic because assertAlignedHeaderClock resets the
-        // framework clock to the actual post time before capture.
-        fixture.awaitNotificationPosted()
+        // Drain immediate Android work without spending the content budget by
+        // advancing simulated time while a resolver is queued. Deadline and
+        // fallback behaviour remain covered by the coordinator/integration tests.
+        fixture.awaitNotificationPosted(advanceMainClock = false)
         withTimeout(WRITE_AWAIT_TIMEOUT_MS) {
             while (writes.get() < 1) delay(1L)
         }
