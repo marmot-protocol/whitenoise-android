@@ -94,7 +94,8 @@ internal class PollVotesPager(
         mine: Int,
         failure: PollVotesPhase,
     ) {
-        if (mine == generation && isCurrent()) phase = failure
+        // A read the owner invalidated mid-flight still leaves the pager retryable, never stuck loading.
+        if (mine == generation) phase = failure
     }
 
     /** Returns the page only while this read is still the newest and its owner is still current. */

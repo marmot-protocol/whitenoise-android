@@ -127,7 +127,7 @@ class PollVotesPagerTest {
             assertEquals(source.calls[1], source.calls[2])
         }
 
-    /** A page that arrives after the account or chat changed is dropped. */
+    /** A page that arrives after the account or chat changed is dropped, leaving a retryable failure. */
     @Test
     fun resultAfterOwnerChangeIsRejected() =
         runTest {
@@ -155,7 +155,7 @@ class PollVotesPagerTest {
             job.join()
 
             assertTrue(pager.votes.isEmpty())
-            assertEquals(PollVotesPhase.LOADING, pager.phase)
+            assertEquals(PollVotesPhase.FAILED, pager.phase)
         }
 
     /** Reprojection restarts from the first page, and the superseded in-flight read cannot overwrite it. */

@@ -50,7 +50,7 @@
     <string name="poll_votes_empty">Голосов пока нет.</string>
     <string name="poll_votes_load_failed">Не удалось загрузить голоса.</string>
     <string name="poll_votes_load_more">Загрузить ещё</string>
-    <string name="poll_voter_blocked">Заблокирован</string>
+    <string name="poll_voter_blocked">В блок-листе</string>
     <plurals name="poll_option_votes">
         <item quantity="one">%1$d голос</item>
         <item quantity="few">%1$d голоса</item>
