@@ -137,7 +137,16 @@ class ConversationLiveReactionReferenceTest {
         ConversationReactionsFfi(
             totalCount = 1uL,
             totalKinds = 1uL,
-            items = listOf(ConversationReactionFfi("👍", 1uL, listOf(ConversationTimelineTestIds.SENDER_ID), false)),
+            items =
+                listOf(
+                    ConversationReactionFfi(
+                        emoji = "👍",
+                        count = 1uL,
+                        reactors = listOf(ConversationTimelineTestIds.SENDER_ID),
+                        viewerReacted = false,
+                        reactionMessageIdHex = null,
+                    ),
+                ),
             omittedKinds = 0uL,
         )
 
