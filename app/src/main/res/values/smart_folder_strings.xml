@@ -42,7 +42,7 @@
         <item quantity="one">%1$d loaded match</item>
         <item quantity="other">%1$d loaded matches</item>
     </plurals>
-  <string name="smart_folder_unresolved">%1$d loaded chats have unresolved rule data.</string>
+  <string name="smart_folder_unresolved">Chats we couldn’t check: %1$d</string>
   <string name="smart_folder_invalid">This rule set is unsupported or invalid. Automatic matching is disabled; replace it to edit.</string>
   <string name="smart_folder_presets">Replace rules with a preset</string>
   <string name="smart_folder_preset_read">All read</string>
@@ -66,4 +66,5 @@
   <string name="smart_folder_no_draft">No draft</string>
   <string name="smart_folder_has_pending">Has a pending outgoing message</string>
   <string name="smart_folder_no_pending">No pending outgoing messages</string>
+    <string name="smart_folder_replace">Replace rules</string>
 </resources>

@@ -41,7 +41,7 @@
     <plurals name="smart_folder_loaded_count">
         <item quantity="other">%1$d 個已載入的比對結果</item>
     </plurals>
-    <string name="smart_folder_unresolved">%1$d 個已載入聊天的規則資料無法確定。</string>
+    <string name="smart_folder_unresolved">無法檢查的聊天：%1$d</string>
     <string name="smart_folder_invalid">此規則集無效或不受支援。自動比對已停用；請取代規則集以編輯。</string>
     <string name="smart_folder_presets">用預設取代規則</string>
     <string name="smart_folder_preset_read">全部已讀</string>
@@ -64,4 +64,5 @@
     <string name="smart_folder_no_draft">無草稿</string>
     <string name="smart_folder_has_pending">有待傳訊息</string>
     <string name="smart_folder_no_pending">無待傳訊息</string>
+    <string name="smart_folder_replace">取代規則</string>
 </resources>

@@ -348,7 +348,13 @@ private fun ChatFolderEditSession(
                     chatListItemDisplayTitle(it, appState, groupTitleCopy)
                 }
             SmartFolderRulePanel(
-                state = SmartFolderPanelState(smartPayload != null, smartRoot, unresolved),
+                state =
+                    SmartFolderPanelState(
+                        smartPayload != null,
+                        smartRoot,
+                        unresolved,
+                        confirmSimpleReplacement = rule != ChatFolderRule(),
+                    ),
                 people = memberRows,
                 resolveKey = { input -> appState.accountIdHex(input).takeIf { canMutate() } },
                 onStart = { if (canMutate()) smartPayload = SmartFolderCodec.encode(defaultSmartFolder()) },

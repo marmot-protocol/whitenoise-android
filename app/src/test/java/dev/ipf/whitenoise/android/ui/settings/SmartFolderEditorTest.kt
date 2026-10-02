@@ -167,6 +167,36 @@ class SmartFolderEditorTest {
         assertEquals(FolderField.MENTIONS, (root.value!!.children.last() as SmartFolderFilter.Condition).field)
     }
 
+    @Test fun replacingSimpleRulesRequiresConfirmationForPresetsAndCustomRules() {
+        val root = mutableStateOf<SmartFolderFilter.Group?>(null)
+        var customStarts = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    SmartFolderRulePanel(
+                        SmartFolderPanelState(root.value != null, root.value, confirmSimpleReplacement = true),
+                        emptyList(),
+                        resolveKey = { null },
+                        onStart = { customStarts++ },
+                        onChange = { root.value = it },
+                        legacyControls = {},
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithTag("folder.presetRead").performClick()
+        assertEquals(null, root.value)
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        assertEquals(null, root.value)
+        composeRule.onNodeWithTag("folder.upgrade").performClick()
+        assertEquals(0, customStarts)
+        composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        assertEquals(1, customStarts)
+        composeRule.onNodeWithTag("folder.presetRead").performClick()
+        composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        assertEquals(FolderMode.NONE, (root.value!!.children.last() as SmartFolderFilter.Condition).mode)
+    }
+
     private fun render(initial: SmartFolderFilter.Group): MutableState<SmartFolderFilter.Group> {
         val state = mutableStateOf(initial)
         composeRule.setContent {

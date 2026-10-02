@@ -36,6 +36,10 @@ draft previews also stay unresolved; attachment-only drafts count as present.
 All read does not mean an agent has completed its turn. The presets intentionally
 make no completion claim; add Participants to restrict one to a chosen agent.
 
+Custom unread and mention conditions read native projected counters and manual
+flags. The presets separately require an active, accepted conversation; keep that
+condition to exclude terminal chats whose counters may retain earlier activity.
+
 ## Existing folders
 
 New folders start in simple mode, retaining ordinary pagination for manual
@@ -43,8 +47,8 @@ folders created from chat selections or group details. Choosing All read, Unread
 mentions or Build custom rules is an explicit opt-in to the loaded-window prototype. Opening or renaming an existing
 folder preserves its legacy rules. Those rules
 remain editable in a collapsed section. A preset or Build custom rules starts a
-new draft; its preview can be checked before Save. Replacing an advanced tree with a preset requires confirmation; cancelling keeps
-the tree unchanged. Public-key entry and negation are optional controls within
+new draft; its preview can be checked before Save. Replacing an advanced tree or non-default simple rules requires confirmation;
+cancelling keeps the draft unchanged. Public-key entry and negation are optional controls within
 each condition. The previous legacy fields
 remain in the stored rule for a future explicit rollback. Unsupported payloads
 remain unchanged when only the name or manual inclusions are edited. Save publishes folder

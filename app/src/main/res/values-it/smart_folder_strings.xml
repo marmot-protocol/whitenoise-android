@@ -42,7 +42,7 @@
         <item quantity="one">%1$d corrispondenza caricata</item>
         <item quantity="other">%1$d corrispondenze caricate</item>
     </plurals>
-    <string name="smart_folder_unresolved">%1$d chat caricate hanno dati delle regole indeterminati.</string>
+    <string name="smart_folder_unresolved">Chat non verificabili: %1$d</string>
     <string name="smart_folder_invalid">Queste regole non sono valide o non sono supportate. Le corrispondenze automatiche sono disattivate; sostituiscile per modificarle.</string>
     <string name="smart_folder_presets">Sostituisci le regole con un modello</string>
     <string name="smart_folder_preset_read">Tutto letto</string>
@@ -66,4 +66,5 @@
     <string name="smart_folder_no_draft">Nessuna bozza</string>
     <string name="smart_folder_has_pending">Ha un messaggio in uscita in attesa</string>
     <string name="smart_folder_no_pending">Nessun messaggio in uscita in attesa</string>
+    <string name="smart_folder_replace">Sostituisci regole</string>
 </resources>

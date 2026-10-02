@@ -42,7 +42,7 @@
         <item quantity="one">%1$d geladener Treffer</item>
         <item quantity="other">%1$d geladene Treffer</item>
     </plurals>
-    <string name="smart_folder_unresolved">Bei %1$d geladenen Chats sind Regeldaten ungeklärt.</string>
+    <string name="smart_folder_unresolved">Nicht prüfbare Chats: %1$d</string>
     <string name="smart_folder_invalid">Dieser Regelsatz ist ungültig oder wird nicht unterstützt. Automatische Zuordnung ist deaktiviert; ersetze ihn zum Bearbeiten.</string>
     <string name="smart_folder_presets">Regeln durch eine Vorlage ersetzen</string>
     <string name="smart_folder_preset_read">Alles gelesen</string>
@@ -66,4 +66,5 @@
     <string name="smart_folder_no_draft">Kein Entwurf</string>
     <string name="smart_folder_has_pending">Hat eine ausstehende Nachricht</string>
     <string name="smart_folder_no_pending">Keine ausstehenden Nachrichten</string>
+    <string name="smart_folder_replace">Regeln ersetzen</string>
 </resources>

@@ -10,6 +10,7 @@ internal data class SmartFolderPanelState(
     val advanced: Boolean,
     val root: SmartFolderFilter.Group?,
     val unresolved: Int = 0,
+    val confirmSimpleReplacement: Boolean = false,
 )
 
 /** Only complete automatic rules can have unresolved source data; an empty root is manual-only. */

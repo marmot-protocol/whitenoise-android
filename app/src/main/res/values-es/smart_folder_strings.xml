@@ -42,7 +42,7 @@
         <item quantity="one">%1$d coincidencia cargada</item>
         <item quantity="other">%1$d coincidencias cargadas</item>
     </plurals>
-    <string name="smart_folder_unresolved">%1$d chats cargados tienen datos de reglas sin determinar.</string>
+    <string name="smart_folder_unresolved">Chats que no se pudieron comprobar: %1$d</string>
     <string name="smart_folder_invalid">Estas reglas no son válidas o no son compatibles. Las coincidencias automáticas están desactivadas; reemplázalas para editarlas.</string>
     <string name="smart_folder_presets">Reemplazar reglas con una plantilla</string>
     <string name="smart_folder_preset_read">Todo leído</string>
@@ -66,4 +66,5 @@
     <string name="smart_folder_no_draft">Sin borrador</string>
     <string name="smart_folder_has_pending">Tiene un mensaje saliente pendiente</string>
     <string name="smart_folder_no_pending">Sin mensajes salientes pendientes</string>
+    <string name="smart_folder_replace">Reemplazar reglas</string>
 </resources>

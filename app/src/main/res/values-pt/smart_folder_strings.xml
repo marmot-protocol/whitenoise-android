@@ -42,7 +42,7 @@
         <item quantity="one">%1$d correspondência carregada</item>
         <item quantity="other">%1$d correspondências carregadas</item>
     </plurals>
-    <string name="smart_folder_unresolved">%1$d conversas carregadas têm dados de regras por determinar.</string>
+    <string name="smart_folder_unresolved">Conversas que não foi possível verificar: %1$d</string>
     <string name="smart_folder_invalid">Estas regras são inválidas ou não são suportadas. As correspondências automáticas estão desativadas; substitua-as para editar.</string>
     <string name="smart_folder_presets">Substituir regras por um modelo</string>
     <string name="smart_folder_preset_read">Tudo lido</string>
@@ -66,4 +66,5 @@
     <string name="smart_folder_no_draft">Sem rascunho</string>
     <string name="smart_folder_has_pending">Tem uma mensagem de saída pendente</string>
     <string name="smart_folder_no_pending">Sem mensagens de saída pendentes</string>
+    <string name="smart_folder_replace">Substituir regras</string>
 </resources>

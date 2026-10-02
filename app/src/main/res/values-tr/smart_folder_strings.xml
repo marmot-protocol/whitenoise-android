@@ -42,7 +42,7 @@
         <item quantity="one">%1$d yüklenen eşleşme</item>
         <item quantity="other">%1$d yüklenen eşleşme</item>
     </plurals>
-    <string name="smart_folder_unresolved">%1$d yüklenen sohbetin kural verileri belirsiz.</string>
+    <string name="smart_folder_unresolved">Kontrol edilemeyen sohbetler: %1$d</string>
     <string name="smart_folder_invalid">Bu kurallar geçersiz veya desteklenmiyor. Otomatik eşleştirme devre dışı; düzenlemek için değiştirin.</string>
     <string name="smart_folder_presets">Kuralları bir ön ayarla değiştir</string>
     <string name="smart_folder_preset_read">Tümü okundu</string>
@@ -66,4 +66,5 @@
     <string name="smart_folder_no_draft">Taslak yok</string>
     <string name="smart_folder_has_pending">Bekleyen giden mesaj var</string>
     <string name="smart_folder_no_pending">Bekleyen giden mesaj yok</string>
+    <string name="smart_folder_replace">Kuralları değiştir</string>
 </resources>

@@ -42,7 +42,7 @@
         <item quantity="one">%1$d correspondance chargée</item>
         <item quantity="other">%1$d correspondances chargées</item>
     </plurals>
-    <string name="smart_folder_unresolved">Les données des règles restent indéterminées pour %1$d conversations chargées.</string>
+    <string name="smart_folder_unresolved">Discussions non vérifiables : %1$d</string>
     <string name="smart_folder_invalid">Ces règles sont invalides ou non prises en charge. Le filtrage automatique est désactivé ; remplacez-les pour les modifier.</string>
     <string name="smart_folder_presets">Remplacer les règles par un modèle</string>
     <string name="smart_folder_preset_read">Tout lu</string>
@@ -66,4 +66,5 @@
     <string name="smart_folder_no_draft">Aucun brouillon</string>
     <string name="smart_folder_has_pending">Contient un message sortant en attente</string>
     <string name="smart_folder_no_pending">Aucun message sortant en attente</string>
+    <string name="smart_folder_replace">Remplacer les règles</string>
 </resources>

@@ -41,7 +41,7 @@
     <plurals name="smart_folder_loaded_count">
         <item quantity="other">%1$d 个已加载的匹配项</item>
     </plurals>
-    <string name="smart_folder_unresolved">%1$d 个已加载聊天的规则数据无法确定。</string>
+    <string name="smart_folder_unresolved">无法检查的聊天：%1$d</string>
     <string name="smart_folder_invalid">此规则集无效或不受支持。自动匹配已禁用；请替换规则集以编辑。</string>
     <string name="smart_folder_presets">用预设替换规则</string>
     <string name="smart_folder_preset_read">全部已读</string>
@@ -64,4 +64,5 @@
     <string name="smart_folder_no_draft">无草稿</string>
     <string name="smart_folder_has_pending">有待发消息</string>
     <string name="smart_folder_no_pending">无待发消息</string>
+    <string name="smart_folder_replace">替换规则</string>
 </resources>

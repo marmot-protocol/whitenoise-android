@@ -30114,9 +30114,9 @@
         ]
       },
       {
-        "surface": "reset",
+        "surface": "smart_folder_replace",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
-        "anchor": "R.string.reset",
+        "anchor": "R.string.smart_folder_replace",
         "test_ids": [
           "FLD-004"
         ]
