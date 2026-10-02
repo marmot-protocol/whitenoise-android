@@ -1023,6 +1023,15 @@ internal fun ChatsScreen(
     val currentVisibleItems by rememberUpdatedState(visibleItems)
     val currentVisibleChatIds by rememberUpdatedState(visibleChatIds)
     val currentSearchActive by rememberUpdatedState(searchActive)
+    LaunchedEffect(
+        controller,
+        appState.activeAccountRef,
+        appState.runtimeGeneration,
+        selectedFolderId,
+        advancedFolder,
+    ) {
+        if (advancedFolder) controller.returnSmartFolderWindowsToTop()
+    }
     val hasEarlierChats = !advancedFolder && controller.hasEarlierChats(chatListWindowView)
     LaunchedEffect(chatListState, controller, chatListWindowView, hasEarlierChats) {
         snapshotFlow { chatListState.firstVisibleItemIndex }
@@ -1740,7 +1749,7 @@ internal fun ChatsScreen(
                             Box(Modifier.fillMaxWidth().weight(1f)) {
                                 ChatListNoResults(
                                     query = searchQuery.trim(),
-                                    unreadFolderSelected = selectedFolderRule?.unreadOnly == true,
+                                    unreadFolderSelected = !advancedFolder && selectedFolderRule?.unreadOnly == true,
                                     filtersActive = filtersActive,
                                 )
                             }

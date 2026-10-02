@@ -1,6 +1,6 @@
 <resources>
-    <string name="smart_folder_start">Reemplazar por reglas avanzadas</string>
-    <string name="smart_folder_legacy">Las reglas actuales siguen activas hasta que las reemplaces.</string>
+    <string name="smart_folder_start">Usar reglas avanzadas</string>
+    <string name="smart_folder_legacy">Las reglas simples siguen activas hasta que las reemplaces.</string>
     <string name="smart_folder_prototype">Solo chats cargados. Desconocido no significa «Ninguno».</string>
     <string name="smart_folder_all">Cumplir todas</string>
     <string name="smart_folder_any">Cumplir cualquiera</string>
@@ -9,11 +9,9 @@
     <string name="smart_folder_add">Añadir condición</string>
     <string name="smart_folder_group">Añadir grupo</string>
     <string name="smart_folder_empty">Sin coincidencias automáticas. Añade una condición o incluye chats manualmente.</string>
-    <string name="smart_folder_remove">Eliminar condición</string>
     <string name="smart_folder_remove_group">Eliminar grupo</string>
     <string name="smart_folder_ignore">Ignorar esta propiedad</string>
     <string name="smart_folder_edit_condition">Editar condición</string>
-    <string name="smart_folder_property">Propiedad</string>
     <string name="smart_folder_present">Presente</string>
     <string name="smart_folder_none">Ninguno</string>
     <string name="smart_folder_participants">Participantes</string>
@@ -40,7 +38,6 @@
     <string name="smart_folder_keyword_hint">Buscar en el título sin distinguir mayúsculas</string>
     <string name="smart_folder_pending_hint">El SDK actual no puede confirmar que no haya mensajes salientes pendientes. Solo un último mensaje pendiente demuestra su presencia; los demás chats quedan sin determinar.</string>
     <string name="smart_folder_negate_condition">Excluir coincidencias (NO)</string>
-    <string name="smart_folder_manual_hint">Los chats incluidos manualmente siempre permanecen en esta carpeta, aunque no cumplan las reglas.</string>
     <string name="smart_folder_loaded_count">%1$d coincidencias cargadas</string>
     <string name="smart_folder_unresolved">%1$d chats cargados tienen datos de reglas sin determinar.</string>
     <string name="smart_folder_invalid">Estas reglas no son válidas o no son compatibles. Las coincidencias automáticas están desactivadas; reemplázalas para editarlas.</string>
@@ -50,7 +47,7 @@
     <string name="smart_folder_preset_hint">Añade Participantes para elegir un agente. Todo leído no significa terminado.</string>
     <string name="smart_folder_limit">Hasta 4 niveles y 64 condiciones o grupos.</string>
     <string name="smart_folder_include_match">Incluir coincidencias</string>
-    <string name="smart_folder_edit_legacy">Editar reglas actuales</string>
+    <string name="smart_folder_edit_legacy">Editar reglas simples</string>
     <string name="smart_folder_empty_group">Añade una condición o elimina este grupo vacío antes de guardar.</string>
     <string name="smart_folder_unread_hint">Incluye Marcar como no leído manualmente.</string>
     <plurals name="smart_folder_group_items">

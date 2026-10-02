@@ -42,8 +42,8 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.smartFolderMatches
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
-import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.allLoadedFolderChats
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
@@ -121,14 +121,8 @@ private fun ChatFolderEditSession(
     val name = rememberTextFieldState(prefillName)
     val description = rememberTextFieldState(existing?.description.orEmpty())
     val keyword = rememberTextFieldState(existingRule?.keyword.orEmpty())
-    val initialSmart =
-        remember {
-            existingRule?.smartFilter ?: if (folderId == null) {
-                SmartFolderCodec.encode(SmartFolderFilter.Group())
-            } else {
-                null
-            }
-        }
+    // Manual folders retain the ordinary native window until advanced rules are explicitly chosen.
+    val initialSmart = remember { existingRule?.smartFilter }
     var smartPayload by rememberSaveable { mutableStateOf(initialSmart) }
     val smartRoot = remember(smartPayload) { smartPayload?.let(SmartFolderCodec::decode) }
 
@@ -258,9 +252,13 @@ private fun ChatFolderEditSession(
     val activeHex = appState.activeAccount?.accountIdHex
     val profileRevision = appState.profileRevisionForCompose
     val source = chatFolderSource(rule, appState.chatListItems, appState.archivedChatListItems)
+    val pickerSource =
+        remember(appState.chatListItems, appState.archivedChatListItems) {
+            allLoadedFolderChats(appState.chatListItems, appState.archivedChatListItems)
+        }
     val chatRows =
-        remember(source, profileRevision, groupTitleCopy) {
-            source.map { item ->
+        remember(pickerSource, profileRevision, groupTitleCopy) {
+            pickerSource.map { item ->
                 WhiteNoisePickerItem(
                     id = item.id.lowercase(Locale.ROOT),
                     title = chatListItemDisplayTitle(item, appState, groupTitleCopy),

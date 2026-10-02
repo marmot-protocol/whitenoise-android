@@ -1,6 +1,6 @@
 <resources>
-    <string name="smart_folder_start">Substituir por regras avançadas</string>
-    <string name="smart_folder_legacy">As regras existentes continuam ativas até serem substituídas.</string>
+    <string name="smart_folder_start">Usar regras avançadas</string>
+    <string name="smart_folder_legacy">As regras simples continuam ativas até serem substituídas.</string>
     <string name="smart_folder_prototype">Apenas conversas carregadas. Desconhecido não significa «Nenhum».</string>
     <string name="smart_folder_all">Corresponder a todas</string>
     <string name="smart_folder_any">Corresponder a qualquer uma</string>
@@ -9,11 +9,9 @@
     <string name="smart_folder_add">Adicionar condição</string>
     <string name="smart_folder_group">Adicionar grupo</string>
     <string name="smart_folder_empty">Sem correspondências automáticas. Adicione uma condição ou inclua conversas manualmente.</string>
-    <string name="smart_folder_remove">Remover condição</string>
     <string name="smart_folder_remove_group">Remover grupo</string>
     <string name="smart_folder_ignore">Ignorar esta propriedade</string>
     <string name="smart_folder_edit_condition">Editar condição</string>
-    <string name="smart_folder_property">Propriedade</string>
     <string name="smart_folder_present">Presente</string>
     <string name="smart_folder_none">Nenhum</string>
     <string name="smart_folder_participants">Participantes</string>
@@ -40,7 +38,6 @@
     <string name="smart_folder_keyword_hint">Pesquisa no título sem distinguir maiúsculas</string>
     <string name="smart_folder_pending_hint">O SDK atual não consegue confirmar a ausência de mensagens de saída pendentes. Só uma última mensagem pendente comprova a presença; as outras conversas ficam por determinar.</string>
     <string name="smart_folder_negate_condition">Excluir correspondências (NÃO)</string>
-    <string name="smart_folder_manual_hint">As conversas incluídas manualmente permanecem sempre nesta pasta, mesmo sem corresponder às regras.</string>
     <string name="smart_folder_loaded_count">%1$d correspondências carregadas</string>
     <string name="smart_folder_unresolved">%1$d conversas carregadas têm dados de regras por determinar.</string>
     <string name="smart_folder_invalid">Estas regras são inválidas ou não são suportadas. As correspondências automáticas estão desativadas; substitua-as para editar.</string>
@@ -50,7 +47,7 @@
     <string name="smart_folder_preset_hint">Adicione Participantes para escolher um agente. Tudo lido não significa concluído.</string>
     <string name="smart_folder_limit">Até 4 níveis e 64 condições ou grupos.</string>
     <string name="smart_folder_include_match">Incluir correspondências</string>
-    <string name="smart_folder_edit_legacy">Editar regras existentes</string>
+    <string name="smart_folder_edit_legacy">Editar regras simples</string>
     <string name="smart_folder_empty_group">Adicione uma condição ou remova este grupo vazio antes de guardar.</string>
     <string name="smart_folder_unread_hint">Inclui a opção manual Marcar como não lida.</string>
     <plurals name="smart_folder_group_items">

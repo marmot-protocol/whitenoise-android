@@ -23,7 +23,7 @@ tracks the account-wide implementation, including evaluation before pagination.
 
 Advanced folders combine the already-loaded active and archived windows. Counts
 and previews cover those rows only. Paging and native visible-anchor reporting
-are disabled in this view; ordinary folders retain their existing window
+are disabled in this view after both windows return to their newest page; ordinary folders retain their existing window
 behavior. Full-account discovery and sorting before paging remain MDK work.
 
 The current SDK has no full outbox summary: a pending latest message proves
@@ -36,10 +36,14 @@ make no completion claim; add Participants to restrict one to a chosen agent.
 
 ## Existing folders
 
-Opening or renaming an existing folder preserves its legacy rules. Those rules
-remain editable in a collapsed section. Replace with advanced rules explicitly starts a
+New folders start in simple mode, retaining ordinary pagination for manual
+folders created from chat selections or group details. Use advanced rules is an
+explicit opt-in to the loaded-window prototype. Opening or renaming an existing
+folder preserves its legacy rules. Those rules
+remain editable in a collapsed section. Use advanced rules explicitly starts a
 new draft; its preview can be checked before Save. The previous legacy fields
 remain in the stored rule for a future explicit rollback. Unsupported payloads
 remain unchanged when only the name or manual inclusions are edited. Save publishes folder
 metadata, manual inclusions and the rule payload together using the existing
-account-scoped preference transaction. Cancel persists none of the draft.
+account-scoped preference transaction. Cancel persists none of the draft. The Included Chats picker always lists both
+loaded active and archived chats, independent of automatic rules.

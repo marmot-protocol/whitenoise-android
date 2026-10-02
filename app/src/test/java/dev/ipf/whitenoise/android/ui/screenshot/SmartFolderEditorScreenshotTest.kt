@@ -45,6 +45,8 @@ class SmartFolderEditorScreenshotTest {
 
     @Test fun absenceDialog() = capture("smart_folder_absence_dialog", dialog = true)
 
+    @Test fun manualFolder() = capture("smart_folder_manual")
+
     @Test fun empty() = capture("smart_folder_empty", empty = true)
 
     @Test
@@ -66,6 +68,7 @@ class SmartFolderEditorScreenshotTest {
         rtl: Boolean = false,
         rules: Boolean = false,
     ) {
+        val manual = name == "smart_folder_manual"
         val conditions =
             listOf(
                 SmartFolderFilter.Condition(
@@ -102,16 +105,16 @@ class SmartFolderEditorScreenshotTest {
                         state =
                             ChatFolderEditFormState(
                                 isNew = true,
-                                name = TextFieldState("Agent chats"),
-                                description = TextFieldState("All read"),
+                                name = TextFieldState(if (manual) "Personal" else "Agent chats"),
+                                description = TextFieldState(if (manual) "" else "All read"),
                                 keyword = TextFieldState(),
                                 unreadOnly = false,
                                 includeMuted = true,
                                 groupsOnly = false,
                                 archivedOnly = false,
                                 manualChatCount = 0,
-                                peopleCount = 1,
-                                previewCount = if (empty) 0 else 8,
+                                peopleCount = if (manual) 0 else 1,
+                                previewCount = if (empty || manual) 0 else 8,
                                 canSave = true,
                             ),
                         onUnreadOnlyChange = {},
@@ -130,7 +133,7 @@ class SmartFolderEditorScreenshotTest {
                         rulesContent = {
                             SmartFolderRulePanel(
                                 SmartFolderPanelState(
-                                    true,
+                                    !manual,
                                     root,
                                 ),
                                 listOf(WhiteNoisePickerItem("a".repeat(64), "Agent", "agent")),

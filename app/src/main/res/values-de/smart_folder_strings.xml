@@ -1,6 +1,6 @@
 <resources>
-    <string name="smart_folder_start">Durch erweiterte Regeln ersetzen</string>
-    <string name="smart_folder_legacy">Bestehende Regeln bleiben aktiv, bis du sie ersetzt.</string>
+    <string name="smart_folder_start">Erweiterte Regeln verwenden</string>
+    <string name="smart_folder_legacy">Einfache Regeln bleiben aktiv, bis du sie ersetzt.</string>
     <string name="smart_folder_prototype">Nur geladene Chats. Unbekannt bedeutet nicht „Keine“.</string>
     <string name="smart_folder_all">Alle erfüllen</string>
     <string name="smart_folder_any">Mindestens eine erfüllen</string>
@@ -9,11 +9,9 @@
     <string name="smart_folder_add">Bedingung hinzufügen</string>
     <string name="smart_folder_group">Gruppe hinzufügen</string>
     <string name="smart_folder_empty">Keine automatischen Treffer. Bedingung hinzufügen oder Chats manuell aufnehmen.</string>
-    <string name="smart_folder_remove">Bedingung entfernen</string>
     <string name="smart_folder_remove_group">Gruppe entfernen</string>
     <string name="smart_folder_ignore">Diese Eigenschaft ignorieren</string>
     <string name="smart_folder_edit_condition">Bedingung bearbeiten</string>
-    <string name="smart_folder_property">Eigenschaft</string>
     <string name="smart_folder_present">Vorhanden</string>
     <string name="smart_folder_none">Keine</string>
     <string name="smart_folder_participants">Teilnehmende</string>
@@ -40,7 +38,6 @@
     <string name="smart_folder_keyword_hint">Titelvergleich ohne Beachtung der Großschreibung</string>
     <string name="smart_folder_pending_hint">Das aktuelle SDK kann nicht bestätigen, dass keine ausgehende Nachricht aussteht. Nur eine ausstehende letzte Nachricht bestätigt das Vorhandensein; andere Chats bleiben ungeklärt.</string>
     <string name="smart_folder_negate_condition">Treffer ausschließen (NICHT)</string>
-    <string name="smart_folder_manual_hint">Manuell aufgenommene Chats bleiben immer in diesem Ordner, auch wenn Regeln nicht zutreffen.</string>
     <string name="smart_folder_loaded_count">%1$d geladene Treffer</string>
     <string name="smart_folder_unresolved">Bei %1$d geladenen Chats sind Regeldaten ungeklärt.</string>
     <string name="smart_folder_invalid">Dieser Regelsatz ist ungültig oder wird nicht unterstützt. Automatische Zuordnung ist deaktiviert; ersetze ihn zum Bearbeiten.</string>
@@ -50,7 +47,7 @@
     <string name="smart_folder_preset_hint">Füge Teilnehmende hinzu, um einen Agenten auszuwählen. Alles gelesen bedeutet nicht abgeschlossen.</string>
     <string name="smart_folder_limit">Bis zu 4 Ebenen und 64 Bedingungen oder Gruppen.</string>
     <string name="smart_folder_include_match">Treffer einschließen</string>
-    <string name="smart_folder_edit_legacy">Bestehende Regeln bearbeiten</string>
+    <string name="smart_folder_edit_legacy">Einfache Regeln bearbeiten</string>
     <string name="smart_folder_empty_group">Füge eine Bedingung hinzu oder entferne diese leere Gruppe vor dem Speichern.</string>
     <string name="smart_folder_unread_hint">Umfasst manuelles Als ungelesen markieren.</string>
     <plurals name="smart_folder_group_items">

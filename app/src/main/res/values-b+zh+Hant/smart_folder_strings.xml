@@ -1,6 +1,6 @@
 <resources>
-    <string name="smart_folder_start">取代為進階規則</string>
-    <string name="smart_folder_legacy">現有規則會繼續生效，直到您將其取代。</string>
+    <string name="smart_folder_start">使用進階規則</string>
+    <string name="smart_folder_legacy">簡單規則會持續生效，直到被取代。</string>
     <string name="smart_folder_prototype">僅比對已載入的聊天。未知不等於「無」。</string>
     <string name="smart_folder_all">符合全部</string>
     <string name="smart_folder_any">符合任一</string>
@@ -9,11 +9,9 @@
     <string name="smart_folder_add">新增條件</string>
     <string name="smart_folder_group">新增群組</string>
     <string name="smart_folder_empty">沒有自動比對結果。請新增條件或手動加入聊天。</string>
-    <string name="smart_folder_remove">移除條件</string>
     <string name="smart_folder_remove_group">移除群組</string>
     <string name="smart_folder_ignore">忽略此屬性</string>
     <string name="smart_folder_edit_condition">編輯條件</string>
-    <string name="smart_folder_property">屬性</string>
     <string name="smart_folder_present">有</string>
     <string name="smart_folder_none">無</string>
     <string name="smart_folder_participants">參與者</string>
@@ -40,7 +38,6 @@
     <string name="smart_folder_keyword_hint">標題比對不區分大小寫</string>
     <string name="smart_folder_pending_hint">目前 SDK 無法確認沒有待傳送訊息。只有最後一則訊息處於待傳送狀態時才能證明其存在；其他聊天仍無法確定。</string>
     <string name="smart_folder_negate_condition">排除比對結果（非）</string>
-    <string name="smart_folder_manual_hint">手動加入的聊天會始終保留在此資料夾中，即使不符合規則。</string>
     <string name="smart_folder_loaded_count">%1$d 個已載入的比對結果</string>
     <string name="smart_folder_unresolved">%1$d 個已載入聊天的規則資料無法確定。</string>
     <string name="smart_folder_invalid">此規則集無效或不受支援。自動比對已停用；請取代規則集以編輯。</string>
@@ -50,7 +47,7 @@
     <string name="smart_folder_preset_hint">新增參與者以選擇代理。全部已讀不代表已完成。</string>
     <string name="smart_folder_limit">最多 4 層和 64 個條件或群組。</string>
     <string name="smart_folder_include_match">包含比對結果</string>
-    <string name="smart_folder_edit_legacy">編輯現有規則</string>
+    <string name="smart_folder_edit_legacy">編輯簡單規則</string>
     <string name="smart_folder_empty_group">儲存前請新增條件或移除此空群組。</string>
     <string name="smart_folder_unread_hint">包含手動標記為未讀的狀態。</string>
     <plurals name="smart_folder_group_items">

@@ -17,6 +17,7 @@ import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
+import dev.ipf.whitenoise.android.state.allLoadedFolderChats
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -100,6 +101,30 @@ class SmartFolderMatchingTest {
         assertEquals(FolderTruth.UNKNOWN, matches(excludes.copy(not = true), pending))
         assertEquals(FolderTruth.UNKNOWN, matches(excludes, item("g", members = emptyList())))
         assertEquals(FolderTruth.TRUE, matches(any, item("g", otherMember = agent)))
+    }
+
+    @Test fun selfOnlyDirectRosterCannotProveAnUnresolvedPeerIsAbsent() {
+        val row = item("dm", members = listOf(other), dm = true, otherMember = null)
+        val any = condition(FolderField.PARTICIPANTS, FolderMode.ANY_OF, setOf(agent))
+        val all = condition(FolderField.PARTICIPANTS, FolderMode.ALL_OF, setOf(agent, other))
+        val excludes = condition(FolderField.PARTICIPANTS, FolderMode.EXCLUDES, setOf(agent))
+        assertEquals(FolderTruth.UNKNOWN, matches(any, row))
+        assertEquals(FolderTruth.UNKNOWN, matches(all, row))
+        assertEquals(FolderTruth.UNKNOWN, matches(excludes, row))
+        assertEquals(FolderTruth.UNKNOWN, matches(excludes.copy(not = true), row))
+        assertEquals(FolderTruth.TRUE, matches(all, row.copy(otherMemberAccount = agent)))
+        assertEquals(FolderTruth.TRUE, matches(excludes, row.copy(otherMemberAccount = other)))
+    }
+
+    @Test fun manualPickerUnionRetainsActiveRowsEvenForArchivedRules() {
+        val active = item("ACTIVE")
+        val archived = item("archived", archived = true)
+        val rule = ChatFolderRule(archivedOnly = true)
+        assertEquals(listOf(archived), chatFolderSource(rule, listOf(active), listOf(archived)))
+        assertEquals(
+            listOf("ACTIVE", "archived"),
+            allLoadedFolderChats(listOf(active), listOf(active, archived)).map { it.id },
+        )
     }
 
     @Test fun unknownPropagatesUnlessAnotherBranchDeterminesTheResult() {

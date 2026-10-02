@@ -174,10 +174,16 @@ internal fun chatFolderSource(
     archived: List<ChatListItem>,
 ): List<ChatListItem> =
     when {
-        rule?.smartFilter != null -> sortChatListItems((active + archived).distinctBy { it.foldedId })
+        rule?.smartFilter != null -> allLoadedFolderChats(active, archived)
         rule?.archivedOnly == true -> archived
         else -> active
     }
+
+/** Manual selection always includes both loaded windows, independent of automatic rule constraints. */
+internal fun allLoadedFolderChats(
+    active: List<ChatListItem>,
+    archived: List<ChatListItem>,
+): List<ChatListItem> = sortChatListItems((active + archived).distinctBy { it.foldedId })
 
 /** Used only for unresolved-roster presentation; matching remains unknown until authoritative data arrives. */
 internal fun SmartFolderFilter.references(field: FolderField): Boolean =

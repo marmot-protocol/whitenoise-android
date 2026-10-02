@@ -129,10 +129,10 @@ private fun folderParticipants(
     item: ChatListItem,
 ): Boolean? {
     val roster = item.memberSnapshot
-    val complete = roster?.members?.isNotEmpty() == true
     // Never copy the full roster for every condition; lookup only the selected keys.
     val ids = roster?.foldedMemberIds.orEmpty()
     val peer = item.otherMemberAccount?.let(::localeInvariantFold)
+    val complete = folderRosterComplete(item, peer)
     val found = condition.values.count { it in ids || it == peer }
     return when (condition.mode) {
         FolderMode.ANY_OF ->
@@ -162,3 +162,15 @@ private fun folderParticipants(
         else -> null
     }
 }
+
+/** A DM roster may enumerate only self; an unresolved counterpart cannot prove absence. */
+private fun folderRosterComplete(
+    item: ChatListItem,
+    peer: String?,
+): Boolean =
+    item.memberSnapshot?.members?.isNotEmpty() == true &&
+        when (item.projection?.conversationKind) {
+            ChatConversationKindFfi.GROUP -> true
+            ChatConversationKindFfi.DIRECT -> peer != null
+            else -> false
+        }

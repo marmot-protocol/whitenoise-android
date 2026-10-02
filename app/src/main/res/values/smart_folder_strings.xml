@@ -1,6 +1,6 @@
 <resources>
-  <string name="smart_folder_start">Replace with advanced rules</string>
-  <string name="smart_folder_legacy">Existing rules stay in use until you replace them.</string>
+  <string name="smart_folder_start">Use advanced rules</string>
+  <string name="smart_folder_legacy">Simple rules stay in use until you replace them.</string>
   <string name="smart_folder_prototype">Matches loaded chats only. Unknown is not “None”.</string>
   <string name="smart_folder_all">Match all</string>
   <string name="smart_folder_any">Match any</string>
@@ -9,11 +9,9 @@
   <string name="smart_folder_add">Add condition</string>
   <string name="smart_folder_group">Add group</string>
   <string name="smart_folder_empty">No automatic matches. Add a condition or include chats manually.</string>
-  <string name="smart_folder_remove">Remove condition</string>
   <string name="smart_folder_remove_group">Remove group</string>
   <string name="smart_folder_ignore">Ignore this property</string>
-  <string name="smart_folder_edit_condition">Condition</string>
-  <string name="smart_folder_property">Property</string>
+  <string name="smart_folder_edit_condition">Edit condition</string>
   <string name="smart_folder_present">Present</string>
   <string name="smart_folder_none">None</string>
   <string name="smart_folder_participants">Participants</string>
@@ -40,7 +38,6 @@
   <string name="smart_folder_keyword_hint">Case-insensitive title match</string>
   <string name="smart_folder_pending_hint">The current SDK cannot verify that no outgoing message is pending. Only a pending latest message proves presence; other rows stay unresolved.</string>
   <string name="smart_folder_negate_condition">Exclude matches (NOT)</string>
-  <string name="smart_folder_manual_hint">Included chats always stay in this folder, even when rules do not match.</string>
   <string name="smart_folder_loaded_count">%1$d loaded matches</string>
   <string name="smart_folder_unresolved">%1$d loaded chats have unresolved rule data.</string>
   <string name="smart_folder_invalid">This rule set is unsupported or invalid. Automatic matching is disabled; replace it to edit.</string>
@@ -50,7 +47,7 @@
   <string name="smart_folder_preset_hint">Add Participants to choose an agent. All read does not mean finished.</string>
   <string name="smart_folder_limit">Up to 4 levels and 64 conditions or groups.</string>
     <string name="smart_folder_include_match">Include matches</string>
-    <string name="smart_folder_edit_legacy">Edit existing rules</string>
+    <string name="smart_folder_edit_legacy">Edit simple rules</string>
     <string name="smart_folder_empty_group">Add a condition or remove this empty group before saving.</string>
     <string name="smart_folder_unread_hint">Includes manual Mark unread.</string>
     <plurals name="smart_folder_group_items">

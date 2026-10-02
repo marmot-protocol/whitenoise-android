@@ -1,13 +1,22 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.references
+import dev.ipf.whitenoise.android.state.returnChatListToTop
+
+/** Restore the newest loaded windows before the prototype disables native paging and anchor reports. */
+internal suspend fun ChatsController.returnSmartFolderWindowsToTop() {
+    returnChatListToTop(ChatListViewFfi.CHATS)
+    returnChatListToTop(ChatListViewFfi.ARCHIVED)
+}
 
 /**
  * One renderable chat-list chip. `All` is not modeled here: it is the
