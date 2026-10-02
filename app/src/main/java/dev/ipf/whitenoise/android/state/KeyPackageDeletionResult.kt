@@ -58,7 +58,13 @@ internal suspend fun deleteKeyPackageThroughSafeSourceRelays(
     accountStillActive: () -> Boolean = { true },
     delete: suspend (List<String>) -> Unit,
 ): KeyPackageDeletionResult =
-    Dispatchers.IO.deleteKeyPackageThroughSafeSourceRelays(sourceRelays, classify, resolve, accountStillActive, delete)
+    Dispatchers.IO.deleteKeyPackageThroughSafeSourceRelays(
+        sourceRelays,
+        classify,
+        resolve,
+        accountStillActive,
+        delete,
+    )
 
 /** Runs the same verification boundary on an explicit dispatcher for deterministic deadline tests. */
 internal suspend fun CoroutineDispatcher.deleteKeyPackageThroughSafeSourceRelays(
