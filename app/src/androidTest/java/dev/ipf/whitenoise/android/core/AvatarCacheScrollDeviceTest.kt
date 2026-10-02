@@ -149,8 +149,14 @@ class AvatarCacheScrollDeviceTest {
         AvatarCacheDiagnostics.stop()
         assertTrue("small fixture never filled profile cache", cold.delta.profile.fetchCalls > 16)
         assertTrue("small fixture never filled group cache", cold.delta.group.fetchCalls > 16)
-        assertTrue("256 px profile images should remain cached", reverse.delta.profile.fetchCalls == 0L && repeated.delta.profile.fetchCalls == 0L)
-        assertTrue("256 px group images should remain cached", reverse.delta.group.fetchCalls == 0L && repeated.delta.group.fetchCalls == 0L)
+        assertTrue(
+            "256 px profile images should remain cached",
+            reverse.delta.profile.fetchCalls == 0L && repeated.delta.profile.fetchCalls == 0L,
+        )
+        assertTrue(
+            "256 px group images should remain cached",
+            reverse.delta.group.fetchCalls == 0L && repeated.delta.group.fetchCalls == 0L,
+        )
         Log.i(AVATAR_BENCH_TAG, "small_completed cold=$cold reverse=$reverse repeated=$repeated")
     }
 
@@ -167,8 +173,7 @@ class AvatarCacheScrollDeviceTest {
         var swipes = 0
         try {
             while (swipes < 12) {
-                val index = composeRule.runOnIdle { state.firstVisibleItemIndex }
-                if (if (down) index >= AVATAR_FIXTURE_COUNT - 8 else index == 0) break
+                if (isAtScrollBoundary(state, down)) break
                 directSwipe(down)
                 swipes++
             }
@@ -177,7 +182,7 @@ class AvatarCacheScrollDeviceTest {
             frames.close()
         }
         val terminalIndex = composeRule.runOnIdle { state.firstVisibleItemIndex }
-        assertTrue("fixture did not traverse the list: $terminalIndex", if (down) terminalIndex >= 32 else terminalIndex == 0)
+        assertTrue("fixture did not reach its scroll boundary: $terminalIndex", isAtScrollBoundary(state, down))
         return AvatarPassSample(
             name = name,
             startIndex = startIndex,
@@ -210,7 +215,15 @@ class AvatarCacheScrollDeviceTest {
                     12 -> MotionEvent.ACTION_UP
                     else -> MotionEvent.ACTION_MOVE
                 }
-            val event = MotionEvent.obtain(startedAt, startedAt + step * 50L, action, x, startY + (endY - startY) * step / 12f, 0)
+            val event =
+                MotionEvent.obtain(
+                    startedAt,
+                    startedAt + step * 50L,
+                    action,
+                    x,
+                    startY + (endY - startY) * step / 12f,
+                    0,
+                )
             event.source = InputDevice.SOURCE_TOUCHSCREEN
             assertTrue("touch injection failed", automation.injectInputEvent(event, true))
             event.recycle()
@@ -218,6 +231,12 @@ class AvatarCacheScrollDeviceTest {
         }
         SystemClock.sleep(250L)
     }
+
+    /** Reads the actual list boundary after touch movement settles. */
+    private fun isAtScrollBoundary(
+        state: LazyListState,
+        down: Boolean,
+    ): Boolean = composeRule.runOnIdle { if (down) !state.canScrollForward else !state.canScrollBackward }
 
     /** Scrolls one direction while recording cache deltas, rendered-frame time, and process memory. */
     private fun measurePass(
@@ -231,10 +250,8 @@ class AvatarCacheScrollDeviceTest {
         var swipes = 0
         val frames = WindowFrameSampler(composeRule.activity.window)
         try {
-            repeat(24) {
-                val index = composeRule.runOnIdle { state.firstVisibleItemIndex }
-                val reachedEnd = if (down) index >= AVATAR_FIXTURE_COUNT - 8 else index == 0
-                if (reachedEnd) return@repeat
+            while (swipes < 24) {
+                if (isAtScrollBoundary(state, down)) break
                 swipes++
                 composeRule.onNodeWithTag("avatar-fixture-list").performTouchInput {
                     val high = Offset(centerX, height * 0.30f)
@@ -251,8 +268,8 @@ class AvatarCacheScrollDeviceTest {
         }
         val terminalIndex = composeRule.runOnIdle { state.firstVisibleItemIndex }
         assertTrue(
-            "fixture did not traverse the list: $terminalIndex",
-            if (down) terminalIndex >= 32 else terminalIndex == 0,
+            "fixture did not reach its scroll boundary: $terminalIndex",
+            isAtScrollBoundary(state, down),
         )
         val sample =
             AvatarPassSample(

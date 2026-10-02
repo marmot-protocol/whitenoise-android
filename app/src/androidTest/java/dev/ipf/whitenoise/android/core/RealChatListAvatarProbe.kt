@@ -61,7 +61,10 @@ class RealChatListAvatarProbe {
         val reverse = measure("reverse_up", down = false)
         val repeated = measure("repeat_down", down = true)
         AvatarCacheDiagnostics.stop()
-        Log.i(REAL_AVATAR_PROBE_TAG, "complete source=${BuildConfig.APP_SHORT_SHA} cold=$cold reverse=$reverse repeated=$repeated")
+        Log.i(
+            REAL_AVATAR_PROBE_TAG,
+            "complete source=${BuildConfig.APP_SHORT_SHA} cold=$cold reverse=$reverse repeated=$repeated",
+        )
         assertTrue("no frames captured", cold.frames.count > 0 && reverse.frames.count > 0 && repeated.frames.count > 0)
     }
 
@@ -151,7 +154,11 @@ private data class RealAvatarPass(
 )
 
 /** Subtracts only aggregate counters, without retaining cache keys. */
-private fun AvatarCacheSnapshot.minus(other: AvatarCacheSnapshot) = AvatarCacheSnapshot(profile.minus(other.profile), group.minus(other.group))
+private fun AvatarCacheSnapshot.minus(other: AvatarCacheSnapshot) =
+    AvatarCacheSnapshot(
+        profile.minus(other.profile),
+        group.minus(other.group),
+    )
 
 /** Calculates one cache's hit, miss, capacity-eviction, and fetch deltas. */
 private fun AvatarCacheCounts.minus(other: AvatarCacheCounts) =
@@ -198,6 +205,11 @@ private class RealWindowFrameSampler(
     fun summary(): RealFrameSummary {
         val sorted = durations.sorted()
         if (sorted.isEmpty()) return RealFrameSummary(0, 0, 0, 0)
-        return RealFrameSummary(sorted.size, sorted[sorted.size / 2], sorted[((sorted.size * 0.95).toInt()).coerceAtMost(sorted.lastIndex)], sorted.last())
+        return RealFrameSummary(
+            sorted.size,
+            sorted[sorted.size / 2],
+            sorted[((sorted.size * 0.95).toInt()).coerceAtMost(sorted.lastIndex)],
+            sorted.last(),
+        )
     }
 }

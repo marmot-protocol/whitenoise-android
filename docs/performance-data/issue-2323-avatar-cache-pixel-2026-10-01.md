@@ -30,7 +30,9 @@ Build the isolated preview app and test APK with `PR_NUMBER=2323 PR_PREVIEW_CHAN
 
 ## October 2 follow-up: actual Dev list and matched synthetic controls
 
-The user selected the available stock Pixel 9 Pro XL in place of GrapheneOS and authorized an aggregate-only probe of the existing Dev chat list. The Pixel was `46131FDAS003CG`, Android 17 `CP3A.260905.009`, 360 dpi, with a 256 MiB heap class. Source was `b79fb71443aaa0cef5c57c6705aaa614d920dcd8` plus the test-only changes in this PR. The real-list Dev APK (`ba064de6b6bc08481d21b3f2bef489f9733388c5d38942d3c71433ed344a4dac`) retained the installed package, version, signing certificate, and native library. A private backup was taken before its in-place install; no app was uninstalled or cleared. The real-list test APK was `3a50b34f5b07c77bb4cdc2c778bcb55ecb6eebb885b9eede1ebc774e6dff15d6`. The opt-in test passed once. Its five swipes per direction did not assert a list endpoint, so these are observed-window measurements, not proof of full-list coverage.
+The October 1 fixture above used a fixed index threshold and included gestures after reaching the list boundary. Its cache counts remain evidence of eviction, but its frame and elapsed-time values are superseded by the boundary-checked runs below.
+
+The user selected the available stock Pixel 9 Pro XL in place of GrapheneOS and authorized an aggregate-only probe of the existing Dev chat list. The Pixel ran Android 17 `CP3A.260905.009` at 360 dpi, with a 256 MiB heap class. Source was `b79fb71443aaa0cef5c57c6705aaa614d920dcd8` plus the test-only changes in this PR. The real-list Dev APK (`ba064de6b6bc08481d21b3f2bef489f9733388c5d38942d3c71433ed344a4dac`) retained the installed package, version, signing certificate, and native library. A private backup was taken before its in-place install; no app was uninstalled or cleared. The real-list test APK was `3a50b34f5b07c77bb4cdc2c778bcb55ecb6eebb885b9eede1ebc774e6dff15d6`. The opt-in test passed once. Its five swipes per direction did not assert a list endpoint, so these are observed-window measurements, not proof of full-list coverage.
 
 | Existing Dev list pass | Profile hit / miss / eviction / fetch / decode / dedup | Group hit / miss / eviction / fetch / decode / dedup | Frames, median / p95 / max | PSS KiB | Whole-app UID RX / TX bytes |
 | --- | --- | --- | --- | ---: | ---: |
@@ -40,23 +42,21 @@ The user selected the available stock Pixel 9 Pro XL in place of GrapheneOS and 
 
 The observed account did not fill either cache; seven profile adapter reads occurred on the cold pass and none on return. No group image appeared in the measured window. UID traffic covers the whole app, including relay traffic, and cannot be attributed to avatar HTTP. No content, image, URL, account ID, or chat name was logged.
 
-The revised isolated fixture kept the same 48 rows and touch coordinates, moved from item 0 to 34 with 12 down swipes and back to 0 with 7 reverse swipes, and recorded 512 px images, 256 px *source* images, and empty avatar boxes. The isolated app APK SHA-256 was `542846ca2dc8d8cfd7d3175e16c8ed673e4ee7101af8369ced9d83d4cf459dd0`; the final test APK was `0c9c27e1c831c716cad71618154aa8fd57ca36dd1ee2ac5407fc1c0038262fef`. All three tests passed on the Pixel with that test APK. The 256 px source models the memory upper bound of a smaller decode; it is not a production loader change or a complete quality comparison.
+The corrected isolated fixture kept the same 48 rows and touch coordinates, but used `canScrollForward`/`canScrollBackward` to stop at actual list boundaries. Every pass started at item 0 or 34 and finished at the opposite boundary. It compared 512 px images, 256 px *source* images, and empty avatar boxes. The isolated app APK SHA-256 was `542846ca2dc8d8cfd7d3175e16c8ed673e4ee7101af8369ced9d83d4cf459dd0`; the corrected test APK was `9fc4615a7af0e447fda15498de4d7a1108ad626db9ca468d3bb826e2015ac52d`. All three tests passed on the Pixel with this APK. The 256 px source models smaller decoded pixels; it is not a production loader change or a quality comparison.
 
-| Fixture / pass | Profile fetch / decode / eviction | Group fetch / decode / eviction | Frames, median / p95 / max | PSS KiB |
-| --- | --- | --- | --- | ---: |
-| 512 px cold down | 34 / 34 / 32 | 34 / 34 / 32 | 124, 7 / 27 / 133 ms | 426,272 |
-| 512 px reverse up | 31 / 31 / 31 | 31 / 31 / 31 | 40, 7 / 66 / 87 ms | 421,377 |
-| 512 px repeat down | 32 / 32 / 32 | 32 / 32 / 32 | 127, 6 / 35 / 70 ms | 429,833 |
-| 256 px cold down | 34 / 34 / 0 | 34 / 34 / 0 | 120, 7 / 74 / 127 ms | 299,421 |
-| 256 px reverse up | 0 / 0 / 0 | 0 / 0 / 0 | 36, 7 / 56 / 65 ms | 302,750 |
-| 256 px repeat down | 0 / 0 / 0 | 0 / 0 / 0 | 126, 6 / 20 / 78 ms | 307,432 |
-| Empty cold down | 0 / 0 / 0 | 0 / 0 / 0 | 116, 6 / 82 / 101 ms | 233,139 |
-| Empty reverse up | 0 / 0 / 0 | 0 / 0 / 0 | 31, 5 / 53 / 63 ms | 234,892 |
-| Empty repeat down | 0 / 0 / 0 | 0 / 0 / 0 | 116, 6 / 34 / 54 ms | 238,172 |
+| Fixture / pass | Swipes | Profile fetch / decode / eviction | Group fetch / decode / eviction | Frames, median / p95 / max | PSS KiB |
+| --- | ---: | --- | --- | --- | ---: |
+| 512 px cold down | 7 | 34 / 34 / 32 | 34 / 34 / 32 | 36, 8 / 163 / 237 ms | 426,852 |
+| 512 px reverse up | 7 | 31 / 31 / 31 | 31 / 31 / 31 | 40, 5 / 64 / 94 ms | 439,272 |
+| 512 px repeat down | 11 | 32 / 32 / 32 | 32 / 32 / 32 | 41, 6 / 59 / 63 ms | 440,344 |
+| 256 px cold down | 7 | 34 / 34 / 0 | 34 / 34 / 0 | 32, 10 / 198 / 237 ms | 298,641 |
+| 256 px reverse up | 7 | 0 / 0 / 0 | 0 / 0 / 0 | 35, 8 / 110 / 132 ms | 301,904 |
+| 256 px repeat down | 7 | 0 / 0 / 0 | 0 / 0 / 0 | 36, 8 / 94 / 102 ms | 306,860 |
+| Empty cold down | 7 | 0 / 0 / 0 | 0 / 0 / 0 | 29, 6 / 120 / 127 ms | 236,912 |
+| Empty reverse up | 7 | 0 / 0 / 0 | 0 / 0 / 0 | 32, 6 / 78 / 108 ms | 232,762 |
+| Empty repeat down | 7 | 0 / 0 / 0 | 0 / 0 / 0 | 29, 6 / 83 / 88 ms | 234,888 |
 
-The 512 px pass was also run once before the final test APK with the same gesture code. Counts were the same within one adapter invocation; cold p95 was 77 ms and repeat p95 was 26 ms. The empty control's p95 also varied between runs (cold 15 then 82 ms; repeat 16 then 34 ms). Reverse captured only 31–40 frames in the direct-touch tests, so its percentile is particularly noisy. These observations do not isolate a frame-time penalty caused by cache eviction. The smaller source eliminated synthetic return-pass adapter work and lowered synthetic PSS, but it does not establish an HTTP or battery saving in an actual chat list. The 512 px adapter calls used a synthetic supplier; no network request was counted.
-
-An assertion-only follow-up of the 256 px fixture passed with test APK SHA-256 `5ed837299ff4b2d1b644893188a8dfe92844842043b814a5165f5d223a7e511e`: cold loaded 34 keys per cache, and reverse/repeat had zero adapter calls or evictions. Its frame p95 was 155 / 101 / 77 ms, despite zero return-pass fetches. These runs cannot attribute the observed frame tail to evictions.
+The 512 px repeat needed 11 gestures in the captured run, so even the boundary-checked fixture is not a matched-duration frame experiment. Each frame percentile has only 29–41 rendered frames. A second corrected 512 px run reached both boundaries in seven swipes per pass, with repeat p95 107 ms; the profile/group return-pass adapter counts were unchanged. A prior 256 px run had zero return-pass fetches yet a repeat p95 of 77 ms. The no-avatar control also had long frame tails. These observations do not isolate a frame-time penalty caused by cache eviction. The smaller source eliminated synthetic return-pass adapter work and reduced synthetic PSS, but it does not establish an HTTP or battery saving in an actual chat list. The 512 px adapter calls used a synthetic supplier; no network request was counted.
 
 ### Updated decision for #2323
 
