@@ -968,6 +968,9 @@ kover {
         createVariant("statePackageFloor") {
             add("devZapstoreDebug")
         }
+        createVariant("runtimeListenerTeardownFloor") {
+            add("devZapstoreDebug")
+        }
     }
     reports {
         filters {
@@ -1015,6 +1018,23 @@ kover {
             verify {
                 rule("dev.ipf.whitenoise.android.state line floor") {
                     minBound(63, CoverageUnit.LINE, AggregationType.COVERED_PERCENTAGE)
+                }
+            }
+        }
+        variant("runtimeListenerTeardownFloor") {
+            filters {
+                includes {
+                    classes("dev.ipf.whitenoise.android.state.AppRuntimeListenerTeardownOwner*")
+                }
+            }
+            verify {
+                // Focused production-delegation measurement: 16/17 eligible lines (94.1176%)
+                // and zero eligible branches. Keep the resource bracket inline; its
+                // cleanup still contributes covered lines to this owner family.
+                // Production tests also require the owner and observe both delegations,
+                // so pure owner tests cannot mask an AppState bypass.
+                rule("runtime listener teardown owner line floor") {
+                    minBound(94, CoverageUnit.LINE, AggregationType.COVERED_PERCENTAGE)
                 }
             }
         }
@@ -1218,6 +1238,7 @@ afterEvaluate {
 tasks.configureEach {
     if (name == "koverVerifyDevZapstoreDebug") {
         dependsOn("koverVerifyStatePackageFloor")
+        dependsOn("koverVerifyRuntimeListenerTeardownFloor")
     }
 }
 
