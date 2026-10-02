@@ -18,7 +18,7 @@ private const val COVERAGE_TEST_SUFFIX = "CoverageTest.kt"
 private const val REGISTRY_COLUMNS = 3
 private val gateCell = Regex("""^\[`([A-Za-z0-9_]+)`]\(\.\./([^)\s]+)\)$""")
 private val skippedDirectories = setOf("build", "node_modules")
-private val testSourceRoots = listOf("app/src/test/", "app/src/androidTest/")
+private val gateRoots = listOf("app/src/test/", "app/src/androidTest/")
 
 /**
  * Parses the marked registry table into rows, failing on any malformed row so a typo cannot silently
@@ -97,8 +97,7 @@ private fun InvariantGateRow.rowError(exists: (String) -> Boolean): String? =
  * True when [path] is a Kotlin file under a test source set with no `..` segment, so production code, tooling and
  * escaped paths can never be registered as gates. Mirrors `isTestSourcePath` in `check-invariant-gate.js`.
  */
-private fun isTestSourcePath(path: String): Boolean =
-    testSourceRoots.any(path::startsWith) && path.endsWith(".kt") && ".." !in path.split('/')
+private fun isTestSourcePath(p: String) = gateRoots.any(p::startsWith) && p.endsWith(".kt") && ".." !in p.split('/')
 
 /** Finds every `*CoverageTest.kt` under [root], skipping hidden and generated directories, as relative paths. */
 internal fun discoverCoverageTests(root: File): Set<String> =
