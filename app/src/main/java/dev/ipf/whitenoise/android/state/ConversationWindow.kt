@@ -82,6 +82,20 @@ internal class ConversationWindowState {
         this.frame = frame
     }
 
+    /**
+     * Messages whose reaction references in [next] differ from the installed frame's. Window rows carry
+     * reactions only in this sidecar (the compatibility timeline record's summary is always empty), so a
+     * reaction added or removed by someone else never changes the row itself, and an extended window
+     * must recompute these tallies on top of the rows it re-projected (#2990). Rows [next] no longer
+     * retains are left alone: their retained tallies stay until the window covers them again.
+     */
+    fun reactionReferenceChanges(next: ConversationWindowFrame): Set<String> {
+        val previous = frame?.references
+        return next.references.entries
+            .filter { (messageIdHex, references) -> previous?.get(messageIdHex)?.reactions != references.reactions }
+            .mapTo(linkedSetOf()) { it.key }
+    }
+
     /** Forgets the frame when the window is retired. */
     fun clear() {
         frame = null
@@ -408,12 +422,18 @@ internal fun reactionTalliesForWindow(
         }.filterValues { it.isNotEmpty() }
 }
 
-/** Installs the sidecar that belongs to the page just applied and warms the previewed reactor identities. */
-internal fun ConversationController.installWindowFrame(frame: ConversationWindowFrame?) {
-    if (frame == null) return
+/**
+ * Installs the sidecar that belongs to the page just applied and warms the previewed reactor identities.
+ * Returns the messages whose reaction references changed against the frame installed before, so the
+ * caller can recompute exactly those tallies; empty when there is no frame to install.
+ */
+internal fun ConversationController.installWindowFrame(frame: ConversationWindowFrame?): Set<String> {
+    if (frame == null) return emptySet()
+    val reactionChanges = window.reactionReferenceChanges(frame)
     window.install(frame)
     val reactors = frame.references.values.flatMap { it.reactions.items.flatMap { item -> item.reactors } }
     if (reactors.isNotEmpty()) appState.requestProfiles(reactors.distinct())
+    return reactionChanges
 }
 
 /**
