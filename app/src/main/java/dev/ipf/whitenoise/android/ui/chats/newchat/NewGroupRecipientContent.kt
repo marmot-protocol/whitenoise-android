@@ -51,6 +51,7 @@ internal fun NewGroupRecipientContent(
     incomplete: Boolean,
     actions: NewGroupRecipientActions,
     isValidNpub: (String) -> Boolean,
+    addressLookupFailed: Boolean = false,
 ) {
     SettingsScaffold(
         title = stringResource(R.string.new_group),
@@ -95,6 +96,7 @@ internal fun NewGroupRecipientContent(
                 }
             }
             item { SettingsSection(stringResource(R.string.new_message_people)) }
+            if (addressLookupFailed) item { RecipientAddressLookupFeedback(false, actions.retry) }
             if (searching) item { UserSearchStatusRow(R.string.user_search_searching, showProgress = true) }
             if (failed || incomplete) {
                 item {

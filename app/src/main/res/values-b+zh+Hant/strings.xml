@@ -2138,4 +2138,6 @@
     <string name="couldnt_check_invitation">無法檢查邀請</string>
     <string name="toast_leave_not_confirmed_history_kept">尚未確認退出。歷史記錄已保留。</string>
     <string name="delete_local_does_not_leave">此操作不會退出對話。</string>
+    <string name="user_search_address_unverified">無法驗證此地址。</string>
+    <string name="user_search_address_result">地址未驗證</string>
 </resources>

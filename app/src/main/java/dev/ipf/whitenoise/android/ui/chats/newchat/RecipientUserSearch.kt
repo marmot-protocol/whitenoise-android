@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -52,6 +53,7 @@ internal data class RecipientSearchRequestKey(
     val activeAccountIdHex: String?,
     val relationshipRevision: Long,
     val retryKey: Int = 0,
+    val runtimeGeneration: Int = 0,
 )
 
 internal data class RecipientSearchProgress(
@@ -161,7 +163,7 @@ internal fun UserSearchStatusRow(
 }
 
 /**
- * Runs one lifecycle-bound Marmot user search for the current plain-text query.
+ * Runs one lifecycle-bound Marmot user search for a name or NIP-05 query.
  * Replacing the query or leaving the screen cancels the traversal and closes
  * its native subscription; no discovered people are persisted by Android.
  */
@@ -174,46 +176,50 @@ internal fun rememberRecipientUserSearchState(
     val trimmed = query.trim()
     val activeAccountRef = appState.activeAccountRef
     val activeAccountIdHex = appState.activeAccount?.accountIdHex
+    val requestKey =
+        RecipientSearchRequestKey(
+            query = trimmed,
+            activeAccountRef = activeAccountRef,
+            activeAccountIdHex = activeAccountIdHex,
+            relationshipRevision = appState.relationshipRevision,
+            retryKey = retryKey,
+            runtimeGeneration = appState.runtimeGeneration,
+        )
     val rawState =
-        produceState(
-            initialValue = RecipientUserSearchState(),
-            key1 =
-                RecipientSearchRequestKey(
-                    query = trimmed,
-                    activeAccountRef = activeAccountRef,
-                    activeAccountIdHex = activeAccountIdHex,
-                    relationshipRevision = appState.relationshipRevision,
-                    retryKey = retryKey,
-                ),
-        ) {
-            if (trimmed.isEmpty() || !isPlainNameQuery(trimmed, appState::accountIdHexForMention)) {
-                value = RecipientUserSearchState()
-                return@produceState
-            }
-            if (activeAccountRef == null || activeAccountIdHex == null) {
-                value = RecipientUserSearchState()
-                return@produceState
-            }
+        key(requestKey) {
+            produceState(
+                initialValue = RecipientUserSearchState(),
+                key1 = requestKey,
+            ) {
+                if (trimmed.isEmpty() || !usesRecipientDirectorySearch(trimmed, appState::accountIdHexForMention)) {
+                    value = RecipientUserSearchState()
+                    return@produceState
+                }
+                if (activeAccountRef == null || activeAccountIdHex == null) {
+                    value = RecipientUserSearchState()
+                    return@produceState
+                }
 
-            // Pending before the debounce elapses, not after — otherwise a query with
-            // no local matches reads as a completed empty search for 300 ms.
-            value = RecipientUserSearchState(isSearching = true)
-            delay(USER_SEARCH_DEBOUNCE_MILLIS)
-            try {
-                val followedIds =
-                    awaitCurrentRecipientSearchValue {
-                        loadRecipientSearchFollowIds {
-                            appState.marmotIo { accountFollows(activeAccountRef) }
+                // Pending before the debounce elapses, not after — otherwise a query with
+                // no local matches reads as a completed empty search for 300 ms.
+                value = RecipientUserSearchState(isSearching = true)
+                delay(USER_SEARCH_DEBOUNCE_MILLIS)
+                try {
+                    val followedIds =
+                        awaitCurrentRecipientSearchValue {
+                            loadRecipientSearchFollowIds {
+                                appState.marmotIo { accountFollows(activeAccountRef) }
+                            }
                         }
-                    }
-                value = value.copy(followedAccountIds = followedIds)
-                consumeRecipientSearch(appState, activeAccountIdHex, trimmed, followedIds) { value = it }
-                currentCoroutineContext().ensureActive()
-                if (value.isSearching) value = value.copy(isSearching = false)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                value = value.copy(isSearching = false, failed = true)
+                    value = value.copy(followedAccountIds = followedIds)
+                    consumeRecipientSearch(appState, activeAccountIdHex, trimmed, followedIds) { value = it }
+                    currentCoroutineContext().ensureActive()
+                    if (value.isSearching) value = value.copy(isSearching = false)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    value = value.copy(isSearching = false, failed = true)
+                }
             }
         }
     val presentationRevision = appState.profileRevisionForCompose

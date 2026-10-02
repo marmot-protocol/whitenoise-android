@@ -32,13 +32,15 @@ class RecipientUserSearchTest {
             )
 
         assertEquals(
-            5,
+            7,
             setOf(
                 request,
                 request.copy(query = "bob"),
                 request.copy(activeAccountRef = "account-b"),
                 request.copy(activeAccountIdHex = "bb"),
                 request.copy(relationshipRevision = 8L),
+                request.copy(runtimeGeneration = 1),
+                request.copy(retryKey = 1),
             ).size,
         )
     }

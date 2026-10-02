@@ -89,6 +89,16 @@ class NewGroupPresentationTest {
         assertEquals(1, retries)
     }
 
+    /** HTTPS failure remains visible beside ordinary directory rows, with an independent retry action. */
+    @Test fun failedAddressLookupKeepsPeopleAndRetry() {
+        var retries = 0
+        picker(listOf(person), emptyList(), addressFailed = true, retry = { retries++ })
+        composeRule.onNodeWithTag("new_group.person.${person.candidate.accountIdHex}").assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.user_search_address_unverified)).assertIsDisplayed()
+        composeRule.onNodeWithTag("address.retry").performClick()
+        assertEquals(1, retries)
+    }
+
     /** Native image preparation disables photo and creation while surfacing the real work state. */
     @Test fun preparingPhotoLocksCompetingActions() {
         setup(NewGroupDraft(), presentation(preparing = true, editable = false, enabled = false))
@@ -222,6 +232,7 @@ class NewGroupPresentationTest {
         retry: () -> Unit = {},
         toggle: (RecipientSearch.Candidate) -> Unit = {},
         profile: (RecipientSearch.Candidate) -> Unit = {},
+        addressFailed: Boolean = false,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -234,6 +245,7 @@ class NewGroupPresentationTest {
                     incomplete,
                     NewGroupRecipientActions({}, confirm, review, {}, {}, retry, toggle, profile),
                     isValidNpub = { true },
+                    addressLookupFailed = addressFailed,
                 )
             }
         }
