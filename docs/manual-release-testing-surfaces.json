@@ -25806,6 +25806,14 @@
         ]
       },
       {
+        "surface": "Incoming reaction references update the chips of an open conversation live",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+        "anchor": "fun reactionReferenceChanges(",
+        "test_ids": [
+          "MSG-031"
+        ]
+      },
+      {
         "surface": "A text or reply send publishes with one engine call and reads no draft",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DraftSend.kt",
         "anchor": "internal suspend fun MarmotInterface.sendComposerText(",
