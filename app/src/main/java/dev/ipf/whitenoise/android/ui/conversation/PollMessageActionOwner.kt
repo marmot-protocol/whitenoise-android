@@ -25,7 +25,7 @@ internal fun currentPollActionTarget(
             !MessageProjector.isDeleted(owner.messageId, controller.deletedMessageIds)
     return if (mayAct) {
         val current =
-            controller.timelineItemsById[owner.messageId]
+            controller.retainedTimelineItem(owner.messageId)
                 ?: controller.timeline.firstOrNull { it.record.messageIdHex == owner.messageId }
         current?.takeIf { pollMessageActionsEligible(it, owner, nowSeconds) }
     } else {

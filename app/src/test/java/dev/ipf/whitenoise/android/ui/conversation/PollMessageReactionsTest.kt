@@ -98,7 +98,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
     @Test fun removedTargetCannotReceiveQueuedQuickReaction() {
         val item = render()
         openMenu(item.record.messageIdHex)
-        composeRule.runOnIdle { pollController.timelineItemsById.remove(item.record.messageIdHex) }
+        composeRule.runOnIdle { pollController.removeProjectedRecord(item.record.messageIdHex) }
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
         composeRule.runOnIdle { assertTrue(recordedCalls().none { it.first == "reactToMessage" }) }
     }
@@ -123,7 +123,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
         composeRule.runOnIdle {
             assertTrue(pollController.reactions[item.record.messageIdHex].orEmpty().any { it.mine })
-            pollController.timelineItemsById.remove(item.record.messageIdHex)
+            pollController.removeProjectedRecord(item.record.messageIdHex)
         }
         assertQueuedReactionDiscarded(item.record.messageIdHex)
     }
@@ -177,7 +177,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
             advanceTimeBy(200L)
             runCurrent()
             assertTrue(pollController.reactions[item.record.messageIdHex].orEmpty().any { it.mine })
-            pollController.timelineItemsById.remove(item.record.messageIdHex)
+            pollController.removeProjectedRecord(item.record.messageIdHex)
             release.complete(Unit)
             lockHolder.join()
             reaction.await()

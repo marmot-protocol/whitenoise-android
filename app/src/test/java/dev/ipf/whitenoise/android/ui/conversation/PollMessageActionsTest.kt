@@ -171,7 +171,7 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         composeRule
             .onNodeWithTag(messageBubbleRowTestTag(item.record.messageIdHex))
             .performSemanticsAction(SemanticsActions.OnLongClick) { it() }
-        composeRule.runOnIdle { pollController.timelineItemsById.remove(item.record.messageIdHex) }
+        composeRule.runOnIdle { pollController.removeProjectedRecord(item.record.messageIdHex) }
         composeRule.onNodeWithText("Reply").performClick()
         composeRule.runOnIdle { assertNull(pollController.replyingTo) }
     }
@@ -203,6 +203,7 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         val first = pollMessage()
         val second =
             first.copy(
+                id = "msg:${"cc".repeat(32)}",
                 record = first.record.copy(messageIdHex = "cc".repeat(32)),
                 status = MessageStatus.Failed,
             )

@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
@@ -27,8 +28,10 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineProjectionUpdateFfi
 import dev.ipf.marmotkit.TimelineRemoveReasonFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.state.RetainedRowWatch
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -372,10 +375,30 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         return item.copy(record = item.record.copy(direction = "sent", retentionExpiresAt = deadline))
     }
 
-    /** Mounts the poll row, opens its sheet with the compose clock paused, and returns once voters show. */
-    private fun openWithPausedClock(item: TimelineMessage): MutableState<Boolean> {
+    /**
+     * Puts a poll through a real timeline page apply, as sent or received, with the engine deadline [seconds]
+     * after the fixture clock, and returns the row the controller built from it.
+     */
+    private fun applyExpiringPage(
+        seconds: Long,
+        direction: String,
+    ): TimelineMessage {
+        val deadline = (pollClockMillis / 1_000L + seconds).toULong()
+        val projected = checkNotNull(votedPoll().projected)
+        applyPage(projected.copy(direction = direction, retentionExpiresAt = deadline))
+        return checkNotNull(pollController.retainedTimelineItem(projected.messageIdHex))
+    }
+
+    /**
+     * Mounts the poll row, opens its sheet with the compose clock paused, and returns once voters show. The row
+     * is retained directly unless the caller already put it into the controller.
+     */
+    private fun openWithPausedClock(
+        item: TimelineMessage,
+        alreadyRetained: Boolean = false,
+    ): MutableState<Boolean> {
         val rowShown = mutableStateOf(true)
-        retain(item)
+        if (!alreadyRetained) retain(item)
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
                 ConversationHost {
@@ -409,13 +432,139 @@ class PollVotesSheetTest : PollMessageTestFixtures() {
         val item = expiringPoll(600)
         val rowShown = openWithPausedClock(item)
         rowShown.value = false
-        pollController.timelineItemsById.remove(item.record.messageIdHex)
+        pollController.removeProjectedRecord(item.record.messageIdHex)
 
         pollClockMillis += 120_000L
         composeRule.mainClock.advanceTimeBy(700_000L)
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag(POLL_VOTES_SHEET_TAG).assertExists()
+    }
+
+    /** A poll the real page apply produced is keyed by item id, and its expiry closes the sheet. */
+    @Test
+    fun expiredPollAppliedThroughAPageClosesTheSheet() {
+        pollVotesResponder = { singleVoterPage() }
+        val applied = applyExpiringPage(seconds = 60, direction = "sent")
+        assertEquals(listOf("msg:${applied.record.messageIdHex}"), pollController.timelineItemsById.keys.toList())
+        val rowShown = openWithPausedClock(applied, alreadyRetained = true)
+        rowShown.value = false
+
+        pollClockMillis += 120_000L
+        composeRule.mainClock.advanceTimeBy(61_000L)
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
+
+    /** A far deadline is awaited in capped steps, so a wall-clock jump is noticed within one sweep period. */
+    @Test
+    fun wallClockJumpPastAFarDeadlineClosesTheSheetWithinOneCap() {
+        pollVotesResponder = { singleVoterPage() }
+        val rowShown = openWithPausedClock(expiringPoll(3_600))
+        rowShown.value = false
+
+        pollClockMillis += 7_200_000L
+        composeRule.mainClock.advanceTimeBy(61_000L)
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
+
+    /** A row the engine pruned after its remembered deadline, while the timer slept, counts as gone. */
+    @Test
+    fun rowPrunedAfterTheRememberedDeadlineClosesTheSheet() {
+        pollVotesResponder = { singleVoterPage() }
+        val item = expiringPoll(60)
+        val rowShown = openWithPausedClock(item)
+        rowShown.value = false
+        pollController.removeProjectedRecord(item.record.messageIdHex)
+
+        pollClockMillis += 120_000L
+        composeRule.mainClock.advanceTimeBy(61_000L)
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
+
+    /** A sheet opened on a poll whose deadline already passed closes without waiting for any timer. */
+    @Test
+    fun deadlineAlreadyPastOnOpenClosesTheSheet() {
+        pollVotesResponder = { singleVoterPage() }
+        val item = expiringPoll(60)
+        render(item)
+        pollClockMillis += 120_000L
+
+        openSheet()
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
+
+    /** Marks [messageId] read through the controller's real visible-read path, as the foreground conversation. */
+    private fun markRead(messageId: String) {
+        pollState.setAppInForeground(true)
+        runBlocking { pollState.setActiveConversation("personal", pollController.group.groupIdHex) }
+        runBlocking { pollController.markReadUpTo(messageId) }
+    }
+
+    /** A read watermark change after the row was trimmed must not forget the deadline the effect saw. */
+    @Test
+    fun readWatermarkChangeAfterTheRowWasTrimmedStillClosesTheSheet() {
+        pollVotesResponder = { singleVoterPage() }
+        val item = expiringPoll(60)
+        val rowShown = openWithPausedClock(item)
+        rowShown.value = false
+        pollController.removeProjectedRecord(item.record.messageIdHex)
+
+        markRead("dd".repeat(32))
+        Snapshot.sendApplyNotifications()
+        pollClockMillis += 120_000L
+        composeRule.mainClock.advanceTimeBy(61_000L)
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { composeRule.countTagged(POLL_VOTES_SHEET_TAG) == 0 }
+    }
+
+    /** The expiry order lists optimistic rows first, so an optimistic row shadowing the read anchor defers a poll. */
+    @Test
+    fun expiryOrderPutsOptimisticRowsFirst() {
+        val poll = checkNotNull(applyExpiringPage(seconds = 300, direction = "received").projected)
+        val anchorId = "aa".repeat(32)
+        val anchor =
+            poll.copy(messageIdHex = anchorId, sourceMessageIdHex = anchorId, poll = null, retentionExpiresAt = null)
+        applyPage(poll, anchor)
+        markRead(anchorId)
+        // Projected order is poll then anchor, so the poll is already read and its engine deadline applies.
+        assertEquals(
+            RetainedRowWatch.Waiting(60_000L, (pollClockMillis / 1_000L + 300L) * 1_000L),
+            pollController.watchRetainedRow(poll.messageIdHex, null),
+        )
+
+        val optimistic = votedPoll()
+        val shadow = optimistic.copy(id = "optimistic-anchor", record = optimistic.record.copy(messageIdHex = anchorId))
+        pollState.optimisticMessages("personal", pollController.group.groupIdHex)[shadow.id] = shadow
+
+        // With the shadow first, the anchor now precedes the poll, so the poll is unread and its deadline deferred.
+        assertEquals(RetainedRowWatch.Waiting(60_000L, null), pollController.watchRetainedRow(poll.messageIdHex, null))
+    }
+
+    /** A received poll's deadline is deferred until read, and closes the sheet once the read anchor settles. */
+    @Test
+    fun receivedPollThatBecomesDueAfterReadClosesTheSheet() {
+        pollVotesResponder = { singleVoterPage() }
+        val applied = applyExpiringPage(seconds = 300, direction = "received")
+        val rowShown = openWithPausedClock(applied, alreadyRetained = true)
+        rowShown.value = false
+        pollClockMillis += 100_000L
+        composeRule.mainClock.advanceTimeBy(61_000L)
+        composeRule.onNodeWithTag(POLL_VOTES_SHEET_TAG).assertExists()
+
+        markRead(applied.record.messageIdHex)
+        assertEquals(applied.record.messageIdHex, pollController.lastReadMessageId)
+        // The paused Robolectric looper does not deliver this off-composition write to the recomposer by itself.
+        Snapshot.sendApplyNotifications()
+        pollClockMillis += 300_000L
+        // Shorter than one capped wait, so only the read watermark key can re-evaluate the deadline.
+        composeRule.mainClock.advanceTimeBy(1_000L)
+        composeRule.waitForIdle()
+
+        assertEquals(0, composeRule.countTagged(POLL_VOTES_SHEET_TAG))
     }
 
     /** Recomposing a visible poll row as deleted, with no projection event, closes its open sheet. */
