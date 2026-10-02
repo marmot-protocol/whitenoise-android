@@ -491,6 +491,7 @@ class LocalNotificationPolicyTest {
             appLockScreenVisible = false,
         )
 
+    /** Builds a typed native update with explicit sender and self-origin fields for policy cases. */
     private fun update(
         groupIdHex: String,
         accountRef: String = "account",

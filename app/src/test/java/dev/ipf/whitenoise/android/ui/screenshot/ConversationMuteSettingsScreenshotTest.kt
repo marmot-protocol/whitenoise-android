@@ -38,6 +38,7 @@ class ConversationMuteSettingsScreenshotTest {
     private lateinit var originalLocale: Locale
     private lateinit var originalTimeZone: TimeZone
 
+    /** Fixes locale and time zone so timed-mute labels render the same in every CI environment. */
     @Before
     fun useDeterministicClockLabels() {
         originalLocale = Locale.getDefault()
@@ -46,6 +47,7 @@ class ConversationMuteSettingsScreenshotTest {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
     }
 
+    /** Restores process-wide formatting defaults before another screenshot test runs. */
     @After
     fun restoreClockLabels() {
         Locale.setDefault(originalLocale)
