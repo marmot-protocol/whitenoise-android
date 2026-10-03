@@ -4,6 +4,7 @@ from copy import deepcopy
 import unittest
 
 from matrix_report import CIPHERTEXT_OVERHEAD, aggregate, attribute, check_matrix, compare, segment, stats
+from matrix_tables import comparison, tables
 
 MIB = 1024 * 1024
 MS = 1_000_000
@@ -206,6 +207,20 @@ class MatrixTest(unittest.TestCase):
         changed["profiles"][0]["cells"][0]["requests"]["retries"] = 1
         self.assertFalse(compare(base, changed)["accepted"])
         self.assertTrue(compare(base, changed)["correctness_diffs"])
+
+    def test_report_tables_render_every_cell_and_the_comparison_verdicts(self):
+        """The markdown tables carry one row per cell and a verdict per compared metric."""
+        base = aggregate([raw(profile([(65536, 4), (MIB, 2)])), raw(profile([(65536, 4), (MIB, 2)]))])
+        text = tables(base)
+        for heading in ("### Upload", "### Cold download", "### Warm, restart and memory", "### Dominant delay"):
+            self.assertIn(heading, text)
+        self.assertIn("| unshaped | 64 KiB | 8 |", text)
+        self.assertIn("| unshaped | 1 MiB | 4 |", text)
+        faster = aggregate([raw(profile([(65536, 4), (MIB, 2)], scale=0.5)) for _ in range(2)])
+        table, verdicts = comparison(base, faster, ("feed_ready_ms",))
+        self.assertIn("feed_ready_ms", table)
+        self.assertIn("faster", table)
+        self.assertTrue(verdicts["accepted"])
 
 
 if __name__ == "__main__":
