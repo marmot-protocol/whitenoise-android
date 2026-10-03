@@ -318,7 +318,7 @@ internal fun GroupEditScreen(
                 pendingCropUri = null
             },
             onUnreadable = { picked ->
-                uploadPublicAvatar { GroupImageDraftProcessor.fromContentUri(context.contentResolver, picked) }
+                uploadPublicAvatar { GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, picked) }
             },
             onCropped = { bytes, crop ->
                 pendingCropUri = null

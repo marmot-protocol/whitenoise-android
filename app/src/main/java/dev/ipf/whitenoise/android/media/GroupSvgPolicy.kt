@@ -72,23 +72,14 @@ internal object GroupSvgPolicy {
             "marker-start",
             "marker-mid",
             "marker-end",
+            "stroke-dasharray",
         )
     private val number = Regex("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
     private val localUrl = Regex("url\\(\\s*['\"]?#([A-Za-z_][A-Za-z0-9_.-]*)['\"]?\\s*\\)", RegexOption.IGNORE_CASE)
     private val identifier = Regex("[A-Za-z_][A-Za-z0-9_.-]{0,127}")
 
     fun validate(bytes: ByteArray): String {
-        require(bytes.isNotEmpty() && bytes.size <= MAX_BYTES)
-        val xml =
-            Charsets.UTF_8
-                .newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-                .decode(ByteBuffer.wrap(bytes))
-                .toString()
-                .removePrefix("\uFEFF")
-        // Never let either XML parser expand a DTD, including internal or external entities.
-        require(!xml.contains("<!DOCTYPE", ignoreCase = true) && !xml.contains("<!ENTITY", ignoreCase = true))
+        val xml = validatedXml(bytes)
         val parser = Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false)
@@ -113,24 +104,50 @@ internal object GroupSvgPolicy {
                     }
                     geometryNumbers += validateAttributes(parser, references)
                     require(geometryNumbers <= MAX_GEOMETRY_NUMBERS)
-                    parser.getAttributeValue(null, "id")?.let { id ->
-                        require(identifier.matches(id) && ids.add(id))
-                        if (parser.name == "linearGradient" || parser.name == "radialGradient") gradients.add(id)
-                    }
+                    registerGradientId(parser, ids, gradients)
                 }
                 XmlPullParser.TEXT, XmlPullParser.CDSECT -> {
                     textCharacters += parser.text.length
                     require(textCharacters <= MAX_TEXT_CHARACTERS)
                 }
-                XmlPullParser.DOCDECL,
-                XmlPullParser.PROCESSING_INSTRUCTION,
-                XmlPullParser.ENTITY_REF,
-                -> error("Unsafe SVG XML")
+                XmlPullParser.ENTITY_REF -> {
+                    // DTDs are refused before parsing; only built-in/numeric text references remain.
+                    require(parser.text != null)
+                    textCharacters += parser.text.length
+                    require(textCharacters <= MAX_TEXT_CHARACTERS)
+                }
+                XmlPullParser.DOCDECL, XmlPullParser.PROCESSING_INSTRUCTION -> error("Unsafe SVG XML")
             }
             parser.nextToken()
         }
         require(rootSeen && references.all { it in gradients })
         return xml
+    }
+
+    private fun validatedXml(bytes: ByteArray): String {
+        require(bytes.isNotEmpty() && bytes.size <= MAX_BYTES)
+        val xml =
+            Charsets.UTF_8
+                .newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+                .removePrefix("\uFEFF")
+        // Never let either XML parser expand a DTD, including internal or external entities.
+        require(!xml.contains("<!DOCTYPE", ignoreCase = true) && !xml.contains("<!ENTITY", ignoreCase = true))
+        return xml
+    }
+
+    private fun registerGradientId(
+        parser: XmlPullParser,
+        ids: MutableSet<String>,
+        gradients: MutableSet<String>,
+    ) {
+        parser.getAttributeValue(null, "id")?.let { id ->
+            require(identifier.matches(id) && ids.add(id))
+            if (parser.name == "linearGradient" || parser.name == "radialGradient") gradients.add(id)
+        }
     }
 
     private fun validateAttributes(

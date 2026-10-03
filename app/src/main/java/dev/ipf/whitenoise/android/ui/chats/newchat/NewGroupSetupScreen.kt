@@ -612,7 +612,7 @@ private fun NewGroupSetupAccountScreen(
             pendingCropUri = null
         },
         onUnreadable = { uri ->
-            prepareImage { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
+            prepareImage { GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, uri) }
         },
         onCropped = { bytes, crop ->
             pendingCropUri = null
