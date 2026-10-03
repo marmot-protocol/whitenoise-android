@@ -135,23 +135,17 @@ internal fun TimelineRow(
             }
             when (timelineRowKind(item.record, appState.streamingDebugEnabled)) {
                 TimelineRowKind.GroupSystem -> {
-                    GroupSystemRow(
-                        record = item.record,
+                    GroupSystemTimelineRow(
+                        item = item,
+                        controller = controller,
                         appState = appState,
-                        groupSystem = item.projected?.groupSystem,
+                        quickReactionEmojis = quickReactionEmojis,
+                        recentEmojis = recentEmojis,
+                        onEmojiUsed = onEmojiUsed,
+                        isActionMenuOpen = isActionMenuOpen,
+                        onActionMenuOpenChange = onActionMenuOpenChange,
+                        readOnly = composerGate != ComposerGate.COMPOSER || selectionMode,
                         onWave = onWave,
-                        waveAccountRef = controller.boundAccountRef,
-                        onOpenProfile = { subjectHex -> appState.presentProfile(appState.npub(subjectHex)) },
-                        onDeleteForMe =
-                            if (controller.group.pendingConfirmation) {
-                                null
-                            } else {
-                                {
-                                    appState.launchMutation {
-                                        controller.hideMessageForMe(item.record.messageIdHex)
-                                    }
-                                }
-                            },
                     )
                     return@Column
                 }

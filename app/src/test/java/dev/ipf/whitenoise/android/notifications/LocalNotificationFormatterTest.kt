@@ -94,18 +94,19 @@ class LocalNotificationFormatterTest {
         assertEquals("Invite from Bob", content?.body)
     }
 
+    /** The host renders MDK’s safe activity preview through the ordinary reaction notification path. */
     @Test
-    fun reactionWithPreviewReadsAsAReactionLine() {
+    fun reactionWithNativeActivityPreviewReadsAsAReactionLine() {
         val content =
             content(
                 update(
                     trigger = NotificationTriggerFfi.NEW_MESSAGE,
                     reactionEmoji = "👍",
-                    reactedToPreview = "Lunch at 1?",
+                    reactedToPreview = "Alice added Bob",
                 ),
             )
 
-        assertEquals("reacted 👍 to: \"Lunch at 1?\"", content?.body)
+        assertEquals("reacted 👍 to: \"Alice added Bob\"", content?.body)
     }
 
     @Test
