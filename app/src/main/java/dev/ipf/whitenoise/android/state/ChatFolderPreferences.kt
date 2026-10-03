@@ -516,7 +516,7 @@ class ChatFolderPreferences(
                             .put(FIELD_ID, folder.id)
                             .put(FIELD_NAME, folder.name)
                             .put(FIELD_DESCRIPTION, folder.description)
-                            .put("showWhenEmpty", folder.showWhenEmpty)
+                            .put(FIELD_SHOW_WHEN_EMPTY, folder.showWhenEmpty)
                             .put(FIELD_ORDER, folder.order)
                             .put(FIELD_SYSTEM_KIND, folder.systemKind?.name),
                     )
@@ -543,7 +543,7 @@ class ChatFolderPreferences(
                     description = json.optString(FIELD_DESCRIPTION),
                     order = json.optInt(FIELD_ORDER, 0),
                     systemKind = kind,
-                    showWhenEmpty = json.optBoolean("showWhenEmpty", false),
+                    showWhenEmpty = json.optBoolean(FIELD_SHOW_WHEN_EMPTY, false),
                 )
             }
         }.getOrNull()
@@ -555,6 +555,7 @@ class ChatFolderPreferences(
         private const val PREFERENCES_NAME = "whitenoise.chat_folders"
         private const val FIELD_ID = "id"
         private const val FIELD_NAME = "name"
+        private const val FIELD_SHOW_WHEN_EMPTY = "showWhenEmpty"
         private const val FIELD_DESCRIPTION = "description"
         private const val FIELD_ORDER = "order"
         private const val FIELD_SYSTEM_KIND = "systemKind"

@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Restablecer filtros</string>
-    <string name="smart_folder_prototype">Solo se usan los chats cargados. No se cuentan los chats con información incompleta.</string>
     <string name="smart_folder_all">Cumplir todos</string>
     <string name="smart_folder_any">Cumplir cualquiera</string>
     <string name="smart_folder_not">NO</string>
@@ -36,7 +35,6 @@
     <string name="smart_folder_keyword_hint">Buscar en el título sin distinguir mayúsculas</string>
     <string name="smart_folder_pending_hint">Algunos chats aún no se pueden comprobar en busca de mensajes pendientes.</string>
     <string name="smart_folder_negate_condition">Excluir coincidencias (NO)</string>
-    <string name="smart_folder_unresolved">Chats que no se pudieron comprobar: %1$d</string>
     <string name="smart_folder_invalid">Estas reglas no son válidas o no son compatibles. Las coincidencias automáticas están desactivadas; reemplázalas para editarlas.</string>
     <string name="smart_folder_presets">Elegir plantilla</string>
     <string name="smart_folder_preset_read">Todo leído</string>
@@ -62,11 +60,8 @@
     <string name="smart_folder_replace">Reemplazar reglas</string>
     <string name="smart_folder_filters">Filtros</string>
     <string name="smart_folder_group_rules">Agrupar reglas</string>
-    <string name="smart_folder_more_filters">Más filtros</string>
     <string name="smart_folder_add_description">Añadir descripción</string>
     <string name="smart_folder_always_include">Incluir chats siempre</string>
-    <string name="smart_folder_loaded_only">Solo chats cargados</string>
     <string name="smart_folder_read_help">Todo leído no significa que el agente haya terminado.</string>
   <string name="folder_show_when_empty">Mostrar cuando esté vacía</string>
-  <string name="folder_drag_reorder">Arrastra para reordenar %1$s</string>
 </resources>

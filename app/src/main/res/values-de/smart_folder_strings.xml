@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Filter zurücksetzen</string>
-    <string name="smart_folder_prototype">Nur geladene Chats werden berücksichtigt. Chats mit fehlenden Angaben werden nicht gezählt.</string>
     <string name="smart_folder_all">Alle erfüllen</string>
     <string name="smart_folder_any">Eine erfüllen</string>
     <string name="smart_folder_not">NICHT</string>
@@ -36,7 +35,6 @@
     <string name="smart_folder_keyword_hint">Titelvergleich ohne Beachtung der Großschreibung</string>
     <string name="smart_folder_pending_hint">Einige Chats können noch nicht auf ausstehende Nachrichten geprüft werden.</string>
     <string name="smart_folder_negate_condition">Treffer ausschließen (NICHT)</string>
-    <string name="smart_folder_unresolved">Nicht prüfbare Chats: %1$d</string>
     <string name="smart_folder_invalid">Dieser Regelsatz ist ungültig oder wird nicht unterstützt. Automatische Zuordnung ist deaktiviert; ersetze ihn zum Bearbeiten.</string>
     <string name="smart_folder_presets">Vorlage wählen</string>
     <string name="smart_folder_preset_read">Alles gelesen</string>
@@ -62,11 +60,8 @@
     <string name="smart_folder_replace">Regeln ersetzen</string>
     <string name="smart_folder_filters">Filter</string>
     <string name="smart_folder_group_rules">Regeln gruppieren</string>
-    <string name="smart_folder_more_filters">Weitere Filter</string>
     <string name="smart_folder_add_description">Beschreibung hinzufügen</string>
     <string name="smart_folder_always_include">Chats immer einschließen</string>
-    <string name="smart_folder_loaded_only">Nur geladene Chats</string>
     <string name="smart_folder_read_help">Alles gelesen bedeutet nicht, dass der Agent fertig ist.</string>
   <string name="folder_show_when_empty">Auch leer anzeigen</string>
-  <string name="folder_drag_reorder">%1$s zum Neuordnen ziehen</string>
 </resources>

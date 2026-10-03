@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,7 @@ import kotlin.math.roundToInt
 /** A drag previews movement locally; only dropping a surviving folder commits a reorder. */
 internal class FolderDragState(
     private val list: LazyListState,
+    private val ids: () -> List<String>,
 ) {
     var folderId: String? by mutableStateOf(null)
         private set
@@ -35,6 +37,7 @@ internal class FolderDragState(
     private var initialOffset = 0
     private var height = 0
     private var scrolled by mutableFloatStateOf(0f)
+    val targetId by derivedStateOf { target(ids()) }
 
     fun start(id: String) {
         if (folderId != null) return
@@ -103,7 +106,8 @@ internal fun rememberFolderDrag(
     list: LazyListState,
     ids: List<String>,
 ): FolderDragState {
-    val drag = remember(list) { FolderDragState(list) }
+    val latestIds by rememberUpdatedState(ids)
+    val drag = remember(list) { FolderDragState(list) { latestIds } }
     val edge = with(LocalDensity.current) { 48.dp.toPx() }
     LaunchedEffect(ids) { drag.cancel() }
     LaunchedEffect(drag.folderId) {

@@ -51,8 +51,6 @@ class SmartFolderEditorScreenshotTest {
 
     @Test fun absenceDialog() = capture("smart_folder_absence_dialog", dialog = true)
 
-    @Test fun unresolvedChat() = capture("smart_folder_unresolved", unresolved = 1)
-
     @Test fun moreOptions() = capture("smart_folder_options", options = true)
 
     @Test fun presetReplacement() = capture("smart_folder_replace", replace = true)
@@ -97,7 +95,6 @@ class SmartFolderEditorScreenshotTest {
         rules: Boolean = false,
         options: Boolean = false,
         replace: Boolean = false,
-        unresolved: Int = 0,
         add: Boolean = false,
         more: Boolean = false,
     ) {
@@ -139,7 +136,7 @@ class SmartFolderEditorScreenshotTest {
                     mentionLabel = stringResource(R.string.smart_folder_preset_mentions)
                     ChatFolderEditContent(
                         state =
-                            formState(name, manual, empty).copy(unresolvedCount = unresolved),
+                            formState(name, manual, empty),
                         onUnreadOnlyChange = {},
                         onIncludeMutedChange = {},
                         onGroupsOnlyChange = {},

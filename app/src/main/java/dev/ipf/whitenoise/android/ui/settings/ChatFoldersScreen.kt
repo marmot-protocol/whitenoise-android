@@ -268,7 +268,7 @@ internal fun ChatFoldersContent(
             }
             state.folders.forEach { folder ->
                 item(key = folder.id) {
-                    SettingsGroup(modifier = folderDragRowModifier(folder.id, drag, drag.target(ids))) {
+                    SettingsGroup(modifier = folderDragRowModifier(folder.id, drag, drag.targetId)) {
                         row(folder.id) { context ->
                             FolderManageRow(
                                 context = context,
@@ -370,7 +370,7 @@ private fun FolderManageRow(
                 ) {
                     Icon(
                         painterResource(R.drawable.ic_drag_handle),
-                        stringResource(R.string.folder_drag_reorder, name),
+                        contentDescription = null,
                     )
                 }
                 Box {

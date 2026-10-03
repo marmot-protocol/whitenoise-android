@@ -301,10 +301,6 @@ private fun ChatFolderEditSession(
                 }
         }
 
-    val unresolved =
-        smartFolderUnresolvedCount(smartRoot, source) {
-            chatListItemDisplayTitle(it, appState, groupTitleCopy)
-        }
     ChatFolderEditContent(
         state =
             ChatFolderEditFormState(
@@ -324,7 +320,6 @@ private fun ChatFolderEditSession(
                 peopleCount = memberHexes.size,
                 previewCount = previewRows.size,
                 advancedRules = smartPayload != null,
-                unresolvedCount = unresolved,
                 canSave =
                     name.text.isNotBlank() &&
                         !missing &&
@@ -477,7 +472,6 @@ internal data class ChatFolderEditFormState(
     val directChatsOnly: Boolean = false,
     val pinnedOnly: Boolean = false,
     val advancedRules: Boolean = false,
-    val unresolvedCount: Int = 0,
     val showWhenEmpty: Boolean = false,
 )
 

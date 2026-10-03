@@ -17,14 +17,6 @@
         ]
       },
       {
-        "surface": "folder_drag_reorder",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
-        "anchor": "R.string.folder_drag_reorder",
-        "test_ids": [
-          "FLD-006"
-        ]
-      },
-      {
         "surface": "FilterChoice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
         "anchor": "private fun FilterChoice(",

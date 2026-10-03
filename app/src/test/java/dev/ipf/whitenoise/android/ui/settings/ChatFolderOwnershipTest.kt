@@ -64,7 +64,7 @@ class ChatFolderOwnershipTest {
             .commit()
     }
 
-    /** A renamed default renders the stored name in the row and the actual editor prefill. */
+    /** Rotation preserves the unsaved visibility draft; only Save changes the account store. */
     @Test
     fun emptyVisibilityDraftSurvivesRotationAndOnlySavePersistsIt() {
         val state = appState()
@@ -80,6 +80,7 @@ class ChatFolderOwnershipTest {
         assertTrue(ChatFolderPreferences(app).foldersFor(A).first { it.id == folder.id }.showWhenEmpty)
     }
 
+    /** A renamed default renders the stored name in the row and the actual editor prefill. */
     @Test fun renamedDefaultIsVisibleInListAndEditor() {
         val state = appState()
         val store = state.chatFolderPreferences

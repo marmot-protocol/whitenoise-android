@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Reimposta filtri</string>
-    <string name="smart_folder_prototype">Vengono usate solo le chat caricate. Le chat con informazioni mancanti non vengono contate.</string>
     <string name="smart_folder_all">Tutti i criteri</string>
     <string name="smart_folder_any">Qualsiasi criterio</string>
     <string name="smart_folder_not">NON</string>
@@ -36,7 +35,6 @@
     <string name="smart_folder_keyword_hint">Ricerca nel titolo senza distinzione tra maiuscole e minuscole</string>
     <string name="smart_folder_pending_hint">Alcune chat non possono ancora essere controllate per i messaggi in attesa.</string>
     <string name="smart_folder_negate_condition">Escludi corrispondenze (NON)</string>
-    <string name="smart_folder_unresolved">Chat non verificabili: %1$d</string>
     <string name="smart_folder_invalid">Queste regole non sono valide o non sono supportate. Le corrispondenze automatiche sono disattivate; sostituiscile per modificarle.</string>
     <string name="smart_folder_presets">Scegli modello</string>
     <string name="smart_folder_preset_read">Tutto letto</string>
@@ -62,11 +60,8 @@
     <string name="smart_folder_replace">Sostituisci regole</string>
     <string name="smart_folder_filters">Filtri</string>
     <string name="smart_folder_group_rules">Raggruppa regole</string>
-    <string name="smart_folder_more_filters">Altri filtri</string>
     <string name="smart_folder_add_description">Aggiungi descrizione</string>
     <string name="smart_folder_always_include">Includi sempre le chat</string>
-    <string name="smart_folder_loaded_only">Solo chat caricate</string>
     <string name="smart_folder_read_help">Tutto letto non significa che l’agente abbia finito.</string>
   <string name="folder_show_when_empty">Mostra anche se vuota</string>
-  <string name="folder_drag_reorder">Trascina per riordinare %1$s</string>
 </resources>

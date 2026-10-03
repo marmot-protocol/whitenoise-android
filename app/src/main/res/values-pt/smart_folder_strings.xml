@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Redefinir filtros</string>
-    <string name="smart_folder_prototype">Apenas conversas carregadas são usadas. Conversas com informações ausentes não são contadas.</string>
     <string name="smart_folder_all">Atender a todos</string>
     <string name="smart_folder_any">Atender a qualquer um</string>
     <string name="smart_folder_not">NÃO</string>
@@ -36,7 +35,6 @@
     <string name="smart_folder_keyword_hint">Pesquisa no título sem distinguir maiúsculas</string>
     <string name="smart_folder_pending_hint">Ainda não é possível verificar mensagens pendentes em algumas conversas.</string>
     <string name="smart_folder_negate_condition">Excluir correspondências (NÃO)</string>
-    <string name="smart_folder_unresolved">Conversas que não foi possível verificar: %1$d</string>
     <string name="smart_folder_invalid">Estas regras são inválidas ou não são suportadas. As correspondências automáticas estão desativadas; substitua-as para editar.</string>
     <string name="smart_folder_presets">Escolher modelo</string>
     <string name="smart_folder_preset_read">Tudo lido</string>
@@ -62,11 +60,8 @@
     <string name="smart_folder_replace">Substituir regras</string>
     <string name="smart_folder_filters">Filtros</string>
     <string name="smart_folder_group_rules">Agrupar regras</string>
-    <string name="smart_folder_more_filters">Mais filtros</string>
     <string name="smart_folder_add_description">Adicionar descrição</string>
     <string name="smart_folder_always_include">Sempre incluir conversas</string>
-    <string name="smart_folder_loaded_only">Apenas conversas carregadas</string>
     <string name="smart_folder_read_help">Tudo lido não significa que o agente terminou.</string>
   <string name="folder_show_when_empty">Mostrar quando vazia</string>
-  <string name="folder_drag_reorder">Arraste para reordenar %1$s</string>
 </resources>

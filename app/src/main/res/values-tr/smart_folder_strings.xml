@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Filtreleri sıfırla</string>
-    <string name="smart_folder_prototype">Yalnızca yüklenen sohbetler kullanılır. Bilgileri eksik sohbetler sayılmaz.</string>
     <string name="smart_folder_all">Tümünü eşleştir</string>
     <string name="smart_folder_any">Herhangi birini eşleştir</string>
     <string name="smart_folder_not">DEĞİL</string>
@@ -36,7 +35,6 @@
     <string name="smart_folder_keyword_hint">Başlıkta büyük/küçük harfe duyarsız arama</string>
     <string name="smart_folder_pending_hint">Bazı sohbetler henüz bekleyen mesajlar için kontrol edilemiyor.</string>
     <string name="smart_folder_negate_condition">Eşleşmeleri hariç tut (DEĞİL)</string>
-    <string name="smart_folder_unresolved">Kontrol edilemeyen sohbetler: %1$d</string>
     <string name="smart_folder_invalid">Bu kurallar geçersiz veya desteklenmiyor. Otomatik eşleştirme devre dışı; düzenlemek için değiştirin.</string>
     <string name="smart_folder_presets">Şablon seç</string>
     <string name="smart_folder_preset_read">Tümü okundu</string>
@@ -62,11 +60,8 @@
     <string name="smart_folder_replace">Kuralları değiştir</string>
     <string name="smart_folder_filters">Filtreler</string>
     <string name="smart_folder_group_rules">Kuralları grupla</string>
-    <string name="smart_folder_more_filters">Diğer filtreler</string>
     <string name="smart_folder_add_description">Açıklama ekle</string>
     <string name="smart_folder_always_include">Sohbetleri her zaman dahil et</string>
-    <string name="smart_folder_loaded_only">Yalnızca yüklenen sohbetler</string>
     <string name="smart_folder_read_help">Tümü okundu, ajanın işini bitirdiği anlamına gelmez.</string>
   <string name="folder_show_when_empty">Boşken göster</string>
-  <string name="folder_drag_reorder">%1$s sırasını değiştirmek için sürükleyin</string>
 </resources>

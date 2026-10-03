@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">重設篩選條件</string>
-    <string name="smart_folder_prototype">僅使用已載入的聊天。資訊缺失的聊天不計入符合項目。</string>
     <string name="smart_folder_all">全部符合</string>
     <string name="smart_folder_any">任一符合</string>
     <string name="smart_folder_not">非</string>
@@ -36,7 +35,6 @@
     <string name="smart_folder_keyword_hint">標題比對不區分大小寫</string>
     <string name="smart_folder_pending_hint">某些聊天暫時無法檢查待傳送訊息。</string>
     <string name="smart_folder_negate_condition">排除比對結果（非）</string>
-    <string name="smart_folder_unresolved">無法檢查的聊天：%1$d</string>
     <string name="smart_folder_invalid">此規則集無效或不受支援。自動比對已停用；請取代規則集以編輯。</string>
     <string name="smart_folder_presets">選擇預設</string>
     <string name="smart_folder_preset_read">全部已讀</string>
@@ -61,11 +59,8 @@
     <string name="smart_folder_replace">取代規則</string>
     <string name="smart_folder_filters">篩選條件</string>
     <string name="smart_folder_group_rules">組合規則</string>
-    <string name="smart_folder_more_filters">更多篩選條件</string>
     <string name="smart_folder_add_description">新增描述</string>
     <string name="smart_folder_always_include">始終包含聊天</string>
-    <string name="smart_folder_loaded_only">僅限已載入的聊天</string>
     <string name="smart_folder_read_help">全部已讀並不表示代理已完成工作。</string>
   <string name="folder_show_when_empty">空資料夾仍顯示</string>
-  <string name="folder_drag_reorder">拖曳以重新排序 %1$s</string>
 </resources>
