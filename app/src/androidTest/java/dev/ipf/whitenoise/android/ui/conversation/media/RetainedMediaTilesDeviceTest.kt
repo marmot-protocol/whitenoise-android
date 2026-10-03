@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -193,17 +193,32 @@ class RetainedMediaTilesDeviceTest {
             val probe = TileProbe()
             composeRule.runOnUiThread { active.value = ActiveTile(case, state, controller, probe) }
             val started = SystemClock.elapsedRealtime()
-            var affordanceSeen = false
+            var downloadSeen = false
+            var retrySeen = false
+            val trace = mutableListOf<Pair<Char, Long>>()
             var settledMillis = -1L
             while (SystemClock.elapsedRealtime() - started < SETTLE_TIMEOUT_MILLIS && settledMillis < 0) {
                 composeRule.waitForIdle()
-                affordanceSeen = affordanceSeen || idleDownloadAffordance(downloadLabel) || labelled(retryLabel)
-                if (shown(case, context)) settledMillis = SystemClock.elapsedRealtime() - started
+                // One consistent sample per frame, so a tile changing between two reads cannot read as two states.
+                val idleDownload = idleDownloadAffordance(downloadLabel)
+                val displayed = shown(case, context)
+                downloadSeen = downloadSeen || idleDownload
+                retrySeen = retrySeen || labelled(retryLabel)
+                val frame =
+                    when {
+                        idleDownload -> 'D'
+                        displayed -> 'I'
+                        labelled(downloadLabel) -> 'S'
+                        else -> '-'
+                    }
+                if (trace.lastOrNull()?.first != frame) trace += frame to (SystemClock.elapsedRealtime() - started)
+                if (displayed) settledMillis = SystemClock.elapsedRealtime() - started
                 kotlinx.coroutines.delay(FRAME_MILLIS)
             }
             // A tile that never showed its media is reported, not tapped: there is nothing readable to open.
             val opened = settledMillis >= 0 && tapOnce(case, probe)
-            report(case, affordanceSeen, settledMillis, opened)
+            val states = trace.joinToString(" ") { "${it.first}@${it.second}" }
+            report(case, downloadSeen, retrySeen, settledMillis, opened, states)
             composeRule.runOnUiThread { active.value = null }
             composeRule.waitForIdle()
         }
@@ -260,15 +275,15 @@ class RetainedMediaTilesDeviceTest {
         }
 
     /**
-     * The idle Download action: it carries [label] with no progress indicator on screen. The loading spinner reuses the
-     * label while MDK-retained bytes are read locally, which is not a prompt to download.
+     * The idle Download action: a node carrying [label] that is not itself clickable, in the unmerged tree. The idle
+     * action's label sits on its icon, inside a clickable surface, while the loading spinner reuses the label on a node
+     * that is clickable, so reading retained bytes locally never counts as a prompt to download.
      */
     private fun idleDownloadAffordance(label: String): Boolean =
-        labelled(label) &&
-            composeRule
-                .onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
-                .fetchSemanticsNodes()
-                .isEmpty()
+        composeRule
+            .onAllNodes(hasContentDescription(label) and !hasClickAction(), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+            .isNotEmpty()
 
     /** Whether any node currently carries [label] as its content description. */
     private fun labelled(label: String): Boolean =
@@ -300,9 +315,11 @@ class RetainedMediaTilesDeviceTest {
     /** Emits only closed facts about one tile; no file name, identifier or content leaves the device. */
     private fun report(
         case: TileCase,
-        affordanceSeen: Boolean,
+        downloadSeen: Boolean,
+        retrySeen: Boolean,
         settledMillis: Long,
         opened: Boolean,
+        trace: String,
     ) {
         InstrumentationRegistry.getInstrumentation().sendStatus(
             0,
@@ -317,7 +334,9 @@ class RetainedMediaTilesDeviceTest {
                         .put("media", case.media)
                         .put("shown", settledMillis >= 0)
                         .put("settle_ms", settledMillis)
-                        .put("download_affordance_seen", affordanceSeen)
+                        .put("download_affordance_seen", downloadSeen)
+                        .put("retry_affordance_seen", retrySeen)
+                        .put("state_trace", trace)
                         .put("one_tap_opened", opened)
                         .toString(),
                 )

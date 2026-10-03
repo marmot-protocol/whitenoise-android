@@ -16,9 +16,13 @@ one composition, one tile at a time. For each tile it samples every frame until 
 and records:
 
 - whether the tile shows its media, and how long that took;
-- whether the **idle Download action** or Retry appeared at any frame (the loading spinner reuses the Download label
-  while retained bytes are read, so it is told apart by the absence of a progress indicator);
-- whether one tap hands the exact attachment to the viewer exactly once.
+- whether the **idle Download action** or Retry appeared at any sampled frame. The idle action is a node carrying the
+  Download label that is not itself clickable in the unmerged semantics tree (its label sits on an icon inside a
+  clickable surface). The loading spinner reuses the label on a clickable node while retained bytes are read locally, so
+  it is not counted. Each frame is read once, so a tile changing between two reads cannot be read as two states;
+- whether one tap hands the exact attachment to the viewer exactly once;
+- a closed per-tile state trace (idle Download, spinner, shown, nothing) with the time of each change, which exposes
+  any transition rather than only the end state.
 
 `media_checker._check_tiles` requires all fourteen tiles and fails on any missing row, unshown tile, affordance or
 unopened tap. The server ledger remains the authority: the whole run issues the seven original uploads and seven
@@ -41,18 +45,33 @@ third photo (a video) were unaffected. All tiles in the baseline run that did sh
   policy they produced, so a retained file goes from the thumbhash placeholder to its image without a download prompt.
   A file that is genuinely absent still offers Download once the probes answer.
 
-A first version of the second change flashed on album tiles for one frame because the intent follows policy one effect
-pass later; the fixture caught it and the gate now waits for the intent. My own first draft also re-keyed an effect on a
-fresh object every composition and made Compose never idle, which 14 existing tests caught before any device run.
+My own first draft also re-keyed an effect on a fresh object every composition and made Compose never idle, which 14
+existing tests caught before any device run.
 
 ## After
 
 From the same fixture, with the fix: **all fourteen tiles show their media, none displays the idle Download action at
 any sampled frame, and every tile opens exactly once on one tap**, qualified on API 30 arm64 (Play), with the ledger
-showing only the original seven uploads and seven GETs. Images show in 99 to 279 ms and videos in 116 to 525 ms; the
-24 MiB video is the slowest at 525 ms. The 261 conversation-media unit tests pass, including a source test that pins the
-fallback order, that the read is a local open that cannot start a transfer, and the account-change guard (it fails when
-the fallback is removed). Two existing tests that expected the Download action immediately now wait for it.
+showing only the original seven uploads and seven GETs. The received image tiles go from the placeholder straight to
+the image in about 100 to 350 ms, and videos show in about 115 to 525 ms (the 24 MiB video is the slowest). The first
+cold pass after a fresh install is the slow one.
+
+The same fixture, with the classification above, fails again when the fix is reverted: the three received image tiles
+never show and keep the idle Download action. That check, and repeated passes of the fixed build, were run after the
+fixture had flagged what turned out to be its own false positives, so how they were found matters:
+
+- **A genuine frame.** A first version of the fix still flashed the Download action on album tiles for a frame,
+  because the materialization intent follows policy one effect pass later. The action is now offered only when the
+  probes have answered and the intent has absorbed the policy they produced, reported in the same effect pass as the
+  grant.
+- **A false positive in the probe.** After that, an intermittent first-run flag remained. Temporary composition
+  logging showed no composition in which the action was offered while retained, so the probe had misread a transition.
+  Reading each frame once and classifying the action from the unmerged tree removed it: five consecutive passes since
+  then are clean, and the reverted build is still caught.
+
+The 261 conversation-media unit tests pass, including a source test that pins the fallback order, that the read is a
+local open that cannot start a transfer, and the account-change guard (it fails when the fallback is removed). Two
+existing tests that expected the Download action immediately now wait for it.
 
 ## Source cohort
 

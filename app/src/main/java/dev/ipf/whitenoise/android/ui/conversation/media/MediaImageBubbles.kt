@@ -216,13 +216,17 @@ internal fun MediaImageBubble(
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
+    var appliedPolicy by remember { mutableStateOf<Boolean?>(null) }
     var materializationIntent by
         rememberAttachmentMaterializationIntent(
             identity = "$key#$attachmentIndex",
             policyAllowsMaterialization = policyAllowsMaterialization,
+            onPolicyApplied = { appliedPolicy = it },
         )
     val startDownload = materializationIntent.shouldMaterialize
-    val downloadActionReady = rememberDownloadActionReady(cacheAvailability, policyAllowsMaterialization)
+    val cacheAvailabilityResolved by cacheAvailability.resolved
+    // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
+    val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
 
     /** Hands the logical image to the conversation-owned viewer before row disposal can occur. */
     fun dispatchViewerOpen() {
@@ -664,13 +668,17 @@ internal fun MediaImageGridTile(
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
+    var appliedPolicy by remember { mutableStateOf<Boolean?>(null) }
     var materializationIntent by
         rememberAttachmentMaterializationIntent(
             identity = tileSlot,
             policyAllowsMaterialization = policyAllowsMaterialization,
+            onPolicyApplied = { appliedPolicy = it },
         )
     val startDownload = materializationIntent.shouldMaterialize
-    val downloadActionReady = rememberDownloadActionReady(cacheAvailability, policyAllowsMaterialization)
+    val cacheAvailabilityResolved by cacheAvailability.resolved
+    // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
+    val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
 
     LaunchedEffect(decodeKey, materializationIntent, reloadToken) {
         if (presentation != null) return@LaunchedEffect
