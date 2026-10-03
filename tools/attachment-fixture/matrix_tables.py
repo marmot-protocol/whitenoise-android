@@ -39,14 +39,15 @@ def tables(agg):
             out.append(f"| {p['name']} | {size_label(c['size'])} | {c['samples']} | {fmt(c, 'prep_visible_ms')} | "
                        f"{fmt(c, 'mdk_upload_ms')} | {fmt(c, 'server_upload_ms')} | {fmt(c, 'upload_publish_ms')} |")
     out += ["", "### Cold download (median ms)", "",
-            "| Link | Size | n | Admission | First progress | Transport | Authoritative READY | Subscription delay | "
-            "Materialize | Open-ready lease |",
-            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
+            "| Link | Size | n | Admission | First progress | Transport | Authoritative READY | Engine feed delay | "
+            "Materialize | Post-READY wait | Open-ready lease |",
+            "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
     for p in agg["profiles"]:
         for c in p["cells"]:
             out.append(f"| {p['name']} | {size_label(c['size'])} | {c['samples']} | {fmt(c, 'admission_ms')} | "
                        f"{fmt(c, 'first_progress_ms')} | {fmt(c, 'transport_ms')} | {fmt(c, 'ready_ms')} | "
-                       f"{fmt(c, 'subscription_delay_ms')} | {fmt(c, 'materialize_ms')} | {fmt(c, 'lease_ms')} |")
+                       f"{fmt(c, 'subscription_delay_ms')} | {fmt(c, 'materialize_ms')} | {fmt(c, 'post_ready_ms')} | "
+                       f"{fmt(c, 'lease_ms')} |")
     out += ["", "### Warm, restart and memory", "",
             "| Link | Size | Warm lease ms | Restart native lease ms | Upload Java peak MiB | Upload native peak MiB | "
             "Cold Java peak MiB | Cold native peak MiB | Uploads | GETs | Retries |",
@@ -104,8 +105,8 @@ def main():
         cand = load(args.candidate)
         print("\n## Candidate\n")
         print(tables(cand))
-        text, verdicts = comparison(base, cand, ("feed_ready_ms", "lease_ms", "subscription_delay_ms", "ready_ms",
-                                                  "upload_publish_ms", "warm_lease_ms"))
+        text, verdicts = comparison(base, cand, ("lease_ms", "post_ready_ms", "first_progress_ms", "ready_ms",
+                                                  "upload_publish_ms", "warm_lease_ms", "feed_ready_ms"))
         print("\n## Comparison\n")
         print(text)
         print(f"\naccepted={verdicts['accepted']} correctness_diffs={len(verdicts['correctness_diffs'])}")
