@@ -212,7 +212,9 @@ class AttachmentDownloadWorker : CoroutineWorker {
             ) {
                 Result.success()
             } else {
-                if (priority == AttachmentDownloadPriority.Interactive) {
+                if (attachmentExecutionClass(priority, userVisible = false, Build.VERSION.SDK_INT) ==
+                    AttachmentExecutionClass.ForegroundWork
+                ) {
                     try {
                         setForeground(
                             attachmentWorkForegroundInfo(applicationContext, request),
@@ -315,7 +317,8 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 intentStore.restoreAutomatic(request)
                 intentStore.setInteractive(request, interactive = true)
                 if (
-                    userVisible &&
+                    attachmentExecutionClass(priority, userVisible, Build.VERSION.SDK_INT) ==
+                    AttachmentExecutionClass.UserInitiatedJob &&
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
                     AttachmentUserInitiatedDownloads.schedule(context.applicationContext, request)
                 ) {
