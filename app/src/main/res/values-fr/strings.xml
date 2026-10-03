@@ -2170,7 +2170,6 @@
     <string name="diagnostics_clear_confirm_title">Effacer les journaux de diagnostic ?</string>
     <string name="diagnostics_clear_confirm_body">Cela supprime définitivement de cet appareil les journaux de diagnostic de tous les profils. Vos réglages de partage ne changent pas.</string>
     <string name="diagnostics_clear_confirm_action">Effacer les journaux</string>
-    <string name="usage_diagnostics_prompt_intro">Aidez-nous à comprendre comment White Noise est utilisé et à rendre la messagerie plus fiable.</string>
     <string name="donate_open_failed">Impossible d’ouvrir la page de dons. Réessayez ou revenez aux paramètres.</string>
     <string name="export_audit_logs_confirm_body">Les journaux de diagnostic contiennent des identifiants techniques et des détails d’activité. Partagez-les uniquement avec une personne de confiance.</string>
     <string name="export_audit_logs">Exporter les journaux de diagnostic</string>
@@ -2194,4 +2193,11 @@
     <string name="delete_local_does_not_leave">Cela ne quitte pas la conversation.</string>
     <string name="user_search_address_unverified">Impossible de vérifier cette adresse.</string>
     <string name="user_search_address_result">Adresse non vérifiée</string>
+    <string name="onboarding_share_usage_title">Partager les données d’utilisation</string>
+    <string name="onboarding_share_usage_summary">Utilisation des fonctions et performances.</string>
+    <string name="onboarding_share_logs_title">Partager les journaux de diagnostic</string>
+    <string name="onboarding_share_logs_summary">Données techniques sur la messagerie.</string>
+    <string name="onboarding_details_accessibility">%1$s : %2$s</string>
+    <string name="onboarding_details_expanded">Développé</string>
+    <string name="onboarding_details_collapsed">Réduit</string>
 </resources>
