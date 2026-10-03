@@ -1212,6 +1212,9 @@
         "anchor": "fun rememberConversationViewportRestorationOwner(",
         "test_ids": ["CON-027"]
       },
+      {"surface": "AttachmentLibraryEmptyState", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "internal fun AttachmentLibraryEmptyState(", "test_ids": ["GRP-018"]},
+      {"surface": "AttachmentLibraryFooter", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/AttachmentLibraryStatus.kt", "anchor": "internal fun AttachmentLibraryFooter(", "test_ids": ["GRP-018"]},
+      {"surface": "rememberGroupAttachmentPager", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/GroupAttachmentLibrary.kt", "anchor": "internal fun rememberGroupAttachmentPager(", "test_ids": ["GRP-018"]},
       {
         "surface": "folderDragRowModifier",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
