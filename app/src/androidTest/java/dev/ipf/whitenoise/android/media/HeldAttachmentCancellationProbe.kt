@@ -179,19 +179,19 @@ internal object HeldAttachmentCancellationProbe {
     ) = state.downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false)
 
     /** Uses only the explicitly generated loopback server and bounds each transport operation. */
-    private suspend fun control(
+    internal suspend fun control(
         port: Int,
         path: String,
     ) = http(port, path, "POST")
 
     /** Reads synthetic request events without exporting account ids or ciphertext locators. */
-    private suspend fun ledger(port: Int): List<JSONObject> {
+    internal suspend fun ledger(port: Int): List<JSONObject> {
         val events = JSONArray(http(port, "/__ledger", "GET"))
         return List(events.length()) { events.getJSONObject(it) }
     }
 
     /** Waits for the durable event itself rather than assuming a fixed ledger flush delay. */
-    private suspend fun awaitLedger(
+    internal suspend fun awaitLedger(
         port: Int,
         done: (List<JSONObject>) -> Boolean,
     ): List<JSONObject> =

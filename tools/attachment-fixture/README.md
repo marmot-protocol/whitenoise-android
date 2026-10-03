@@ -54,6 +54,29 @@ The `controller-restart` mode force-stops only the isolated emulator fixture pac
 
 The `controller-cancel` mode uses the same genuine send, then holds the received HTTP body without EOF. It requires native acknowledgement and a server-recorded disconnect within five seconds, ten ordinary terminal joins and a thirty-second quiet interval with no extra acquisition, followed by an explicit Retry returning exact bytes. The separate `cancellation_checker.py` also enforces measured Java/native memory and overall latency ceilings. Reports remain failed when any event, budget or retry proof is missing. This checks the shared Android cancellation adapter; platform job replacement and external handoff need their own qualification.
 
+The `controller-resume` and `controller-resume-changed` modes send a generated
+4 MiB file through the shipping Android controller, hold the received ciphertext
+at 2 MiB, and interrupt the connection without a deliberate Retry. Native retry
+must send Range at that prefix with If-Range. The compatible case transfers only
+the suffix; a changed validator returns a complete replacement body. Both cases
+require exact plaintext, no readable partial lease, exactly two GET attempts,
+independent completion/disconnect events and zero acquisition on subsequent
+retained reads. `resume_checker.py` rejects missing or contradictory evidence.
+These probes match MDK's canonical `hash.bin` locator so a different fallback
+locator cannot replace the checkpoint under test. Ordinary small-file modes keep
+their original upload descriptor and strict performance ceilings.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-resume
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-resume-changed
+```
+
+These are **transport interruption** checks. They do not simulate a JobScheduler
+stop or Android process death. Latency and sampled Java/native peaks remain in
+the report, but representative 4 MiB performance is explicitly unqualified;
+the 1 KiB performance checker is inapplicable rather than relaxed. Full issue
+closure requires the remaining [five-issue qualification](../../docs/attachment-remaining-closure.md).
+
 Performance checks use explicit environment profiles: local API30 arm64 defaults to `reference-api30-arm64`; CI passes `ci-api34-x86_64` as the script's third argument. The runner verifies actual API/ABI and enforces every sample through `budget_checker.py` before transport qualification. Violations are included in the saved report and fail the command; no successful HTTP transfer can override them. To check only the performance fields of an existing report:
 
 ```bash

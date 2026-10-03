@@ -142,6 +142,37 @@ class FixtureContractTest(unittest.TestCase):
         self.assertFalse(client.is_alive())
         self.assertEqual(source.read_bytes(), result[0][2])
 
+    def test_interruption_preserves_prefix_and_replacement_control(self):
+        """Both validator paths close the held socket and keep replacement responses independent."""
+        for changed in (False, True):
+            with self.subTest(changed=changed):
+                token = "changed-prefix" if changed else "compatible-prefix"
+                source = self.server.generate(token, 4 * 1024 * 1024)
+                self.get("/__hold-resumable-acquisition", method="POST")
+                client = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+                client.request("GET", "/" + token)
+                response = client.getresponse()
+                validator = response.getheader("ETag")
+                prefix = response.read(2 * 1024 * 1024)
+                held_count = 2 if changed else 1
+                self.await_event("held", held_count)
+                path = "/__interrupt-changed-validator" if changed else "/__interrupt-acquisition"
+                self.assertEqual(200, self.get(path, method="POST")[0])
+                with self.assertRaises(http.client.IncompleteRead):
+                    response.read()
+                client.close()
+                self.await_event("disconnect", held_count)
+                status, _, body = self.get("/" + token, {
+                    "Range": f"bytes={len(prefix)}-", "If-Range": validator,
+                })
+                self.assertEqual(200 if changed else 206, status)
+                self.assertEqual(source.read_bytes() if changed else source.read_bytes()[len(prefix):], body)
+                events = self.await_event("complete", held_count)
+                relevant = [e for e in events if e["fixture"] == token]
+                self.assertEqual([int(not changed)], [e["value"] for e in relevant if e["kind"] == "if_range_match"])
+                self.assertEqual([len(prefix)], [e["value"] for e in relevant if e["kind"] == "range_requested_offset"])
+                self.assertNotIn(validator, json.dumps(events))
+
     def test_unknown_length_head_and_invalid_range(self):
         """Unknown total length and invalid ranges remain distinguishable from a full known body."""
         source = self.server.generate("unknown", 1024, Control(unknown_length=True))
@@ -182,6 +213,20 @@ class FixtureContractTest(unittest.TestCase):
         self.assertEqual(404, self.get("/../ledger.sqlite3")[0])
         self.assertEqual(413, self.get("/upload", method="PUT", headers={"Content-Length": "999999999"})[0])
         self.assertEqual(0o600, Path(self.server.ledger.path).stat().st_mode & 0o777)
+
+    def test_binary_suffix_is_the_same_generated_blob_without_changing_default_uploads(self):
+        """Match MDK's canonical group fallback only when that explicit fixture mode requests it."""
+        original = b"generated suffix fixture"
+        self.server.upload_extension = ".bin"
+        status, _, body = self.get("/upload", method="PUT", body=original)
+        self.assertEqual(200, status)
+        descriptor = json.loads(body)
+        self.assertTrue(descriptor["url"].endswith(descriptor["sha256"] + ".bin"))
+        self.assertEqual(original, self.get("/" + descriptor["sha256"] + ".bin")[2])
+        self.assertEqual(original, self.get("/" + descriptor["sha256"])[2])
+        self.assertEqual(404, self.get("/../ledger.sqlite3.bin")[0])
+        with self.assertRaises(ValueError):
+            FixtureServer(self.directory.name, upload_extension="/../escape")
 
 
 if __name__ == "__main__":

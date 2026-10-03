@@ -13,6 +13,7 @@ from budget_checker import PROFILES, check_budget
 from cancellation_checker import check_cancellation
 from fixture_relay import FixtureRelay
 from fixture_server import FixtureServer
+from resume_checker import check_resume
 
 APP = "dev.ipf.whitenoise.android.medialatency"
 PROBE = "dev.ipf.whitenoise.android.media.MediaAttachmentLatencyProbe#measureControlledReceivedAttachment"
@@ -56,7 +57,7 @@ def wait_for_cancellation_completion(ledger, start):
         time.sleep(min(0.01, remaining))
 
 
-def run(adb, serial, root, output, private_debug=False, budget_profile="reference-api30-arm64", android_send_controller=False, held_cancellation=False, process_restart=False, physical_fixture_serial=None):
+def run(adb, serial, root, output, private_debug=False, budget_profile="reference-api30-arm64", android_send_controller=False, held_cancellation=False, process_restart=False, physical_fixture_serial=None, transport_resume=None):
     """Count genuine uploaded ciphertext and received bodies without resetting failed attempts."""
     physical = physical_fixture_serial is not None
     if physical:
@@ -75,8 +76,15 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         raise ValueError("held cancellation requires the Android send controller")
     if held_cancellation and process_restart:
         raise ValueError("cancellation and process-restart scenarios require separate ledgers")
+    if transport_resume is not None and (
+        transport_resume not in ("compatible", "changed-validator")
+        or not android_send_controller or held_cancellation or process_restart
+    ):
+        raise ValueError("transport resume requires a separate genuine-controller scenario")
     session = str(uuid.uuid4()) if process_restart else None
-    server = FixtureServer(root)
+    # Native group fallback uses hash.bin. Match the published locator only for
+    # resume qualification so a different locator cannot replace its checkpoint.
+    server = FixtureServer(root, upload_extension=".bin") if transport_resume else FixtureServer(root)
     relay = FixtureRelay()
     forwards = []
     threads = []
@@ -103,6 +111,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             "-e", "fixtureRelayPort", str(relay.port),
             *(["-e", "fixtureUseAndroidSendController", "true"] if android_send_controller else []),
             *(["-e", "fixtureCancellation", "true"] if held_cancellation else []),
+            *(["-e", "fixtureTransportResume", transport_resume] if transport_resume else []),
             *(["-e", "fixtureRestartRole", "prepare", "-e", "fixtureRestartSession", session] if process_restart else []),
             APP + ".test/androidx.test.runner.AndroidJUnitRunner",
         )
@@ -138,7 +147,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         report["failure_class"] = type(error).__name__
     finally:
         # Retain failure/timeout evidence before cleanup; never discard failed attempts.
-        if held_cancellation:
+        if held_cancellation or transport_resume:
             events, report["ledger_finalized"] = wait_for_cancellation_completion(server.ledger, len(before))
         else:
             events, report["ledger_finalized"] = wait_for_ledger_completion(server.ledger, len(before))
@@ -188,6 +197,20 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             report["qualified"] = report.get("instrumentation_passed", False) and report["budget_check"]["passed"]
             report["deferred"] = ["platform-worker-lifetime", "external-handoff", "process-restart-offline",
                                   "mdk-large-received-sender", "physical-device"]
+        if transport_resume:
+            report["scope"] = "android-host-resolver-packaged-native-transport-resume"
+            report["transport_resume_check"] = check_resume(report["metrics"], events, transport_resume)
+            # The unchanged 1 KiB performance ceilings do not describe this
+            # 4 MiB functional probe. Keep measured peaks/timing and defer SLOs.
+            report["budget_check"] = {"applicable": False, "passed": False,
+                                     "reason": "representative performance remains unqualified"}
+            report["qualified"] = (
+                report.get("instrumentation_passed", False) and report["ledger_finalized"]
+                and report["transport_resume_check"]["passed"]
+                and report.get("environment") == PROFILES[budget_profile]
+            )
+            report["deferred"] = ["platform-worker-lifetime", "external-handoff", "process-restart-offline",
+                                  "mdk-large-received-sender", "physical-device"]
         if physical and "physical-device" in report["deferred"]:
             report["deferred"].remove("physical-device")
         report["deferred"].extend(["manual-ui-flows", "representative-large-file-performance"])
@@ -222,8 +245,9 @@ def main():
     parser.add_argument("--held-cancellation", action="store_true", help="Require bounded native cancel, server disconnect and quiet interval")
     parser.add_argument("--process-restart", action="store_true", help="Force-stop the isolated fixture between retained-read processes")
     parser.add_argument("--physical-fixture-serial", help="Explicitly opt into the matching physical serial with the Pixel profile; install only the isolated fixture in place after a private backup")
+    parser.add_argument("--transport-resume", choices=("compatible", "changed-validator"), help="Qualify native retry after a held 4 MiB body is interrupted; Android scheduler lifetime stays deferred")
     args = parser.parse_args()
-    run(args.adb, args.serial, args.root, args.output, args.private_debug, args.budget_profile, args.android_send_controller, args.held_cancellation, args.process_restart, args.physical_fixture_serial)
+    run(args.adb, args.serial, args.root, args.output, args.private_debug, args.budget_profile, args.android_send_controller, args.held_cancellation, args.process_restart, args.physical_fixture_serial, args.transport_resume)
 
 
 if __name__ == "__main__":
