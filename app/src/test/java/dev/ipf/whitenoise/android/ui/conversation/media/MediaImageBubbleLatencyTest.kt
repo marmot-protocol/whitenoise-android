@@ -117,7 +117,13 @@ class MediaImageBubbleLatencyTest {
         }
         composeRule.waitForIdle()
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.media_tap_to_download)).assertIsDisplayed()
+        val download = context.getString(R.string.media_tap_to_download)
+        // Download is offered only once the host and MDK probes have answered that nothing is retained.
+        composeRule.waitUntil(10_000) {
+            composeRule.waitForIdle()
+            composeRule.onAllNodesWithContentDescription(download).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription(download).assertIsDisplayed()
         assertEquals(0, fixture.calls.size)
     }
 
