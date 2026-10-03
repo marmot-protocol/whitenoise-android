@@ -146,7 +146,9 @@ class ConversationViewportRestorationOwnerTest {
             var revealed = false
             val job =
                 launch {
-                    if (fixture.owner.commitInitialPosition(position, { measured() }, { frame.await() })) revealed = true
+                    if (fixture.owner.commitInitialPosition(position, { measured() }, { frame.await() })) {
+                        revealed = true
+                    }
                 }
             runCurrent()
             job.cancel()
