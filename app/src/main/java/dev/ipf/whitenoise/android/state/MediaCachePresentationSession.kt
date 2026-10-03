@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.media.toByteArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -28,6 +29,29 @@ internal suspend fun ConversationController.cachedAttachmentPlaintext(
     val key = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
     return withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(key) }
         ?: withContext(Dispatchers.IO) { appState.diskMediaCache.get(key) }
+}
+
+/**
+ * Reads MDK-retained plaintext for a cache-only render, never starting a transfer.
+ *
+ * The host presentation caches can be empty while MDK still holds verified bytes, for example after the cache was
+ * trimmed or for media received while no host copy was written. A late result after an account change is rejected.
+ */
+internal suspend fun ConversationController.retainedNativeAttachmentBytes(
+    messageIdHex: String,
+    attachmentIndex: Int,
+): ByteArray? {
+    val account = boundAccountRef ?: return null
+    val request =
+        AttachmentTransferRequest(
+            account,
+            group.groupIdHex,
+            messageIdHex,
+            attachmentIndex,
+            sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
+        )
+    val bytes = appState.openNativeAttachment(request)?.use { it.toByteArray() }
+    return bytes?.takeIf { boundAccountRef == account }
 }
 
 /** Reconcile presentation state with the encrypted L1/L2 cache. */

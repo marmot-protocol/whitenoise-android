@@ -138,16 +138,42 @@ def _check_ledger(events, boundary, sizes, violations):
         violations.append("acquisition was not denied exactly once before restart")
 
 
-def check_media(prepare, read, events, boundary):
+def _check_tiles(tiles, violations):
+    """Every restored tile showed its media without a Download or Retry affordance and opened on one tap."""
+    rows = {}
+    for row in (m for m in tiles if m.get("phase") == "media-tile"):
+        key = (row.get("message"), row.get("index"), row.get("role"))
+        if key in rows:
+            violations.append("a tile row was recorded twice")
+        rows[key] = row
+    for message, index, media in EXPECTED:
+        for role in ROLES:
+            row = rows.get((message, index, role))
+            if (row is None or row.get("media") != media or row.get("shown") is not True
+                    or not _finite(row.get("settle_ms"))):
+                violations.append(f"missing or unshown tile for {role}-{message}-{index}")
+            elif row.get("download_affordance_seen") is not False or row.get("retry_affordance_seen") is not False:
+                violations.append(f"a retained {role}-{message}-{index} showed a Download or Retry affordance")
+            elif row.get("one_tap_opened") is not True:
+                violations.append(f"{role}-{message}-{index} did not open exactly once on one tap")
+    if len(rows) != len(EXPECTED) * len(ROLES):
+        violations.append("unexpected tile rows")
+
+
+def check_media(prepare, read, events, boundary, tiles=None):
     """Fail closed on any missing proof, extra request, inexact byte, absent preview or missing process boundary."""
-    if (not isinstance(prepare, list) or not isinstance(read, list)
-            or any(not isinstance(m, dict) for m in prepare + read)):
+    check_tiles = tiles is not None
+    tiles = [] if tiles is None else tiles
+    if (not isinstance(prepare, list) or not isinstance(read, list) or not isinstance(tiles, list)
+            or any(not isinstance(m, dict) for m in prepare + read + tiles)):
         return {"passed": False, "violations": ["invalid metric collection"], "scope": SCOPE,
                 "attachments": 0, "performance_qualified": False}
     violations = []
     sizes = _check_prepare(prepare, violations)
     _check_read(read, sizes, violations)
     _check_ledger(events, boundary, sizes, violations)
+    if check_tiles:
+        _check_tiles(tiles, violations)
     host_hits = {f"{r['role']}-{r['message']}-{r['index']}": r.get("host_disk_hit")
                  for r in read if r.get("phase") == "media-readback"}
     return {"passed": not violations, "violations": violations, "scope": SCOPE,

@@ -192,8 +192,9 @@ internal fun MediaImageBubble(
     }
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     var reloadToken by remember(key, attachmentIndex, epoch) { mutableIntStateOf(0) }
-    var cachedPlaintextOnEntry by
+    val cacheAvailability =
         rememberImageAttachmentCacheAvailability(controller, key, attachmentIndex, epoch, presentation != null)
+    var cachedPlaintextOnEntry by cacheAvailability.cached
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(key).getOrNull(attachmentIndex) != null
     // Auto-download gating (#10): retained/cached own bytes always render;
@@ -215,12 +216,17 @@ internal fun MediaImageBubble(
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
+    var appliedPolicy by remember { mutableStateOf<Boolean?>(null) }
     var materializationIntent by
         rememberAttachmentMaterializationIntent(
             identity = "$key#$attachmentIndex",
             policyAllowsMaterialization = policyAllowsMaterialization,
+            onPolicyApplied = { appliedPolicy = it },
         )
     val startDownload = materializationIntent.shouldMaterialize
+    val cacheAvailabilityResolved by cacheAvailability.resolved
+    // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
+    val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
 
     /** Hands the logical image to the conversation-owned viewer before row disposal can occur. */
     fun dispatchViewerOpen() {
@@ -383,6 +389,8 @@ internal fun MediaImageBubble(
                                     )
                                 },
                             )
+                        // Until the retained-bytes probes answer, a file MDK holds must not flash a Download action.
+                        !startDownload && !downloadActionReady -> Unit
                         !startDownload ->
                             MediaCircleAction(
                                 icon = Icons.Default.ArrowDownward,
@@ -629,13 +637,15 @@ internal fun MediaImageGridTile(
     }
     var failed by remember(decodeKey) { mutableStateOf(false) }
     var reloadToken by remember(decodeKey) { mutableIntStateOf(0) }
-    var cachedPlaintextOnEntry by rememberImageAttachmentCacheAvailability(
-        controller,
-        messageIdHex,
-        attachmentIndex,
-        reference.sourceEpoch,
-        presentation != null,
-    )
+    val cacheAvailability =
+        rememberImageAttachmentCacheAvailability(
+            controller,
+            messageIdHex,
+            attachmentIndex,
+            reference.sourceEpoch,
+            presentation != null,
+        )
+    var cachedPlaintextOnEntry by cacheAvailability.cached
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex) != null
     // Mirror the single-image bubble's auto-download gate (#10) so the
@@ -658,12 +668,17 @@ internal fun MediaImageGridTile(
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasRetainedPlaintext = retainedPlaintextOnEntry,
         )
+    var appliedPolicy by remember { mutableStateOf<Boolean?>(null) }
     var materializationIntent by
         rememberAttachmentMaterializationIntent(
             identity = tileSlot,
             policyAllowsMaterialization = policyAllowsMaterialization,
+            onPolicyApplied = { appliedPolicy = it },
         )
     val startDownload = materializationIntent.shouldMaterialize
+    val cacheAvailabilityResolved by cacheAvailability.resolved
+    // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
+    val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
 
     LaunchedEffect(decodeKey, materializationIntent, reloadToken) {
         if (presentation != null) return@LaunchedEffect
@@ -795,6 +810,8 @@ internal fun MediaImageGridTile(
                                 )
                             },
                         )
+                    // Until the retained-bytes probes answer, a file MDK holds must not flash a Download action.
+                    !startDownload && !downloadActionReady -> Unit
                     !startDownload ->
                         MediaCircleAction(
                             icon = Icons.Default.ArrowDownward,
