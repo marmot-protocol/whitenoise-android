@@ -66,7 +66,7 @@ jobs:
 
       - name: Test manual release guide validator
         if: matrix.phase == 'tooling'
-        run: python3 -m unittest scripts/test_check_manual_test_guide.py
+        run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_check_viewport_restoration_coverage.py
 
       - name: Test attachment fixture HTTP ledger and cancellation contracts
         if: matrix.phase == 'tooling'
@@ -551,6 +551,7 @@ jobs:
         run: |
           test "$COVERAGE_REPORT_OUTCOME" = success
           python3 scripts/check_runtime_listener_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
+          python3 scripts/check_viewport_restoration_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
 
       - name: Save MarmotKit artifact
         if: >-

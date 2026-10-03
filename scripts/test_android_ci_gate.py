@@ -183,6 +183,16 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('        id: coverage_report\n',
                       self.named_step(self.tests_job, 'Coverage report (Kover)'))
 
+    def test_viewport_floor_reuses_the_required_full_suite_report(self):
+        floor = self.named_step(self.tests_job, 'Runtime listener teardown coverage floor')
+        self.assertIn("matrix.flavor == 'Zapstore'", floor)
+        self.assertIn("steps.unit_tests.outcome == 'success'", floor)
+        self.assertIn('test "$COVERAGE_REPORT_OUTCOME" = success', floor)
+        self.assertIn('scripts/check_viewport_restoration_coverage.py', floor)
+        self.assertNotIn('continue-on-error:', floor)
+        self.assertNotIn('./gradlew', floor)
+        self.assertIn('scripts/test_check_viewport_restoration_coverage.py', self.build_contracts)
+
     def test_screenshot_owners_come_from_the_checked_registry(self):
         """Both flavors verify the registered owners, then prove every golden was compared."""
         self.assertIn("name: Curated screenshot verification (${{ matrix.flavor }})", self.screenshots)
