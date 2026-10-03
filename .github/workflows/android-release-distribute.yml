@@ -90,6 +90,10 @@ jobs:
           cp build/production-release/release-notes-en-US.txt build/play-whats-new/whatsnew-en-US
 
       - name: Upload reviewed AAB to internal testing only
+        id: play_deferred
+        # Play requires changesNotSentForReview while other changes await review and
+        # rejects it when nothing else is pending. Try the deferred commit first.
+        continue-on-error: true
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
@@ -100,6 +104,19 @@ jobs:
           releaseName: White Noise ${{ steps.candidate.outputs.version }}
           whatsNewDirectory: build/play-whats-new
           mappingFile: build/production-release/mapping-${{ steps.candidate.outputs.version }}-play.txt
-          # Play refuses to auto-submit while other changes await review. Commit the
-          # edit and leave sending it for review to the Console operator.
           changesNotSentForReview: true
+      - name: Upload reviewed AAB to internal testing only (nothing else pending)
+        if: steps.play_deferred.outcome == 'failure'
+        # A fresh edit that Play sends for review itself. Play accepts this only when
+        # no other changes await review, so it submits this internal release alone.
+        # If the first edit was in fact committed, Play rejects the reused version code.
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: dev.ipf.whitenoise.android
+          releaseFiles: build/production-release/*.aab
+          tracks: internal
+          status: completed
+          releaseName: White Noise ${{ steps.candidate.outputs.version }}
+          whatsNewDirectory: build/play-whats-new
+          mappingFile: build/production-release/mapping-${{ steps.candidate.outputs.version }}-play.txt
