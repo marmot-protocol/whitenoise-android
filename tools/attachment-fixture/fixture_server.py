@@ -184,6 +184,9 @@ class Handler(BaseHTTPRequestHandler):
                 control.release.clear()
             self.server.ledger.event(None, "control", "hold_acquisition")
             self.reply(200, {"held_after": 1024})
+        elif self.path == "/__platform-stop-marker":
+            self.server.ledger.event(None, "control", "platform_stop_marker")
+            self.reply(200, {"marked": True})
         elif self.path in ("/__background-start", "/__background-end"):
             kind = "background_start" if self.path == "/__background-start" else "background_end"
             self.server.ledger.event(None, "control", kind)
@@ -208,12 +211,12 @@ class Handler(BaseHTTPRequestHandler):
                 control.release.clear()
             self.server.ledger.event(None, "control", "hold_resumable_acquisition")
             self.reply(200, {"held_after": 2 * 1024 * 1024})
-        elif self.path in ("/__interrupt-acquisition", "/__interrupt-changed-validator"):
+        elif self.path in ("/__interrupt-acquisition", "/__interrupt-changed-validator", "/__interrupt-acquisition-held-resume"):
             changed = self.path == "/__interrupt-changed-validator"
             # Existing responses own the old control. Replacement requests must
             # not inherit its interruption or hold, even if the retry is immediate.
             for token, previous in list(self.server.controls.items()):
-                replacement = Control()
+                replacement = Control(interval=0.01, hold_after=3 * 1024 * 1024) if self.path.endswith("held-resume") else Control()
                 replacement.validator_generation = previous.validator_generation + int(changed)
                 self.server.controls[token] = replacement
                 previous.interrupt.set()

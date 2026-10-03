@@ -216,7 +216,7 @@ internal object PlatformBackgroundAttachmentProbe {
     }
 
     /** Replace only the Lab application's lazy state; platform jobs, native calls and HTTP remain real. */
-    private suspend fun bindGeneratedApplication(
+    internal suspend fun bindGeneratedApplication(
         context: Context,
         state: WhiteNoiseAppState,
     ): suspend () -> Unit =
@@ -234,7 +234,7 @@ internal object PlatformBackgroundAttachmentProbe {
         }
 
     /** Commands contain only fixed fixture controls and are guarded by Lab identity plus an emulator check. */
-    private fun shell(command: String): String =
+    internal fun shell(command: String): String =
         InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command).use { descriptor ->
             android.os.ParcelFileDescriptor
                 .AutoCloseInputStream(descriptor)
