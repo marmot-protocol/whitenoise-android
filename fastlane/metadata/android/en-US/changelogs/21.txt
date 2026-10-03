@@ -1,0 +1,1 @@
+Adds custom emoji, including NIP-30 emoji in reactions and shortcode suggestions. Polls gain replies, reactions, per-voter results and custom closing times. Adds smart-folder rules and unread, mention, direct-chat and pinned filters. GIF profile pictures now animate. Improves dictation, attachments, notifications, reading position, relay setup and chat-list loading.
