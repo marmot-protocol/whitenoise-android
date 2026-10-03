@@ -60,6 +60,10 @@ class MediaAttachmentLatencyProbe {
     @Test
     fun measureControlledReceivedAttachment() = runBlocking { ControlledAttachmentProbe.run() }
 
+    /** Opt-in genuine media lifecycle probe: one prepare process and one separately launched offline read process. */
+    @Test
+    fun measureControlledMediaLifecycle() = runBlocking { MediaLifecycleAttachmentProbe.run() }
+
     /** Compares generated file preparation, upload, and verified cold downloads by payload size. */
     @Test
     fun measureSyntheticSizeMatrix() =
