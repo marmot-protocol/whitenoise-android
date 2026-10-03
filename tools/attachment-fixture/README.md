@@ -71,6 +71,21 @@ bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-a
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-resume-changed
 ```
 
+The `controller-phases` mode sends two generated files through the shipping controller, a paced 32 MiB
+file and a 1 MiB file, and subscribes to the same `nativeProgress` observer the conversation file card uses.
+The paced file must publish one body phase whose byte count never moves backwards and whose total equals the
+true ciphertext length, followed only by forward phases (verification, decryption) and Ready. The second file
+hits a permanent miss: the probe must observe a real failure phase, acknowledge cancellation when that phase
+is a live deferred attempt, then admit exactly one deliberate Retry that ends Ready with exact bytes.
+`phases_checker.py` also reads the server ledger: one upload each, one successful body for the paced file,
+only 404 attempts before the single successful body for the other, and a terminal outcome for every request.
+Phase observation reports which transient phases the native feed actually published; an unobserved phase is
+reported as such rather than inferred. The checker explicitly records `performance_qualified: false`.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-phases
+```
+
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
 the report, but representative 4 MiB performance is explicitly unqualified;
