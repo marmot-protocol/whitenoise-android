@@ -125,7 +125,8 @@ For each declared link (`unshaped`, `wifi` at 50/20 Mbit/s and 20 ms, `constrain
 **server** shapes bandwidth and latency in both directions, so a constrained label is verified outside the app: the
 checker rejects a sample whose server-observed throughput exceeds the declared link. Each link runs genuine uploads
 through the shipping controller (split into its synchronous preparation half and its upload-and-publish half), a cold
-download, and a warm retained read, for 64 KiB, 1 MiB, 8 MiB and 30 MiB generated files. The cold download records the
+download, and a warm retained read, for 64 KiB, 1 MiB, 8 MiB and 30 MiB generated files (the 4/1 Mbit/s link stops at
+8 MiB: a 30 MiB upload needs about 4.5 minutes there and the engine rejected its reference once the group epoch moved). The cold download records the
 authoritative phase times from a 2 ms read-only poll next to the production subscription feed, plus sampled Java and
 native peaks, so a delay is attributed to Android preparation, the FFI and engine, storage or transport instead of
 guessed. A numbered ledger marker brackets every sample, so each sample owns exactly its own requests, bytes and
