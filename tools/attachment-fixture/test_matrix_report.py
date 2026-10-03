@@ -21,6 +21,7 @@ def profile(plan, down=0, up=0, latency=0, body_ms=None, name="unshaped", scale=
     events, foreground, seq, clock = [], [], 0, 0
 
     def add(request, kind, value, fixture, at):
+        """Append one committed ledger event and return its sequence number."""
         nonlocal seq
         seq += 1
         events.append({"seq": seq, "request": request, "kind": kind, "value": value, "fixture": fixture, "at_ns": at})
