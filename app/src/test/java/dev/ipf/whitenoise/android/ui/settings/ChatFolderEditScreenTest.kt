@@ -19,6 +19,10 @@ import dev.ipf.whitenoise.android.state.ChatFolderPreferences
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.FolderField
+import dev.ipf.whitenoise.android.state.FolderMode
+import dev.ipf.whitenoise.android.state.SmartFolderCodec
+import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WHITE_NOISE_TOP_BAR_BACK_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -47,6 +51,91 @@ class ChatFolderEditScreenTest {
             .edit()
             .clear()
             .commit()
+    }
+
+    @Test
+    fun firstArchivedFilterReplacesTheDefaultScopeWithoutAnOppositeConstraint() {
+        val appState = appState()
+        renderEditor(appState, {}, folderId = null)
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Archive")
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.onNodeWithTag("folder.moreFilters").performClick()
+        composeRule.onNodeWithTag("folder.addField.ARCHIVED").performClick()
+        composeRule.onNodeWithTag("folder.conditionDone").performClick()
+        composeRule.onNodeWithTag("folder.save").performClick()
+        val folder = appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).first { it.name == "Archive" }
+        val rule = appState.chatFolderPreferences.folderRule(ACCOUNT_REF, folder.id)!!
+        val root = SmartFolderCodec.decode(rule.smartFilter!!)!!
+        val conditions = root.children.filterIsInstance<SmartFolderFilter.Condition>()
+        val archived = conditions.filter { it.field == FolderField.ARCHIVED }
+        assertEquals(1, archived.size)
+        assertEquals(FolderMode.PRESENT, archived.single().mode)
+    }
+
+    @Test
+    fun clearingLastSavedFilterKeepsSimpleControlsEditable() {
+        val appState = appState()
+        val store = appState.chatFolderPreferences
+        val id = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        store.foldersFor(ACCOUNT_REF)
+        store.commitFolderDraft(ACCOUNT_REF, id, null, "", emptySet(), ChatFolderRule(keyword = "Before"))
+        renderEditor(appState, {})
+        val content = composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+        content.performScrollToNode(hasTestTag("folder.legacyEdit"))
+        composeRule.onNodeWithTag("folder.legacyEdit").performClick()
+        content.performScrollToNode(hasTestTag("folder.keyword"))
+        composeRule.onNodeWithTag("folder.keyword").performTextReplacement("")
+        composeRule.onNodeWithTag("folder.keyword").performTextReplacement("After")
+        composeRule.onNodeWithTag("folder.save").performClick()
+        assertEquals("After", store.folderRule(ACCOUNT_REF, id)?.keyword)
+    }
+
+    @Test
+    fun turningOffLastSavedSwitchKeepsItAvailableToTurnOnAgain() {
+        val appState = appState()
+        val store = appState.chatFolderPreferences
+        val id = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        store.foldersFor(ACCOUNT_REF)
+        store.commitFolderDraft(ACCOUNT_REF, id, null, "", emptySet(), ChatFolderRule(unreadOnly = true))
+        renderEditor(appState, {})
+        val content = composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+        content.performScrollToNode(hasTestTag("folder.legacyEdit"))
+        composeRule.onNodeWithTag("folder.legacyEdit").performClick()
+        val label = app.getString(R.string.chat_folder_unread_only)
+        content.performScrollToNode(hasText(label))
+        composeRule.onNodeWithText(label).performClick()
+        composeRule.onNodeWithText(label).assertIsOff()
+        content.performScrollToNode(hasText(label))
+        composeRule.onNodeWithText(label).performClick()
+        composeRule.onNodeWithText(label).assertIsOn()
+    }
+
+    @Test
+    fun optionalDescriptionCanBeAddedAndSavedWithoutChangingManualRules() {
+        val appState = appState()
+        renderEditor(appState, {}, folderId = null)
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Personal")
+        composeRule.onNodeWithTag("folder.description").assertDoesNotExist()
+        composeRule.onNodeWithTag("folder.addDescription").performClick()
+        composeRule.onNodeWithTag("folder.description").performTextReplacement("My notes")
+        composeRule.onNodeWithTag("folder.save").performClick()
+        val folder = appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).first { it.name == "Personal" }
+        assertEquals("My notes", folder.description)
+        assertEquals(null, appState.chatFolderPreferences.folderRule(ACCOUNT_REF, folder.id))
+    }
+
+    @Test
+    fun cancellingFirstFilterKeepsManualFolderAndOrdinaryWindow() {
+        val appState = appState()
+        renderEditor(appState, {}, folderId = null)
+        composeRule.onNodeWithTag("folder.name").performTextReplacement("Personal")
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.onNodeWithTag("folder.addField.UNREAD").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.cancel)).performClick()
+        composeRule.onNodeWithTag("folder.group.").assertDoesNotExist()
+        composeRule.onNodeWithTag("folder.save").performClick()
+        val folder = appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).first { it.name == "Personal" }
+        assertEquals(null, appState.chatFolderPreferences.folderRule(ACCOUNT_REF, folder.id))
     }
 
     @Test
@@ -231,8 +320,8 @@ class ChatFolderEditScreenTest {
         var closed = false
         renderEditor(appState, { closed = true }, folderId = null, initialManualChatIds = manual)
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Personal")
-        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.legacyEdit"))
-        composeRule.onNodeWithTag("folder.legacyEdit").assertExists()
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.add."))
+        composeRule.onNodeWithTag("folder.legacyEdit").assertDoesNotExist()
         composeRule.onNodeWithTag("folder.group.").assertDoesNotExist()
         composeRule.onNodeWithTag("folder.save").performClick()
         assertTrue(closed)
@@ -247,8 +336,11 @@ class ChatFolderEditScreenTest {
         val appState = appState()
         renderEditor(appState, {}, folderId = null)
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Advanced")
-        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.upgrade"))
-        composeRule.onNodeWithTag("folder.upgrade").performClick()
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.add."))
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.onNodeWithTag("folder.addField.MENTIONS").performClick()
+        composeRule.onNodeWithTag("folder.group.").assertDoesNotExist()
+        composeRule.onNodeWithTag("folder.conditionDone").performClick()
         composeRule.onNodeWithTag("folder.group.").assertExists()
         composeRule.onNodeWithTag("folder.save").performClick()
         val reloaded = ChatFolderPreferences(app)

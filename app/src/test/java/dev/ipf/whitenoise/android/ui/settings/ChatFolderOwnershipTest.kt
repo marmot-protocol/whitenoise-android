@@ -179,6 +179,7 @@ class ChatFolderOwnershipTest {
         val folder = state.chatFolderPreferences.createFolder(A, "Work")!!
         var closed = false
         showEditor(state, folder.id) { closed = true }
+        composeRule.onNodeWithTag("folder.addDescription").performClick()
         composeRule.onNodeWithTag("folder.description").performTextReplacement("Keep this draft")
         val save = saveAction()
         composeRule.runOnIdle {
@@ -270,13 +271,16 @@ class ChatFolderOwnershipTest {
         val restoration = StateRestorationTester(composeRule)
         restoration.setContent { WhiteNoiseTheme { ChatFolderEditScreen(state, A, null, {}) } }
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Rotated")
-        composeRule.onNodeWithText(app.getString(R.string.folder_included_chats)).performClick()
+        val inclusions = app.getString(R.string.smart_folder_always_include)
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasText(inclusions))
+        composeRule.onNodeWithText(inclusions).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_manual_hint)).assertExists()
         composeRule.onNode(isToggleable() and hasAnyAncestor(hasTestTag("folder.choice.g1"))).performClick()
         composeRule.onNodeWithText(app.getString(R.string.done)).performClick()
         assertFalse(state.chatFolderPreferences.foldersFor(A).any { it.name == "Rotated" })
         restoration.emulateSavedInstanceStateRestore()
         composeRule
-            .onNode(hasText(app.getString(R.string.folder_included_chats)) and hasText("1") and hasClickAction())
+            .onNode(hasText(app.getString(R.string.smart_folder_always_include)) and hasText("1") and hasClickAction())
             .assertExists()
         composeRule.onNodeWithTag("folder.save").performClick()
         val folder = state.chatFolderPreferences.foldersFor(A).single { it.name == "Rotated" }

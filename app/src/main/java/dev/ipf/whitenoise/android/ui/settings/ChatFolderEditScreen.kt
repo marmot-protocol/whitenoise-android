@@ -297,6 +297,10 @@ private fun ChatFolderEditSession(
                 }
         }
 
+    val unresolved =
+        smartFolderUnresolvedCount(smartRoot, source) {
+            chatListItemDisplayTitle(it, appState, groupTitleCopy)
+        }
     ChatFolderEditContent(
         state =
             ChatFolderEditFormState(
@@ -315,6 +319,7 @@ private fun ChatFolderEditSession(
                 peopleCount = memberHexes.size,
                 previewCount = previewRows.size,
                 advancedRules = smartPayload != null,
+                unresolvedCount = unresolved,
                 canSave =
                     name.text.isNotBlank() &&
                         !missing &&
@@ -343,21 +348,15 @@ private fun ChatFolderEditSession(
         },
         onPinnedOnlyChange = { pinnedOnly = it },
         rulesContent = {
-            val unresolved =
-                smartFolderUnresolvedCount(smartRoot, source) {
-                    chatListItemDisplayTitle(it, appState, groupTitleCopy)
-                }
             SmartFolderRulePanel(
                 state =
                     SmartFolderPanelState(
                         smartPayload != null,
                         smartRoot,
-                        unresolved,
                         confirmSimpleReplacement = rule != ChatFolderRule(),
                     ),
                 people = memberRows,
                 resolveKey = { input -> appState.accountIdHex(input).takeIf { canMutate() } },
-                onStart = { if (canMutate()) smartPayload = SmartFolderCodec.encode(defaultSmartFolder()) },
                 onChange = { tree -> if (canMutate()) smartPayload = SmartFolderCodec.encode(tree) },
                 legacyControls = {
                     LegacyFolderRuleControls(
@@ -429,6 +428,7 @@ private fun ChatFolderEditSession(
                         FolderPicker.Chats -> R.string.folder_included_chats
                     },
                 ),
+            description = if (mode == FolderPicker.Chats) stringResource(R.string.folder_manual_hint) else null,
             items =
                 when (mode) {
                     FolderPicker.People -> memberRows
@@ -471,6 +471,7 @@ internal data class ChatFolderEditFormState(
     val directChatsOnly: Boolean = false,
     val pinnedOnly: Boolean = false,
     val advancedRules: Boolean = false,
+    val unresolvedCount: Int = 0,
 )
 
 /** The form without any store access, so tests can render every draft. */
@@ -520,12 +521,7 @@ internal fun ChatFolderEditContent(
                         label = { Text(stringResource(R.string.chat_folder_name)) },
                         lineLimits = TextFieldLineLimits.SingleLine,
                     )
-                    WhiteNoiseTextField(
-                        state = state.description,
-                        modifier = Modifier.fillMaxWidth().testTag("folder.description"),
-                        label = { Text(stringResource(R.string.chat_folder_description_label)) },
-                        lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 2, maxHeightInLines = 4),
-                    )
+                    folderDescription(state.description, compact = rulesContent != null)
                     state.error?.let { error ->
                         Text(
                             error,
@@ -535,18 +531,20 @@ internal fun ChatFolderEditContent(
                     }
                 }
             }
-            item {
-                SettingsGroup {
-                    row("chats") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.folder_included_chats),
-                            onClick = onOpenManualChats,
-                            value = state.manualChatCount.toString(),
-                        )
+            if (rulesContent == null) {
+                item {
+                    SettingsGroup {
+                        row("chats") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.folder_included_chats),
+                                onClick = onOpenManualChats,
+                                value = state.manualChatCount.toString(),
+                            )
+                        }
                     }
+                    SettingsExplainer(stringResource(R.string.folder_manual_hint))
                 }
-                SettingsExplainer(stringResource(R.string.folder_manual_hint))
             }
             if (rulesContent != null) {
                 item { rulesContent() }
@@ -619,20 +617,17 @@ internal fun ChatFolderEditContent(
                 }
             }
             item {
-                SettingsSection(stringResource(R.string.folder_preview))
+                if (rulesContent == null) SettingsSection(stringResource(R.string.folder_preview))
                 SettingsGroup {
                     row("preview") { context ->
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.folder_preview),
                             onClick = onOpenPreview,
+                            value = if (rulesContent != null) state.previewCount.toString() else null,
                             subtitle =
-                                if (state.advancedRules) {
-                                    pluralStringResource(
-                                        R.plurals.smart_folder_loaded_count,
-                                        state.previewCount,
-                                        state.previewCount,
-                                    )
+                                if (rulesContent != null || state.advancedRules) {
+                                    stringResource(R.string.smart_folder_loaded_only)
                                 } else {
                                     pluralStringResource(
                                         R.plurals.chat_folder_chat_count,
@@ -641,6 +636,23 @@ internal fun ChatFolderEditContent(
                                     )
                                 },
                         )
+                    }
+                }
+            }
+            if (rulesContent != null) {
+                item {
+                    if (state.unresolvedCount > 0) {
+                        SettingsExplainer(stringResource(R.string.smart_folder_unresolved, state.unresolvedCount))
+                    }
+                    SettingsGroup {
+                        row("chats") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.smart_folder_always_include),
+                                onClick = onOpenManualChats,
+                                value = state.manualChatCount.toString(),
+                            )
+                        }
                     }
                 }
             }
@@ -661,6 +673,27 @@ internal fun ChatFolderEditContent(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Optional metadata is revealed only when needed; existing descriptions remain visible. */
+@Composable
+private fun folderDescription(
+    description: TextFieldState,
+    compact: Boolean,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    if (!compact || expanded || description.text.isNotEmpty()) {
+        WhiteNoiseTextField(
+            state = description,
+            modifier = Modifier.fillMaxWidth().testTag("folder.description"),
+            label = { Text(stringResource(R.string.chat_folder_description_label)) },
+            lineLimits = TextFieldLineLimits.MultiLine(minHeightInLines = 2, maxHeightInLines = 4),
+        )
+    } else {
+        TextButton(onClick = { expanded = true }, modifier = Modifier.testTag("folder.addDescription")) {
+            Text(stringResource(R.string.smart_folder_add_description))
         }
     }
 }

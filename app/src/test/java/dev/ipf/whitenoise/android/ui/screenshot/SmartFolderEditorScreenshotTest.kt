@@ -67,13 +67,21 @@ class SmartFolderEditorScreenshotTest {
 
     @Test fun empty() = capture("smart_folder_empty", empty = true)
 
+    @Test fun addFilterSheet() = capture("smart_folder_add_filter", add = true)
+
+    @Test fun moreFiltersSheet() = capture("smart_folder_more_filters", add = true, more = true)
+
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
+    fun addFilterRtlLarge() = capture("smart_folder_add_filter_rtl_large", add = true, rtl = true)
+
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
     fun rtlLarge() = capture("smart_folder_rtl_large", rtl = true)
 
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
-    fun rtlRulesLarge() = capture("smart_folder_rtl_rules_large", rtl = true, rules = true)
+    fun rtlRulesLarge() = capture("smart_folder_rtl_rules_large", rtl = true, rules = true, options = true)
 
     @Suppress("LongMethod") // Render one fixed full form consistently across visual configurations.
     private fun capture(
@@ -88,6 +96,8 @@ class SmartFolderEditorScreenshotTest {
         options: Boolean = false,
         replace: Boolean = false,
         unresolved: Int = 0,
+        add: Boolean = false,
+        more: Boolean = false,
     ) {
         var mentionLabel = ""
         val simpleExpanded = name.startsWith("smart_folder_simple_")
@@ -127,7 +137,7 @@ class SmartFolderEditorScreenshotTest {
                     mentionLabel = stringResource(R.string.smart_folder_preset_mentions)
                     ChatFolderEditContent(
                         state =
-                            formState(name, manual, empty),
+                            formState(name, manual, empty).copy(unresolvedCount = unresolved),
                         onUnreadOnlyChange = {},
                         onIncludeMutedChange = {},
                         onGroupsOnlyChange = {},
@@ -146,13 +156,12 @@ class SmartFolderEditorScreenshotTest {
                                 SmartFolderPanelState(
                                     !manual,
                                     root,
-                                    unresolved = unresolved,
+                                    confirmSimpleReplacement = simpleExpanded,
                                 ),
                                 listOf(WhiteNoisePickerItem("a".repeat(64), "Agent", "agent")),
                                 resolveKey = {
                                     null
                                 },
-                                onStart = {},
                                 onChange = {},
                                 legacyControls = {
                                     LegacyFolderRuleControls(
@@ -181,21 +190,51 @@ class SmartFolderEditorScreenshotTest {
                 }
             }
         }
-        if (simpleExpanded) expandSimple(rtl)
-        if (rules) {
+        prepareCapture(
+            CaptureActions(simpleExpanded, rtl, rules, add, more, options, replace, dialog),
+            mentionLabel,
+        )
+        val target =
+            when {
+                add -> composeRule.onNodeWithTag("sheet.surface")
+                dialog || replace -> composeRule.onNode(isDialog())
+                else -> composeRule.onRoot()
+            }
+        target.captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    private fun prepareCapture(
+        actions: CaptureActions,
+        mentionLabel: String,
+    ) {
+        if (actions.simple) expandSimple(actions.rtl)
+        if (actions.rules) {
             composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.group."))
         }
-        if (options) composeRule.onNodeWithTag("folder.options.").performClick()
-        if (replace) {
+        if (actions.add) {
+            composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.add."))
+            composeRule.onNodeWithTag("folder.add.").performClick()
+            settleSheet()
+            if (actions.more) {
+                composeRule.onNodeWithTag("folder.moreFilters").performClick()
+                settleSheet()
+                composeRule.onNodeWithTag("folder.addField.DRAFT").assertExists()
+            }
+        }
+        if (actions.options) composeRule.onNodeWithTag("folder.options.").performClick()
+        if (actions.replace) {
             composeRule.onNodeWithTag("folder.presets").performClick()
             composeRule.onNodeWithText(mentionLabel).performClick()
             composeRule.mainClock.advanceTimeBy(PRESET_MENU_SETTLE_MILLIS)
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("folder.confirmPreset").assertExists()
         }
-        if (dialog) composeRule.onNodeWithTag("folder.condition.1").performClick()
-        val target = if (dialog || replace) composeRule.onNode(isDialog()) else composeRule.onRoot()
-        target.captureRoboImage("src/test/snapshots/$name.png")
+        if (actions.dialog) composeRule.onNodeWithTag("folder.condition.1").performClick()
+    }
+
+    private fun settleSheet() {
+        composeRule.mainClock.advanceTimeBy(SHEET_SETTLE_MILLIS)
+        composeRule.waitForIdle()
     }
 
     private fun formState(
@@ -235,3 +274,16 @@ class SmartFolderEditorScreenshotTest {
 }
 
 private const val PRESET_MENU_SETTLE_MILLIS = 300L
+
+private data class CaptureActions(
+    val simple: Boolean,
+    val rtl: Boolean,
+    val rules: Boolean,
+    val add: Boolean,
+    val more: Boolean,
+    val options: Boolean,
+    val replace: Boolean,
+    val dialog: Boolean,
+)
+
+private const val SHEET_SETTLE_MILLIS = 1000L

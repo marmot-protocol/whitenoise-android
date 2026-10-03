@@ -3,9 +3,15 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -14,31 +20,42 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
+import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** Shared by the live editing session and its full-form render tests. Every write is owned by the caller. */
+/** Shared by the live editing session and render tests; replacement is always an explicit draft edit. */
 @Composable
-@Suppress("LongParameterList", "LongMethod") // Stateless property controls remain one visual section.
+@Suppress("LongMethod") // One bounded section with a shared replacement confirmation.
 internal fun SmartFolderRulePanel(
     state: SmartFolderPanelState,
     people: List<WhiteNoisePickerItem>,
     resolveKey: suspend (String) -> String?,
-    onStart: () -> Unit,
     onChange: (SmartFolderFilter.Group) -> Unit,
     legacyControls: @Composable () -> Unit,
 ) {
+    val editSimpleRules = rememberSaveable { state.confirmSimpleReplacement }
     var legacyExpanded by rememberSaveable { mutableStateOf(false) }
-    var pendingStart by rememberSaveable { mutableStateOf<FolderRuleStart?>(null) }
+    var adding by rememberSaveable { mutableStateOf(false) }
+    var pendingPayload by rememberSaveable { mutableStateOf<String?>(null) }
+    val requestRules: (SmartFolderFilter.Group) -> Unit = { tree ->
+        if (state.advanced || state.confirmSimpleReplacement) {
+            pendingPayload = SmartFolderCodec.encode(tree)
+        } else {
+            onChange(tree)
+        }
+    }
     val applyPreset: (Boolean) -> Unit = { allRead ->
         val condition =
             if (allRead) {
@@ -47,115 +64,114 @@ internal fun SmartFolderRulePanel(
                 SmartFolderFilter.Condition(FolderField.MENTIONS)
             }
         val preset = defaultSmartFolder()
-        onChange(preset.copy(children = preset.children + condition))
+        requestRules(preset.copy(children = preset.children + condition))
     }
-    val startRules: (FolderRuleStart) -> Unit = { choice ->
-        if (choice == FolderRuleStart.CUSTOM) {
-            onStart()
-        } else {
-            applyPreset(choice == FolderRuleStart.ALL_READ)
-        }
-    }
-    val requestStart: (FolderRuleStart) -> Unit = { choice ->
-        if (state.advanced || state.confirmSimpleReplacement) {
-            pendingStart = choice
-        } else {
-            startRules(choice)
-        }
-    }
-    SettingsSection(stringResource(R.string.folder_rules))
     Column(
-        Modifier.fillMaxWidth().padding(WhiteNoiseSpacing.CompactScreenMargin),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.smart_folder_filters),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            if (state.advanced || editSimpleRules) {
+                SmartFolderPresetMenu(applyPreset)
+            }
+        }
         if (!state.advanced) {
-            Text(stringResource(R.string.smart_folder_legacy), style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.smart_folder_preset_hint), style = MaterialTheme.typography.bodySmall)
-            TextButton(
-                onClick = { requestStart(FolderRuleStart.ALL_READ) },
-                modifier = Modifier.testTag("folder.presetRead"),
-            ) {
-                Text(stringResource(R.string.smart_folder_preset_read))
+            if (!editSimpleRules) {
+                TextButton(onClick = { applyPreset(true) }, modifier = Modifier.testTag("folder.presetRead")) {
+                    Text(stringResource(R.string.smart_folder_preset_read))
+                }
+                TextButton(onClick = { applyPreset(false) }, modifier = Modifier.testTag("folder.presetMentions")) {
+                    Text(stringResource(R.string.smart_folder_preset_mentions))
+                }
             }
-            TextButton(
-                onClick = { requestStart(FolderRuleStart.MENTIONS) },
-                modifier = Modifier.testTag("folder.presetMentions"),
-            ) {
-                Text(stringResource(R.string.smart_folder_preset_mentions))
+            TextButton(onClick = { adding = true }, modifier = Modifier.testTag("folder.add.")) {
+                Text(stringResource(R.string.smart_folder_add))
             }
-            TextButton(
-                onClick = { requestStart(FolderRuleStart.CUSTOM) },
-                modifier = Modifier.testTag("folder.upgrade"),
-            ) {
-                Text(stringResource(R.string.smart_folder_start))
+            if (editSimpleRules) {
+                TextButton(
+                    onClick = { legacyExpanded = !legacyExpanded },
+                    modifier = Modifier.testTag("folder.legacyEdit"),
+                ) {
+                    val label = stringResource(R.string.smart_folder_edit_legacy)
+                    FolderButtonLabel(label, R.drawable.ic_expand_more, legacyExpanded)
+                }
+                if (legacyExpanded) legacyControls()
             }
-            TextButton(
-                onClick = {
-                    legacyExpanded = !legacyExpanded
-                },
-                modifier = Modifier.testTag("folder.legacyEdit"),
-            ) {
-                Text(stringResource(R.string.smart_folder_edit_legacy))
-            }
-            if (legacyExpanded) legacyControls()
         } else {
-            Text(stringResource(R.string.smart_folder_prototype), style = MaterialTheme.typography.bodySmall)
-            if (state.unresolved > 0) {
-                Text(
-                    stringResource(
-                        R.string.smart_folder_unresolved,
-                        state.unresolved,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
             val root = state.root
             if (root == null) {
                 Text(stringResource(R.string.smart_folder_invalid), color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = { requestStart(FolderRuleStart.CUSTOM) }) {
+                TextButton(onClick = { requestRules(defaultSmartFolder()) }) {
                     Text(stringResource(R.string.smart_folder_start))
                 }
             } else {
-                FolderChoice(
-                    stringResource(R.string.smart_folder_presets),
-                    listOf(
-                        true to stringResource(R.string.smart_folder_preset_read),
-                        false to stringResource(R.string.smart_folder_preset_mentions),
-                    ),
-                    "folder.presets",
-                ) { requestStart(if (it) FolderRuleStart.ALL_READ else FolderRuleStart.MENTIONS) }
                 SmartFolderEditor(root, people, resolveKey, onChange)
             }
         }
     }
-    pendingStart?.let { choice ->
-        WhiteNoiseAlertDialog(
-            onDismissRequest = { pendingStart = null },
-            title = {
-                Text(
-                    stringResource(
-                        when (choice) {
-                            FolderRuleStart.ALL_READ -> R.string.smart_folder_preset_read
-                            FolderRuleStart.MENTIONS -> R.string.smart_folder_preset_mentions
-                            FolderRuleStart.CUSTOM -> R.string.smart_folder_start
-                        },
+    if (adding) {
+        SmartFolderAddFilter(
+            people,
+            resolveKey,
+            onDismiss = { adding = false },
+            onDone = { condition ->
+                adding = false
+                val defaults = defaultSmartFolder()
+                requestRules(
+                    defaults.copy(
+                        children =
+                            defaults.children.filterNot {
+                                (it as? SmartFolderFilter.Condition)?.field == condition.field
+                            } + condition,
                     ),
                 )
             },
+        )
+    }
+    pendingPayload?.let { payload ->
+        WhiteNoiseAlertDialog(
+            onDismissRequest = { pendingPayload = null },
+            title = { Text(stringResource(R.string.smart_folder_replace)) },
             text = { Text(stringResource(R.string.smart_folder_replace_hint)) },
             confirmButton = {
-                TextButton(onClick = {
-                    startRules(choice)
-                    pendingStart = null
-                }, modifier = Modifier.testTag("folder.confirmPreset")) {
-                    Text(stringResource(R.string.smart_folder_replace))
-                }
+                TextButton(
+                    onClick = {
+                        SmartFolderCodec.decode(payload)?.let(onChange)
+                        pendingPayload = null
+                    },
+                    modifier = Modifier.testTag("folder.confirmPreset"),
+                ) { Text(stringResource(R.string.smart_folder_replace)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingStart = null }) { Text(stringResource(R.string.cancel)) }
+                TextButton(onClick = { pendingPayload = null }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
 }
 
-private enum class FolderRuleStart { ALL_READ, MENTIONS, CUSTOM }
+@Composable
+private fun SmartFolderPresetMenu(onSelect: (Boolean) -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }, modifier = Modifier.testTag("folder.presets")) {
+            Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.smart_folder_presets))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            listOf(true, false).forEach { allRead ->
+                val title = if (allRead) R.string.smart_folder_preset_read else R.string.smart_folder_preset_mentions
+                DropdownMenuItem(
+                    text = { Text(stringResource(title)) },
+                    onClick = {
+                        open = false
+                        onSelect(allRead)
+                    },
+                )
+            }
+        }
+    }
+}

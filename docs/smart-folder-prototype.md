@@ -8,10 +8,11 @@ tracks the account-wide implementation, including evaluation before pagination.
 
 ## Rule contract
 
-- Match every condition / Match any condition applies to one group. More options
-  contains nested groups and exclusion; existing exclusions remain visible.
+- Match all / Match any applies to one group. Group rules contains nested groups
+  and exclusion; existing exclusions remain visible. Single-child groups hide
+  the irrelevant match selector without changing its stored mode.
 - Choices such as Has unread messages / No unread messages require known data.
-  Remove condition stops checking that property. Unknown
+  Remove filter stops checking that property. Unknown
   remains unknown under NOT and cannot grant automatic membership.
 - Participants use the current roster and resolved peer, never stale display
   identities. People can match any, all, or none of the selected public keys.
@@ -42,12 +43,14 @@ condition to exclude terminal chats whose counters may retain earlier activity.
 
 ## Existing folders
 
-New folders start in simple mode, retaining ordinary pagination for manual
-folders created from chat selections or group details. Choosing All read, Unread
-mentions or Build custom rules is an explicit opt-in to the loaded-window prototype. Opening or renaming an existing
+New folders start as manual folders, retaining ordinary pagination for chat
+selections or group details. New automatic filters use the composable editor;
+the simple controls are available only for editing saved simple rules. Choosing All read, Unread
+mentions or saving a first Add filter is an explicit opt-in to the loaded-window prototype. Opening or renaming an existing
 folder preserves its legacy rules. Those rules
-remain editable in a collapsed section. A preset or Build custom rules starts a
-new draft; its preview can be checked before Save. Replacing an advanced tree or non-default simple rules requires confirmation;
+remain editable in a collapsed section, which stays mounted when the last
+keyword or switch is cleared during editing. A preset or a completed first filter starts a
+new draft; dismissing the picker or condition dialog changes nothing. Replacing an advanced tree or non-default simple rules requires confirmation;
 cancelling keeps the draft unchanged. Public-key entry and negation are optional controls within
 each condition. The previous legacy fields
 remain in the stored rule for a future explicit rollback. Unsupported payloads
@@ -55,3 +58,16 @@ remain unchanged when only the name or manual inclusions are edited. Save publis
 metadata, manual inclusions and the rule payload together using the existing
 account-scoped preference transaction. Cancel persists none of the draft. The Included Chats picker always lists both
 loaded active and archived chats, independent of automatic rules.
+
+## Compact editor
+
+One Add filter sheet offers People, Read status and Unread mentions first; More
+filters exposes the other fields. Selecting a field opens only its values.
+Existing filters can be edited or removed; new filters offer Save and Cancel.
+To change a filter’s property, remove it and add the desired filter.
+Presets are shown directly on empty/manual folders and move into the menu when
+filters exist. Group rules keeps nesting and exclusion available without
+repeating the Boolean editor on every row. Optional description starts collapsed
+when empty. Manual exceptions follow the rules and preview, with their bypass
+explanation in the picker. The preview always labels the loaded-window scope
+and reports incomplete data beside its count.
