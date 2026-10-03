@@ -86,6 +86,22 @@ reported as such rather than inferred. The checker explicitly records `performan
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-phases
 ```
 
+The `controller-media` mode qualifies genuine sent and received media across an Android process restart. The
+prepare process sends a JPEG, a small video, 9 MiB and 24 MiB videos (either side of the 8 MiB memory-entry ceiling)
+and a three-attachment album through the shipping controller, waits for each own send to publish its encrypted host
+copy, reads that copy natively, then downloads every attachment as the receiver. The runner force-stops only the
+isolated fixture package, and a second process opens the restored runtime with acquisition unavailable. Both
+directions of every attachment must then read exact bytes natively and through the resolver, miss the memory cache,
+and decode a first frame (a bitmap for an image, a frame and duration for a video). The 24 MiB send also holds its host
+copy to prove native retention does not wait for it. `media_checker.py` reads the server ledger: one upload and one
+acquisition per attachment before the restart boundary and **none** after it. Generated MP4 padding is a top-level
+`free` box, so it decodes and plays; it tests size thresholds, not throughput. Above-64 MiB media cannot be sent by the
+Android controller and is deferred, as are the conversation tiles themselves and physical devices.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-media
+```
+
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
 the report, but representative 4 MiB performance is explicitly unqualified;

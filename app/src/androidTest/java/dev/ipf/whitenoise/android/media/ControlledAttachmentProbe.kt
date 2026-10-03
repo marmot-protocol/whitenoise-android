@@ -468,7 +468,7 @@ internal object ControlledAttachmentProbe {
     }
 
     /** Waits for the actual welcome; transient worker readiness cannot become fixture state. */
-    private suspend fun awaitReceivedGroup(
+    internal suspend fun awaitReceivedGroup(
         marmot: Marmot,
         account: String,
         group: String,
