@@ -106,6 +106,15 @@ MarmotKit cache retains one writer: Play unit tests. GitHub's ephemeral runner
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
+`.github/workflows/invariant-gate.yml` runs on every pull request to `master`,
+including description edits, without compiling anything. The checker script runs
+from the base revision, and the pull request's registry is fetched through the API
+as data. The workflow file itself is protected by review and CODEOWNERS, not by the
+check; see the registry page for what is and is not protected. A pull request that closes a bug
+must change, name or exempt a gate from the [invariant-gate registry](docs/invariant-gates.md);
+pull requests that close no bug pass. `InvariantGateRegistryTest` in the unit suite
+keeps the registry in sync with every `*CoverageTest.kt`.
+
 Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:
 
