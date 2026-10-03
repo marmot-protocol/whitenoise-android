@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "basis": "Pooled medians of three baseline and three candidate runs on the API 30 arm64 emulator (docs/performance-data/attachment-latency-matrix-2026-10-03.md). A ceiling is fixed + per_mib x size and rejects a regression; a target is where the layer's owner should land and may be unmet today.",
+  "budgets": [
+    {"id": "preparation", "phase": "preparation", "metric": "prep_visible_ms", "unit": "ms", "owner": "android",
+     "ceiling": {"fixed": 8, "per_mib": 0}, "target": {"fixed": 2, "per_mib": 0}},
+    {"id": "first-visible-progress", "phase": "first visible progress", "metric": "first_progress_ms", "unit": "ms",
+     "owner": "android+engine", "ceiling": {"fixed": 500, "per_mib": 0}, "target": {"fixed": 350, "per_mib": 0}},
+    {"id": "transfer-completion-overhead", "phase": "transfer completion", "metric": "transfer_overhead_ms", "unit": "ms",
+     "owner": "android+engine", "ceiling": {"fixed": 120, "per_mib": 0}, "target": {"fixed": 80, "per_mib": 0}},
+    {"id": "verification", "phase": "verification", "metric": "verify_decrypt_ms", "unit": "ms", "owner": "engine",
+     "ceiling": {"fixed": 6, "per_mib": 25}, "target": null},
+    {"id": "post-ready-materialization", "phase": "verification and materialization", "metric": "post_ready_ms",
+     "unit": "ms", "owner": "android", "ceiling": {"fixed": 50, "per_mib": 20}, "target": {"fixed": 10, "per_mib": 5}},
+    {"id": "warm-lease", "phase": "materialization", "metric": "warm_lease_ms", "unit": "ms", "owner": "android",
+     "ceiling": {"fixed": 10, "per_mib": 22}, "target": {"fixed": 5, "per_mib": 5}},
+    {"id": "restart-lease", "phase": "materialization", "metric": "restart_lease_ms", "unit": "ms", "owner": "android",
+     "ceiling": {"fixed": 15, "per_mib": 22}, "target": {"fixed": 5, "per_mib": 5}},
+    {"id": "engine-upload", "phase": "upload", "metric": "mdk_upload_ms", "unit": "ms", "owner": "engine",
+     "links": ["unshaped"], "ceiling": {"fixed": 30, "per_mib": 30}, "target": null},
+    {"id": "upload-java-peak", "phase": "memory", "metric": "upload_java_peak_bytes", "unit": "MiB", "owner": "android",
+     "ceiling": {"fixed": 40, "per_mib": 2.5}, "target": null},
+    {"id": "cold-java-peak", "phase": "memory", "metric": "cold_java_peak_bytes", "unit": "MiB", "owner": "android",
+     "ceiling": {"fixed": 40, "per_mib": 2.5}, "target": null},
+    {"id": "upload-native-peak", "phase": "memory", "metric": "upload_native_peak_bytes", "unit": "MiB",
+     "owner": "engine", "ceiling": {"fixed": 80, "per_mib": 6}, "target": null},
+    {"id": "cold-native-peak", "phase": "memory", "metric": "cold_native_peak_bytes", "unit": "MiB", "owner": "engine",
+     "ceiling": {"fixed": 80, "per_mib": 6}, "target": null}
+  ]
+}

@@ -143,6 +143,7 @@ bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-a
 # A short harness proof, never a measurement:
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-matrix unshaped,quick
 python3 tools/attachment-fixture/matrix_compare.py --baseline base-1.json base-2.json base-3.json --candidate cand-1.json cand-2.json cand-3.json
+python3 tools/attachment-fixture/matrix_budgets.py cand-1.json cand-2.json cand-3.json
 ```
 
 `matrix_report.py` pools repeated runs at the sample level, so the observed spread includes run-to-run variation, and
@@ -150,6 +151,9 @@ aggregates samples into per-cell distributions (a p95 only from twenty samples o
 dominant component and its layer for upload and download, and compares a candidate with a baseline: a change counts only
 when it exceeds both the observed run spread and ten percent, and any difference in request count, byte count or
 retries rejects the candidate whatever its latency. Emulator shaping does not establish physical Wi-Fi performance.
+
+`matrix_budgets.py` applies `matrix_budgets.json` to a pooled set of runs: each budget is a ceiling of `fixed + per MiB x size` on a
+median (with an optional target), a ceiling breach or a missing measurement fails, and an unmet target is reported only.
 
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
