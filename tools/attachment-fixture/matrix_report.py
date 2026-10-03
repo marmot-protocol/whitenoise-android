@@ -7,8 +7,12 @@ SCHEMA = 1
 NS_PER_MS = 1_000_000.0
 # Cell metrics that are lower-is-better latencies, in milliseconds.
 LATENCY_METRICS = ("prep_visible_ms", "upload_publish_ms", "mdk_upload_ms", "server_upload_ms", "admission_ms",
-                   "first_progress_ms", "body_complete_ms", "ready_ms", "feed_ready_ms", "lease_ms",
+                   "first_progress_ms", "body_complete_ms", "ready_ms", "feed_ready_ms", "lease_ms", "post_ready_ms",
                    "verify_decrypt_ms", "subscription_delay_ms", "materialize_ms", "warm_lease_ms", "cold_elapsed_ms")
+# What the reader waits for through the shipping path. A candidate is rejected only for a slower value here; the rest
+# (the probe's own raw feed recorder, the server's view, the derived splits) describe the engine and explain the cause.
+GATING_METRICS = ("prep_visible_ms", "upload_publish_ms", "admission_ms", "first_progress_ms", "body_complete_ms",
+                  "ready_ms", "lease_ms", "post_ready_ms", "warm_lease_ms")
 # Which layer a latency belongs to when attributing a dominant delay.
 LAYER = {"prep_visible_ms": "android-preparation-ui", "mdk_upload_ms": "ffi-mdk", "server_upload_ms": "transport",
          "admission_ms": "ffi-mdk", "transport_ms": "transport", "verify_decrypt_ms": "ffi-mdk",
@@ -89,6 +93,9 @@ def build_samples(profile):
             sample["subscription_delay_ms"] = max(0.0, delivered - sample["ready_ms"])
         if _finite(sample.get("lease_ms")) and _finite(delivered):
             sample["materialize_ms"] = max(0.0, sample["lease_ms"] - delivered)
+        # What the shipping path adds after the engine's authoritative READY: delivery plus materialization.
+        if _finite(sample.get("lease_ms")) and _finite(sample.get("ready_ms")):
+            sample["post_ready_ms"] = max(0.0, sample["lease_ms"] - sample["ready_ms"])
         if _finite(sample.get("body_complete_ms")) and _finite(sample.get("admission_ms")):
             sample["transport_ms"] = max(0.0, sample["body_complete_ms"] - sample["admission_ms"])
         samples.append(sample)
@@ -252,8 +259,10 @@ def compare(baseline, candidate):
             verdict = "unchanged" if not material else ("faster" if delta < 0 else "slower")
             result["cells"].append({"profile": key[0], "size": key[1], "metric": metric, "baseline_p50": a["p50"],
                                     "candidate_p50": b["p50"], "delta_ms": delta, "spread_ms": spread,
-                                    "verdict": verdict})
-    result["faster"] = [c for c in result["cells"] if c["verdict"] == "faster"]
-    result["slower"] = [c for c in result["cells"] if c["verdict"] == "slower"]
+                                    "verdict": verdict, "gating": metric in GATING_METRICS})
+    gating = [c for c in result["cells"] if c["gating"]]
+    result["faster"] = [c for c in gating if c["verdict"] == "faster"]
+    result["slower"] = [c for c in gating if c["verdict"] == "slower"]
+    result["diagnostic_changes"] = [c for c in result["cells"] if not c["gating"] and c["verdict"] != "unchanged"]
     result["accepted"] = not result["correctness_diffs"] and not result["slower"]
     return result

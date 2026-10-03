@@ -217,10 +217,27 @@ class MatrixTest(unittest.TestCase):
         self.assertIn("| unshaped | 64 KiB | 8 |", text)
         self.assertIn("| unshaped | 1 MiB | 4 |", text)
         faster = aggregate([raw(profile([(65536, 4), (MIB, 2)], scale=0.5)) for _ in range(2)])
-        table, verdicts = comparison(base, faster, ("feed_ready_ms",))
-        self.assertIn("feed_ready_ms", table)
+        table, verdicts = comparison(base, faster, ("lease_ms",))
+        self.assertIn("lease_ms", table)
         self.assertIn("faster", table)
         self.assertTrue(verdicts["accepted"])
+
+    def test_only_host_visible_metrics_can_reject_a_candidate(self):
+        """A slower engine-side diagnostic is reported but cannot reject, while a slower reader-visible wait does."""
+        base = aggregate([raw(profile([(65536, 4)])) for _ in range(2)])
+        noisy = deepcopy(base)
+        noisy["profiles"][0]["cells"][0]["subscription_delay_ms"]["p50"] *= 3
+        verdict = compare(base, noisy)
+        self.assertTrue(verdict["accepted"])
+        self.assertTrue(any(c["metric"] == "subscription_delay_ms" for c in verdict["diagnostic_changes"]))
+        slower = deepcopy(base)
+        slower["profiles"][0]["cells"][0]["lease_ms"]["p50"] *= 3
+        self.assertFalse(compare(base, slower)["accepted"])
+
+    def test_post_ready_wait_is_what_the_shipping_path_adds_after_ready(self):
+        """The wait after authoritative READY is the open-ready lease minus READY, whatever the feed did."""
+        cell = aggregate(raw(profile([(65536, 4)])))["profiles"][0]["cells"][0]
+        self.assertAlmostEqual(262.0 - 90.0, cell["post_ready_ms"]["p50"], places=3)
 
 
 if __name__ == "__main__":
