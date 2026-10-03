@@ -102,6 +102,24 @@ Android controller and is deferred, as are the conversation tiles themselves and
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-media
 ```
 
+The `controller-apk` mode qualifies the received-APK boundary on a disposable emulator. The prepare stage sends five
+generated files through the shipping controller, receives each genuinely, and requires exact bytes: a valid signed
+package (this fixture's own APK), the same bytes labelled `application/octet-stream`, the same bytes labelled
+`image/png`, a ZIP with a dex entry but no `AndroidManifest.xml`, and a truncated package. Each later stage reopens the
+restored runtime in a new process with acquisition unavailable, republishes the verified file from native retention,
+and calls the real `openAttachmentExternally`. A self-update build is run with the install-unknown-apps app-op denied and
+then allowed, which the **host** toggles between stages because changing it kills the app process; a Play build has no
+installer and must answer `InstallUnsupported`. `apk_checker.py` requires, per distribution, the exact
+`OpenAttachmentResult` and whether the system installer actually reached the screen (the probe polls the active
+window for the package that handles APK installs, then dismisses it with Back). Nothing is ever installed. The server
+ledger must show exactly one acquisition per case across all stages, so a denied or blocked dispatch reuses the
+completed download. Invalid packages must be rejected before any installer launch on every distribution.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Zapstore reference-api30-arm64 controller-apk
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-apk
+```
+
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
 the report, but representative 4 MiB performance is explicitly unqualified;
