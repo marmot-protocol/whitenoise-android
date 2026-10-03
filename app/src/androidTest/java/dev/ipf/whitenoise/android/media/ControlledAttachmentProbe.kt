@@ -139,7 +139,9 @@ internal object ControlledAttachmentProbe {
                         WhiteNoiseAppState(
                             context = context,
                             draftStore = DraftStore(DiscardedDrafts),
-                            accountIdHexResolver = { null },
+                            accountIdHexResolver = { account ->
+                                automaticFixtureAccountId(bodyCase, account, receiver.label, receiver.accountIdHex)
+                            },
                             accounts = emptyList(),
                             activeAccountRef = receiver.label,
                             initialMarmotRuntime = runtime,
@@ -265,6 +267,14 @@ internal object ControlledAttachmentProbe {
         }
     }
 
+    /** Only the automatic scheduler case resolves its generated account for real per-account policy persistence. */
+    private fun automaticFixtureAccountId(
+        scenario: String?,
+        requested: String,
+        receiver: String,
+        accountId: String,
+    ): String? = if (scenario == "automatic-platform-resume" && requested == receiver) accountId else null
+
     /** Measures only the selected native body scenario, leaving baseline and large-read paths unchanged. */
     private suspend fun runBodyCase(
         state: WhiteNoiseAppState,
@@ -275,7 +285,11 @@ internal object ControlledAttachmentProbe {
         scenario: String,
         onUnknownLengthProgress: ((NativeAttachmentProgress, MediaAttachmentReferenceFfi) -> Unit)?,
     ) {
-        if (scenario in setOf("platform-background", "platform-lock")) {
+        if (scenario == "automatic-platform-resume") {
+            measure("automatic-platform-resume-overall", bytes.size) {
+                PlatformInterruptedAttachmentProbe.run(state, request, port, bytes)
+            }
+        } else if (scenario in setOf("platform-background", "platform-lock")) {
             measure("platform-background-overall", bytes.size) {
                 PlatformBackgroundAttachmentProbe.run(
                     state,
@@ -304,7 +318,7 @@ internal object ControlledAttachmentProbe {
         val resumeCase = arguments.getString("fixtureTransportResume")
         val functionalCase = arguments.getString("fixtureFunctionalBodyCase")
         val unknownLength = arguments.getString("fixtureUnknownLength") == "true"
-        val platformCases = setOf("platform-background", "platform-lock")
+        val platformCases = setOf("platform-background", "platform-lock", "automatic-platform-resume")
         require(functionalCase == null || functionalCase in platformCases)
         require(functionalCase == null || (!unknownLength && resumeCase == null))
         require(!unknownLength || resumeCase == null)

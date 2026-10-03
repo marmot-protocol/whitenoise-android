@@ -134,3 +134,22 @@ performance and rejects incomplete proof. See the [background report](../../docs
 and [screen-lock report](../../docs/performance-data/attachment-screen-lock-2026-10-03.md).
 Actual automatic-job stop/resume and full Open/Save/network-policy/manual flows
 remain separate; these modes never authorize physical-device actions.
+
+### Actual automatic Android scheduler interruption
+
+`controller-automatic-resume` registers the shipping connectivity listener that the
+injected fixture constructor normally omits, enables the generated account's document
+matrix, and waits for actual validated Android connectivity. It enqueues ordinary
+WorkManager work without interactive intent or a foreground/user-initiated service.
+After a real native 2 MiB prefix is held, the Activity leaves TOP. The fixture finds
+that WorkSpec's exact platform job and asks Android to enforce its timeout. It must
+observe the same WorkSpec return from RUNNING through ENQUEUED to RUNNING and SUCCEEDED,
+and record the real coarse stop reason and first-run WorkManager attempt.
+
+A separately controlled socket interruption forces native compatible Range/If-Range
+recovery. The resumed suffix is held again until the platform worker has returned,
+then released and verified exactly. No deliberate Retry, interactive read, force-run,
+or acquisition record is seeded. The HTTP checker requires two GETs with no prefix
+retransfer. This combines actual scheduler stop with independent transport failure;
+it does not kill the app process, simulate every policy transition, or qualify
+representative performance. All original small-file budgets stay unchanged.

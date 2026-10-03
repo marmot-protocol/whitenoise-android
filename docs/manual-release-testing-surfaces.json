@@ -25124,6 +25124,15 @@
     ],
     "source_coverage": [
       {
+        "surface": "automatic-attachment-permission-commit-order",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal fun refreshNativeAttachmentPermissions()",
+        "test_ids": [
+          "SET-010",
+          "MED-022"
+        ]
+      },
+      {
         "surface": "Android 11 notification reply history re-post",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/RemoteInputHistoryCompat.kt",
         "anchor": "internal fun Notification.withoutApi30RemoteInputHistoryItems(",

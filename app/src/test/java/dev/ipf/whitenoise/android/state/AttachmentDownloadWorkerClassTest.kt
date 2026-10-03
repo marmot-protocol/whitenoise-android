@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.app.job.JobScheduler
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ServiceInfo
@@ -338,6 +339,45 @@ class AttachmentDownloadWorkerClassTest {
             assertEquals(Result.success(), worker.doWork())
             assertEquals("a cancelled attachment must not be downloaded by a queued worker", 0, downloads)
         }
+
+    /** Only a reader-requested transfer is elevated; automatic work stays ordinary on every API level. */
+    @Test
+    fun onlyInteractiveTransfersLeaveOrdinaryBackgroundWork() {
+        for (sdk in listOf(30, 33, 34, 36)) {
+            for (visible in listOf(false, true)) {
+                assertEquals(
+                    AttachmentExecutionClass.OrdinaryWork,
+                    attachmentExecutionClass(AttachmentDownloadPriority.Automatic, visible, sdk),
+                )
+            }
+        }
+        assertEquals(
+            AttachmentExecutionClass.ForegroundWork,
+            attachmentExecutionClass(AttachmentDownloadPriority.Interactive, userVisible = false, sdkInt = 36),
+        )
+        assertEquals(
+            AttachmentExecutionClass.ForegroundWork,
+            attachmentExecutionClass(AttachmentDownloadPriority.Interactive, userVisible = true, sdkInt = 33),
+        )
+        assertEquals(
+            AttachmentExecutionClass.UserInitiatedJob,
+            attachmentExecutionClass(AttachmentDownloadPriority.Interactive, userVisible = true, sdkInt = 34),
+        )
+    }
+
+    /** An automatic request, even one that claims to be visible, never reaches the user-initiated scheduler. */
+    @Test
+    fun anAutomaticRequestIsOrdinaryWorkAndNeverAUserInitiatedJob() {
+        val request = testRequest()
+        val intents = AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+
+        AttachmentDownloadWorker.enqueue(appContext, request, AttachmentDownloadPriority.Automatic, userVisible = true)
+
+        assertEquals(1, enqueuedWorkCount(request))
+        assertFalse(intents.isInteractive(request))
+        val scheduler = appContext.getSystemService(JobScheduler::class.java)
+        assertTrue(scheduler.allPendingJobs.isEmpty())
+    }
 
     private fun enqueuedWorkCount(request: AttachmentTransferRequest): Int =
         WorkManager

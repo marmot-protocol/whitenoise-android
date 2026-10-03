@@ -1452,11 +1452,15 @@ class WhiteNoiseAppState private constructor(
             while (pending.isNotEmpty() && nativeAttachmentPermissions.isCurrent(revision, runtime)) {
                 pending =
                     nativeAttachmentPermissions.update(revision, runtime, engine, pending.toList()) { account ->
-                        loadMediaAutoDownloadMatrix(account).nativePermission(
-                            activeNetworkTypes(),
-                            hasValidatedInternet(),
-                            attachmentDownloadIntents.isAutomaticPaused(account),
-                        )
+                        // The editor commits off-main. Revoke first, then wait for queued
+                        // settings saves so this generation never restores an obsolete matrix.
+                        hostPreferenceCommitMutex.withLock {
+                            loadMediaAutoDownloadMatrix(account).nativePermission(
+                                activeNetworkTypes(),
+                                hasValidatedInternet(),
+                                attachmentDownloadIntents.isAutomaticPaused(account),
+                            )
+                        }
                     }
                 if (!nativeAttachmentPermissions.isCurrent(revision, runtime)) return@launch
                 if (pending.isEmpty()) {
