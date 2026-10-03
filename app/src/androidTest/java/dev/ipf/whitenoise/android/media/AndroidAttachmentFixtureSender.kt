@@ -101,7 +101,7 @@ internal suspend fun sendAndroidFixtureMedia(
 }
 
 /** The generated sender's state and controller, plus the optional hold on its own host copy. */
-private class SenderHarness(
+internal class SenderHarness(
     val state: WhiteNoiseAppState,
     val controller: ConversationController,
     val heldHostCopy: OutgoingHostCopyHold?,
@@ -117,7 +117,7 @@ private class SenderHarness(
 }
 
 /** Points the generated group at the loopback blob server and builds a fixture-only sender state and controller. */
-private suspend fun openSenderHarness(
+internal suspend fun openSenderHarness(
     context: Context,
     root: File,
     marmot: Marmot,
@@ -200,7 +200,7 @@ private suspend fun awaitAndroidFixtureProjection(
 }
 
 /** Reads the actual published source; no outgoing row, asset reference or accepted send is manufactured. */
-private suspend fun awaitAndroidFixtureReferences(
+internal suspend fun awaitAndroidFixtureReferences(
     marmot: Marmot,
     sender: String,
     group: String,
