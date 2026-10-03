@@ -101,6 +101,24 @@ class Control:
         self.validator_generation = 0
 
 
+class Shape:
+    """Deterministic bandwidth and latency applied to every request, so a constrained run is verified outside the app."""
+
+    LIMIT = 10_000_000
+
+    def __init__(self, down_kbps=0, up_kbps=0, latency_ms=0):
+        """Zero means unshaped; every value is bounded and recorded in the ledger by the control that sets it."""
+        if not all(isinstance(v, int) and 0 <= v <= self.LIMIT for v in (down_kbps, up_kbps, latency_ms)):
+            raise ValueError("shape outside bounded range")
+        self.down_bps = down_kbps * 1000
+        self.up_bps = up_kbps * 1000
+        self.latency = latency_ms / 1000
+
+    def delay(self, nbytes, bps):
+        """Seconds one chunk of nbytes occupies a link of bps bits per second; zero when unshaped."""
+        return nbytes * 8 / bps if bps else 0.0
+
+
 class FixtureServer(ThreadingHTTPServer):
     """Keep counters and bytes on disk; keep transport controls outside the app process."""
 
@@ -116,12 +134,20 @@ class FixtureServer(ThreadingHTTPServer):
         self.stopping = threading.Event()
         self.acquisition_unavailable = threading.Event()
         self.acquisition_not_found = threading.Event()
+        self.shape = Shape()
         super().__init__(("127.0.0.1", port), Handler)
 
     @property
     def url(self):
         """Return the loopback URL for explicit test configuration only."""
         return f"http://127.0.0.1:{self.server_port}"
+
+    def set_shape(self, down_kbps, up_kbps, latency_ms):
+        """Apply a bounded link shape and record it in the ledger; an invalid shape changes nothing."""
+        self.shape = Shape(down_kbps, up_kbps, latency_ms)
+        for kind, value in (("shape_down_kbps", down_kbps), ("shape_up_kbps", up_kbps),
+                            ("shape_latency_ms", latency_ms)):
+            self.ledger.event(None, "control", kind, value)
 
     def generate(self, token, size, control=None):
         """Generate bounded disk fixtures without allocating the complete payload."""
@@ -230,6 +256,26 @@ class Handler(BaseHTTPRequestHandler):
                 control.interval = PACED_INTERVAL_SECONDS
             self.server.ledger.event(None, "control", "pace_acquisition")
             self.reply(200, {"interval": PACED_INTERVAL_SECONDS})
+        elif self.path.startswith("/__marker/"):
+            # A numbered boundary in the ledger lets the host attribute requests and bytes to one measured sample.
+            try:
+                number = int(self.path.removeprefix("/__marker/"))
+                if not 0 <= number <= 1_000_000:
+                    raise ValueError
+            except ValueError:
+                self.reply(400, {})
+                return
+            self.server.ledger.event(None, "control", "marker", number)
+            self.reply(200, {"marker": number})
+        elif self.path.startswith("/__shape/"):
+            # /__shape/<down kbps>/<up kbps>/<latency ms>; zeros restore an unshaped link. Counters are never reset.
+            try:
+                down, up, latency = (int(part) for part in self.path.removeprefix("/__shape/").split("/"))
+                self.server.set_shape(down, up, latency)
+            except ValueError:
+                self.reply(400, {})
+                return
+            self.reply(200, {"down_kbps": down, "up_kbps": up, "latency_ms": latency})
         elif self.path == "/__acquisition-not-found":
             self.server.acquisition_not_found.set()
             self.server.ledger.event(None, "control", "acquisition_not_found")
@@ -268,6 +314,8 @@ class Handler(BaseHTTPRequestHandler):
             self.close_connection = True
             self.reply(413, {})
             return
+        shape = self.server.shape
+        self.server.stopping.wait(shape.latency)
         token = "upload-" + os.urandom(8).hex()
         request = self.server.ledger.event(None, token, "upload", size)
         path = self.server.ledger.root / token
@@ -284,6 +332,7 @@ class Handler(BaseHTTPRequestHandler):
                     digest.update(chunk)
                     remaining -= len(chunk)
                     self.server.ledger.event(request, token, "upload_bytes", len(chunk))
+                    self.server.stopping.wait(shape.delay(len(chunk), shape.up_bps))
                 output.flush()
                 os.fsync(output.fileno())
             locator = digest.hexdigest()
@@ -382,7 +431,8 @@ class Handler(BaseHTTPRequestHandler):
             ranged = True
         ledger.event(request, token, "range_offset", offset)
         try:
-            self.wait(control.header_delay, control)
+            shape = self.server.shape
+            self.wait(control.header_delay + shape.latency, control)
             status = 206 if ranged else 200
             self.send_response(status)
             self.send_header("Content-Type", "application/octet-stream")
@@ -415,6 +465,8 @@ class Handler(BaseHTTPRequestHandler):
                         chunk = source.read(limit)
                         if not chunk:
                             raise OSError("fixture shortened")
+                        # The chunk occupies the shaped link before it is delivered, so completion is never paced.
+                        self.wait(shape.delay(len(chunk), shape.down_bps), control, allow_release=False)
                         self.wfile.write(chunk)
                         ledger.event(request, token, "body_bytes", len(chunk))
                         offset += len(chunk)
