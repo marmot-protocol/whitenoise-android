@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ServiceInfo
+import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.ListenableWorker
 import androidx.work.ListenableWorker.Result
@@ -29,6 +30,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLog
 
 private typealias DownloadOverride = PerformDurableAttachmentDownload
 
@@ -196,7 +198,9 @@ class AttachmentDownloadWorkerClassTest {
             }
         }
 
+    /** Platform interruption preserves retry ownership; diagnostics contain only coarse reason and attempt count. */
     @Test
+    @Config(sdk = [30, 36])
     fun stoppedWorkerPropagatesCancellationAndRetainsInteractiveIntent() =
         runTest {
             val request = testRequest()
@@ -210,16 +214,28 @@ class AttachmentDownloadWorkerClassTest {
                         enteredDownload.complete(Unit)
                         awaitCancellation()
                     },
+                    runAttemptCount = 2,
                 )
             val run = async { worker.doWork() }
             runCurrent()
             enteredDownload.await()
-            run.cancel()
+            run.cancel(CancellationException("fixture://private-stop-context"))
             runCurrent()
 
             assertTrue(run.isCancelled)
             assertTrue(runCatching { run.await() }.exceptionOrNull() is CancellationException)
             assertTrue(intents.isInteractive(request))
+            val stopped =
+                ShadowLog.getLogsForTag("DMAttachmentWorker").filter { it.msg.startsWith("attachment_work_stopped") }
+            assertEquals(1, stopped.size)
+            val expectedReason =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) worker.stopReason.toString() else "unavailable"
+            assertEquals("attachment_work_stopped reason=$expectedReason run_attempt=2", stopped.single().msg)
+            val privateValues =
+                listOf(request.accountRef, request.groupIdHex, request.messageIdHex, "fixture://private-stop-context")
+            privateValues.forEach { value ->
+                assertFalse("stop diagnostics exposed private context", stopped.single().msg.contains(value))
+            }
         }
 
     @Test

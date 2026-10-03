@@ -184,6 +184,23 @@ class Handler(BaseHTTPRequestHandler):
                 control.release.clear()
             self.server.ledger.event(None, "control", "hold_acquisition")
             self.reply(200, {"held_after": 1024})
+        elif self.path in ("/__background-start", "/__background-end"):
+            kind = "background_start" if self.path == "/__background-start" else "background_end"
+            self.server.ledger.event(None, "control", kind)
+            self.reply(200, {"marked": True})
+        elif self.path == "/__pace-background-acquisition":
+            for control in self.server.controls.values():
+                control.interval = 0.25
+            self.server.ledger.event(None, "control", "pace_background_acquisition")
+            self.reply(200, {"paced": True})
+        elif self.path == "/__hold-unknown-acquisition":
+            for control in self.server.controls.values():
+                control.hold_after = 2 * 1024 * 1024
+                control.interval = 0.01
+                control.unknown_length = True
+                control.release.clear()
+            self.server.ledger.event(None, "control", "hold_unknown_acquisition")
+            self.reply(200, {"held_after": 2 * 1024 * 1024, "content_length": False})
         elif self.path == "/__hold-resumable-acquisition":
             for control in self.server.controls.values():
                 control.hold_after = 2 * 1024 * 1024
@@ -285,13 +302,13 @@ class Handler(BaseHTTPRequestHandler):
                 return True
         return False
 
-    def wait(self, seconds, control=None):
-        """Keep waits interruptible by peer close, server shutdown or explicit release."""
+    def wait(self, seconds, control=None, allow_release=True):
+        """Interrupt every wait on disconnect; explicit release bypasses holds but preserves body pacing."""
         deadline = time.monotonic() + seconds
         while time.monotonic() < deadline:
             if self.server.stopping.is_set() or self.disconnected() or (control is not None and control.interrupt.is_set()):
                 raise ConnectionResetError()
-            if control is not None and control.release.is_set():
+            if allow_release and control is not None and control.release.is_set():
                 return
             self.server.stopping.wait(min(0.02, max(0, deadline - time.monotonic())))
 
@@ -350,6 +367,7 @@ class Handler(BaseHTTPRequestHandler):
             if not control.unknown_length:
                 self.send_header("Content-Length", str(size - offset))
             else:
+                ledger.event(request, token, "unknown_content_length")
                 self.send_header("Connection", "close")
                 self.close_connection = True
             self.end_headers()
@@ -375,7 +393,7 @@ class Handler(BaseHTTPRequestHandler):
                         ledger.event(request, token, "body_bytes", len(chunk))
                         offset += len(chunk)
                         if offset < size:
-                            self.wait(control.interval, control)
+                            self.wait(control.interval, control, allow_release=False)
             ledger.event(request, token, "complete")
         except (OSError, TimeoutError):
             ledger.event(request, token, "disconnect")

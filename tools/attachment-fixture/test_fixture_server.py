@@ -95,6 +95,17 @@ class FixtureContractTest(unittest.TestCase):
         events = self.await_event("complete")
         self.assertEqual(0, sum(e["kind"] == "held" for e in events))
 
+    def test_releasing_hold_preserves_body_pacing(self):
+        """Release admits the suffix without turning a constrained response into an instant body."""
+        control = Control(interval=0.1, hold_after=16384)
+        source = self.server.generate("paced-release", 65537, control)
+        control.release.set()
+        self.assertEqual(source.read_bytes(), self.get("/paced-release")[2])
+        events = self.await_event("complete")
+        chunks = [event for event in events if event["kind"] == "body_bytes"]
+        self.assertEqual(5, len(chunks))
+        self.assertGreaterEqual(chunks[-1]["at_ns"] - chunks[0]["at_ns"], 350_000_000)
+
     def test_restart_preserves_all_attempts_including_missing_body(self):
         """A restart must retain successful and failed request attempts in one ledger."""
         self.server.generate("restart", 1024)
@@ -141,6 +152,40 @@ class FixtureContractTest(unittest.TestCase):
         client.join(5)
         self.assertFalse(client.is_alive())
         self.assertEqual(source.read_bytes(), result[0][2])
+
+    def test_background_controls_preserve_hold_and_record_independent_markers(self):
+        """Pacing changes only future chunks; Android lifecycle evidence cannot reset request counters."""
+        self.server.generate("background", 4 * 1024 * 1024)
+        self.assertEqual(200, self.get("/__hold-resumable-acquisition", method="POST")[0])
+        self.assertEqual(200, self.get("/__pace-background-acquisition", method="POST")[0])
+        control = self.server.controls["background"]
+        self.assertEqual(0.25, control.interval)
+        self.assertEqual(2 * 1024 * 1024, control.hold_after)
+        self.assertFalse(control.release.is_set())
+        self.assertEqual(200, self.get("/__background-start", method="POST")[0])
+        self.assertEqual(200, self.get("/__background-end", method="POST")[0])
+        kinds = [e["kind"] for e in self.server.ledger.snapshot()]
+        self.assertEqual(["hold_resumable_acquisition", "pace_background_acquisition", "background_start", "background_end"], kinds)
+
+    def test_native_unknown_length_control_holds_then_releases_without_content_length(self):
+        """Exercise the actual opt-in endpoint, response framing and durable byte totals."""
+        source = self.server.generate("unknown-held", 4 * 1024 * 1024 + 16)
+        self.assertEqual(200, self.get("/__hold-unknown-acquisition", method="POST")[0])
+        client = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        try:
+            client.request("GET", "/unknown-held")
+            response = client.getresponse()
+            self.assertIsNone(response.getheader("Content-Length"))
+            self.assertEqual("close", response.getheader("Connection"))
+            prefix = response.read(2 * 1024 * 1024)
+            self.await_event("held")
+            self.assertEqual(200, self.get("/__release-acquisition", method="POST")[0])
+            self.assertEqual(source.read_bytes(), prefix + response.read())
+            events = self.await_event("complete")
+            self.assertEqual(1, sum(e["kind"] == "unknown_content_length" for e in events))
+            self.assertEqual(source.stat().st_size, sum(e["value"] for e in events if e["kind"] == "body_bytes"))
+        finally:
+            client.close()
 
     def test_interruption_preserves_prefix_and_replacement_control(self):
         """Both validator paths close the held socket and keep replacement responses independent."""

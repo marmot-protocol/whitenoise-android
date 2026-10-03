@@ -14,6 +14,8 @@ from cancellation_checker import check_cancellation
 from fixture_relay import FixtureRelay
 from fixture_server import FixtureServer
 from resume_checker import check_resume
+from unknown_length_checker import check_unknown_length
+from background_checker import check_background
 
 APP = "dev.ipf.whitenoise.android.medialatency"
 PROBE = "dev.ipf.whitenoise.android.media.MediaAttachmentLatencyProbe#measureControlledReceivedAttachment"
@@ -57,7 +59,7 @@ def wait_for_cancellation_completion(ledger, start):
         time.sleep(min(0.01, remaining))
 
 
-def run(adb, serial, root, output, private_debug=False, budget_profile="reference-api30-arm64", android_send_controller=False, held_cancellation=False, process_restart=False, physical_fixture_serial=None, transport_resume=None):
+def run(adb, serial, root, output, private_debug=False, budget_profile="reference-api30-arm64", android_send_controller=False, held_cancellation=False, process_restart=False, physical_fixture_serial=None, transport_resume=None, unknown_length=False, platform_background=False, platform_lock=False):
     """Count genuine uploaded ciphertext and received bodies without resetting failed attempts."""
     physical = physical_fixture_serial is not None
     if physical:
@@ -81,10 +83,16 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         or not android_send_controller or held_cancellation or process_restart
     ):
         raise ValueError("transport resume requires a separate genuine-controller scenario")
+    if platform_lock and not platform_background:
+        raise ValueError("screen-lock qualification requires the separate background scenario")
+    if platform_background and (physical or not android_send_controller or held_cancellation or process_restart or transport_resume or unknown_length):
+        raise ValueError("platform background requires a separate generated-controller emulator scenario")
+    if unknown_length and (not android_send_controller or held_cancellation or process_restart or transport_resume):
+        raise ValueError("unknown length requires a separate genuine-controller scenario")
     session = str(uuid.uuid4()) if process_restart else None
     # Native group fallback uses hash.bin. Match the published locator only for
-    # resume qualification so a different locator cannot replace its checkpoint.
-    server = FixtureServer(root, upload_extension=".bin") if transport_resume else FixtureServer(root)
+    # held-body qualification so native fallback cannot silently replace its locator.
+    server = FixtureServer(root, upload_extension=".bin") if transport_resume or unknown_length or platform_background else FixtureServer(root)
     relay = FixtureRelay()
     forwards = []
     threads = []
@@ -106,12 +114,15 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             forwards.append(port)
         result = adb_command(
             adb, serial, "shell", "am", "instrument", "-w", "-r",
-            "-e", "class", PROBE, "-e", "allowControlledAttachmentProbe", "true",
+            "-e", "class", ("dev.ipf.whitenoise.android.media.UnknownLengthAttachmentDeviceTest#nativeUnknownLengthProgressHasAccessibleByteOnlyControl" if unknown_length else PROBE),
+            "-e", "allowControlledAttachmentProbe", "true",
             "-e", "fixtureBlobPort", str(server.server_port),
             "-e", "fixtureRelayPort", str(relay.port),
             *(["-e", "fixtureUseAndroidSendController", "true"] if android_send_controller else []),
             *(["-e", "fixtureCancellation", "true"] if held_cancellation else []),
             *(["-e", "fixtureTransportResume", transport_resume] if transport_resume else []),
+            *(["-e", "fixtureUnknownLength", "true"] if unknown_length else []),
+            *(["-e", "fixtureFunctionalBodyCase", "platform-lock" if platform_lock else "platform-background"] if platform_background else []),
             *(["-e", "fixtureRestartRole", "prepare", "-e", "fixtureRestartSession", session] if process_restart else []),
             APP + ".test/androidx.test.runner.AndroidJUnitRunner",
         )
@@ -211,6 +222,32 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             )
             report["deferred"] = ["platform-worker-lifetime", "external-handoff", "process-restart-offline",
                                   "mdk-large-received-sender", "physical-device"]
+        if unknown_length:
+            report["scope"] = "android-host-resolver-packaged-native-unknown-length"
+            report["unknown_length_check"] = check_unknown_length(report["metrics"], events)
+            report["budget_check"] = {"applicable": False, "passed": False,
+                                     "reason": "representative performance remains unqualified"}
+            report["qualified"] = (
+                report.get("instrumentation_passed", False) and report["ledger_finalized"]
+                and report["unknown_length_check"]["passed"]
+                and report.get("environment") == PROFILES[budget_profile]
+            )
+            report["deferred"] = ["platform-worker-lifetime", "external-handoff", "process-restart-offline",
+                                  "mdk-large-received-sender", "physical-device"]
+        if platform_background:
+            report["scope"] = "android-scheduled-interactive-background-continuation"
+            report["platform_background_check"] = check_background(report["metrics"], events, report.get("environment"), locked=platform_lock)
+            report["budget_check"] = {"applicable": False, "passed": False,
+                                     "reason": "representative performance remains unqualified"}
+            report["qualified"] = (
+                report.get("instrumentation_passed", False) and report["ledger_finalized"]
+                and report["platform_background_check"]["passed"]
+                and report.get("environment") == PROFILES[budget_profile]
+            )
+            report["deferred"] = ["platform-job-stop-resume", "screen-lock", "external-handoff", "process-restart-offline",
+                                  "mdk-large-received-sender", "physical-device"]
+        if platform_lock and platform_background and report["qualified"]:
+            report["deferred"].remove("screen-lock")
         if physical and "physical-device" in report["deferred"]:
             report["deferred"].remove("physical-device")
         report["deferred"].extend(["manual-ui-flows", "representative-large-file-performance"])
@@ -246,8 +283,11 @@ def main():
     parser.add_argument("--process-restart", action="store_true", help="Force-stop the isolated fixture between retained-read processes")
     parser.add_argument("--physical-fixture-serial", help="Explicitly opt into the matching physical serial with the Pixel profile; install only the isolated fixture in place after a private backup")
     parser.add_argument("--transport-resume", choices=("compatible", "changed-validator"), help="Qualify native retry after a held 4 MiB body is interrupted; Android scheduler lifetime stays deferred")
+    parser.add_argument("--unknown-length", action="store_true", help="Require native byte-only progress without Content-Length")
+    parser.add_argument("--platform-background", action="store_true", help="Require thirty seconds behind Home with a real elevated Android scheduler")
+    parser.add_argument("--platform-lock", action="store_true", help="Require the emulator keyguard and screen-off during sustained background transfer")
     args = parser.parse_args()
-    run(args.adb, args.serial, args.root, args.output, args.private_debug, args.budget_profile, args.android_send_controller, args.held_cancellation, args.process_restart, args.physical_fixture_serial, args.transport_resume)
+    run(args.adb, args.serial, args.root, args.output, args.private_debug, args.budget_profile, args.android_send_controller, args.held_cancellation, args.process_restart, args.physical_fixture_serial, args.transport_resume, args.unknown_length, args.platform_background, args.platform_lock)
 
 
 if __name__ == "__main__":

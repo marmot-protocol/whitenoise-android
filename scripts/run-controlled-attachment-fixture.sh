@@ -6,13 +6,16 @@ serial="${1:?Pass the exact emulator serial}"
 distribution="${2:-Play}"
 budget_profile="${3:-reference-api30-arm64}"
 sender_mode="${4:-native}"
-case "$sender_mode" in native|controller|controller-cancel|controller-restart|controller-resume|controller-resume-changed) ;; *) echo 'Invalid fixture sender mode' >&2; exit 2 ;; esac
+case "$sender_mode" in native|controller|controller-cancel|controller-restart|controller-resume|controller-resume-changed|controller-unknown-length|controller-background|controller-lock) ;; *) echo 'Invalid fixture sender mode' >&2; exit 2 ;; esac
 runner_args=()
 if [[ "$sender_mode" != native ]]; then runner_args+=(--android-send-controller); fi
 if [[ "$sender_mode" == controller-cancel ]]; then runner_args+=(--held-cancellation); fi
 if [[ "$sender_mode" == controller-restart ]]; then runner_args+=(--process-restart); fi
 if [[ "$sender_mode" == controller-resume ]]; then runner_args+=(--transport-resume compatible); fi
 if [[ "$sender_mode" == controller-resume-changed ]]; then runner_args+=(--transport-resume changed-validator); fi
+if [[ "$sender_mode" == controller-unknown-length ]]; then runner_args+=(--unknown-length); fi
+if [[ "$sender_mode" == controller-background ]]; then runner_args+=(--platform-background); fi
+if [[ "$sender_mode" == controller-lock ]]; then runner_args+=(--platform-background --platform-lock); fi
 case "$serial" in emulator-*) ;; *) echo 'Disposable emulator required' >&2; exit 2 ;; esac
 case "$distribution" in Play|Zapstore) ;; *) echo 'Invalid distribution' >&2; exit 2 ;; esac
 [[ "$(adb -s "$serial" shell getprop ro.kernel.qemu | tr -d '\r\n')" == 1 ]] || exit 2
