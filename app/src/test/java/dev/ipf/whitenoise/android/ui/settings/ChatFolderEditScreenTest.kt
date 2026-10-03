@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import androidx.compose.material3.Surface
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasTestTag
@@ -10,8 +11,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
@@ -58,9 +62,16 @@ class ChatFolderEditScreenTest {
         val appState = appState()
         renderEditor(appState, {}, folderId = null)
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Archive")
-        composeRule.onNodeWithTag("folder.add.").performClick()
-        composeRule.onNodeWithTag("folder.moreFilters").performClick()
-        composeRule.onNodeWithTag("folder.addField.ARCHIVED").performClick()
+        openFilterSheet()
+        composeRule.onNodeWithTag("sheet.dragHandle", useUnmergedTree = true).performTouchInput {
+            swipeUp(endY = -450f)
+        }
+        composeRule.mainClock.advanceTimeBy(1000L)
+        composeRule
+            .onNodeWithTag("folder.addField.ARCHIVED")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithTag("folder.conditionDone").performClick()
         composeRule.onNodeWithTag("folder.save").performClick()
         val folder = appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).first { it.name == "Archive" }
@@ -129,7 +140,7 @@ class ChatFolderEditScreenTest {
         val appState = appState()
         renderEditor(appState, {}, folderId = null)
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Personal")
-        composeRule.onNodeWithTag("folder.add.").performClick()
+        openFilterSheet()
         composeRule.onNodeWithTag("folder.addField.UNREAD").performClick()
         composeRule.onNodeWithText(app.getString(R.string.cancel)).performClick()
         composeRule.onNodeWithTag("folder.group.").assertDoesNotExist()
@@ -336,8 +347,7 @@ class ChatFolderEditScreenTest {
         val appState = appState()
         renderEditor(appState, {}, folderId = null)
         composeRule.onNodeWithTag("folder.name").performTextReplacement("Advanced")
-        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.add."))
-        composeRule.onNodeWithTag("folder.add.").performClick()
+        openFilterSheet()
         composeRule.onNodeWithTag("folder.addField.MENTIONS").performClick()
         composeRule.onNodeWithTag("folder.group.").assertDoesNotExist()
         composeRule.onNodeWithTag("folder.conditionDone").performClick()
@@ -346,6 +356,12 @@ class ChatFolderEditScreenTest {
         val reloaded = ChatFolderPreferences(app)
         val folder = reloaded.foldersFor(ACCOUNT_REF).first { it.name == "Advanced" }
         assertTrue(reloaded.folderRule(ACCOUNT_REF, folder.id)?.smartFilter != null)
+    }
+
+    private fun openFilterSheet() {
+        composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.add."))
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.mainClock.advanceTimeBy(1000L)
     }
 
     private fun renderEditor(
