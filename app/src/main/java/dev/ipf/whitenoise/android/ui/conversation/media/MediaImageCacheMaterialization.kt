@@ -2,10 +2,8 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -39,25 +37,6 @@ internal fun rememberImageAttachmentCacheAvailability(
     }
     // Stable across recompositions: the readiness effect below keys on this holder.
     return remember(cached, resolved) { ImageCacheAvailability(cached, resolved) }
-}
-
-/**
- * True once the retained-bytes probes have answered and the materialization intent has caught up with the policy they
- * produced. The intent follows policy one effect pass later, so without this a file MDK holds would flash its
- * Download action for a frame between the probe's answer and the intent's grant.
- *
- * Call it after [rememberAttachmentMaterializationIntent]: effects run in declaration order, so both writes land in
- * the same pass.
- */
-@Composable
-internal fun rememberDownloadActionReady(
-    availability: ImageCacheAvailability,
-    policyAllowsMaterialization: Boolean,
-): Boolean {
-    val resolved by availability.resolved
-    var ready by remember(availability) { mutableStateOf(false) }
-    LaunchedEffect(availability, resolved, policyAllowsMaterialization) { ready = resolved }
-    return ready
 }
 
 /**

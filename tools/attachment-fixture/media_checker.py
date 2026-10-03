@@ -152,7 +152,7 @@ def _check_tiles(tiles, violations):
             if (row is None or row.get("media") != media or row.get("shown") is not True
                     or not _finite(row.get("settle_ms"))):
                 violations.append(f"missing or unshown tile for {role}-{message}-{index}")
-            elif row.get("download_affordance_seen") is not False:
+            elif row.get("download_affordance_seen") is not False or row.get("retry_affordance_seen") is not False:
                 violations.append(f"a retained {role}-{message}-{index} showed a Download or Retry affordance")
             elif row.get("one_tap_opened") is not True:
                 violations.append(f"{role}-{message}-{index} did not open exactly once on one tap")

@@ -160,7 +160,8 @@ class MediaEvidenceTest(unittest.TestCase):
 def tile_rows():
     """One closed tile row per expected attachment and role, as the device test reports them."""
     return [{"phase": "media-tile", "message": message, "index": index, "role": role, "media": media, "shown": True,
-             "settle_ms": 120, "download_affordance_seen": False, "one_tap_opened": True}
+             "settle_ms": 120, "download_affordance_seen": False, "retry_affordance_seen": False,
+             "one_tap_opened": True}
             for message, index, media in EXPECTED for role in ROLES]
 
 
@@ -179,7 +180,8 @@ class RetainedTilesEvidenceTest(unittest.TestCase):
         prepare, read, events, boundary = evidence()
         rows = tile_rows()
         for index in range(len(rows)):
-            for field, bad in (("shown", False), ("download_affordance_seen", True), ("one_tap_opened", False),
+            for field, bad in (("shown", False), ("download_affordance_seen", True), ("retry_affordance_seen", True),
+                               ("one_tap_opened", False),
                                ("settle_ms", None), ("media", "other")):
                 altered = deepcopy(rows)
                 altered[index][field] = bad
