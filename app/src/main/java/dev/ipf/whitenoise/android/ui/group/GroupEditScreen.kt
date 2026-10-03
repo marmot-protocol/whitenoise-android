@@ -247,42 +247,50 @@ internal fun GroupEditScreen(
             imageSaving = true
             controller.clearLastMutationError()
             appState.launchMutation {
-                var prepared = false
+                val attemptIsCurrent = {
+                    imageFailureScope.isCurrent(failureAttempt) &&
+                        appState.activeAccountRef == accountRef &&
+                        controller.boundAccountRef == accountRef &&
+                        controller.isSelfMember &&
+                        controller.isSelfAdmin &&
+                        !controller.group.unrecoverable
+                }
                 try {
-                    val draft = load()
-                    prepared = true
-                    // The picker and the crop keep this open long enough for membership, admin rights
-                    // or recoverability to change underneath it, so the permission is read again here
-                    // rather than trusted from when the picture was chosen.
-                    if (!controller.isSelfMember || !controller.isSelfAdmin || controller.group.unrecoverable) {
-                        return@launchMutation
-                    }
-                    val uploaded =
-                        appState.marmotIo {
-                            uploadProfileImage(accountRef, draft.plaintext, draft.mediaType, null)
-                        }
-                    val change =
-                        ScopedGroupImageMutation(safeAvatarUploadUrl(uploaded)) {
-                            imageFailureScope.isCurrent(failureAttempt)
-                        }
-                    val updated = controller.updateGroupAvatarUrl(change)
+                    val attempt =
+                        GroupAvatarUploadAttempt(
+                            isCurrent = attemptIsCurrent,
+                            clockMillis = android.os.SystemClock::elapsedRealtime,
+                        )
+                    val updated =
+                        attempt.run(
+                            prepare = load,
+                            upload = { draft ->
+                                appState.marmotIo {
+                                    uploadProfileImage(accountRef, draft.plaintext, draft.mediaType, null)
+                                }
+                            },
+                            publish = { safeUrl ->
+                                val change = ScopedGroupImageMutation(safeUrl, attemptIsCurrent)
+                                controller.updateGroupAvatarUrl(change)
+                            },
+                        )
                     if (updated) {
                         showImageSearch = false
-                    } else if (controller.lastMutationError != null) {
+                    } else if (attemptIsCurrent() && controller.lastMutationError != null) {
                         imageFailureScope.captureFailure(failureAttempt)
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
-                    if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
+                    if (!attemptIsCurrent()) return@launchMutation
                     appState.presentFailure(
                         titleRes =
-                            if (prepared) {
+                            if ((error as? GroupAvatarUploadFailure)?.stage != GroupAvatarUploadStage.Prepare) {
                                 R.string.toast_couldnt_upload_group_image
                             } else {
                                 R.string.toast_couldnt_prepare_image
                             },
-                        operationCode = if (prepared) "GROUP_IMAGE_UPLOAD" else "GROUP_IMAGE_PREPARE",
+                        operationCode = (error as? GroupAvatarUploadFailure)?.stage?.operationCode ?: "GROUP_IMAGE_UPLOAD",
                         throwable = error,
                     )
                     imageFailureScope.captureFailure(failureAttempt)
