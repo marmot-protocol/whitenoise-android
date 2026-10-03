@@ -65,6 +65,7 @@ def tables(agg):
     for p in agg["profiles"]:
         for c in p["cells"]:
             def named(part):
+                """The dominant component with its layer and share, or a dash when nothing was measured."""
                 return "—" if not part else f"{part['dominant']} ({part['layer']}, {part['shares'][part['dominant']] * 100:.0f}%)"
             out.append(f"| {p['name']} | {size_label(c['size'])} | {named(c['attribution']['upload'])} | "
                        f"{named(c['attribution']['download'])} |")
