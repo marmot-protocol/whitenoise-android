@@ -58,7 +58,10 @@ internal object TransportResumeAttachmentProbe {
         assertEquals(prefix, events.single { it.getString("kind") == "range_requested_offset" }.getLong("value"))
         assertEquals(if (changed) 0 else 1, events.single { it.getString("kind") == "if_range_match" }.getInt("value"))
         val expectedTransferred = bytes.size + 16L + if (changed) prefix else 0L
-        assertEquals(expectedTransferred, events.filter { it.getString("kind") == "body_bytes" }.sumOf { it.getLong("value") })
+        assertEquals(
+            expectedTransferred,
+            events.filter { it.getString("kind") == "body_bytes" }.sumOf { it.getLong("value") },
+        )
         HeldAttachmentCancellationProbe.control(port, "/__acquisition-unavailable")
         repeat(3) {
             state.openNativeAttachment(request).use { local ->

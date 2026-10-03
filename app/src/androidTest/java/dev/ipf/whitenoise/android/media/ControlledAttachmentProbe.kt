@@ -51,15 +51,13 @@ internal object ControlledAttachmentProbe {
         val arguments = InstrumentationRegistry.getArguments()
         assumeTrue(arguments.getString("allowControlledAttachmentProbe") == "true")
         check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
-        val androidSendController = arguments.getString("fixtureUseAndroidSendController") == "true"
-        val compareLargeReads = arguments.getString("fixtureCompareLargeLocalReads") == "true"
-        val resumeCase = arguments.getString("fixtureTransportResume")
-        require(resumeCase == null || resumeCase in setOf("compatible", "changed-validator"))
-        require(resumeCase == null || (!compareLargeReads && androidSendController))
-        val payloadBytes = if (resumeCase != null) 4 * 1024 * 1024 else LargeAttachmentLocalReadComparison.payloadBytes(compareLargeReads)
-        val blobPort = requireNotNull(arguments.getString("fixtureBlobPort")).toInt()
-        val relayPort = requireNotNull(arguments.getString("fixtureRelayPort")).toInt()
-        require(blobPort in 1024..65535 && relayPort in 1024..65535)
+        val options = fixtureOptions(arguments)
+        val androidSendController = options.androidSendController
+        val compareLargeReads = options.compareLargeReads
+        val resumeCase = options.resumeCase
+        val payloadBytes = options.payloadBytes
+        val blobPort = options.blobPort
+        val relayPort = options.relayPort
         MarmotAndroid.initialize(context)
         val restartRole = arguments.getString("fixtureRestartRole")
         val session = arguments.getString("fixtureRestartSession")
@@ -263,6 +261,34 @@ internal object ControlledAttachmentProbe {
             check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
         }
     }
+
+    /** Rejects incompatible probe modes and unsafe ports before any native runtime is opened. */
+    private fun fixtureOptions(arguments: Bundle): FixtureOptions {
+        val androidSendController = arguments.getString("fixtureUseAndroidSendController") == "true"
+        val compareLargeReads = arguments.getString("fixtureCompareLargeLocalReads") == "true"
+        val resumeCase = arguments.getString("fixtureTransportResume")
+        require(resumeCase == null || resumeCase in setOf("compatible", "changed-validator"))
+        require(resumeCase == null || (!compareLargeReads && androidSendController))
+        val payloadBytes =
+            if (resumeCase != null) {
+                4 * 1024 * 1024
+            } else {
+                LargeAttachmentLocalReadComparison.payloadBytes(compareLargeReads)
+            }
+        val blobPort = requireNotNull(arguments.getString("fixtureBlobPort")).toInt()
+        val relayPort = requireNotNull(arguments.getString("fixtureRelayPort")).toInt()
+        require(blobPort in 1024..65535 && relayPort in 1024..65535)
+        return FixtureOptions(androidSendController, compareLargeReads, resumeCase, payloadBytes, blobPort, relayPort)
+    }
+
+    private data class FixtureOptions(
+        val androidSendController: Boolean,
+        val compareLargeReads: Boolean,
+        val resumeCase: String?,
+        val payloadBytes: Int,
+        val blobPort: Int,
+        val relayPort: Int,
+    )
 
     /** Makes accidental downloads fail visibly while preserving the external attempt ledger. */
     private suspend fun denyAcquisition(port: Int) =
