@@ -2187,7 +2187,6 @@
     <string name="diagnostics_clear_confirm_title">Diagnoseprotokolle löschen?</string>
     <string name="diagnostics_clear_confirm_body">Dadurch werden Diagnoseprotokolle aller Profile dauerhaft von diesem Gerät gelöscht. Deine Freigabeeinstellungen ändern sich nicht.</string>
     <string name="diagnostics_clear_confirm_action">Protokolle löschen</string>
-    <string name="usage_diagnostics_prompt_intro">Hilf uns zu verstehen, wie White Noise genutzt wird, und das Messaging zuverlässiger zu machen.</string>
     <string name="donate_open_failed">Die Spendenseite konnte nicht geöffnet werden. Versuche es erneut oder kehre zu den Einstellungen zurück.</string>
     <string name="export_audit_logs_confirm_body">Diagnoseprotokolle enthalten technische Kennungen und Aktivitätsdetails. Teile sie nur mit Personen, denen du vertraust.</string>
     <string name="export_audit_logs">Diagnoseprotokolle exportieren</string>
@@ -2211,4 +2210,11 @@
     <string name="delete_local_does_not_leave">Dadurch verlässt du den Chat nicht.</string>
     <string name="user_search_address_unverified">Diese Adresse konnte nicht verifiziert werden.</string>
     <string name="user_search_address_result">Adresse nicht verifiziert</string>
+    <string name="onboarding_share_usage_title">Nutzung teilen</string>
+    <string name="onboarding_share_usage_summary">Funktionsnutzung und App-Leistung.</string>
+    <string name="onboarding_share_logs_title">Diagnoseprotokolle teilen</string>
+    <string name="onboarding_share_logs_summary">Technische Daten zu Nachrichten.</string>
+    <string name="onboarding_details_accessibility">%1$s: %2$s</string>
+    <string name="onboarding_details_expanded">Ausgeklappt</string>
+    <string name="onboarding_details_collapsed">Eingeklappt</string>
 </resources>

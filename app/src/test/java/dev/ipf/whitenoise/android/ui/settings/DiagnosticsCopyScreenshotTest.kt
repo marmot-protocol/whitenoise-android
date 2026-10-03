@@ -132,6 +132,7 @@ class DiagnosticsCopyScreenshotTest {
                 }
             }
         }
+        composeRule.onNodeWithTag("diagnostics.logs.details").performClick()
         composeRule
             .onNodeWithText(context.getString(R.string.diagnostics_disable_disclosure))
             .performScrollTo()

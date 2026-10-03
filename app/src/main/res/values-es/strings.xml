@@ -2170,7 +2170,6 @@
     <string name="diagnostics_clear_confirm_title">¿Borrar registros de diagnóstico?</string>
     <string name="diagnostics_clear_confirm_body">Esto elimina permanentemente de este dispositivo los registros de diagnóstico de todos los perfiles. Tus preferencias de envío no cambian.</string>
     <string name="diagnostics_clear_confirm_action">Borrar registros</string>
-    <string name="usage_diagnostics_prompt_intro">Ayúdanos a entender cómo se utiliza White Noise y a hacer que la mensajería sea más fiable.</string>
     <string name="donate_open_failed">No se pudo abrir la página de donaciones. Inténtalo de nuevo o vuelve a Ajustes.</string>
     <string name="export_audit_logs_confirm_body">Los registros de diagnóstico contienen identificadores técnicos y detalles de actividad. Compártelos solo con alguien de confianza.</string>
     <string name="export_audit_logs">Exportar registros de diagnóstico</string>
@@ -2194,4 +2193,11 @@
     <string name="delete_local_does_not_leave">Esto no abandona el chat.</string>
     <string name="user_search_address_unverified">No se pudo verificar esta dirección.</string>
     <string name="user_search_address_result">Dirección no verificada</string>
+    <string name="onboarding_share_usage_title">Compartir uso</string>
+    <string name="onboarding_share_usage_summary">Uso de funciones y rendimiento de la app.</string>
+    <string name="onboarding_share_logs_title">Compartir registros de diagnóstico</string>
+    <string name="onboarding_share_logs_summary">Datos técnicos sobre los mensajes.</string>
+    <string name="onboarding_details_accessibility">%1$s: %2$s</string>
+    <string name="onboarding_details_expanded">Expandido</string>
+    <string name="onboarding_details_collapsed">Contraído</string>
 </resources>

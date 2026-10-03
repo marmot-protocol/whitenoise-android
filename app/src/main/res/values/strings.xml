@@ -2344,10 +2344,16 @@
     <string name="diagnostics_clear_confirm_title">Clear diagnostic logs?</string>
     <string name="diagnostics_clear_confirm_body">This permanently deletes diagnostic logs for every profile from this device. Your sharing settings don’t change.</string>
     <string name="diagnostics_clear_confirm_action">Clear Logs</string>
-    <string name="usage_diagnostics_prompt_intro">Help us understand how White Noise is used and make messaging more reliable.</string>
     <string name="donate_open_failed">Couldn’t open the donation page. Try again or return to Settings.</string>
     <string name="checking_invitation">Checking invitation…</string>
     <string name="couldnt_check_invitation">Couldn’t check invitation</string>
     <string name="toast_leave_not_confirmed_history_kept">Leave not confirmed. History kept.</string>
     <string name="delete_local_does_not_leave">This does not leave the chat.</string>
+    <string name="onboarding_share_usage_title">Share usage</string>
+    <string name="onboarding_share_usage_summary">Feature use and app performance.</string>
+    <string name="onboarding_share_logs_title">Share diagnostic logs</string>
+    <string name="onboarding_share_logs_summary">Technical data about messaging.</string>
+    <string name="onboarding_details_accessibility">%1$s, %2$s</string>
+    <string name="onboarding_details_expanded">Expanded</string>
+    <string name="onboarding_details_collapsed">Collapsed</string>
 </resources>

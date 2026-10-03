@@ -39,7 +39,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.launch
 
-/** Shows the actual collection scope wherever a user can grant the expanded MDK receipt. */
+/** Full settings disclosure; onboarding offers the same information in each choice's Details section. */
 @Composable
 internal fun UsageDiagnosticsDisclosure() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -72,8 +72,8 @@ internal fun diagnosticsStatusLabel(status: DiagnosticsExporterStatusFfi?): Int 
 private fun UsageDiagnosticsChoice(appState: WhiteNoiseAppState) {
     val state = appState.diagnostics
     ConsentSwitchRow(
-        title = stringResource(R.string.usage_diagnostics_title),
-        subtitle = stringResource(R.string.usage_diagnostics_subtitle),
+        title = stringResource(R.string.onboarding_share_usage_title),
+        subtitle = stringResource(R.string.onboarding_share_usage_summary),
         checked = state.selected,
         enabled = state.snapshot != null && !state.failed,
         saving = state.busy,
@@ -162,7 +162,7 @@ internal fun UsageDiagnosticsPrompt(
     }
 }
 
-/** The scrolling part of the consent sheet: both choices in one card, then the disclosure and feedback. */
+/** Short choices with independently expandable disclosures, followed by loading/save feedback. */
 @Composable
 private fun ColumnScope.UsageDiagnosticsPromptBody(
     appState: WhiteNoiseAppState,
@@ -177,22 +177,40 @@ private fun ColumnScope.UsageDiagnosticsPromptBody(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.ConversationCluster),
     ) {
-        Text(stringResource(R.string.usage_diagnostics_prompt_intro), style = MaterialTheme.typography.bodyMedium)
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             Column {
-                UsageDiagnosticsChoice(appState)
+                DiagnosticsChoiceDetails(
+                    title = stringResource(R.string.onboarding_share_usage_title),
+                    tag = "diagnostics.usage.details",
+                    details =
+                        listOf(
+                            R.string.usage_diagnostics_disclosure,
+                            R.string.diagnostics_retention,
+                            R.string.diagnostics_disable_disclosure,
+                        ),
+                ) { UsageDiagnosticsChoice(appState) }
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     color = MaterialTheme.colorScheme.outlineVariant,
                 )
-                IndependentAuditLogChoice(appState, loggingBusy, onLoggingBusyChange)
+                DiagnosticsChoiceDetails(
+                    title = stringResource(R.string.onboarding_share_logs_title),
+                    tag = "diagnostics.logs.details",
+                    details =
+                        listOf(
+                            R.string.audit_upload_subtitle,
+                            R.string.diagnostics_group_disclosure,
+                            R.string.diagnostics_existing_logs,
+                            R.string.diagnostics_retention,
+                            R.string.diagnostics_disable_disclosure,
+                        ),
+                ) { IndependentAuditLogChoice(appState, loggingBusy, onLoggingBusyChange) }
             }
         }
         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            UsageDiagnosticsDisclosure()
             if (appState.auditUploadConsentRequired) {
                 Text(stringResource(R.string.audit_upload_renew), style = MaterialTheme.typography.bodySmall)
             }
@@ -225,8 +243,8 @@ private fun IndependentAuditLogChoice(
         }
     }
     ConsentSwitchRow(
-        title = stringResource(R.string.audit_upload_title),
-        subtitle = stringResource(R.string.audit_upload_subtitle),
+        title = stringResource(R.string.onboarding_share_logs_title),
+        subtitle = stringResource(R.string.onboarding_share_logs_summary),
         checked = pendingChoice ?: (appState.auditLogSettings?.enabled == true),
         enabled = appState.auditLogSettings != null,
         saving = busy,
