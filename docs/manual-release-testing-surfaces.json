@@ -12646,6 +12646,16 @@
         ]
       },
       {
+        "surface": "Group image failure fallback retry copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageFailureDetail.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "GRP-003",
+          "GRP-025",
+          "NCH-002"
+        ]
+      },
+      {
         "surface": "setting:group_svg_rejected_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageFailureDetail.kt",
         "anchor": "R.string.group_svg_rejected_detail",
