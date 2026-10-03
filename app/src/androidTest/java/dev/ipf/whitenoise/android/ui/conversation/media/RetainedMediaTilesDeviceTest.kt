@@ -16,14 +16,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.AttachmentAcquisitionModeFfi
-import dev.ipf.marmotkit.MarkdownDocumentFfi
-import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
-import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.FixtureSession
@@ -32,16 +26,9 @@ import dev.ipf.whitenoise.android.media.MediaLifecycleAttachmentProbe
 import dev.ipf.whitenoise.android.media.RestartAttachmentRetentionProbe
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
-import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
-import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
-import dev.ipf.whitenoise.android.state.MessageStatus
-import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
@@ -102,7 +89,7 @@ class RetainedMediaTilesDeviceTest {
                     arguments.getString("fixtureRestartSession"),
                 )
             val relays = listOf("ws://127.0.0.1:$relayPort")
-            val marmot = openRuntime(root, relays)
+            val marmot = TileFixtureSupport.openRuntime(root, relays)
             val session = FixtureSession(context, root, marmot, relays, blobPort)
             try {
                 marmot.start()
@@ -111,20 +98,6 @@ class RetainedMediaTilesDeviceTest {
                 session.close(preserve = false)
             }
         }
-
-    /** Opens the generated loopback-only runtime used by every fixture probe. */
-    private fun openRuntime(
-        root: File,
-        relays: List<String>,
-    ): Marmot =
-        Marmot.newWithConfiguration(
-            root.absolutePath,
-            relays,
-            MarmotOptions(
-                relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
-                attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
-            ),
-        )
 
     /** Restores each attachment from the private receipt and the native history, never from the original bytes. */
     private suspend fun cases(session: FixtureSession): List<TileCase> {
@@ -151,26 +124,6 @@ class RetainedMediaTilesDeviceTest {
         return cases
     }
 
-    /** One state and controller per account, with every automatic-download cell off for images and videos. */
-    private suspend fun controller(
-        session: FixtureSession,
-        request: AttachmentTransferRequest,
-    ): Pair<WhiteNoiseAppState, ConversationController> {
-        val state = session.state(request.accountRef)
-        withContext(Dispatchers.Main.immediate) {
-            for (type in listOf(MediaAutoDownloadType.Image, MediaAutoDownloadType.Video)) {
-                for (network in MediaAutoDownloadNetwork.values()) state.setMediaAutoDownload(type, network, false)
-            }
-        }
-        val details = session.marmot.groupDetails(request.accountRef, request.groupIdHex)
-        val members = session.marmot.groupMembers(request.accountRef, request.groupIdHex)
-        val controller =
-            withContext(Dispatchers.Main.immediate) {
-                ConversationController(state, details.group, GroupMemberSnapshot(members))
-            }
-        return state to controller
-    }
-
     /** Renders each tile in turn inside the rule's single content, samples it until it settles, then taps it once. */
     private suspend fun renderAndTap(session: FixtureSession) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -188,8 +141,9 @@ class RetainedMediaTilesDeviceTest {
             }
         }
         for (case in cases(session)) {
-            val (state, controller) =
-                controllers.getOrPut(case.request.accountRef) { controller(session, case.request) }
+            val req = case.request
+            val receiver = controllers.getOrPut(req.accountRef) { TileFixtureSupport.receiverController(session, req) }
+            val (state, controller) = receiver
             val probe = TileProbe()
             composeRule.runOnUiThread { active.value = ActiveTile(case, state, controller, probe) }
             val started = SystemClock.elapsedRealtime()
@@ -232,7 +186,7 @@ class RetainedMediaTilesDeviceTest {
         controller: ConversationController,
         probe: TileProbe,
     ) {
-        val item = timelineMessage(case)
+        val item = TileFixtureSupport.timelineMessage(case.request, case.reference, sent = case.role == "sent")
         WhiteNoiseTheme(darkTheme = false) {
             Column {
                 if (case.media == "video") {
@@ -343,34 +297,6 @@ class RetainedMediaTilesDeviceTest {
             },
         )
     }
-
-    /** The received kind-9 row the production tile renders, built from the real identifiers and reference. */
-    private fun timelineMessage(case: TileCase) =
-        TimelineMessage(
-            id = "msg:${case.request.messageIdHex}",
-            record =
-                AppMessageRecordFfi(
-                    messageIdHex = case.request.messageIdHex,
-                    direction = if (case.role == "sent") "sent" else "received",
-                    groupIdHex = case.request.groupIdHex,
-                    sender = case.request.accountRef,
-                    plaintext = "",
-                    contentTokens =
-                        MarkdownDocumentFfi(
-                            truncated = false,
-                            blankLinesBefore = byteArrayOf(),
-                            blocks = emptyList(),
-                        ),
-                    kind = 9uL,
-                    tags = emptyList(),
-                    sourceEpoch = case.reference.sourceEpoch,
-                    retentionSeconds = null,
-                    retentionExpiresAt = null,
-                    recordedAt = 1uL,
-                    receivedAt = 1uL,
-                ),
-            status = if (case.role == "sent") MessageStatus.Sent else MessageStatus.Received,
-        )
 
     /** Restores one request from the private receipt. */
     private fun request(value: JSONObject) =
