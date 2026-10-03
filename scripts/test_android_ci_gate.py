@@ -83,6 +83,19 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('JOB_RESULTS: ${{ toJSON(needs) }}', self.gate)
         self.assertNotIn('continue-on-error:', self.gate)
 
+    def test_fuzz_trigger_policy_runs_outside_filtered_fuzz_workflow(self):
+        """A missing parser path cannot skip the policy check itself."""
+        events = self.workflow.split('\non:\n', 1)[1].split('\nconcurrency:', 1)[0]
+        self.assertIn('  pull_request:\n    branches: [master]', events)
+        self.assertNotIn('paths:', events)
+        self.assertNotIn('paths-ignore:', events)
+        self.assertNotIn('\n    if:', self.build_contracts.split('    steps:', 1)[0])
+        step = self.named_step(self.build_contracts, 'Validate fuzz PR production triggers')
+        self.assertIn("        if: matrix.phase == 'tooling'\n", step)
+        self.assertIn('python3 scripts/check_fuzz_pr_triggers.py\n', step)
+        self.assertIn('python3 -m unittest scripts/test_check_fuzz_pr_triggers.py', step)
+        self.assertNotIn('continue-on-error:', step)
+
     def test_compose_reports_run_independently_without_leaving_a_duplicate(self):
         """The measured Compose compile is parallel but remains a required gate."""
         compile_step = self.named_step(

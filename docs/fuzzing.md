@@ -14,6 +14,13 @@ White Noise Android runs bounded JVM fuzzing in the dedicated `:fuzz` Kotlin mod
 
 Production parsers are included from `app/` via an exact allow-list in `fuzz/build.gradle.kts`. Do not duplicate parser logic in `:fuzz`.
 
+Every allow-listed production source must also have an explicit path in
+`.github/workflows/fuzz-pr.yml`. Unfiltered Android CI runs
+`python3 scripts/check_fuzz_pr_triggers.py` and its regression tests so adding
+a parser without its PR trigger cannot silently skip fuzz validation. The
+checker rejects exclusions and unsupported allow-list or YAML forms rather
+than approximating GitHub glob matching.
+
 ### JVM targets
 
 Each fuzz class exposes one `@FuzzTest` entry point that dispatches on the final input byte to a bounded subtarget. This matches Jazzer's end-consuming `FuzzedDataProvider` behavior and prevents Jazzer from silently skipping additional `@FuzzTest` methods in the same class.
@@ -24,6 +31,7 @@ Each fuzz class exposes one `@FuzzTest` entry point that dispatches on the final
 | `:fuzz:fuzzIdentityReference` | `fuzzIdentityReference` | `ProfileLink`, `RecipientNormalize`, `RecipientTokenize`, `PlausibleClipboard` |
 | `:fuzz:fuzzGroupSystemEvent` | `fuzzGroupSystemEvent` | `Json` |
 | `:fuzz:fuzzNip55SignerProtocol` | `fuzzNip55SignerProtocol` | `ParseContentRow`, `ParseActivityResult`, `SignedEventPubkeyHelpers` |
+| `:fuzz:fuzzImageContainerBytes` | `fuzzImageContainerBytes` | `AllContainers` (PNG, JPEG, GIF, WebP headers) |
 
 Synthetic seeds live under `*FuzzTestInputs/<entry-point>/` with the fuzz payload followed by a trailing subtarget-id byte (0-based enum ordinal).
 
@@ -43,7 +51,7 @@ export JAVA_HOME=/path/to/temurin-17
 ./gradlew :fuzz:replayAllFuzzRegression
 
 # Bounded campaign per target (standalone Jazzer with jobs=2, workers=2)
-./gradlew :fuzz:fuzzZapstoreProtocol :fuzz:fuzzIdentityReference :fuzz:fuzzGroupSystemEvent :fuzz:fuzzNip55SignerProtocol
+./gradlew :fuzz:fuzzZapstoreProtocol :fuzz:fuzzIdentityReference :fuzz:fuzzGroupSystemEvent :fuzz:fuzzNip55SignerProtocol :fuzz:fuzzImageContainerBytes
 
 # All targets sequentially (scheduled CI style)
 ./gradlew :fuzz:fuzzScheduledDryRun
@@ -95,7 +103,7 @@ CI does not cache test-task results, so assertions execute in each fresh job.
 Task-level timing reports are retained in `fuzz-pr-gradle-profiles` for seven days. The larger job limit is a timeout
 allowance, not a performance target; use those reports to investigate slow runs.
 
-Scheduled runs call `:fuzz:fuzzScheduledDryRun` (the shell runner), execute one target at a time, use `-Xmx2g` per worker JVM, `contents: read`, no secrets, and workflow-level concurrency with `cancel-in-progress: true`. Engine input size is capped at 64 KiB via `-max_len=65536`. A failed target stops the campaign immediately; the first deterministic artifact is minimized, replayed, and classified before the campaign exits non-zero. The four 90-second nightly target budgets leave 3.5 minutes of the 15-minute ceiling for setup, compilation, metadata, and artifact upload after the bounded 5.5-minute triage path.
+Scheduled runs call `:fuzz:fuzzScheduledDryRun` (the shell runner), execute one target at a time, use `-Xmx2g` per worker JVM, `contents: read`, no secrets, and workflow-level concurrency with `cancel-in-progress: true`. Engine input size is capped at 64 KiB via `-max_len=65536`. A failed target stops the campaign immediately; the first deterministic artifact is minimized, replayed, and classified before the campaign exits non-zero. The five 90-second nightly target budgets leave 2 minutes of the 15-minute ceiling for setup, compilation, metadata, and artifact upload after the bounded 5.5-minute triage path. This arithmetic is a worst-case budget, not a measured cold-build guarantee; use campaign timing evidence to evaluate headroom without expanding the limit by default.
 
 Artifacts retain reviewed minimized reproducers under `fuzz/regression-corpus/`, `fuzz/build/fuzz-engine-metadata.properties`, and digest-only sanitized triage metadata under `fuzz/build/fuzz-triage-metadata/` for 7 days. Evolving corpora (`fuzz/build/cifuzz-corpus/`), legacy JUnit corpus dirs (`fuzz/.cifuzz-corpus/`), Gradle campaign logs (`fuzz/build/fuzz-campaign-logs/`), local minimized review files, and unreviewed crash payloads are never uploaded.
 
