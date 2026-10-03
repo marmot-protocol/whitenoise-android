@@ -10805,7 +10805,10 @@ class ConversationController(
     }
 
     /** Updates the public avatar and reports failure only while [change] owns the attempt. */
-    internal suspend fun updateGroupAvatarUrl(change: ScopedGroupImageMutation<String?>): Boolean =
+    internal suspend fun updateGroupAvatarUrl(
+        change: ScopedGroupImageMutation<String?>,
+        commitIfCurrent: () -> Boolean = { true },
+    ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val report = change.isActive
@@ -10816,23 +10819,31 @@ class ConversationController(
             val normalized = change.value?.trim()?.takeIf { it.isNotEmpty() }
             var encryptedImageCleared = group.imageHashHex == null || normalized == null
             runCatchingCancellable {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo {
-                        updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
+                val committed =
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        // Queuing behind another commit can outlive this editor or account.
+                        if (!commitIfCurrent()) return@withGroupCommitLock false
+                        appState.marmotIo {
+                            updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
+                        }
+                        // A public avatar supersedes the encrypted component. Clear it
+                        // after the URL is durable so another client cannot resurrect it.
+                        if (normalized != null && group.imageHashHex != null) {
+                            encryptedImageCleared =
+                                runCatchingCancellable {
+                                    appState.marmotIo {
+                                        clearGroupImage(account, group.groupIdHex)
+                                    }
+                                }.onFailure {
+                                    if (BuildConfig.DEBUG) {
+                                        Log.w("DMConversation", "encrypted avatar cleanup failed", it)
+                                    }
+                                }.isSuccess
+                        }
+                        true
                     }
-                    // A public avatar supersedes the encrypted component. Clear it
-                    // after the URL is durable so another client cannot resurrect it.
-                    if (normalized != null && group.imageHashHex != null) {
-                        encryptedImageCleared =
-                            runCatchingCancellable {
-                                appState.marmotIo {
-                                    clearGroupImage(account, group.groupIdHex)
-                                }
-                            }.onFailure {
-                                if (BuildConfig.DEBUG) Log.w("DMConversation", "encrypted avatar cleanup failed", it)
-                            }.isSuccess
-                    }
-                }
+
+                if (!committed) return@runCatchingCancellable false
                 // Reflect the change locally so the avatar updates immediately,
                 // without waiting for the group-state subscription to converge.
                 group = groupWithPublicAvatar(group, normalized, encryptedImageCleared)

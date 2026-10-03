@@ -271,7 +271,7 @@ internal fun GroupEditScreen(
                             },
                             publish = { safeUrl ->
                                 val change = ScopedGroupImageMutation(safeUrl, attemptIsCurrent)
-                                controller.updateGroupAvatarUrl(change)
+                                controller.updateGroupAvatarUrl(change, commitIfCurrent = attemptIsCurrent)
                             },
                         )
                     if (updated) {
@@ -283,14 +283,15 @@ internal fun GroupEditScreen(
                     throw cancelled
                 } catch (error: Exception) {
                     if (!attemptIsCurrent()) return@launchMutation
+                    val uploadFailure = error as? GroupAvatarUploadFailure
                     appState.presentFailure(
                         titleRes =
-                            if ((error as? GroupAvatarUploadFailure)?.stage != GroupAvatarUploadStage.Prepare) {
+                            if (uploadFailure?.stage != GroupAvatarUploadStage.Prepare) {
                                 R.string.toast_couldnt_upload_group_image
                             } else {
                                 R.string.toast_couldnt_prepare_image
                             },
-                        operationCode = (error as? GroupAvatarUploadFailure)?.stage?.operationCode ?: "GROUP_IMAGE_UPLOAD",
+                        operationCode = uploadFailure?.stage?.operationCode ?: "GROUP_IMAGE_UPLOAD",
                         throwable = error,
                     )
                     imageFailureScope.captureFailure(failureAttempt)

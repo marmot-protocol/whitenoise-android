@@ -45,11 +45,11 @@ internal class GroupAvatarUploadAttempt(
         var started = clockMillis()
         return runCatchingCancellable {
             val draft = prepare()
-            if (!isCurrent()) return false
+            if (!isCurrent()) return@runCatchingCancellable false
             stage = GroupAvatarUploadStage.Upload
             started = clockMillis()
             val uploaded = upload(draft)
-            if (!isCurrent()) return false
+            if (!isCurrent()) return@runCatchingCancellable false
             stage = GroupAvatarUploadStage.ValidateUrl
             started = clockMillis()
             val safeUrl = safeAvatarUploadUrl(uploaded)
