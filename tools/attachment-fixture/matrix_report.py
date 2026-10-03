@@ -123,31 +123,42 @@ def attribute(cell, parts):
 
 
 def aggregate(raw):
-    """Group samples by profile and size into distributions, attributions and correctness counters."""
+    """Group samples by profile and size into distributions, attributions and correctness counters.
+
+    Accepts one raw matrix or several repeats of the same matrix; repeats are pooled at the sample level, so the
+    observed spread includes run-to-run variation.
+    """
+    raws = raw if isinstance(raw, list) else [raw]
+    by_profile = {}
+    for run in raws:
+        for profile in run["profiles"]:
+            entry = by_profile.setdefault(profile["name"], {"shape": profile["shape"], "samples": [], "recreated": {}})
+            entry["samples"].extend(build_samples(profile))
+            for m in profile["recreated_metrics"]:
+                if m.get("phase") == "matrix-recreated":
+                    entry["recreated"].setdefault(m["size"], []).append(m["native_lease_ms"])
     profiles = []
-    for profile in raw["profiles"]:
+    for name, entry in by_profile.items():
         by_size = {}
-        for sample in build_samples(profile):
+        for sample in entry["samples"]:
             by_size.setdefault(sample["size"], []).append(sample)
         cells = []
         for size, samples in sorted(by_size.items()):
             cell = {"size": size, "samples": len(samples)}
             for metric in LATENCY_METRICS:
                 cell[metric] = stats([s.get(metric) for s in samples])
-            for name in ("upload_java_peak_bytes", "upload_native_peak_bytes", "cold_java_peak_bytes",
-                         "cold_native_peak_bytes", "transport_ms"):
-                cell[name] = stats([s.get(name) for s in samples])
+            for field in ("upload_java_peak_bytes", "upload_native_peak_bytes", "cold_java_peak_bytes",
+                          "cold_native_peak_bytes", "transport_ms"):
+                cell[field] = stats([s.get(field) for s in samples])
             cell["requests"] = {"uploads": sum(s["uploads"] for s in samples), "gets": sum(s["gets"] for s in samples),
                                 "retries": sum(max(0, s["gets"] - 1) for s in samples)}
             cell["bytes"] = {"uploaded": sum(s["upload_bytes"] for s in samples),
                              "downloaded": sum(s["body_bytes"] for s in samples)}
             cell["attribution"] = {"upload": attribute(cell, UPLOAD_PARTS), "download": attribute(cell, DOWNLOAD_PARTS)}
             cells.append(cell)
-        recreated = {m["size"]: m["native_lease_ms"] for m in profile["recreated_metrics"]
-                     if m.get("phase") == "matrix-recreated"}
-        profiles.append({"name": profile["name"], "shape": profile["shape"], "cells": cells,
-                         "recreated_native_lease_ms": recreated})
-    return {"schema": SCHEMA, "environment": raw["environment"], "profiles": profiles}
+        profiles.append({"name": name, "shape": entry["shape"], "cells": cells,
+                         "recreated_native_lease_ms": {size: stats(values) for size, values in entry["recreated"].items()}})
+    return {"schema": SCHEMA, "environment": raws[0]["environment"], "runs": len(raws), "profiles": profiles}
 
 
 def check_matrix(raw):

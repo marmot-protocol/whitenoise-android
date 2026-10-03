@@ -176,7 +176,19 @@ class MatrixTest(unittest.TestCase):
         self.assertEqual({"uploads": 4, "gets": 4, "retries": 0}, cell["requests"])
         self.assertEqual(4 * (65536 + CIPHERTEXT_OVERHEAD), cell["bytes"]["downloaded"])
         self.assertIsNotNone(cell["attribution"]["download"])
-        self.assertEqual({65536: 12.0}, report["profiles"][0]["recreated_native_lease_ms"])
+        self.assertEqual(12.0, report["profiles"][0]["recreated_native_lease_ms"][65536]["p50"])
+
+    def test_repeats_are_pooled_so_spread_includes_run_to_run_variation(self):
+        """Three repeats of one matrix give three times the samples, and the spread covers all of them."""
+        runs = [raw(profile([(65536, 4)], scale=scale)) for scale in (1.0, 1.2, 0.9)]
+        pooled = aggregate(runs)
+        cell = pooled["profiles"][0]["cells"][0]
+        self.assertEqual(12, cell["samples"])
+        self.assertEqual(3, pooled["runs"])
+        self.assertEqual({"uploads": 12, "gets": 12, "retries": 0}, cell["requests"])
+        single = aggregate(runs[0])["profiles"][0]["cells"][0]
+        self.assertGreater(cell["ready_ms"]["max"] - cell["ready_ms"]["min"],
+                           single["ready_ms"]["max"] - single["ready_ms"]["min"])
 
     def test_compare_flags_only_material_changes_and_requires_equal_correctness(self):
         """Faster is accepted only beyond run spread and ten percent, and never with a changed request count."""
