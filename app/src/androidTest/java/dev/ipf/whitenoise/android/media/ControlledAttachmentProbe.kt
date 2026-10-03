@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.media
 
+import android.content.Context
 import android.os.Bundle
 import android.os.Debug
 import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentAcquisitionModeFfi
 import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
@@ -38,12 +40,19 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.atomic.AtomicLong
 
 /** Runs only generated peers through the unchanged Android resolver and the packaged native runtime. */
 internal object ControlledAttachmentProbe {
+    private const val PHASE_PAYLOAD_BYTES = 32 * 1024 * 1024
+    private const val FAILING_PAYLOAD_BYTES = 1024 * 1024
+    private const val FAILING_PATTERN = 241
+    private const val FAILING_FILE_NAME = "failure.txt"
+    private const val PHASES_CASE = "native-phases"
+
     /** Explicit large-read comparisons leave the normal small-file baseline unchanged. */
     @Suppress("LongMethod") // One guarded sequence keeps disposable peers and measured source identity together.
     suspend fun run(
@@ -79,7 +88,7 @@ internal object ControlledAttachmentProbe {
         val accounts = mutableListOf<String>()
         var fixtureState: WhiteNoiseAppState? = null
         try {
-            withTimeout(LargeAttachmentLocalReadComparison.timeoutMillis(compareLargeReads)) {
+            withTimeout(options.deadlineMillis) {
                 marmot.start()
                 if (restartRole == "read") {
                     RestartAttachmentRetentionProbe.read(context, root, marmot, accounts)
@@ -129,6 +138,8 @@ internal object ControlledAttachmentProbe {
                         check(requireNotNull(uploaded.sent).messageIds.size == 1)
                         uploaded.attachments.single().reference
                     }
+                val failing =
+                    sendFailingFixture(bodyCase == PHASES_CASE, context, root, marmot, sender, group, blobPort)
                 report(JSONObject().put("phase", "fixture-stage").put("stage", "upload-published"))
                 marmot.catchUpAccounts()
                 val request = projectedRequest(marmot, receiver.label, group, reference)
@@ -151,7 +162,11 @@ internal object ControlledAttachmentProbe {
                 fixtureState = state
                 report(JSONObject().put("phase", "fixture-stage").put("stage", "received-projected"))
                 if (bodyCase != null) {
-                    runBodyCase(state, request, reference, blobPort, bytes, bodyCase, onUnknownLengthProgress)
+                    val inputs =
+                        BodyCaseInputs(bodyCase, onUnknownLengthProgress, failing) {
+                            projectedRequest(marmot, receiver.label, group, it)
+                        }
+                    runBodyCase(state, request, reference, blobPort, bytes, inputs)
                     return@withTimeout
                 }
                 if (arguments.getString("fixtureCancellation") == "true") {
@@ -275,6 +290,47 @@ internal object ControlledAttachmentProbe {
         accountId: String,
     ): String? = if (scenario == "automatic-platform-resume" && requested == receiver) accountId else null
 
+    /** Everything a selected body scenario needs beyond the primary attachment. */
+    private class BodyCaseInputs(
+        val scenario: String,
+        val onUnknownLengthProgress: ((NativeAttachmentProgress, MediaAttachmentReferenceFfi) -> Unit)?,
+        val failing: FailingFixture?,
+        val project: suspend (MediaAttachmentReferenceFfi) -> AttachmentTransferRequest,
+    )
+
+    /** A second, small generated file with its own canonical identity for the permanent-miss scenario. */
+    private class FailingFixture(
+        val bytes: ByteArray,
+        val reference: MediaAttachmentReferenceFfi,
+    )
+
+    /** Sends the independent failure fixture only for the native-phase scenario; other modes send nothing extra. */
+    @Suppress("LongParameterList") // Mirrors the genuine sender's explicit generated-session inputs.
+    private suspend fun sendFailingFixture(
+        enabled: Boolean,
+        context: Context,
+        root: File,
+        marmot: Marmot,
+        sender: AccountSummaryFfi,
+        group: String,
+        blobPort: Int,
+    ): FailingFixture? {
+        if (!enabled) return null
+        val bytes = ByteArray(FAILING_PAYLOAD_BYTES) { (it % FAILING_PATTERN).toByte() }
+        val reference =
+            sendAndroidFixtureAttachment(
+                context,
+                root,
+                marmot,
+                sender,
+                group,
+                blobPort,
+                bytes,
+                fileName = FAILING_FILE_NAME,
+            )
+        return FailingFixture(bytes, reference)
+    }
+
     /** Measures only the selected native body scenario, leaving baseline and large-read paths unchanged. */
     private suspend fun runBodyCase(
         state: WhiteNoiseAppState,
@@ -282,9 +338,9 @@ internal object ControlledAttachmentProbe {
         reference: MediaAttachmentReferenceFfi,
         port: Int,
         bytes: ByteArray,
-        scenario: String,
-        onUnknownLengthProgress: ((NativeAttachmentProgress, MediaAttachmentReferenceFfi) -> Unit)?,
+        inputs: BodyCaseInputs,
     ) {
+        val scenario = inputs.scenario
         if (scenario == "automatic-platform-resume") {
             measure("automatic-platform-resume-overall", bytes.size) {
                 PlatformInterruptedAttachmentProbe.run(state, request, port, bytes)
@@ -302,7 +358,17 @@ internal object ControlledAttachmentProbe {
             }
         } else if (scenario == "unknown-length") {
             measure("unknown-length-overall", bytes.size) {
-                UnknownLengthAttachmentProbe.run(state, request, reference, port, bytes, onUnknownLengthProgress)
+                UnknownLengthAttachmentProbe.run(state, request, reference, port, bytes, inputs.onUnknownLengthProgress)
+            }
+        } else if (scenario == PHASES_CASE) {
+            measure("native-phases-overall", bytes.size) {
+                val failing = requireNotNull(inputs.failing)
+                NativePhaseAttachmentProbe.run(
+                    state,
+                    FixtureAttachment(request, reference, bytes),
+                    FixtureAttachment(inputs.project(failing.reference), failing.reference, failing.bytes),
+                    port,
+                )
             }
         } else {
             measure("transport-resume-overall", bytes.size) {
@@ -315,27 +381,54 @@ internal object ControlledAttachmentProbe {
     private fun fixtureOptions(arguments: Bundle): FixtureOptions {
         val androidSendController = arguments.getString("fixtureUseAndroidSendController") == "true"
         val compareLargeReads = arguments.getString("fixtureCompareLargeLocalReads") == "true"
-        val resumeCase = arguments.getString("fixtureTransportResume")
-        val functionalCase = arguments.getString("fixtureFunctionalBodyCase")
-        val unknownLength = arguments.getString("fixtureUnknownLength") == "true"
-        val platformCases = setOf("platform-background", "platform-lock", "automatic-platform-resume")
-        require(functionalCase == null || functionalCase in platformCases)
-        require(functionalCase == null || (!unknownLength && resumeCase == null))
-        require(!unknownLength || resumeCase == null)
-        val bodyCase = functionalCase ?: if (unknownLength) "unknown-length" else resumeCase
-        val allowedCases = platformCases + setOf("compatible", "changed-validator", "unknown-length")
-        require(bodyCase == null || bodyCase in allowedCases)
-        require(bodyCase == null || (!compareLargeReads && androidSendController))
+        val nativePhases = arguments.getString("fixtureNativePhases") == "true"
+        val bodyCase = selectBodyCase(arguments, androidSendController, compareLargeReads)
         val payloadBytes =
-            if (bodyCase != null) {
-                4 * 1024 * 1024
-            } else {
-                LargeAttachmentLocalReadComparison.payloadBytes(compareLargeReads)
+            when {
+                nativePhases -> PHASE_PAYLOAD_BYTES
+                bodyCase != null -> 4 * 1024 * 1024
+                else -> LargeAttachmentLocalReadComparison.payloadBytes(compareLargeReads)
             }
         val blobPort = requireNotNull(arguments.getString("fixtureBlobPort")).toInt()
         val relayPort = requireNotNull(arguments.getString("fixtureRelayPort")).toInt()
         require(blobPort in 1024..65535 && relayPort in 1024..65535)
-        return FixtureOptions(androidSendController, compareLargeReads, bodyCase, payloadBytes, blobPort, relayPort)
+        val deadline = LargeAttachmentLocalReadComparison.timeoutMillis(compareLargeReads || nativePhases)
+        return FixtureOptions(
+            androidSendController,
+            compareLargeReads,
+            bodyCase,
+            payloadBytes,
+            blobPort,
+            relayPort,
+            deadline,
+        )
+    }
+
+    /** Selects the single received-side body scenario and rejects every combination of two or more modes. */
+    private fun selectBodyCase(
+        arguments: Bundle,
+        androidSendController: Boolean,
+        compareLargeReads: Boolean,
+    ): String? {
+        val resumeCase = arguments.getString("fixtureTransportResume")
+        val functionalCase = arguments.getString("fixtureFunctionalBodyCase")
+        val unknownLength = arguments.getString("fixtureUnknownLength") == "true"
+        val nativePhases = arguments.getString("fixtureNativePhases") == "true"
+        val platformCases = setOf("platform-background", "platform-lock", "automatic-platform-resume")
+        val selected = listOf(functionalCase != null, resumeCase != null, unknownLength, nativePhases).count { it }
+        require(selected <= 1) { "at most one received-side body scenario may be selected" }
+        require(functionalCase == null || functionalCase in platformCases)
+        val bodyCase =
+            when {
+                functionalCase != null -> functionalCase
+                unknownLength -> "unknown-length"
+                nativePhases -> PHASES_CASE
+                else -> resumeCase
+            }
+        val allowedCases = platformCases + setOf("compatible", "changed-validator", "unknown-length", PHASES_CASE)
+        require(bodyCase == null || bodyCase in allowedCases)
+        require(bodyCase == null || (!compareLargeReads && androidSendController))
+        return bodyCase
     }
 
     private data class FixtureOptions(
@@ -345,6 +438,7 @@ internal object ControlledAttachmentProbe {
         val payloadBytes: Int,
         val blobPort: Int,
         val relayPort: Int,
+        val deadlineMillis: Long,
     )
 
     /** Makes accidental downloads fail visibly while preserving the external attempt ledger. */

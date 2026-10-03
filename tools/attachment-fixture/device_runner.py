@@ -13,6 +13,7 @@ from budget_checker import PROFILES, check_budget
 from cancellation_checker import check_cancellation
 from fixture_relay import FixtureRelay
 from fixture_server import FixtureServer
+from phases_checker import check_phases
 from resume_checker import check_resume
 from unknown_length_checker import check_unknown_length
 from background_checker import check_background
@@ -60,7 +61,24 @@ def wait_for_cancellation_completion(ledger, start):
         time.sleep(min(0.01, remaining))
 
 
-def run(adb, serial, root, output, private_debug=False, budget_profile="reference-api30-arm64", android_send_controller=False, held_cancellation=False, process_restart=False, physical_fixture_serial=None, transport_resume=None, unknown_length=False, platform_background=False, platform_lock=False, automatic_resume=False):
+def wait_for_phase_completion(ledger, start):
+    """Wait until both genuine uploads and every counted request, including permanent misses, have terminal events."""
+    deadline = time.monotonic() + LEDGER_COMPLETION_TIMEOUT_SECONDS
+    while True:
+        events = ledger.snapshot()[start:]
+        requests = {e["seq"] for e in events if e["kind"] in ("get", "head")}
+        completed = {e["request"] for e in events if e["kind"] == "complete"}
+        uploads = {e["seq"] for e in events if e["kind"] == "upload"}
+        uploaded = {e["request"] for e in events if e["kind"] == "upload_complete"}
+        if len(uploads) == 2 and uploads <= uploaded and requests and requests <= completed:
+            return events, True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return events, False
+        time.sleep(min(0.01, remaining))
+
+
+def run(adb, serial, root, output, private_debug=False, budget_profile="reference-api30-arm64", android_send_controller=False, held_cancellation=False, process_restart=False, physical_fixture_serial=None, transport_resume=None, unknown_length=False, platform_background=False, platform_lock=False, automatic_resume=False, native_phases=False):
     """Count genuine uploaded ciphertext and received bodies without resetting failed attempts."""
     physical = physical_fixture_serial is not None
     if physical:
@@ -84,7 +102,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         or not android_send_controller or held_cancellation or process_restart
     ):
         raise ValueError("transport resume requires a separate genuine-controller scenario")
-    if automatic_resume and (physical or not android_send_controller or held_cancellation or process_restart or transport_resume or unknown_length or platform_background or platform_lock):
+    if automatic_resume and (physical or not android_send_controller or held_cancellation or process_restart or transport_resume or unknown_length or platform_background or platform_lock or native_phases):
         raise ValueError("automatic resume requires a separate generated-controller emulator scenario")
     if platform_lock and not platform_background:
         raise ValueError("screen-lock qualification requires the separate background scenario")
@@ -92,6 +110,9 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         raise ValueError("platform background requires a separate generated-controller emulator scenario")
     if unknown_length and (not android_send_controller or held_cancellation or process_restart or transport_resume):
         raise ValueError("unknown length requires a separate genuine-controller scenario")
+    if native_phases and (not android_send_controller or held_cancellation or process_restart or transport_resume
+                          or unknown_length or platform_background or automatic_resume):
+        raise ValueError("native phases require a separate genuine-controller scenario")
     session = str(uuid.uuid4()) if process_restart else None
     # Native group fallback uses hash.bin. Match the published locator only for
     # held-body qualification so native fallback cannot silently replace its locator.
@@ -126,6 +147,7 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             *(["-e", "fixtureTransportResume", transport_resume] if transport_resume else []),
             *(["-e", "fixtureUnknownLength", "true"] if unknown_length else []),
             *(["-e", "fixtureFunctionalBodyCase", "automatic-platform-resume"] if automatic_resume else []),
+            *(["-e", "fixtureNativePhases", "true"] if native_phases else []),
             *(["-e", "fixtureFunctionalBodyCase", "platform-lock" if platform_lock else "platform-background"] if platform_background else []),
             *(["-e", "fixtureRestartRole", "prepare", "-e", "fixtureRestartSession", session] if process_restart else []),
             APP + ".test/androidx.test.runner.AndroidJUnitRunner",
@@ -162,7 +184,9 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
         report["failure_class"] = type(error).__name__
     finally:
         # Retain failure/timeout evidence before cleanup; never discard failed attempts.
-        if held_cancellation or transport_resume or automatic_resume:
+        if native_phases:
+            events, report["ledger_finalized"] = wait_for_phase_completion(server.ledger, len(before))
+        elif held_cancellation or transport_resume or automatic_resume:
             events, report["ledger_finalized"] = wait_for_cancellation_completion(server.ledger, len(before))
         else:
             events, report["ledger_finalized"] = wait_for_ledger_completion(server.ledger, len(before))
@@ -246,6 +270,19 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
             )
             report["deferred"] = ["platform-worker-lifetime", "external-handoff", "process-restart-offline",
                                   "mdk-large-received-sender", "physical-device"]
+        if native_phases:
+            report["scope"] = "android-host-resolver-packaged-native-phase-observer"
+            report["native_phases_check"] = check_phases(report["metrics"], events)
+            # The unchanged 1 KiB ceilings do not describe this 32 MiB functional probe.
+            report["budget_check"] = {"applicable": False, "passed": False,
+                                     "reason": "representative performance remains unqualified"}
+            report["qualified"] = (
+                report.get("instrumentation_passed", False) and report["ledger_finalized"]
+                and report["native_phases_check"]["passed"]
+                and report.get("environment") == PROFILES[budget_profile]
+            )
+            report["deferred"] = ["platform-worker-lifetime", "external-handoff", "process-restart-offline",
+                                  "mdk-large-received-sender", "physical-device"]
         if platform_background:
             report["scope"] = "android-scheduled-interactive-background-continuation"
             report["platform_background_check"] = check_background(report["metrics"], events, report.get("environment"), locked=platform_lock)
@@ -299,8 +336,9 @@ def main():
     parser.add_argument("--platform-background", action="store_true", help="Require thirty seconds behind Home with a real elevated Android scheduler")
     parser.add_argument("--automatic-resume", action="store_true", help="Stop and automatically resume the same ordinary Android WorkSpec with native compatible-prefix recovery")
     parser.add_argument("--platform-lock", action="store_true", help="Require the emulator keyguard and screen-off during sustained background transfer")
+    parser.add_argument("--native-phases", action="store_true", help="Observe a paced known-length transfer and a permanent-miss recovery through the production progress feed")
     args = parser.parse_args()
-    run(args.adb, args.serial, args.root, args.output, args.private_debug, args.budget_profile, args.android_send_controller, args.held_cancellation, args.process_restart, args.physical_fixture_serial, args.transport_resume, args.unknown_length, args.platform_background, args.platform_lock, args.automatic_resume)
+    run(args.adb, args.serial, args.root, args.output, args.private_debug, args.budget_profile, args.android_send_controller, args.held_cancellation, args.process_restart, args.physical_fixture_serial, args.transport_resume, args.unknown_length, args.platform_background, args.platform_lock, args.automatic_resume, args.native_phases)
 
 
 if __name__ == "__main__":
