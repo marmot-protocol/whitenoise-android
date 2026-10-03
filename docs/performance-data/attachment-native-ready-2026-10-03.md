@@ -26,7 +26,8 @@ Play, `.medialatency` installed in place) from clean signed commits, MDK pin `12
 | Baseline | `3436010c5233e568296e07115aed21cedaebe520` | `564a645365e6f1690752c52bcc2496221485bcbc937906608e41af25c0572a09` | `94f6ced2746d215858c5cd7dec3913b9e08c9ea935f77ec168b0e9bfe627a210` |
 | Candidate | `ee19c3548bb53dff61cf4cfffbd0602958fb365c` | `02b02e1907ef543336efeb052aebd8716c8f2b2290aeb072831b6d622a809349` | `13c897e3cced31af15d7bc3423128053dfc5544869ab76b4a0487aae948fbae2` |
 
-The candidate source is this change on the same tip; later commits on both branches change only documentation,
+The runs were taken before #3023 landed and the branches were then rebased onto master, so the exact heads are the
+commits above, preserved privately, not the rebased ones. The candidate source is this change on the same tip; later commits on both branches change only documentation,
 comments and host tooling. Baseline runs 1, 3 and 4 and candidate runs 1 to 3 pass every stage. Baseline run 2 failed
 and is preserved, as are the earlier failed attempts described in the baseline report.
 
