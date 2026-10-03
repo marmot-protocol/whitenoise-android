@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import android.os.SystemClock
 import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -41,10 +42,17 @@ internal class NativePhaseRecorder(
     request: AttachmentTransferRequest,
 ) {
     private val samples = CopyOnWriteArrayList<NativeAttachmentProgress>()
+    private val sampleNanos = CopyOnWriteArrayList<Long>()
     private val polled = CopyOnWriteArrayList<AttachmentTransferStateFfi>()
+    private val polledNanos = CopyOnWriteArrayList<Long>()
+
+    @Volatile private var firstByte: Long? = null
     private val collector =
         scope.launch(Dispatchers.Default) {
-            state.nativeProgress(request).filterNotNull().collect { samples.add(it) }
+            state.nativeProgress(request).filterNotNull().collect {
+                sampleNanos.add(SystemClock.elapsedRealtimeNanos())
+                samples.add(it)
+            }
         }
 
     // The subscription is latest-wins, so a phase shorter than one wake-up can be skipped. This read-only poll of the
@@ -63,7 +71,13 @@ internal class NativePhaseRecorder(
                         .marmotIo {
                             attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(target)).items
                         }.singleOrNull()
-                if (item != null && polled.lastOrNull() != item.state) polled.add(item.state)
+                if (item != null && item.received > 0uL && firstByte == null) {
+                    firstByte = SystemClock.elapsedRealtimeNanos()
+                }
+                if (item != null && polled.lastOrNull() != item.state) {
+                    polledNanos.add(SystemClock.elapsedRealtimeNanos())
+                    polled.add(item.state)
+                }
                 delay(POLL_INTERVAL_MILLIS)
             }
         }
@@ -73,6 +87,15 @@ internal class NativePhaseRecorder(
 
     /** Returns each distinct consecutive authoritative phase seen by the read-only poll, in order. */
     fun polledPhases(): List<AttachmentTransferStateFfi> = polled.toList()
+
+    /** The first time the authoritative poll saw a non-zero received byte count, or null if it never did. */
+    fun firstByteNanos(): Long? = firstByte
+
+    /** Monotonic receive times of [snapshot], index for index. */
+    fun sampleTimesNanos(): List<Long> = sampleNanos.toList()
+
+    /** Monotonic first-seen times of [polledPhases], index for index. */
+    fun polledTimesNanos(): List<Long> = polledNanos.toList()
 
     /** Waits for a published sample, never inferring a phase that the native feed did not report. */
     suspend fun awaitSample(

@@ -64,6 +64,10 @@ class MediaAttachmentLatencyProbe {
     @Test
     fun measureControlledApkInstaller() = runBlocking { ApkInstallerAttachmentProbe.run() }
 
+    /** Opt-in controlled matrix probe: genuine uploads, cold downloads and retained reads with phase timings. */
+    @Test
+    fun measureControlledMatrix() = runBlocking { MatrixAttachmentProbe.run() }
+
     /** Opt-in genuine media lifecycle probe: one prepare process and one separately launched offline read process. */
     @Test
     fun measureControlledMediaLifecycle() = runBlocking { MediaLifecycleAttachmentProbe.run() }
