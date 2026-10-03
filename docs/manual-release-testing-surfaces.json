@@ -606,6 +606,110 @@
         "test_ids": ["MED-025"]
       },
       {
+        "surface": "TileTransferControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "internal fun TileTransferControl(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "TileTransferGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "internal fun TileTransferGlyph(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "TileTransferCaption",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "private fun TileTransferCaption(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:reply_media_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "R.string.reply_media_video",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancel_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_cancel_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancel_download (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_cancel_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancel_unconfirmed (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_cancel_unconfirmed",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancelling_download (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_cancelling_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_download_cancelled (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_download_cancelled",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_downloading (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_tap_to_download (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_tap_to_retry (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_tap_to_retry",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
         "surface": "FileBodyProgressIndicator",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/FileBubbleContent.kt",
         "anchor": "private fun FileBodyProgressIndicator(",
