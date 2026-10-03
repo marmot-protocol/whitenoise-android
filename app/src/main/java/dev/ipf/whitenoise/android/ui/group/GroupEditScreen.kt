@@ -188,6 +188,7 @@ internal fun GroupEditScreen(
                         R.string.toast_couldnt_prepare_image,
                         "GROUP_IMAGE_PREPARE",
                         error,
+                        detail = groupImageFailureDetail(error),
                     )
                     imageFailureScope.captureFailure(failureAttempt)
                 } finally {
@@ -284,6 +285,7 @@ internal fun GroupEditScreen(
                             },
                         operationCode = if (prepared) "GROUP_IMAGE_UPLOAD" else "GROUP_IMAGE_PREPARE",
                         throwable = error,
+                        detail = groupImageFailureDetail(error),
                     )
                     imageFailureScope.captureFailure(failureAttempt)
                 } finally {

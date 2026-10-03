@@ -1,4 +1,5 @@
 [versions]
+androidSvg = "1.4"
 agp = "9.4.1"
 coreKtx = "1.19.0"
 coreSplashscreen = "1.2.0"
@@ -48,6 +49,7 @@ uiAutomator = "2.4.0"
 tracing = "2.0.2"
 
 [libraries]
+androidsvg = { group = "com.caverock", name = "androidsvg-aar", version.ref = "androidSvg" }
 osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
