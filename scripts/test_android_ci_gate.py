@@ -171,7 +171,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
     def test_teardown_floor_reuses_report_and_propagates_report_failure(self):
-        floor = self.named_step(self.tests_job, 'Runtime listener teardown coverage floor')
+        floor = self.named_step(self.tests_job, 'Runtime listener and viewport restoration coverage floors')
         self.assertIn("matrix.flavor == 'Zapstore'", floor)
         self.assertIn("steps.unit_tests.outcome == 'success'", floor)
         self.assertIn('COVERAGE_REPORT_OUTCOME: ${{ steps.coverage_report.outcome }}', floor)
@@ -184,7 +184,7 @@ class AndroidCiGateTest(unittest.TestCase):
                       self.named_step(self.tests_job, 'Coverage report (Kover)'))
 
     def test_viewport_floor_reuses_the_required_full_suite_report(self):
-        floor = self.named_step(self.tests_job, 'Runtime listener teardown coverage floor')
+        floor = self.named_step(self.tests_job, 'Runtime listener and viewport restoration coverage floors')
         self.assertIn("matrix.flavor == 'Zapstore'", floor)
         self.assertIn("steps.unit_tests.outcome == 'success'", floor)
         self.assertIn('test "$COVERAGE_REPORT_OUTCOME" = success', floor)

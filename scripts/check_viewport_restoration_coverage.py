@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 
 OWNER = 'dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationOwner'
-# Ratchet values are finalized against the exact candidate report before publication.
+# Initial targets; validate against the candidate report before PR readiness.
 LINE_FLOOR = 90
 BRANCH_FLOOR = 80
 

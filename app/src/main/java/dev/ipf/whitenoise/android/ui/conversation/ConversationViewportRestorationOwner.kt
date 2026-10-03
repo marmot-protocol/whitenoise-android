@@ -96,7 +96,10 @@ internal class ConversationViewportRestorationOwner(
     }
 }
 
-internal data class ConversationViewportPresentation(val anchored: Boolean, val imeIsOpen: Boolean)
+internal data class ConversationViewportPresentation(
+    val anchored: Boolean,
+    val imeIsOpen: Boolean,
+)
 
 internal data class ConversationViewportNavigation(
     val resolveAnchor: (ConversationScrollAnchor) -> Int?,

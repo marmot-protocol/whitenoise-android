@@ -46,7 +46,7 @@ internal fun ConversationViewportRestorationEffects(
             owner.onViewportHeight(height, currentInputs.presentation, currentCallbacks.navigation)
         }
     }
-    ConversationSavedViewportEffect(controller, viewport, owner, inputs.scrollRestore, callbacks.onAnchored)
+    ConversationSavedViewportEffect(controller, viewport, owner, inputs, callbacks.onAnchored)
     ConversationEntryViewportEffect(controller, viewport, owner, inputs, callbacks)
 }
 
@@ -81,11 +81,14 @@ private fun ConversationSavedViewportEffect(
     controller: ConversationController,
     viewport: ConversationTimelineViewport,
     owner: ConversationViewportRestorationOwner,
-    restore: ConversationScrollSnapshot?,
+    inputs: ConversationViewportRestorationInputs,
     onAnchored: (String?) -> Unit,
 ) {
+    val restore = inputs.scrollRestore
     LaunchedEffect(controller, restore, owner) {
-        if (restore == null) return@LaunchedEffect
+        // A replacement coordinator must not replay an old saved position after
+        // this screen has established its current reading position.
+        if (restore == null || inputs.presentation.anchored) return@LaunchedEffect
         snapshotFlow { controller.initialTimelineSeedActive }.filter { !it }.first()
         restore.anchorMessageIdHex?.takeIf { it.isNotBlank() }?.let { controller.loadUntilMessageAvailable(it) }
         if (!owner.isActive) return@LaunchedEffect
@@ -170,7 +173,9 @@ private fun ConversationEntryViewportEffect(
                 initialTimelineAnchored = inputs.presentation.anchored,
                 hasScrollRestore = inputs.scrollRestore != null,
             )
-        ) return@LaunchedEffect
+        ) {
+            return@LaunchedEffect
+        }
         val unreadId =
             resolveConversationEntryUnreadMessageId(
                 snapshot = inputs.entryUnread,
