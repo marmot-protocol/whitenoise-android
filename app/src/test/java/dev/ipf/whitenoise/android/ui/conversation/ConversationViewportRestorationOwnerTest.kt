@@ -286,9 +286,11 @@ class ConversationViewportRestorationOwnerTest {
 
     private fun presentation() = ConversationViewportPresentation(true, false)
 
-    private fun navigation(resolve: (ConversationScrollAnchor) -> Int? = { 7 }): ConversationViewportNavigation {
-        return ConversationViewportNavigation(resolve) { 9 }
-    }
+    private fun navigation(resolve: (ConversationScrollAnchor) -> Int? = { 7 }) =
+        ConversationViewportNavigation(
+            resolveAnchor = resolve,
+            tailIndex = { 9 },
+        )
 
     private class Fixture {
         val writer = RecordingWriter()
