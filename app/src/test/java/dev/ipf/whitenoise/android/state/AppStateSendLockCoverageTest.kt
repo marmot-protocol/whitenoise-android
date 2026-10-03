@@ -413,11 +413,15 @@ class AppStateSendLockCoverageTest {
         val screenFile = conversationScreenSource()
         val source = screenFile.readText().replace(Regex("\\s+"), " ")
         val owner =
-            screenFile.parentFile.resolve("ConversationViewportRestorationOwner.kt")
-                .readText().replace(Regex("\\s+"), " ")
+            screenFile.parentFile
+                .resolve("ConversationViewportRestorationOwner.kt")
+                .readText()
+                .replace(Regex("\\s+"), " ")
         val effects =
-            screenFile.parentFile.resolve("ConversationViewportRestorationEffects.kt")
-                .readText().replace(Regex("\\s+"), " ")
+            screenFile.parentFile
+                .resolve("ConversationViewportRestorationEffects.kt")
+                .readText()
+                .replace(Regex("\\s+"), " ")
 
         assertTrue(
             "startup materialization and same-row media hydration must not restart durable history anchoring",

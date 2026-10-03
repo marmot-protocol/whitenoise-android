@@ -125,9 +125,10 @@ class ConversationViewportRestorationOwnerTest {
             val pausedFrame = CompletableDeferred<Unit>()
             val position = requireNotNull(conversationViewportEntryPosition(rows(5), "message-1", 1))
             var committed = false
-            val job = launch {
-                committed = fixture.owner.commitInitialPosition(position, { measured() }, { pausedFrame.await() })
-            }
+            val job =
+                launch {
+                    committed = fixture.owner.commitInitialPosition(position, { measured() }, { pausedFrame.await() })
+                }
             runCurrent()
             fixture.coordinator.programmaticJump("reply", ConversationScrollReason.Reply) { scrollToItem(12) }
             pausedFrame.complete(Unit)
@@ -143,9 +144,10 @@ class ConversationViewportRestorationOwnerTest {
             val position = requireNotNull(conversationViewportEntryPosition(rows(5), "message-1", 1))
             val frame = CompletableDeferred<Unit>()
             var revealed = false
-            val job = launch {
-                if (fixture.owner.commitInitialPosition(position, { measured() }, { frame.await() })) revealed = true
-            }
+            val job =
+                launch {
+                    if (fixture.owner.commitInitialPosition(position, { measured() }, { frame.await() })) revealed = true
+                }
             runCurrent()
             job.cancel()
             job.join()
@@ -263,9 +265,10 @@ class ConversationViewportRestorationOwnerTest {
             fixture.gate.commit(structure(), 720)
             fixture.owner.onStructure(structure().copy(olderHeaderCount = 1), false) { 12 }
             val blocked = CompletableDeferred<Unit>()
-            val job = launch {
-                fixture.coordinator.programmaticJump("reply", ConversationScrollReason.Reply) { blocked.await() }
-            }
+            val job =
+                launch {
+                    fixture.coordinator.programmaticJump("reply", ConversationScrollReason.Reply) { blocked.await() }
+                }
             runCurrent()
             fixture.owner.onViewportHeight(800, presentation(), navigation())
             assertTrue(fixture.writer.writes.isEmpty())
@@ -281,8 +284,9 @@ class ConversationViewportRestorationOwnerTest {
 
     private fun presentation() = ConversationViewportPresentation(true, false)
 
-    private fun navigation(resolve: (ConversationScrollAnchor) -> Int? = { 7 }) =
-        ConversationViewportNavigation(resolve) { 9 }
+    private fun navigation(resolve: (ConversationScrollAnchor) -> Int? = { 7 }): ConversationViewportNavigation {
+        return ConversationViewportNavigation(resolve) { 9 }
+    }
 
     private class Fixture {
         val writer = RecordingWriter()
@@ -295,11 +299,17 @@ class ConversationViewportRestorationOwnerTest {
         override var firstVisibleItemIndex = 0
         val writes = mutableListOf<Pair<Int, Int>>()
 
-        override suspend fun scrollToItem(index: Int, scrollOffset: Int) {
+        override suspend fun scrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
             firstVisibleItemIndex = index
             writes += index to scrollOffset
         }
 
-        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) = scrollToItem(index, scrollOffset)
+        override suspend fun animateScrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) = scrollToItem(index, scrollOffset)
     }
 }

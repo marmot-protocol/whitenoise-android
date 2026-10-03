@@ -7,9 +7,11 @@ import xml.etree.ElementTree as ET
 
 
 OWNER = 'dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationOwner'
-# Initial targets; validate against the candidate report before PR readiness.
-LINE_FLOOR = 90
-BRANCH_FLOOR = 80
+# Measured in full-suite CI at 1e8a14bb897dfbd9dd3be82e0b11224f2f005c4f:
+# 82/82 lines, 52/56 branches (92.857%). Keep every line and a 90% branch floor,
+# including the saved fallback and remembered factory; exclude no owner classes.
+LINE_FLOOR = 100
+BRANCH_FLOOR = 90
 
 
 def owner_class(name):

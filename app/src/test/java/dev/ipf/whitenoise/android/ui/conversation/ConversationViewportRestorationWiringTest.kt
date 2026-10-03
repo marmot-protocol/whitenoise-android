@@ -202,19 +202,31 @@ class ConversationViewportRestorationWiringTest {
         override var firstVisibleItemIndex = 0
         val writes = mutableListOf<Pair<Int, Int>>()
 
-        override suspend fun scrollToItem(index: Int, scrollOffset: Int) {
+        override suspend fun scrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
             firstVisibleItemIndex = index
             writes += index to scrollOffset
         }
 
-        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) = scrollToItem(index, scrollOffset)
+        override suspend fun animateScrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) = scrollToItem(index, scrollOffset)
     }
 
     private class NoopWriter : ConversationScrollWriter {
         override val firstVisibleItemIndex = 0
 
-        override suspend fun scrollToItem(index: Int, scrollOffset: Int) = Unit
+        override suspend fun scrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) = Unit
 
-        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) = Unit
+        override suspend fun animateScrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) = Unit
     }
 }

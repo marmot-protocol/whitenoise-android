@@ -29,7 +29,7 @@ class ViewportRestorationCoverageTest(unittest.TestCase):
     def test_similarly_named_unrelated_class_does_not_inflate_coverage(self):
         self.assertFalse(owner_class(OWNER + 'Other'))
         with self.assertRaisesRegex(ValueError, 'BRANCH'):
-            self.check(klass(OWNER, branches=(79, 21)) + klass(OWNER + 'Other'))
+            self.check(klass(OWNER, branches=(89, 11)) + klass(OWNER + 'Other'))
 
     def test_generated_class_without_the_real_owner_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'missing'):
@@ -49,10 +49,10 @@ class ViewportRestorationCoverageTest(unittest.TestCase):
 
     def test_floor_comparison_is_not_rounded_up(self):
         with self.assertRaisesRegex(ValueError, 'LINE'):
-            self.check(klass(OWNER, lines=(899, 101)))
+            self.check(klass(OWNER, lines=(999, 1)))
         with self.assertRaisesRegex(ValueError, 'BRANCH'):
-            self.check(klass(OWNER, branches=(799, 201)))
-        self.check(klass(OWNER, lines=(90, 10), branches=(80, 20)))
+            self.check(klass(OWNER, branches=(899, 101)))
+        self.check(klass(OWNER, lines=(100, 0), branches=(90, 10)))
 
     def test_generated_class_without_branches_is_valid(self):
         no_branches = f'<class name="{OWNER}$generated">' + counter('LINE', 10, 0) + '</class>'

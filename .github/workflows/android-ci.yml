@@ -543,7 +543,8 @@ jobs:
         run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug --build-cache --profile --daemon --stacktrace
 
       # Reuse the report from the full suite; no extra Gradle invocation or tests.
-      # Measured owner family: 16/17 lines (94.1176%), zero eligible branches.
+      # Runtime listener: 16/17 lines (94.1176%), zero eligible branches.
+      # Viewport family: 82/82 lines, 52/56 branches; preserve 100%/90% floors.
       - name: Runtime listener and viewport restoration coverage floors
         if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
         env:
