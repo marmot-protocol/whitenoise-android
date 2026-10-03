@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
+import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.downloadAttachmentPlaintextSource
@@ -45,7 +46,9 @@ import java.util.concurrent.atomic.AtomicLong
 internal object ControlledAttachmentProbe {
     /** Explicit large-read comparisons leave the normal small-file baseline unchanged. */
     @Suppress("LongMethod") // One guarded sequence keeps disposable peers and measured source identity together.
-    suspend fun run() {
+    suspend fun run(
+        onUnknownLengthProgress: ((NativeAttachmentProgress, MediaAttachmentReferenceFfi) -> Unit)? = null,
+    ) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val arguments = InstrumentationRegistry.getArguments()
@@ -54,7 +57,7 @@ internal object ControlledAttachmentProbe {
         val options = fixtureOptions(arguments)
         val androidSendController = options.androidSendController
         val compareLargeReads = options.compareLargeReads
-        val resumeCase = options.resumeCase
+        val bodyCase = options.bodyCase
         val payloadBytes = options.payloadBytes
         val blobPort = options.blobPort
         val relayPort = options.relayPort
@@ -130,6 +133,7 @@ internal object ControlledAttachmentProbe {
                 marmot.catchUpAccounts()
                 val request = projectedRequest(marmot, receiver.label, group, reference)
                 // History lookup is native authority; no retained row or attachment state is seeded.
+                val runtime = AppMarmotRuntime(root.absolutePath, marmot)
                 val state =
                     withContext(Dispatchers.Main.immediate) {
                         WhiteNoiseAppState(
@@ -138,15 +142,14 @@ internal object ControlledAttachmentProbe {
                             accountIdHexResolver = { null },
                             accounts = emptyList(),
                             activeAccountRef = receiver.label,
-                            initialMarmotRuntime = AppMarmotRuntime(root.absolutePath, marmot),
+                            initialMarmotRuntime = runtime,
+                            marmotRuntimeFactory = { runtime },
                         )
                     }
                 fixtureState = state
                 report(JSONObject().put("phase", "fixture-stage").put("stage", "received-projected"))
-                if (resumeCase != null) {
-                    measure("transport-resume-overall", payloadBytes) {
-                        TransportResumeAttachmentProbe.run(state, request, reference, blobPort, bytes, resumeCase)
-                    }
+                if (bodyCase != null) {
+                    runBodyCase(state, request, reference, blobPort, bytes, bodyCase, onUnknownLengthProgress)
                     return@withTimeout
                 }
                 if (arguments.getString("fixtureCancellation") == "true") {
@@ -262,15 +265,55 @@ internal object ControlledAttachmentProbe {
         }
     }
 
+    /** Measures only the selected native body scenario, leaving baseline and large-read paths unchanged. */
+    private suspend fun runBodyCase(
+        state: WhiteNoiseAppState,
+        request: AttachmentTransferRequest,
+        reference: MediaAttachmentReferenceFfi,
+        port: Int,
+        bytes: ByteArray,
+        scenario: String,
+        onUnknownLengthProgress: ((NativeAttachmentProgress, MediaAttachmentReferenceFfi) -> Unit)?,
+    ) {
+        if (scenario in setOf("platform-background", "platform-lock")) {
+            measure("platform-background-overall", bytes.size) {
+                PlatformBackgroundAttachmentProbe.run(
+                    state,
+                    request,
+                    reference,
+                    port,
+                    bytes,
+                    lockScreen = scenario == "platform-lock",
+                )
+            }
+        } else if (scenario == "unknown-length") {
+            measure("unknown-length-overall", bytes.size) {
+                UnknownLengthAttachmentProbe.run(state, request, reference, port, bytes, onUnknownLengthProgress)
+            }
+        } else {
+            measure("transport-resume-overall", bytes.size) {
+                TransportResumeAttachmentProbe.run(state, request, reference, port, bytes, scenario)
+            }
+        }
+    }
+
     /** Rejects incompatible probe modes and unsafe ports before any native runtime is opened. */
     private fun fixtureOptions(arguments: Bundle): FixtureOptions {
         val androidSendController = arguments.getString("fixtureUseAndroidSendController") == "true"
         val compareLargeReads = arguments.getString("fixtureCompareLargeLocalReads") == "true"
         val resumeCase = arguments.getString("fixtureTransportResume")
-        require(resumeCase == null || resumeCase in setOf("compatible", "changed-validator"))
-        require(resumeCase == null || (!compareLargeReads && androidSendController))
+        val functionalCase = arguments.getString("fixtureFunctionalBodyCase")
+        val unknownLength = arguments.getString("fixtureUnknownLength") == "true"
+        val platformCases = setOf("platform-background", "platform-lock")
+        require(functionalCase == null || functionalCase in platformCases)
+        require(functionalCase == null || (!unknownLength && resumeCase == null))
+        require(!unknownLength || resumeCase == null)
+        val bodyCase = functionalCase ?: if (unknownLength) "unknown-length" else resumeCase
+        val allowedCases = platformCases + setOf("compatible", "changed-validator", "unknown-length")
+        require(bodyCase == null || bodyCase in allowedCases)
+        require(bodyCase == null || (!compareLargeReads && androidSendController))
         val payloadBytes =
-            if (resumeCase != null) {
+            if (bodyCase != null) {
                 4 * 1024 * 1024
             } else {
                 LargeAttachmentLocalReadComparison.payloadBytes(compareLargeReads)
@@ -278,13 +321,13 @@ internal object ControlledAttachmentProbe {
         val blobPort = requireNotNull(arguments.getString("fixtureBlobPort")).toInt()
         val relayPort = requireNotNull(arguments.getString("fixtureRelayPort")).toInt()
         require(blobPort in 1024..65535 && relayPort in 1024..65535)
-        return FixtureOptions(androidSendController, compareLargeReads, resumeCase, payloadBytes, blobPort, relayPort)
+        return FixtureOptions(androidSendController, compareLargeReads, bodyCase, payloadBytes, blobPort, relayPort)
     }
 
     private data class FixtureOptions(
         val androidSendController: Boolean,
         val compareLargeReads: Boolean,
-        val resumeCase: String?,
+        val bodyCase: String?,
         val payloadBytes: Int,
         val blobPort: Int,
         val relayPort: Int,

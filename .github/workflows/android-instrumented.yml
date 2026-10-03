@@ -107,6 +107,9 @@ jobs:
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-resume
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-resume-changed
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-unknown-length
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-lock
       - name: Preserve redacted ledger and measurements on success or failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

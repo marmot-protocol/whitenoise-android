@@ -101,3 +101,36 @@ The Pixel profile applies the existing 1500 ms cold / 150 ms retained-read /
 controller, held-cancellation and process-restart modes work with this explicit
 opt-in. A passing physical fixture does not qualify manual UI flows, real platform
 job lifetime or representative large-file performance.
+
+### Unknown-length native control
+
+Run `bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-unknown-length`
+(or the corresponding Zapstore/API36 environment) on an explicitly owned emulator.
+The generated 4 MiB body has no Content-Length; native total/fraction must remain
+unknown while positive bytes are rendered in a real Android file control. Exact
+plaintext, 48 dp localized RTL/large-font semantics and zero repeat acquisition
+are required. `unknown_length_checker.py` rejects incomplete evidence. This mode
+qualifies functional behavior only; representative performance and complete
+manual flows remain deferred. See the [source/APK qualification report](../../docs/performance-data/attachment-unknown-length-2026-10-03.md).
+
+### Real Android background and screen lock
+
+Use `controller-background` or `controller-lock` with the explicit emulator and
+profile, for example:
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-background
+bash scripts/run-controlled-attachment-fixture.sh emulator-5558 Zapstore reference-api36-arm64 controller-lock
+```
+
+Both require shipping Android scheduling, a stopped real Activity, independent
+late HTTP bytes and a still-active transfer after 30 seconds. The lock mode checks
+screen-off and Android keyguard, temporarily enables the owned emulator's disabled
+keyguard if needed, then restores its original setting. A completed foreground
+body or background-only evidence cannot pass lock qualification. Runtime observer
+binding is test-only and points at generated peers; services, native IO and HTTP
+are real. `background_checker.py` preserves measured timing/memory separately from
+performance and rejects incomplete proof. See the [background report](../../docs/performance-data/attachment-background-2026-10-03.md)
+and [screen-lock report](../../docs/performance-data/attachment-screen-lock-2026-10-03.md).
+Actual automatic-job stop/resume and full Open/Save/network-policy/manual flows
+remain separate; these modes never authorize physical-device actions.

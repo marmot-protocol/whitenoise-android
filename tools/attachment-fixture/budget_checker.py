@@ -8,9 +8,10 @@ from pathlib import Path
 
 REOPEN = "received-native-reopen-unavailable-endpoint"
 PHASE_COUNTS = {"received-cold": 1, "received-retained": 10, REOPEN: 1}
-# Both measured environments fit the original reference ceilings; do not relax CI silently.
+# Declared environments use the original reference ceilings; adding a profile does not qualify its measurements.
 PROFILES = {
     "reference-api30-arm64": {"api": "30", "abi": "arm64-v8a"},
+    "reference-api36-arm64": {"api": "36", "abi": "arm64-v8a"},
     "ci-api34-x86_64": {"api": "34", "abi": "x86_64"},
     "pixel-api37-arm64": {"api": "37", "abi": "arm64-v8a"},
 }

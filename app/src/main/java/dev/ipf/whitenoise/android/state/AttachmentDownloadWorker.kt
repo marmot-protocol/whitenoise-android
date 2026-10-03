@@ -228,6 +228,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
         }
     }
 
+    /** Keeps scheduler interruption distinct from terminal acquisition so only live completed runs retire intent. */
     private suspend fun performDownload(
         application: WhiteNoiseApplication,
         request: AttachmentTransferRequest,
@@ -251,7 +252,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
             if (!currentCoroutineContext().isActive) {
                 val reason =
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) stopReason.toString() else "unavailable"
-                Log.w(TAG, "attachment_work_stopped reason=$reason")
+                Log.w(TAG, "attachment_work_stopped reason=$reason run_attempt=$runAttemptCount")
                 throw cancel
             }
             currentCoroutineContext().ensureActive()
