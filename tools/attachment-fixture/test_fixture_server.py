@@ -85,6 +85,42 @@ class FixtureContractTest(unittest.TestCase):
         self.assertEqual(1024, sum(e["value"] for e in events if e["kind"] == "body_bytes"))
         self.assertEqual(1, sum(e["kind"] == "acquisition_unavailable" for e in events))
 
+    def test_not_found_and_restore_are_counted_and_never_reset_the_ledger(self):
+        """A permanent-miss phase is a counted attempt, and restoring service keeps every earlier attempt."""
+        source = self.server.generate("missing", 2048)
+        self.assertEqual(200, self.get("/__acquisition-not-found", method="POST")[0])
+        self.assertEqual(404, self.get("/missing")[0])
+        self.assertEqual(200, self.get("/__restore-acquisition", method="POST")[0])
+        self.assertEqual(source.read_bytes(), self.get("/missing")[2])
+        events = self.await_event("complete", 2)
+        self.assertEqual(2, sum(e["kind"] == "get" for e in events))
+        self.assertEqual([404, 200], [e["value"] for e in events if e["kind"] == "status"])
+        self.assertEqual(2048, sum(e["value"] for e in events if e["kind"] == "body_bytes"))
+        self.assertEqual(1, sum(e["kind"] == "acquisition_not_found" for e in events))
+        self.assertEqual(1, sum(e["kind"] == "restore_acquisition" for e in events))
+
+    def test_restore_also_lifts_the_service_unavailable_denial(self):
+        """One restore control clears either denial so a deliberate Retry can be exercised."""
+        self.server.generate("denied", 1024)
+        self.assertEqual(200, self.get("/__acquisition-unavailable", method="POST")[0])
+        self.assertEqual(503, self.get("/denied")[0])
+        self.assertEqual(200, self.get("/__restore-acquisition", method="POST")[0])
+        self.assertEqual(200, self.get("/denied")[0])
+
+    def test_pacing_slows_existing_bodies_without_holding_or_truncating_them(self):
+        """Pacing is applied to uploaded bodies after creation and still delivers every byte."""
+        source = self.server.generate("paced", 3 * 16 * 1024)
+        self.assertEqual(0, self.server.controls["paced"].interval)
+        self.assertEqual(200, self.get("/__pace-acquisition", method="POST")[0])
+        self.assertGreater(self.server.controls["paced"].interval, 0)
+        self.assertIsNone(self.server.controls["paced"].hold_after)
+        started = time.monotonic()
+        self.assertEqual(source.read_bytes(), self.get("/paced")[2])
+        self.assertGreaterEqual(time.monotonic() - started, 2 * self.server.controls["paced"].interval)
+        events = self.await_event("complete")
+        self.assertEqual(0, sum(e["kind"] == "held" for e in events))
+        self.assertEqual(1, sum(e["kind"] == "pace_acquisition" for e in events))
+
     def test_global_hold_release_does_not_hold_the_deliberate_retry(self):
         """The release control removes the hold rather than reporting a second fake hold event."""
         source = self.server.generate("released", 1040)

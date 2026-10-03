@@ -15,6 +15,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 CHUNK = 16 * 1024
+PACED_INTERVAL_SECONDS = 0.002
 MAX_BYTES = 128 * 1024 * 1024
 TOKEN = re.compile(r"[a-z0-9-]{1,64}\Z")
 HASH = re.compile(r"[0-9a-f]{64}\Z")
@@ -114,6 +115,7 @@ class FixtureServer(ThreadingHTTPServer):
         self.controls = {}
         self.stopping = threading.Event()
         self.acquisition_unavailable = threading.Event()
+        self.acquisition_not_found = threading.Event()
         super().__init__(("127.0.0.1", port), Handler)
 
     @property
@@ -222,6 +224,22 @@ class Handler(BaseHTTPRequestHandler):
                 previous.interrupt.set()
             self.server.ledger.event(None, "control", "interrupt_acquisition", int(changed))
             self.reply(200, {"interrupted": True, "validator_changed": changed})
+        elif self.path == "/__pace-acquisition":
+            # Slow every existing body so progress is observable without holding it.
+            for control in self.server.controls.values():
+                control.interval = PACED_INTERVAL_SECONDS
+            self.server.ledger.event(None, "control", "pace_acquisition")
+            self.reply(200, {"interval": PACED_INTERVAL_SECONDS})
+        elif self.path == "/__acquisition-not-found":
+            self.server.acquisition_not_found.set()
+            self.server.ledger.event(None, "control", "acquisition_not_found")
+            self.reply(200, {"acquisition_not_found": True})
+        elif self.path == "/__restore-acquisition":
+            # Lifts a prior denial; counters and failed attempts are never reset.
+            self.server.acquisition_unavailable.clear()
+            self.server.acquisition_not_found.clear()
+            self.server.ledger.event(None, "control", "restore_acquisition")
+            self.reply(200, {"acquisition_unavailable": False, "acquisition_not_found": False})
         elif self.path == "/__release-acquisition":
             for control in self.server.controls.values():
                 control.release.set()
@@ -327,6 +345,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.server.acquisition_unavailable.is_set():
             ledger.event(request, token, "status", 503)
             self.reply(503, {})
+            ledger.event(request, token, "complete")
+            return
+        if self.server.acquisition_not_found.is_set():
+            ledger.event(request, token, "status", 404)
+            self.reply(404, {})
             ledger.event(request, token, "complete")
             return
         if blob is None:

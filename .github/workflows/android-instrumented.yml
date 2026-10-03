@@ -59,6 +59,8 @@ on:
       - 'tools/attachment-fixture/**'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/ControlledAttachmentProbe.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaAttachmentLatencyProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/NativePhaseAttachmentProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AndroidAttachmentFixtureSender.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt'
       # Stored direct-peer title and membership separation (#2149) against the real native runtime.
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/state/ChatListColdStartDirectPeerPresentationFfiIntegrationTest.kt'
@@ -111,6 +113,7 @@ jobs:
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-lock
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-automatic-resume
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-phases
       - name: Preserve redacted ledger and measurements on success or failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

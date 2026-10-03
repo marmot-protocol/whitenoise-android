@@ -22,6 +22,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.File
 
+/** The default generated attachment name; scenarios that send several files pass distinct names. */
+internal const val FIXTURE_FILE_NAME = "fixture.txt"
+
 /** Uses the shipping Android send controller and native admission, upload, publication and retention paths. */
 internal suspend fun sendAndroidFixtureAttachment(
     context: Context,
@@ -32,6 +35,7 @@ internal suspend fun sendAndroidFixtureAttachment(
     blobPort: Int,
     bytes: ByteArray,
     qualifyOwnLocalCache: Boolean = false,
+    fileName: String = FIXTURE_FILE_NAME,
 ): MediaAttachmentReferenceFfi {
     check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
     val endpoint = AppBlobEndpointFfi("blossom-v1", "http://127.0.0.1:$blobPort")
@@ -61,9 +65,9 @@ internal suspend fun sendAndroidFixtureAttachment(
             controller.retryMembers()
             check(controller.canSendMessages) { "generated sender membership not ready" }
             if (qualifyOwnLocalCache) controller.start()
-            controller.sendAttachments(listOf(PendingAttachment(bytes, "text/plain", "fixture.txt")), caption = null)
+            controller.sendAttachments(listOf(PendingAttachment(bytes, "text/plain", fileName)), caption = null)
         }
-        val (messageId, reference) = awaitAndroidFixtureReference(marmot, sender.label, group)
+        val (messageId, reference) = awaitAndroidFixtureReference(marmot, sender.label, group, fileName)
         if (qualifyOwnLocalCache) {
             // Accepted-pending sends seed the confirmed cache when the shipping live projection reconciles.
             awaitAndroidFixtureProjection(controller, messageId)
@@ -107,6 +111,7 @@ private suspend fun awaitAndroidFixtureReference(
     marmot: Marmot,
     sender: String,
     group: String,
+    fileName: String,
 ): Pair<String, MediaAttachmentReferenceFfi> =
     withTimeout(30_000L) {
         var reference: Pair<String, MediaAttachmentReferenceFfi>? = null
@@ -120,7 +125,7 @@ private suspend fun awaitAndroidFixtureReference(
                             .mapNotNull { entry ->
                                 val accepted = entry.attachment as? MediaAttachmentOutcomeFfi.Accepted
                                 accepted?.reference?.let { entry.messageIdHex to it }
-                            }.singleOrNull { it.second.fileName == "fixture.txt" }
+                            }.singleOrNull { it.second.fileName == fileName }
                 } finally {
                     page.nextCursor?.close()
                     page.version.close()
