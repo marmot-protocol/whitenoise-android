@@ -8,6 +8,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
