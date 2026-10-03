@@ -3,6 +3,44 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "folderDragRowModifier",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
+        "anchor": "internal fun folderDragRowModifier(",
+        "test_ids": ["FLD-006"]
+      },
+      {
+        "surface": "folder_show_when_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+        "anchor": "R.string.folder_show_when_empty",
+        "test_ids": [
+          "FLD-005"
+        ]
+      },
+      {
+        "surface": "FilterChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+        "anchor": "private fun FilterChoice(",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "rememberFolderDrag",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
+        "anchor": "internal fun rememberFolderDrag(",
+        "test_ids": [
+          "FLD-006"
+        ]
+      },
+      {
+        "surface": "Modifier.folderDragHandle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
+        "anchor": "internal fun Modifier.folderDragHandle(",
+        "test_ids": [
+          "FLD-006"
+        ]
+      },
+      {
         "surface": "folderDescription",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "private fun folderDescription(",
@@ -43,22 +81,6 @@
         ]
       },
       {
-        "surface": "smart_folder_loaded_only",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.smart_folder_loaded_only",
-        "test_ids": [
-          "FLD-004"
-        ]
-      },
-      {
-        "surface": "smart_folder_unresolved",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
-        "anchor": "R.string.smart_folder_unresolved",
-        "test_ids": [
-          "FLD-004"
-        ]
-      },
-      {
         "surface": "smart_folder_group_rules",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
         "anchor": "R.string.smart_folder_group_rules",
@@ -94,14 +116,6 @@
         "surface": "smart_folder_add",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
         "anchor": "R.string.smart_folder_add",
-        "test_ids": [
-          "FLD-004"
-        ]
-      },
-      {
-        "surface": "smart_folder_more_filters",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
-        "anchor": "R.string.smart_folder_more_filters",
         "test_ids": [
           "FLD-004"
         ]
@@ -30299,14 +30313,6 @@
         "surface": "smart_folder_start",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
         "anchor": "R.string.smart_folder_start",
-        "test_ids": [
-          "FLD-004"
-        ]
-      },
-      {
-        "surface": "Advanced folder loaded scope",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "R.string.smart_folder_prototype",
         "test_ids": [
           "FLD-004"
         ]

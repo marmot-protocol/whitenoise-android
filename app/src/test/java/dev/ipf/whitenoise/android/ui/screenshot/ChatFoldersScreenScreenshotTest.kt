@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -32,6 +33,9 @@ class ChatFoldersScreenScreenshotTest {
     /** Light theme. */
     @Test
     fun chatFoldersScreenLight() = capture("chat_folders_screen_light", dark = false, amoled = false)
+
+    @Test
+    fun draggingFolderLight() = capture("chat_folders_drag_light", dark = false, amoled = false, drag = true)
 
     /** Dark theme. */
     @Test
@@ -78,6 +82,7 @@ class ChatFoldersScreenScreenshotTest {
         empty: Boolean = false,
         menu: Boolean = false,
         largeRtl: Boolean = false,
+        drag: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -96,7 +101,18 @@ class ChatFoldersScreenScreenshotTest {
                 }
             }
         }
-        if (menu) {
+        if (drag) {
+            composeRule.mainClock.autoAdvance = false
+            val handle = composeRule.onNodeWithTag("folder.drag.unread", useUnmergedTree = true)
+            handle.performTouchInput {
+                down(center)
+                moveBy(Offset(0f, 80f))
+            }
+            composeRule.mainClock.advanceTimeBy(32L)
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+            handle.performTouchInput { up() }
+            composeRule.mainClock.autoAdvance = true
+        } else if (menu) {
             composeRule.onNodeWithTag("folder.row.work").performTouchInput { longClick() }
             composeRule.onNodeWithTag("folder.menu.work").captureRoboImage("src/test/snapshots/$name.png")
         } else {

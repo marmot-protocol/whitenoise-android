@@ -118,6 +118,8 @@ private fun ChatFolderEditSession(
     val prefillName = existing?.let { chatFolderDisplayName(it) }.orEmpty()
     val name = rememberTextFieldState(prefillName)
     val description = rememberTextFieldState(existing?.description.orEmpty())
+    val initialShowWhenEmpty = remember { existing?.showWhenEmpty ?: false }
+    var showWhenEmpty by rememberSaveable { mutableStateOf(initialShowWhenEmpty) }
     val keyword = rememberTextFieldState(existingRule?.keyword.orEmpty())
     // Manual folders retain the ordinary native window until advanced rules are explicitly chosen.
     val initialSmart = remember { existingRule?.smartFilter }
@@ -174,7 +176,8 @@ private fun ChatFolderEditSession(
         name.text.toString() != prefillName ||
             description.text.toString() != existing?.description.orEmpty() ||
             rule != initialRule ||
-            manualChatIds != initialManual
+            manualChatIds != initialManual ||
+            showWhenEmpty != initialShowWhenEmpty
 
     /** Back confirms discarding a dirty draft. */
     fun back() {
@@ -215,6 +218,7 @@ private fun ChatFolderEditSession(
                     description = trimmedDescription,
                     manualChatIds = manualChatIds,
                     rule = rule.takeIf { it != ChatFolderRule() },
+                    showWhenEmpty = showWhenEmpty,
                 )
             } catch (_: Exception) {
                 null
@@ -297,14 +301,11 @@ private fun ChatFolderEditSession(
                 }
         }
 
-    val unresolved =
-        smartFolderUnresolvedCount(smartRoot, source) {
-            chatListItemDisplayTitle(it, appState, groupTitleCopy)
-        }
     ChatFolderEditContent(
         state =
             ChatFolderEditFormState(
                 isNew = folderId == null,
+                showWhenEmpty = showWhenEmpty,
                 name = name,
                 description = description,
                 keyword = keyword,
@@ -319,7 +320,6 @@ private fun ChatFolderEditSession(
                 peopleCount = memberHexes.size,
                 previewCount = previewRows.size,
                 advancedRules = smartPayload != null,
-                unresolvedCount = unresolved,
                 canSave =
                     name.text.isNotBlank() &&
                         !missing &&
@@ -335,6 +335,7 @@ private fun ChatFolderEditSession(
                         else -> null
                     },
             ),
+        onShowWhenEmptyChange = { showWhenEmpty = it },
         onUnreadOnlyChange = { unreadOnly = it },
         onIncludeMutedChange = { includeMuted = it },
         onGroupsOnlyChange = {
@@ -471,7 +472,7 @@ internal data class ChatFolderEditFormState(
     val directChatsOnly: Boolean = false,
     val pinnedOnly: Boolean = false,
     val advancedRules: Boolean = false,
-    val unresolvedCount: Int = 0,
+    val showWhenEmpty: Boolean = false,
 )
 
 /** The form without any store access, so tests can render every draft. */
@@ -493,6 +494,7 @@ internal fun ChatFolderEditContent(
     onDirectChatsOnlyChange: (Boolean) -> Unit,
     onPinnedOnlyChange: (Boolean) -> Unit,
     rulesContent: (@Composable () -> Unit)? = null,
+    onShowWhenEmptyChange: (Boolean) -> Unit = {},
 ) {
     SettingsScaffold(
         title = stringResource(if (state.isNew) R.string.folder_new_title else R.string.folder_edit),
@@ -527,6 +529,19 @@ internal fun ChatFolderEditContent(
                             error,
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        )
+                    }
+                }
+            }
+            item {
+                SettingsGroup {
+                    row("showWhenEmpty") { context ->
+                        SettingsSwitch(
+                            context = context,
+                            title = stringResource(R.string.folder_show_when_empty),
+                            checked = state.showWhenEmpty,
+                            onCheckedChange = onShowWhenEmptyChange,
+                            modifier = Modifier.testTag("folder.showWhenEmpty"),
                         )
                     }
                 }
@@ -627,7 +642,7 @@ internal fun ChatFolderEditContent(
                             value = if (rulesContent != null) state.previewCount.toString() else null,
                             subtitle =
                                 if (rulesContent != null || state.advancedRules) {
-                                    stringResource(R.string.smart_folder_loaded_only)
+                                    null
                                 } else {
                                     pluralStringResource(
                                         R.plurals.chat_folder_chat_count,
@@ -641,9 +656,6 @@ internal fun ChatFolderEditContent(
             }
             if (rulesContent != null) {
                 item {
-                    if (state.unresolvedCount > 0) {
-                        SettingsExplainer(stringResource(R.string.smart_folder_unresolved, state.unresolvedCount))
-                    }
                     SettingsGroup {
                         row("chats") { context ->
                             SettingsLink(

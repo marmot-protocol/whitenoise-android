@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Réinitialiser les filtres</string>
-    <string name="smart_folder_prototype">Seules les discussions chargées sont utilisées. Celles dont les informations sont incomplètes ne sont pas comptées.</string>
     <string name="smart_folder_all">Tous les critères</string>
     <string name="smart_folder_any">Un des critères</string>
     <string name="smart_folder_not">NON</string>
@@ -36,7 +35,6 @@
     <string name="smart_folder_keyword_hint">Recherche dans le titre sans distinction de casse</string>
     <string name="smart_folder_pending_hint">Les messages en attente ne peuvent pas encore être vérifiés dans certaines discussions.</string>
     <string name="smart_folder_negate_condition">Exclure les correspondances (NON)</string>
-    <string name="smart_folder_unresolved">Discussions non vérifiables : %1$d</string>
     <string name="smart_folder_invalid">Ces règles sont invalides ou non prises en charge. Le filtrage automatique est désactivé ; remplacez-les pour les modifier.</string>
     <string name="smart_folder_presets">Choisir un modèle</string>
     <string name="smart_folder_preset_read">Tout lu</string>
@@ -62,9 +60,8 @@
     <string name="smart_folder_replace">Remplacer les règles</string>
     <string name="smart_folder_filters">Filtres</string>
     <string name="smart_folder_group_rules">Grouper les règles</string>
-    <string name="smart_folder_more_filters">Autres filtres</string>
     <string name="smart_folder_add_description">Ajouter une description</string>
     <string name="smart_folder_always_include">Toujours inclure des discussions</string>
-    <string name="smart_folder_loaded_only">Discussions chargées uniquement</string>
     <string name="smart_folder_read_help">Tout lu ne signifie pas que l’agent a terminé.</string>
+  <string name="folder_show_when_empty">Afficher même vide</string>
 </resources>

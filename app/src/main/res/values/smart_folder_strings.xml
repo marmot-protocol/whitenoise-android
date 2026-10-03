@@ -1,6 +1,5 @@
 <resources>
   <string name="smart_folder_start">Reset filters</string>
-  <string name="smart_folder_prototype">Matches loaded chats only. Chats with missing information are not counted.</string>
   <string name="smart_folder_all">Match all</string>
   <string name="smart_folder_any">Match any</string>
   <string name="smart_folder_not">NOT</string>
@@ -36,7 +35,6 @@
   <string name="smart_folder_keyword_hint">Case-insensitive title match</string>
   <string name="smart_folder_pending_hint">Some chats cannot be checked for pending messages yet.</string>
   <string name="smart_folder_negate_condition">Exclude matches (NOT)</string>
-  <string name="smart_folder_unresolved">Chats we couldn’t check: %1$d</string>
   <string name="smart_folder_invalid">This rule set is unsupported or invalid. Automatic matching is disabled; replace it to edit.</string>
   <string name="smart_folder_presets">Choose preset</string>
   <string name="smart_folder_preset_read">All read</string>
@@ -62,9 +60,8 @@
     <string name="smart_folder_replace">Replace rules</string>
     <string name="smart_folder_filters">Filters</string>
     <string name="smart_folder_group_rules">Group rules</string>
-    <string name="smart_folder_more_filters">More filters</string>
     <string name="smart_folder_add_description">Add description</string>
     <string name="smart_folder_always_include">Always include chats</string>
-    <string name="smart_folder_loaded_only">Loaded chats only</string>
     <string name="smart_folder_read_help">All read does not mean the agent has finished.</string>
+  <string name="folder_show_when_empty">Show when empty</string>
 </resources>

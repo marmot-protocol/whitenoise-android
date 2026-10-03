@@ -36,6 +36,24 @@ class ChatFolderDraftCommitTest {
         preferences.writes = 0
     }
 
+    /** The per-account visibility setting shares the draft write and survives other folder edits. */
+    @Test
+    fun emptyVisibilityIsAtomicAccountScopedAndPreservedByMetadataAndReorder() {
+        val folder = store.createFolder(A, "Empty")!!
+        val other = store.createFolder("acct-other", "Other")!!
+        preferences.writes = 0
+        store.commitFolderDraft(A, folder.id, "Visible", "", emptySet(), null, showWhenEmpty = true)
+        assertEquals(1, preferences.writes)
+        store.commitFolderDraft(A, folder.id, "Renamed", "", emptySet(), null)
+        store.reorderFolders(A, listOf(folder.id))
+        val reloaded = ChatFolderPreferences(context, preferences)
+        assertEquals(true, reloaded.foldersFor(A).first { it.id == folder.id }.showWhenEmpty)
+        assertEquals(false, reloaded.foldersFor("acct-other").first { it.id == other.id }.showWhenEmpty)
+        store.commitFolderDraft(A, folder.id, null, "", emptySet(), null, showWhenEmpty = false)
+        val disabled = ChatFolderPreferences(context, preferences).foldersFor(A).first { it.id == folder.id }
+        assertEquals(false, disabled.showWhenEmpty)
+    }
+
     /** Listeners see only the old or complete new definition, and a new reader gets all fields together. */
     @Test fun updateUsesOneTransactionAndOneCompletePublication() =
         runBlocking {

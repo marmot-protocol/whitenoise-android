@@ -12,6 +12,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
@@ -48,8 +50,6 @@ class SmartFolderEditorScreenshotTest {
     @Test fun nested() = capture("smart_folder_nested", nested = true)
 
     @Test fun absenceDialog() = capture("smart_folder_absence_dialog", dialog = true)
-
-    @Test fun unresolvedChat() = capture("smart_folder_unresolved", unresolved = 1)
 
     @Test fun moreOptions() = capture("smart_folder_options", options = true)
 
@@ -95,7 +95,6 @@ class SmartFolderEditorScreenshotTest {
         rules: Boolean = false,
         options: Boolean = false,
         replace: Boolean = false,
-        unresolved: Int = 0,
         add: Boolean = false,
         more: Boolean = false,
     ) {
@@ -137,7 +136,7 @@ class SmartFolderEditorScreenshotTest {
                     mentionLabel = stringResource(R.string.smart_folder_preset_mentions)
                     ChatFolderEditContent(
                         state =
-                            formState(name, manual, empty).copy(unresolvedCount = unresolved),
+                            formState(name, manual, empty),
                         onUnreadOnlyChange = {},
                         onIncludeMutedChange = {},
                         onGroupsOnlyChange = {},
@@ -216,7 +215,11 @@ class SmartFolderEditorScreenshotTest {
             composeRule.onNodeWithTag("folder.add.").performClick()
             settleSheet()
             if (actions.more) {
-                composeRule.onNodeWithTag("folder.moreFilters").performClick()
+                composeRule
+                    .onNodeWithTag(
+                        "sheet.dragHandle",
+                        useUnmergedTree = true,
+                    ).performTouchInput { swipeUp(endY = -450f) }
                 settleSheet()
                 composeRule.onNodeWithTag("folder.addField.DRAFT").assertExists()
             }

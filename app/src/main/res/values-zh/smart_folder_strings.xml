@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">重置筛选条件</string>
-    <string name="smart_folder_prototype">仅使用已加载的聊天。信息缺失的聊天不计入匹配。</string>
     <string name="smart_folder_all">全部符合</string>
     <string name="smart_folder_any">任一符合</string>
     <string name="smart_folder_not">非</string>
@@ -36,7 +35,6 @@
     <string name="smart_folder_keyword_hint">标题匹配不区分大小写</string>
     <string name="smart_folder_pending_hint">某些聊天暂时无法检查待发送消息。</string>
     <string name="smart_folder_negate_condition">排除匹配项（非）</string>
-    <string name="smart_folder_unresolved">无法检查的聊天：%1$d</string>
     <string name="smart_folder_invalid">此规则集无效或不受支持。自动匹配已禁用；请替换规则集以编辑。</string>
     <string name="smart_folder_presets">选择预设</string>
     <string name="smart_folder_preset_read">全部已读</string>
@@ -61,9 +59,8 @@
     <string name="smart_folder_replace">替换规则</string>
     <string name="smart_folder_filters">筛选条件</string>
     <string name="smart_folder_group_rules">组合规则</string>
-    <string name="smart_folder_more_filters">更多筛选条件</string>
     <string name="smart_folder_add_description">添加描述</string>
     <string name="smart_folder_always_include">始终包含聊天</string>
-    <string name="smart_folder_loaded_only">仅限已加载的聊天</string>
     <string name="smart_folder_read_help">全部已读并不表示代理已完成工作。</string>
+  <string name="folder_show_when_empty">空文件夹仍显示</string>
 </resources>

@@ -2,22 +2,30 @@
 
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
 import dev.ipf.whitenoise.android.state.FolderMode
@@ -36,24 +44,31 @@ internal fun SmartFolderAddFilter(
     onDone: (SmartFolderFilter.Condition) -> Unit,
 ) {
     var field by rememberSaveable { mutableStateOf<FolderField?>(null) }
-    var more by rememberSaveable { mutableStateOf(false) }
     val selected = field
     if (selected == null) {
-        WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
-            WhiteNoiseSheetHeader(stringResource(R.string.smart_folder_add), onClose = onDismiss)
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+        val density = LocalDensity.current
+        val windowHeight = LocalWindowInfo.current.containerSize.height
+        var headerHeight by remember { mutableIntStateOf(0) }
+        // Keep the four common choices inside the initial half-height viewport. Material owns
+        // drag expansion and nested scrolling; every other choice follows directly below them.
+        val commonHeight =
+            with(density) {
+                (windowHeight / 2 - headerHeight).toDp() - 48.dp
+            }.coerceAtLeast(224.dp * density.fontScale)
+        val common = listOf(FolderField.PARTICIPANTS, FolderField.UNREAD, FolderField.MENTIONS, FolderField.TYPE)
+        WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+            Box(Modifier.onSizeChanged { headerHeight = it.height }) {
+                WhiteNoiseSheetHeader(stringResource(R.string.smart_folder_add), onClose = onDismiss)
+            }
             Column(Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                val common = listOf(FolderField.PARTICIPANTS, FolderField.UNREAD, FolderField.MENTIONS)
-                val choices = if (more) common + FolderField.entries.filterNot { it in common } else common
-                choices.forEach { choice ->
-                    TextButton(
-                        onClick = { field = choice },
-                        modifier = Modifier.fillMaxWidth().testTag("folder.addField." + choice.name),
-                    ) { FolderButtonLabel(stringResource(fieldLabel(choice)), R.drawable.ic_chevron_right) }
-                }
-                if (!more) {
-                    TextButton(onClick = { more = true }, modifier = Modifier.testTag("folder.moreFilters")) {
-                        Text(stringResource(R.string.smart_folder_more_filters))
+                Column(Modifier.fillMaxWidth().height(commonHeight)) {
+                    common.forEach { choice ->
+                        FilterChoice(choice, Modifier.weight(1f)) { field = choice }
                     }
+                }
+                FolderField.entries.filterNot { it in common }.forEach { choice ->
+                    FilterChoice(choice) { field = choice }
                 }
             }
         }
@@ -69,6 +84,18 @@ internal fun SmartFolderAddFilter(
             )
         }
     }
+}
+
+@Composable
+private fun FilterChoice(
+    field: FolderField,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().testTag("folder.addField." + field.name),
+    ) { FolderButtonLabel(stringResource(fieldLabel(field)), R.drawable.ic_chevron_right) }
 }
 
 private fun defaultFolderMode(field: FolderField): FolderMode =

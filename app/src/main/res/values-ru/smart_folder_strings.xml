@@ -1,6 +1,5 @@
 <resources>
     <string name="smart_folder_start">Сбросить фильтры</string>
-    <string name="smart_folder_prototype">Учитываются только загруженные чаты. Чаты с неполными данными не учитываются.</string>
     <string name="smart_folder_all">Все условия</string>
     <string name="smart_folder_any">Любое условие</string>
     <string name="smart_folder_not">НЕ</string>
@@ -36,7 +35,6 @@
     <string name="smart_folder_keyword_hint">Поиск в заголовке без учёта регистра</string>
     <string name="smart_folder_pending_hint">В некоторых чатах пока нельзя проверить наличие ожидающих отправки сообщений.</string>
     <string name="smart_folder_negate_condition">Исключать совпадения (НЕ)</string>
-    <string name="smart_folder_unresolved">Чаты, которые не удалось проверить: %1$d</string>
     <string name="smart_folder_invalid">Эти правила недопустимы или не поддерживаются. Автоматический отбор отключён; замените правила для редактирования.</string>
     <string name="smart_folder_presets">Выбрать шаблон</string>
     <string name="smart_folder_preset_read">Всё прочитано</string>
@@ -64,9 +62,8 @@
     <string name="smart_folder_replace">Заменить правила</string>
     <string name="smart_folder_filters">Фильтры</string>
     <string name="smart_folder_group_rules">Группировка правил</string>
-    <string name="smart_folder_more_filters">Другие фильтры</string>
     <string name="smart_folder_add_description">Добавить описание</string>
     <string name="smart_folder_always_include">Всегда включать чаты</string>
-    <string name="smart_folder_loaded_only">Только загруженные чаты</string>
     <string name="smart_folder_read_help">Всё прочитано не означает, что агент закончил работу.</string>
+  <string name="folder_show_when_empty">Показывать пустую папку</string>
 </resources>

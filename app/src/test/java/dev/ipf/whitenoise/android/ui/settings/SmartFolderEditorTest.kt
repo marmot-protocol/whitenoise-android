@@ -4,12 +4,20 @@ import android.content.Context
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
@@ -200,12 +208,38 @@ class SmartFolderEditorTest {
     @Test fun addingFilterCancellationDoesNotCreateAnEmptyRuleOrOfferRemoval() {
         val root = render(SmartFolderFilter.Group())
         composeRule.onNodeWithTag("folder.add.").performClick()
-        composeRule.onNodeWithTag("folder.addField.DRAFT").assertDoesNotExist()
-        composeRule.onNodeWithTag("folder.moreFilters").performClick()
+        composeRule.onNodeWithTag("folder.moreFilters").assertDoesNotExist()
+        composeRule.mainClock.advanceTimeBy(1000L)
+        composeRule
+            .onNodeWithTag(
+                "sheet.dragHandle",
+                useUnmergedTree = true,
+            ).performTouchInput { swipeUp(endY = -450f) }
+        composeRule.mainClock.advanceTimeBy(1000L)
+        composeRule.onNodeWithTag("folder.addField.DRAFT").assertIsDisplayed()
         composeRule.onNodeWithTag("folder.addField.DRAFT").performClick()
         composeRule.onNodeWithText(context.getString(R.string.smart_folder_ignore)).assertDoesNotExist()
         composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
         assertTrue(root.value.children.isEmpty())
+    }
+
+    @Test
+    fun filterSheetStartsWithFourChoicesAndDragRevealsTheRest() {
+        render(SmartFolderFilter.Group())
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.mainClock.advanceTimeBy(1000L)
+        listOf("PARTICIPANTS", "UNREAD", "MENTIONS", "TYPE").forEach {
+            composeRule.onNodeWithTag("folder.addField.$it").assertIsDisplayed()
+        }
+        composeRule.onNodeWithTag("folder.addField.DRAFT").assertIsNotDisplayed()
+        composeRule.onNodeWithTag("folder.moreFilters").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag(
+                "sheet.dragHandle",
+                useUnmergedTree = true,
+            ).performTouchInput { swipeUp(endY = -450f) }
+        composeRule.mainClock.advanceTimeBy(1000L)
+        composeRule.onNodeWithTag("folder.addField.DRAFT").assertIsDisplayed()
     }
 
     @Test fun singleFilterHidesMatchChoiceWithoutChangingItsStoredMode() {
@@ -219,10 +253,39 @@ class SmartFolderEditorTest {
         assertFalse(root.value.all)
     }
 
-    private fun render(initial: SmartFolderFilter.Group): MutableState<SmartFolderFilter.Group> {
+    @Test
+    fun filterSheetExposesAnAccessibleExpandAction() {
+        render(SmartFolderFilter.Group())
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.mainClock.advanceTimeBy(1000L)
+        composeRule
+            .onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Expand), useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.Expand) { it() }
+        composeRule.mainClock.advanceTimeBy(1000L)
+        composeRule.onNodeWithTag("folder.addField.DRAFT").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(qualifiers = "en-w640dp-h360dp-mdpi")
+    fun shortLandscapeAtDoubleTextSizeCanReachTheLastFilter() {
+        render(SmartFolderFilter.Group(), fontScale = 2f)
+        composeRule.onNodeWithTag("folder.add.").performClick()
+        composeRule.mainClock.advanceTimeBy(1000L)
+        composeRule
+            .onNodeWithTag("folder.addField.PINNED")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        composeRule.onNodeWithTag("folder.conditionDone").assertExists()
+    }
+
+    private fun render(
+        initial: SmartFolderFilter.Group,
+        fontScale: Float = 1f,
+    ): MutableState<SmartFolderFilter.Group> {
         val state = mutableStateOf(initial)
         composeRule.setContent {
-            WhiteNoiseTheme {
+            WhiteNoiseTheme(fontScale = fontScale) {
                 Surface {
                     SmartFolderEditor(
                         state.value,

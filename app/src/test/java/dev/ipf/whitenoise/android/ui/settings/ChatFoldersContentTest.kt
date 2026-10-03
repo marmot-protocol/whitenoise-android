@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
 import androidx.compose.material3.Surface
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SystemFolderKind
@@ -34,6 +36,75 @@ class ChatFoldersContentTest {
     val composeRule = createComposeRule()
 
     private val app = ApplicationProvider.getApplicationContext<Context>()
+
+    @Test
+    fun handleDragCommitsOnlyOnDropAndDoesNotEdit() {
+        val moves = mutableListOf<Pair<String, Int>>()
+        var edited: String? = null
+        render(
+            folders = listOf(folderRow("a", "A"), folderRow("b", "B"), folderRow("c", "C")),
+            onMove = { id, delta -> moves.add(id to delta) },
+            onEdit = { edited = it },
+        )
+        val start =
+            composeRule
+                .onNodeWithTag("folder.drag.a", useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.center
+        val end =
+            composeRule
+                .onNodeWithTag("folder.drag.c", useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.center
+        composeRule.onNodeWithTag("folder.drag.a", useUnmergedTree = true).performTouchInput {
+            swipe(center, center + Offset(0f, end.y - start.y))
+        }
+        assertEquals(listOf("a" to 2), moves)
+        assertEquals(null, edited)
+    }
+
+    @Test
+    fun cancellingHandleDragDoesNotPersistAReorder() {
+        val moves = mutableListOf<Pair<String, Int>>()
+        render(
+            folders = listOf(folderRow("a", "A"), folderRow("b", "B")),
+            onMove = { id, delta -> moves.add(id to delta) },
+        )
+        composeRule.onNodeWithTag("folder.drag.a", useUnmergedTree = true).performTouchInput {
+            down(center)
+            moveBy(Offset(0f, 100f))
+            cancel()
+        }
+        assertEquals(emptyList<Pair<String, Int>>(), moves)
+    }
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h500dp-mdpi")
+    fun edgeDragReachesFoldersBeyondTheInitialViewport() {
+        var moved: Pair<String, Int>? = null
+        render(
+            folders = (0 until 20).map { folderRow("f$it", "Folder $it") },
+            onMove = { id, delta -> moved = id to delta },
+        )
+        val handle =
+            composeRule
+                .onNodeWithTag("folder.drag.f0", useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot.center
+        val list = composeRule.onNodeWithTag(CHAT_FOLDERS_CONTENT_TAG)
+        val bounds = list.fetchSemanticsNode().boundsInRoot
+        composeRule.mainClock.autoAdvance = false
+        list.performTouchInput {
+            down(Offset(handle.x - bounds.left, handle.y - bounds.top))
+            moveTo(Offset(handle.x - bounds.left, bounds.height - 12f))
+        }
+        composeRule.mainClock.advanceTimeBy(1600L)
+        list.performTouchInput { up() }
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        assertEquals("f0", moved?.first)
+        org.junit.Assert.assertTrue("Drag must pass the first viewport", (moved?.second ?: 0) > 4)
+    }
 
     /** The row is one button that edits, with Edit, the in-bounds move and Delete as accessibility actions. */
     @Test

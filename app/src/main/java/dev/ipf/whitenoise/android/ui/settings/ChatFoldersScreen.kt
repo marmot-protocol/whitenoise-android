@@ -3,11 +3,13 @@ package dev.ipf.whitenoise.android.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -236,6 +239,9 @@ internal fun ChatFoldersContent(
     onDelete: (String) -> Unit,
     onRestoreDefaults: () -> Unit,
 ) {
+    val list = rememberLazyListState()
+    val ids = state.folders.map { it.id }
+    val drag = rememberFolderDrag(list, ids)
     SettingsScaffold(
         title = stringResource(R.string.chat_folders_title),
         onBack = onBack,
@@ -246,6 +252,7 @@ internal fun ChatFoldersContent(
         },
     ) {
         LazyColumn(
+            state = list,
             modifier = Modifier.fillMaxSize().testTag(CHAT_FOLDERS_CONTENT_TAG),
             contentPadding = PaddingValues(vertical = WhiteNoiseSpacing.CompactScreenMargin),
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
@@ -261,7 +268,7 @@ internal fun ChatFoldersContent(
             }
             state.folders.forEach { folder ->
                 item(key = folder.id) {
-                    SettingsGroup {
+                    SettingsGroup(modifier = folderDragRowModifier(folder.id, drag, drag.targetId)) {
                         row(folder.id) { context ->
                             FolderManageRow(
                                 context = context,
@@ -269,6 +276,7 @@ internal fun ChatFoldersContent(
                                 onEdit = { onEdit(folder.id) },
                                 onMove = { onMove(folder.id, it) },
                                 onDelete = { onDelete(folder.id) },
+                                dragHandle = Modifier.folderDragHandle(folder.id, drag, ids, onMove),
                             )
                         }
                     }
@@ -301,6 +309,7 @@ private fun FolderManageRow(
     onEdit: () -> Unit,
     onMove: (Int) -> Unit,
     onDelete: () -> Unit,
+    dragHandle: Modifier,
 ) {
     var menu by remember(folder.id) { mutableStateOf(false) }
     val name = folder.displayName()
@@ -354,16 +363,27 @@ private fun FolderManageRow(
         },
         supportingContent = { Text(supporting) },
         trailingContent = {
-            Box {
-                IconButton(onClick = { menu = true }) {
-                    Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.actions_for, name))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = dragHandle.size(48.dp).testTag("folder.drag.${folder.id}"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_drag_handle),
+                        contentDescription = null,
+                    )
                 }
-                WhiteNoiseDropdownMenu(
-                    expanded = menu,
-                    onDismissRequest = { menu = false },
-                    items = choices,
-                    modifier = Modifier.testTag("folder.menu.${folder.id}"),
-                )
+                Box {
+                    IconButton(onClick = { menu = true }) {
+                        Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.actions_for, name))
+                    }
+                    WhiteNoiseDropdownMenu(
+                        expanded = menu,
+                        onDismissRequest = { menu = false },
+                        items = choices,
+                        modifier = Modifier.testTag("folder.menu.${folder.id}"),
+                    )
+                }
             }
         },
     ) {

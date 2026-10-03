@@ -40,6 +40,9 @@ class ChatFolderEditScreenScreenshotTest {
     @Test
     fun chatFolderEditScreenLight() = capture("chat_folder_edit_screen_light", dark = false, amoled = false)
 
+    @Test
+    fun emptyFolderVisibleLight() = capture("chat_folder_empty_visible_light", dark = false, amoled = false)
+
     /** Dark theme. */
     @Test
     fun chatFolderEditScreenDark() = capture("chat_folder_edit_screen_dark", dark = true, amoled = false)
@@ -150,6 +153,7 @@ class ChatFolderEditScreenScreenshotTest {
                     ChatFolderEditContent(
                         state =
                             previewState().copy(
+                                showWhenEmpty = name == "chat_folder_empty_visible_light",
                                 unreadMentionsOnly = attention,
                                 pinnedOnly = attention,
                                 groupsOnly = attention,
