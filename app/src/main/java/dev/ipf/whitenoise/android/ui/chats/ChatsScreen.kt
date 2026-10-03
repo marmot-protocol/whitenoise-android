@@ -1641,13 +1641,6 @@ internal fun ChatsScreen(
                     )
                 }
             }
-            if (advancedFolder) {
-                Text(
-                    stringResource(R.string.smart_folder_prototype),
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
             if (shouldShowGlobalSearchFilterControls(
                     searchState = globalSearchState,
                     selectionMode = selectionMode,

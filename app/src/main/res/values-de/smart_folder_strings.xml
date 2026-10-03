@@ -67,4 +67,6 @@
     <string name="smart_folder_always_include">Chats immer einschließen</string>
     <string name="smart_folder_loaded_only">Nur geladene Chats</string>
     <string name="smart_folder_read_help">Alles gelesen bedeutet nicht, dass der Agent fertig ist.</string>
+  <string name="folder_show_when_empty">Auch leer anzeigen</string>
+  <string name="folder_drag_reorder">%1$s zum Neuordnen ziehen</string>
 </resources>

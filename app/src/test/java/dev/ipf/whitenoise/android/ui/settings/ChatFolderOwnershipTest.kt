@@ -65,6 +65,21 @@ class ChatFolderOwnershipTest {
     }
 
     /** A renamed default renders the stored name in the row and the actual editor prefill. */
+    @Test
+    fun emptyVisibilityDraftSurvivesRotationAndOnlySavePersistsIt() {
+        val state = appState()
+        val store = state.chatFolderPreferences
+        val folder = store.createFolder(A, "Empty")!!
+        val restoration = StateRestorationTester(composeRule)
+        restoration.setContent { WhiteNoiseTheme { ChatFolderEditScreen(state, A, folder.id, {}) } }
+        composeRule.onNodeWithTag("folder.showWhenEmpty").performClick()
+        assertFalse(store.foldersFor(A).first { it.id == folder.id }.showWhenEmpty)
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.onNodeWithTag("folder.save").performClick()
+        assertTrue(store.foldersFor(A).first { it.id == folder.id }.showWhenEmpty)
+        assertTrue(ChatFolderPreferences(app).foldersFor(A).first { it.id == folder.id }.showWhenEmpty)
+    }
+
     @Test fun renamedDefaultIsVisibleInListAndEditor() {
         val state = appState()
         val store = state.chatFolderPreferences

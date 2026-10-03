@@ -67,4 +67,6 @@
     <string name="smart_folder_always_include">Always include chats</string>
     <string name="smart_folder_loaded_only">Loaded chats only</string>
     <string name="smart_folder_read_help">All read does not mean the agent has finished.</string>
+  <string name="folder_show_when_empty">Show when empty</string>
+  <string name="folder_drag_reorder">Drag to reorder %1$s</string>
 </resources>

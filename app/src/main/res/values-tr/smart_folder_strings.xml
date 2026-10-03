@@ -67,4 +67,6 @@
     <string name="smart_folder_always_include">Sohbetleri her zaman dahil et</string>
     <string name="smart_folder_loaded_only">Yalnızca yüklenen sohbetler</string>
     <string name="smart_folder_read_help">Tümü okundu, ajanın işini bitirdiği anlamına gelmez.</string>
+  <string name="folder_show_when_empty">Boşken göster</string>
+  <string name="folder_drag_reorder">%1$s sırasını değiştirmek için sürükleyin</string>
 </resources>

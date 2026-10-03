@@ -66,4 +66,6 @@
     <string name="smart_folder_always_include">始終包含聊天</string>
     <string name="smart_folder_loaded_only">僅限已載入的聊天</string>
     <string name="smart_folder_read_help">全部已讀並不表示代理已完成工作。</string>
+  <string name="folder_show_when_empty">空資料夾仍顯示</string>
+  <string name="folder_drag_reorder">拖曳以重新排序 %1$s</string>
 </resources>

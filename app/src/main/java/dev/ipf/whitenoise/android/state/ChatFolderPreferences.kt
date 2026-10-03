@@ -24,6 +24,7 @@ data class ChatFolder(
     val description: String,
     val order: Int,
     val systemKind: SystemFolderKind?,
+    val showWhenEmpty: Boolean = false,
 )
 
 /**
@@ -123,6 +124,7 @@ class ChatFolderPreferences(
         description: String,
         manualChatIds: Set<String>,
         rule: ChatFolderRule?,
+        showWhenEmpty: Boolean? = null,
     ): ChatFolder? {
         val account = normalizedAccount(accountRef)
         val trimmedName = name?.trim()
@@ -133,21 +135,29 @@ class ChatFolderPreferences(
             val current = _state.value[account] ?: return@synchronized null
             val existing = folderId?.let { id -> current.folders.firstOrNull { it.id == id } }
             if (folderId != null && existing == null) return@synchronized null
+            val visibleWhenEmpty = folderDraftVisibility(showWhenEmpty, existing)
             val folder =
                 existing?.copy(
                     name = trimmedName ?: existing.name,
                     description = description.trim(),
+                    showWhenEmpty = visibleWhenEmpty,
                 ) ?: ChatFolder(
                     id = UUID.randomUUID().toString(),
                     name = requireNotNull(trimmedName),
                     description = description.trim(),
                     order = (current.folders.maxOfOrNull { it.order } ?: -1) + 1,
                     systemKind = null,
+                    showWhenEmpty = visibleWhenEmpty,
                 )
             persistFolderDraft(account, current, folder, existing == null, manualChatIds, rule)
             folder
         }
     }
+
+    private fun folderDraftVisibility(
+        requested: Boolean?,
+        existing: ChatFolder?,
+    ): Boolean = requested ?: existing?.showWhenEmpty ?: false
 
     /**
      * Persist the entire draft atomically before publishing its single observable projection; caller holds
@@ -506,6 +516,7 @@ class ChatFolderPreferences(
                             .put(FIELD_ID, folder.id)
                             .put(FIELD_NAME, folder.name)
                             .put(FIELD_DESCRIPTION, folder.description)
+                            .put("showWhenEmpty", folder.showWhenEmpty)
                             .put(FIELD_ORDER, folder.order)
                             .put(FIELD_SYSTEM_KIND, folder.systemKind?.name),
                     )
@@ -532,6 +543,7 @@ class ChatFolderPreferences(
                     description = json.optString(FIELD_DESCRIPTION),
                     order = json.optInt(FIELD_ORDER, 0),
                     systemKind = kind,
+                    showWhenEmpty = json.optBoolean("showWhenEmpty", false),
                 )
             }
         }.getOrNull()

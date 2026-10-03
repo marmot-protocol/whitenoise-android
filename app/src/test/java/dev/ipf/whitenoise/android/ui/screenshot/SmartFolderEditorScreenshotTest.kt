@@ -12,6 +12,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
@@ -216,7 +218,11 @@ class SmartFolderEditorScreenshotTest {
             composeRule.onNodeWithTag("folder.add.").performClick()
             settleSheet()
             if (actions.more) {
-                composeRule.onNodeWithTag("folder.moreFilters").performClick()
+                composeRule
+                    .onNodeWithTag(
+                        "sheet.dragHandle",
+                        useUnmergedTree = true,
+                    ).performTouchInput { swipeUp(endY = -450f) }
                 settleSheet()
                 composeRule.onNodeWithTag("folder.addField.DRAFT").assertExists()
             }

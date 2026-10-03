@@ -67,4 +67,6 @@
     <string name="smart_folder_always_include">Toujours inclure des discussions</string>
     <string name="smart_folder_loaded_only">Discussions chargées uniquement</string>
     <string name="smart_folder_read_help">Tout lu ne signifie pas que l’agent a terminé.</string>
+  <string name="folder_show_when_empty">Afficher même vide</string>
+  <string name="folder_drag_reorder">Faites glisser pour réorganiser %1$s</string>
 </resources>

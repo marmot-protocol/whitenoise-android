@@ -18,6 +18,16 @@ import org.junit.Test
 
 class ChatFolderChipModelTest {
     @Test
+    fun optedInEmptyFoldersKeepTheirOrderAndZeroUnreadCount() {
+        val hidden = ChatFolder("hidden", "Hidden", "", 0, null)
+        val visible = ChatFolder("visible", "Visible", "", 1, null, showWhenEmpty = true)
+        val chips = chips(folders = listOf(visible, hidden))
+        assertEquals(listOf("visible"), chips.map { it.folderId })
+        assertEquals(0, chips.single().trailingCount)
+        assertTrue(chips(folders = listOf(visible.copy(showWhenEmpty = false))).isEmpty())
+    }
+
+    @Test
     fun defaultChipsHideWhenEmptyAndCountTheirUnread() {
         val chips =
             chips(

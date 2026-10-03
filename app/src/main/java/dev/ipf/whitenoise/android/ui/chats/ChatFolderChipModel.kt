@@ -34,8 +34,7 @@ internal data class ChatFolderChipModel(
 
 /**
  * Derives the visible chip row from the folder store: the user's configured
- * order, and only non-selected folders that currently match ≥1 chat — the
- * hide-when-empty rule the Archived chip pioneered, applied to every folder.
+ * order, hiding empty folders unless their settings opt in to keeping them visible.
  * The selected folder stays represented while empty so its filter remains
  * visible and explicit. Membership, source list, and the unread badge all
  * come from each folder's own rule (via [membershipOf], which must evaluate
@@ -69,7 +68,8 @@ internal fun chatFolderChipModels(
                 }
             }
             val pending = folder.id in pendingFolderIds
-            if (memberCount == 0 && folder.id != selectedFolderId && !pending) {
+            val hiddenWhenEmpty = memberCount == 0 && !folder.showWhenEmpty
+            if (hiddenWhenEmpty && folder.id != selectedFolderId && !pending) {
                 null
             } else {
                 ChatFolderChipModel(

@@ -69,4 +69,6 @@
     <string name="smart_folder_always_include">Всегда включать чаты</string>
     <string name="smart_folder_loaded_only">Только загруженные чаты</string>
     <string name="smart_folder_read_help">Всё прочитано не означает, что агент закончил работу.</string>
+  <string name="folder_show_when_empty">Показывать пустую папку</string>
+  <string name="folder_drag_reorder">Перетащите, чтобы изменить порядок %1$s</string>
 </resources>

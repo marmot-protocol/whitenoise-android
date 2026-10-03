@@ -67,4 +67,6 @@
     <string name="smart_folder_always_include">Sempre incluir conversas</string>
     <string name="smart_folder_loaded_only">Apenas conversas carregadas</string>
     <string name="smart_folder_read_help">Tudo lido não significa que o agente terminou.</string>
+  <string name="folder_show_when_empty">Mostrar quando vazia</string>
+  <string name="folder_drag_reorder">Arraste para reordenar %1$s</string>
 </resources>

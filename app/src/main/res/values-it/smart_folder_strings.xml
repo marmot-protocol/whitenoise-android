@@ -67,4 +67,6 @@
     <string name="smart_folder_always_include">Includi sempre le chat</string>
     <string name="smart_folder_loaded_only">Solo chat caricate</string>
     <string name="smart_folder_read_help">Tutto letto non significa che l’agente abbia finito.</string>
+  <string name="folder_show_when_empty">Mostra anche se vuota</string>
+  <string name="folder_drag_reorder">Trascina per riordinare %1$s</string>
 </resources>
