@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -88,6 +89,20 @@ class ForwardRetainedSourceTest {
         val copyThread = checkNotNull(lease.copiedOn) { "the lease was never copied" }
         assertTrue("the lease was copied on the main thread", copyThread !== Looper.getMainLooper().thread)
         assertTrue("the lease was not released", lease.closed)
+    }
+
+    /** A retained lease above the forward's cap is rejected before any copy and still released. */
+    @Test
+    fun retainedLeaseAboveTheCapIsRejectedBeforeAnyCopyAndReleased() {
+        val lease = RecordingLease(DOWNLOADED)
+
+        val failure =
+            runCatching { runBlocking { readRetainedForwardPlaintext(maxBytes = DOWNLOADED.size - 1L) { lease } } }
+                .exceptionOrNull()
+
+        assertTrue("the over-cap lease was not rejected: $failure", failure is AttachmentTooLargeToPresentException)
+        assertNull("an over-cap lease was copied", lease.copiedOn)
+        assertTrue("the rejected lease was not released", lease.closed)
     }
 
     /** An absent lease reads as null, and a copy that fails still releases the lease. */

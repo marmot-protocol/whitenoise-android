@@ -6,7 +6,7 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
-import dev.ipf.whitenoise.android.media.toByteArray
+import dev.ipf.whitenoise.android.media.readWithin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -343,11 +343,14 @@ private suspend fun WhiteNoiseAppState.retainedForwardPlaintext(request: Attachm
     readRetainedForwardPlaintext { openNativeAttachment(request) }
 
 /**
- * Copies an opened retained lease into a private buffer on the IO dispatcher and closes it on every path.
+ * Copies an opened retained lease into a private buffer of at most [maxBytes] on the IO dispatcher and closes it on
+ * every path.
  *
- * A forward session runs on the main dispatcher, and opening a lease returns to that context, so the whole-file read
- * is moved to IO explicitly. A forward cancelled while the copy runs stops at the end of the copy, and the lease is
- * released either way.
+ * A forward session runs on the main dispatcher, and opening a lease returns to that context, so the read runs on IO.
+ * The read is bounded by the forward's own retained-bytes cap, so a larger attachment is rejected before it is
+ * allocated and the caller falls back to the download, and a forward cancelled mid-copy stops at the next chunk.
  */
-internal suspend fun readRetainedForwardPlaintext(open: suspend () -> AttachmentPlaintext?): ByteArray? =
-    open()?.use { lease -> withContext(Dispatchers.IO) { lease.toByteArray() } }
+internal suspend fun readRetainedForwardPlaintext(
+    maxBytes: Long = ConversationController.MEDIA_RETAINED_MAX_BYTES,
+    open: suspend () -> AttachmentPlaintext?,
+): ByteArray? = open()?.use { lease -> lease.readWithin(maxBytes) }
