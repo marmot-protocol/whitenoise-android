@@ -29,7 +29,7 @@ that is provably the whole package, before anything reaches the system installer
 tag, anything other than exactly two acquisitions of it and no HEAD, a first acquisition that is not held at the prefix
 or that completes, a second that starts before the first ended, a replacement that does not deliver exactly the bytes it
 still needed, an unexplained cancel or payload control, a file not proven exact, and a wrong platform outcome for the
-distribution. Thirteen checker tests remove or falsify each proof in turn, and disabling the ledger or metric checks
+distribution. Fourteen checker tests remove or falsify each proof in turn, and disabling the ledger or metric checks
 makes several of them fail.
 
 ## Results
