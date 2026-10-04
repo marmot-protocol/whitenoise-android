@@ -261,7 +261,11 @@ class ConversationSendRetryIntegrationTest {
                 controller.retryMembers()
                 val originalSend = async(start = CoroutineStart.UNDISPATCHED) { controller.send("hello") }
                 originalStarted.await()
-                controller.beginMessageEdit(controller.timeline.single().record.messageIdHex)
+                val originalToken =
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex
+                controller.beginMessageEdit(originalToken)
                 controller.send("rejected revision")
                 runCurrent()
                 assertEquals(MessageStatus.Failed, controller.timeline.single().status)
