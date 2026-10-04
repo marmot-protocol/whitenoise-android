@@ -5,7 +5,7 @@ buildscript {
     dependencies {
         constraints {
             classpath("org.bouncycastle:bcprov-jdk18on:$bouncyCastleVersion") {
-                because("CVE-2025-14813 is fixed in Bouncy Castle 1.84")
+                because("Bouncy Castle 1.86 includes the 1.85 and 1.86 security fixes")
             }
             classpath("org.bouncycastle:bcpkix-jdk18on:$bouncyCastleVersion") {
                 because("keep Bouncy Castle build modules on one security-fixed release")
