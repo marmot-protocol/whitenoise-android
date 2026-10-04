@@ -7,6 +7,7 @@ package dev.ipf.whitenoise.android.state
  */
 internal class PendingMessageEditHandoff {
     private data class Entry(
+        val originalClientToken: String,
         var confirmedId: String? = null,
         var ready: Boolean = false,
         var editing: Boolean = true,
@@ -15,9 +16,16 @@ internal class PendingMessageEditHandoff {
 
     private val entries = mutableMapOf<String, Entry>()
 
-    fun begin(clientToken: String) {
-        entries.getOrPut(clientToken, ::Entry).editing = true
+    fun begin(
+        clientToken: String,
+        originalClientToken: String = clientToken,
+    ) {
+        entries.getOrPut(clientToken) { Entry(originalClientToken) }.editing = true
     }
+
+    fun originalClientToken(clientToken: String): String? = entries[clientToken]?.originalClientToken
+
+    fun confirmedTarget(clientToken: String): String? = entries[clientToken]?.confirmedId
 
     sealed interface Submission {
         data class Publish(
@@ -56,7 +64,7 @@ internal class PendingMessageEditHandoff {
         ready: Boolean,
     ): String? {
         val entry = entries[clientToken] ?: return null
-        return if (confirmedId == clientToken) {
+        return if (confirmedId == entry.originalClientToken) {
             null
         } else {
             entry.confirmedId = confirmedId

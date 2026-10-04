@@ -304,6 +304,24 @@
         "test_ids": ["CHL-017"]
       },
       {
+        "surface": "Pending edit admission failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun failPendingEditAdmission(",
+        "test_ids": ["MSG-007"]
+      },
+      {
+        "surface": "Pending edit failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_edit_message",
+        "test_ids": ["MSG-007"]
+      },
+      {
+        "surface": "Durable pending message edit admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DurablePendingEditIntent.kt",
+        "anchor": "fun MarmotInterface.admitPendingMessageEdit(",
+        "test_ids": ["MSG-007"]
+      },
+      {
         "surface": "Accepted send native draft presentation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SentComposerDraftPresentation.kt",
         "anchor": "fun selectedPreview(",
@@ -25338,6 +25356,12 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Failed original send precedence for Retry and Discard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun failedEditForAction(",
+        "test_ids": ["MSG-004", "MSG-007"]
+      },
       {
         "surface": "Content-based animated image source admission",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AnimationSourceAdmission.kt",
