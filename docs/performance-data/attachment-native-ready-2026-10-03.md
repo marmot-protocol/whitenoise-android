@@ -98,16 +98,26 @@ External dispatch is not measured by this matrix. It is bounded by the [received
 where dispatch took 1 to 8 ms on API 30 and 36, so the ceiling has an order of magnitude of headroom.
 
 Applied to the pooled runs, the **baseline breaches the post-READY ceiling in five cells** (the 64 KiB file on every link and the
-1 MiB file on the unshaped and Wi-Fi links) and nothing else. The **candidate breaches no ceiling.** The remaining
-targets the candidate does not yet meet are all in two places: materialization of 8 MiB and larger files (a whole-file
-copy, 54 ms at 8 MiB and 548 ms at 30 MiB against targets of 50 and 160 ms) and the post-READY wait of small files on
-shaped links (27 to 30 ms against 10 ms), where the backoff reads the snapshot at a growing interval.
+1 MiB file on the unshaped and Wi-Fi links) and nothing else. The **candidate breaches no ceiling**: 102 of its 125
+budget cells are within their ceiling and meet any target, and the other 23 are within their ceiling and miss a target.
+Those 23 are:
+
+- **First visible progress:** 411 ms on the constrained link at 1 and 8 MiB, against 350 ms.
+- **Transfer completion:** 84.8 ms at 8 MiB on Wi-Fi, against 80 ms.
+- **Post-READY materialization:** 17.0 ms (unshaped) and 19.3 ms (Wi-Fi) at 1 MiB against 15 ms; 52 to 54 ms at 8 MiB on
+  every link against 50 ms; 523 to 548 ms at 30 MiB on the unshaped and Wi-Fi links against 160 ms; and 26.6 ms (Wi-Fi) and
+  30.4 ms (constrained) at 64 KiB against 10 ms, where the backoff reads the snapshot at a growing interval.
+- **Warm and restart leases:** 8 MiB and 30 MiB files on every link they were measured on (for example 55 ms against 45 ms
+  at 8 MiB, and 517 to 561 ms against 155 ms at 30 MiB), and the 64 KiB restart lease on the unshaped link (5.8 ms against
+  5.3 ms).
 
 ## What this leaves, by owner
 
 - **Engine.** Verification and decryption take about 18 ms/MiB after the last body byte (535 ms at 30 MiB, 152 ms at
   8 MiB), the engine's feed still coalesces at 250 ms, and an upload that spans a group commit is rejected after its last
-  byte. The first two are budgeted with no target; the last is the epoch finding in the baseline report.
+  byte. Verification is budgeted with a ceiling and no target. The raw feed delay is measured (`feed_ready_ms` and
+  `subscription_delay_ms`) but has no budget of its own, because the shipping path no longer waits for it. The rejected
+  upload is the epoch finding in the baseline report.
 - **Android storage.** Whole-file copy materialization above, and the whole-array memory boundary: 66 MiB Java when
   sending and 89 MiB when receiving a 30 MiB file. Neither is changed here.
 - **Not measured.** Physical Wi-Fi, a production network and external dispatch beyond the figures cited above.

@@ -26,7 +26,7 @@ def cell(size, **values):
 
 def aggregate_of(*cells, link="unshaped", restart=None):
     """A one-link aggregate with the given cells."""
-    return {"profiles": [{"name": link, "cells": list(cells), "recreated_native_lease_ms": restart or {}}]}
+    return {"runs": 3, "profiles": [{"name": link, "cells": list(cells), "recreated_native_lease_ms": restart or {}}]}
 
 
 class MatrixBudgetsTest(unittest.TestCase):
@@ -65,6 +65,24 @@ class MatrixBudgetsTest(unittest.TestCase):
         verdict = evaluate(aggregate_of(cell(65536, prep_visible_ms=1.0)), self.budgets)
         self.assertFalse(verdict["passed"])
         self.assertTrue(any(v["observed"] is None for v in verdict["violations"]))
+
+    def test_a_metric_measured_on_only_some_samples_is_a_violation_never_a_pass(self):
+        """A median over two of three samples describes the survivors, so it is missing rather than within its ceiling."""
+        budget = next(b for b in self.budgets if b["id"] == "first-visible-progress")
+        partial = cell(65536, first_progress_ms=30.0)
+        partial["first_progress_ms"]["n"] = 2
+        verdict = evaluate(aggregate_of(partial), [budget])
+        self.assertFalse(verdict["passed"])
+        self.assertEqual([None], [v["observed"] for v in verdict["violations"]])
+        self.assertTrue(evaluate(aggregate_of(cell(65536, first_progress_ms=30.0)), [budget])["passed"])
+
+    def test_a_restart_read_must_exist_for_every_run(self):
+        """The restart table holds one value per run, so two reads from three runs do not satisfy its budget."""
+        budget = next(b for b in self.budgets if b["id"] == "restart-lease")
+        whole = {65536: stats(4.0)}
+        short = {65536: {**stats(4.0), "n": 2}}
+        self.assertTrue(evaluate(aggregate_of(cell(65536), restart=whole), [budget])["passed"])
+        self.assertFalse(evaluate(aggregate_of(cell(65536), restart=short), [budget])["passed"])
 
     def test_the_ceiling_grows_with_the_payload(self):
         """The same materialization time passes for a large file and fails for a small one."""

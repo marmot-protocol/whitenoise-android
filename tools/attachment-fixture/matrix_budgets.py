@@ -28,12 +28,15 @@ def limit(bound, size):
     return None if bound is None else bound["fixed"] + bound["per_mib"] * size / MIB
 
 
-def observed(profile, cell, budget):
-    """The budgeted quantile of one cell, in the budget's unit, or None when it was not measured."""
+def observed(profile, cell, budget, expected):
+    """The budgeted quantile of one cell, in the budget's unit, or None unless all `expected` samples measured it.
+
+    A quantile over only some of the samples describes the survivors, so partial coverage counts as not measured.
+    """
     metric = budget["metric"]
     stats = (profile["recreated_native_lease_ms"].get(cell["size"]) if metric == "restart_lease_ms"
              else cell.get(metric))
-    if not stats or stats.get(budget.get("quantile", "p50")) is None:
+    if not stats or stats["n"] != expected or stats.get(budget.get("quantile", "p50")) is None:
         return None
     value = stats[budget.get("quantile", "p50")]
     return value / MIB if budget["unit"] == "MiB" else value
@@ -53,7 +56,9 @@ def evaluate(agg, budgets):
             if "links" in budget and profile["name"] not in budget["links"]:
                 continue
             for cell in profile["cells"]:
-                value = observed(profile, cell, budget)
+                # One restart read is taken per run and size; every other metric is read once per sample.
+                expected = agg["runs"] if budget["metric"] == "restart_lease_ms" else cell["samples"]
+                value = observed(profile, cell, budget, expected)
                 ceiling = limit(budget["ceiling"], cell["size"])
                 target = limit(budget.get("target"), cell["size"])
                 rows.append({"budget": budget["id"], "link": profile["name"], "size": cell["size"],

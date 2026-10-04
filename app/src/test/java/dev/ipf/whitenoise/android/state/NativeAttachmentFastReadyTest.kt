@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.functionBody
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
@@ -12,6 +13,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,25 +26,31 @@ import java.util.concurrent.atomic.AtomicInteger
 class NativeAttachmentFastReadyTest {
     /** A feed that hands out exactly the snapshots a test chooses to deliver, like the rate-limited engine feed. */
     private class ScriptedFeed : NativeTransferFeed {
-        private val deliveries = Channel<AttachmentTransferSnapshotFfi?>(Channel.UNLIMITED)
+        private val deliveries = Channel<Result<AttachmentTransferSnapshotFfi?>>(Channel.UNLIMITED)
         val closed = AtomicBoolean()
         val reads = AtomicInteger()
+        val delivered = AtomicInteger()
 
         /** Blocks like the engine until the test delivers a snapshot or the owner closes the feed. */
         override suspend fun next(): AttachmentTransferSnapshotFfi? {
             reads.incrementAndGet()
-            return deliveries.receive()
+            return deliveries.receive().getOrThrow().also { delivered.incrementAndGet() }
         }
 
         /** Closing wakes a blocked read with end of stream, as the real handle does. */
         override fun close() {
             closed.set(true)
-            deliveries.trySend(null)
+            deliveries.trySend(Result.success(null))
         }
 
         /** Delivers one complete one-target replacement. */
         fun deliver(state: AttachmentTransferStateFfi) {
-            deliveries.trySend(AttachmentTransferSnapshotFfi(listOf(status(state))))
+            deliveries.trySend(Result.success(AttachmentTransferSnapshotFfi(listOf(status(state)))))
+        }
+
+        /** Makes the next read fail with the engine's own typed error. */
+        fun fail(error: Throwable) {
+            deliveries.trySend(Result.failure(error))
         }
     }
 
@@ -93,15 +101,20 @@ class NativeAttachmentFastReadyTest {
             assertEquals("one initial read and one pending read, never a restarted one", 2, feed.reads.get())
         }
 
-    /** An authoritative terminal failure is thrown as the terminal exception without waiting for the feed. */
+    /** An authoritative terminal state stops the cross-checking, and the feed's own typed failure still decides. */
     @Test
-    fun `an authoritative terminal state fails without waiting for the feed`() =
+    fun `an authoritative terminal state defers to the feed's typed failure`() =
         runBlocking {
             val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
+            val typed = MarmotKitException.InvalidMediaReference("synthetic integrity failure")
             val peeks = AtomicInteger()
+            launch {
+                delay(120)
+                feed.fail(typed)
+            }
 
             val failure =
-                assertThrows(NativeAttachmentTerminalException::class.java) {
+                assertThrows(MarmotKitException.InvalidMediaReference::class.java) {
                     runBlocking {
                         withTimeout(WAIT_MILLIS) {
                             awaitNativeAttachment(
@@ -112,7 +125,87 @@ class NativeAttachmentFastReadyTest {
                     }
                 }
 
+            assertSame("the engine's own failure must not be replaced by a generic terminal state", typed, failure)
+            assertTrue("the terminal state was seen before the feed failed", peeks.get() >= 2)
+            assertTrue(feed.closed.get())
+        }
+
+    /** A terminal state that the feed delivers as a snapshot is still thrown as the terminal exception. */
+    @Test
+    fun `a terminal snapshot from the feed is thrown as the terminal exception`() =
+        runBlocking {
+            val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
+            launch {
+                delay(60)
+                feed.deliver(AttachmentTransferStateFfi.FAILED)
+            }
+
+            val failure =
+                assertThrows(NativeAttachmentTerminalException::class.java) {
+                    runBlocking {
+                        withTimeout(WAIT_MILLIS) {
+                            awaitNativeAttachment(feed = feed, peek = { AttachmentTransferStateFfi.FAILED }) {
+                                AttachmentTransferStateFfi.QUEUED
+                            }
+                        }
+                    }
+                }
+
             assertEquals(AttachmentTransferStateFfi.FAILED, failure.state)
+            assertTrue(feed.closed.get())
+        }
+
+    /** A feed result that completes while an older authoritative change is being returned is consumed, not dropped. */
+    @Test
+    fun `a ready the feed delivered during a peek is kept for the next wait`() =
+        runBlocking {
+            val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
+            val peeks = AtomicInteger()
+            val states = mutableListOf<AttachmentTransferStateFfi>()
+
+            withTimeout(WAIT_MILLIS) {
+                awaitNativeAttachment(
+                    feed = feed,
+                    onState = { states += it },
+                    peek = {
+                        if (peeks.incrementAndGet() == 1) {
+                            feed.deliver(AttachmentTransferStateFfi.READY)
+                            while (feed.delivered.get() < 2) delay(1)
+                            delay(SETTLE_AFTER_DELIVERY_MILLIS)
+                        }
+                        AttachmentTransferStateFfi.DOWNLOADING
+                    },
+                ) { AttachmentTransferStateFfi.QUEUED }
+            }
+
+            assertEquals("the completed feed read must not be replaced by a new one", 2, feed.reads.get())
+            assertEquals(AttachmentTransferStateFfi.READY, states.last())
+            assertTrue(feed.closed.get())
+        }
+
+    /** A native read that is stuck behind another transaction never holds back a feed that has already delivered. */
+    @Test
+    fun `a blocked peek does not delay a ready from the feed`() =
+        runBlocking {
+            val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
+            val started = AtomicBoolean()
+            launch {
+                while (!started.get()) delay(1)
+                feed.deliver(AttachmentTransferStateFfi.READY)
+            }
+
+            withTimeout(WAIT_MILLIS) {
+                awaitNativeAttachment(
+                    feed = feed,
+                    peek = {
+                        started.set(true)
+                        delay(BLOCKED_PEEK_MILLIS)
+                        AttachmentTransferStateFfi.QUEUED
+                    },
+                ) { AttachmentTransferStateFfi.QUEUED }
+            }
+
+            assertTrue("the peek was in flight when the feed delivered", started.get())
             assertTrue(feed.closed.get())
         }
 
@@ -306,6 +399,8 @@ class NativeAttachmentFastReadyTest {
             )
 
         const val WAIT_MILLIS = 5_000L
+        const val BLOCKED_PEEK_MILLIS = 60_000L
+        const val SETTLE_AFTER_DELIVERY_MILLIS = 30L
         const val SETTLE_MILLIS = 700L
         const val MAX_PEEKS = 20
     }

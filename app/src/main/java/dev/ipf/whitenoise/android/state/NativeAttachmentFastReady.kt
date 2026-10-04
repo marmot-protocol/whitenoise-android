@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Reads the authoritative state of the observed transfer. It never demands, retries or cancels work. */
@@ -24,7 +25,11 @@ internal const val NATIVE_FAST_PEEK_MAX_MILLIS = 250L
  * The engine coalesces replacement snapshots to at most one per 250 ms, including a terminal one, so a transfer that
  * finishes inside that window is announced late. This wait keeps the feed read pending and races it against short,
  * backed-off authoritative reads. The pending read is never cancelled to start another, because cancelling it after the
- * engine consumed a change notification could drop that wakeup and stall observation.
+ * engine consumed a change notification could drop that wakeup and stall observation. It is released only once its
+ * result has been handed to the caller, so a result delivered while an authoritative read was in flight is not lost.
+ *
+ * An authoritative terminal state is not reported from here. The feed carries the engine's own typed failure, which the
+ * caller classifies, so a terminal state only stops the cross-checking and the feed decides how the transfer ended.
  */
 internal class PendingFeedWait(
     private val updates: NativeTransferFeed,
@@ -38,25 +43,41 @@ internal class PendingFeedWait(
         peek: NativeStatePeek?,
     ): AttachmentTransferStateFfi {
         val pending = wait ?: scope.async { updates.nextState() }.also { wait = it }
-        val state = if (peek == null) pending.await() else raceAuthoritative(pending, current, peek)
-        if (pending.isCompleted) wait = null
-        return state
+        if (peek != null) authoritativeChange(pending, current, peek)?.let { return it }
+        return pending.await().also { wait = null }
     }
 
     /** Stops waiting. A read still blocked in the engine ends when the caller closes the feed it owns. */
     fun cancel() = scope.cancel()
 
-    /** Waits for the feed, cross-checking the authoritative state at a growing interval until a change appears. */
-    private suspend fun raceAuthoritative(
+    /**
+     * Cross-checks the authoritative state at a growing interval and returns the first non-terminal change, or null
+     * once the feed has delivered or the authoritative state is terminal. A blocked authoritative read never holds
+     * back a feed result, because the two are raced.
+     */
+    @Suppress("ReturnCount") // The feed delivering, a terminal state and a change each end the cross-check.
+    private suspend fun authoritativeChange(
         pending: Deferred<AttachmentTransferStateFfi>,
         current: AttachmentTransferStateFfi?,
         peek: NativeStatePeek,
-    ): AttachmentTransferStateFfi {
+    ): AttachmentTransferStateFfi? {
         var window = NATIVE_FAST_PEEK_INITIAL_MILLIS
         while (true) {
-            withTimeoutOrNull(window) { pending.await() }?.let { return it }
-            val authoritative = runCatchingCancellable { peek() }.getOrNull()
-            if (authoritative != null && authoritative != current) return authoritative
+            if (withTimeoutOrNull(window) { pending.await() } != null) return null
+            val read = scope.async { runCatchingCancellable { peek() }.getOrNull() }
+            try {
+                val fedFirst =
+                    select<Boolean> {
+                        pending.onAwait { true }
+                        read.onAwait { false }
+                    }
+                if (fedFirst) return null
+                val authoritative = read.await()
+                if (authoritative in NATIVE_TRANSFER_TERMINAL_FAILURES) return null
+                if (authoritative != null && authoritative != current) return authoritative
+            } finally {
+                read.cancel()
+            }
             window = minOf(window * 2, NATIVE_FAST_PEEK_MAX_MILLIS)
         }
     }
