@@ -821,6 +821,14 @@ class MessageBubblePollMediaReplyScreenshotTest : MessageBubbleFileAttachmentFix
                 status = MessageStatus.Pending,
             )
         val failed = fileTimelineMessage(17, "notes.txt", mine = true, hasReply = true, status = MessageStatus.Failed)
+        // Local admission may already reference uploaded files. Pin their retained plaintext before
+        // composition so this preview test cannot race unrelated background download acquisition.
+        listOf(pending, failed).forEach { item ->
+            appState.cacheMediaPlaintext(
+                mediaCacheKey(ACCOUNT_REF, GROUP_ID, item.record.messageIdHex, 0),
+                byteArrayOf(1, 2, 3),
+            )
+        }
 
         fun pollReply(item: TimelineMessage): TimelineMessage =
             item.copy(
@@ -839,6 +847,11 @@ class MessageBubblePollMediaReplyScreenshotTest : MessageBubbleFileAttachmentFix
                 }
             }
         }
+        composeRule.onAllNodesWithText("Poll", useUnmergedTree = true).assertCountEquals(2)
+        composeRule.onNodeWithText("report.pdf").assertExists()
+        composeRule.onNodeWithText("notes.txt").assertExists()
+        composeRule.onNodeWithText("private poll JSON").assertDoesNotExist()
+        composeRule.onNodeWithText("Preparing download").assertDoesNotExist()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_file_poll_reply_light.png")
     }
 
