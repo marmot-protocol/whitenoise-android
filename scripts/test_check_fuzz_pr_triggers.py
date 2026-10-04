@@ -38,6 +38,12 @@ class FuzzPrTriggerPolicyTest(unittest.TestCase):
         with self.assertRaisesRegex(TriggerPolicyError, 'exclusions'):
             validate(BUILD, excluded)
 
+    def test_escaped_double_quoted_exclusions_fail_closed(self):
+        for escape in (r'\x21', r'\u0021'):
+            excluded = covered_workflow() + f'      - "{escape}app/**"\n'
+            with self.subTest(escape=escape), self.assertRaisesRegex(TriggerPolicyError, 'escapes'):
+                validate(BUILD, excluded)
+
     def test_missing_or_duplicate_mappings_fail(self):
         for text in ('on:\n  push:\n', covered_workflow() * 2,
                      covered_workflow().replace('    paths:', '    paths-ignore:')):

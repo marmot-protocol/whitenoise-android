@@ -60,6 +60,10 @@ def pr_paths(workflow: str) -> list[str]:
         match = re.fullmatch(r' {6}-\s+(?:\'([^\']+)\'|"([^"]+)"|([^\s#]+))\s*(?:#.*)?', line)
         if match is None:
             raise TriggerPolicyError('unsupported PR paths list; use literal YAML string entries')
+        # Double-quoted YAML decodes escapes; raw text could hide an exclusion.
+        # Keep this restricted literal reader fail-closed instead of decoding YAML.
+        if match.group(2) is not None and '\\' in match.group(2):
+            raise TriggerPolicyError('unsupported escapes in double-quoted PR paths')
         entry = next(value for value in match.groups() if value is not None)
         if entry.startswith('!'):
             raise TriggerPolicyError('PR path exclusions could suppress a production parser trigger')
