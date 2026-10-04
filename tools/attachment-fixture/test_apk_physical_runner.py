@@ -183,6 +183,16 @@ class RunTest(unittest.TestCase):
             self.assertIn(gap, report["deferred"])
         self.assertEqual({"api": "37", "abi": "arm64-v8a"}, report["environment"])
 
+    def test_only_a_cancel_retry_run_treats_a_disconnect_as_a_terminal_request(self):
+        """The cancelled attempt never completes, so only the run that cancels on purpose waits for its disconnect."""
+        for cancel_retry, expected in ((False, ("complete",)), (True, ("complete", "disconnect"))):
+            device = FakeDevice()
+            with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+                runner, "wait_for_completion", return_value=([], True)
+            ) as wait:
+                self.execute(device, "Zapstore", directory, cancel_retry=cancel_retry)
+            self.assertEqual(expected, wait.call_args.kwargs["terminal_kinds"], cancel_retry)
+
     def test_selected_gaps_reach_the_probe_as_closed_selectors_and_leave_deferred(self):
         """Cancel-retry, the host payload and the no-installer branch are passed as `-e` pairs and recorded."""
         device = FakeDevice()

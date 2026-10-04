@@ -179,8 +179,10 @@ def run(adb, serial, root, output, distribution, physical_fixture_serial=None, b
     finally:
         # Failed and partial attempts stay in the ledger and report, nothing is reset.
         cases = cases_for(payload is not None)
+        # The deliberately cancelled attempt ends with the client's disconnect, so only that run counts it as terminal.
         events, report["ledger_finalized"] = wait_for_completion(
-            server.ledger, start, len(cases), len(cases) + int(cancel_retry))
+            server.ledger, start, len(cases), len(cases) + int(cancel_retry),
+            terminal_kinds=("complete", "disconnect") if cancel_retry else ("complete",))
         time.sleep(0.5)
         events = server.ledger.snapshot()[start:]
         report["ledger"] = events
