@@ -10816,7 +10816,10 @@ class ConversationController(
         appState.applyLocalGroupUpdate(updated, account)
     }
 
-    /** Updates the public avatar and reports failure only while [change] owns the attempt. */
+    /**
+     * Updates the public avatar and reports failure only while [change] owns the attempt.
+     * [commitIfCurrent] must support reads on IO as well as the editor's main thread.
+     */
     internal suspend fun updateGroupAvatarUrl(
         change: ScopedGroupImageMutation<String?>,
         commitIfCurrent: () -> Boolean = { true },
@@ -10835,9 +10838,17 @@ class ConversationController(
                     appState.withGroupCommitLock(account, group.groupIdHex) {
                         // Queuing behind another commit can outlive this editor or account.
                         if (!commitIfCurrent()) return@withGroupCommitLock false
-                        appState.marmotIo {
-                            updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
-                        }
+                        val wroteAvatar =
+                            appState.marmotIo {
+                                // Dispatch to IO can also wait after the group lock was acquired.
+                                if (!commitIfCurrent()) {
+                                    false
+                                } else {
+                                    updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
+                                    true
+                                }
+                            }
+                        if (!wroteAvatar) return@withGroupCommitLock false
                         // A public avatar supersedes the encrypted component. Clear it
                         // after the URL is durable so another client cannot resurrect it.
                         if (normalized != null && group.imageHashHex != null) {

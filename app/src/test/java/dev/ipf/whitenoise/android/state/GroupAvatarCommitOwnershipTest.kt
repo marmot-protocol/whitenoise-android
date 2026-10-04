@@ -4,6 +4,8 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotInterface
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -19,6 +21,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.CoroutineContext
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -86,6 +89,65 @@ class GroupAvatarCommitOwnershipTest {
             assertNull(controller.lastMutationError)
         }
 
+    @Test
+    fun editorRetiredWhileIoIsQueuedDoesNotWriteOrChangeAvatar() =
+        runTest {
+            val writes = AtomicInteger()
+            val ioDispatcher = QueuedIoDispatcher()
+            val state = appState(writes, ioDispatcher)
+            val controller = ConversationController(state, conversationTimelineTestGroup().copy(avatarUrl = OLD_AVATAR))
+            var current = true
+            val result =
+                async {
+                    controller.updateGroupAvatarUrl(ScopedGroupImageMutation(NEW_AVATAR) { true }) { current }
+                }
+            runCurrent()
+            assertFalse(result.isCompleted)
+            assertEquals(0, writes.get())
+            current = false
+            ioDispatcher.runQueued()
+            runCurrent()
+            assertFalse(result.await())
+            assertEquals(0, writes.get())
+            assertEquals(OLD_AVATAR, controller.group.avatarUrl)
+            assertNull(controller.lastMutationError)
+            assertFalse(controller.mutationInFlight)
+        }
+
+    @Test
+    fun currentAttemptQueuedForIoWritesOnceAfterDispatch() =
+        runTest {
+            val writes = AtomicInteger()
+            val ioDispatcher = QueuedIoDispatcher()
+            val controller =
+                ConversationController(
+                    appState(writes, ioDispatcher),
+                    conversationTimelineTestGroup(),
+                )
+            val result = async { controller.updateGroupAvatarUrl(ScopedGroupImageMutation(NEW_AVATAR) { true }) }
+            runCurrent()
+            assertFalse(result.isCompleted)
+            assertEquals(0, writes.get())
+            ioDispatcher.runQueued()
+            runCurrent()
+            assertTrue(result.await())
+            assertEquals(1, writes.get())
+            assertEquals(NEW_AVATAR, controller.group.avatarUrl)
+        }
+
+    /** Holds the IO entry without mixing runTest's scheduler with another test scheduler. */
+    private class QueuedIoDispatcher : CoroutineDispatcher() {
+        private val queued = ArrayDeque<Runnable>()
+
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            queued.addLast(block)
+        }
+
+        fun runQueued() {
+            while (queued.isNotEmpty()) queued.removeFirst().run()
+        }
+    }
+
     private fun native(writes: AtomicInteger): MarmotInterface =
         Proxy.newProxyInstance(
             MarmotInterface::class.java.classLoader,
@@ -103,7 +165,7 @@ class GroupAvatarCommitOwnershipTest {
             }
         } as MarmotInterface
 
-    private fun appState(writes: AtomicInteger): WhiteNoiseAppState =
+    private fun appState(writes: AtomicInteger, ioDispatcher: CoroutineDispatcher = Dispatchers.IO): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
             draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
@@ -121,6 +183,7 @@ class GroupAvatarCommitOwnershipTest {
                 ),
             activeAccountRef = ACCOUNT,
             initialMarmotRuntime = AppMarmotRuntime("test", native(writes)),
+            marmotIoDispatcher = ioDispatcher,
         )
 
     private companion object {
