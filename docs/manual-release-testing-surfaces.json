@@ -3,6 +3,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "NotificationPreviewControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "anchor": "fun NotificationPreviewControl(",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
         "surface": "ConversationViewportRestorationEffects",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
         "anchor": "fun ConversationViewportRestorationEffects(",
@@ -10630,6 +10638,38 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "string:toast_notification_scope_update_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "anchor": "R.string.toast_notification_scope_update_failed",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "string:notification_show_previews",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "anchor": "R.string.notification_show_previews",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "string:notification_show_previews_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "anchor": "R.string.notification_show_previews_detail",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
       {
         "surface": "string:onboarding_details_accessibility",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsChoiceDetails.kt",
@@ -30718,6 +30758,36 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "Generic conversation shortcut display metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewShortcuts.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic notification preview title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Safe generic notification Mark as read action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.chat_row_action_mark_read",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Notification preview privacy payload",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
       {
         "surface": "Silent group summary channel name",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",

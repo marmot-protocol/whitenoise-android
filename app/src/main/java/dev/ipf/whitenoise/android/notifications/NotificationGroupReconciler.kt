@@ -47,6 +47,7 @@ internal class NotificationGroupReconciler(
         scope.launch {
             for (request in requests) {
                 delay(SETTLE_DELAY_MS)
+                NotificationPreviewPreferences.recover(context)
                 reconcile()
             }
         }
@@ -212,12 +213,19 @@ internal class NotificationGroupReconciler(
                                 ).setOnlyAlertOnce(true)
                                 .setSilent(true)
                                 .build()
-                        post(compat, requireNotNull(live.tag), live.id, adopted)
+                        val payload =
+                            if (NotificationPreviewPreferences.canExpose(context, adopted, live.notification)) {
+                                adopted
+                            } else {
+                                notificationWithoutPreview(context, adopted, silent = true)
+                            }
+                        post(compat, requireNotNull(live.tag), live.id, payload)
                         NotificationGroupWriteVisibility.childWritten(context)
                         ConversationCardPostedRegistry.markPosted(
                             requireNotNull(live.tag),
                             live.id,
                             UserEventNotificationGroup.dismissalTime(live),
+                            generation,
                         )
                         changed = true
                     }

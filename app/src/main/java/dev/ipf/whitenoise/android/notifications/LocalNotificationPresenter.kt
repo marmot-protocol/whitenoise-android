@@ -560,6 +560,7 @@ class LocalNotificationPresenter(
         isPostStillAllowed: () -> Boolean = { true },
         shortNpub: (String) -> String,
     ): Boolean {
+        val previewToken = NotificationPreviewPreferences.capture(context)
         val formattedContent =
             LocalNotificationFormatter.content(
                 update = update,
@@ -730,6 +731,7 @@ class LocalNotificationPresenter(
                         NotificationCompat
                             .Builder(context, channelId)
                             .apply {
+                                NotificationPreviewPreferences.stamp(this, previewToken, silentUpdate || replaceCurrentMessage)
                                 UserEventNotificationGroup.decorateChild(
                                     context,
                                     this,
@@ -1335,6 +1337,18 @@ class LocalNotificationPresenter(
                     senderAvatarBitmap = senderAvatarBitmap,
                     sender = enrichedSender,
                     directShareEligible = directShareEligible,
+                    isPublishAllowed = {
+                        val latest = activeConversationCard(content.notificationTag, content.notificationId)
+                        val sameGeneration =
+                            latest != null &&
+                                latest.extras.getString(EXTRA_GENERATION) == active.extras.getString(EXTRA_GENERATION)
+                        val privateContentAllowed =
+                            latest != null &&
+                                NotificationPreviewPreferences.canExpose(context, latest, latest) &&
+                                !latest.extras.getBoolean(EXTRA_CONTENT_REDACTED)
+                        val currentShow = isPostStillAllowed() && ConversationCardPostSynchronizer.isShowCurrent(showToken)
+                        sameGeneration && privateContentAllowed && currentShow
+                    },
                 )
             }
             val avatarChanged =
@@ -1513,9 +1527,28 @@ class LocalNotificationPresenter(
                                 notification.extras.getString(EXTRA_GENERATION)
                         }
                     },
-                ) { notificationPoster(manager, tag, id, notification) }
+                ) {
+                    val current =
+                        if (notification.extras.getBoolean(NotificationPreviewPreferences.EXTRA_CORRECTION)) {
+                            activeConversationCard(tag, id)
+                        } else {
+                            null
+                        }
+                    val payload =
+                        if (NotificationPreviewPreferences.canExpose(context, notification, current)) {
+                            notification
+                        } else {
+                            notificationWithoutPreview(context, notification)
+                        }
+                    notificationPoster(manager, tag, id, payload)
+                }
             if (written) {
-                ConversationCardPostedRegistry.markPosted(tag, id, recordedAtMs ?: System.currentTimeMillis())
+                ConversationCardPostedRegistry.markPosted(
+                    tag,
+                    id,
+                    recordedAtMs ?: System.currentTimeMillis(),
+                    notification.extras.getString(EXTRA_GENERATION),
+                )
                 runCatching { onNotificationWritten?.invoke() }
             }
             if (written) NotificationCardWriteResult.WRITTEN else NotificationCardWriteResult.REFUSED
@@ -1955,6 +1988,7 @@ class LocalNotificationPresenter(
         val existing =
             activeConversationCard(tag, id)
                 ?.takeUnless { it.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true }
+                ?.takeIf { NotificationPreviewPreferences.canRetainPreview(context, it) }
                 ?: return null
         val messages =
             NotificationCompat.MessagingStyle
@@ -2000,6 +2034,7 @@ class LocalNotificationPresenter(
         senderAvatarBitmap: android.graphics.Bitmap?,
         sender: Person,
         directShareEligible: Boolean,
+        isPublishAllowed: () -> Boolean,
     ) {
         runCatching {
             val candidateTitle = content.conversationTitle ?: content.title
@@ -2026,13 +2061,15 @@ class LocalNotificationPresenter(
                     senderAvatarUrl = senderAvatarUrl,
                     senderAvatarGenerationId = senderAvatarBitmap?.generationId,
                     directShareEligible = directShareEligible,
+                    previewRevision = NotificationPreviewPreferences.capture(context).revision,
                 )
             shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
             if (shortcutSnapshots[shortcutId] == snapshot) {
-                ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
+                synchronized(UserEventNotificationGroup.mutationLock) {
+                    if (isPublishAllowed()) ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
+                }
                 return
             }
-            pruneConversationShortcutsBeforePublish(shortcutId)
             val intent = conversationShortcutOpenIntent(update, content)
             val shortcut =
                 conversationShortcutInfo(
@@ -2044,9 +2081,14 @@ class LocalNotificationPresenter(
                     conversationAvatarBitmap = conversationAvatarBitmap,
                     directShareEligible = directShareEligible,
                 )
-            shortcutPublisher(shortcut)
-            shortcutSnapshots[shortcutId] = snapshot
-            ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
+            synchronized(UserEventNotificationGroup.mutationLock) {
+                if (isPublishAllowed()) {
+                    pruneConversationShortcutsBeforePublish(shortcutId)
+                    shortcutPublisher(shortcut)
+                    shortcutSnapshots[shortcutId] = snapshot
+                    ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
+                }
+            }
         }.onFailure {
             notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
         }
@@ -2236,6 +2278,7 @@ private data class ConversationShortcutSnapshot(
     val senderAvatarUrl: String?,
     val senderAvatarGenerationId: Int?,
     val directShareEligible: Boolean,
+    val previewRevision: Long,
 )
 
 /**
@@ -2317,7 +2360,7 @@ internal fun notificationSenderPerson(
 
 private const val NOTIFICATION_MONOGRAM_SIZE_PX = 128
 private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L
-private const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
+internal const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
 
 private val notificationEnrichmentScope =
     CoroutineScope(

@@ -2218,4 +2218,6 @@
     <string name="onboarding_details_expanded">Ausgeklappt</string>
     <string name="onboarding_details_collapsed">Eingeklappt</string>
     <string name="group_svg_rejected_detail">Diese SVG konnte nicht verarbeitet werden. Wähle eine einfache SVG, PNG oder JPEG.</string>
+    <string name="notification_show_previews">Benachrichtigungsvorschau anzeigen</string>
+    <string name="notification_show_previews_detail">Wenn ausgeschaltet, werden Namen und Nachrichteninhalte verborgen. Gilt für alle Konten.</string>
 </resources>

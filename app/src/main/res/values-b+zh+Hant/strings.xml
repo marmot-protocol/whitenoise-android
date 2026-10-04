@@ -2169,4 +2169,6 @@
     <string name="onboarding_details_expanded">已展開</string>
     <string name="onboarding_details_collapsed">已收合</string>
     <string name="group_svg_rejected_detail">無法處理此 SVG。請選擇簡單的 SVG、PNG 或 JPEG。</string>
+    <string name="notification_show_previews">顯示通知預覽</string>
+    <string name="notification_show_previews_detail">關閉時隱藏姓名和訊息內容。適用於所有帳戶。</string>
 </resources>

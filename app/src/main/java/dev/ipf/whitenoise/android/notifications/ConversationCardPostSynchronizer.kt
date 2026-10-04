@@ -242,18 +242,19 @@ internal object ConversationCardPostSynchronizer {
 internal object ConversationCardPostedRegistry {
     private const val CAPACITY = 256
     private val lock = Any()
-    private val postedCards = linkedMapOf<PostedConversationCardKey, Long>()
+    private val postedCards = linkedMapOf<PostedConversationCardKey, PostedCard>()
 
     /** Records an app-side write at its dismissal age so an immediate cleanup can still find it. */
     fun markPosted(
         notificationTag: String,
         notificationId: Int,
         recordedAtMs: Long = System.currentTimeMillis(),
+        generationId: String? = null,
     ) {
         val key = PostedConversationCardKey(notificationTag, notificationId)
         synchronized(lock) {
             postedCards.remove(key)
-            postedCards[key] = recordedAtMs
+            postedCards[key] = PostedCard(recordedAtMs, generationId)
             while (postedCards.size > CAPACITY) postedCards.remove(postedCards.keys.first())
         }
     }
@@ -266,7 +267,7 @@ internal object ConversationCardPostedRegistry {
     ): Boolean {
         val key = PostedConversationCardKey(notificationTag, notificationId)
         return synchronized(lock) {
-            val writtenAtMs = postedCards[key] ?: return@synchronized false
+            val writtenAtMs = postedCards[key]?.writtenAtMs ?: return@synchronized false
             if (cutoffMs == null || writtenAtMs <= cutoffMs) {
                 postedCards.remove(key)
                 true
@@ -275,6 +276,20 @@ internal object ConversationCardPostedRegistry {
             }
         }
     }
+
+    /** Detects an accepted app write newer than the asynchronously visible tray snapshot. */
+    fun latestGeneration(
+        tag: String,
+        id: Int,
+    ): String? =
+        synchronized(lock) {
+            postedCards[PostedConversationCardKey(tag, id)]?.generationId
+        }
+
+    private data class PostedCard(
+        val writtenAtMs: Long,
+        val generationId: String?,
+    )
 
     private data class PostedConversationCardKey(
         val tag: String,

@@ -1529,6 +1529,7 @@ class WhiteNoiseAppState private constructor(
     private val hiddenMessageMutationMutex = Mutex()
     internal val conversationVibrationPreferences = ConversationVibrationPreferences(appContext)
     internal val conversationNotificationRouting by lazy { ConversationNotificationRouting(appContext) }
+    internal val notificationPreviewSettings by lazy { NotificationPreviewSettings.forContext(appContext) }
     private val localNotificationPresenter = LocalNotificationPresenter(appContext)
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
     private val appUpdateRepository = AppUpdateRepository(appContext)
@@ -11521,6 +11522,7 @@ class WhiteNoiseAppState private constructor(
     // fields declared later in this class before their initializers have run.
     init {
         if (startPlatformServices) {
+            mutationsScope.launch { notificationPreviewSettings.recover() }
             mutationsScope.launch {
                 val policy = withContext(Dispatchers.IO) { readNotificationBatteryPolicy(appContext) }
                 notificationBatteryPolicy = policy

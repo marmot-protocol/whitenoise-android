@@ -2269,4 +2269,6 @@
     <string name="onboarding_details_expanded">Развёрнуто</string>
     <string name="onboarding_details_collapsed">Свёрнуто</string>
     <string name="group_svg_rejected_detail">Не удалось обработать этот SVG. Выберите простой SVG, PNG или JPEG.</string>
+    <string name="notification_show_previews">Показывать содержимое уведомлений</string>
+    <string name="notification_show_previews_detail">При отключении скрывает имена и содержимое сообщений. Применяется ко всем аккаунтам.</string>
 </resources>

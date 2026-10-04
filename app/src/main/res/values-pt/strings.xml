@@ -2201,4 +2201,6 @@
     <string name="onboarding_details_expanded">Expandido</string>
     <string name="onboarding_details_collapsed">Recolhido</string>
     <string name="group_svg_rejected_detail">Não foi possível preparar este SVG. Escolha um SVG simples, PNG ou JPEG.</string>
+    <string name="notification_show_previews">Mostrar prévias das notificações</string>
+    <string name="notification_show_previews_detail">Quando desativado, oculta nomes e o conteúdo das mensagens. Aplica-se a todas as contas.</string>
 </resources>
