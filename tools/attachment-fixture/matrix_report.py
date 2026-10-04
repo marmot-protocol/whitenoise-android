@@ -8,12 +8,13 @@ SCHEMA = 1
 NS_PER_MS = 1_000_000.0
 # Cell metrics that are lower-is-better latencies, in milliseconds.
 LATENCY_METRICS = ("prep_visible_ms", "upload_publish_ms", "mdk_upload_ms", "server_upload_ms", "admission_ms",
-                   "first_progress_ms", "body_complete_ms", "ready_ms", "feed_ready_ms", "lease_ms", "post_ready_ms",
+                   "first_progress_ms", "body_complete_ms", "transfer_overhead_ms", "ready_ms", "feed_ready_ms",
+                   "lease_ms", "post_ready_ms",
                    "verify_decrypt_ms", "subscription_delay_ms", "materialize_ms", "warm_lease_ms", "cold_elapsed_ms")
 # What the reader waits for through the shipping path. A candidate is rejected only for a slower value here; the rest
 # (the probe's own raw feed recorder, the server's view, the derived splits) describe the engine and explain the cause.
 GATING_METRICS = ("prep_visible_ms", "upload_publish_ms", "admission_ms", "first_progress_ms", "body_complete_ms",
-                  "ready_ms", "lease_ms", "post_ready_ms", "warm_lease_ms")
+                  "transfer_overhead_ms", "ready_ms", "lease_ms", "post_ready_ms", "warm_lease_ms")
 # Which layer a latency belongs to when attributing a dominant delay.
 LAYER = {"prep_visible_ms": "android-preparation-ui", "mdk_upload_ms": "ffi-mdk", "server_upload_ms": "transport",
          "admission_ms": "ffi-mdk", "transport_ms": "transport", "verify_decrypt_ms": "ffi-mdk",
@@ -99,6 +100,11 @@ def build_samples(profile):
             sample["post_ready_ms"] = max(0.0, sample["lease_ms"] - sample["ready_ms"])
         if _finite(sample.get("body_complete_ms")) and _finite(sample.get("admission_ms")):
             sample["transport_ms"] = max(0.0, sample["body_complete_ms"] - sample["admission_ms"])
+        # What the client adds to the server's own time to answer and send the body: the cost beyond the link.
+        if (_finite(sample.get("body_complete_ms")) and _finite(sample.get("server_header_ms"))
+                and _finite(sample.get("server_body_ms"))):
+            sample["transfer_overhead_ms"] = max(
+                0.0, sample["body_complete_ms"] - sample["server_header_ms"] - sample["server_body_ms"])
         samples.append(sample)
     return samples
 

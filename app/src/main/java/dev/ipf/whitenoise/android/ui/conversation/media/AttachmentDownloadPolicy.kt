@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
+import dev.ipf.whitenoise.android.state.AttachmentTransferCancelledByUserException
 import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
 import kotlinx.coroutines.CancellationException
 
@@ -71,12 +72,15 @@ internal enum class AttachmentMaterializationIntent {
 
     fun afterInteractiveRequest(): AttachmentMaterializationIntent = Interactive
 
-    /** Only the gate's explicit queued-automatic cancellation revokes accepted automatic work. */
+    /**
+     * Only an explicit stop revokes accepted work: the gate's queued-automatic cancellation or the reader's own Cancel.
+     * Any other cancellation is the composition leaving and keeps propagating.
+     */
     fun afterProducerCancellation(cancellation: CancellationException): AttachmentMaterializationIntent {
-        val stoppedByBacklogControl =
+        val stoppedExplicitly =
             generateSequence<Throwable>(cancellation) { it.cause }
-                .any { it is AutomaticBacklogStoppedException }
-        if (!stoppedByBacklogControl) throw cancellation
+                .any { it is AutomaticBacklogStoppedException || it is AttachmentTransferCancelledByUserException }
+        if (!stoppedExplicitly) throw cancellation
         return Idle
     }
 }

@@ -566,8 +566,14 @@
       {
         "surface": "Native attachment transfer observation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
-        "anchor": "private suspend fun NativeTransferFeed.nextState()",
-        "test_ids": ["MED-019", "MED-020"]
+        "anchor": "internal suspend fun NativeTransferFeed.nextState()",
+        "test_ids": ["MED-019", "MED-020", "MED-025"]
+      },
+      {
+        "surface": "Prompt native READY observation beside the engine feed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentFastReady.kt",
+        "anchor": "internal class PendingFeedWait(",
+        "test_ids": ["MED-025"]
       },
       {
         "surface": "Interactive attachment demand and post-admission native state",
@@ -598,6 +604,110 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
         "anchor": "R.string.media_download_cancelled",
         "test_ids": ["MED-025"]
+      },
+      {
+        "surface": "TileTransferControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "internal fun TileTransferControl(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "TileTransferGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "internal fun TileTransferGlyph(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "TileTransferCaption",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "private fun TileTransferCaption(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:reply_media_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "R.string.reply_media_video",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancel_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_cancel_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancel_download (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_cancel_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancel_unconfirmed (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_cancel_unconfirmed",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancelling_download (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_cancelling_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_download_cancelled (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_download_cancelled",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_downloading (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_tap_to_download (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_tap_to_retry (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_tap_to_retry",
+        "test_ids": [
+          "MED-025"
+        ]
       },
       {
         "surface": "FileBodyProgressIndicator",
@@ -6630,7 +6740,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "fun GroupEditPhotoMenu(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -6638,7 +6749,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "fun GroupEditScaffold(",
         "test_ids": [
-          "GRP-002"
+          "GRP-002",
+          "GRP-025"
         ]
       },
       {
@@ -16072,7 +16184,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.add_photo",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16080,7 +16193,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.change_photo",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16088,7 +16202,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.choose_files",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16096,7 +16211,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.choose_photos",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16104,7 +16220,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.edit_group_info_title",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16112,7 +16229,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.find_web_image",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16120,7 +16238,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_avatar_url",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16128,7 +16247,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_description",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16136,7 +16256,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_emoji_create",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16144,7 +16265,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_image_search_edit",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16152,7 +16274,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_image_search_title",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16160,7 +16283,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_name",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16168,7 +16292,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_private_image",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16176,7 +16301,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.group_private_image_detail",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16184,7 +16310,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.profile_picture_invalid",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16192,7 +16319,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.profile_view_picture",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16200,7 +16328,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.remove_photo",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16208,7 +16337,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.save_group",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16216,7 +16346,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.saving_group",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16224,7 +16355,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.toast_couldnt_prepare_image",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -16232,7 +16364,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
         "anchor": "R.string.toast_couldnt_upload_group_image",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-025"
         ]
       },
       {
@@ -28585,7 +28718,8 @@
         "anchor": "R.string.edit_group_info_title",
         "test_ids": [
           "GRP-002",
-          "GRP-003"
+          "GRP-003",
+          "GRP-025"
         ]
       },
       {
