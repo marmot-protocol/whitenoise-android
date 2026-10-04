@@ -71,6 +71,21 @@ class MediaLifecycleRunnerTest(unittest.TestCase):
                     runner.run("adb", serial, Path(directory), Path(directory) / "out.json", profile)
             adb.assert_not_called()
 
+    def test_the_restart_read_preserves_the_runtime_and_the_tile_stage_targets_only_the_tile_test(self):
+        """Stage two keeps the restored runtime for stage three, which runs the tile test and no other class."""
+        with mock.patch.object(runner.subprocess, "run") as run:
+            run.return_value.stdout = "OK (1 test)"
+            runner.instrument("adb", "emulator-5554", (4001, 4002), "read", "3b6c9c1e-0000-4000-8000-000000000000",
+                              preserve=True)
+            runner.instrument("adb", "emulator-5554", (4001, 4002), "read", "3b6c9c1e-0000-4000-8000-000000000000",
+                              target=runner.TILES)
+        preserved, tiles = (call.args[0] for call in run.call_args_list)
+        self.assertIn("fixtureMediaPreserve", preserved)
+        self.assertEqual(runner.PROBE, preserved[preserved.index("class") + 1])
+        self.assertNotIn("fixtureMediaPreserve", tiles)
+        self.assertEqual(runner.TILES, tiles[tiles.index("class") + 1])
+        self.assertFalse({"uninstall", "install", "clear"} & set(preserved + tiles))
+
 
 if __name__ == "__main__":
     unittest.main()

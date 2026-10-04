@@ -15,8 +15,9 @@ internal data class ChatRowNativePreview(
 internal fun chatRowDraftPreview(
     item: ChatListItem,
     legacyDraft: String?,
+    selectedPreview: SelectedChatPreviewFfi? = item.selectedPreview,
 ): ChatRowNativePreview? =
-    when (val selected = item.selectedPreview) {
+    when (val selected = selectedPreview) {
         is SelectedChatPreviewFfi.Draft ->
             selected.draft
                 .takeIf { it.text.isNotBlank() || it.attachmentKind != null || it.attachmentCount > 0u }

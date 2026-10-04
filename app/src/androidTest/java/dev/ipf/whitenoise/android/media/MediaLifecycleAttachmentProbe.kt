@@ -61,7 +61,7 @@ private class ManifestAttachment(
  * launched process, with acquisition unavailable, that every copy is still readable and decodes a first frame.
  */
 internal object MediaLifecycleAttachmentProbe {
-    private const val MANIFEST = "media-lifecycle.json"
+    internal const val MANIFEST = "media-lifecycle.json"
     private const val MIB = 1024 * 1024
     private const val DEADLINE_MILLIS = 600_000L
     private const val PROJECTION_TIMEOUT_MILLIS = 30_000L
@@ -101,7 +101,8 @@ internal object MediaLifecycleAttachmentProbe {
                 if (role == "prepare") prepare(session) else read(session)
             }
         } finally {
-            session.close(preserve = role == "prepare")
+            // The restart-read stage keeps the runtime when a tile stage follows it in a third process.
+            session.close(preserve = role == "prepare" || arguments.getString("fixtureMediaPreserve") == "true")
         }
     }
 

@@ -3477,6 +3477,7 @@ class ChatsController private constructor(
                 }
             }
         state.reservedActivitySequenceById[optimisticMessageIdHex] = nextChatActivitySequence()
+        scheduleRecompute()
         while (state.reservedActivitySequenceById.size > MAX_CHAT_LIST_ACTIVITY_SEQUENCE_HISTORY) {
             state.reservedActivitySequenceById.remove(state.reservedActivitySequenceById.keys.first())
         }
@@ -3725,6 +3726,11 @@ class ChatsController private constructor(
                 ?.let { chatListMemberPresentation(it, activeAccountIdHex) }
     }
 
+    private fun awaitingSendPreview(groupIdHex: String): Boolean {
+        val key = chatRowKey(groupIdHex)
+        return optimisticChatListPreviewByGroup[key]?.awaitingSendPreview() == true
+    }
+
     /** Projects current rows using MDK Markdown first and the exact-text cache only as fallback. */
     private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
         chatRows.map { authoritativeRow ->
@@ -3743,6 +3749,9 @@ class ChatsController private constructor(
                 resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
                 removed = row.groupIdHex in removedGroupIds,
                 activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
+                awaitingSendPreview = awaitingSendPreview(row.groupIdHex),
+                hasOptimisticSendPreview =
+                    optimisticChatListPreviewByGroup[chatRowKey(row.groupIdHex)]?.hasOptimisticSendPreview() == true,
             )
         }
 
@@ -3771,6 +3780,9 @@ class ChatsController private constructor(
             resolvedMediaPreviewFallback = row.lastMessage?.messageIdHex?.let { mediaPreviewFallbackByMessageId[it] },
             removed = row.groupIdHex in removedGroupIds,
             activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
+            awaitingSendPreview = awaitingSendPreview(row.groupIdHex),
+            hasOptimisticSendPreview =
+                optimisticChatListPreviewByGroup[chatRowKey(row.groupIdHex)]?.hasOptimisticSendPreview() == true,
         )
     }
 

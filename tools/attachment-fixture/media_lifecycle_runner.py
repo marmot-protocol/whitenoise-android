@@ -15,18 +15,21 @@ from fixture_server import FixtureServer
 from media_checker import EXPECTED, check_media
 
 PROBE = "dev.ipf.whitenoise.android.media.MediaAttachmentLatencyProbe#measureControlledMediaLifecycle"
+TILES = ("dev.ipf.whitenoise.android.ui.conversation.media.RetainedMediaTilesDeviceTest"
+         "#retainedMediaRendersLocallyWithAutomaticDownloadsOff")
 STATUS_PREFIX = "INSTRUMENTATION_STATUS: controlled_attachment_json="
 INSTRUMENT_TIMEOUT_SECONDS = 900
 LEDGER_COMPLETION_TIMEOUT_SECONDS = 10
 
 
-def instrument(adb, serial, ports, role, session):
+def instrument(adb, serial, ports, role, session, target=PROBE, preserve=False):
     """Run one probe process; the timeout is long because the large video uploads and downloads are real."""
     command = [
         adb, "-s", serial, "shell", "am", "instrument", "-w", "-r",
-        "-e", "class", PROBE, "-e", "allowControlledAttachmentProbe", "true",
+        "-e", "class", target, "-e", "allowControlledAttachmentProbe", "true",
         "-e", "fixtureBlobPort", str(ports[0]), "-e", "fixtureRelayPort", str(ports[1]),
         "-e", "fixtureMediaLifecycle", "true", "-e", "fixtureRestartRole", role,
+        *(["-e", "fixtureMediaPreserve", "true"] if preserve else []),
         "-e", "fixtureRestartSession", session, APP + ".test/androidx.test.runner.AndroidJUnitRunner",
     ]
     return subprocess.run(command, check=True, capture_output=True, text=True,
@@ -71,7 +74,7 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
     server, relay = FixtureServer(root), FixtureRelay()
     session = str(uuid.uuid4())
     report = {"schema": 1, "scope": "android-media-lifecycle-process-restart", "qualified": False,
-              "prepare_metrics": [], "read_metrics": []}
+              "prepare_metrics": [], "read_metrics": [], "tiles_metrics": []}
     start = len(server.ledger.snapshot())
     forwards, threads, started, failure = [], [], [], None
     boundary = None
@@ -92,9 +95,15 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
         report["prepare_passed"] = passed(first)
         if report["prepare_passed"]:
             adb_command(adb, serial, "shell", "am", "force-stop", APP)
-            second = instrument(adb, serial, ports, "read", session)
+            second = instrument(adb, serial, ports, "read", session, preserve=True)
             report["read_metrics"] = metrics_of(second)
             report["read_passed"] = passed(second)
+            if report["read_passed"]:
+                # A third process renders the real tiles over the same restored runtime, then cleans up.
+                adb_command(adb, serial, "shell", "am", "force-stop", APP)
+                third = instrument(adb, serial, ports, "read", session, target=TILES)
+                report["tiles_metrics"] = metrics_of(third)
+                report["tiles_passed"] = passed(third)
         report["environment"] = {
             "api": adb_command(adb, serial, "shell", "getprop", "ro.build.version.sdk").strip(),
             "abi": adb_command(adb, serial, "shell", "getprop", "ro.product.cpu.abi").strip(),
@@ -114,12 +123,14 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
         report["http_upload_requests"] = sum(e["kind"] == "upload" for e in events)
         report["uploaded_ciphertext_bytes"] = sum(e["value"] for e in events if e["kind"] == "upload_bytes")
         report["successful_ciphertext_body_write_bytes"] = sum(e["value"] for e in events if e["kind"] == "body_bytes")
-        report["media_check"] = check_media(report["prepare_metrics"], report["read_metrics"], events, boundary)
+        report["media_check"] = check_media(report["prepare_metrics"], report["read_metrics"], events, boundary,
+                                            report["tiles_metrics"])
         # The unchanged 1 KiB ceilings do not describe these multi-megabyte media; sampled peaks stay in the report.
         report["budget_check"] = {"applicable": False, "passed": False,
                                   "reason": "representative performance remains unqualified"}
         report["qualified"] = (
             report.get("prepare_passed", False) and report.get("read_passed", False)
+            and report.get("tiles_passed", False)
             and report.get("prepare_ledger_finalized", False) and report["media_check"]["passed"]
             and report.get("environment") == PROFILES[budget_profile] and failure is None
         )

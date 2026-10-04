@@ -197,6 +197,13 @@ internal fun ChatRow(
     menuHighlighted: Boolean = false,
     onActionsHeldChange: (Boolean) -> Unit = {},
 ) {
+    val selectedPreview =
+        appState.chatRowSelectedPreviewFor(
+            accountRef = accountRef,
+            groupIdHex = item.group.groupIdHex,
+            nativePreview = item.selectedPreview,
+            hasOptimisticSendPreview = item.hasOptimisticSendPreview,
+        )
     val haptics = LocalHapticFeedback.current
     val rowCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val actionsLabel = stringResource(R.string.actions)
@@ -349,14 +356,15 @@ internal fun ChatRow(
                 chatRowDraftPreview(
                     item = item,
                     legacyDraft = appState.chatRowDraftFor(accountRef, item.group.groupIdHex),
+                    selectedPreview = selectedPreview,
                 ).takeUnless { item.checkingInvitation }
             val invitation =
                 item.checkingInvitation ||
-                    item.selectedPreview == SelectedChatPreviewFfi.Invitation ||
-                    (item.selectedPreview == null && item.group.pendingConfirmation)
+                    selectedPreview == SelectedChatPreviewFfi.Invitation ||
+                    (selectedPreview == null && item.group.pendingConfirmation)
             val expired by rememberChatPreviewExpired(item.messagePreviewForRetention())
             val empty =
-                item.selectedPreview == SelectedChatPreviewFfi.Empty ||
+                selectedPreview == SelectedChatPreviewFfi.Empty ||
                     (expired && !invitation && draft == null)
             // Tokens only ever describe the last message's body, so they're
             // ignored whenever the line shows something else (invite copy,
@@ -367,10 +375,11 @@ internal fun ChatRow(
                 item.previewTokens
                     ?.takeIf {
                         !invitation &&
+                            !item.awaitingSendPreview &&
                             !empty &&
                             draft == null &&
                             it.blocks.isNotEmpty() &&
-                            (item.selectedPreview == null || item.selectedPreview == SelectedChatPreviewFfi.Message)
+                            (selectedPreview == null || selectedPreview == SelectedChatPreviewFfi.Message)
                     }
             val preview =
                 if (markdownPreview != null) {
@@ -400,6 +409,7 @@ internal fun ChatRow(
                                             }.orEmpty()
                                 chatRowDraftText(stringResource(R.string.chat_row_draft_prefix), draftText)
                             }
+                            item.awaitingSendPreview -> stringResource(R.string.sending)
                             empty -> stringResource(R.string.no_messages_yet)
                             else ->
                                 item.projectedPreviewText(
@@ -443,11 +453,12 @@ internal fun ChatRow(
                                 ?.lastMessage
                                 ?.takeIf {
                                     draft == null &&
+                                        !item.awaitingSendPreview &&
                                         !invitation &&
                                         !empty &&
                                         (
-                                            item.selectedPreview == null ||
-                                                item.selectedPreview == SelectedChatPreviewFfi.Message
+                                            selectedPreview == null ||
+                                                selectedPreview == SelectedChatPreviewFfi.Message
                                         ) &&
                                         !it.deleted &&
                                         (

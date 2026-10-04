@@ -322,6 +322,18 @@
         "test_ids": ["MSG-007"]
       },
       {
+        "surface": "Accepted send native draft presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SentComposerDraftPresentation.kt",
+        "anchor": "fun selectedPreview(",
+        "test_ids": ["CHL-004", "CHL-002"]
+      },
+      {
+        "surface": "Pending send preview preparation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.sending",
+        "test_ids": ["CHL-004", "CHL-002"]
+      },
+      {
         "surface": "Composer cursor updates during dictation Send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
         "anchor": "fun setDraft(",
@@ -562,6 +574,12 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/QuickAccountSwitchingPreference.kt",
         "anchor": "internal class QuickAccountSwitchingPreference",
         "test_ids": ["NAV-005", "ACC-017", "SET-001"]
+      },
+      {
+        "surface": "Cache-only image render from MDK retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageCacheMaterialization.kt",
+        "anchor": "internal suspend fun imageAttachmentBytes(",
+        "test_ids": ["MED-023"]
       },
       {
         "surface": "Native attachment transfer observation",
