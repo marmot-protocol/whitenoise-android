@@ -197,9 +197,19 @@ internal fun GroupEditScreen(
             }
         }
 
+        /** Both public-avatar paths retain the same editor, account and permission ownership. */
+        fun imageAttemptIsCurrent(attempt: Long, accountRef: String): Boolean =
+            imageFailureScope.isCurrent(attempt) &&
+                appState.activeAccountRef == accountRef &&
+                controller.boundAccountRef == accountRef &&
+                controller.isSelfMember &&
+                controller.isSelfAdmin &&
+                !controller.group.unrecoverable
+
         /** Validate and publish a public HTTPS avatar URL for this group's current editor. */
         @Suppress("TooGenericExceptionCaught") // The FFI boundary can surface unchecked non-cancellation failures.
         fun setPublicAvatarUrl(url: String) {
+            val accountRef = appState.activeAccountRef ?: return
             if (imageSaving || controller.mutationInFlight) return
             val failureAttempt = imageFailureScope.begin()
             // Same HTTPS/credential/loopback policy the upload path enforces, but a
@@ -214,7 +224,7 @@ internal fun GroupEditScreen(
             controller.clearLastMutationError()
             appState.launchMutation {
                 try {
-                    val change = ScopedGroupImageMutation(safeUrl) { imageFailureScope.isCurrent(failureAttempt) }
+                    val change = ScopedGroupImageMutation(safeUrl) { imageAttemptIsCurrent(failureAttempt, accountRef) }
                     if (controller.updateGroupAvatarUrl(change)) {
                         showImageSearch = false
                     } else if (controller.lastMutationError != null) {
@@ -248,14 +258,7 @@ internal fun GroupEditScreen(
             imageSaving = true
             controller.clearLastMutationError()
             appState.launchMutation {
-                val attemptIsCurrent = {
-                    imageFailureScope.isCurrent(failureAttempt) &&
-                        appState.activeAccountRef == accountRef &&
-                        controller.boundAccountRef == accountRef &&
-                        controller.isSelfMember &&
-                        controller.isSelfAdmin &&
-                        !controller.group.unrecoverable
-                }
+                val attemptIsCurrent = { imageAttemptIsCurrent(failureAttempt, accountRef) }
                 try {
                     val attempt =
                         GroupAvatarUploadAttempt(

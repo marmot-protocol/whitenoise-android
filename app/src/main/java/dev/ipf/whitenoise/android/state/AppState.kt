@@ -3958,7 +3958,7 @@ class WhiteNoiseAppState private constructor(
         block: suspend MarmotInterface.() -> T,
     ): T {
         val ticket = diagnostics.observations.ticket()
-        return withContext(Dispatchers.IO) {
+        return withContext(marmotIoDispatcher) {
             val runtime = marmot()
             marmotBridgeTracer.trace(
                 traceSection,

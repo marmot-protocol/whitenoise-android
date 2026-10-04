@@ -11,7 +11,13 @@ class GroupImageFailureDetailTest {
     fun rejectedSvgHasFormatSpecificCopyEvenWhenUploadStageWrapsIt() {
         assertEquals(
             AppText.Resource(R.string.group_svg_rejected_detail),
-            groupImageFailureDetail(Exception("wrapper", ImageUploadPreparationException.UnsupportedSvg)),
+            groupImageFailureDetail(
+                GroupAvatarUploadFailure(
+                    GroupAvatarUploadStage.Prepare,
+                    3L,
+                    ImageUploadPreparationException.UnsupportedSvg,
+                ),
+            ),
         )
     }
 

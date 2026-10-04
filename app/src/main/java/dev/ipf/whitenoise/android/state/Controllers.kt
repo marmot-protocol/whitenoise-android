@@ -10822,7 +10822,7 @@ class ConversationController(
      */
     internal suspend fun updateGroupAvatarUrl(
         change: ScopedGroupImageMutation<String?>,
-        commitIfCurrent: () -> Boolean = { true },
+        commitIfCurrent: () -> Boolean = change.isActive,
     ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null

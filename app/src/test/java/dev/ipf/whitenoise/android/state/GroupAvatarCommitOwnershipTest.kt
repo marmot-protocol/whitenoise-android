@@ -99,7 +99,7 @@ class GroupAvatarCommitOwnershipTest {
             var current = true
             val result =
                 async {
-                    controller.updateGroupAvatarUrl(ScopedGroupImageMutation(NEW_AVATAR) { true }) { current }
+                    controller.updateGroupAvatarUrl(ScopedGroupImageMutation(NEW_AVATAR) { current })
                 }
             runCurrent()
             assertFalse(result.isCompleted)

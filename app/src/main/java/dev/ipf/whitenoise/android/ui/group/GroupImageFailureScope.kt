@@ -19,8 +19,9 @@ internal class GroupImageFailureScope(
 
     /** Start a replacement attempt and retire only this scope's previous failure. */
     fun begin(): Long {
+        val attempt = attempts.advance()
         clear()
-        return attempts.advance()
+        return attempt
     }
 
     /** Ignore completions from a replaced attempt or a screen that was left. */
