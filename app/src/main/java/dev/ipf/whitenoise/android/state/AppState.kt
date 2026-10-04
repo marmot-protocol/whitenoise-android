@@ -1076,6 +1076,7 @@ class WhiteNoiseAppState private constructor(
     initialMarmotRuntime: AppMarmotRuntime?,
     private val notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription,
     private val notificationDispatcher: CoroutineDispatcher,
+    private val marmotIoDispatcher: CoroutineDispatcher,
     private val notificationCardCancellationDispatcher: CoroutineDispatcher,
     private val notificationReceiverTimeoutMillis: () -> Long,
     private val pushWakeNowMs: () -> Long,
@@ -1131,6 +1132,7 @@ class WhiteNoiseAppState private constructor(
             initialMarmotRuntime = null,
             notificationSubscriber = ::subscribeToNotifications,
             notificationDispatcher = Dispatchers.IO,
+            marmotIoDispatcher = Dispatchers.IO,
             notificationCardCancellationDispatcher = processNotificationCardCancellationDispatcher,
             notificationReceiverTimeoutMillis = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
             pushWakeNowMs = System::currentTimeMillis,
@@ -1165,6 +1167,7 @@ class WhiteNoiseAppState private constructor(
         initialMarmotRuntime: AppMarmotRuntime? = null,
         notificationSubscriber: suspend (MarmotInterface) -> AppNotificationSubscription = ::subscribeToNotifications,
         notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        marmotIoDispatcher: CoroutineDispatcher = Dispatchers.IO,
         notificationCardCancellationDispatcher: CoroutineDispatcher = processNotificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis: () -> Long = { NOTIFICATION_STARTUP_RECEIVER_TIMEOUT_MILLIS },
         pushWakeNowMs: () -> Long = System::currentTimeMillis,
@@ -1196,6 +1199,7 @@ class WhiteNoiseAppState private constructor(
         initialMarmotRuntime = initialMarmotRuntime,
         notificationSubscriber = notificationSubscriber,
         notificationDispatcher = notificationDispatcher,
+        marmotIoDispatcher = marmotIoDispatcher,
         notificationCardCancellationDispatcher = notificationCardCancellationDispatcher,
         notificationReceiverTimeoutMillis = notificationReceiverTimeoutMillis,
         pushWakeNowMs = pushWakeNowMs,
@@ -3964,7 +3968,7 @@ class WhiteNoiseAppState private constructor(
     private val marmotBridgeTracer = MarmotBridgeTracer()
 
     suspend fun <T> marmotIo(block: suspend MarmotInterface.() -> T): T =
-        withContext(Dispatchers.IO) {
+        withContext(marmotIoDispatcher) {
             marmot().block()
         }
 
@@ -3974,7 +3978,7 @@ class WhiteNoiseAppState private constructor(
         block: suspend MarmotInterface.() -> T,
     ): T {
         val ticket = diagnostics.observations.ticket()
-        return withContext(Dispatchers.IO) {
+        return withContext(marmotIoDispatcher) {
             val runtime = marmot()
             marmotBridgeTracer.trace(
                 traceSection,
