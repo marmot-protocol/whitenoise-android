@@ -101,7 +101,13 @@ internal fun ShareChatPickerFullScreenContent(
         )
     val presentedTargets = rememberShareChatPickerPresentations(appState, pickerState)
     val snackbarHostState = remember { SnackbarHostState() }
-    val scaffoldActions = rememberShareChatPickerActions(requestId, pickerState, snackbarHostState, onDismiss, onStage)
+    val scaffoldActions = rememberShareChatPickerActions(
+            requestId = requestId,
+            snackbarHostState = snackbarHostState,
+            onDismiss = onDismiss,
+            stage = { pickerState.stage(onStage) },
+            bindCommitting = { pickerState.isCommitting = it },
+        )
     ShareChatPickerScaffold(
         pickerState = pickerState,
         presentedTargets = presentedTargets,

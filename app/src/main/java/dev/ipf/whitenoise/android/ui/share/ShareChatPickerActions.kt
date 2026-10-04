@@ -17,10 +17,10 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun rememberShareChatPickerActions(
     requestId: String,
-    pickerState: ShareChatPickerState,
     snackbarHostState: SnackbarHostState,
     onDismiss: () -> Unit,
-    onStage: suspend (String, List<String>) -> Boolean,
+    stage: suspend () -> Boolean,
+    bindCommitting: (() -> Boolean) -> Unit,
 ): ShareChatPickerScaffoldActions {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -28,7 +28,7 @@ internal fun rememberShareChatPickerActions(
     val stageRejectedMessage = stringResource(R.string.no_share_target_available)
     val finishingState = remember(requestId) { mutableStateOf(false) }
     var finishing by finishingState
-    pickerState.isCommitting = { finishingState.value }
+    bindCommitting { finishingState.value }
     val dismissPicker: () -> Unit = {
         if (!finishing) {
             finishing = true
@@ -46,7 +46,7 @@ internal fun rememberShareChatPickerActions(
                 finishing = true
                 coroutineScope.launch {
                     try {
-                        if (pickerState.stage(onStage)) {
+                        if (stage()) {
                             runShareChatPickerDismissal(
                                 clearFocus = { focusManager.clearFocus(force = true) },
                                 hideKeyboard = { keyboardController?.hide() },
