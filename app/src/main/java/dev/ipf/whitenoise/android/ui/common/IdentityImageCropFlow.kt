@@ -34,7 +34,13 @@ internal fun IdentityImageCropFlow(
     var source by remember(uri) { mutableStateOf<IdentityImageCropSource?>(null) }
     LaunchedEffect(uri) {
         if (uri == null) return@LaunchedEffect
-        val loaded = loadIdentityImageCropSource(context.contentResolver, uri)
+        val loaded =
+            loadIdentityImageCropSource(
+                context.contentResolver,
+                uri,
+                // RoundedSquare is the group-image surface; profile avatars retain their existing decoder.
+                prepareGroupImage = shape == IdentityImageCropShape.RoundedSquare,
+            )
         if (loaded == null) {
             onDismiss()
             onUnreadable(uri)

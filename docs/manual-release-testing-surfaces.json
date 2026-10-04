@@ -63,6 +63,36 @@
         ]
       },
       {
+        "surface": "ConversationViewportRestorationEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationViewportRestorationEffects(",
+        "test_ids": ["CON-027", "CON-002", "CON-013", "CON-014"]
+      },
+      {
+        "surface": "ConversationViewportStructureEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationViewportStructureEffect(",
+        "test_ids": ["CON-027", "CON-003"]
+      },
+      {
+        "surface": "ConversationSavedViewportEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationSavedViewportEffect(",
+        "test_ids": ["CON-027"]
+      },
+      {
+        "surface": "ConversationEntryViewportEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationEntryViewportEffect(",
+        "test_ids": ["CON-027", "CON-002"]
+      },
+      {
+        "surface": "rememberConversationViewportRestorationOwner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationOwner.kt",
+        "anchor": "fun rememberConversationViewportRestorationOwner(",
+        "test_ids": ["CON-027"]
+      },
+      {
         "surface": "folderDragRowModifier",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
         "anchor": "internal fun folderDragRowModifier(",
@@ -12706,6 +12736,26 @@
         ]
       },
       {
+        "surface": "Group image failure fallback retry copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageFailureDetail.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "GRP-003",
+          "GRP-025",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "setting:group_svg_rejected_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageFailureDetail.kt",
+        "anchor": "R.string.group_svg_rejected_detail",
+        "test_ids": [
+          "GRP-003",
+          "GRP-025",
+          "NCH-002"
+        ]
+      },
+      {
         "surface": "setting:group_photo_error",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
         "anchor": "R.string.group_photo_error",
@@ -25188,6 +25238,30 @@
         "test_ids": [
           "SYS-004",
           "SYS-005"
+        ]
+      },
+      {
+        "surface": "Content-based animated image source admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AnimationSourceAdmission.kt",
+        "anchor": "internal fun admitAnimationSource(",
+        "test_ids": [
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "Attachment decoder dispatch after animation admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AnimatedAttachmentImage.kt",
+        "anchor": "suspend fun decodeMessageAttachmentImage(",
+        "test_ids": [
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "Native animated decoder admission chokepoint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt",
+        "anchor": "fun decodeAnimatedDrawable(",
+        "test_ids": [
+          "MED-026"
         ]
       },
       {

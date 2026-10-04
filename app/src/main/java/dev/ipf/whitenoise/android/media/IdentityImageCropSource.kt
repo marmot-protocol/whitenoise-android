@@ -31,9 +31,14 @@ internal class IdentityImageCropSource(
 private suspend fun readSourceOrNull(
     contentResolver: ContentResolver,
     uri: Uri,
+    prepareGroupImage: Boolean,
 ): ByteArray? =
     try {
-        readIdentityImageSource(contentResolver, uri)
+        if (prepareGroupImage) {
+            readGroupIdentityImageSource(contentResolver, uri)
+        } else {
+            readIdentityImageSource(contentResolver, uri)
+        }
     } catch (cancelled: CancellationException) {
         // Leaving the surface cancels this read. Reporting it as unreadable would send the caller
         // down its fallback path and upload a picture nobody is still choosing.
@@ -46,8 +51,9 @@ internal suspend fun loadIdentityImageCropSource(
     contentResolver: ContentResolver,
     uri: Uri,
     renderer: PhotoEditorRenderer = PhotoEditorRenderer(),
+    prepareGroupImage: Boolean = false,
 ): IdentityImageCropSource? {
-    val bytes = readSourceOrNull(contentResolver, uri) ?: return null
+    val bytes = readSourceOrNull(contentResolver, uri, prepareGroupImage) ?: return null
     val oriented = (renderer.inspect(bytes) as? PhotoEditorInspectResult.Success)?.source?.orientedSize
     val preview = oriented?.let { renderer.decodePreview(bytes) }
     return if (oriented != null && preview != null) {

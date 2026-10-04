@@ -171,7 +171,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('withPathSensitivity(PathSensitivity.RELATIVE)', self.app_build)
 
     def test_teardown_floor_reuses_report_and_propagates_report_failure(self):
-        floor = self.named_step(self.tests_job, 'Runtime listener teardown coverage floor')
+        floor = self.named_step(self.tests_job, 'Runtime listener and viewport restoration coverage floors')
         self.assertIn("matrix.flavor == 'Zapstore'", floor)
         self.assertIn("steps.unit_tests.outcome == 'success'", floor)
         self.assertIn('COVERAGE_REPORT_OUTCOME: ${{ steps.coverage_report.outcome }}', floor)
@@ -182,6 +182,16 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn('./gradlew', floor)
         self.assertIn('        id: coverage_report\n',
                       self.named_step(self.tests_job, 'Coverage report (Kover)'))
+
+    def test_viewport_floor_reuses_the_required_full_suite_report(self):
+        floor = self.named_step(self.tests_job, 'Runtime listener and viewport restoration coverage floors')
+        self.assertIn("matrix.flavor == 'Zapstore'", floor)
+        self.assertIn("steps.unit_tests.outcome == 'success'", floor)
+        self.assertIn('test "$COVERAGE_REPORT_OUTCOME" = success', floor)
+        self.assertIn('scripts/check_viewport_restoration_coverage.py', floor)
+        self.assertNotIn('continue-on-error:', floor)
+        self.assertNotIn('./gradlew', floor)
+        self.assertIn('scripts/test_check_viewport_restoration_coverage.py', self.build_contracts)
 
     def test_screenshot_owners_come_from_the_checked_registry(self):
         """Both flavors verify the registered owners, then prove every golden was compared."""
