@@ -70,14 +70,7 @@ private fun admitAnimatedWebp(
     var refusal: AnimationSourceRefusal? = null
     while (valid && refusal == null && chunks.advance()) {
         val fourCc = chunks.fourCc
-        valid =
-            when (fourCc) {
-                FOURCC_ANIM -> !animationSeen && budget.frames == 0 && chunks.payloadSize == ANIM_PAYLOAD_BYTES
-                FOURCC_ANMF ->
-                    animationSeen &&
-                        webpFrameIsValid(bytes, chunks.payloadOffset, chunks.payloadSize, canvasWidth, canvasHeight)
-                else -> !isWebpStructureChunk(fourCc)
-            }
+        valid = animatedWebpChunkIsValid(bytes, chunks, canvasWidth, canvasHeight, animationSeen, budget.frames)
         animationSeen = animationSeen || fourCc == FOURCC_ANIM
         if (valid && fourCc == FOURCC_ANMF) refusal = budget.addFrame()
     }
@@ -87,6 +80,23 @@ private fun admitAnimatedWebp(
         else -> malformedAnimationSource
     }
 }
+
+/** Validates a top-level animation chunk without changing traversal state or charging its budget. */
+private fun animatedWebpChunkIsValid(
+    bytes: ByteArray,
+    chunks: RiffChunkCursor,
+    canvasWidth: Int,
+    canvasHeight: Int,
+    animationSeen: Boolean,
+    frameCount: Int,
+): Boolean =
+    when (chunks.fourCc) {
+        FOURCC_ANIM -> !animationSeen && frameCount == 0 && chunks.payloadSize == ANIM_PAYLOAD_BYTES
+        FOURCC_ANMF ->
+            animationSeen &&
+                webpFrameIsValid(bytes, chunks.payloadOffset, chunks.payloadSize, canvasWidth, canvasHeight)
+        else -> !isWebpStructureChunk(chunks.fourCc)
+    }
 
 /**
  * Validates one ANMF payload: a frame rectangle (offsets stored halved) inside the
