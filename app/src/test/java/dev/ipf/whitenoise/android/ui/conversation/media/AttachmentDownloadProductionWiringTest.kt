@@ -208,7 +208,7 @@ class AttachmentDownloadProductionWiringTest {
                 .substringAfter("fun ConversationController.retainedNativeAttachmentBytes(")
                 .substringBefore("/** Reconcile presentation state")
         assertTrue("the read must be a local open", "appState.openNativeAttachment(request)" in read)
-        assertTrue("a late result after an account change must be rejected", "boundAccountRef == account" in read)
+        assertTrue("the read must go through the guarded off-main helper", "readRetainedAttachmentBytes(" in read)
         val transferStarts = listOf("downloadAttachment", "acquireNativeAttachment", "enqueue", "requestAttachment")
         assertFalse("a cache-only read must never start a transfer", transferStarts.any { it in read })
     }

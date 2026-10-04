@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.toByteArray
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,7 +36,8 @@ internal suspend fun ConversationController.cachedAttachmentPlaintext(
  * Reads MDK-retained plaintext for a cache-only render, never starting a transfer.
  *
  * The host presentation caches can be empty while MDK still holds verified bytes, for example after the cache was
- * trimmed or for media received while no host copy was written. A late result after an account change is rejected.
+ * trimmed or for media received while no host copy was written. A result that finishes after an account or session
+ * change is rejected.
  */
 internal suspend fun ConversationController.retainedNativeAttachmentBytes(
     messageIdHex: String,
@@ -50,8 +52,27 @@ internal suspend fun ConversationController.retainedNativeAttachmentBytes(
             attachmentIndex,
             sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
         )
-    val bytes = appState.openNativeAttachment(request)?.use { it.toByteArray() }
-    return bytes?.takeIf { boundAccountRef == account }
+    return appState.readRetainedAttachmentBytes(account) { appState.openNativeAttachment(request) }
+}
+
+/**
+ * Materializes the plaintext [open] returns off the main thread and hands it back only while [accountRef] and the
+ * media session epoch are still the live ones.
+ *
+ * A controller's bound account never changes after it is created, so it cannot detect a switch. The live active
+ * account and the epoch are read on Main both before the open starts and after the bytes are in memory.
+ */
+internal suspend fun WhiteNoiseAppState.readRetainedAttachmentBytes(
+    accountRef: String,
+    open: suspend () -> AttachmentPlaintext?,
+): ByteArray? {
+    val session =
+        withContext(Dispatchers.Main.immediate) {
+            MediaCachePresentationSession(accountRef, mediaUploadSessionEpoch())
+        }
+    if (!withContext(Dispatchers.Main.immediate) { mediaCachePresentationSessionCurrent(session) }) return null
+    val bytes = open()?.use { plaintext -> withContext(Dispatchers.IO) { plaintext.toByteArray() } }
+    return bytes?.takeIf { withContext(Dispatchers.Main.immediate) { mediaCachePresentationSessionCurrent(session) } }
 }
 
 /** Reconcile presentation state with the encrypted L1/L2 cache. */
