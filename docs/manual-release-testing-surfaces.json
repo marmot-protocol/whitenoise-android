@@ -23,6 +23,126 @@
         ]
       },
       {
+        "surface": "R.string.profile_readiness_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_loading",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_optional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_optional",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_ready",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_ready",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_setup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_setup",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_added",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_address",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_address",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_banner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_banner",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_bio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_bio",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_field",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_field",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_field_optional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_field_optional",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_lightning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_lightning",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_name",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_picture",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_recommended",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_recommended",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
         "surface": "ProfileReadinessChecklist",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
         "anchor": "fun ProfileReadinessChecklist(",
