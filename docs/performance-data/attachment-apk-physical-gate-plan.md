@@ -307,6 +307,10 @@ APKs. The report's `environment` is API and ABI only, no serial, model, account 
   probe ends its own process while a real download is held and a new process completes it from the committed prefix.
   Not run on a physical device: it needs the owner's approval for the probe to end its own process on the phone, in
   addition to the authorizations above.
+- **A forced native-retention readback on the phone.** The physical runs predate the probe change that deletes the
+  published copy of each file before a dispatch stage reads it back. On the phone the later stages therefore reused the
+  copy the prepare process had published, and the retained bytes were not re-read. The forced readback is qualified on
+  emulators only.
 - **A genuine installer-less platform state.** Not inducible on the owner's phone without disabling the system
   package installer, which is a system change this plan does not request. The simulated branch covers the app's
   `NoInstaller` handling only. A disposable emulator with the installer disabled for user 0 is the only truthful
