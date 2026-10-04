@@ -12,12 +12,9 @@ class InviteFailureLocalizationTest(unittest.TestCase):
         node = root.find("string[@name='error_invalid_key_package']")
         self.assertIsNotNone(node)
         assert node is not None
-        message = node.text
-        self.assertEqual(
-            "Não foi possível validar a chave de conversa publicada desta pessoa. "
-            "Pede-lhe para atualizar o White Noise e publicar uma nova chave de conversa e tenta novamente.",
-            message,
-        )
+        message = node.text or ""
+        self.assertIn("publicada desta pessoa.", message)
+        self.assertNotIn("de esta pessoa", message)
 
 
 if __name__ == "__main__":

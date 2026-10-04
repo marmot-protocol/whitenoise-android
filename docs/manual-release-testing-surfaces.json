@@ -25004,8 +25004,7 @@
         "test_ids": [
           "NCH-001",
           "NCH-002",
-          "GRP-006",
-          "ACC-017"
+          "GRP-005"
         ]
       },
       {
@@ -25015,8 +25014,7 @@
         "test_ids": [
           "NCH-001",
           "NCH-002",
-          "GRP-006",
-          "ACC-017"
+          "GRP-005"
         ]
       },
       {
@@ -25026,8 +25024,7 @@
         "test_ids": [
           "NCH-001",
           "NCH-002",
-          "GRP-006",
-          "ACC-017"
+          "GRP-005"
         ]
       },
       {
@@ -25037,8 +25034,7 @@
         "test_ids": [
           "NCH-001",
           "NCH-002",
-          "GRP-006",
-          "ACC-017"
+          "GRP-005"
         ]
       },
       {
@@ -25048,8 +25044,7 @@
         "test_ids": [
           "NCH-001",
           "NCH-002",
-          "GRP-006",
-          "ACC-017"
+          "GRP-005"
         ]
       },
       {
@@ -25059,53 +25054,90 @@
         "test_ids": [
           "NCH-001",
           "NCH-002",
-          "GRP-006",
-          "ACC-017"
+          "GRP-005"
         ]
       },
       {
         "surface": "setting:error_group_create_failed_retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
         "anchor": "R.string.error_group_create_failed_retry",
-        "test_ids": ["NCH-001", "NCH-002", "GRP-006", "ACC-017"]
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
       },
       {
         "surface": "setting:error_invalid_identity_reference",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
         "anchor": "R.string.error_invalid_identity_reference",
-        "test_ids": ["NCH-001", "NCH-002", "GRP-006", "ACC-017"]
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
       },
       {
         "surface": "setting:invite_to_white_noise_description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
         "anchor": "R.string.invite_to_white_noise_description",
-        "test_ids": ["NCH-001", "NCH-002"]
+        "test_ids": [
+          "NCH-001",
+          "NCH-002"
+        ]
       },
       {
         "surface": "setting:toast_chat_still_loading",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
         "anchor": "R.string.toast_chat_still_loading",
-        "test_ids": ["NCH-001", "NCH-002", "GRP-006", "ACC-017"]
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
       },
       {
         "surface": "setting:toast_no_active_account",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
         "anchor": "R.string.toast_no_active_account",
-        "test_ids": ["NCH-001", "NCH-002", "GRP-006", "ACC-017"]
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
       },
       {
         "surface": "setting:unknown_invite_to_white_noise_description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
         "anchor": "R.string.unknown_invite_to_white_noise_description",
-        "test_ids": ["NCH-001", "NCH-002"]
+        "test_ids": [
+          "NCH-001",
+          "NCH-002"
+        ]
       },
       {
         "surface": "setting:toast_couldnt_add_members",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_couldnt_add_members",
         "test_ids": [
-          "GRP-006",
-          "ACC-017"
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:invite_to_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "R.string.invite_to_white_noise",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "setting:error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "GRP-005"
         ]
       }
     ],

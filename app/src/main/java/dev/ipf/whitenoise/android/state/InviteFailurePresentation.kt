@@ -24,6 +24,7 @@ internal fun inviteFailureDetail(
     throwable: Throwable,
     displayName: (String) -> String,
     recipientName: String? = null,
+    @StringRes fallbackResource: Int = R.string.error_try_again,
 ): AppText =
     when (throwable) {
         is StartProfileChatNoActiveAccountException -> AppText.Resource(R.string.toast_no_active_account)
@@ -47,13 +48,13 @@ internal fun inviteFailureDetail(
             } ?: AppText.Resource(R.string.error_invalid_key_package)
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.GroupHydrationPending -> AppText.Resource(R.string.toast_chat_still_loading)
-        else -> AppText.Resource(R.string.error_group_create_failed_retry)
+        else -> AppText.Resource(fallbackResource)
     }
 
 internal fun groupCreateFailureDetail(
     throwable: Throwable,
     displayName: (String) -> String,
-): AppText = inviteFailureDetail(throwable, displayName)
+): AppText = inviteFailureDetail(throwable, displayName, fallbackResource = R.string.error_group_create_failed_retry)
 
 /** Sharing an install link is optional help for a missing package, never an invalid-package diagnosis. */
 internal fun startProfileChatFailureIsMissingSetup(throwable: Throwable): Boolean = throwable is MissingKeyPackage

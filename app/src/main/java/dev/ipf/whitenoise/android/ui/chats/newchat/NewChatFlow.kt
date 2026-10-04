@@ -790,12 +790,7 @@ internal fun StartChatErrorCard(
         Text(
             title,
             style = MaterialTheme.typography.titleSmall,
-            color =
-                if (error.invitation) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
+            color = MaterialTheme.colorScheme.error,
         )
         Text(
             detail,

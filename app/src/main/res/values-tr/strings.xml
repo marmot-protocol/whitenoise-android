@@ -203,7 +203,7 @@
     <string name="invite">Davet etmek</string>
     <string name="new_chat">Yeni sohbet</string>
     <string name="error_not_white_noise_profile_qr">Bu QR kodu bir White Noise profili değil.</string>
-    <string name="error_missing_key_package">bu kişi için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını güncelleyip açmasını isteyin, sonra tekrar deneyin.</string>
+    <string name="error_missing_key_package">Bu kişi için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını güncelleyip açmasını isteyin, sonra tekrar deneyin.</string>
     <string name="error_missing_key_package_for">%1$s için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını güncelleyip açmasını isteyin, sonra tekrar deneyin.</string>
     <string name="invite_to_white_noise">White Noise\'a Davet Et</string>
     <string name="invite_friends">Arkadaşlarını davet et</string>
@@ -2199,8 +2199,8 @@
     <string name="onboarding_details_expanded">Genişletildi</string>
     <string name="onboarding_details_collapsed">Daraltıldı</string>
     <string name="group_svg_rejected_detail">Bu SVG hazırlanamadı. Basit bir SVG, PNG veya JPEG seçin.</string>
-    <string name="error_invalid_key_package">bu kişi için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
+    <string name="error_invalid_key_package">Bu kişi için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
     <string name="error_invalid_key_package_for">%1$s için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
-    <string name="error_missing_member_inbox">bu kişi için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
+    <string name="error_missing_member_inbox">Bu kişi için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
     <string name="error_missing_member_inbox_for">%1$s için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
 </resources>
