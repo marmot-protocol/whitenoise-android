@@ -1,6 +1,6 @@
 # Retained media tiles with automatic downloads off, 2026-10-03
 
-Refs [#2909](https://github.com/marmot-protocol/whitenoise-android/issues/2909) and tracker
+Context: [#2909](https://github.com/marmot-protocol/whitenoise-android/issues/2909) and tracker
 [#2779](https://github.com/marmot-protocol/whitenoise-android/issues/2779). This qualifies what the **real image and
 video tiles** show for media that was genuinely sent and received and that only MDK still retains, and fixes the case
 where they did not. It is an emulator measurement and does not replace physical-device acceptance.
@@ -45,9 +45,6 @@ third photo (a video) were unaffected. All tiles in the baseline run that did sh
   policy they produced, so a retained file goes from the thumbhash placeholder to its image without a download prompt.
   A file that is genuinely absent still offers Download once the probes answer.
 
-My own first draft also re-keyed an effect on a fresh object every composition and made Compose never idle, which 14
-existing tests caught before any device run.
-
 ## After
 
 From the same fixture, with the fix: **all fourteen tiles show their media, none displays the idle Download action at
@@ -75,7 +72,7 @@ existing tests that expected the Download action immediately now wait for it.
 
 ## Source cohort
 
-- Base: signed commit `829111244` (the head of #3028 at the time), plus the fixture commit and the fix. Development runs
+- Base: signed commit `829111244` (the received-APK fixture), plus the fixture commit and the fix. Development runs
   used the fix as an uncommitted overlay on the fixture commit; the overlay, the red and green reports and the APK
   digests are preserved. Hosted CI runs this stage on both distributions on the committed head.
 - MDK pin `122bd90ffac60bb6311346e228d0f609a18521ee`, native bytes unchanged. Owned `wn_2779_fixture_api30` only.
@@ -84,5 +81,5 @@ existing tests that expected the Download action immediately now wait for it.
 
 One emulator and one API level for the device stage; hosted CI adds API 34 on both distributions. Voice attachments are
 not covered. It proves what the tiles display from retention and that one tap opens them; it does not prove first-frame
-continuity across an Activity recreation, poster priming after restart, or the full-screen viewer. Those and the physical
-acceptance #2909 asks for stay open.
+continuity across an Activity recreation, poster priming after restart, or the full-screen viewer, and it is not a
+physical-device measurement.
