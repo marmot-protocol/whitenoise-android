@@ -9691,12 +9691,17 @@ class ConversationController(
             runCatchingCancellable { publishPendingEdit(account, intent, text) }.fold(
                 onSuccess = { summary -> completePendingEditAdmission(intent, summary, text) },
                 onFailure = { cause ->
-                    failPendingEditAdmission(intent, target, account, cause)
-                    false
+                    if (intent.editClientToken in pendingEditPublicationObserved) {
+                        true
+                    } else {
+                        failPendingEditAdmission(intent, target, account, cause)
+                        false
+                    }
                 },
             )
         } finally {
             pendingEditAdmissions.remove(intent.editClientToken)
+            pendingEditPublicationObserved.remove(intent.editClientToken)
             optimisticEdits.entries
                 .firstOrNull { it.value.durableIntent == intent }
                 ?.key
@@ -9709,14 +9714,18 @@ class ConversationController(
         account: String,
         intent: DurablePendingEditIntent,
         text: String,
-    ) = pendingMessageEditPublisher?.invoke(
-        account,
-        group.groupIdHex,
-        intent.originalClientToken,
-        text,
-        intent.editClientToken,
-    ) ?: appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) {
-        admitPendingMessageEdit(account, group.groupIdHex, intent, text)
+    ) = pendingEditAdmissionMutex.withLock {
+        // Preserve this controller's submission order at the local native boundary.
+        // Newer UI revisions already own their overlay while this admission waits.
+        pendingMessageEditPublisher?.invoke(
+            account,
+            group.groupIdHex,
+            intent.originalClientToken,
+            text,
+            intent.editClientToken,
+        ) ?: appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) {
+            admitPendingMessageEdit(account, group.groupIdHex, intent, text)
+        }
     }
 
     private fun completePendingEditAdmission(
@@ -9730,6 +9739,7 @@ class ConversationController(
         }
         publishTimelineFromIndexes()
         return current != null ||
+            intent.editClientToken in pendingEditPublicationObserved ||
             timelineRecords.values.any { record ->
                 record.edit?.latestEditMessageIdHex in summary.messageIds && record.plaintext == text
             }
@@ -9756,6 +9766,10 @@ class ConversationController(
     }
 
     private val pendingEditAdmissions = mutableSetOf<String>()
+    private val pendingEditAdmissionMutex = Mutex()
+
+    // Only in-flight callbacks retain this proof; finally removes it even on cancellation.
+    private val pendingEditPublicationObserved = mutableSetOf<String>()
     private val pendingEditStatusReads = mutableSetOf<String>()
     private val pendingEditStatusRechecks = mutableSetOf<String>()
 
@@ -9772,6 +9786,10 @@ class ConversationController(
         if (record.kind == 1009uL && record.sourceMessageIdHex != null) {
             targets.forEach { target ->
                 optimisticEdits[target]?.let { edit ->
+                    edit.durableIntent
+                        ?.editClientToken
+                        ?.takeIf { it in pendingEditAdmissions }
+                        ?.let(pendingEditPublicationObserved::add)
                     optimisticEdits[target] =
                         edit.copy(
                             status = MessageStatus.Sent,
