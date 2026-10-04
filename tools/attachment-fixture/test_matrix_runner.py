@@ -15,7 +15,7 @@ class MatrixRunnerTest(unittest.TestCase):
         """The matrix is for disposable emulators only; a physical serial never reaches adb."""
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(runner, "adb_command") as adb:
             output = Path(directory) / "out.json"
-            for serial, profile, links in (("46131FDAS003CG", "reference-api30-arm64", ("unshaped",)),
+            for serial, profile, links in (("PHYSICAL000TEST", "reference-api30-arm64", ("unshaped",)),
                                            ("emulator-5554", "pixel-api37-arm64", ("unshaped",)),
                                            ("emulator-5554", "no-such-profile", ("unshaped",)),
                                            ("emulator-5554", "reference-api30-arm64", ("dialup",)),
