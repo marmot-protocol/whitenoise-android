@@ -9835,11 +9835,10 @@ class ConversationController(
         val edit = optimisticEdits[target]
         val intent = edit?.durableIntent
         val account = conversationAccountRef
-        if (controllerCleared || edit == null || intent == null || account == null) return
+        if (edit == null || intent == null || account == null) return
         val unresolvedFailure = edit.status == MessageStatus.Failed && !edit.nativeRevisionRejected
-        if ((edit.status != MessageStatus.Pending && !unresolvedFailure) ||
-            intent.editClientToken in pendingEditAdmissions
-        ) {
+        val shouldRecover = !controllerCleared && (edit.status == MessageStatus.Pending || unresolvedFailure)
+        if (!shouldRecover || intent.editClientToken in pendingEditAdmissions) {
             return
         }
         if (!pendingEditStatusReads.add(intent.editClientToken)) {
