@@ -204,7 +204,7 @@ three commands and none of them ever uninstalls, clears, downgrades or grants an
   app-op mode and restores it, uses `adb reverse --no-rebind` and removes only its own mappings, and keeps failed and
   partial stages in the redacted report. Optional selectors close named gaps: `--cancel-retry` runs the shared
   held-body cancellation probe on the valid package before publication, `--large-apk PATH` registers a host-built
-  30 to 31 MiB signed package on the server's `/__payload/` endpoint (outside the counted acquisition ledger) and
+  30 to 31 MiB signed package, which `apksigner` from `--build-tools` must verify before the device is contacted, on the server's `/__payload/` endpoint (outside the counted acquisition ledger) and
   sends it through the shipping controller, `--no-installer-branch` dispatches the valid package through a context
   whose launch raises `ActivityNotFoundException`, which the checker reports as simulated, never as a platform state.
 
@@ -212,7 +212,7 @@ three commands and none of them ever uninstalls, clears, downgrades or grants an
 then `apksigner sign` with the debug key, so the package is genuinely signed and within the 32 MiB Android sender cap.
 Nothing installs it. The exact preconditions, owner authorizations, command order, evidence and restore steps are in
 the [physical gate plan](../../docs/performance-data/attachment-apk-physical-gate-plan.md), which also states that
-the gate has not been run and which criteria it still does not cover.
+the Pixel results recorded so far and which criteria the gate still does not cover.
 
 ### Unknown-length native control
 

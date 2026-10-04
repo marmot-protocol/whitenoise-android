@@ -433,6 +433,7 @@ internal object ApkInstallerAttachmentProbe {
                 .put("installer_shown", installer.shown)
                 .put("installer_observed_ms", installer.observedMillis)
                 .put("installer_settled", installer.settled)
+                .put("installer_progress_seen", installer.progressSeen)
                 .put("installer_staging_ms", installer.stagingMillis)
                 .put("dispatch_ms", dispatchMillis)
                 .put("transfer_reused", received.file.isFile),
@@ -441,14 +442,22 @@ internal object ApkInstallerAttachmentProbe {
 
     /**
      * Whether the installer reached the screen after one dispatch, for how long the screen was watched, whether the
-     * installer had finished staging the package before Back was sent, and how long its progress indicator was visible.
-     * Zero staging time for a large package means the indicator was never recognized, so the wait proved nothing.
+     * installer had finished staging the package before Back was sent, whether its progress indicator was ever seen,
+     * and how long the wait for it lasted. A package whose indicator was never seen was not proven to have finished
+     * staging, because an installer that draws it under another class name looks the same as one that never staged.
      */
     private class InstallerObservation(
         val shown: Boolean,
         val observedMillis: Long,
         val settled: Boolean,
+        val progressSeen: Boolean,
         val stagingMillis: Long,
+    )
+
+    /** The outcome of waiting for staging to finish and whether the progress indicator was seen at any poll. */
+    private class StagingWait(
+        val settled: Boolean,
+        val progressSeen: Boolean,
     )
 
     /**
@@ -476,7 +485,8 @@ internal object ApkInstallerAttachmentProbe {
             }
         val observedMillis = SystemClock.elapsedRealtime() - started
         val stagingStarted = SystemClock.elapsedRealtime()
-        val settled = shown && awaitStagingFinished(automation)
+        val staging =
+            if (shown) awaitStagingFinished(automation) else StagingWait(settled = false, progressSeen = false)
         val stagingMillis = if (shown) SystemClock.elapsedRealtime() - stagingStarted else 0L
         if (shown || opened) {
             repeat(DISMISS_ATTEMPTS) {
@@ -484,7 +494,7 @@ internal object ApkInstallerAttachmentProbe {
                 delay(POLL_MILLIS)
             }
         }
-        return InstallerObservation(shown, observedMillis, settled, stagingMillis)
+        return InstallerObservation(shown, observedMillis, staging.settled, staging.progressSeen, stagingMillis)
     }
 
     /** Polls for the whole observation window and reports whether an installer package owned the screen at any poll. */
@@ -500,14 +510,25 @@ internal object ApkInstallerAttachmentProbe {
         return false
     }
 
-    /** Polls until the installer window no longer shows the progress indicator it draws while staging a package. */
-    private suspend fun awaitStagingFinished(automation: UiAutomation): Boolean =
-        runCatching {
-            withTimeout(STAGING_TIMEOUT_MILLIS) {
-                while (automation.rootInActiveWindow?.let(::showsProgress) == true) delay(POLL_MILLIS)
-                true
-            }
-        }.getOrDefault(false)
+    /**
+     * Polls until the installer window no longer shows the progress indicator it draws while staging a package, and
+     * records whether the indicator was visible at any poll, so a wait that never saw it is told apart from one that
+     * watched it disappear.
+     */
+    private suspend fun awaitStagingFinished(automation: UiAutomation): StagingWait {
+        var progressSeen = false
+        val settled =
+            runCatching {
+                withTimeout(STAGING_TIMEOUT_MILLIS) {
+                    while (automation.rootInActiveWindow?.let(::showsProgress) == true) {
+                        progressSeen = true
+                        delay(POLL_MILLIS)
+                    }
+                    true
+                }
+            }.getOrDefault(false)
+        return StagingWait(settled, progressSeen)
+    }
 
     /** True when this window or any descendant is a progress bar. */
     private fun showsProgress(node: AccessibilityNodeInfo): Boolean =

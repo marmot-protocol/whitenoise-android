@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -135,7 +136,23 @@ class RefusalTest(unittest.TestCase):
                 archive.writestr("AndroidManifest.xml", b"x")
             for path in (small, Path(directory) / "absent.apk"):
                 with self.assertRaises(ValueError):
-                    self.run_with(device, large_apk=path)
+                    self.run_with(device, large_apk=path, build_tools=Path("build-tools"))
+        self.assertEqual([], device.calls)
+
+    def test_large_apk_must_pass_apksigner_before_adb(self):
+        """An unsigned or invalidly signed payload, or a run without build-tools to verify it, never reaches the device."""
+        device = FakeDevice()
+        with tempfile.TemporaryDirectory() as directory:
+            payload = large_payload(directory)
+            with self.assertRaises(ValueError):
+                self.run_with(device, large_apk=payload)
+            for failure in (subprocess.CalledProcessError(1, "apksigner"), ValueError("expected exactly one signer"),
+                            OSError("apksigner missing")):
+                with mock.patch.object(runner, "signer_digest", side_effect=failure), self.assertRaises(ValueError):
+                    self.run_with(device, large_apk=payload, build_tools=Path("build-tools"))
+            with mock.patch.object(runner, "signer_digest", return_value="a" * 64) as verified:
+                self.assertEqual(payload, runner.validate_large_apk(payload, Path("build-tools")))
+            self.assertEqual(Path("build-tools") / "apksigner", verified.call_args.args[0])
         self.assertEqual([], device.calls)
 
 
@@ -147,7 +164,11 @@ class RunTest(unittest.TestCase):
         confirmed = CONFIRMED if distribution == "Zapstore" else PLAY_CONFIRMED
         output = Path(directory) / "report.json"
         patches = patched(device, instrument)
-        with patches[0], patches[1], patches[2], self.assertRaises(RuntimeError):
+        if overrides.get("large_apk") is not None:
+            overrides.setdefault("build_tools", Path("build-tools"))
+        with patches[0], patches[1], patches[2], mock.patch.object(
+            runner, "signer_digest", return_value="a" * 64
+        ), self.assertRaises(RuntimeError):
             runner.run("adb", SERIAL, Path(directory) / "root", output, distribution, SERIAL, PROFILE, **confirmed,
                        **overrides)
         return json.loads(output.read_text())

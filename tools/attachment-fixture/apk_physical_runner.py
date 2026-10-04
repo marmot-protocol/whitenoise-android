@@ -103,12 +103,22 @@ def deferred_for(cancel_retry, large, no_installer):
     return deferred
 
 
-def validate_large_apk(path):
-    """Refuse a payload that is not an APK-shaped archive inside the sender-safe 30 to 31 MiB range."""
+def validate_large_apk(path, build_tools=None):
+    """Refuse a payload that is not a validly signed APK-shaped archive inside the sender-safe 30 to 31 MiB range.
+
+    The attachment-open path checks the binary manifest but not the signature, so an unsigned or invalidly signed payload
+    would otherwise qualify, which is why apksigner must accept it before anything touches the device.
+    """
     path = Path(path)
     if path.is_symlink() or not path.is_file() or not MIN_BYTES <= path.stat().st_size <= MAX_BYTES \
             or not has_manifest(path):
         raise ValueError("--large-apk must be a 30 to 31 MiB APK-shaped archive built by apk_payload.py")
+    if build_tools is None:
+        raise ValueError("--build-tools is required with --large-apk so its signature can be verified")
+    try:
+        signer_digest(Path(build_tools) / "apksigner", path)
+    except (subprocess.SubprocessError, OSError, ValueError) as error:
+        raise ValueError("--large-apk failed apksigner verification") from error
     return path
 
 
@@ -138,13 +148,13 @@ def _stages(adb, serial, ports, distribution, extra, report, root, private_debug
 
 def run(adb, serial, root, output, distribution, physical_fixture_serial=None, budget_profile=None,
         owner_present_device_idle=False, allow_installer_on_screen=False, allow_install_app_op_toggle=False,
-        cancel_retry=False, large_apk=None, no_installer_branch=False, private_debug=False):
+        cancel_retry=False, large_apk=None, no_installer_branch=False, private_debug=False, build_tools=None):
     """Drive the probe on the confirmed device, restore the app-op and reverses, and keep every attempt in the report."""
     require_confirmations(distribution, owner_present_device_idle, allow_installer_on_screen,
                           allow_install_app_op_toggle)
     if no_installer_branch and distribution != "Zapstore":
         raise ValueError("the no-installer branch is reachable only on a self-update build")
-    payload = validate_large_apk(large_apk) if large_apk is not None else None
+    payload = validate_large_apk(large_apk, build_tools) if large_apk is not None else None
     environment = verify_physical_device(adb, serial, physical_fixture_serial, budget_profile)
     if installed_identity(adb, serial) != IDENTITY:
         raise ValueError("install the isolated app and test identity in place first, see the install command")
@@ -346,6 +356,7 @@ def main():
     execute.add_argument("--allow-install-app-op-toggle", action="store_true")
     execute.add_argument("--cancel-retry", action="store_true")
     execute.add_argument("--large-apk", type=Path)
+    execute.add_argument("--build-tools", type=Path, help="Directory holding apksigner, required with --large-apk")
     execute.add_argument("--no-installer-branch", action="store_true")
     execute.add_argument("--private-debug", action="store_true")
     args = parser.parse_args()
@@ -360,7 +371,7 @@ def main():
         run(args.adb, args.serial, args.root, args.output, args.distribution, args.physical_fixture_serial,
             args.budget_profile, args.owner_present_device_idle, args.allow_installer_on_screen,
             args.allow_install_app_op_toggle, args.cancel_retry, args.large_apk, args.no_installer_branch,
-            args.private_debug)
+            args.private_debug, args.build_tools)
 
 
 if __name__ == "__main__":

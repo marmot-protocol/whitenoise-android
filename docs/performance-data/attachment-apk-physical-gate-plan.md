@@ -19,7 +19,7 @@ confirmed, because the probe dismisses the installer, and the gaps under "Not co
 | Invalid APK-shaped file settles as a distinct state | Existing `no-manifest` and `truncated` cases, plus `generic` and `conflict` | Run, qualified | `InvalidPackage` before any launch |
 | Install permission denied, then granted | Host toggles the app-op on the isolated package between stages | Run, qualified | Requires `--allow-install-app-op-toggle`; the original mode is recorded and restored |
 | Cancellation and retry | `--cancel-retry`: the shared held-body cancellation probe runs on the `valid` case before publication | Run, qualified | Cancel acknowledged and the socket closed within 0.2 s, ten ordinary joins refused, 30 s quiet, exact bytes on the deliberate retry |
-| 30 to 50 MiB package | `--large-apk`: a host-built, genuinely signed 30 to 31 MiB package sent through the shipping controller | Run, qualified | 31 MiB is inside the issue's range and under the 32 MiB Android sender cap, above 32 MiB is not sendable, see below |
+| 30 to 50 MiB package | `--large-apk`: a host-built, genuinely signed 30 to 31 MiB package sent through the shipping controller | Run at 30.3 MiB, qualified with the earlier probe | 31 MiB is inside the issue's range and under the 32 MiB Android sender cap, above 32 MiB is not sendable, see below |
 | No installer available | `--no-installer-branch`: the real open path meets `ActivityNotFoundException` through a context wrapper | Simulated branch only | Exercises the app's `NoInstaller` branch on the device, does not induce a genuine installer-less platform state |
 | Process recreation during download | `controller-apk-recreation` | Emulator only | Qualified separately on owned emulators; not run on a physical device |
 
@@ -183,7 +183,8 @@ mkdir -p "$RUN" && chmod 700 "$RUN"
    ```
 
 8. **Large package and the simulated no-installer branch.** Same as 5 plus `--large-apk "$RUN/large.apk"
-   --no-installer-branch`, new root and output. The payload is served to the probe over the loopback fixture server's
+   --build-tools "$TOOLS" --no-installer-branch`, new root and output. `apksigner` must accept the payload before the
+   device is contacted. The payload is served to the probe over the loopback fixture server's
    `/__payload/large-apk` endpoint, outside the counted acquisition ledger, then sent through the shipping controller
    like every other case.
 
@@ -192,7 +193,7 @@ mkdir -p "$RUN" && chmod 700 "$RUN"
      --serial "$SERIAL" --physical-fixture-serial "$SERIAL" --budget-profile pixel-api37-arm64 \
      --distribution Zapstore --root "$RUN/zapstore-large" --output "$RUN/zapstore-large.json" \
      --owner-present-device-idle --allow-installer-on-screen --allow-install-app-op-toggle \
-     --large-apk "$RUN/large.apk" --no-installer-branch
+     --large-apk "$RUN/large.apk" --build-tools "$TOOLS" --no-installer-branch
    ```
 
 9. **Play flavor.** Build, install in place (this replaces the Zapstore isolated build, same package id, retained in
@@ -215,7 +216,8 @@ mkdir -p "$RUN" && chmod 700 "$RUN"
    python3 tools/attachment-fixture/apk_physical_runner.py run --adb "$ADB" \
      --serial "$SERIAL" --physical-fixture-serial "$SERIAL" --budget-profile pixel-api37-arm64 \
      --distribution Play --root "$RUN/play-gaps" --output "$RUN/play-gaps.json" \
-     --owner-present-device-idle --allow-installer-on-screen --cancel-retry --large-apk "$RUN/large.apk"
+     --owner-present-device-idle --allow-installer-on-screen --cancel-retry --large-apk "$RUN/large.apk" \
+     --build-tools "$TOOLS"
    ```
 
 Every `run` exits non-zero and raises unless its report is `qualified`. A failed or partial run keeps its ledger and
@@ -238,9 +240,10 @@ Four things a physical run exposes that emulator runs do not:
    disconnect as terminal for finalization while the checker still requires the exact shape.
 4. **Large packages stage slowly.** For a 31 MiB package the system installer is still copying the file when the probe
    would press Back, and Back does not cancel the staging. The probe waits, bounded, for the installer's progress
-   indicator to disappear and reports `installer_settled` and `installer_staging_ms`. A large package with a staging
-   time of zero means the indicator was never recognized and the wait proved nothing, so read that field before
-   trusting the large case.
+   indicator to disappear and reports `installer_settled`, `installer_progress_seen` and `installer_staging_ms`. The
+   checker requires all three for the large case with an installer: the indicator must have been seen, the installer
+   must have finished staging, and the staging time must be above zero, so a wait that never recognized the indicator
+   cannot qualify.
 
 The system installer appears for a few seconds on each allowed dispatch and is dismissed without installing. Put the
 phone on the home screen and leave it idle before every run: the probe's Back presses would otherwise land on whatever

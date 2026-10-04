@@ -93,6 +93,12 @@ def _check_dispatch(metrics, distribution, violations, table, case_count):
         if (row is None or row.get("result") not in allowed or row.get("installer_shown") is not installer
                 or row.get("transfer_reused") is not True or not _finite(row.get("dispatch_ms"))):
             violations.append(f"wrong platform outcome for {key[0]} ({key[1]})")
+        # A package big enough to stage visibly must have been seen staging and seen finished, otherwise the wait that
+        # keeps Back from stranding the installer's dialog proved nothing.
+        if installer and key[0] == LARGE_CASE and row is not None and (
+                row.get("installer_settled") is not True or row.get("installer_progress_seen") is not True
+                or not _finite(row.get("installer_staging_ms")) or row["installer_staging_ms"] <= 0):
+            violations.append("the installer's staging of the large package was not seen to finish")
         # Whatever the status, the screen must have been watched: an absent installer only counts if it was looked for.
         observed = None if row is None else row.get("installer_observed_ms")
         # A dispatch that saw an installer stops watching at once and is already a wrong outcome, so only an absent

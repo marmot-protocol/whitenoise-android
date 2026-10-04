@@ -37,6 +37,8 @@ def evidence(distribution, cancel_retry=False, large=False, no_installer=False):
     for (case, permission), (allowed, installer) in table_for(distribution, large, no_installer).items():
         metrics.append({"phase": "apk-dispatch", "case": case, "permission": permission, "result": allowed[0],
                         "installer_shown": installer, "installer_observed_ms": 150 if installer else 1000,
+                        "installer_settled": installer, "installer_progress_seen": installer,
+                        "installer_staging_ms": 400 if installer else 0,
                         "dispatch_ms": 12.0, "transfer_reused": True})
     metrics.append({"phase": "apk-complete", "self_update_enabled": distribution == "Zapstore", "cases": len(cases)})
     rows = []
@@ -189,6 +191,30 @@ class ApkEvidenceTest(unittest.TestCase):
         extra = events + [{"seq": 999, "request": None, "kind": "payload_fetch", "value": 1, "fixture": "large-apk"},
                           {"seq": 1000, "request": 999, "kind": "payload_complete", "value": 0, "fixture": "large-apk"}]
         self.assertFalse(check_apk(metrics, extra, distribution, large=True)["passed"])
+
+    def test_the_large_package_must_be_seen_staging_and_finishing(self):
+        """A large installer dispatch whose indicator was never seen, never settled or took no time proves nothing."""
+        metrics, events, distribution = evidence("Zapstore", large=True)
+        self.assertTrue(check_apk(metrics, events, distribution, large=True)["passed"])
+        for field, value in (("installer_settled", False), ("installer_progress_seen", False),
+                             ("installer_progress_seen", None), ("installer_staging_ms", 0),
+                             ("installer_staging_ms", None)):
+            altered = deepcopy(metrics)
+            row = next(m for m in altered if m.get("phase") == "apk-dispatch" and m["case"] == LARGE_CASE)
+            if value is None:
+                del row[field]
+            else:
+                row[field] = value
+            self.assertFalse(check_apk(altered, events, distribution, large=True)["passed"], (field, value))
+
+    def test_the_staging_evidence_applies_only_to_the_large_case(self):
+        """The small packages stage instantly, so their rows are not held to a visible progress indicator."""
+        metrics, events, distribution = evidence("Zapstore", large=True)
+        altered = deepcopy(metrics)
+        row = next(m for m in altered if m.get("phase") == "apk-dispatch" and m["case"] == "valid"
+                   and m["permission"] == "allowed")
+        del row["installer_progress_seen"], row["installer_staging_ms"]
+        self.assertTrue(check_apk(altered, events, distribution, large=True)["passed"])
 
     def test_inexact_transfer_or_invalid_measurement_fails(self):
         """Bytes must be exact, and latency and peaks must be finite measurements."""
