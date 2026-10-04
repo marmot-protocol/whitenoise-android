@@ -16,6 +16,7 @@ import dev.ipf.whitenoise.android.share.OutboundShareStream
 import dev.ipf.whitenoise.android.share.launchOutboundShare
 import dev.ipf.whitenoise.android.share.outboundShareChooser
 import dev.ipf.whitenoise.android.share.outboundShareIntent
+import dev.ipf.whitenoise.android.state.ATTACHMENT_EXPLICIT_READ_MAX_BYTES
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import kotlinx.coroutines.Dispatchers
@@ -107,12 +108,14 @@ internal suspend fun shareMessageExternally(
         stageMessageShareStreams(context, sources) { source ->
             when (source) {
                 is MessageShareAttachmentSource.Confirmed ->
+                    // An explicit Share stages the whole verified file, so it is not bounded by the preview budget.
                     attachmentBytes(
                         controller = controller,
                         messageIdHex = messageIdHex,
                         attachmentIndex = source.attachmentIndex,
                         reference = source.reference,
                         mine = mine,
+                        maxBytes = ATTACHMENT_EXPLICIT_READ_MAX_BYTES,
                     )
                 is MessageShareAttachmentSource.Retained -> source.attachment.plaintextBytes
             }

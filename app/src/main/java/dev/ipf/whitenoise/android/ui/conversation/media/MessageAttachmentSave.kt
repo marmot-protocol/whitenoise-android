@@ -4,6 +4,7 @@ import android.content.Context
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
+import dev.ipf.whitenoise.android.state.ATTACHMENT_EXPLICIT_READ_MAX_BYTES
 import dev.ipf.whitenoise.android.state.ConversationController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -116,6 +117,7 @@ private suspend fun saveMessageImageAttachment(
     attachmentIndex: Int,
     reference: MediaAttachmentReferenceFfi,
 ): Boolean {
+    // An explicit Save hands the whole verified image to MediaStore, so it is not bounded by the preview budget.
     val bytes =
         attachmentBytes(
             controller = context.controller,
@@ -123,6 +125,7 @@ private suspend fun saveMessageImageAttachment(
             attachmentIndex = attachmentIndex,
             reference = reference,
             mine = context.mine,
+            maxBytes = ATTACHMENT_EXPLICIT_READ_MAX_BYTES,
         )
     return withContext(Dispatchers.IO) {
         saveAttachmentToMediaStore(

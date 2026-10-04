@@ -1396,6 +1396,8 @@
     <string name="media_uploading">Uploading…</string>
     <string name="media_upload_failed">Upload failed</string>
     <string name="media_tap_to_retry">Tap to retry</string>
+    <string name="media_too_large_to_preview">Too large to preview</string>
+    <string name="media_too_large_to_preview_hint">Save or share this image to view it with another app</string>
     <string name="media_tap_to_download">Tap to download</string>
     <string name="media_preparing_download">Preparing download</string>
     <string name="media_preparing_attachment">Preparing attachment</string>

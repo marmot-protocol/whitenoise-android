@@ -299,7 +299,7 @@ internal fun TileTransferGlyph(
 
 /** Step and byte text for sighted readers; the spoken description lives on the control itself. */
 @Composable
-private fun TileTransferCaption(text: String) {
+internal fun TileTransferCaption(text: String) {
     Text(
         text = text,
         color = Color.White,

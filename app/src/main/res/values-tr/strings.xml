@@ -1023,6 +1023,8 @@
     <string name="media_uploading">Yükleniyor…</string>
     <string name="media_upload_failed">Yükleme başarısız</string>
     <string name="media_tap_to_retry">Yeniden denemek için dokunun</string>
+    <string name="media_too_large_to_preview">Önizleme için çok büyük</string>
+    <string name="media_too_large_to_preview_hint">Başka bir uygulamada görüntülemek için bu görseli kaydedin veya paylaşın</string>
     <string name="media_tap_to_download">İndirmek için dokunun</string>
     <string name="media_preparing_download">İndirme hazırlanıyor</string>
     <string name="media_preparing_attachment">Ek hazırlanıyor</string>
