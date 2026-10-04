@@ -1784,7 +1784,13 @@ internal fun ConversationScreen(
                 retainedDocuments.size,
                 MEDIA_PICKER_MAX_ITEMS,
             )
-        pendingMediaSlots = appendPendingMediaSlots(retainedMedia, capped.accepted.mediaUris, MEDIA_PICKER_MAX_ITEMS)
+        pendingMediaSlots =
+            restoreImportedMediaSlots(
+                pendingMediaSlots,
+                capped.accepted.mediaUris,
+                MEDIA_PICKER_MAX_ITEMS,
+                importedShareFiles::owns,
+            )
         pendingDocumentUris = (retainedDocuments + capped.accepted.documentUris).distinct()
         if (capped.droppedCount > 0) {
             appState.presentText(

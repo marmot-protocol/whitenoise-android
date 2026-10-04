@@ -472,6 +472,7 @@ internal class ConversationMediaSender(
         val pendingDraftClear =
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
+        val sourceAccount = appState.accounts.firstOrNull { it.label == controller.boundAccountRef }?.accountIdHex
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             var accepted = false
@@ -494,7 +495,7 @@ internal class ConversationMediaSender(
                 sourceLease =
                     withContext(Dispatchers.IO) {
                         dev.ipf.whitenoise.android.share.PrivateShareSendLease
-                            .acquire(context, imageSlots.map { it.uri } + documentUris)
+                            .acquire(context, imageSlots.map { it.uri } + documentUris, sourceAccount)
                     }
                 val seeded =
                     seedPreparedAttachments(

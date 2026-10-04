@@ -31,6 +31,7 @@ class AccountWipeMemberMuteRetentionTest {
     private val context: Application = RuntimeEnvironment.getApplication()
     private var listAccountsFailure: Throwable? = null
     private var wiped = false
+    private var localCleanupCompleted = true
 
     private fun localAccount(
         label: String,
@@ -67,7 +68,7 @@ class AccountWipeMemberMuteRetentionTest {
                         groupLeaveFailures = emptyList(),
                         keyPackagesDeleted = 1u,
                         keyPackageFailures = emptyList(),
-                        localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
+                        localCleanup = LocalCleanupReportFfi(completed = localCleanupCompleted, reason = null),
                     ).also { wiped = true }
                 "listAccounts" -> {
                     listAccountsFailure?.let(::suspendFailure)
@@ -124,6 +125,49 @@ class AccountWipeMemberMuteRetentionTest {
                 !appState.memberMutePreferences.isMuted(WIPED_ACCOUNT, GROUP, MEMBER),
             )
         }
+
+    @Test
+    fun successfulWipePurgesItsPrivateShareShelfAndPreservesAnotherAccount() =
+        runBlocking {
+            val state = appState()
+            val files = dev.ipf.whitenoise.android.share.PrivateShareFiles(context)
+            val removed = stagedFile(files, localAccount(WIPED_ACCOUNT).accountIdHex)
+            val retained = stagedFile(files, localAccount(SURVIVING_ACCOUNT).accountIdHex)
+            try {
+                state.signOutAndWipeActiveAccount()
+                org.junit.Assert.assertNull(files.resolve(removed))
+                org.junit.Assert.assertNotNull(files.metadata(retained))
+            } finally {
+                files.leases.releaseAccount(localAccount(WIPED_ACCOUNT).accountIdHex)
+                files.leases.releaseAccount(localAccount(SURVIVING_ACCOUNT).accountIdHex)
+            }
+        }
+
+    @Test
+    fun failedNativeLocalCleanupKeepsThePrivateShareShelf() =
+        runBlocking {
+            localCleanupCompleted = false
+            val state = appState()
+            val files = dev.ipf.whitenoise.android.share.PrivateShareFiles(context)
+            val uri = stagedFile(files, localAccount(WIPED_ACCOUNT).accountIdHex)
+            try {
+                state.signOutAndWipeActiveAccount()
+                org.junit.Assert.assertNotNull(files.metadata(uri))
+            } finally {
+                files.leases.releaseAccount(localAccount(WIPED_ACCOUNT).accountIdHex)
+            }
+        }
+
+    private fun stagedFile(
+        files: dev.ipf.whitenoise.android.share.PrivateShareFiles,
+        account: String,
+    ): android.net.Uri {
+        val (uri, file) = files.newFile()
+        file.writeBytes(byteArrayOf(1))
+        files.finish(uri, "file", "application/octet-stream", 1)
+        files.leases.saveShelf(account, GROUP, listOf(uri))
+        return uri
+    }
 
     /** A refresh that fails right after the wipe must not prune an unrelated account's mutes. */
     @Test

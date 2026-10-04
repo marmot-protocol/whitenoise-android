@@ -178,16 +178,7 @@ internal class ShareFileImporter(
             staged = uri
             onStaged(uri)
             copyLimit = minOf(remaining, files.availableBytes())
-            val reader = ShareSourceReader(metadata, open) { info, header ->
-                val isImage =
-                    resolveShareMime(info.mime, intentMime).startsWith("image/") ||
-                        dev.ipf.whitenoise.android.media.MediaPipeline.sniffImageMediaType(header) != null
-                if (isImage) {
-                    PRIVATE_SHARE_MAX_BYTES
-                } else {
-                    PRIVATE_SHARE_DOCUMENT_MAX_BYTES
-                }
-            }
+            val reader = ShareSourceReader(metadata, open) { info, header -> sourceLimit(info, header, intentMime) }
             val copied = reader.copy(source, file, copyLimit, progress)
             files.finish(uri, copied.name, resolveShareMime(copied.mime, intentMime), copied.size)
             staged = null
@@ -221,6 +212,17 @@ internal class ShareFileImporter(
     private suspend fun importFailure(error: ShareImportError): ImportedFile {
         currentCoroutineContext().ensureActive()
         return ImportedFile(error = error)
+    }
+
+    private fun sourceLimit(
+        info: ShareSourceMetadata,
+        header: ByteArray,
+        intentMime: String?,
+    ): Long {
+        val isImage =
+            resolveShareMime(info.mime, intentMime).startsWith("image/") ||
+                dev.ipf.whitenoise.android.media.MediaPipeline.sniffImageMediaType(header) != null
+        return if (isImage) PRIVATE_SHARE_MAX_BYTES else PRIVATE_SHARE_DOCUMENT_MAX_BYTES
     }
 
     private data class ImportedFile(

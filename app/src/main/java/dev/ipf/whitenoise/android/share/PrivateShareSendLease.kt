@@ -33,6 +33,7 @@ internal class PrivateShareSendLease private constructor(
         fun acquire(
             context: Context,
             uris: List<Uri>,
+            account: String? = null,
         ): PrivateShareSendLease? {
             val files = PrivateShareFiles(context)
             val owned = uris.filter(files::owns)
@@ -40,7 +41,7 @@ internal class PrivateShareSendLease private constructor(
                 null
             } else {
                 val id = UUID.randomUUID().toString()
-                files.leases.holdSend(id, owned)
+                files.leases.holdSend(id, owned, account)
                 PrivateShareSendLease(files, id)
             }
         }

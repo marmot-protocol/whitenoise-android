@@ -60,6 +60,31 @@ class ShareFileImporterTest {
             assertTrue(imported.payload.importErrors.isEmpty())
         }
 
+    @Test fun accountWipeReleasesOnlyItsShelvesAndQueuedSends() =
+        runBlocking {
+            val importer =
+                ShareFileImporter(
+                    files,
+                    { _, _ -> ShareSourceMetadata("file", null, null) },
+                    { _, _ -> ByteArrayInputStream(byteArrayOf(1)) },
+                )
+            val imported = importer.import(request(List(4) { Uri.parse("content://external/$it") }))
+            val (first, second, shared, queued) = imported.payload.streamUris
+            files.leases.saveShelf("first-account", "chat", listOf(first, shared))
+            files.leases.saveShelf("second-account", "chat", listOf(second, shared))
+            files.leases.holdSend("queued", listOf(queued), "first-account")
+            files.leases.releaseRequest(imported.requestId)
+            files.leases.releaseAccount("first-account")
+            assertTrue(files.leases.loadShelf("first-account", "chat").isEmpty())
+            assertEquals(listOf(second, shared), files.leases.loadShelf("second-account", "chat"))
+            assertNull(files.resolve(first))
+            assertNull(files.resolve(queued))
+            assertNotNull(files.metadata(second))
+            assertNotNull(files.metadata(shared))
+            files.leases.releaseAccount("second-account")
+            assertTrue(root.listFiles().orEmpty().isEmpty())
+        }
+
     @Test fun missingSizeIsMeasuredAndProviderMimeBeatsIntentMime() =
         runBlocking {
             val importer =

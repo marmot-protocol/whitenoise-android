@@ -100,6 +100,23 @@ class PendingShareRequestStoreTest {
         }
 
     @Test
+    fun failedInterruptionMarkerDoesNotOpenAnyExternalSource() =
+        kotlinx.coroutines.runBlocking {
+            val delegate =
+                object : PendingShareRequestStore by store() {
+                    override fun save(request: ShareRequest): Boolean = false
+                }
+            var imported = false
+            val serialized =
+                SerializedPendingShareRequestStore(delegate, importRequest = {
+                    imported = true
+                    it
+                })
+            assertFalse(serialized.save(request("failed-marker", text = "caption")))
+            assertFalse(imported)
+        }
+
+    @Test
     fun newRequestReplacesThePreviousPendingShare() {
         val first = request("request-1", text = "first")
         val second = request("request-2", text = "second")

@@ -201,6 +201,46 @@ class ImportedShareDocumentBoundaryTest {
         }
 
     @Test
+    fun rejectedDestinationCommitPreservesConcurrentComposerRemovalAndAddition() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val files = PrivateShareFiles(context)
+            val importer =
+                ShareFileImporter(
+                    files,
+                    { _, _ -> ShareSourceMetadata("file", null, null) },
+                    { _, _ -> ByteArrayInputStream(byteArrayOf(1)) },
+                )
+            val sources = listOf("old", "incoming", "concurrent").map { Uri.parse("content://x/$it") }
+            val request =
+                importer.import(
+                    ShareRequest(
+                        SharePayload(null, sources, null),
+                        shortcutId = null,
+                        requestId = "concurrent-rollback",
+                    ),
+                )
+            val (old, incoming, concurrent) = request.payload.streamUris
+            files.leases.saveShelf("account", "chat", listOf(old))
+            val committed =
+                retainShareAtDestination(
+                    context,
+                    "account",
+                    listOf("chat"),
+                    request.payload.copy(streamUris = listOf(incoming)),
+                ) {
+                    files.leases.changeShelf("account", "chat", listOf(old), listOf(concurrent))
+                    false
+                }
+            org.junit.Assert.assertFalse(committed)
+            assertEquals(listOf(concurrent), files.leases.loadShelf("account", "chat"))
+            org.junit.Assert.assertNotNull(files.metadata(incoming))
+            files.leases.releaseRequest(request.requestId)
+            files.leases.saveShelf("account", "chat", emptyList())
+            assertTrue(files.availableBytes() == PRIVATE_SHARE_BATCH_MAX_BYTES)
+        }
+
+    @Test
     fun rejectedDestinationCommitKeepsTheRecoverableRequestAndRestoresPriorShelves() =
         runBlocking {
             val context = ApplicationProvider.getApplicationContext<Context>()

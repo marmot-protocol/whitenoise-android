@@ -14,22 +14,28 @@ internal suspend fun retainShareAtDestination(
     commit: suspend (droppedCount: Int) -> Boolean,
 ): Boolean {
     val files = PrivateShareFiles(context)
-    val previous = withContext(Dispatchers.IO) { groups.associateWith { files.leases.loadShelf(account, it) } }
+    val previous = mutableMapOf<String, List<android.net.Uri>>()
     var committed = false
     return try {
         val dropped =
             withContext(Dispatchers.IO) {
-                previous
-                    .map { (group, shelf) ->
-                        val retained = files.leases.saveShelf(account, group, shelf + payload.streamUris)
-                        payload.streamUris.count { files.owns(it) && it !in retained }
-                    }.maxOrNull() ?: 0
+                synchronized(privateShareLock) {
+                    groups
+                        .distinct()
+                        .map { group ->
+                            previous[group] = files.leases.loadShelf(account, group)
+                            val retained = files.leases.changeShelf(account, group, emptyList(), payload.streamUris)
+                            payload.streamUris.count { files.owns(it) && it !in retained }
+                        }.maxOrNull() ?: 0
+                }
             }
         commit(dropped).also { committed = it }
     } finally {
         if (!committed) {
             withContext(NonCancellable + Dispatchers.IO) {
-                previous.forEach { (group, shelf) -> files.leases.saveShelf(account, group, shelf) }
+                previous.forEach { (group, shelf) ->
+                    files.leases.changeShelf(account, group, shelf + payload.streamUris, shelf)
+                }
             }
         }
     }

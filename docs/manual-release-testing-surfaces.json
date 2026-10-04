@@ -25247,10 +25247,16 @@
     ],
     "source_coverage": [
       {
-        "surface": "Share picker staging rejection",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
-        "anchor": "R.string.no_share_target_available",
-        "test_ids": ["SYS-004", "SYS-005"]
+        "surface": "Private share account wipe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": ".leases.releaseAccount(account)",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "Share destination rollback ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShelfCommit.kt",
+        "anchor": "fun retainShareAtDestination(",
+        "test_ids": ["SYS-005"]
       },
       {
         "surface": "Share-owned attachment discard storage recovery",

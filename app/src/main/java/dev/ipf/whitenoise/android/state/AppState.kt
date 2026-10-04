@@ -6292,6 +6292,7 @@ class WhiteNoiseAppState private constructor(
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
+        val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
         try {
@@ -6348,6 +6349,13 @@ class WhiteNoiseAppState private constructor(
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
             }
             withContext(NonCancellable + Dispatchers.IO) {
+                wipedShareAccount?.takeIf(String::isNotBlank)?.let { account ->
+                    runCatching {
+                        dev.ipf.whitenoise.android.share.PrivateShareFiles(appContext).leases.releaseAccount(account)
+                    }.onFailure {
+                        appStateDebug(it) { "private share purge failed after wipe: ${it.readableMessage()}" }
+                    }
+                }
                 runCatching {
                     if (editorSessionStore.removeAccount(wipedRef)) {
                         editorSessionStore.sourceLeaseReferenceCounts()?.let(editorSourceStore::reconcile)

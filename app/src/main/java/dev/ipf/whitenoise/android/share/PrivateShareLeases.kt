@@ -4,7 +4,6 @@ import android.net.Uri
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 
 /** Durable ownership references; one picker, destination shelf or queued send can release independently. */
 internal class PrivateShareLeases(
@@ -19,13 +18,16 @@ internal class PrivateShareLeases(
         group: String,
         uris: List<Uri>,
     ) = synchronized(privateShareLock) {
-        val shelf = shelfFile(account, group)
+        val shelf = privateShareLeaseFile(root, "shelf", "$account $group")
         val previous = loadShelf(account, group)
         val owned = capPrivateShareShelf(uris, metadata)
         if (owned.isEmpty()) {
             if (shelf.exists() && !shelf.delete()) throw IOException("Cannot release private share shelf")
         } else {
-            writePrivateShareJson(shelf, JSONObject().put("uris", org.json.JSONArray(owned.map(Uri::toString))))
+            writePrivateShareJson(
+                shelf,
+                JSONObject().put("account", account).put("uris", org.json.JSONArray(owned.map(Uri::toString))),
+            )
         }
         previous.filterNot(owned::contains).forEach(::deleteIfUnreferenced)
         owned
@@ -48,7 +50,9 @@ internal class PrivateShareLeases(
         group: String,
     ): List<Uri> =
         synchronized(privateShareLock) {
-            val json = readPrivateShareJson(shelfFile(account, group)) ?: return@synchronized emptyList()
+            val json =
+                readPrivateShareJson(privateShareLeaseFile(root, "shelf", "$account $group"))
+                    ?: return@synchronized emptyList()
             val rows = json.optJSONArray("uris") ?: return@synchronized emptyList()
             List(rows.length().coerceAtMost(MAX_PENDING_SHARE_URIS)) { Uri.parse(rows.optString(it)) }
                 .filter { metadata(it) != null }
@@ -57,10 +61,11 @@ internal class PrivateShareLeases(
     fun holdSend(
         id: String,
         uris: List<Uri>,
+        account: String? = null,
     ) = synchronized(privateShareLock) {
         writePrivateShareJson(
             File(root, "send-$id.lease"),
-            JSONObject().put("uris", org.json.JSONArray(uris.filter(owns).map(Uri::toString))),
+            JSONObject().put("account", account).put("uris", org.json.JSONArray(uris.filter(owns).map(Uri::toString))),
         )
     }
 
@@ -82,7 +87,7 @@ internal class PrivateShareLeases(
             releaseRequest(requestId)
         } else {
             writePrivateShareJson(
-                requestFile(requestId),
+                privateShareLeaseFile(root, "request", requestId),
                 JSONObject().put("uris", org.json.JSONArray(owned.map(Uri::toString))),
             )
         }
@@ -90,7 +95,7 @@ internal class PrivateShareLeases(
 
     fun releaseRequest(requestId: String) =
         synchronized(privateShareLock) {
-            val file = requestFile(requestId)
+            val file = privateShareLeaseFile(root, "request", requestId)
             val uris = readPrivateShareJson(file)?.optJSONArray("uris")
             file.delete()
             if (uris != null) repeat(uris.length()) { deleteIfUnreferenced(Uri.parse(uris.optString(it))) }
@@ -111,26 +116,19 @@ internal class PrivateShareLeases(
             uris.forEach(::deleteIfUnreferenced)
         }
 
-    private fun shelfFile(
-        account: String,
-        group: String,
-    ): File {
-        val key =
-            MessageDigest
-                .getInstance("SHA-256")
-                .digest("$account $group".toByteArray())
-                .joinToString("") { "%02x".format(java.util.Locale.ROOT, it) }
-        return File(root, "shelf-$key.lease")
-    }
-
-    private fun requestFile(id: String): File {
-        val key =
-            MessageDigest
-                .getInstance("SHA-256")
-                .digest(id.toByteArray())
-                .joinToString("") { "%02x".format(java.util.Locale.ROOT, it) }
-        return File(root, "request-$key.lease")
-    }
+    /** Wipe only this account's destination/send ownership; shared bytes stay with their other owners. */
+    fun releaseAccount(account: String) =
+        synchronized(privateShareLock) {
+            require(account.isNotBlank())
+            root.listFiles().orEmpty().filter { it.extension == "lease" }.forEach { file ->
+                val json = readPrivateShareJson(file) ?: return@forEach
+                if (json.optString("account") == account) {
+                    if (!file.delete()) throw IOException("Cannot release private share account")
+                    val rows = json.optJSONArray("uris")
+                    if (rows != null) repeat(rows.length()) { deleteIfUnreferenced(Uri.parse(rows.optString(it))) }
+                }
+            }
+        }
 
     private fun deleteIfUnreferenced(uri: Uri) {
         val referenced =
