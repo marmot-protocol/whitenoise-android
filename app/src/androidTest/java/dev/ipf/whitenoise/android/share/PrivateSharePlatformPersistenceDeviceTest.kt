@@ -34,7 +34,8 @@ class PrivateSharePlatformPersistenceDeviceTest {
                         .getUriForFile(context, "${context.packageName}.fileprovider", file)
                 val prefixed = uri.buildUpon().authority("0@${uri.authority}").build()
                 val privateSource =
-                    Uri.Builder()
+                    Uri
+                        .Builder()
                         .scheme("content")
                         .authority("0@${context.packageName}.private-share")
                         .appendPath(UUID.randomUUID().toString())
