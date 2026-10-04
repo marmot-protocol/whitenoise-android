@@ -13,12 +13,17 @@ class TriggerPolicyError(ValueError):
 
 
 def production_sources(build: str) -> list[str]:
-    matches = re.findall(
+    matches = list(re.finditer(
         r'val\s+fuzzProductionIncludes\s*=\s*listOf\((.*?)\n\s*\)', build, re.DOTALL,
-    )
+    ))
     if len(matches) != 1:
         raise TriggerPolicyError('expected exactly one literal fuzzProductionIncludes list')
-    body = re.sub(r'//[^\n]*', '', matches[0])
+    # This is a restricted literal declaration reader, not a Kotlin evaluator.
+    # Require EOF or a new declaration, never silently consume a list prefix.
+    tail = re.sub(r'//[^\n]*', '', build[matches[0].end():])
+    if tail.strip() and not re.match(r'[ \t]*\n\s*(?:val|var|fun|class|object)\s+', tail):
+        raise TriggerPolicyError('unsupported production allow-list initializer continuation')
+    body = re.sub(r'//[^\n]*', '', matches[0].group(1))
     entries = re.findall(r'"([^"\n]+)"', body)
     remainder = re.sub(r'"[^"\n]+"', '', body)
     if re.sub(r'[\s,]', '', remainder) or not entries or len(entries) != len(set(entries)):

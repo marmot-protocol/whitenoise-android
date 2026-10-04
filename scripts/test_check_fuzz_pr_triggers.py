@@ -57,6 +57,15 @@ class FuzzPrTriggerPolicyTest(unittest.TestCase):
             with self.subTest(body=body), self.assertRaises(TriggerPolicyError):
                 production_sources(build)
 
+    def test_chained_allowlist_initializers_fail_closed(self):
+        path = 'dev/ipf/whitenoise/android/media/NewParser.kt'
+        literal = 'val fuzzProductionIncludes = listOf(\n"dev/ipf/whitenoise/android/core/ProfileLink.kt",\n)'
+        for suffix in (f'.plus("{path}")', f' + listOf("{path}")',
+                       f'\n    .plus("{path}")', f'\n    + listOf("{path}")',
+                       f' // continuation\n    .plus("{path}")'):
+            with self.subTest(suffix=suffix), self.assertRaises(TriggerPolicyError):
+                production_sources(literal + suffix + '\n')
+
     def test_unknown_yaml_configuration_fails_closed(self):
         for line in ('      - ["fuzz/**", "app/**"]', '      - &anchor fuzz/**', '\t- fuzz/**'):
             workflow = 'on:\n  pull_request:\n    paths:\n' + line + '\n'
