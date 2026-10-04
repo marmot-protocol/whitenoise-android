@@ -67,6 +67,7 @@ import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.GroupProjector
+import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.LeaveAction
 import dev.ipf.whitenoise.android.core.MediaPreviewFallback
@@ -86,6 +87,7 @@ import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.core.withAuthoritativeEdits
+import dev.ipf.whitenoise.android.diagnostics.GroupMembershipTimings
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -5834,106 +5836,11 @@ internal fun conversationIdentityProjection(
     )
 }
 
-/**
- * Short-lived presentation intent for a roster mutation that MDK has not
- * reconciled yet. The authoritative [ConversationController.members] and
- * [ConversationController.group] values are never changed by this overlay.
- */
-internal sealed interface OptimisticGroupRosterMutation {
-    data class Invite(
-        val memberRefs: List<String>,
-    ) : OptimisticGroupRosterMutation
-
-    data class Remove(
-        val memberIdHex: String,
-    ) : OptimisticGroupRosterMutation
-
-    data class SetAdmin(
-        val memberIdHex: String,
-        val admin: Boolean,
-    ) : OptimisticGroupRosterMutation
-}
-
 private enum class GroupAdministrationCommitOutcome {
     COMMITTED,
     ROSTER_CHANGED,
     KEEP_ONE_ADMIN,
     NO_CHANGE,
-}
-
-internal suspend fun canonicalGroupInviteRefs(
-    memberRefs: List<String>,
-    resolveAccountIdHex: suspend (String) -> String?,
-): List<String> {
-    val canonicalRefs = mutableListOf<String>()
-    val seenInputs = mutableSetOf<String>()
-    val seenAccountIds = mutableSetOf<String>()
-    memberRefs.forEach { rawRef ->
-        val memberRef = rawRef.trim()
-        if (memberRef.isEmpty() || !seenInputs.add(memberRef)) return@forEach
-        val accountIdHex =
-            resolveAccountIdHex(memberRef)
-                ?: throw IllegalArgumentException("Invalid member reference")
-        if (seenAccountIds.add(accountIdHex.lowercase())) canonicalRefs += accountIdHex
-    }
-    return canonicalRefs
-}
-
-internal fun projectedGroupMembers(
-    authoritativeMembers: List<AppGroupMemberRecordFfi>,
-    mutation: OptimisticGroupRosterMutation?,
-): List<AppGroupMemberRecordFfi> =
-    if (mutation is OptimisticGroupRosterMutation.Remove) {
-        authoritativeMembers.filterNot {
-            it.memberIdHex.equals(mutation.memberIdHex, ignoreCase = true)
-        }
-    } else {
-        authoritativeMembers
-    }
-
-internal fun pendingGroupInviteRefs(
-    authoritativeMembers: List<AppGroupMemberRecordFfi>,
-    mutation: OptimisticGroupRosterMutation?,
-): List<String> {
-    val refs = (mutation as? OptimisticGroupRosterMutation.Invite)?.memberRefs.orEmpty()
-    if (refs.isEmpty()) return emptyList()
-    val memberIds = authoritativeMembers.map { it.memberIdHex.lowercase() }.toSet()
-    return refs.filterNot { it.lowercase() in memberIds }
-}
-
-internal fun projectedGroupAdmin(
-    authoritativeAdmin: Boolean,
-    memberIdHex: String,
-    mutation: OptimisticGroupRosterMutation?,
-): Boolean =
-    (mutation as? OptimisticGroupRosterMutation.SetAdmin)
-        ?.takeIf { it.memberIdHex.equals(memberIdHex, ignoreCase = true) }
-        ?.admin
-        ?: authoritativeAdmin
-
-/**
- * Owns one lifecycle-bound optimistic roster mutation. Projection always uses
- * the caller's latest authoritative values, so rollback cannot restore a stale
- * roster if an MDK subscription update arrives while the commit is pending.
- */
-internal class OptimisticGroupRosterMutationTracker {
-    var current by mutableStateOf<OptimisticGroupRosterMutation?>(null)
-        private set
-
-    private val mutations = StalenessGuard()
-
-    /** Projects [mutation] until its own completion, without clearing a newer mutation. */
-    suspend fun <T> track(
-        mutation: OptimisticGroupRosterMutation,
-        block: suspend () -> T,
-    ): T {
-        val token = mutations.advance { current = mutation }
-        return try {
-            block()
-        } finally {
-            mutations.runIfCurrent(token) { current = null }
-        }
-    }
 }
 
 internal fun conversationStartsLoading(
@@ -6142,7 +6049,16 @@ class ConversationController(
     var members by mutableStateOf<List<AppGroupMemberRecordFfi>>(membershipSeed.members)
         private set
 
-    private val optimisticGroupRosterMutation = OptimisticGroupRosterMutationTracker()
+    internal val membershipTimings = GroupMembershipTimings()
+    private val optimisticGroupRosterMutation =
+        OptimisticGroupRosterMutationTracker(
+            onMembershipStarted = membershipTimings::pendingAccepted,
+            onMembershipSettled = membershipTimings::pendingSettled,
+        )
+
+    /** Ephemeral action feedback belonging only to this account-bound conversation controller. */
+    internal val pendingMembershipActivity: PendingGroupMembershipActivity?
+        get() = optimisticGroupRosterMutation.pendingMembershipActivity
 
     /** Roster shown by group-management UI while MDK reconciles a local action. */
     val presentedMembers: List<AppGroupMemberRecordFfi>
@@ -11331,6 +11247,7 @@ class ConversationController(
             val refs = resolveCanonicalInviteRefs(memberRefs) ?: return@withMutationLockResult false
             if (refs.isEmpty()) return@withMutationLockResult false
             optimisticGroupRosterMutation.track(OptimisticGroupRosterMutation.Invite(refs)) {
+                val activityId = pendingMembershipActivity?.id
                 var inviteSent = false
                 try {
                     val adminTargets = if (addAsAdmin) refs else emptyList()
@@ -11345,6 +11262,7 @@ class ConversationController(
                                 }
                             applyMutationDetails(account, inviteResult.details)
                             inviteSent = true
+                            optimisticGroupRosterMutation.settleMembershipActivity(activityId)
                             adminTargets.forEach { target ->
                                 val promoteResult =
                                     appState.marmotIo(MarmotTraceSection.PROMOTE_ADMIN) {
@@ -12107,6 +12025,7 @@ class ConversationController(
         val preparationGeneration = timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
         val applied = installed?.page ?: page
+        applied.messages.forEach(::recordMembershipProjectionArrival)
         val snapshot = currentWindowApplySnapshot()
         val preparation =
             prepareWindowApplyOn(
@@ -12262,6 +12181,7 @@ class ConversationController(
             when (change) {
                 is TimelineMessageChangeFfi.Upsert -> {
                     val record = change.message
+                    recordMembershipProjectionArrival(record)
                     val actionRecord =
                         upsertProjectedRecord(
                             record,
@@ -12570,6 +12490,16 @@ class ConversationController(
         ).forEach(optimisticReactionChanges::remove)
     }
 
+    /** Arrival is timed before window preparation; stable row IDs stay local to this controller. */
+    private fun recordMembershipProjectionArrival(record: TimelineMessageRecordFfi) {
+        if (record.messageIdHex !in timelineRecords &&
+            record.groupSystem?.systemType in setOf("member_added", "member_removed") &&
+            GroupSystemEvents.resolve(record)?.fromAuthenticatedStateProjection == true
+        ) {
+            membershipTimings.projectionArrived(record.messageIdHex)
+        }
+    }
+
     private fun upsertProjectedRecord(
         record: TimelineMessageRecordFfi,
         reconcileOptimistic: Boolean = false,
@@ -12601,6 +12531,7 @@ class ConversationController(
             recoverPendingEditStatusForProjection(record)
             return preparedAction ?: TimelineProjector.toAppMessageRecord(record)
         }
+        recordMembershipProjectionArrival(record)
         var retentionAtSendSeconds =
             previousItemId?.let { itemId -> timelineItemsById[itemId]?.retentionAtSendSeconds }
         if (previousItemId != null) {

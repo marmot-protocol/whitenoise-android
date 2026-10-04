@@ -155,6 +155,8 @@ class PerformanceDiagnosticSchemaTest {
                 "attachment_fetch",
                 "sync_catch_up",
                 "chat_history_page",
+                "group_membership_pending",
+                "group_membership_projection",
             ),
             PerformanceOperation.entries.mapTo(mutableSetOf()) { it.wireName },
         )

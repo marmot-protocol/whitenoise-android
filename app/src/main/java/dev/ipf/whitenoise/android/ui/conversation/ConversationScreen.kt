@@ -2310,6 +2310,7 @@ internal fun ConversationScreen(
         conversationTimelineTailListIndex(
             timelineSize = renderedTimeline.size,
             trailingRowCount = trailingRowCount,
+            hasPendingMembership = controller.pendingMembershipActivity != null,
         ) ?: 0
     val currentTailIndex by rememberUpdatedState(newValue = tailTimelineIndex)
     val seededTailAlignmentReady =
@@ -3849,6 +3850,23 @@ internal fun ConversationScreen(
                                     targetEdge = ConversationLoadFailureEdge.BOTTOM,
                                     onRetry = { scope.launch { controller.retryLoadFailure() } },
                                 )
+                                controller.pendingMembershipActivity?.let { activity ->
+                                    item(key = "pending-membership:${activity.id}", contentType = "pendingMembership") {
+                                        PendingGroupMembershipRow(
+                                            activity = activity,
+                                            displayName = { ref ->
+                                                appState.contactNicknameFor(controller.boundAccountRef, ref)
+                                                    ?: appState.networkDisplayName(ref)
+                                            },
+                                            modifier =
+                                                Modifier
+                                                    .timelineReadingExposure(timelineViewport)
+                                                    .membershipVisibleDraw(timelineViewport) {
+                                                        controller.membershipTimings.pendingFrame(activity.id)
+                                                    },
+                                        )
+                                    }
+                                }
                                 itemsIndexed(
                                     renderedTimelineNewestFirst,
                                     key = { _, item -> item.id },
@@ -3863,11 +3881,20 @@ internal fun ConversationScreen(
                                     },
                                 ) { index, item ->
                                     val messageId = item.record.messageIdHex
+                                    val membershipFrameModifier =
+                                        if (item.projected?.groupSystem?.systemType in setOf("member_added", "member_removed")) {
+                                            Modifier.membershipVisibleDraw(timelineViewport) {
+                                                controller.membershipTimings.projectionFrame(messageId)
+                                            }
+                                        } else {
+                                            Modifier
+                                        }
                                     TimelineRow(
                                         modifier =
                                             Modifier
                                                 .timelineReadingExposure(timelineViewport)
-                                                .conversationTailEntranceMotion(tailEntrance, item.id),
+                                                .conversationTailEntranceMotion(tailEntrance, item.id)
+                                                .then(membershipFrameModifier),
                                         item = item,
                                         // Newest-first rows: the chronologically
                                         // older neighbour is the next row emitted.
