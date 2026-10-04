@@ -156,6 +156,17 @@ class MediaEvidenceTest(unittest.TestCase):
         self.assertFalse(check_media(["not a metric"], read, events, boundary)["passed"])
         self.assertFalse(check_media(prepare, None, events, boundary)["passed"])
 
+    def test_a_readback_row_missing_its_identity_fails_closed_instead_of_raising(self):
+        """A malformed readback row is a violation, so the runner still writes the report for the failed attempt."""
+        prepare, read, events, boundary = evidence()
+        for field in ("role", "message", "index"):
+            altered = deepcopy(read)
+            row = next(m for m in altered if m.get("phase") == "media-readback")
+            del row[field]
+            result = check_media(prepare, altered, events, boundary)
+            self.assertFalse(result["passed"], field)
+            self.assertTrue(result["violations"], field)
+
 
 if __name__ == "__main__":
     unittest.main()

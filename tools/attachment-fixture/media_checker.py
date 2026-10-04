@@ -148,7 +148,7 @@ def check_media(prepare, read, events, boundary):
     sizes = _check_prepare(prepare, violations)
     _check_read(read, sizes, violations)
     _check_ledger(events, boundary, sizes, violations)
-    host_hits = {f"{r['role']}-{r['message']}-{r['index']}": r.get("host_disk_hit")
+    host_hits = {f"{r.get('role')}-{r.get('message')}-{r.get('index')}": r.get("host_disk_hit")
                  for r in read if r.get("phase") == "media-readback"}
     return {"passed": not violations, "violations": violations, "scope": SCOPE,
             "attachments": len(sizes), "host_disk_hits": host_hits, "performance_qualified": False}
