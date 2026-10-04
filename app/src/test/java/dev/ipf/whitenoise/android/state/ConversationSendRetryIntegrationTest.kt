@@ -232,6 +232,54 @@ class ConversationSendRetryIntegrationTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun oneDiscardRemovesAFailedOriginalAfterItsEarlierEditWasRejected() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val originalStarted = CompletableDeferred<Unit>()
+            val originalReturn = CompletableDeferred<Unit>()
+            var statusReads = 0
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    textPublisher = { _, _, _, _ ->
+                        originalStarted.complete(Unit)
+                        originalReturn.await()
+                        throw MarmotKitException.Runtime("original was never admitted")
+                    },
+                    pendingMessageEditPublisher = { _, _, _, _, _ ->
+                        throw MarmotKitException.Runtime("original token does not exist")
+                    },
+                    pendingEditStatusReader = { _, _, _ ->
+                        statusReads += 1
+                        LocalSendStatusFfi.Rejected
+                    },
+                )
+            try {
+                controller.retryMembers()
+                val originalSend = async(start = CoroutineStart.UNDISPATCHED) { controller.send("hello") }
+                originalStarted.await()
+                controller.beginMessageEdit(controller.timeline.single().record.messageIdHex)
+                controller.send("rejected revision")
+                runCurrent()
+                assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                originalReturn.complete(Unit)
+                originalSend.await()
+                assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                val readsBeforeDiscard = statusReads
+                controller.discardFailedSend(controller.timeline.single())
+                assertTrue(controller.timeline.isEmpty())
+                assertEquals(readsBeforeDiscard, statusReads)
+            } finally {
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun temporaryTargetRetryReplacesAnAuthoritativelyRejectedEditToken() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))

@@ -10396,11 +10396,7 @@ class ConversationController(
         // optimisticMessages entry); its retry re-runs the edit publish rather
         // than re-sending a new message. editMessage flips the overlay back to
         // Pending, so a double-tap finds it non-Failed and the guard below exits.
-        val failedEdit =
-            optimisticEdits[item.record.messageIdHex]?.takeIf {
-                it.status == MessageStatus.Failed &&
-                    !(it.durableIntent != null && optimisticMessages[key]?.status == MessageStatus.Failed)
-            }
+        val failedEdit = failedEditForAction(item)
         if (failedEdit != null) {
             val intent = failedEdit.durableIntent
             if (intent == null) {
@@ -10700,8 +10696,9 @@ class ConversationController(
         // Discarding a failed edit drops the local overlay, reverting the
         // bubble to its pre-edit body. The original message is untouched —
         // only the unsent kind-1009 edit is abandoned.
-        if (optimisticEdits[item.record.messageIdHex]?.status == MessageStatus.Failed) {
-            val edit = requireNotNull(optimisticEdits[item.record.messageIdHex])
+        val failedEdit = failedEditForAction(item)
+        if (failedEdit != null) {
+            val edit = failedEdit
             val intent = edit.durableIntent
             if (intent == null) {
                 optimisticEdits.remove(item.record.messageIdHex)
@@ -10722,6 +10719,13 @@ class ConversationController(
                 appState.presentFailure(R.string.toast_couldnt_delete_message, "MESSAGE_CANCEL", failure)
             }
     }
+
+    /** Retry and Discard act on a failed original before its dependent durable edit. */
+    private fun failedEditForAction(item: TimelineMessage): OptimisticEdit? =
+        optimisticEdits[item.record.messageIdHex]?.takeIf {
+            it.status == MessageStatus.Failed &&
+                !(it.durableIntent != null && optimisticMessages[item.id]?.status == MessageStatus.Failed)
+        }
 
     /** An unavailable acknowledgement cannot authorize discarding a durably queued revision. */
     private suspend fun discardPendingEdit(
