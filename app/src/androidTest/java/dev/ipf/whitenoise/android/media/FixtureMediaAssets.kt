@@ -82,6 +82,22 @@ internal object FixtureMediaAssets {
         return base + box.array()
     }
 
+    /**
+     * Grows a valid JPEG to [targetBytes] with random bytes after its end-of-image marker, which decoders ignore, so
+     * the result still decodes. It exists to make an image large enough to observe a transfer, not to measure
+     * throughput.
+     */
+    fun paddedJpeg(
+        base: ByteArray,
+        targetBytes: Int,
+        seed: Long,
+    ): ByteArray {
+        require(targetBytes > base.size)
+        val filler = ByteArray(targetBytes - base.size)
+        Random(seed).nextBytes(filler)
+        return base + filler
+    }
+
     /** One generated attachment as the shipping send path accepts it, with the digest the readback must reproduce. */
     fun attachment(
         bytes: ByteArray,

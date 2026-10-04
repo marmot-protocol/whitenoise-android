@@ -38,6 +38,7 @@ import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupRejoinInvitationFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
+import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -721,6 +722,9 @@ data class OptimisticEdit(
     val text: String,
     val preEditText: String,
     val status: MessageStatus,
+    val durableIntent: DurablePendingEditIntent? = null,
+    val nativeEditMessageId: String? = null,
+    val nativeRevisionRejected: Boolean = false,
 )
 
 /**
@@ -5972,6 +5976,8 @@ internal typealias MediaPublisher =
 
 internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
 
+private const val MESSAGE_EDIT_EVENT_KIND = 1009uL
+
 class ConversationController(
     internal val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -6008,6 +6014,9 @@ class ConversationController(
     private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
     },
+    private val pendingMessageEditPublisher: PendingMessageEditPublisher? = null,
+    private val pendingEditStatusReader: suspend (String, String, String) -> dev.ipf.marmotkit.LocalSendStatusFfi? =
+        { account, groupId, token -> appState.marmotIo { localSendStatus(account, groupId, token) } },
     private val mediaUploader: MediaUploader? = null,
     private val mediaImetaTagsBuilder: MediaImetaTagsBuilder = { account, groupIdHex, references ->
         appState.marmotIo {
@@ -6274,15 +6283,27 @@ class ConversationController(
      * banner reflects this and the next [send] routes through [editMessage]
      * instead of producing a new chat. Cleared on submit, cancel, or
      * navigation away. */
+    private var editSessionRevision = 0L
     var editingMessageId by mutableStateOf<String?>(null)
 
     fun beginMessageEdit(messageId: String) {
         if (editingMessageId != messageId) cancelMessageEdit()
-        if ("msg:$messageId" in optimisticMessages) pendingMessageEditHandoff.begin(pendingEditKey(messageId))
+        if (
+            "msg:$messageId" in optimisticMessages &&
+            (
+                optimisticMessages["msg:$messageId"]?.status != MessageStatus.Sent ||
+                    timelineRecords[messageId]?.sourceMessageIdHex == null
+            )
+        ) {
+            val originalToken = timelineRecords[messageId]?.clientToken ?: messageId
+            pendingMessageEditHandoff.begin(pendingEditKey(messageId), originalToken)
+        }
+        editSessionRevision += 1
         editingMessageId = messageId
     }
 
     fun cancelMessageEdit() {
+        editSessionRevision += 1
         val readyEdit = editingMessageId?.let { pendingMessageEditHandoff.cancel(pendingEditKey(it)) }
         editingMessageId = null
         readyEdit?.let { edit -> appState.launchMutation { editMessage(edit.targetId, edit.text) } }
@@ -7881,9 +7902,33 @@ class ConversationController(
         // [editsByTarget] picks it up.
         val editTarget = editingMessageId
         if (editTarget != null) {
+            // Native projection tokens come from MDK's retained submission ledger.
+            // Keep native edit ordering after publication and controller replacement too.
+            val originalToken =
+                pendingMessageEditHandoff.originalClientToken(pendingEditKey(editTarget))
+                    ?: optimisticEdits[editTarget]
+                        ?.takeIf { it.status != MessageStatus.Sent }
+                        ?.durableIntent
+                        ?.originalClientToken
+                    ?: timelineRecords[editTarget]?.clientToken
+            if (originalToken != null && (textPublisher == null || pendingMessageEditPublisher != null)) {
+                var session = editSessionRevision
+                // Local admission is independent of relay publication. Until it succeeds the editor
+                // retains its revision; an unadmitted original cannot silently consume this edit.
+                val admitted =
+                    admitPendingEdit(editTarget, originalToken, trimmed, onAttemptStarted = {
+                        editSessionRevision += 1
+                        session = editSessionRevision
+                    })
+                if (admitted && editSessionRevision == session) {
+                    pendingMessageEditHandoff.abandon(pendingEditKey(editTarget))
+                    editingMessageId = null
+                }
+                return
+            }
             val handoffKey = pendingEditKey(editTarget)
             if ("msg:$editTarget" in optimisticMessages && !pendingMessageEditHandoff.hasSession(handoffKey)) {
-                pendingMessageEditHandoff.begin(handoffKey)
+                pendingMessageEditHandoff.begin(handoffKey, editTarget)
             }
             val editSubmission = pendingMessageEditHandoff.submit(handoffKey, editTarget, trimmed)
             editingMessageId = null
@@ -9626,6 +9671,213 @@ class ConversationController(
         }
     }
 
+    /** Transfers the revision to MDK before dismissing the editor, with immutable tokens for safe retries. */
+    private suspend fun admitPendingEdit(
+        target: String,
+        originalToken: String,
+        text: String,
+        retryIntent: DurablePendingEditIntent? = null,
+        onAttemptStarted: () -> Unit = {},
+    ): Boolean {
+        val account = conversationAccountRef ?: return false
+        val confirmedTarget = pendingMessageEditHandoff.confirmedTarget(pendingEditKey(target))
+        val resolvedTarget =
+            confirmedTarget?.takeIf {
+                it in timelineRecords || "msg:$it" in optimisticMessages
+            } ?: target
+        val retained =
+            optimisticEdits[resolvedTarget]
+                ?.takeIf {
+                    !it.nativeRevisionRejected &&
+                        it.text == text &&
+                        it.durableIntent?.originalClientToken == originalToken
+                }?.durableIntent
+        val intent = retryIntent ?: retained ?: DurablePendingEditIntent(originalToken, UUID.randomUUID().toString())
+        return if (!pendingEditAdmissions.add(intent.editClientToken)) {
+            false
+        } else {
+            onAttemptStarted()
+            performPendingEdit(account, target, resolvedTarget, intent, text)
+        }
+    }
+
+    private suspend fun performPendingEdit(
+        account: String,
+        target: String,
+        resolvedTarget: String,
+        intent: DurablePendingEditIntent,
+        text: String,
+    ): Boolean {
+        val previous = optimisticEdits[resolvedTarget]?.preEditText ?: currentDisplayedText(resolvedTarget)
+        optimisticEdits[resolvedTarget] = OptimisticEdit(text, previous, MessageStatus.Pending, intent)
+        publishTimelineFromIndexes()
+        return try {
+            runCatchingCancellable { publishPendingEdit(account, intent, text) }.fold(
+                onSuccess = { summary -> completePendingEditAdmission(intent, summary, text) },
+                onFailure = { cause ->
+                    if (intent.editClientToken in pendingEditPublicationObserved) {
+                        true
+                    } else {
+                        failPendingEditAdmission(intent, target, account, cause)
+                        false
+                    }
+                },
+            )
+        } finally {
+            pendingEditAdmissions.remove(intent.editClientToken)
+            pendingEditPublicationObserved.remove(intent.editClientToken)
+            optimisticEdits.entries
+                .firstOrNull { it.value.durableIntent == intent }
+                ?.key
+                ?.let(::recoverPendingEditStatus)
+        }
+    }
+
+    private suspend fun publishPendingEdit(
+        account: String,
+        intent: DurablePendingEditIntent,
+        text: String,
+    ) = pendingEditAdmissionMutex.withLock {
+        // Preserve this controller's submission order at the local native boundary.
+        // Newer UI revisions already own their overlay while this admission waits.
+        pendingMessageEditPublisher?.invoke(
+            account,
+            group.groupIdHex,
+            intent.originalClientToken,
+            text,
+            intent.editClientToken,
+        ) ?: appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) {
+            admitPendingMessageEdit(account, group.groupIdHex, intent, text)
+        }
+    }
+
+    private fun completePendingEditAdmission(
+        intent: DurablePendingEditIntent,
+        summary: SendSummaryFfi,
+        text: String,
+    ): Boolean {
+        val current = optimisticEdits.entries.firstOrNull { it.value.durableIntent == intent }
+        if (current != null) {
+            optimisticEdits[current.key] = current.value.copy(nativeEditMessageId = summary.messageIds.firstOrNull())
+        }
+        publishTimelineFromIndexes()
+        return current != null ||
+            intent.editClientToken in pendingEditPublicationObserved ||
+            timelineRecords.values.any { record ->
+                record.edit?.latestEditMessageIdHex in summary.messageIds && record.plaintext == text
+            }
+    }
+
+    private fun failPendingEditAdmission(
+        intent: DurablePendingEditIntent,
+        target: String,
+        account: String,
+        cause: Throwable,
+    ) {
+        val current = optimisticEdits.entries.firstOrNull { it.value.durableIntent == intent }
+        if (current != null) {
+            if (optimisticMessages["msg:$target"]?.status == MessageStatus.Failed) {
+                optimisticEdits.remove(current.key)
+            } else {
+                optimisticEdits[current.key] = current.value.copy(status = MessageStatus.Failed)
+            }
+        }
+        publishTimelineFromIndexes()
+        if (current != null && appState.activeAccountRef == account) {
+            appState.presentFailure(R.string.toast_couldnt_edit_message, "MESSAGE_EDIT", cause)
+        }
+    }
+
+    private val pendingEditAdmissions = mutableSetOf<String>()
+    private val pendingEditAdmissionMutex = Mutex()
+
+    // Only in-flight callbacks retain this proof; finally removes it even on cancellation.
+    private val pendingEditPublicationObserved = mutableSetOf<String>()
+    private val pendingEditStatusReads = mutableSetOf<String>()
+    private val pendingEditStatusRechecks = mutableSetOf<String>()
+
+    /** Edit-event delivery can advance without changing the original row's rendered body. */
+    private fun recoverPendingEditStatusForProjection(record: TimelineMessageRecordFfi) {
+        val targets =
+            optimisticEdits
+                .filterValues { edit ->
+                    edit.nativeEditMessageId == record.messageIdHex ||
+                        (record.clientToken != null && edit.durableIntent?.editClientToken == record.clientToken)
+                }.keys
+                .toList()
+        recoverPendingEditStatus(record)
+        if (record.kind == MESSAGE_EDIT_EVENT_KIND && record.sourceMessageIdHex != null) {
+            targets.forEach { target ->
+                optimisticEdits[target]?.let { edit ->
+                    edit.durableIntent
+                        ?.editClientToken
+                        ?.takeIf { it in pendingEditAdmissions }
+                        ?.let(pendingEditPublicationObserved::add)
+                    optimisticEdits[target] =
+                        edit.copy(
+                            status = MessageStatus.Sent,
+                            nativeEditMessageId = record.messageIdHex,
+                        )
+                }
+            }
+            if (targets.isNotEmpty()) publishTimelineFromIndexes()
+        } else {
+            targets.mapNotNull(timelineRecords::get).forEach(::recoverPendingEditStatus)
+        }
+    }
+
+    /** Recover native engine ownership or terminal rejection when the target reprojects. */
+    private fun recoverPendingEditStatus(record: TimelineMessageRecordFfi) {
+        recoverPendingEditStatus(record.messageIdHex)
+    }
+
+    private fun recoverPendingEditStatus(target: String) {
+        val edit = optimisticEdits[target]
+        val intent = edit?.durableIntent
+        val account = conversationAccountRef
+        if (edit == null || intent == null || account == null) return
+        val unresolvedFailure = edit.status == MessageStatus.Failed && !edit.nativeRevisionRejected
+        val shouldRecover = !controllerCleared && (edit.status == MessageStatus.Pending || unresolvedFailure)
+        if (!shouldRecover || intent.editClientToken in pendingEditAdmissions) {
+            return
+        }
+        if (!pendingEditStatusReads.add(intent.editClientToken)) {
+            pendingEditStatusRechecks.add(intent.editClientToken)
+        } else {
+            controllerScope.launch { readPendingEditStatus(account, intent) }
+        }
+    }
+
+    private suspend fun readPendingEditStatus(
+        account: String,
+        intent: DurablePendingEditIntent,
+    ) {
+        try {
+            val status =
+                runCatchingCancellable {
+                    pendingEditStatusReader(account, group.groupIdHex, intent.editClientToken)
+                }.getOrNull()
+            if (controllerCleared) return
+            val current =
+                optimisticEdits.entries.firstOrNull {
+                    it.value.durableIntent == intent && it.value.status != MessageStatus.Sent
+                }
+            if (current != null) {
+                optimisticEdits[current.key] = current.value.withNativeEditStatus(status)
+                publishTimelineFromIndexes()
+            }
+        } finally {
+            pendingEditStatusReads.remove(intent.editClientToken)
+            // Coalesce native events received during the read, including identical rows.
+            if (pendingEditStatusRechecks.remove(intent.editClientToken) && !controllerCleared) {
+                optimisticEdits.entries
+                    .firstOrNull { it.value.durableIntent == intent }
+                    ?.key
+                    ?.let(::recoverPendingEditStatus)
+            }
+        }
+    }
+
     private fun handoffPendingMessageEdit(
         clientToken: String,
         confirmedId: String,
@@ -9633,7 +9885,10 @@ class ConversationController(
     ) {
         val queuedText = pendingMessageEditHandoff.confirm(pendingEditKey(clientToken), confirmedId, ready)
         if (!ready || confirmedId == clientToken) return
-        optimisticEdits.remove(clientToken)?.let { optimisticEdits[confirmedId] = it }
+        optimisticEdits.remove(clientToken)?.let { edit ->
+            // An edit already submitted against the confirmed row is newer than the temporary overlay.
+            if (confirmedId !in optimisticEdits) optimisticEdits[confirmedId] = edit
+        }
         if (queuedText != null) {
             // Projection installation can still be mid-batch here. Resume on
             // the next main turn before publishing and rebuilding the timeline.
@@ -10141,9 +10396,17 @@ class ConversationController(
         // optimisticMessages entry); its retry re-runs the edit publish rather
         // than re-sending a new message. editMessage flips the overlay back to
         // Pending, so a double-tap finds it non-Failed and the guard below exits.
-        val failedEdit = optimisticEdits[item.record.messageIdHex]?.takeIf { it.status == MessageStatus.Failed }
+        val failedEdit = failedEditForAction(item)
         if (failedEdit != null) {
-            editMessage(item.record.messageIdHex, failedEdit.text)
+            val intent = failedEdit.durableIntent
+            if (intent == null) {
+                editMessage(item.record.messageIdHex, failedEdit.text)
+            } else {
+                // A definite native rejection owns no publication. Only this deliberate Retry
+                // creates a new token; ambiguous admissions keep their original identity.
+                val retryIntent = intent.takeUnless { failedEdit.nativeRevisionRejected }
+                admitPendingEdit(item.record.messageIdHex, intent.originalClientToken, failedEdit.text, retryIntent)
+            }
             return
         }
         // Re-check live state. The captured item.status may be stale if the
@@ -10433,9 +10696,16 @@ class ConversationController(
         // Discarding a failed edit drops the local overlay, reverting the
         // bubble to its pre-edit body. The original message is untouched —
         // only the unsent kind-1009 edit is abandoned.
-        if (optimisticEdits[item.record.messageIdHex]?.status == MessageStatus.Failed) {
-            optimisticEdits.remove(item.record.messageIdHex)
-            publishTimelineFromIndexes()
+        val failedEdit = failedEditForAction(item)
+        if (failedEdit != null) {
+            val edit = failedEdit
+            val intent = edit.durableIntent
+            if (intent == null) {
+                optimisticEdits.remove(item.record.messageIdHex)
+                publishTimelineFromIndexes()
+            } else {
+                discardPendingEdit(item.record.messageIdHex, intent)
+            }
             return
         }
         val current =
@@ -10448,6 +10718,44 @@ class ConversationController(
             .onFailure { failure ->
                 appState.presentFailure(R.string.toast_couldnt_delete_message, "MESSAGE_CANCEL", failure)
             }
+    }
+
+    /** Retry and Discard act on a failed original before its dependent durable edit. */
+    private fun failedEditForAction(item: TimelineMessage): OptimisticEdit? =
+        optimisticEdits[item.record.messageIdHex]?.takeIf {
+            it.status == MessageStatus.Failed &&
+                !(it.durableIntent != null && optimisticMessages[item.id]?.status == MessageStatus.Failed)
+        }
+
+    /** An unavailable acknowledgement cannot authorize discarding a durably queued revision. */
+    private suspend fun discardPendingEdit(
+        target: String,
+        intent: DurablePendingEditIntent,
+    ) {
+        val account = conversationAccountRef ?: return
+        val result =
+            runCatchingCancellable {
+                pendingEditStatusReader(account, group.groupIdHex, intent.editClientToken)
+            }
+        val current =
+            optimisticEdits[target]?.takeIf {
+                it.durableIntent == intent && it.status == MessageStatus.Failed
+            } ?: return
+        val status = result.getOrNull()
+        when {
+            result.isFailure -> {
+                if (appState.activeAccountRef == account) {
+                    appState.presentFailure(
+                        R.string.toast_couldnt_edit_message,
+                        "MESSAGE_EDIT",
+                        requireNotNull(result.exceptionOrNull()),
+                    )
+                }
+            }
+            status == null || status == LocalSendStatusFfi.Rejected -> optimisticEdits.remove(target)
+            else -> optimisticEdits[target] = current.withNativeEditStatus(status)
+        }
+        publishTimelineFromIndexes()
     }
 
     /**
@@ -10816,8 +11124,14 @@ class ConversationController(
         appState.applyLocalGroupUpdate(updated, account)
     }
 
-    /** Updates the public avatar and reports failure only while [change] owns the attempt. */
-    internal suspend fun updateGroupAvatarUrl(change: ScopedGroupImageMutation<String?>): Boolean =
+    /**
+     * Updates the public avatar and reports failure only while [change] owns the attempt.
+     * [commitIfCurrent] must support reads on IO as well as the editor's main thread.
+     */
+    internal suspend fun updateGroupAvatarUrl(
+        change: ScopedGroupImageMutation<String?>,
+        commitIfCurrent: () -> Boolean = change.isActive,
+    ): Boolean =
         withMutationLockResult(false) {
             lastMutationError = null
             val report = change.isActive
@@ -10828,23 +11142,39 @@ class ConversationController(
             val normalized = change.value?.trim()?.takeIf { it.isNotEmpty() }
             var encryptedImageCleared = group.imageHashHex == null || normalized == null
             runCatchingCancellable {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo {
-                        updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
-                    }
-                    // A public avatar supersedes the encrypted component. Clear it
-                    // after the URL is durable so another client cannot resurrect it.
-                    if (normalized != null && group.imageHashHex != null) {
-                        encryptedImageCleared =
-                            runCatchingCancellable {
-                                appState.marmotIo {
-                                    clearGroupImage(account, group.groupIdHex)
+                val committed =
+                    appState.withGroupCommitLock(account, group.groupIdHex) {
+                        // Queuing behind another commit can outlive this editor or account.
+                        if (!commitIfCurrent()) return@withGroupCommitLock false
+                        val wroteAvatar =
+                            appState.marmotIo {
+                                // Dispatch to IO can also wait after the group lock was acquired.
+                                if (!commitIfCurrent()) {
+                                    false
+                                } else {
+                                    updateGroupAvatarUrl(account, group.groupIdHex, normalized, null, null)
+                                    true
                                 }
-                            }.onFailure {
-                                if (BuildConfig.DEBUG) Log.w("DMConversation", "encrypted avatar cleanup failed", it)
-                            }.isSuccess
+                            }
+                        if (!wroteAvatar) return@withGroupCommitLock false
+                        // A public avatar supersedes the encrypted component. Clear it
+                        // after the URL is durable so another client cannot resurrect it.
+                        if (normalized != null && group.imageHashHex != null) {
+                            encryptedImageCleared =
+                                runCatchingCancellable {
+                                    appState.marmotIo {
+                                        clearGroupImage(account, group.groupIdHex)
+                                    }
+                                }.onFailure {
+                                    if (BuildConfig.DEBUG) {
+                                        Log.w("DMConversation", "encrypted avatar cleanup failed", it)
+                                    }
+                                }.isSuccess
+                        }
+                        true
                     }
-                }
+
+                if (!committed) return@runCatchingCancellable false
                 // Reflect the change locally so the avatar updates immediately,
                 // without waiting for the group-state subscription to converge.
                 group = groupWithPublicAvatar(group, normalized, encryptedImageCleared)
@@ -12268,6 +12598,7 @@ class ConversationController(
         val previousItemId = existing?.let(::projectedItemId)
         val stillProjected = previousItemId != null && timelineItemsById.containsKey(previousItemId)
         if (existing != null && stillProjected && timelineRecordsRenderEqual(existing, record)) {
+            recoverPendingEditStatusForProjection(record)
             return preparedAction ?: TimelineProjector.toAppMessageRecord(record)
         }
         var retentionAtSendSeconds =
@@ -12412,6 +12743,7 @@ class ConversationController(
             appState.pendingSendDiagnostics.recordEchoReconcile(optimisticId)
         }
         messageById[record.messageIdHex] = actionRecord
+        recoverPendingEditStatusForProjection(record)
         record.clientToken?.let { clientToken ->
             // A newly mounted controller may see the native projection after
             // the editor's original controller was disposed. The process-owned
@@ -12925,13 +13257,13 @@ class ConversationController(
             }
         val localEdits = aggregateEdits(visible.map { it.record })
         val aggregated = withAuthoritativeEdits(localEdits, authoritativeEditsOf(timelineRecords.values))
-        // Drop any optimistic edit the real kind-1009 has now caught up to:
-        // once `aggregateEdits` reports the same latest text, the overlay is
-        // redundant and would otherwise mask a later remote edit. Failed/Pending
-        // overlays are kept until they resolve through editMessage.
+        // Admission projects the revised body before publication. The original row's
+        // delivery state cannot confirm its edit; retain the overlay until the edit's
+        // own native publication and exact revision agree.
         optimisticEdits.entries
-            .filter { (target, edit) -> edit.status == MessageStatus.Sent && aggregated[target]?.latestText == edit.text }
-            .map { it.key }
+            .filter { (target, edit) ->
+                isConfirmedOptimisticEdit(target, edit, aggregated)
+            }.map { it.key }
             .forEach(optimisticEdits::remove)
         timeline =
             orderTimelineMessagesForDisplay(
@@ -12949,6 +13281,20 @@ class ConversationController(
         }
         editsByTarget = applyOptimisticEdits(aggregated)
         signalForegroundSweepScheduleChanged()
+    }
+
+    private fun isConfirmedOptimisticEdit(
+        target: String,
+        edit: OptimisticEdit,
+        aggregated: Map<String, EditState>,
+    ): Boolean {
+        val confirmedWireEdit = aggregated[target]?.latestText == edit.text
+        val record = timelineRecords[target]
+        val confirmedNativeEdit =
+            edit.nativeEditMessageId != null &&
+                record?.edit?.latestEditMessageIdHex == edit.nativeEditMessageId &&
+                record.plaintext == edit.text
+        return edit.status == MessageStatus.Sent && (confirmedWireEdit || confirmedNativeEdit)
     }
 
     /**
@@ -12979,12 +13325,13 @@ class ConversationController(
     /**
      * Surface an in-flight optimistic edit as the target bubble's status so the
      * existing Sending indicator / Failed retry+discard row light up without a
-     * new affordance. Only overrides a confirmed (Sent) own bubble — a still
-     * in-flight optimistic *send* keeps its own status until that send resolves.
+     * new affordance. Durable revisions can also override a pending original;
+     * a failed original keeps its own retry status until that send resolves.
      */
     private fun TimelineMessage.withOptimisticEditStatus(): TimelineMessage {
         val edit = optimisticEdits[record.messageIdHex] ?: return this
-        if (status != MessageStatus.Sent) return this
+        val durablePending = edit.durableIntent != null && status == MessageStatus.Pending
+        if (status != MessageStatus.Sent && !durablePending) return this
         return when (edit.status) {
             MessageStatus.Pending -> copy(status = MessageStatus.Pending)
             MessageStatus.Failed -> copy(status = MessageStatus.Failed)
