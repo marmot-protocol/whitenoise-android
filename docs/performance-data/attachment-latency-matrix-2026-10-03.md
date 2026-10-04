@@ -182,5 +182,9 @@ python3 tools/attachment-fixture/matrix_tables.py --baseline run-1.json run-3.js
 
 Raw reports, logs, APK digests and verified checksums for the passing, failed and diagnostic runs stay private and
 durable. Compare a candidate with `matrix_compare.py --baseline ... --candidate ...`: a change counts only when it
-exceeds the observed spread and ten percent, any difference in requests, bytes or retries rejects the candidate, and
-only reader-visible metrics can reject it for being slower.
+exceeds the observed spread and ten percent, any difference in requests, bytes or retries rejects the candidate, a
+profile or size measured on only one side rejects it as incomplete, and only reader-visible metrics can reject it for
+being slower. Every baseline and candidate run is first held to the same correctness check that gated its own report,
+and the command exits with status 2 without comparing anything when one fails: an extra HEAD inside a sample leaves
+every aggregate unchanged, so it can only be seen there. The preserved baseline run that failed its checks (run 2 of
+the first pairing attempt) is rejected by this check, which is why the comparison uses runs 1, 3 and 4.
