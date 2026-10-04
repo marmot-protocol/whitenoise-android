@@ -158,7 +158,7 @@ class LocalGroupDeleteCleanupJournalTest {
         }
 
     @Test
-    fun presentGroupDropsIntentWithoutClearingData() =
+    fun presentGroupRetainsIntentWithoutClearingData() =
         runTest {
             val directory = folder.newFolder("present")
             val journal = LocalGroupDeleteCleanupJournal(directory)
@@ -171,8 +171,8 @@ class LocalGroupDeleteCleanupJournalTest {
                     cleanup = { error("present group must never be cleaned") },
                     finish = journal::finish,
                 )
-            assertTrue(result)
-            assertTrue(journal.pending().isEmpty())
+            assertFalse(result)
+            assertEquals(listOf(pending), LocalGroupDeleteCleanupJournal(directory).pending())
         }
 
     @Test

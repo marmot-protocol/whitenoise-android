@@ -2202,4 +2202,5 @@
     <string name="local_delete_cleanup_pending">\u2068Sohbet silindi. Yerel verilerin temizlenmesi otomatik olarak yeniden denenecek.\u2069</string>
     <string name="chat_list_delete_stopped">Silme durdu</string>
     <string name="chat_list_delete_stopped_detail">\u2068%2$d silme işleminin %1$d tanesi doğrulandı. Sonucu kontrol etmek için Bu cihazdan sil işlemini tekrar deneyin. Hata devam ederse uygulamayı yeniden başlatın.\u2069</string>
+    <string name="group_svg_rejected_detail">Bu SVG hazırlanamadı. Basit bir SVG, PNG veya JPEG seçin.</string>
 </resources>

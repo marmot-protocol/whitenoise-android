@@ -239,7 +239,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -2866,10 +2865,6 @@ internal fun ConversationScreen(
     // rebind the observer; resolved through the existing Context.lifecycleOwner()
     // idiom (no new Local import).
     val resumeLifecycleOwner = context.lifecycleOwner()
-    val currentScrollAnchorResolver by
-        rememberUpdatedState(newValue = { anchor: ConversationScrollAnchor -> resolveScrollAnchorIndex(anchor) })
-    val currentInitialTimelineAnchored by rememberUpdatedState(newValue = initialTimelineAnchored)
-    val currentImeIsOpen by rememberUpdatedState(newValue = imeIsOpen)
     ConversationForegroundRestoreEffects(
         controller = controller,
         scrollCoordinator = scrollCoordinator,
@@ -2888,256 +2883,38 @@ internal fun ConversationScreen(
         resolveScrollAnchorIndex = { anchor -> resolveScrollAnchorIndex(anchor) },
         currentTailIndex = { currentTailIndex },
     )
-    LaunchedEffect(listState, scrollCoordinator, postInitialReanchorGate) {
-        snapshotFlow { timelineViewport.readingLayoutInfo().viewportSize.height }.collect { viewportHeight ->
-            val viewportChanged = postInitialReanchorGate.onViewportHeight(viewportHeight)
-            if (!viewportChanged || !currentInitialTimelineAnchored || currentImeIsOpen) {
-                return@collect
-            }
-            if (scrollCoordinator.foregroundRestoreInProgress) {
-                return@collect
-            }
-            when (scrollCoordinator.mode) {
-                ConversationScrollMode.FollowingTail ->
-                    scrollCoordinator.programmaticJump(
-                        targetMessageId = null,
-                        reason = ConversationScrollReason.ViewportChange,
-                        resultingMode = ConversationScrollMode.FollowingTail,
-                    ) {
-                        scrollToTail(currentTailIndex)
-                    }
-                is ConversationScrollMode.ReadingHistory ->
-                    scrollCoordinator.reanchorReadingHistory(currentScrollAnchorResolver)
-                else -> Unit
-            }
-        }
-    }
-
-    // Re-apply a saved scroll position once the timeline materializes (#1107).
-    // Seeding rememberLazyListState alone is not enough: the list can clamp
-    // while the window is still empty, and the first-open anchor would snap to
-    // bottom before the reader's position is restored.
-    LaunchedEffect(controller, scrollRestore) {
-        val restore = scrollRestore ?: return@LaunchedEffect
-        snapshotFlow { controller.initialTimelineSeedActive }
-            .filter { active -> !active }
-            .first()
-        restore.anchorMessageIdHex
-            ?.takeIf { it.isNotBlank() }
-            ?.let { controller.loadUntilMessageAvailable(it) }
-        val targetIndex =
-            snapshotFlow {
-                val rendered = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-                if (rendered.isEmpty()) {
-                    null
-                } else {
-                    val liveTrailingRowCount = controller.conversationTrailingRowCount(rendered.size)
-                    val liveTailTimelineIndex =
-                        conversationTimelineTailListIndex(rendered.size, liveTrailingRowCount)
-                            ?: return@snapshotFlow null
-                    // Reversed rows: history sits above the tail, so a restored
-                    // anchor may never resolve below the newest row.
-                    conversationScrollRestoreListIndex(
-                        snapshot = restore,
-                        renderedItemIds = rendered.map { it.id },
-                        renderedMessageIds = rendered.map { it.record.messageIdHex },
-                        trailingRowCount = liveTrailingRowCount,
-                    ).coerceAtLeast(liveTailTimelineIndex)
-                }
-            }.filterNotNull()
-                .first()
-        val resultingMode =
-            ConversationScrollMode.ReadingHistory(
-                restore.anchorMessageIdHex,
-                restore.firstVisibleItemScrollOffset,
-            )
-        while (
-            !scrollCoordinator.commitInitialAnchor(
-                targetMessageId = restore.anchorMessageIdHex,
-                reason = ConversationScrollReason.SavedRestore,
-                resultingMode = resultingMode,
-                targetIndex = targetIndex,
-                pixelOffset = restore.firstVisibleItemScrollOffset,
-                captureLayout = {
-                    val layoutInfo = timelineViewport.readingLayoutInfo()
-                    ConversationInitialAnchorLayout(
-                        viewportHeight = layoutInfo.viewportSize.height,
-                        targetItemSize = layoutInfo.visibleItemsInfo.firstOrNull { it.index == targetIndex }?.size,
-                    )
-                },
-            )
-        ) {
-            // Keep the loading surface visible. Each attempt yields through its
-            // frame window, and cancellation still follows the LaunchedEffect.
-            withFrameNanos { }
-        }
-        val restoredRendered =
-            controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        val restoredItem =
-            restoredRendered.getOrNull(
-                conversationTimelineIndexForListIndex(
-                    listIndex = targetIndex,
-                    timelineSize = restoredRendered.size,
-                    trailingRowCount = controller.conversationTrailingRowCount(restoredRendered.size),
-                ),
-            )
-        scrollCoordinator.settleReadingAt(
-            ConversationScrollAnchor(
-                listIndex = targetIndex,
-                pixelOffset = restore.firstVisibleItemScrollOffset,
-                itemId = restoredItem?.id ?: restore.anchorItemId,
-                messageId = restoredItem?.record?.messageIdHex ?: restore.anchorMessageIdHex,
+    val viewportRestorationOwner =
+        rememberConversationViewportRestorationOwner(controller, scrollCoordinator, postInitialReanchorGate)
+    ConversationViewportRestorationEffects(
+        controller = controller,
+        viewport = timelineViewport,
+        owner = viewportRestorationOwner,
+        inputs =
+            ConversationViewportRestorationInputs(
+                scrollRestore = scrollRestore,
+                presentation = ConversationViewportPresentation(initialTimelineAnchored, imeIsOpen),
+                structure =
+                    ConversationTimelineStructure(
+                        rowKeys = renderedTimelineAnchorKeys,
+                        olderHeaderCount = olderHeaderCount,
+                        inlineTopErrorCount = inlineTopErrorCount,
+                        groupRecoveryCount = groupRecoveryCount,
+                    ),
+                entryUnread = entryUnreadSnapshot,
+                entryProjectionAvailable = entryProjectionAvailable,
+                notificationOpenRequestId = notificationOpenRequestId,
+                seedTailAwaitingAuthoritative = navigationState.seedTailAwaitingAuthoritative,
             ),
-        )
-        postInitialReanchorGate.commit(
-            structure =
-                ConversationTimelineStructure(
-                    rowKeys = restoredRendered.map { it.id to it.record.messageIdHex },
-                    olderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0,
-                    inlineTopErrorCount =
-                        if (
-                            restoredRendered.isNotEmpty() &&
-                            controller.error != null &&
-                            controller.errorEdge == ConversationLoadFailureEdge.TOP
-                        ) {
-                            1
-                        } else {
-                            0
-                        },
-                    groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0,
-                ),
-            viewportHeight = timelineViewport.readingLayoutInfo().viewportSize.height,
-        )
-        initialTimelineAnchored = true
-        navigationState.lastFollowedLatestId = restoredRendered.lastOrNull()?.id
-    }
-    LaunchedEffect(
-        controller,
-        renderedTimeline.isNotEmpty(),
-        notificationOpenRequestId,
-        entryProjectionAvailable,
-        controller.initialTimelineSeedActive,
-        navigationState.seedTailAwaitingAuthoritative,
-    ) {
-        if (navigationState.seedTailAwaitingAuthoritative || controller.initialTimelineSeedActive) {
-            return@LaunchedEffect
-        }
-        if (
-            !shouldCommitConversationInitialAnchor(
-                hasRenderedTimeline = renderedTimeline.isNotEmpty(),
-                projectionAvailable = entryProjectionAvailable,
-                initialTimelineAnchored = initialTimelineAnchored,
-                hasScrollRestore = scrollRestore != null,
-            )
-        ) {
-            return@LaunchedEffect
-        }
-
-        // The chat-list projection carries the durable first-unread id. Page it
-        // into the bounded timeline before revealing or positioning the list;
-        // count-from-tail is only a compatibility fallback for older projections.
-        val unreadId =
-            resolveConversationEntryUnreadMessageId(
-                snapshot = entryUnreadSnapshot,
-                timeline = { controller.timeline },
-                loadUntilMessageAvailable = controller::loadConversationEntryUnreadMessageAvailable,
-            )
-        val anchoredTimeline = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
-        if (anchoredTimeline.isEmpty()) return@LaunchedEffect
-        val anchoredOlderHeaderCount = if (controller.hasMoreBefore || controller.isLoadingOlder) 1 else 0
-        val anchoredInlineTopErrorCount =
-            if (
-                controller.error != null &&
-                controller.errorEdge == ConversationLoadFailureEdge.TOP
-            ) {
-                1
-            } else {
-                0
-            }
-        val anchoredTrailingRowCount = controller.conversationTrailingRowCount(anchoredTimeline.size)
-        val anchoredTailTimelineIndex =
-            requireNotNull(
-                conversationTimelineTailListIndex(
-                    anchoredTimeline.size,
-                    anchoredTrailingRowCount,
-                ),
-            )
-        val renderedUnreadIndex =
-            unreadId?.let { id -> anchoredTimeline.indexOfFirst { it.record.messageIdHex == id } } ?: -1
-        val targetIndex =
-            if (renderedUnreadIndex >= 0) {
-                conversationTimelineListIndex(
-                    timelineIndex = renderedUnreadIndex,
-                    timelineSize = anchoredTimeline.size,
-                    trailingRowCount = anchoredTrailingRowCount,
-                )
-            } else {
-                anchoredTailTimelineIndex
-            }
-        val resultingMode =
-            if (renderedUnreadIndex >= 0) {
-                ConversationScrollMode.ReadingHistory(unreadId, 0)
-            } else {
-                ConversationScrollMode.FollowingTail
-            }
-        if (hasSentMessageAfterUnreadBoundary(anchoredTimeline, unreadId)) {
-            entryUnreadDividerRetired = true
-        }
-        val captureInitialLayout = {
-            val layoutInfo = timelineViewport.readingLayoutInfo()
-            ConversationInitialAnchorLayout(
-                viewportHeight = layoutInfo.viewportSize.height,
-                targetItemSize =
-                    layoutInfo.visibleItemsInfo
-                        .firstOrNull { it.index == targetIndex }
-                        ?.size,
-            )
-        }
-
-        /** Commits the chosen unread or tail owner only after its target and viewport are stable. */
-        suspend fun commitInitialPosition(): Boolean =
-            if (resultingMode is ConversationScrollMode.FollowingTail) {
-                scrollCoordinator.commitInitialTailAnchor(
-                    targetIndex = targetIndex,
-                    captureLayout = captureInitialLayout,
-                )
-            } else {
-                scrollCoordinator.commitInitialAnchor(
-                    targetMessageId = unreadId,
-                    reason = ConversationScrollReason.InitialAnchor,
-                    resultingMode = resultingMode,
-                    targetIndex = targetIndex,
-                    captureLayout = captureInitialLayout,
-                )
-            }
-        while (!commitInitialPosition()) {
-            // Do not reveal until the target and viewport are stable.
-            withFrameNanos { }
-        }
-        if (resultingMode is ConversationScrollMode.ReadingHistory) {
-            val unreadItem = anchoredTimeline.getOrNull(renderedUnreadIndex)
-            scrollCoordinator.settleReadingAt(
-                ConversationScrollAnchor(
-                    listIndex = targetIndex,
-                    pixelOffset = 0,
-                    itemId = unreadItem?.id,
-                    messageId = unreadId,
-                ),
-            )
-        }
-        postInitialReanchorGate.commit(
-            structure =
-                ConversationTimelineStructure(
-                    rowKeys = anchoredTimeline.map { it.id to it.record.messageIdHex },
-                    olderHeaderCount = anchoredOlderHeaderCount,
-                    inlineTopErrorCount = anchoredInlineTopErrorCount,
-                    groupRecoveryCount = if (controller.conversationGroupRecoveryRowVisible()) 1 else 0,
-                ),
-            viewportHeight = timelineViewport.readingLayoutInfo().viewportSize.height,
-        )
-        initialTimelineAnchored = true
-        navigationState.lastFollowedLatestId = anchoredTimeline.lastOrNull()?.id
-    }
+        callbacks =
+            ConversationViewportRestorationCallbacks(
+                navigation = ConversationViewportNavigation(::resolveScrollAnchorIndex) { currentTailIndex },
+                onAnchored = { latestId ->
+                    initialTimelineAnchored = true
+                    navigationState.lastFollowedLatestId = latestId
+                },
+                retireUnreadDivider = { entryUnreadDividerRetired = true },
+            ),
+    )
     // Resolved in composition so the row-inserting frame already knows which
     // row is entering; the follow effect below only runs after that frame.
     val tailEntrance =
@@ -3173,30 +2950,19 @@ internal fun ConversationScreen(
         }
     }
 
-    // Re-resolve the durable history anchor only when the list structure or
-    // header changes. Same-row projection and media hydration must not restart
-    // anchoring after the conversation is already visible.
-    LaunchedEffect(
-        controller,
-        renderedTimelineAnchorKeys,
-        olderHeaderCount,
-        inlineTopErrorCount,
-        initialTimelineAnchored,
-        postInitialReanchorGate,
-    ) {
-        val structureChanged =
-            postInitialReanchorGate.onStructure(
-                ConversationTimelineStructure(
-                    rowKeys = renderedTimelineAnchorKeys,
-                    olderHeaderCount = olderHeaderCount,
-                    inlineTopErrorCount = inlineTopErrorCount,
-                    groupRecoveryCount = groupRecoveryCount,
-                ),
-            )
-        if (initialTimelineAnchored && structureChanged) {
-            scrollCoordinator.reanchorReadingHistory(::resolveScrollAnchorIndex)
-        }
-    }
+    ConversationViewportStructureEffect(
+        controller = controller,
+        owner = viewportRestorationOwner,
+        structure =
+            ConversationTimelineStructure(
+                rowKeys = renderedTimelineAnchorKeys,
+                olderHeaderCount = olderHeaderCount,
+                inlineTopErrorCount = inlineTopErrorCount,
+                groupRecoveryCount = groupRecoveryCount,
+            ),
+        anchored = initialTimelineAnchored,
+        resolveAnchor = ::resolveScrollAnchorIndex,
+    )
 
     // Reacting to the last message grows its bubble height (a reaction chip) but
     // doesn't change any timeline id, so the append-follow above never sees it.

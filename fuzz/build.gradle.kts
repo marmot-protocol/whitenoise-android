@@ -33,6 +33,9 @@ val fuzzProductionIncludes =
         "dev/ipf/whitenoise/android/core/GroupSystemEventJson.kt",
         "dev/ipf/whitenoise/android/amber/Nip55SignerPure.kt",
         "dev/ipf/whitenoise/android/media/ImageContainerBytes.kt",
+        "dev/ipf/whitenoise/android/media/AnimationSourceAdmission.kt",
+        "dev/ipf/whitenoise/android/media/AnimationSourceGif.kt",
+        "dev/ipf/whitenoise/android/media/AnimationSourceWebp.kt",
     )
 
 val syncFuzzProductionSources =

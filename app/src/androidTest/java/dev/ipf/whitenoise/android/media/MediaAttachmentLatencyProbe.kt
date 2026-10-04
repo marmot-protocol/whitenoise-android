@@ -60,6 +60,18 @@ class MediaAttachmentLatencyProbe {
     @Test
     fun measureControlledReceivedAttachment() = runBlocking { ControlledAttachmentProbe.run() }
 
+    /** Opt-in received-APK probe: genuine transfer, then the real Android open path under each permission state. */
+    @Test
+    fun measureControlledApkInstaller() = runBlocking { ApkInstallerAttachmentProbe.run() }
+
+    /** Opt-in controlled matrix probe: genuine uploads, cold downloads and retained reads with phase timings. */
+    @Test
+    fun measureControlledMatrix() = runBlocking { MatrixAttachmentProbe.run() }
+
+    /** Opt-in genuine media lifecycle probe: one prepare process and one separately launched offline read process. */
+    @Test
+    fun measureControlledMediaLifecycle() = runBlocking { MediaLifecycleAttachmentProbe.run() }
+
     /** Compares generated file preparation, upload, and verified cold downloads by payload size. */
     @Test
     fun measureSyntheticSizeMatrix() =

@@ -2172,4 +2172,5 @@
     <string name="local_delete_cleanup_pending">\u2068聊天已刪除。本機資料清理將自動重試。\u2069</string>
     <string name="chat_list_delete_stopped">刪除已停止</string>
     <string name="chat_list_delete_stopped_detail">\u2068已確認 %1$d 次刪除，共 %2$d 次。請重試「從此裝置刪除」以檢查結果。若仍然失敗，請重新啟動應用程式。\u2069</string>
+    <string name="group_svg_rejected_detail">無法處理此 SVG。請選擇簡單的 SVG、PNG 或 JPEG。</string>
 </resources>

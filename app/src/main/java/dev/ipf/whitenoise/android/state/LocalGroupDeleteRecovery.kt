@@ -3,11 +3,6 @@ package dev.ipf.whitenoise.android.state
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 
-internal class LocalDeleteRecoveryObserver(
-    val recoverTransport: suspend () -> Unit = {},
-    val onProgress: (LocalDeletePhase, Int, Boolean?, Boolean) -> Unit = { _, _, _, _ -> },
-)
-
 /**
  * A local wipe is idempotent, but a closed worker can lose the response after committing it.
  * Resolve that ambiguity against the native group projection before another mutation. A failed
@@ -54,8 +49,7 @@ internal suspend fun deleteLocalGroupWithRecovery(
                 if (!isRetryableIdempotentMutationError(failure)) throw failure
                 reconciliationFailure = failure
                 if (read < IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS) {
-                    if (isTransientRuntimeWorkerError(failure)) observer.recoverTransport()
-                    pauseLocalGroupDeleteRetry(pause)
+                    recoverAndPauseLocalGroupDeleteRetry(failure, pause, observer)
                 }
             }
         }
@@ -73,6 +67,15 @@ internal suspend fun deleteLocalGroupWithRecovery(
         pauseLocalGroupDeleteRetry(pause)
     }
     throw lastFailure ?: IllegalStateException("local deletion retry budget exhausted")
+}
+
+private suspend fun recoverAndPauseLocalGroupDeleteRetry(
+    failure: Throwable,
+    pause: (suspend (Long) -> Unit)?,
+    observer: LocalDeleteRecoveryObserver,
+) {
+    if (isTransientRuntimeWorkerError(failure)) observer.recoverTransport()
+    pauseLocalGroupDeleteRetry(pause)
 }
 
 /** Keep production backoff out of suspend default-argument lowering; tests can supply a clock. */

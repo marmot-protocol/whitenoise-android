@@ -150,10 +150,7 @@ internal suspend fun reconcilePendingLocalGroupDeleteCleanup(
     if (!accountReady()) return false
     val present = runCatchingCancellable { isGroupPresent() }.getOrElse { return false }
     if (!accountReady()) return false
-    if (present) {
-        finish(pending)
-        return true
-    }
+    if (present) return false
     if (!cleanup(pending)) return false
     finish(pending)
     return true

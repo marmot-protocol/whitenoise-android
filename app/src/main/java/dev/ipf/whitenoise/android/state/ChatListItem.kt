@@ -62,6 +62,8 @@ internal fun chatListItemFromProjection(
     resolvedMediaPreviewFallback: MediaPreviewFallback? = null,
     removed: Boolean = false,
     activitySequence: ULong = 0uL,
+    awaitingSendPreview: Boolean = false,
+    hasOptimisticSendPreview: Boolean = false,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
@@ -77,24 +79,7 @@ internal fun chatListItemFromProjection(
     val displayGroup = chatListDisplayGroup(row, baseGroup, selectedPresentation, resolvedMemberCount)
     return ChatListItem(
         group = displayGroup,
-        latest =
-            row.lastMessage?.let { preview ->
-                AppMessageRecordFfi(
-                    messageIdHex = preview.messageIdHex,
-                    direction = "received",
-                    groupIdHex = row.groupIdHex,
-                    sender = preview.sender,
-                    plaintext = preview.plaintext,
-                    contentTokens = EMPTY_MARKDOWN_DOCUMENT,
-                    kind = preview.kind,
-                    tags = emptyList(),
-                    sourceEpoch = null,
-                    retentionSeconds = preview.retentionSeconds,
-                    retentionExpiresAt = preview.retentionExpiresAt,
-                    recordedAt = preview.timelineAt,
-                    receivedAt = preview.timelineAt,
-                )
-            },
+        latest = chatListLatestMessage(row),
         otherMemberAccount = members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) },
         memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0,
         memberSnapshot = members?.let(::GroupMemberSnapshot),
@@ -119,8 +104,29 @@ internal fun chatListItemFromProjection(
         resolvedMediaPreviewFallback = resolvedMediaPreviewFallback,
         removed = removed,
         activitySequence = activitySequence,
+        awaitingSendPreview = awaitingSendPreview,
+        hasOptimisticSendPreview = hasOptimisticSendPreview,
     )
 }
+
+private fun chatListLatestMessage(row: ChatListRowFfi): AppMessageRecordFfi? =
+    row.lastMessage?.let { preview ->
+        AppMessageRecordFfi(
+            messageIdHex = preview.messageIdHex,
+            direction = "received",
+            groupIdHex = row.groupIdHex,
+            sender = preview.sender,
+            plaintext = preview.plaintext,
+            contentTokens = EMPTY_MARKDOWN_DOCUMENT,
+            kind = preview.kind,
+            tags = emptyList(),
+            sourceEpoch = null,
+            retentionSeconds = preview.retentionSeconds,
+            retentionExpiresAt = preview.retentionExpiresAt,
+            recordedAt = preview.timelineAt,
+            receivedAt = preview.timelineAt,
+        )
+    }
 
 data class ChatListItem(
     val group: AppGroupRecordFfi,
@@ -148,6 +154,8 @@ data class ChatListItem(
     val selectedAvatarAsset: AvatarAssetFfi? = null,
     /** MarmotKit-selected message, draft, invitation, or empty preview for this row. */
     val selectedPreview: SelectedChatPreviewFfi? = null,
+    val awaitingSendPreview: Boolean = false,
+    val hasOptimisticSendPreview: Boolean = false,
     /** All ten advisory row capabilities from the same native snapshot as [projection]. */
     val actions: ChatListRowActionsFfi? = null,
     /**
@@ -356,11 +364,15 @@ data class ChatListItem(
 
     /** Delivery tick for the projected last message, or null for no tick. */
     fun projectedDeliveryIndicator(): OutgoingMessageIndicator? =
-        projection
-            ?.lastMessage
-            ?.takeUnless { it.deleted }
-            ?.deliveryState
-            ?.outgoingIndicator()
+        if (awaitingSendPreview) {
+            OutgoingMessageIndicator.Sending
+        } else {
+            projection
+                ?.lastMessage
+                ?.takeUnless { it.deleted }
+                ?.deliveryState
+                ?.outgoingIndicator()
+        }
 
     /** The engine's durable mute projection — ORed with local preferences. */
     fun engineMuted(): Boolean = projection?.muted == true

@@ -2272,4 +2272,5 @@
     <string name="local_delete_cleanup_pending">\u2068Чат удалён. Очистка локальных данных будет автоматически повторена.\u2069</string>
     <string name="chat_list_delete_stopped">Удаление остановлено</string>
     <string name="chat_list_delete_stopped_detail">\u2068Подтверждено удалений: %1$d из %2$d. Повторите «Удалить с этого устройства», чтобы проверить результат. Если ошибка сохраняется, перезапустите приложение.\u2069</string>
+    <string name="group_svg_rejected_detail">Не удалось обработать этот SVG. Выберите простой SVG, PNG или JPEG.</string>
 </resources>

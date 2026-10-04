@@ -159,6 +159,9 @@ The expanded upload/download size matrix and machine-readable aggregate
 reporting are documented in [media-latency-matrix.md](media-latency-matrix.md).
 The first emulator results are in
 [media-latency-preliminary-baseline.md](media-latency-preliminary-baseline.md).
+The controlled matrix with verified link shaping, its baseline and the latency and memory budgets it enforces are in
+[attachment-latency-matrix-2026-10-03.md](performance-data/attachment-latency-matrix-2026-10-03.md) and
+[attachment-native-ready-2026-10-03.md](performance-data/attachment-native-ready-2026-10-03.md).
 
 For a diagnostic breakdown of native image downloads, encrypted Android cache
 reads/writes, and platform decoding, use `MediaAttachmentLatencyProbe`. This is

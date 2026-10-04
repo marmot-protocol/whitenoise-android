@@ -2361,4 +2361,5 @@
     <string name="local_delete_cleanup_pending">\u2068The chat was deleted. Cleanup of local data will retry automatically.\u2069</string>
     <string name="chat_list_delete_stopped">Deletion stopped</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d of %2$d deletions confirmed. Retry Delete from this device to check the result. If it keeps failing, restart the app.\u2069</string>
+    <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
 </resources>

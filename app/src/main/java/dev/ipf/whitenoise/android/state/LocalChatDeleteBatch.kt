@@ -24,11 +24,12 @@ internal suspend fun deleteLocalChatsBatch(
     val ids = groupIds.distinctBy { it.lowercase() }
     var attempted = 0
     var deleted = 0
+    var canContinue = true
     for (id in ids) {
-        if (!isCurrent()) break
+        if (!canContinue || !isCurrent()) break
         attempted++
-        if (!delete(id)) break
-        deleted++
+        canContinue = delete(id)
+        if (canContinue) deleted++
     }
     return LocalChatDeleteBatchResult(ids.size, attempted, deleted)
 }

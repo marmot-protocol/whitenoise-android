@@ -64,9 +64,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Test manual release guide validator
+      - name: Test manual release guide and viewport coverage validators
         if: matrix.phase == 'tooling'
-        run: python3 -m unittest scripts/test_check_manual_test_guide.py
+        run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_check_viewport_restoration_coverage.py
 
       - name: Test attachment fixture HTTP ledger and cancellation contracts
         if: matrix.phase == 'tooling'
@@ -543,14 +543,16 @@ jobs:
         run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug --build-cache --profile --daemon --stacktrace
 
       # Reuse the report from the full suite; no extra Gradle invocation or tests.
-      # Measured owner family: 16/17 lines (94.1176%), zero eligible branches.
-      - name: Runtime listener teardown coverage floor
+      # Runtime listener: 16/17 lines (94.1176%), zero eligible branches.
+      # Viewport family: 82/82 lines, 52/56 branches; preserve 100%/90% floors.
+      - name: Runtime listener and viewport restoration coverage floors
         if: ${{ !cancelled() && matrix.flavor == 'Zapstore' && steps.unit_tests.outcome == 'success' }}
         env:
           COVERAGE_REPORT_OUTCOME: ${{ steps.coverage_report.outcome }}
         run: |
           test "$COVERAGE_REPORT_OUTCOME" = success
           python3 scripts/check_runtime_listener_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
+          python3 scripts/check_viewport_restoration_coverage.py app/build/reports/kover/reportDevZapstoreDebug.xml
 
       - name: Save MarmotKit artifact
         if: >-

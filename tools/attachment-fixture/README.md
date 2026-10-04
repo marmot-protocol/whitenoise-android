@@ -71,11 +71,96 @@ bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-a
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-resume-changed
 ```
 
+The `controller-phases` mode sends two generated files through the shipping controller, a paced 32 MiB
+file and a 1 MiB file, and subscribes to the same `nativeProgress` observer the conversation file card uses.
+The paced file must publish one body phase whose byte count never moves backwards and whose total equals the
+true ciphertext length, followed only by forward phases (verification, decryption) and Ready. The second file
+hits a permanent miss: the probe must observe a real failure phase, acknowledge cancellation when that phase
+is a live deferred attempt, then admit exactly one deliberate Retry that ends Ready with exact bytes.
+`phases_checker.py` also reads the server ledger: one upload each, one successful body for the paced file,
+only 404 attempts before the single successful body for the other, and a terminal outcome for every request.
+Phase observation reports which transient phases the native feed actually published; an unobserved phase is
+reported as such rather than inferred. The checker explicitly records `performance_qualified: false`.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-phases
+```
+
+The `controller-media` mode qualifies genuine sent and received media across an Android process restart. The
+prepare process sends a JPEG, a small video, 9 MiB and 24 MiB videos (either side of the 8 MiB memory-entry ceiling)
+and a three-attachment album through the shipping controller, waits for each own send to publish its encrypted host
+copy, reads that copy natively, then downloads every attachment as the receiver. The runner force-stops only the
+isolated fixture package, and a second process opens the restored runtime with acquisition unavailable. Both
+directions of every attachment must then read exact bytes natively and through the resolver, miss the memory cache,
+and decode a first frame (a bitmap for an image, a frame and duration for a video). The 24 MiB send also holds its host
+copy to prove native retention does not wait for it. `media_checker.py` reads the server ledger: one upload and one
+acquisition per attachment before the restart boundary and **none** after it. Generated MP4 padding is a top-level
+`free` box, so it decodes and plays; it tests size thresholds, not throughput. Attachment albums whose total payload
+exceeds 32 MiB cannot be sent by the Android controller and are deferred, as are the conversation tiles themselves and
+physical devices.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-media
+```
+
+The `controller-apk` mode qualifies the received-APK boundary on a disposable emulator. The prepare stage sends five
+generated files through the shipping controller, receives each genuinely, and requires exact bytes: a valid signed
+package (this fixture's own APK), the same bytes labelled `application/octet-stream`, the same bytes labelled
+`image/png`, a ZIP with a dex entry but no `AndroidManifest.xml`, and a truncated package. Each later stage reopens the
+restored runtime in a new process with acquisition unavailable, deletes the published copy of the file, republishes it
+from native retention (the stage fails if that read did not happen), and calls the real `openAttachmentExternally`. A self-update build is run with the install-unknown-apps app-op denied and
+then allowed, which the **host** toggles between stages because changing it kills the app process; a Play build has no
+installer and must answer `InstallUnsupported`. `apk_checker.py` requires, per distribution, the exact
+`OpenAttachmentResult` and whether the system installer actually reached the screen. The probe watches the active
+window for the package that handles APK installs after **every** dispatch, whatever status it returned: it waits for an
+installer where one is expected, and otherwise watches for a full second so a launch behind `InvalidPackage`,
+`InstallPermissionRequired` or `InstallUnsupported` is still seen. Each row records `installer_observed_ms`, and the
+checker rejects a row that was not watched long enough. An installer that did appear is dismissed with Back. Nothing is
+ever installed. The server
+ledger must show exactly one acquisition per case across all stages, so a denied or blocked dispatch reuses the
+completed download. Invalid packages must be rejected before any installer launch on every distribution.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Zapstore reference-api30-arm64 controller-apk
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-apk
+```
+
+The `controller-matrix` mode is the controlled latency matrix for [#2785](https://github.com/marmot-protocol/whitenoise-android/issues/2785).
+For each declared link (`unshaped`, `wifi` at 50/20 Mbit/s and 20 ms, `constrained` at 4/1 Mbit/s and 120 ms) the
+**server** shapes bandwidth and latency in both directions, so a constrained label is verified outside the app: the
+checker rejects a sample whose server-observed throughput exceeds the declared link. Each link runs genuine uploads
+through the shipping controller (split into its synchronous preparation half and its upload-and-publish half), a cold
+download, and a warm retained read, for 64 KiB, 1 MiB, 8 MiB and 30 MiB generated files (the 4/1 Mbit/s link stops at
+8 MiB: a 30 MiB upload needs about 4.5 minutes there and the engine rejected its reference once the group epoch moved). The cold download records the
+authoritative phase times from a 2 ms read-only poll next to the production subscription feed, plus sampled Java and
+native peaks, so a delay is attributed to Android preparation, the FFI and engine, storage or transport instead of
+guessed. A numbered ledger marker brackets every sample, so each sample owns exactly its own requests, bytes and
+retries. The host then force-stops only the isolated package and a new process reads one kept file per size offline.
+Every sample carries only a size, a repetition and measurements: no file name, identifier, URL, key or content.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-matrix unshaped,wifi
+# A short harness proof, never a measurement:
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-matrix unshaped,quick
+python3 tools/attachment-fixture/matrix_compare.py --baseline base-1.json base-2.json base-3.json --candidate cand-1.json cand-2.json cand-3.json
+python3 tools/attachment-fixture/matrix_budgets.py cand-1.json cand-2.json cand-3.json
+```
+
+`matrix_report.py` pools repeated runs at the sample level, so the observed spread includes run-to-run variation, and
+aggregates samples into per-cell distributions (a p95 only from twenty samples or more), names the
+dominant component and its layer for upload and download, and compares a candidate with a baseline: a change counts only
+when it exceeds both the observed run spread and ten percent, and any difference in request count, byte count or
+retries rejects the candidate whatever its latency. Emulator shaping does not establish physical Wi-Fi performance.
+
+`matrix_budgets.py` applies `matrix_budgets.json` to a pooled set of runs: each budget is a ceiling of `fixed + per MiB x size` on a
+median (with an optional target), a ceiling breach, a missing measurement or a budgeted link that was never measured fails,
+and an unmet target is reported only. The command refuses (status 2) a report whose run did not qualify, whose raw matrix
+fails the correctness check, or whose cohort mixes environments or link shapes, before it evaluates any ceiling.
+
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
 the report, but representative 4 MiB performance is explicitly unqualified;
-the 1 KiB performance checker is inapplicable rather than relaxed. Full issue
-closure requires the remaining [five-issue qualification](../../docs/attachment-remaining-closure.md).
+the 1 KiB performance checker is inapplicable rather than relaxed.
 
 Performance checks use explicit environment profiles: local API30 arm64 defaults to `reference-api30-arm64`; CI passes `ci-api34-x86_64` as the script's third argument. The runner verifies actual API/ABI and enforces every sample through `budget_checker.py` before transport qualification. Violations are included in the saved report and fail the command; no successful HTTP transfer can override them. To check only the performance fields of an existing report:
 
