@@ -513,6 +513,37 @@ class ShareChatPickerFullScreenTest {
     }
 
     @Test
+    fun successfulStageCannotRepeatWhilePickerDismissalIsPending() {
+        val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice"))
+        val appState = appStateWithDirectChat(GROUP_A, PEER_A, profiles = profiles)
+        var commits = 0
+        var dismissals = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = { dismissals++ },
+                    onStage = { _, _ ->
+                        commits++
+                        true
+                    },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Alice").performClick()
+        val action = app.resources.getQuantityString(R.plurals.share_to_chats_count, 1, 1)
+        composeRule.onNodeWithText(action).performClick()
+        composeRule.runOnIdle { assertEquals(1, commits) }
+        // Keep the old UI mounted to exercise the interval before its route is removed.
+        composeRule.onNodeWithText(action).performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, commits)
+            assertEquals(1, dismissals)
+        }
+    }
+
+    @Test
     fun rejectedStageKeepsThePickerOpenForRecovery() {
         val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice"))
         val appState = appStateWithDirectChat(GROUP_A, PEER_A, profiles = profiles)

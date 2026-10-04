@@ -217,7 +217,8 @@ internal fun decodePendingShareRequest(
                         json
                             .optJSONArray("import_errors")
                             ?.let { errors ->
-                                List(errors.length().coerceAtMost(SHARE_STREAM_MAX_ITEMS + 1)) {
+                                // Per-item errors, over-count rejection, and interruption/revalidation outcomes.
+                                List(errors.length().coerceAtMost(SHARE_STREAM_MAX_ITEMS + 3)) {
                                     runCatching { ShareImportError.valueOf(errors.getString(it)) }
                                         .getOrDefault(ShareImportError.Interrupted)
                                 }

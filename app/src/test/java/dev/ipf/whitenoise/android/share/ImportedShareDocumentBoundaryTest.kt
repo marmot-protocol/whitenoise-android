@@ -7,6 +7,10 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.ConversationAttachmentReader
+import dev.ipf.whitenoise.android.ui.conversation.acquireStagedSources
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -20,6 +24,61 @@ import java.io.ByteArrayInputStream
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ImportedShareDocumentBoundaryTest {
+    @Test
+    fun sendOwnershipKeepsSourceReadableWhenBackClearsShelfDuringPreparation() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val files = PrivateShareFiles(context)
+            val bytes = "private document".toByteArray()
+            val (uri, file) = files.newFile()
+            file.writeBytes(bytes)
+            files.finish(uri, "document.txt", "text/plain", bytes.size.toLong())
+            files.leases.saveShelf("account", "chat", listOf(uri))
+            val lease = acquireStagedSources(context, listOf(uri), "account").getOrThrow()!!
+            val started = CompletableDeferred<Unit>()
+            val resumePreparation = CompletableDeferred<Unit>()
+            val reader = fixtureReader(context)
+            try {
+                val prepared =
+                    async(Dispatchers.IO) {
+                        started.complete(Unit)
+                        resumePreparation.await()
+                        reader.readDocumentDraft(uri)
+                    }
+                started.await()
+                files.leases.changeShelf("account", "chat", listOf(uri), emptyList())
+                resumePreparation.complete(Unit)
+                assertArrayEquals(bytes, prepared.await()!!.plaintextBytes)
+            } finally {
+                resumePreparation.complete(Unit)
+                lease.release()
+                files.leases.saveShelf("account", "chat", emptyList())
+            }
+            org.junit.Assert.assertNull(files.resolve(uri))
+        }
+
+    private fun fixtureReader(context: Context): ConversationAttachmentReader {
+        val persistence =
+            object : DraftPersistence {
+                override fun read(): Map<String, String> = emptyMap()
+
+                override fun write(
+                    key: String,
+                    value: String?,
+                ) = Unit
+            }
+        val state =
+            WhiteNoiseAppState(
+                context,
+                DraftStore(persistence),
+                { null },
+                emptyList(),
+                "fixture",
+                inboundShareTextStager = { _, _, _ -> },
+            )
+        return ConversationAttachmentReader(state, context)
+    }
+
     @Test
     fun sourceImageAboveSendBudgetStillUsesTheOrdinaryCompressionPath() =
         runBlocking {

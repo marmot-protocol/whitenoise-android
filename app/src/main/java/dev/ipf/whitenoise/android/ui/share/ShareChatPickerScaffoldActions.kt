@@ -45,8 +45,10 @@ internal fun rememberShareChatPickerActions(
             if (!finishing) {
                 finishing = true
                 coroutineScope.launch {
+                    var committed = false
                     try {
-                        if (stage()) {
+                        committed = stage()
+                        if (committed) {
                             runShareChatPickerDismissal(
                                 clearFocus = { focusManager.clearFocus(force = true) },
                                 hideKeyboard = { keyboardController?.hide() },
@@ -57,7 +59,7 @@ internal fun rememberShareChatPickerActions(
                             snackbarHostState.showSnackbar(stageRejectedMessage)
                         }
                     } finally {
-                        finishing = false
+                        if (!committed) finishing = false
                     }
                 }
             }

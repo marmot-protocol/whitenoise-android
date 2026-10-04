@@ -9,10 +9,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
+import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.conversation.media.BoundedDocumentRead
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.normalizeDocumentMime
@@ -477,8 +477,13 @@ internal class ConversationMediaSender(
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             var accepted = false
-            var sourceLease: dev.ipf.whitenoise.android.share.PrivateShareSendLease? = null
+            var sourceLease: PrivateShareSendLease? = null
             try {
+                sourceLease =
+                    acquireStagedSources(context, imageSlots.map { it.uri } + documentUris, sourceAccount).getOrElse {
+                        appState.present(R.string.share_import_storage)
+                        return@launchMutation
+                    }
                 val prepared =
                     prepareStagedAttachments(
                         imageSlots,
@@ -493,16 +498,6 @@ internal class ConversationMediaSender(
                     prepared.documents.copy(
                         attachments = addMissingThumbhashes(prepared.documents.attachments),
                     )
-                sourceLease =
-                    runCatchingCancellable {
-                        withContext(Dispatchers.IO) {
-                            dev.ipf.whitenoise.android.share.PrivateShareSendLease
-                                .acquire(context, imageSlots.map { it.uri } + documentUris, sourceAccount)
-                        }
-                    }.getOrElse {
-                        appState.present(R.string.share_import_storage)
-                        return@launchMutation
-                    }
                 val seeded =
                     seedPreparedAttachments(
                         prepared.copy(documents = readyDocuments),

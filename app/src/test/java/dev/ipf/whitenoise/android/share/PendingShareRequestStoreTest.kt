@@ -61,6 +61,17 @@ class PendingShareRequestStoreTest {
     }
 
     @Test
+    fun allBoundedImportOutcomesSurviveEncryptedRecovery() {
+        val errors =
+            List(SHARE_STREAM_MAX_ITEMS) { ShareImportError.Unreadable } +
+                listOf(ShareImportError.TooMany, ShareImportError.Interrupted, ShareImportError.Interrupted)
+        val original = request("all-outcomes", text = "retained caption")
+        val interrupted = original.copy(payload = original.payload.copy(importReady = true, importErrors = errors))
+        assertTrue(store().save(interrupted))
+        assertEquals(interrupted, store().load(interrupted.requestId))
+    }
+
+    @Test
     fun requestRoundTripsAcrossStoreRecreationWithoutPlaintextOnDisk() {
         val request = request("request-1", text = "private shared text")
         val first = store()
