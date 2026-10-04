@@ -79,24 +79,7 @@ internal fun chatListItemFromProjection(
     val displayGroup = chatListDisplayGroup(row, baseGroup, selectedPresentation, resolvedMemberCount)
     return ChatListItem(
         group = displayGroup,
-        latest =
-            row.lastMessage?.let { preview ->
-                AppMessageRecordFfi(
-                    messageIdHex = preview.messageIdHex,
-                    direction = "received",
-                    groupIdHex = row.groupIdHex,
-                    sender = preview.sender,
-                    plaintext = preview.plaintext,
-                    contentTokens = EMPTY_MARKDOWN_DOCUMENT,
-                    kind = preview.kind,
-                    tags = emptyList(),
-                    sourceEpoch = null,
-                    retentionSeconds = preview.retentionSeconds,
-                    retentionExpiresAt = preview.retentionExpiresAt,
-                    recordedAt = preview.timelineAt,
-                    receivedAt = preview.timelineAt,
-                )
-            },
+        latest = chatListLatestMessage(row),
         otherMemberAccount = members?.let { GroupProjector.otherMemberAccount(it, activeAccountIdHex) },
         memberCount = members?.let(GroupProjector::uniqueMemberCount) ?: 0,
         memberSnapshot = members?.let(::GroupMemberSnapshot),
@@ -125,6 +108,25 @@ internal fun chatListItemFromProjection(
         hasOptimisticSendPreview = hasOptimisticSendPreview,
     )
 }
+
+private fun chatListLatestMessage(row: ChatListRowFfi): AppMessageRecordFfi? =
+    row.lastMessage?.let { preview ->
+        AppMessageRecordFfi(
+            messageIdHex = preview.messageIdHex,
+            direction = "received",
+            groupIdHex = row.groupIdHex,
+            sender = preview.sender,
+            plaintext = preview.plaintext,
+            contentTokens = EMPTY_MARKDOWN_DOCUMENT,
+            kind = preview.kind,
+            tags = emptyList(),
+            sourceEpoch = null,
+            retentionSeconds = preview.retentionSeconds,
+            retentionExpiresAt = preview.retentionExpiresAt,
+            recordedAt = preview.timelineAt,
+            receivedAt = preview.timelineAt,
+        )
+    }
 
 data class ChatListItem(
     val group: AppGroupRecordFfi,
