@@ -67,6 +67,31 @@ The 24 MiB video on every case:
 | API 36 Play | 360 | 371 | 380 | 8 | 103 | 7 / 0 |
 | API 36 Zapstore | 374 | 376 | 397 | 9 | 102 | 7 / 0 |
 
+## Each local layer, timed on its own
+
+The read process also times the layers that can serve an attachment without a transfer, apart from native retention and
+from the decode, and the checker requires each one exactly where that layer can serve the attachment. A **host-disk hit**
+is the encrypted presentation copy read and authenticated on its own. A **memory hit** is a lookup in the memory cache after
+the retained bytes are seeded through its production entry point, so it is measured only for an attachment under the 8 MiB
+memory entry ceiling; the 9 and 24 MiB videos can never be one. Sent attachments on the clean head `82251d342`, API 30
+arm64 (Play), milliseconds:
+
+| Attachment | Bytes | Native read | Resolver read | Host-disk hit | Memory hit |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| single-image#0 | 16,051 | 5.9 | 6.6 | 3.8 | 0.7 |
+| video-small#0 | 19,832 | 2.9 | 4.7 | 3.9 | 0.6 |
+| album-3#0 | 16,051 | 2.1 | 5.5 | 3.7 | 0.6 |
+| album-3#1 | 16,057 | 1.9 | 3.8 | 3.6 | 0.5 |
+| album-3#2 | 19,832 | 1.5 | 4.2 | 3.9 | 0.7 |
+| video-9mib#0 | 9,437,184 | 102.4 | 124.0 | 121.3 | not eligible |
+| video-24mib#0 | 25,165,824 | 402.6 | 401.1 | no host copy by design | not eligible |
+
+API 36 arm64 (Zapstore) agrees within a few milliseconds for the small attachments (host-disk hit 3.0 to 3.9 ms, memory hit
+0.4 to 0.6 ms) and reads the 9 MiB video from the host disk in 149 ms. Received attachments have no host copy in this
+probe, so they are timed for memory only. Both cases pass the checker with no violations and the ledger shows no
+acquisition after the restart. A small retained attachment is therefore served in a few milliseconds from any local
+layer, and only the very large videos cost a visible fraction of a second, which is local work and never a transfer.
+
 ## What this shows
 
 - Sent and received images, videos and album members stay locally readable across a process restart with no
@@ -89,8 +114,10 @@ The 24 MiB video on every case:
 
 ## Not qualified here
 
-The conversation tiles themselves (first committed frame, one-tap playback, the automatic-download policy and
-offline-without-policy cases are covered by unit and Robolectric tests, not by this report), media above 64 MiB
+The conversation tiles themselves (first committed frame, one-tap playback, the automatic-download policy,
+offline-without-policy cases, and the same tiles across Activity recreation and a background/foreground round trip, where
+`MediaTileLifecycleTest` asserts that no Download or Retry action appears at any idle point and no request is made, are
+covered by unit and Robolectric tests, not by this report), media above 64 MiB
 (the Android controller cannot send it), account switching and deletion on a device, physical devices, and
 representative performance. Padded MP4s test size thresholds, not throughput. Private raw reports, logs and
 checksums are retained outside the repository.
