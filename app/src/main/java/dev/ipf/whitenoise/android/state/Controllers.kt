@@ -11397,7 +11397,11 @@ class ConversationController(
                             inviteFailureDetail(
                                 throwable,
                                 appState::displayName,
-                                refs.singleOrNull()?.let(appState::displayName),
+                                if (throwable is MarmotKitException.InvalidKeyPackageEvent) {
+                                    refs.singleOrNull()?.let(appState::displayName)
+                                } else {
+                                    null
+                                },
                             ),
                         )
                         false

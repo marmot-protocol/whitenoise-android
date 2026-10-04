@@ -3817,7 +3817,11 @@ class WhiteNoiseAppState private constructor(
                                 listOf(displayName(ref)),
                             )
                         } else {
-                            inviteFailureDetail(error, ::displayName, displayName(ref))
+                            inviteFailureDetail(
+                                error,
+                                ::displayName,
+                                if (error is MarmotKitException.InvalidKeyPackageEvent) displayName(ref) else null,
+                            )
                         }
                 }
             }

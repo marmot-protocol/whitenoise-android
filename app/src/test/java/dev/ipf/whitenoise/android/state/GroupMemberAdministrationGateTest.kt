@@ -258,7 +258,8 @@ class GroupMemberAdministrationGateTest {
                         calls += 1
                         throw failure
                     })
-                state.setContactNickname(invitee, "Carol")
+                // Generic failures must not request profiles or encode an uncached recipient name.
+                if (resource != R.string.error_try_again) state.setContactNickname(invitee, "Carol")
                 assertFalse(state.inviteProfileToGroups(invitee, listOf("one", "two")))
                 assertEquals(2, calls)
                 assertEquals(AppText.Resource(R.string.toast_couldnt_add_members), state.toast?.title)
@@ -277,7 +278,8 @@ class GroupMemberAdministrationGateTest {
                         calls += 1
                         throw failure
                     })
-                state.setContactNickname(invitee, "Carol")
+                // Generic failures must not request profiles or encode an uncached recipient name.
+                if (resource != R.string.error_try_again) state.setContactNickname(invitee, "Carol")
                 val controller = readyController(state)
                 assertFalse(controller.inviteMembers(listOf(invitee)))
                 assertEquals(1, calls)
