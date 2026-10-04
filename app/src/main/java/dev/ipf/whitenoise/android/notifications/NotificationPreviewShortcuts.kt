@@ -80,7 +80,8 @@ internal fun redactNotificationShortcut(
     }.getOrDefault(false)
 
 private fun shortcutPreviewHidden(shortcut: ShortcutInfoCompat): Boolean {
-    return shortcut.extras?.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN) == true
+    val extras = shortcut.extras
+    return extras?.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN) == true
 }
 
 internal fun stampShortcutPreview(

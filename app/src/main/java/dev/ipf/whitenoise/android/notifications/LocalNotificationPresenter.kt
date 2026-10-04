@@ -1882,8 +1882,7 @@ class LocalNotificationPresenter(
                         .apply {
                             extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
                             extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
-                        }
-                        .setRemoteInputHistory(arrayOf(handledText))
+                        }.setRemoteInputHistory(arrayOf(handledText))
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()
@@ -1944,8 +1943,7 @@ class LocalNotificationPresenter(
                         .apply {
                             extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
                             extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
-                        }
-                        .setRemoteInputHistory(arrayOf(failureNotice))
+                        }.setRemoteInputHistory(arrayOf(failureNotice))
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
                         .build()

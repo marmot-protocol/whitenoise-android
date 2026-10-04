@@ -40,6 +40,7 @@ class NotificationPreviewPrivacyTest {
     @Before
     fun setUp() {
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        NotificationGroupReconciler.shared(context).close()
         manager.cancelAll()
         context
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -63,7 +64,10 @@ class NotificationPreviewPrivacyTest {
                 )
             },
         )
-        val card = manager.activeNotifications.single().notification
+        val card =
+            manager.activeNotifications
+                .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
+                .notification
         assertEquals(context.getString(R.string.app_name), card.extras.getCharSequence(Notification.EXTRA_TITLE))
         assertEquals(
             context.getString(R.string.notification_hidden_content),
@@ -100,7 +104,10 @@ class NotificationPreviewPrivacyTest {
                         )
                     },
                 )
-                val card = manager.activeNotifications.single().notification
+                val card =
+                    manager.activeNotifications
+                        .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
+                        .notification
                 assertEquals(
                     context.getString(R.string.app_name),
                     card.extras.getCharSequence(Notification.EXTRA_TITLE),
@@ -141,7 +148,10 @@ class NotificationPreviewPrivacyTest {
                     )
                 },
             )
-            val card = manager.activeNotifications.single().notification
+            val card =
+                manager.activeNotifications
+                    .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
+                    .notification
             assertEquals(
                 context.getString(R.string.app_name),
                 card.extras.getCharSequence(Notification.EXTRA_TITLE),
@@ -169,8 +179,8 @@ class NotificationPreviewPrivacyTest {
                 },
             )
         }
-        assertEquals(2, manager.activeNotifications.size)
-        manager.activeNotifications.forEach { posted ->
+        assertEquals(2, manager.activeNotifications.count { it.tag != UserEventNotificationGroup.SUMMARY_TAG })
+        manager.activeNotifications.filterNot { it.tag == UserEventNotificationGroup.SUMMARY_TAG }.forEach { posted ->
             assertEquals(
                 context.getString(R.string.app_name),
                 posted.notification.extras.getCharSequence(Notification.EXTRA_TITLE),
@@ -339,12 +349,15 @@ class NotificationPreviewPrivacyTest {
         assertEquals(
             context.getString(R.string.app_name),
             manager.activeNotifications
-                .single()
+                .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
                 .notification.extras
                 .getCharSequence(Notification.EXTRA_TITLE),
         )
         showFreshMessage(presenter)
-        val fresh = manager.activeNotifications.single().notification
+        val fresh =
+            manager.activeNotifications
+                .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
+                .notification
         assertTrue(
             fresh.extras
                 .getCharSequence(Notification.EXTRA_TITLE)
@@ -375,7 +388,7 @@ class NotificationPreviewPrivacyTest {
         assertEquals(
             context.getString(R.string.app_name),
             manager.activeNotifications
-                .single()
+                .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
                 .notification.extras
                 .getCharSequence(Notification.EXTRA_TITLE),
         )
@@ -396,7 +409,10 @@ class NotificationPreviewPrivacyTest {
                     shortNpub = { "sender" },
                 ),
             )
-            val card = manager.activeNotifications.single().notification
+            val card =
+                manager.activeNotifications
+                    .single { it.tag != UserEventNotificationGroup.SUMMARY_TAG }
+                    .notification
             assertTrue(!card.extras.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
             val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(card)!!
             assertEquals(listOf("New text"), style.messages.map { it.text.toString() })

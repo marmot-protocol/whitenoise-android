@@ -10,7 +10,8 @@ import kotlinx.coroutines.delay
 
 /** Scrubs live OS cards only; never reconstructs a dismissed card or changes channel settings. */
 internal suspend fun redactActiveNotificationPreviews(context: Context): Boolean {
-    return NotificationPreviewRedactor(context).redact()
+    val redactor = NotificationPreviewRedactor(context)
+    return redactor.redact()
 }
 
 @SuppressLint("MissingPermission")
