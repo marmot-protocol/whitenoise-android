@@ -198,7 +198,10 @@ internal fun GroupEditScreen(
         }
 
         /** Both public-avatar paths retain the same editor, account and permission ownership. */
-        fun imageAttemptIsCurrent(attempt: Long, accountRef: String): Boolean =
+        fun imageAttemptIsCurrent(
+            attempt: Long,
+            accountRef: String,
+        ): Boolean =
             imageFailureScope.isCurrent(attempt) &&
                 appState.activeAccountRef == accountRef &&
                 controller.boundAccountRef == accountRef &&
