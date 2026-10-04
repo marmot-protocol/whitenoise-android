@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from matrix_report import aggregate
+from matrix_report import aggregate, load_checked_runs
 from matrix_tables import size_label
 
 MIB = 1024 * 1024
@@ -42,7 +42,13 @@ def observed(profile, cell, budget):
 def evaluate(agg, budgets):
     """One row per budget and cell. A ceiling breach or a missing measurement is a violation."""
     rows = []
+    present = {profile["name"] for profile in agg["profiles"]}
     for budget in budgets:
+        # A budget that names its links is not met by a matrix that never measured them.
+        for link in budget.get("links", ()):
+            if link not in present:
+                rows.append({"budget": budget["id"], "link": link, "size": None, "observed": None, "ceiling": None,
+                             "target": None, "within_ceiling": False, "met_target": None})
         for profile in agg["profiles"]:
             if "links" in budget and profile["name"] not in budget["links"]:
                 continue
@@ -69,20 +75,33 @@ def table(result):
         status = "over ceiling" if not r["within_ceiling"] else "target not met"
         value = "missing" if r["observed"] is None else f"{r['observed']:.1f}"
         target = "—" if r["target"] is None else f"{r['target']:.1f}"
-        lines.append(f"| {r['budget']} | {r['link']} | {size_label(r['size'])} | {value} | {r['ceiling']:.1f} | "
-                     f"{target} | {status} |")
+        size = "link not measured" if r["size"] is None else size_label(r["size"])
+        ceiling = "—" if r["ceiling"] is None else f"{r['ceiling']:.1f}"
+        lines.append(f"| {r['budget']} | {r['link']} | {size} | {value} | {ceiling} | {target} | {status} |")
     lines.append(f"\n{quiet} cell values are within their ceiling and meet any target.")
     return "\n".join(lines)
 
 
 def main():
-    """Pool the given reports, print the budget table and exit non-zero when any ceiling is breached."""
+    """Pool the given reports, print the budget table and exit non-zero when any ceiling is breached.
+
+    Exits with status 2, before any budget is evaluated, when a report did not qualify, fails the correctness check,
+    or was taken in a different environment or link shape than the others, because timings that meet a ceiling
+    prove nothing when the run behind them was incomplete or its requests were wrong.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("reports", nargs="+", type=Path, help="Preserved matrix reports of one head")
     parser.add_argument("--budgets", type=Path, default=BUDGETS_PATH)
     args = parser.parse_args()
-    result = evaluate(aggregate([json.loads(path.read_text())["raw"] for path in args.reports]),
-                      load_budgets(args.budgets))
+    runs, violations = load_checked_runs(args.reports)
+    try:
+        pooled = aggregate(runs) if not violations else None
+    except ValueError as error:
+        violations.append(str(error))
+    if violations:
+        print(json.dumps({"passed": False, "invalid_runs": violations}, indent=2))
+        raise SystemExit(2)
+    result = evaluate(pooled, load_budgets(args.budgets))
     print(table(result))
     raise SystemExit(0 if result["passed"] else 1)
 

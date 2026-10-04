@@ -75,7 +75,9 @@ engine, unchanged. What changed is that the shipping path no longer waits for it
 ## Budgets
 
 [`matrix_budgets.json`](../../tools/attachment-fixture/matrix_budgets.json) holds the budgets and
-`matrix_budgets.py` applies them to a pooled set of runs, failing on a ceiling breach or a missing measurement. A ceiling
+`matrix_budgets.py` applies them to a pooled set of runs, failing on a ceiling breach, a missing measurement or a
+budgeted link that was never measured, and refusing, with status 2 and before any ceiling is read, a report whose run did
+not qualify, whose raw matrix fails the correctness check, or whose cohort mixes environments or link shapes. A ceiling
 is `fixed + per MiB x size` of the budgeted median and rejects a regression. A target is where the owner should land and
 may be unmet today. Ceilings come from these measured medians with headroom; they are regression gates, not a claim
 about field latency.

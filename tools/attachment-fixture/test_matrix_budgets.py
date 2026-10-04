@@ -1,12 +1,17 @@
 """Budget contracts: a ceiling rejects a regression, a missing measurement is never a pass, and targets only inform."""
 
 from copy import deepcopy
+import contextlib
+import io
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from matrix_budgets import MIB, evaluate, limit, load_budgets, table
+from matrix_budgets import MIB, evaluate, limit, load_budgets, main as budgets_main, table
+from test_matrix_report import profile, raw
 
 
 def stats(value):
@@ -80,12 +85,56 @@ class MatrixBudgetsTest(unittest.TestCase):
         """Engine upload is budgeted on the unshaped link only, and a missed target never fails the check."""
         upload = next(b for b in self.budgets if b["id"] == "engine-upload")
         shaped = aggregate_of(cell(MIB, mdk_upload_ms=900.0), link="constrained")
-        self.assertEqual([], evaluate(shaped, [upload])["rows"])
+        skipped = evaluate(shaped, [upload])
+        self.assertEqual([], [r for r in skipped["rows"] if r["link"] == "constrained"])
+        self.assertEqual([("engine-upload", "unshaped")], [(r["budget"], r["link"]) for r in skipped["rows"]],
+                         "the link the budget names was never measured")
         materialize = next(b for b in self.budgets if b["id"] == "post-ready-materialization")
         result = evaluate(aggregate_of(cell(30 * MIB, post_ready_ms=548.0)), [materialize])
         self.assertTrue(result["passed"])
         self.assertFalse(result["rows"][0]["met_target"])
         self.assertIn("target not met", table(result))
+
+    def test_a_budget_that_names_a_link_fails_when_that_link_was_not_measured(self):
+        """Omitting the profile a budget is defined on cannot make the budget pass, and the table says so."""
+        upload = next(b for b in self.budgets if b["id"] == "engine-upload")
+        result = evaluate(aggregate_of(cell(MIB, mdk_upload_ms=1.0), link="constrained"), [upload])
+        self.assertFalse(result["passed"])
+        self.assertIn("link not measured", table(result))
+        measured = evaluate(aggregate_of(cell(MIB, mdk_upload_ms=1.0)), [upload])
+        self.assertTrue(measured["passed"])
+
+    def run_budgets(self, *reports):
+        """Write each report dict to a file, run the budget command and return its exit code and printed output."""
+        with tempfile.TemporaryDirectory() as folder:
+            paths = []
+            for index, report in enumerate(reports):
+                path = Path(folder) / f"report-{index}.json"
+                path.write_text(json.dumps(report))
+                paths.append(str(path))
+            with mock.patch.object(sys, "argv", ["matrix_budgets.py", *paths]), \
+                    contextlib.redirect_stdout(io.StringIO()) as out:
+                with self.assertRaises(SystemExit) as raised:
+                    budgets_main()
+        return raised.exception.code, out.getvalue()
+
+    def test_the_budget_command_refuses_reports_it_cannot_trust_before_evaluating_any_ceiling(self):
+        """Timings that meet a ceiling prove nothing from a failed run or one with the wrong requests."""
+        clean = raw(profile([(65536, 3)]))
+        good = {"qualified": True, "raw": clean}
+        self.assertNotEqual(2, self.run_budgets(good)[0], "a qualified, correct report is evaluated")
+        code, printed = self.run_budgets({"qualified": False, "failure_class": "TimeoutExpired", "raw": clean})
+        self.assertEqual(2, code)
+        self.assertIn("did not qualify", printed)
+        extra_head = deepcopy(clean)
+        ledger = extra_head["profiles"][0]["ledger"]
+        marker = next(i for i, e in enumerate(ledger) if e["kind"] == "marker" and e["value"] == 2)
+        ledger.insert(marker, {"seq": 900, "request": None, "kind": "head", "value": 0, "fixture": "u", "at_ns": 1})
+        extra_head["profiles"][0]["boundary"] += 1
+        self.assertEqual(2, self.run_budgets({"qualified": True, "raw": extra_head})[0])
+        elsewhere = deepcopy(clean)
+        elsewhere["environment"] = {"api": "36", "abi": "arm64-v8a"}
+        self.assertEqual(2, self.run_budgets(good, {"qualified": True, "raw": elsewhere})[0])
 
     def test_a_malformed_budget_file_is_rejected(self):
         """An unknown schema or a budget without a ceiling must not silently pass everything."""

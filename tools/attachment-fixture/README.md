@@ -153,7 +153,9 @@ when it exceeds both the observed run spread and ten percent, and any difference
 retries rejects the candidate whatever its latency. Emulator shaping does not establish physical Wi-Fi performance.
 
 `matrix_budgets.py` applies `matrix_budgets.json` to a pooled set of runs: each budget is a ceiling of `fixed + per MiB x size` on a
-median (with an optional target), a ceiling breach or a missing measurement fails, and an unmet target is reported only.
+median (with an optional target), a ceiling breach, a missing measurement or a budgeted link that was never measured fails,
+and an unmet target is reported only. The command refuses (status 2) a report whose run did not qualify, whose raw matrix
+fails the correctness check, or whose cohort mixes environments or link shapes, before it evaluates any ceiling.
 
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
