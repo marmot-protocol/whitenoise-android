@@ -61,6 +61,7 @@ internal class ShareSourceReader(
                 currentCoroutineContext().ensureActive()
                 val hint = info.size?.takeIf { it > 0 && it <= remaining }
                 val size = stream.use { copyStream(it, file, remaining, hint, progress) }
+                currentCoroutineContext().ensureActive()
                 if (size == 0L) throw EmptyShareSource()
                 progress(size, size)
                 CopiedShareSource(name, info.mime, size)

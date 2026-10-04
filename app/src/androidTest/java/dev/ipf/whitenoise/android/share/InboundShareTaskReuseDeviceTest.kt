@@ -69,11 +69,12 @@ class InboundShareTaskReuseDeviceTest {
         assertEquals(1, whiteNoiseTaskCount(targetContext))
 
         instrumentation.runOnMainSync { secondDelivery.recreate() }
-        val recreated = awaitResumedMainActivity(excluding = secondDelivery) { activity ->
-            activity.pendingInboundShareRequestForTest?.let { request ->
-                request.requestId == secondRequest.requestId && request.payload.importReady
-            } == true
-        }
+        val recreated =
+            awaitResumedMainActivity(excluding = secondDelivery) { activity ->
+                activity.pendingInboundShareRequestForTest?.let { request ->
+                    request.requestId == secondRequest.requestId && request.payload.importReady
+                } == true
+            }
         assertNotSame(secondDelivery, recreated)
         assertEquals(secondRequest.requestId, recreated.pendingInboundShareRequestForTest?.requestId)
         assertEquals(1, whiteNoiseTaskCount(targetContext))

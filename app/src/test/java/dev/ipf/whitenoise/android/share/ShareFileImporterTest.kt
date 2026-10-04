@@ -147,15 +147,20 @@ class ShareFileImporterTest {
                     files,
                     { _, _ -> ShareSourceMetadata("file", null, null) },
                     { uri, _ ->
-                        if (uri != stalled) ByteArrayInputStream(byteArrayOf(1)) else
+                        if (uri != stalled) {
+                            ByteArrayInputStream(byteArrayOf(1))
+                        } else {
                             object : InputStream() {
                                 override fun read(): Int {
                                     check(closed.await(5, java.util.concurrent.TimeUnit.SECONDS))
                                     return -1
                                 }
 
-                                override fun close() { closed.countDown() }
+                                override fun close() {
+                                    closed.countDown()
+                                }
                             }
+                        }
                     },
                     timeoutMs = 1_000,
                 )
@@ -338,7 +343,7 @@ class ShareFileImporterTest {
 
     @Test fun exactByteBoundaryAndCumulativeOverflowKeepOnlyCompleteFiles() =
         runBlocking {
-            val sizes = listOf(PRIVATE_SHARE_MAX_BYTES, PRIVATE_SHARE_MAX_BYTES, PRIVATE_SHARE_MAX_BYTES, PRIVATE_SHARE_MAX_BYTES, 1L)
+            val sizes = List(4) { PRIVATE_SHARE_MAX_BYTES } + 1L
             val importer =
                 ShareFileImporter(
                     files,

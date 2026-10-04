@@ -31,28 +31,41 @@ class ImportedShareDocumentBoundaryTest {
             // PNG permits bytes after IEND; a sparse tail supplies a bounded large raw provider source.
             java.io.RandomAccessFile(source, "rw").use { it.setLength(33L * 1024 * 1024) }
             val files = PrivateShareFiles(context)
-            val request = ShareRequest(
-                SharePayload(null, listOf(Uri.parse("content://external/large-image")), "image/png"),
-                null,
-                "large-image-boundary",
-            )
-            try {
-                val imported = ShareFileImporter(
-                    files,
-                    { _, _ -> ShareSourceMetadata("large.png", "image/png", source.length()) },
-                    { _, _ -> source.inputStream() },
-                ).import(request)
-                assertTrue(imported.payload.importErrors.isEmpty())
-                val persistence = object : DraftPersistence {
-                    override fun read(): Map<String, String> = emptyMap()
-                    override fun write(key: String, value: String?) = Unit
-                }
-                val state = WhiteNoiseAppState(
-                    context, DraftStore(persistence), { null }, emptyList(), "fixture",
-                    inboundShareTextStager = { _, _, _ -> },
+            val request =
+                ShareRequest(
+                    SharePayload(null, listOf(Uri.parse("content://external/large-image")), "image/png"),
+                    null,
+                    "large-image-boundary",
                 )
-                val attachment = ConversationAttachmentReader(state, context)
-                    .readVisualDraft(imported.payload.streamUris.single())!!
+            try {
+                val imported =
+                    ShareFileImporter(
+                        files,
+                        { _, _ -> ShareSourceMetadata("large.png", "image/png", source.length()) },
+                        { _, _ -> source.inputStream() },
+                    ).import(request)
+                assertTrue(imported.payload.importErrors.isEmpty())
+                val persistence =
+                    object : DraftPersistence {
+                        override fun read(): Map<String, String> = emptyMap()
+
+                        override fun write(
+                            key: String,
+                            value: String?,
+                        ) = Unit
+                    }
+                val state =
+                    WhiteNoiseAppState(
+                        context,
+                        DraftStore(persistence),
+                        { null },
+                        emptyList(),
+                        "fixture",
+                        inboundShareTextStager = { _, _, _ -> },
+                    )
+                val attachment =
+                    ConversationAttachmentReader(state, context)
+                        .readVisualDraft(imported.payload.streamUris.single())!!
                 assertEquals("image/jpeg", attachment.mediaType)
                 assertTrue(attachment.plaintextBytes.size < 32 * 1024 * 1024)
             } finally {

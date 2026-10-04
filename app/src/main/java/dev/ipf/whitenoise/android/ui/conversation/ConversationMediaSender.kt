@@ -505,7 +505,7 @@ internal class ConversationMediaSender(
                 if (seeded.isEmpty()) {
                     return@launchMutation
                 }
-                val sourceReleases = retainStagedSources(sourceLease, seeded)
+                val sourceReleases = retainStagedSources(appState, controller, sourceLease, seeded)
                 accepted = true
                 onAccepted()
                 onAfterSend()
@@ -537,22 +537,6 @@ internal class ConversationMediaSender(
                 },
             )
         }
-    }
-
-    private fun retainStagedSources(
-        sourceLease: dev.ipf.whitenoise.android.share.PrivateShareSendLease?,
-        seeded: List<ConversationController.QueuedAttachmentSend>,
-    ): List<() -> Unit>? {
-        val releases =
-            sourceLease?.ownerReleases(seeded.size) { lease ->
-                appState.launchMutation { withContext(Dispatchers.IO) { lease.release() } }
-            }
-        seeded.forEachIndexed { index, queued ->
-            releases?.get(index)?.let { release ->
-                if (!controller.retainQueuedAttachmentSource(queued, release)) release()
-            }
-        }
-        return releases
     }
 
     private suspend fun prepareStagedAttachments(

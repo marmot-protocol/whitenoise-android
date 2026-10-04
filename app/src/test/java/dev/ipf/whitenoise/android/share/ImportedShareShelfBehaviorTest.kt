@@ -48,12 +48,13 @@ class ImportedShareShelfBehaviorTest {
             }
             composeRule.waitUntil(10_000) { outcomes.isNotEmpty() }
             composeRule.waitForIdle()
-            blocker = Thread {
-                synchronized(privateShareLock) {
-                    entered.countDown()
-                    check(release.await(10, java.util.concurrent.TimeUnit.SECONDS))
-                }
-            }.apply { start() }
+            blocker =
+                Thread {
+                    synchronized(privateShareLock) {
+                        entered.countDown()
+                        check(release.await(10, java.util.concurrent.TimeUnit.SECONDS))
+                    }
+                }.apply { start() }
             assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS))
             composeRule.runOnIdle {
                 visible.value = emptyList()

@@ -28,7 +28,9 @@ class PrivateSharePlatformPersistenceDeviceTest {
             val file = File(directory, "share-ownership-${UUID.randomUUID()}.bin")
             try {
                 file.writeBytes(byteArrayOf(4, 5, 6))
-                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val uri =
+                    androidx.core.content.FileProvider
+                        .getUriForFile(context, "${context.packageName}.fileprovider", file)
                 val request = ShareRequest(SharePayload(null, listOf(uri), null), null, UUID.randomUUID().toString())
                 val result = ShareFileImporter(context).import(request)
                 assertEquals(listOf(ShareImportError.Scheme), result.payload.importErrors)
