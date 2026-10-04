@@ -6289,8 +6289,9 @@ class ConversationController(
     fun beginMessageEdit(messageId: String) {
         if (editingMessageId != messageId) cancelMessageEdit()
         if (
-            optimisticMessages["msg:$messageId"]?.status != MessageStatus.Sent &&
-            "msg:$messageId" in optimisticMessages
+            "msg:$messageId" in optimisticMessages &&
+            (optimisticMessages["msg:$messageId"]?.status != MessageStatus.Sent ||
+                timelineRecords[messageId]?.sourceMessageIdHex == null)
         ) {
             val originalToken = timelineRecords[messageId]?.clientToken ?: messageId
             pendingMessageEditHandoff.begin(pendingEditKey(messageId), originalToken)
@@ -9831,11 +9832,10 @@ class ConversationController(
     }
 
     private fun recoverPendingEditStatus(target: String) {
-        if (controllerCleared) return
         val edit = optimisticEdits[target]
         val intent = edit?.durableIntent
         val account = conversationAccountRef
-        if (edit == null || intent == null || account == null) return
+        if (controllerCleared || edit == null || intent == null || account == null) return
         val unresolvedFailure = edit.status == MessageStatus.Failed && !edit.nativeRevisionRejected
         if ((edit.status != MessageStatus.Pending && !unresolvedFailure) ||
             intent.editClientToken in pendingEditAdmissions
@@ -9845,31 +9845,36 @@ class ConversationController(
         if (!pendingEditStatusReads.add(intent.editClientToken)) {
             pendingEditStatusRechecks.add(intent.editClientToken)
         } else {
-            controllerScope.launch {
-                try {
-                    val status =
-                        runCatchingCancellable {
-                            pendingEditStatusReader(account, group.groupIdHex, intent.editClientToken)
-                        }.getOrNull()
-                    if (controllerCleared) return@launch
-                    val current =
-                        optimisticEdits.entries.firstOrNull {
-                            it.value.durableIntent == intent && it.value.status != MessageStatus.Sent
-                        }
-                    if (current != null) {
-                        optimisticEdits[current.key] = current.value.withNativeEditStatus(status)
-                        publishTimelineFromIndexes()
-                    }
-                } finally {
-                    pendingEditStatusReads.remove(intent.editClientToken)
-                    // Coalesce native events received during the read, including identical rows.
-                    if (pendingEditStatusRechecks.remove(intent.editClientToken) && !controllerCleared) {
-                        optimisticEdits.entries
-                            .firstOrNull { it.value.durableIntent == intent }
-                            ?.key
-                            ?.let(::recoverPendingEditStatus)
-                    }
+            controllerScope.launch { readPendingEditStatus(account, intent) }
+        }
+    }
+
+    private suspend fun readPendingEditStatus(
+        account: String,
+        intent: DurablePendingEditIntent,
+    ) {
+        try {
+            val status =
+                runCatchingCancellable {
+                    pendingEditStatusReader(account, group.groupIdHex, intent.editClientToken)
+                }.getOrNull()
+            if (controllerCleared) return
+            val current =
+                optimisticEdits.entries.firstOrNull {
+                    it.value.durableIntent == intent && it.value.status != MessageStatus.Sent
                 }
+            if (current != null) {
+                optimisticEdits[current.key] = current.value.withNativeEditStatus(status)
+                publishTimelineFromIndexes()
+            }
+        } finally {
+            pendingEditStatusReads.remove(intent.editClientToken)
+            // Coalesce native events received during the read, including identical rows.
+            if (pendingEditStatusRechecks.remove(intent.editClientToken) && !controllerCleared) {
+                optimisticEdits.entries
+                    .firstOrNull { it.value.durableIntent == intent }
+                    ?.key
+                    ?.let(::recoverPendingEditStatus)
             }
         }
     }

@@ -107,6 +107,44 @@ class ConversationSendRetryIntegrationTest {
 
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
+    fun publishedOriginalBeforeProjectionKeepsBothRevisionsOnTheNativePath() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val revisions = mutableListOf<Triple<String, String, String>>()
+            val controller =
+                nativeEditControllerWithStatus(
+                    originalReturn = CompletableDeferred<Unit>().also { it.complete(Unit) },
+                    publisher = { _, _, original, text, token ->
+                        revisions += Triple(original, text, token)
+                        pendingLocalSend()
+                    },
+                    statusReader = { _, _, _ -> LocalSendStatusFfi.Queued },
+                    originalSummary = successfulSendSummary(),
+                )
+            try {
+                controller.retryMembers()
+                controller.send("hello")
+                val original = controller.timeline.single()
+                assertEquals(MessageStatus.Sent, original.status)
+                val token = original.record.messageIdHex
+                controller.beginMessageEdit(token)
+                controller.send("first revision")
+                assertEquals(1, revisions.size)
+                assertNull(controller.editingMessageId)
+                controller.beginMessageEdit(token)
+                controller.send("second revision")
+                assertEquals(listOf(token, token), revisions.map { it.first })
+                assertEquals(listOf("first revision", "second revision"), revisions.map { it.second })
+                assertEquals(2, revisions.map { it.third }.distinct().size)
+                assertNull(controller.editingMessageId)
+            } finally {
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun canonicalPendingTargetKeepsTheOriginalNativeClientToken() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -3151,6 +3189,7 @@ class ConversationSendRetryIntegrationTest {
         publisher: PendingMessageEditPublisher,
         statusReader: suspend (String, String, String) -> LocalSendStatusFfi?,
         state: WhiteNoiseAppState = appState(),
+        originalSummary: SendSummaryFfi = pendingLocalSend(listOf(CONFIRMED_MESSAGE_ID)),
     ) = ConversationController(
         appState = state,
         initialGroup = group(),
@@ -3158,7 +3197,7 @@ class ConversationSendRetryIntegrationTest {
         groupRosterReader = { _, _ -> authoritativeRoster() },
         textPublisher = { _, _, _, _ ->
             originalReturn.await()
-            pendingLocalSend(listOf(CONFIRMED_MESSAGE_ID))
+            originalSummary
         },
         pendingMessageEditPublisher = publisher,
         pendingEditStatusReader = statusReader,
