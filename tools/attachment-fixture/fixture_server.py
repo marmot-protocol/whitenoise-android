@@ -172,14 +172,17 @@ class Handler(BaseHTTPRequestHandler):
         self.connection.settimeout(self.idle_timeout)
 
     def handle_one_request(self):
-        """Wait out a pooled connection's idle gap with the long idle bound before reading the next request."""
+        """Wait out a pooled connection's idle gap with the long bound, then bound the rest of the request line."""
         self.connection.settimeout(self.idle_timeout)
-        super().handle_one_request()
-
-    def parse_request(self):
-        """Once a request line has arrived, bound every further read and write by the request timeout."""
+        try:
+            self.rfile.peek(1)
+        except OSError:
+            # Idle past the bound or reset: no request was started, so the connection is simply done.
+            self.close_connection = True
+            return
+        # The first byte of a request has arrived, so a peer that stalls mid-request is bounded like any other.
         self.connection.settimeout(self.request_timeout)
-        return super().parse_request()
+        super().handle_one_request()
 
     def reply(self, status, value):
         """Return a bounded JSON control response without retaining request contents."""

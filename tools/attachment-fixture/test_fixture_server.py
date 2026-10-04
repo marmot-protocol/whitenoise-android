@@ -316,6 +316,18 @@ class FixtureContractTest(unittest.TestCase):
                 stalled.close()
         self.await_event("upload_disconnect")
 
+    def test_a_peer_that_stalls_inside_the_request_line_is_bounded_by_the_request_timeout(self):
+        """The long idle bound ends at the first byte, so half a request line cannot hold a handler for minutes."""
+        with mock.patch.object(Handler, "request_timeout", 0.3):
+            stalled = socket.create_connection(("127.0.0.1", self.server.server_port), timeout=5)
+            try:
+                stalled.sendall(b"PUT /up")
+                started = time.monotonic()
+                self.assertEqual(b"", stalled.recv(1))
+                self.assertLess(time.monotonic() - started, 3)
+            finally:
+                stalled.close()
+
     def test_rejects_path_escape_and_oversize_upload(self):
         """Fixture paths cannot escape the private run root and upload admission is bounded."""
         with self.assertRaises(ValueError):
