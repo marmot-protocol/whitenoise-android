@@ -119,8 +119,14 @@ class ShareFileImporterTest {
                     { _, _ -> error("Must not open app-owned provider") },
                     isAppOwnedProvider = { it.authority == "test.fileprovider" },
                 )
-            val result = importer.import(request(listOf(Uri.parse("content://test.fileprovider/audit/secret"))))
-            assertEquals(listOf(ShareImportError.Scheme), result.payload.importErrors)
+            val sources =
+                listOf(
+                    Uri.parse("content://test.fileprovider/audit/secret"),
+                    Uri.parse("content://0@test.fileprovider/audit/secret"),
+                    Uri.parse("content://0@test.private-share/00000000-0000-0000-0000-000000000000"),
+                )
+            val result = importer.import(request(sources))
+            assertEquals(List(3) { ShareImportError.Scheme }, result.payload.importErrors)
             assertTrue(result.payload.streamUris.isEmpty())
         }
 
@@ -140,37 +146,92 @@ class ShareFileImporterTest {
 
     @Test fun timedOutBatchRetainsCompletedFilesAndClosesOnlyThePartialSource() =
         runBlocking {
-            val stalled = Uri.parse("content://external/stalled")
-            val closed = java.util.concurrent.CountDownLatch(1)
-            val importer =
-                ShareFileImporter(
-                    files,
-                    { _, _ -> ShareSourceMetadata("file", null, null) },
-                    { uri, _ ->
-                        if (uri != stalled) {
-                            ByteArrayInputStream(byteArrayOf(1))
-                        } else {
-                            object : InputStream() {
-                                override fun read(): Int {
-                                    check(closed.await(5, java.util.concurrent.TimeUnit.SECONDS))
-                                    return -1
-                                }
+            for (mode in CancelledProvider.entries) {
+                val stalled = Uri.parse("content://external/stalled")
+                val closed = java.util.concurrent.CountDownLatch(1)
+                val importer =
+                    ShareFileImporter(
+                        files,
+                        { _, _ -> ShareSourceMetadata("file", null, null) },
+                        { uri, signal ->
+                            if (uri != stalled) ByteArrayInputStream(byteArrayOf(1)) else
+                                cancelledSource(mode, signal, closed)
+                        },
+                        timeoutMs = 1_000,
+                    )
+                val result = importer.import(request(listOf(source, stalled)))
+                assertEquals(mode.name, listOf(ShareImportError.Interrupted), result.payload.importErrors)
+                assertEquals(1, result.payload.importRejectedCount)
+                assertEquals(1, result.payload.streamUris.size)
+                assertEquals(1L, files.metadata(result.payload.streamUris.single())!!.getLong("size"))
+                assertEquals(1, root.listFiles()!!.count { it.extension == "bin" })
+                assertEquals(0L, closed.count)
+            }
+        }
 
-                                override fun close() {
-                                    closed.countDown()
-                                }
-                            }
-                        }
-                    },
-                    timeoutMs = 1_000,
-                )
-            val result = importer.import(request(listOf(source, stalled)))
-            assertEquals(listOf(ShareImportError.Interrupted), result.payload.importErrors)
-            assertEquals(1, result.payload.importRejectedCount)
-            assertEquals(1, result.payload.streamUris.size)
-            assertEquals(1L, files.metadata(result.payload.streamUris.single())!!.getLong("size"))
-            assertEquals(1, root.listFiles()!!.count { it.extension == "bin" })
-            assertEquals(0, closed.count)
+    private fun cancelledSource(
+        mode: CancelledProvider,
+        signal: android.os.CancellationSignal,
+        closed: java.util.concurrent.CountDownLatch,
+    ): InputStream {
+        if (mode == CancelledProvider.OPEN) {
+            signal.setOnCancelListener { closed.countDown() }
+            check(closed.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            throw android.os.OperationCanceledException()
+        }
+        return object : InputStream() {
+            override fun read(): Int {
+                check(closed.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                if (mode == CancelledProvider.IO) throw java.io.IOException("Closed provider")
+                return -1
+            }
+
+            override fun close() { closed.countDown() }
+        }
+    }
+
+    private enum class CancelledProvider { EOF, IO, OPEN }
+
+    @Test fun externalUserIdPrefixIsPreservedForTheGrantedRead() =
+        runBlocking {
+            val granted = Uri.parse("content://10@external/document")
+            val importer = ShareFileImporter(
+                files,
+                { uri, _ ->
+                    assertEquals(granted, uri)
+                    ShareSourceMetadata("file.txt", "text/plain", null)
+                },
+                { uri, _ ->
+                    assertEquals(granted, uri)
+                    ByteArrayInputStream(byteArrayOf(1))
+                },
+                isAppOwnedProvider = { uri ->
+                    assertEquals("external", uri.authority)
+                    false
+                },
+            )
+            assertTrue(importer.import(request(listOf(granted))).payload.importErrors.isEmpty())
+        }
+
+    @Test fun tinyShareUsesTheActualFreeSpaceAlongsideLargeRetainedDrafts() =
+        runBlocking {
+            val retained = List(4) { index ->
+                val size = if (index < 3) PRIVATE_SHARE_MAX_BYTES else 1024L * 1024
+                val (uri, file) = files.newFile()
+                java.io.RandomAccessFile(file, "rw").use { it.setLength(size) }
+                files.finish(uri, "retained.png", "image/png", size)
+                uri
+            }
+            files.leases.saveShelf("account", "existing", retained)
+            val importer = ShareFileImporter(
+                files,
+                { _, _ -> ShareSourceMetadata("tiny.txt", "text/plain", null) },
+                { _, _ -> ByteArrayInputStream(byteArrayOf(1)) },
+            )
+            val imported = importer.import(request(listOf(source)))
+            assertTrue(imported.payload.importErrors.isEmpty())
+            assertEquals(1L, files.metadata(imported.payload.streamUris.single())!!.getLong("size"))
+            assertEquals(retained, files.leases.loadShelf("account", "existing"))
         }
 
     @Test fun oversizedStreamingInputReadsAtMostBudgetPlusOneAndDeletesPartial() =
@@ -198,7 +259,7 @@ class ShareFileImporterTest {
                 )
             val result = importer.import(request(listOf(source)))
             assertEquals(listOf(ShareImportError.FileTooLarge), result.payload.importErrors)
-            assertEquals(PRIVATE_SHARE_MAX_BYTES + 1, readBytes)
+            assertEquals(PRIVATE_SHARE_DOCUMENT_MAX_BYTES + 1, readBytes)
             assertEquals(0, root.listFiles()!!.count { it.extension == "bin" })
         }
 
@@ -343,17 +404,17 @@ class ShareFileImporterTest {
 
     @Test fun exactByteBoundaryAndCumulativeOverflowKeepOnlyCompleteFiles() =
         runBlocking {
-            val sizes = List(4) { PRIVATE_SHARE_MAX_BYTES } + 1L
+            val sizes = List(3) { PRIVATE_SHARE_MAX_BYTES } + listOf(PRIVATE_SHARE_MAX_BYTES - 1, 2L, 1L)
             val importer =
                 ShareFileImporter(
                     files,
-                    { _, _ -> ShareSourceMetadata("file", null, null) },
+                    { _, _ -> ShareSourceMetadata("file", "image/png", null) },
                     { uri, _ -> sizedStream(sizes[uri.lastPathSegment!!.toInt()]) },
                 )
             val result = importer.import(request(sizes.indices.map { Uri.parse("content://external/$it") }))
             assertEquals(listOf(ShareImportError.BatchTooLarge), result.payload.importErrors)
             assertEquals(
-                List(4) { PRIVATE_SHARE_MAX_BYTES },
+                List(3) { PRIVATE_SHARE_MAX_BYTES } + listOf(PRIVATE_SHARE_MAX_BYTES - 1, 1L),
                 result.payload.streamUris.map {
                     files.metadata(it)!!.getLong("size")
                 },

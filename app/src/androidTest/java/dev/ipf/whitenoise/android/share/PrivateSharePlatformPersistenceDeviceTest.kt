@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.share
 
+import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
@@ -31,9 +32,21 @@ class PrivateSharePlatformPersistenceDeviceTest {
                 val uri =
                     androidx.core.content.FileProvider
                         .getUriForFile(context, "${context.packageName}.fileprovider", file)
-                val request = ShareRequest(SharePayload(null, listOf(uri), null), null, UUID.randomUUID().toString())
+                val prefixed = uri.buildUpon().authority("0@${uri.authority}").build()
+                val privateSource =
+                    Uri.Builder()
+                        .scheme("content")
+                        .authority("0@${context.packageName}.private-share")
+                        .appendPath(UUID.randomUUID().toString())
+                        .build()
+                val request =
+                    ShareRequest(
+                        payload = SharePayload(null, listOf(uri, prefixed, privateSource), null),
+                        shortcutId = null,
+                        requestId = UUID.randomUUID().toString(),
+                    )
                 val result = ShareFileImporter(context).import(request)
-                assertEquals(listOf(ShareImportError.Scheme), result.payload.importErrors)
+                assertEquals(List(3) { ShareImportError.Scheme }, result.payload.importErrors)
                 assertTrue(result.payload.streamUris.isEmpty())
                 assertArrayEquals(byteArrayOf(4, 5, 6), file.readBytes())
             } finally {

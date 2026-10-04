@@ -6,7 +6,7 @@
     <string name="share_import_unreadable">Файл недоступен для чтения или доступ истёк.</string>
     <string name="share_import_scheme">Поддерживаются только файлы поставщиков содержимого.</string>
     <string name="share_import_empty">Общий файл пуст.</string>
-    <string name="share_import_file_limit">Файл превышает лимит 64 МиБ.</string>
+    <string name="share_import_file_limit">Файл превышает лимит импорта (64 МиБ для изображений, 32 МиБ для других файлов).</string>
     <string name="share_import_batch_limit">Общий размер файлов превышает 256 МиБ.</string>
     <string name="share_import_count_limit">Можно импортировать только первые 10 файлов.</string>
     <string name="share_import_metadata">У файла неверные метаданные или изменился размер.</string>

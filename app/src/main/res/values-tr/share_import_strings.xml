@@ -6,7 +6,7 @@
     <string name="share_import_unreadable">Bir dosya okunamıyor veya erişim süresi doldu.</string>
     <string name="share_import_scheme">Yalnızca içerik sağlayıcısı dosyaları desteklenir.</string>
     <string name="share_import_empty">Paylaşılan bir dosya boş.</string>
-    <string name="share_import_file_limit">Bir dosya 64 MiB sınırını aşıyor.</string>
+    <string name="share_import_file_limit">Bir dosya içe aktarma sınırını aşıyor (görüntüler için 64 MiB, diğer dosyalar için 32 MiB).</string>
     <string name="share_import_batch_limit">Dosyaların toplamı 256 MiB sınırını aşıyor.</string>
     <string name="share_import_count_limit">Yalnızca ilk 10 dosya içe aktarılabilir.</string>
     <string name="share_import_metadata">Bir dosyanın meta verileri geçersiz veya boyutu değişti.</string>

@@ -115,7 +115,7 @@ internal class ShareFileImporter(
         sources.take(SHARE_STREAM_MAX_ITEMS).forEachIndexed { index, uri ->
             currentCoroutineContext().ensureActive()
             val result =
-                if (!isExternalContent(uri) || files.owns(uri) || isAppOwnedProvider(uri)) {
+                if (isRejectedSource(uri)) {
                     ImportedFile(error = ShareImportError.Scheme)
                 } else {
                     importOne(
@@ -139,7 +139,13 @@ internal class ShareFileImporter(
         }
     }
 
-    private fun isExternalContent(uri: Uri): Boolean = uri.scheme == "content" && !uri.authority.isNullOrBlank()
+    private fun isRejectedSource(uri: Uri): Boolean {
+        if (uri.scheme != "content" || uri.authority.isNullOrBlank()) return true
+        // ContentResolver strips Android's user-id prefix before choosing a provider.
+        // Normalize that lookup here too, while retaining the original URI for external grants.
+        val provider = uri.buildUpon().authority(uri.authority.orEmpty().substringAfterLast('@')).build()
+        return files.owns(provider) || isAppOwnedProvider(provider)
+    }
 
     private class ImportedBatch {
         val accepted = mutableListOf<Uri>()
@@ -165,35 +171,45 @@ internal class ShareFileImporter(
         onStaged: (Uri) -> Unit,
     ): ImportedFile {
         var staged: Uri? = null
+        var copyLimit = remaining
         return try {
             if (remaining <= 0) return ImportedFile(error = ShareImportError.BatchTooLarge)
             val (uri, file) = files.newFile()
             staged = uri
             onStaged(uri)
-            val copied = ShareSourceReader(metadata, open).copy(source, file, remaining, progress)
+            copyLimit = minOf(remaining, files.availableBytes())
+            val reader = ShareSourceReader(metadata, open) { info, header ->
+                val isImage =
+                    resolveShareMime(info.mime, intentMime).startsWith("image/") ||
+                        dev.ipf.whitenoise.android.media.MediaPipeline.sniffImageMediaType(header) != null
+                if (isImage) {
+                    PRIVATE_SHARE_MAX_BYTES
+                } else {
+                    PRIVATE_SHARE_DOCUMENT_MAX_BYTES
+                }
+            }
+            val copied = reader.copy(source, file, copyLimit, progress)
             files.finish(uri, copied.name, resolveShareMime(copied.mime, intentMime), copied.size)
             staged = null
             ImportedFile(uri, copied.size)
-        } catch (_: ShareSizeExceeded) {
-            val error =
-                if (remaining == PRIVATE_SHARE_MAX_BYTES) {
-                    ShareImportError.FileTooLarge
-                } else {
-                    ShareImportError.BatchTooLarge
-                }
-            ImportedFile(error = error)
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
-        } catch (_: EmptyShareSource) {
-            ImportedFile(error = ShareImportError.Empty)
-        } catch (_: SecurityException) {
-            ImportedFile(error = ShareImportError.Unreadable)
-        } catch (_: ShareSourceUnavailable) {
-            ImportedFile(error = ShareImportError.Unreadable)
-        } catch (_: IOException) {
-            ImportedFile(error = ShareImportError.Storage)
-        } catch (_: Exception) {
-            ImportedFile(error = ShareImportError.Metadata)
+        } catch (failure: Exception) {
+            currentCoroutineContext().ensureActive()
+            val error =
+                when (failure) {
+                    is ShareSizeExceeded ->
+                        when {
+                            failure.fileLimited -> ShareImportError.FileTooLarge
+                            copyLimit < remaining -> ShareImportError.Storage
+                            else -> ShareImportError.BatchTooLarge
+                        }
+                    is EmptyShareSource -> ShareImportError.Empty
+                    is SecurityException, is ShareSourceUnavailable -> ShareImportError.Unreadable
+                    is IOException -> ShareImportError.Storage
+                    else -> ShareImportError.Metadata
+                }
+            ImportedFile(error = error)
         } finally {
             staged?.let(files::delete)
         }

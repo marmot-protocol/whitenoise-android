@@ -38,36 +38,38 @@ class ImportedShareDocumentBoundaryTest {
                     "large-image-boundary",
                 )
             try {
-                val imported =
-                    ShareFileImporter(
-                        files,
-                        { _, _ -> ShareSourceMetadata("large.png", "image/png", source.length()) },
-                        { _, _ -> source.inputStream() },
-                    ).import(request)
-                assertTrue(imported.payload.importErrors.isEmpty())
-                val persistence =
-                    object : DraftPersistence {
-                        override fun read(): Map<String, String> = emptyMap()
+                for (mime in listOf("image/png", "application/octet-stream")) {
+                    val imported =
+                        ShareFileImporter(
+                            files,
+                            { _, _ -> ShareSourceMetadata("large.png", mime, source.length()) },
+                            { _, _ -> source.inputStream() },
+                        ).import(request)
+                    assertTrue(imported.payload.importErrors.isEmpty())
+                    val persistence =
+                        object : DraftPersistence {
+                            override fun read(): Map<String, String> = emptyMap()
 
-                        override fun write(
-                            key: String,
-                            value: String?,
-                        ) = Unit
-                    }
-                val state =
-                    WhiteNoiseAppState(
-                        context,
-                        DraftStore(persistence),
-                        { null },
-                        emptyList(),
-                        "fixture",
-                        inboundShareTextStager = { _, _, _ -> },
-                    )
-                val attachment =
-                    ConversationAttachmentReader(state, context)
-                        .readVisualDraft(imported.payload.streamUris.single())!!
-                assertEquals("image/jpeg", attachment.mediaType)
-                assertTrue(attachment.plaintextBytes.size < 32 * 1024 * 1024)
+                            override fun write(
+                                key: String,
+                                value: String?,
+                            ) = Unit
+                        }
+                    val state =
+                        WhiteNoiseAppState(
+                            context,
+                            DraftStore(persistence),
+                            { null },
+                            emptyList(),
+                            "fixture",
+                            inboundShareTextStager = { _, _, _ -> },
+                        )
+                    val reader = ConversationAttachmentReader(state, context)
+                    val uri = imported.payload.streamUris.single()
+                    val attachment = if (mime == "image/png") reader.readVisualDraft(uri)!! else reader.readDocumentDraft(uri)!!
+                    assertEquals("image/jpeg", attachment.mediaType)
+                    assertTrue(attachment.plaintextBytes.size < 32 * 1024 * 1024)
+                }
             } finally {
                 files.leases.releaseRequest(request.requestId)
                 source.delete()

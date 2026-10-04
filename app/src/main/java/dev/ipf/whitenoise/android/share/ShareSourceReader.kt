@@ -12,11 +12,20 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.io.PushbackInputStream
 import java.util.concurrent.atomic.AtomicReference
 
 private const val IMPORT_PROGRESS_INTERVAL_MS = 100L
+private const val SHARE_IMAGE_HEADER_BYTES = 12
 
-internal class ShareSizeExceeded : IOException()
+internal class ShareSizeExceeded(
+    val fileLimited: Boolean,
+) : IOException()
+
+private data class ShareSourceBudget(
+    val bytes: Long,
+    val fileLimited: Boolean,
+)
 
 internal class EmptyShareSource : IllegalArgumentException()
 
@@ -34,6 +43,7 @@ internal data class CopiedShareSource(
 internal class ShareSourceReader(
     private val metadata: (Uri, CancellationSignal) -> ShareSourceMetadata,
     private val open: (Uri, CancellationSignal) -> InputStream?,
+    private val sourceLimit: (ShareSourceMetadata, ByteArray) -> Long = { _, _ -> PRIVATE_SHARE_MAX_BYTES },
 ) {
     suspend fun copy(
         source: Uri,
@@ -56,11 +66,14 @@ internal class ShareSourceReader(
             try {
                 val info = providerRead { metadata(source, signal) }
                 val name = sanitizeShareFilename(info.name) ?: "file"
-                val stream = providerRead { open(source, signal) } ?: throw ShareSourceUnavailable()
+                val opened = providerRead { open(source, signal) } ?: throw ShareSourceUnavailable()
+                val stream = PushbackInputStream(opened, SHARE_IMAGE_HEADER_BYTES)
                 input.set(stream)
                 currentCoroutineContext().ensureActive()
-                val hint = info.size?.takeIf { it > 0 && it <= remaining }
-                val size = stream.use { copyStream(it, file, remaining, hint, progress) }
+                val fileLimit = sourceLimit(info, readHeader(stream, remaining))
+                val budget = ShareSourceBudget(minOf(remaining, fileLimit), fileLimit <= remaining)
+                val hint = info.size?.takeIf { it > 0 && it <= budget.bytes }
+                val size = stream.use { copyStream(it, file, budget, hint, progress) }
                 currentCoroutineContext().ensureActive()
                 if (size == 0L) throw EmptyShareSource()
                 progress(size, size)
@@ -71,10 +84,26 @@ internal class ShareSourceReader(
             }
         }
 
+    private suspend fun readHeader(
+        stream: PushbackInputStream,
+        remaining: Long,
+    ): ByteArray {
+        val header = ByteArray(minOf(SHARE_IMAGE_HEADER_BYTES.toLong(), remaining + 1).toInt())
+        var size = 0
+        while (size < header.size) {
+            currentCoroutineContext().ensureActive()
+            val read = providerRead { stream.read(header, size, header.size - size) }
+            if (read < 0) break
+            size += read
+        }
+        stream.unread(header, 0, size)
+        return header.copyOf(size)
+    }
+
     private suspend fun copyStream(
         stream: InputStream,
         file: File,
-        remaining: Long,
+        budget: ShareSourceBudget,
         hint: Long?,
         progress: (Long, Long?) -> Unit,
     ): Long =
@@ -86,12 +115,12 @@ internal class ShareSourceReader(
             var ended = false
             while (!ended) {
                 currentCoroutineContext().ensureActive()
-                val limit = minOf(buffer.size.toLong(), remaining - size + 1).toInt()
+                val limit = minOf(buffer.size.toLong(), budget.bytes - size + 1).toInt()
                 val read = providerRead { stream.read(buffer, 0, limit) }
                 ended = read == -1
                 if (read > 0) {
                     size += read
-                    if (size > remaining) throw ShareSizeExceeded()
+                    if (size > budget.bytes) throw ShareSizeExceeded(budget.fileLimited)
                     output.write(buffer, 0, read)
                 }
                 val now = android.os.SystemClock.elapsedRealtime()

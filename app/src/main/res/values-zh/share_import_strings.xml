@@ -6,7 +6,7 @@
     <string name="share_import_unreadable">文件无法读取或访问权限已过期。</string>
     <string name="share_import_scheme">仅支持内容提供程序的文件。</string>
     <string name="share_import_empty">共享文件为空。</string>
-    <string name="share_import_file_limit">文件超过 64 MiB 限制。</string>
+    <string name="share_import_file_limit">文件超过导入限制（图片为 64 MiB，其他文件为 32 MiB）。</string>
     <string name="share_import_batch_limit">文件总大小超过 256 MiB 限制。</string>
     <string name="share_import_count_limit">只能导入前 10 个文件。</string>
     <string name="share_import_metadata">文件元数据无效或大小发生变化。</string>

@@ -6,7 +6,7 @@
     <string name="share_import_unreadable">A file is unreadable or its access expired.</string>
     <string name="share_import_scheme">Only content-provider files are supported.</string>
     <string name="share_import_empty">A shared file is empty.</string>
-    <string name="share_import_file_limit">A file exceeds the 64 MiB limit.</string>
+    <string name="share_import_file_limit">A file exceeds the import limit (64 MiB for images, 32 MiB for other files).</string>
     <string name="share_import_batch_limit">The files exceed the combined 256 MiB limit.</string>
     <string name="share_import_count_limit">Only the first 10 files can be imported.</string>
     <string name="share_import_metadata">A file has invalid metadata or its size changed.</string>

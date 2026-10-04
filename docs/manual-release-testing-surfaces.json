@@ -4,7 +4,7 @@
     "composable_surfaces": [
       {
         "surface": "rememberShareChatPickerActions",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerActions.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "fun rememberShareChatPickerActions(",
         "test_ids": ["SYS-004", "SYS-005"]
       },
@@ -25224,7 +25224,7 @@
     "source_coverage": [
       {
         "surface": "Share picker staging rejection",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerActions.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "R.string.no_share_target_available",
         "test_ids": ["SYS-004", "SYS-005"]
       },

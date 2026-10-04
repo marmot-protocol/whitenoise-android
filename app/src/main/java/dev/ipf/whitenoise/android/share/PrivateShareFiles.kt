@@ -10,6 +10,8 @@ import java.util.UUID
 
 internal const val PRIVATE_SHARE_DIRECTORY = "inbound-share-files"
 internal const val PRIVATE_SHARE_MAX_BYTES = 64L * 1024 * 1024
+internal const val PRIVATE_SHARE_DOCUMENT_MAX_BYTES =
+    dev.ipf.whitenoise.android.state.ConversationController.MEDIA_RETAINED_MAX_BYTES
 internal const val PRIVATE_SHARE_BATCH_MAX_BYTES = 256L * 1024 * 1024
 private const val PRIVATE_SHARE_STORAGE_BUDGET = PRIVATE_SHARE_BATCH_MAX_BYTES
 internal const val PRIVATE_SHARE_MAX_AGE_MS = 24L * 60 * 60 * 1000
@@ -31,9 +33,7 @@ internal class PrivateShareFiles(
     fun newFile(): Pair<Uri, File> =
         synchronized(privateShareLock) {
             privateShareDirectory(root)
-            if (root.listFiles().orEmpty().sumOf { if (it.extension == "bin") it.length() else 0L } +
-                PRIVATE_SHARE_MAX_BYTES > PRIVATE_SHARE_STORAGE_BUDGET
-            ) {
+            if (availableBytes() <= 0) {
                 throw IOException("Share storage budget exhausted")
             }
             val id = UUID.randomUUID().toString()
@@ -46,6 +46,14 @@ internal class PrivateShareFiles(
                 throw expected
             }
             Uri.parse("content://$authority/$id") to file
+        }
+
+    /** Only serialized intake writes source bytes; retained shelves and sends can release them concurrently. */
+    fun availableBytes(): Long =
+        synchronized(privateShareLock) {
+            (PRIVATE_SHARE_STORAGE_BUDGET -
+                root.listFiles().orEmpty().sumOf { if (it.extension == "bin") it.length() else 0L })
+                .coerceAtLeast(0)
         }
 
     fun resolve(uri: Uri): File? {

@@ -6,7 +6,7 @@
     <string name="share_import_unreadable">Un archivo no se puede leer o su acceso caducó.</string>
     <string name="share_import_scheme">Solo se admiten archivos de proveedores de contenido.</string>
     <string name="share_import_empty">Un archivo compartido está vacío.</string>
-    <string name="share_import_file_limit">Un archivo supera el límite de 64 MiB.</string>
+    <string name="share_import_file_limit">Un archivo supera el límite de importación (64 MiB para imágenes, 32 MiB para otros archivos).</string>
     <string name="share_import_batch_limit">Los archivos superan el límite combinado de 256 MiB.</string>
     <string name="share_import_count_limit">Solo se pueden importar los primeros 10 archivos.</string>
     <string name="share_import_metadata">Un archivo tiene metadatos no válidos o cambió de tamaño.</string>
