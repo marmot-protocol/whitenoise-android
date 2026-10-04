@@ -11,6 +11,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /** One commit/dismiss owner shared by the toolbar, system Back and selected-recipient action. */
@@ -55,8 +56,7 @@ internal fun rememberShareChatPickerActions(
                                 dismiss = onDismiss,
                             )
                         } else {
-                            snackbarHostState.currentSnackbarData?.dismiss()
-                            snackbarHostState.showSnackbar(stageRejectedMessage)
+                            showShareStageRejection(coroutineScope, snackbarHostState, stageRejectedMessage)
                         }
                     } finally {
                         if (!committed) finishing = false
@@ -65,6 +65,16 @@ internal fun rememberShareChatPickerActions(
             }
         },
     )
+}
+
+/** Feedback must not keep the commit lock or block Close/Back after a rejected destination. */
+private fun showShareStageRejection(
+    scope: CoroutineScope,
+    snackbar: SnackbarHostState,
+    message: String,
+) {
+    snackbar.currentSnackbarData?.dismiss()
+    scope.launch { snackbar.showSnackbar(message) }
 }
 
 internal data class ShareChatPickerScaffoldActions(

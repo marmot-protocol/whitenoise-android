@@ -166,8 +166,10 @@ private const val PENDING_SHARE_REQUEST_VERSION = 1
 internal const val MAX_PENDING_SHARE_REQUEST_BYTES = 4 * 1024 * 1024
 internal const val PENDING_SHARE_REQUEST_CACHE_BYTES = MAX_PENDING_SHARE_REQUEST_BYTES + (64 * 1024)
 internal const val MAX_PENDING_SHARE_URIS = 1_000
+
 // Per-item errors, over-count rejection, and interruption/revalidation outcomes.
 private const val MAX_PENDING_SHARE_ERRORS = SHARE_STREAM_MAX_ITEMS + 3
+
 private const val KEY_VERSION = "version"
 private const val KEY_REQUEST_ID = "request_id"
 private const val KEY_TEXT = "text"
