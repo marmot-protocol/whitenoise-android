@@ -221,6 +221,33 @@ mkdir -p "$RUN" && chmod 700 "$RUN"
 Every `run` exits non-zero and raises unless its report is `qualified`. A failed or partial run keeps its ledger and
 report in place, never reset. Use a new `--root` per attempt.
 
+## What the first two attempts found
+
+Two attempts on the Pixel (2026-10-04) found four things that the emulator runs could not, three in this tooling:
+
+1. **A foreign UiAutomation holder.** Android allows one UiAutomation connection per device. The `android` CLI leaves
+   `com.android.cli.interact.instrumentation` running on a device after a session, and while it is active the probe
+   crashes on its first `getUiAutomation()` with `UiAutomationService ... already registered`. Check
+   `dumpsys activity processes` for any `mInstr=ActiveInstrumentation` before every run and stop on one. Stopping a
+   holder is a device-state change that needs its own owner approval, and nothing else on the phone should use the
+   `android` CLI during a gate.
+2. **A five-second keep-alive bound in the fixture server.** It closed idle pooled connections exactly when a Pixel's
+   slower per-case cycle sent the next upload, and a request whose body has started is not replayed, so the native
+   upload failed before any byte arrived. Fixed in `fixture_server.py`: the wait for a request line has its own much
+   longer bound.
+3. **A cancel run could never finalize.** The runner waited for a `complete` event on every GET, but a body cancelled
+   on purpose ends with the client's disconnect. A cancel-retry run now treats a disconnect as terminal; the checker
+   still requires the exact shape.
+4. **The installer outlived a large dismissal.** For a 31 MiB package the system installer was still staging the file
+   when the probe pressed Back, Back did not cancel the staging, and the dialog stayed on the owner's screen. The probe
+   now waits, bounded, for the installer's progress indicator to disappear and reports `installer_settled` and
+   `installer_staging_ms`. A large package with a staging time of zero means the indicator was never recognized and
+   the wait proved nothing, so read that field before trusting the large case.
+
+The owner should expect the system installer to appear for a few seconds on each allowed dispatch and to be dismissed
+without installing. Press Home and leave the phone idle before every run: the probe's Back presses would otherwise
+land on whatever app is underneath.
+
 ## Evidence per criterion and how it is checked
 
 All checks are `apk_checker.check_apk`, applied by the runner with the selected gaps, and recorded in the report's
