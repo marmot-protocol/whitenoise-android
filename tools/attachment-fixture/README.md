@@ -111,8 +111,12 @@ restored runtime in a new process with acquisition unavailable, deletes the publ
 from native retention (the stage fails if that read did not happen), and calls the real `openAttachmentExternally`. A self-update build is run with the install-unknown-apps app-op denied and
 then allowed, which the **host** toggles between stages because changing it kills the app process; a Play build has no
 installer and must answer `InstallUnsupported`. `apk_checker.py` requires, per distribution, the exact
-`OpenAttachmentResult` and whether the system installer actually reached the screen (the probe polls the active
-window for the package that handles APK installs, then dismisses it with Back). Nothing is ever installed. The server
+`OpenAttachmentResult` and whether the system installer actually reached the screen. The probe watches the active
+window for the package that handles APK installs after **every** dispatch, whatever status it returned: it waits for an
+installer where one is expected, and otherwise watches for a full second so a launch behind `InvalidPackage`,
+`InstallPermissionRequired` or `InstallUnsupported` is still seen. Each row records `installer_observed_ms`, and the
+checker rejects a row that was not watched long enough. An installer that did appear is dismissed with Back. Nothing is
+ever installed. The server
 ledger must show exactly one acquisition per case across all stages, so a denied or blocked dispatch reuses the
 completed download. Invalid packages must be rejected before any installer launch on every distribution.
 

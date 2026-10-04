@@ -18,7 +18,8 @@ def evidence(distribution):
     table = ZAPSTORE if distribution == "Zapstore" else PLAY
     for (case, permission), (allowed, installer) in table.items():
         metrics.append({"phase": "apk-dispatch", "case": case, "permission": permission, "result": allowed[0],
-                        "installer_shown": installer, "dispatch_ms": 12.0, "transfer_reused": True})
+                        "installer_shown": installer, "installer_observed_ms": 150 if installer else 1000,
+                        "dispatch_ms": 12.0, "transfer_reused": True})
     metrics.append({"phase": "apk-complete", "self_update_enabled": distribution == "Zapstore", "cases": len(CASES)})
     rows = []
     for number, case in enumerate(CASES, 1):
@@ -73,6 +74,37 @@ class ApkEvidenceTest(unittest.TestCase):
                     altered = deepcopy(metrics)
                     altered[index][field] = value
                     self.assertFalse(check_apk(altered, events, distribution)["passed"], (distribution, index, field))
+
+    def test_an_installer_behind_any_status_fails_qualification(self):
+        """A launch that returns InvalidPackage, InstallPermissionRequired or InstallUnsupported is still a launch."""
+        for distribution in ("Play", "Zapstore"):
+            metrics, events, _ = evidence(distribution)
+            for index, row in enumerate(metrics):
+                if row.get("phase") == "apk-dispatch" and row["installer_shown"] is False:
+                    altered = deepcopy(metrics)
+                    altered[index]["installer_shown"] = True
+                    result = check_apk(altered, events, distribution)
+                    self.assertFalse(result["passed"], (distribution, row["case"], row["result"]))
+                    self.assertTrue(any("wrong platform outcome" in v for v in result["violations"]))
+
+    def test_every_dispatch_must_have_been_watched_for_an_installer(self):
+        """A missing, short or non-numeric observation means an absent installer was never actually looked for."""
+        for distribution in ("Play", "Zapstore"):
+            metrics, events, _ = evidence(distribution)
+            for index, row in enumerate(metrics):
+                if row.get("phase") != "apk-dispatch":
+                    continue
+                for observed in (None, "1000", True, -1, float("nan")):
+                    altered = deepcopy(metrics)
+                    if observed is None:
+                        del altered[index]["installer_observed_ms"]
+                    else:
+                        altered[index]["installer_observed_ms"] = observed
+                    self.assertFalse(check_apk(altered, events, distribution)["passed"], (row["case"], observed))
+                if row["installer_shown"] is False:
+                    altered = deepcopy(metrics)
+                    altered[index]["installer_observed_ms"] = 100
+                    self.assertFalse(check_apk(altered, events, distribution)["passed"], row["case"])
 
     def test_a_retry_that_downloads_again_fails(self):
         """A denied or blocked dispatch must reuse the completed download, never fetch again."""

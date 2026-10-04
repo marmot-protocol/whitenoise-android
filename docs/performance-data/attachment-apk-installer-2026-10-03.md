@@ -24,8 +24,11 @@ package, and each stage reopens the restored runtime with acquisition unavailabl
 file, republishes it from native retention (the stage fails if that read did not happen) and calls the real
 `openAttachmentExternally`. The host toggles the app-op between stages because changing it
 kills the app process. The probe records the exact
-`OpenAttachmentResult` and whether the system package installer actually reached the screen, by polling the active window
-for the package that handles APK installs, then dismisses it with Back. Nothing is ever installed or replaced.
+`OpenAttachmentResult` and whether the system package installer actually reached the screen, by watching the active
+window for the package that handles APK installs after every dispatch, whatever status it returned, and records how long
+it watched. An installer that appears is dismissed with Back. Nothing is ever installed or replaced. A throwaway device experiment that
+launched the real installer behind an `InvalidPackage` result was seen by the probe (`installer_shown` true) and failed
+qualification, so a launch behind a non-Opened status is detected.
 
 The server ledger is authoritative: one upload and one acquisition per case across all stages, so a denied or blocked
 dispatch reuses the completed download. `apk_checker.py` fails closed and records `installation_confirmed: false`.

@@ -65,6 +65,7 @@ internal object ApkInstallerAttachmentProbe {
     private const val DEADLINE_MILLIS = 600_000L
     private const val INSTALLER_TIMEOUT_MILLIS = 10_000L
     private const val POLL_MILLIS = 100L
+    private const val UNEXPECTED_OBSERVE_MILLIS = 1_000L
     private const val DISMISS_ATTEMPTS = 3
     private const val ZERO_BYTE_PAD = 4096
     private const val MAX_SENDABLE_BYTES = 31 * 1024 * 1024
@@ -327,40 +328,69 @@ internal object ApkInstallerAttachmentProbe {
                 fileName = received.fileName,
             )
         val dispatchMillis = (SystemClock.elapsedRealtimeNanos() - started) / NANOS_PER_MILLI
-        val installerShown = result == OpenAttachmentResult.Opened && awaitInstallerAndDismiss(context, expectInstaller)
+        // The screen is watched for every result, so an installer behind any status, not only Opened, is seen.
+        val installer = awaitInstallerAndDismiss(context, expectInstaller, result == OpenAttachmentResult.Opened)
         ControlledAttachmentProbe.report(
             JSONObject()
                 .put("phase", "apk-dispatch")
                 .put("case", received.key)
                 .put("permission", permission)
                 .put("result", result.name)
-                .put("installer_shown", installerShown)
+                .put("installer_shown", installer.shown)
+                .put("installer_observed_ms", installer.observedMillis)
                 .put("dispatch_ms", dispatchMillis)
                 .put("transfer_reused", received.file.isFile),
         )
     }
 
-    /** Waits for the package installer window when one is expected, then dismisses it without installing. */
+    /** Whether the system installer reached the screen after one dispatch, and for how long the screen was watched. */
+    private class InstallerObservation(
+        val shown: Boolean,
+        val observedMillis: Long,
+    )
+
+    /**
+     * Watches the screen after any dispatch result. When an installer is expected it waits for it, and otherwise it
+     * watches for [UNEXPECTED_OBSERVE_MILLIS] so a launch behind a non-Opened status is still seen. The installer, or
+     * whatever an Opened dispatch left on screen, is dismissed with Back without installing.
+     */
     private suspend fun awaitInstallerAndDismiss(
         context: Context,
         expectInstaller: Boolean,
-    ): Boolean {
+        opened: Boolean,
+    ): InstallerObservation {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val installers = installerPackages(context)
+        val started = SystemClock.elapsedRealtime()
         val shown =
             if (expectInstaller) {
                 runCatching {
                     withTimeout(INSTALLER_TIMEOUT_MILLIS) { pollForeground(automation, installers) }
                 }.getOrDefault(false)
             } else {
-                delay(POLL_MILLIS * DISMISS_ATTEMPTS)
-                foregroundPackage(automation) in installers
+                watchForInstaller(automation, installers)
             }
-        repeat(DISMISS_ATTEMPTS) {
-            automation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+        val observedMillis = SystemClock.elapsedRealtime() - started
+        if (shown || opened) {
+            repeat(DISMISS_ATTEMPTS) {
+                automation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                delay(POLL_MILLIS)
+            }
+        }
+        return InstallerObservation(shown, observedMillis)
+    }
+
+    /** Polls for the whole observation window and reports whether an installer package owned the screen at any poll. */
+    private suspend fun watchForInstaller(
+        automation: UiAutomation,
+        installers: Set<String>,
+    ): Boolean {
+        val deadline = SystemClock.elapsedRealtime() + UNEXPECTED_OBSERVE_MILLIS
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (foregroundPackage(automation) in installers) return true
             delay(POLL_MILLIS)
         }
-        return shown
+        return false
     }
 
     /** Resolves the package that handles APK installation on this device instead of assuming a vendor package. */

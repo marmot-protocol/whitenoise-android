@@ -6,6 +6,8 @@ SCOPE = "genuine-received-apk-transfer-and-platform-open"
 CIPHERTEXT_OVERHEAD = 16
 CASES = ("valid", "generic", "conflict", "no-manifest", "truncated")
 ORDINARY = ("Opened", "NoHandler")
+# A dispatch that expects no installer must have been watched for at least this long, a little under the probe's window.
+OBSERVE_MIN_MS = 900
 # (case, permission) -> allowed results, and whether the system installer must reach the screen.
 ZAPSTORE = {
     ("valid", "denied"): (("InstallPermissionRequired",), False),
@@ -63,6 +65,13 @@ def _check_dispatch(metrics, distribution, violations):
         if (row is None or row.get("result") not in allowed or row.get("installer_shown") is not installer
                 or row.get("transfer_reused") is not True or not _finite(row.get("dispatch_ms"))):
             violations.append(f"wrong platform outcome for {key[0]} ({key[1]})")
+        # Whatever the status, the screen must have been watched: an absent installer only counts if it was looked for.
+        observed = None if row is None else row.get("installer_observed_ms")
+        # A dispatch that saw an installer stops watching at once and is already a wrong outcome, so only an absent
+        # installer needs the full window to be evidence.
+        if row is not None and (not _finite(observed) or (
+                not installer and row.get("installer_shown") is not True and observed < OBSERVE_MIN_MS)):
+            violations.append(f"the screen was not watched for an installer after {key[0]} ({key[1]})")
     done = [m for m in metrics if m.get("phase") == "apk-complete"]
     if (len(done) != 1 or done[0].get("self_update_enabled") is not (distribution == "Zapstore")
             or done[0].get("cases") != len(CASES)):
