@@ -1005,6 +1005,8 @@
     <string name="media_uploading">上传中…</string>
     <string name="media_upload_failed">上传失败</string>
     <string name="media_tap_to_retry">点按重试</string>
+    <string name="media_too_large_to_preview">文件过大，无法预览</string>
+    <string name="media_too_large_to_preview_hint">保存或分享此图片，以在其他应用中查看</string>
     <string name="media_tap_to_download">点按下载</string>
     <string name="media_preparing_download">准备下载</string>
     <string name="media_preparing_attachment">正在准备附件</string>

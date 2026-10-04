@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.media.Thumbhash
@@ -192,6 +193,9 @@ internal fun MediaImageBubble(
         onDispose(mediaApplyHostAttempt::cancel)
     }
     var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
+    // A verified image above the preview budget is not a failure: Retry cannot shrink it, so the tile opens the
+    // viewer instead, where Save and Share still work.
+    var tooLargeToPreview by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
     var reloadToken by remember(key, attachmentIndex, epoch) { mutableIntStateOf(0) }
     val cacheAvailability =
         rememberImageAttachmentCacheAvailability(controller, key, attachmentIndex, epoch, presentation != null)
@@ -248,6 +252,7 @@ internal fun MediaImageBubble(
         if (presentation != null) return@LaunchedEffect // already have decoded pixels
         if (!startDownload) return@LaunchedEffect
         failed = false
+        tooLargeToPreview = false
         try {
             val data =
                 imageAttachmentBytes(
@@ -287,6 +292,8 @@ internal fun MediaImageBubble(
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             materializationIntent = materializationIntent.afterProducerCancellation(cancel)
+        } catch (_: AttachmentTooLargeToPresentException) {
+            tooLargeToPreview = true
         } catch (_: Throwable) {
             android.util.Log.w("MediaImageBubble", "image_auto_download_failed")
             failed = true
@@ -299,7 +306,8 @@ internal fun MediaImageBubble(
         sourceEpoch = epoch,
         controller = controller,
         appState = appState,
-        isReady = { presentation != null },
+        // A pending open of an image that turned out too large to preview still opens the viewer.
+        isReady = { presentation != null || tooLargeToPreview },
         ensureMaterialization = {
             if (failed) {
                 failed = false
@@ -378,6 +386,8 @@ internal fun MediaImageBubble(
                     )
                 null ->
                     when {
+                        tooLargeToPreview ->
+                            MediaTooLargeToPreviewControl(onOpen = ::dispatchViewerOpen, showCaption = true)
                         failed ->
                             MediaCircleAction(
                                 icon = Icons.Default.Refresh,
@@ -651,6 +661,8 @@ internal fun MediaImageGridTile(
         onDispose(mediaApplyHostAttempt::cancel)
     }
     var failed by remember(decodeKey) { mutableStateOf(false) }
+    // Mirrors the single bubble: a verified image above the preview budget opens the viewer instead of retrying.
+    var tooLargeToPreview by remember(decodeKey) { mutableStateOf(false) }
     var reloadToken by remember(decodeKey) { mutableIntStateOf(0) }
     val cacheAvailability =
         rememberImageAttachmentCacheAvailability(
@@ -708,6 +720,7 @@ internal fun MediaImageGridTile(
         if (presentation != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         failed = false
+        tooLargeToPreview = false
         try {
             val data =
                 imageAttachmentBytes(
@@ -747,6 +760,8 @@ internal fun MediaImageGridTile(
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             materializationIntent = materializationIntent.afterProducerCancellation(cancel)
+        } catch (_: AttachmentTooLargeToPresentException) {
+            tooLargeToPreview = true
         } catch (_: Throwable) {
             android.util.Log.w("MediaImageGridTile", "image_tile_auto_download_failed")
             failed = true
@@ -759,7 +774,8 @@ internal fun MediaImageGridTile(
         sourceEpoch = reference.sourceEpoch,
         controller = controller,
         appState = appState,
-        isReady = { presentation != null },
+        // A pending open of an image that turned out too large to preview still opens the viewer.
+        isReady = { presentation != null || tooLargeToPreview },
         ensureMaterialization = {
             if (failed) {
                 failed = false
@@ -782,6 +798,7 @@ internal fun MediaImageGridTile(
                 onClick = {
                     when {
                         transfer.cancelling -> Unit
+                        tooLargeToPreview -> onTap()
                         failed ->
                             controller.retryAttachmentTransfer(
                                 messageIdHex,
@@ -823,6 +840,7 @@ internal fun MediaImageGridTile(
                 )
             null ->
                 when {
+                    tooLargeToPreview -> MediaTooLargeToPreviewControl(onOpen = onTap)
                     failed ->
                         MediaCircleAction(
                             icon = Icons.Default.Refresh,
