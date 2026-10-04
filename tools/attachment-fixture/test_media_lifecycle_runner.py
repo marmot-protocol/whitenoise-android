@@ -54,6 +54,20 @@ class MediaLifecycleRunnerTest(unittest.TestCase):
         self.assertTrue(finalized)
         self.assertEqual(rows, events)
 
+    def test_a_disconnect_is_terminal_only_when_the_caller_names_it(self):
+        """A cancelled attempt ends with a disconnect, which is never silently accepted as a completed request."""
+        rows = [
+            {"seq": 1, "request": None, "kind": "upload", "value": 5},
+            {"seq": 2, "request": 1, "kind": "upload_complete", "value": 0},
+            {"seq": 3, "request": None, "kind": "get", "value": 0},
+            {"seq": 4, "request": 3, "kind": "disconnect", "value": 0},
+        ]
+        _, default = runner.wait_for_completion(FakeLedger(rows), 0, uploads=1, gets=1, timeout=0.05)
+        self.assertFalse(default)
+        _, named = runner.wait_for_completion(FakeLedger(rows), 0, uploads=1, gets=1, timeout=2,
+                                              terminal_kinds=("complete", "disconnect"))
+        self.assertTrue(named)
+
     def test_completion_wait_keeps_unfinished_evidence_on_timeout(self):
         """An unfinished request is reported as unfinalized with every attempt retained."""
         rows = [{"seq": 1, "request": None, "kind": "upload", "value": 5},
@@ -65,7 +79,7 @@ class MediaLifecycleRunnerTest(unittest.TestCase):
     def test_real_device_or_unknown_profile_is_refused_before_any_adb_call(self):
         """The fixture is for disposable emulators only; a physical serial never reaches adb."""
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(runner, "adb_command") as adb:
-            for serial, profile in (("46131FDAS003CG", "reference-api30-arm64"),
+            for serial, profile in (("PHYSICAL000TEST", "reference-api30-arm64"),
                                     ("emulator-5554", "pixel-api37-arm64")):
                 with self.assertRaises(ValueError):
                     runner.run("adb", serial, Path(directory), Path(directory) / "out.json", profile)

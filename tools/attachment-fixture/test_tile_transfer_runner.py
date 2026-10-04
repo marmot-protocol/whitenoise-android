@@ -15,7 +15,7 @@ class TileTransferRunnerTest(unittest.TestCase):
         """The fixture is for disposable emulators only; nothing reaches adb for a refused device or profile."""
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(runner, "adb_command") as adb:
             output = Path(directory) / "out.json"
-            for serial, profile in (("46131FDAS003CG", "reference-api30-arm64"), ("emulator-5554", "pixel-api37-arm64"),
+            for serial, profile in (("PHYSICAL000TEST", "reference-api30-arm64"), ("emulator-5554", "pixel-api37-arm64"),
                                     ("emulator-5554", "no-such-profile")):
                 with self.assertRaises(ValueError):
                     runner.run("adb", serial, Path(directory), output, profile)

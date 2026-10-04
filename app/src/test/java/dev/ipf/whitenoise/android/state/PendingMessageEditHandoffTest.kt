@@ -8,6 +8,18 @@ import org.junit.Test
 
 class PendingMessageEditHandoffTest {
     @Test
+    fun scopedSessionKeepsItsRawNativeTokenAndIgnoresAnUnchangedTemporaryId() {
+        val handoff = PendingMessageEditHandoff()
+        val key = "account|group|original-token"
+        handoff.begin(key, "original-token")
+        assertEquals("original-token", handoff.originalClientToken(key))
+        assertNull(handoff.confirm(key, "original-token", ready = true))
+        assertNull(handoff.confirmedTarget(key))
+        handoff.confirm(key, "native-message", ready = false)
+        assertEquals("native-message", handoff.confirmedTarget(key))
+    }
+
+    @Test
     fun establishedMessageStillPublishesAgainstItsExistingEventId() {
         val handoff = PendingMessageEditHandoff()
 

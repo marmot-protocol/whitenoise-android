@@ -15,6 +15,7 @@ import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
+import dev.ipf.whitenoise.android.state.MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
@@ -271,6 +272,9 @@ internal object MediaLifecycleAttachmentProbe {
             }
         }
         val preview = decodePreview(session, state, request, attachment)
+        if (hostDisk) measureHostDiskRead(state, key, attachment, label)
+        val memoryEligible = attachment.bytes <= MEDIA_PLAINTEXT_CACHE_MAX_ENTRY_BYTES
+        if (memoryEligible) measureMemoryHit(state, request, key, attachment, label)
         ControlledAttachmentProbe.report(
             JSONObject()
                 .put("phase", "media-readback")
@@ -282,9 +286,49 @@ internal object MediaLifecycleAttachmentProbe {
                 .put("exact", true)
                 .put("memory_hit", false)
                 .put("host_disk_hit", hostDisk)
+                .put("memory_eligible", memoryEligible)
                 .put("preview_ok", preview.first)
                 .put("preview_ms", preview.second),
         )
+    }
+
+    /** Reads the encrypted host copy on its own, so a stored-byte hit is timed apart from native retention. */
+    private suspend fun measureHostDiskRead(
+        state: WhiteNoiseAppState,
+        key: String,
+        attachment: ManifestAttachment,
+        label: String,
+    ) {
+        ControlledAttachmentProbe.measure("media-host-disk-read-$label", attachment.bytes.toInt()) {
+            val bytes =
+                requireNotNull(withContext(Dispatchers.IO) { state.diskMediaCache.get(key) }) {
+                    "the host copy reported as a hit could not be read"
+                }
+            assertEquals(attachment.sha256, digestOf(AttachmentPlaintext.Bytes(bytes)))
+        }
+    }
+
+    /**
+     * Seeds the memory cache through its production entry point from the retained bytes, then times a hit on it. Only
+     * an attachment under the memory entry ceiling is admitted, so a larger one is never measured here.
+     */
+    private suspend fun measureMemoryHit(
+        state: WhiteNoiseAppState,
+        request: AttachmentTransferRequest,
+        key: String,
+        attachment: ManifestAttachment,
+        label: String,
+    ) {
+        val retained = requireNotNull(state.openNativeAttachment(request)).use { it.toByteArray() }
+        val admitted = withContext(Dispatchers.Main.immediate) { state.cacheMediaPlaintext(key, retained) }
+        assertTrue("the memory cache rejected an entry under its ceiling for $label", admitted)
+        ControlledAttachmentProbe.measure("media-memory-hit-$label", attachment.bytes.toInt()) {
+            val hit =
+                requireNotNull(withContext(Dispatchers.Main.immediate) { state.cachedMediaPlaintext(key) }) {
+                    "the seeded memory entry was not served"
+                }
+            assertEquals(attachment.sha256, digestOf(AttachmentPlaintext.Bytes(hit)))
+        }
     }
 
     /** Decodes what a tile would show first: a bitmap for an image, a first frame and duration for a video. */
