@@ -69,6 +69,122 @@ import java.util.concurrent.TimeUnit
 @Config(sdk = [36], qualifiers = "en")
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
+    /** Both public send routes stage the selected row before entering a suspending native edit call. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // Both native token routes share the same hidden-list and callback lifecycle.
+    fun latestMessageEditsReachTheHiddenListBeforePublication() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                for (originalToken in listOf(null, "native-original")) {
+                    val state = appState()
+                    val row =
+                        chatListRow().let {
+                            it.copy(
+                                lastMessage =
+                                    it.lastMessage!!.copy(
+                                        messageIdHex = CONFIRMED_MESSAGE_ID,
+                                        plaintext = "hello",
+                                        deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED,
+                                    ),
+                            )
+                        }
+                    val chats = attachedChatsController(state, ACCOUNT_REF, row)
+                    val release = CompletableDeferred<Unit>()
+                    val entered = CompletableDeferred<Unit>()
+                    val controller =
+                        ConversationController(
+                            appState = state,
+                            initialGroup = group(),
+                            initialMemberSnapshot = memberSnapshot(),
+                            groupRosterReader = { _, _ -> authoritativeRoster() },
+                            markdownParser = { row.lastMessage!!.contentTokens },
+                            messageEditPublisher = { _, _, _, _ ->
+                                entered.complete(Unit)
+                                release.await()
+                            },
+                            pendingMessageEditPublisher = { _, _, _, _, _ ->
+                                entered.complete(Unit)
+                                release.await()
+                                pendingLocalSend(listOf("edit-id"))
+                            },
+                            pendingEditStatusReader = { _, _, _ -> publishedNativeEditStatus("edit-id") },
+                        )
+                    try {
+                        controller.retryMembers()
+                        applyProjection(controller, projectedMessage(5uL, null, null).copy(clientToken = originalToken))
+                        controller.beginMessageEdit(CONFIRMED_MESSAGE_ID)
+                        val send = async(start = CoroutineStart.UNDISPATCHED) { controller.send("revision") }
+                        entered.await()
+                        chats.setChatListVisible(true)
+                        assertEquals("revision", chats.items.single().projectedPreviewText())
+                        assertEquals(
+                            ChatListMessageDeliveryStateFfi.PENDING,
+                            chats.items
+                                .single()
+                                .projection
+                                ?.lastMessage
+                                ?.deliveryState,
+                        )
+                        release.complete(Unit)
+                        send.await()
+                        runCurrent()
+                        assertEquals("revision", chats.items.single().projectedPreviewText())
+                        chats.applyChatListRow(row.copy(lastMessage = row.lastMessage!!.copy(plaintext = "revision")))
+                        assertEquals("revision", chats.items.single().projectedPreviewText())
+                        assertEquals(
+                            row.activitySortAt,
+                            chats.items
+                                .single()
+                                .projection
+                                ?.activitySortAt,
+                        )
+                        assertEquals(
+                            row.unreadCount,
+                            chats.items
+                                .single()
+                                .projection
+                                ?.unreadCount,
+                        )
+                    } finally {
+                        release.complete(Unit)
+                        controller.onCleared()
+                        chats.onCleared()
+                    }
+                }
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    /** Wire edit payloads, including another author's forged target, never override the native target row. */
+    @Test
+    fun mismatchedAuthorEditInTimelineCannotAlterBubble() =
+        runTest {
+            val controller = ConversationController(appState(), group(), initialMemberSnapshot = memberSnapshot())
+            try {
+                val original = projectedMessage(5uL, null, null)
+                applyProjection(controller, original)
+                applyProjection(
+                    controller,
+                    original.copy(
+                        messageIdHex = "forged-edit",
+                        kind = 1009uL,
+                        sender = "other-author",
+                        plaintext = "forged revision",
+                        tags = listOf(MessageTagFfi(listOf("e", CONFIRMED_MESSAGE_ID))),
+                        timelineAt = 6uL,
+                    ),
+                )
+                val target = controller.timeline.first { it.record.messageIdHex == CONFIRMED_MESSAGE_ID }
+                assertEquals("hello", controller.displayedText(target.record))
+                assertNull(controller.editsByTarget[CONFIRMED_MESSAGE_ID])
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun confirmedProjectionUsesNativeEditsOnlyWhenItsLedgerTokenIsRetained() =

@@ -96,6 +96,55 @@ class ChatListFirstFrameMarkdownScreenshotTest {
             .captureRoboImage("src/test/snapshots/chat_list_first_frame_markdown_light.png")
     }
 
+    /** Captures the first row only after proving styled text rendered and raw Markdown never did. */
+    @Test
+    fun optimisticEditHasParsedTokensOnTheFirstVisibleFrame() {
+        val appState = appState()
+        val tokens =
+            MarkdownDocumentFfi(
+                truncated = false,
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("Rendered first"))),
+                                MarkdownInlineFfi.Text(" after launch"),
+                            ),
+                        ),
+                    ),
+                blankLinesBefore = ByteArray(0),
+            )
+        val row = notificationChatListRow().copy(lastMessage = notifiedMessagePreview().copy(plaintext = "Before edit"))
+        val edits =
+            dev.ipf.whitenoise.android.state
+                .OptimisticChatEditPreviews()
+        edits.begin(row, row.lastMessage!!.messageIdHex, "edit-action", "**Rendered first** after launch", tokens)
+        val item = chatListItemFromProjection(edits.project(row))
+
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Box(Modifier.fillMaxWidth().testTag(FIRST_FRAME_MARKDOWN_TAG)) {
+                        ChatRow(
+                            item = item,
+                            appState = appState,
+                            interactionsEnabled = true,
+                            onClick = {},
+                            onOpenProfile = {},
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Rendered first after launch").assertIsDisplayed()
+        composeRule.onNodeWithText("**Rendered first** after launch").assertDoesNotExist()
+        composeRule.onAllNodes(hasClickAction()).assertCountEquals(1)
+        composeRule
+            .onNodeWithTag(FIRST_FRAME_MARKDOWN_TAG)
+            .captureRoboImage("src/test/snapshots/chat_list_edited_first_frame_markdown_light.png")
+    }
+
     /** Creates the active-account presentation dependencies used by the production chat row. */
     private fun appState() =
         WhiteNoiseAppState(
