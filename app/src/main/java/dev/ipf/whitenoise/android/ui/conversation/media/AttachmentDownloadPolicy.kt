@@ -3,8 +3,10 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
 import kotlinx.coroutines.CancellationException
@@ -88,6 +90,7 @@ internal enum class AttachmentMaterializationIntent {
 internal fun rememberAttachmentMaterializationIntent(
     identity: String,
     policyAllowsMaterialization: Boolean,
+    onPolicyApplied: (Boolean) -> Unit = {},
 ): MutableState<AttachmentMaterializationIntent> {
     val intent =
         remember(identity) {
@@ -95,8 +98,11 @@ internal fun rememberAttachmentMaterializationIntent(
                 AttachmentMaterializationIntent.Idle.withPolicyAllowed(policyAllowsMaterialization),
             )
         }
+    val applied by rememberUpdatedState(onPolicyApplied)
     LaunchedEffect(identity, policyAllowsMaterialization) {
         intent.value = intent.value.withPolicyAllowed(policyAllowsMaterialization)
+        // Reported in the same pass as the grant, so a caller can tell the intent has caught up with the policy.
+        applied(policyAllowsMaterialization)
     }
     return intent
 }

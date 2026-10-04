@@ -546,6 +546,12 @@
         "test_ids": ["NAV-005", "ACC-017", "SET-001"]
       },
       {
+        "surface": "Cache-only image render from MDK retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageCacheMaterialization.kt",
+        "anchor": "internal suspend fun imageAttachmentBytes(",
+        "test_ids": ["MED-023"]
+      },
+      {
         "surface": "Native attachment transfer observation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
         "anchor": "private suspend fun NativeTransferFeed.nextState()",

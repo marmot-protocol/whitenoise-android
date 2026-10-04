@@ -6155,6 +6155,15 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
+     * Applies what an account switch does to the media session, in the production order: the in-memory media caches
+     * are cleared and the session epoch advances, then [activeAccountRef] moves to [label] when one is given.
+     */
+    internal fun switchMediaSessionForTest(label: String?) {
+        clearInMemoryMediaCaches()
+        if (label != null) activeAccountRef = label
+    }
+
+    /**
      * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
      * the established local fail-open behavior; a structured unfinished-local
      * outcome retains the active session. Returns null when no account is active.

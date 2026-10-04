@@ -168,5 +168,47 @@ class MediaEvidenceTest(unittest.TestCase):
             self.assertTrue(result["violations"], field)
 
 
+def tile_rows():
+    """One closed tile row per expected attachment and role, as the device test reports them."""
+    return [{"phase": "media-tile", "message": message, "index": index, "role": role, "media": media, "shown": True,
+             "settle_ms": 120, "download_affordance_seen": False, "retry_affordance_seen": False,
+             "one_tap_opened": True}
+            for message, index, media in EXPECTED for role in ROLES]
+
+
+class RetainedTilesEvidenceTest(unittest.TestCase):
+    """Retained media must render without a Download affordance and open on one tap, for every sent and received tile."""
+
+    def test_complete_tile_rows_pass_and_an_absent_tile_stage_is_skipped_only_when_not_requested(self):
+        """A full set passes, an empty requested stage fails, and a caller that omits tiles keeps the old contract."""
+        prepare, read, events, boundary = evidence()
+        self.assertTrue(check_media(prepare, read, events, boundary, tile_rows())["passed"])
+        self.assertTrue(check_media(prepare, read, events, boundary)["passed"])
+        self.assertFalse(check_media(prepare, read, events, boundary, [])["passed"])
+
+    def test_a_missing_unshown_affordance_or_unopened_tile_fails(self):
+        """Each tile property is individually required, so a single bad tile cannot hide among good ones."""
+        prepare, read, events, boundary = evidence()
+        rows = tile_rows()
+        for index in range(len(rows)):
+            for field, bad in (("shown", False), ("download_affordance_seen", True), ("retry_affordance_seen", True),
+                               ("one_tap_opened", False),
+                               ("settle_ms", None), ("media", "other")):
+                altered = deepcopy(rows)
+                altered[index][field] = bad
+                with self.subTest(index=index, field=field):
+                    self.assertFalse(check_media(prepare, read, events, boundary, altered)["passed"])
+            with self.subTest(index=index, field="row"):
+                self.assertFalse(check_media(prepare, read, events, boundary, rows[:index] + rows[index + 1:])["passed"])
+
+    def test_duplicate_and_extra_tile_rows_fail(self):
+        """A repeated row or one for an unexpected attachment is evidence of a changed fixture."""
+        prepare, read, events, boundary = evidence()
+        rows = tile_rows()
+        self.assertFalse(check_media(prepare, read, events, boundary, rows + [rows[0]])["passed"])
+        extra = dict(rows[0], message="unexpected")
+        self.assertFalse(check_media(prepare, read, events, boundary, rows + [extra])["passed"])
+
+
 if __name__ == "__main__":
     unittest.main()
