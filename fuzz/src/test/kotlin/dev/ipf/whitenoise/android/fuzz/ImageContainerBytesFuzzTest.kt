@@ -4,7 +4,14 @@ import com.code_intelligence.jazzer.api.FuzzedDataProvider
 import com.code_intelligence.jazzer.junit.DictionaryEntries
 import com.code_intelligence.jazzer.junit.DictionaryFile
 import com.code_intelligence.jazzer.junit.FuzzTest
+import dev.ipf.whitenoise.android.media.AnimationSourceAdmission
+import dev.ipf.whitenoise.android.media.AnimationSourceKind
 import dev.ipf.whitenoise.android.media.ImageContainerKind
+import dev.ipf.whitenoise.android.media.MAX_ANIMATION_SOURCE_CANVAS_PIXELS
+import dev.ipf.whitenoise.android.media.MAX_ANIMATION_SOURCE_EDGE_PX
+import dev.ipf.whitenoise.android.media.MAX_ANIMATION_SOURCE_FRAMES
+import dev.ipf.whitenoise.android.media.MAX_ANIMATION_SOURCE_WORK_PIXELS
+import dev.ipf.whitenoise.android.media.admitAnimationSource
 import dev.ipf.whitenoise.android.media.imageContainerKind
 import dev.ipf.whitenoise.android.media.stripGifMetadata
 import dev.ipf.whitenoise.android.media.stripImageContainerMetadata
@@ -13,11 +20,14 @@ import dev.ipf.whitenoise.android.media.stripPngMetadata
 import dev.ipf.whitenoise.android.media.stripWebpMetadata
 import org.junit.jupiter.api.Tag
 
-/** Fuzzes all Android-free image metadata walkers with bounded provider-controlled bytes. */
+/** Fuzzes all Android-free image metadata walkers and animation admission with bounded provider-controlled bytes. */
 @Tag("fuzz-image-container")
 class ImageContainerBytesFuzzTest {
     /** Lets uncaught parser failures reach Jazzer while asserting successful-output invariants. */
-    @DictionaryEntries("hex:", "RIFF", "WEBP", "GIF87a", "GIF89a", "IEND", "EXIF", "XMP ")
+    @DictionaryEntries(
+        "hex:", "RIFF", "WEBP", "GIF87a", "GIF89a", "IEND", "EXIF", "XMP ",
+        "VP8X", "ANIM", "ANMF", "ALPH", "VP8L",
+    )
     @DictionaryFile(resourcePath = "/fuzz-grammar.dict")
     @FuzzTest
     fun fuzzImageContainerBytes(data: FuzzedDataProvider) {
@@ -43,7 +53,11 @@ class ImageContainerBytesFuzzTest {
                 FuzzAssertions.assertNull("a mismatched walker must reject the container", result)
             }
             if (result != null) {
-                FuzzAssertions.assertEquals("accepted output must preserve its container kind", walkerKind, imageContainerKind(result))
+                FuzzAssertions.assertEquals(
+                    "accepted output must preserve its container kind",
+                    walkerKind,
+                    imageContainerKind(result),
+                )
                 FuzzAssertions.assertTrue("metadata removal must not expand its source", result.size <= bytes.size)
                 FuzzAssertions.assertTrue(
                     "metadata removal must be idempotent",
@@ -57,6 +71,46 @@ class ImageContainerBytesFuzzTest {
         FuzzAssertions.assertTrue(
             "the production dispatcher must match the positively identified walker",
             dispatched?.contentEquals(direct) ?: (direct == null),
+        )
+        exerciseAnimationAdmission(bytes, sourceKind)
+    }
+
+    /** Runs the exact production animation admission walk and checks its content-derived limits. */
+    private fun exerciseAnimationAdmission(
+        bytes: ByteArray,
+        sourceKind: ImageContainerKind?,
+    ) {
+        val admission = admitAnimationSource(bytes)
+        FuzzAssertions.assertEquals("admission must be deterministic", admission, admitAnimationSource(bytes))
+        if (sourceKind == ImageContainerKind.Gif) {
+            FuzzAssertions.assertTrue(
+                "a recognized GIF must be admitted or refused, never treated as a still",
+                admission != AnimationSourceAdmission.NotAnimation,
+            )
+        }
+        if (admission !is AnimationSourceAdmission.Admitted) return
+        val expectedKind =
+            if (sourceKind == ImageContainerKind.Gif) AnimationSourceKind.Gif else AnimationSourceKind.Webp
+        FuzzAssertions.assertTrue(
+            "only GIF or WebP content may be admitted",
+            sourceKind == ImageContainerKind.Gif || sourceKind == ImageContainerKind.Webp,
+        )
+        FuzzAssertions.assertEquals("admitted kind must match the container signature", expectedKind, admission.kind)
+        val canvas = admission.canvasWidth.toLong() * admission.canvasHeight.toLong()
+        FuzzAssertions.assertTrue(
+            "admitted canvas must stay inside the edge and area limits",
+            admission.canvasWidth in 1..MAX_ANIMATION_SOURCE_EDGE_PX &&
+                admission.canvasHeight in 1..MAX_ANIMATION_SOURCE_EDGE_PX &&
+                canvas <= MAX_ANIMATION_SOURCE_CANVAS_PIXELS,
+        )
+        FuzzAssertions.assertTrue(
+            "admitted frames must stay inside the frame and aggregate work limits",
+            admission.frameCount in 1..MAX_ANIMATION_SOURCE_FRAMES &&
+                canvas * admission.frameCount <= MAX_ANIMATION_SOURCE_WORK_PIXELS,
+        )
+        FuzzAssertions.assertTrue(
+            "a truncated admitted source must not be admitted",
+            admitAnimationSource(bytes.copyOf(bytes.size - 1)) !is AnimationSourceAdmission.Admitted,
         )
     }
 
