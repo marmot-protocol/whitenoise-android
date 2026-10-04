@@ -28,4 +28,24 @@ class ConversationImportedMediaSlotsTest {
         val removed = restoreImportedMediaSlots(repeated, listOf(added), 10, owns)
         assertEquals(listOf(camera, restored[2]), removed)
     }
+
+    @Test
+    fun ordinaryRestorePreservesCurrentPrivateSourcesAndCannotResurrectRemovedOnes() {
+        val ordinary = PendingMediaSlot("native", Uri.parse("content://native/photo"))
+        val imported = PendingMediaSlot("prepared", Uri.parse("content://private-share/photo"))
+        val removed = PendingMediaSlot("removed", Uri.parse("content://private-share/removed"))
+        val ordinaryDocument = Uri.parse("content://native/document")
+        val importedDocument = Uri.parse("content://private-share/document")
+        val restored = RestoredConversationAttachments(listOf(ordinary, removed), listOf(ordinaryDocument))
+        val merged =
+            mergeRestoredComposerAttachments(
+                listOf(imported),
+                listOf(importedDocument),
+                restored,
+                owns = { it.authority == "private-share" },
+            )
+        assertEquals(listOf(ordinary, imported), merged.mediaSlots)
+        assertSame(imported, merged.mediaSlots.last())
+        assertEquals(listOf(ordinaryDocument, importedDocument), merged.documentUris)
+    }
 }

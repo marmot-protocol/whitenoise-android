@@ -6355,7 +6355,10 @@ class WhiteNoiseAppState private constructor(
             withContext(NonCancellable + Dispatchers.IO) {
                 wipedShareAccount?.takeIf(String::isNotBlank)?.let { account ->
                     runCatching {
-                        dev.ipf.whitenoise.android.share.PrivateShareFiles(appContext).leases.releaseAccount(account)
+                        val files =
+                            dev.ipf.whitenoise.android.share
+                                .PrivateShareFiles(appContext)
+                        files.leases.releaseAccount(account)
                     }.onFailure {
                         appStateDebug(it) { "private share purge failed after wipe: ${it.readableMessage()}" }
                     }

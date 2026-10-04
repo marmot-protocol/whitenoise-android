@@ -221,7 +221,8 @@ internal class ShareFileImporter(
     ): Long {
         val isImage =
             resolveShareMime(info.mime, intentMime).startsWith("image/") ||
-                dev.ipf.whitenoise.android.media.MediaPipeline.sniffImageMediaType(header) != null
+                dev.ipf.whitenoise.android.media.MediaPipeline
+                    .sniffImageMediaType(header) != null
         return if (isImage) PRIVATE_SHARE_MAX_BYTES else PRIVATE_SHARE_DOCUMENT_MAX_BYTES
     }
 

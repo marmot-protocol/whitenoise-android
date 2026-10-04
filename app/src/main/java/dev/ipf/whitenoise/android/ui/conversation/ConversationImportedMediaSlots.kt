@@ -15,3 +15,15 @@ internal fun restoreImportedMediaSlots(
     val added = restored.filterNot { uri -> retained.any { it.uri == uri } }
     return appendPendingMediaSlots(retained, added, maxItems)
 }
+
+/** The native restore cannot discard platform sources published since its last input projection. */
+internal fun mergeRestoredComposerAttachments(
+    currentMedia: List<PendingMediaSlot>,
+    currentDocuments: List<Uri>,
+    restored: RestoredConversationAttachments,
+    owns: (Uri) -> Boolean,
+): RestoredConversationAttachments =
+    RestoredConversationAttachments(
+        mediaSlots = restored.mediaSlots.filterNot { owns(it.uri) } + currentMedia.filter { owns(it.uri) },
+        documentUris = (restored.documentUris.filterNot(owns) + currentDocuments.filter(owns)).distinct(),
+    )

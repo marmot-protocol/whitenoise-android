@@ -72,7 +72,7 @@ private fun persistInboundShareImport(
             return@LaunchedEffect
         }
         // The token also recovers the narrow pre-marker process-death window.
-        holder.markInboundSharePersisted(request.requestId)
+        if (!holder.markInboundSharePersisted(request.requestId)) return@LaunchedEffect
         state.progress = null
         val ready =
             runCatchingCancellable {

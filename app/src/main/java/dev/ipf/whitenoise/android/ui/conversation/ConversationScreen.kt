@@ -3158,8 +3158,15 @@ internal fun ConversationScreen(
 
     LaunchedEffect(mediaDraftState, controller.boundAccountRef, chat.id) {
         val restored = mediaDraftState.restorePersistedAttachments() ?: return@LaunchedEffect
-        pendingMediaSlots = restored.mediaSlots
-        pendingDocumentUris = restored.documentUris
+        val merged =
+            mergeRestoredComposerAttachments(
+                pendingMediaSlots,
+                pendingDocumentUris,
+                restored,
+                importedShareFiles::owns,
+            )
+        pendingMediaSlots = merged.mediaSlots
+        pendingDocumentUris = merged.documentUris
     }
 
     val pollVotesHost = remember(controller) { PollVotesHostState() }

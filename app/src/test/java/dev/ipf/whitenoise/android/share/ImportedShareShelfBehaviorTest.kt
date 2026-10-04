@@ -5,6 +5,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import dev.ipf.whitenoise.android.ui.conversation.RestoredConversationAttachments
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.mergeRestoredComposerAttachments
+import dev.ipf.whitenoise.android.ui.conversation.restoreImportedMediaSlots
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
@@ -21,6 +25,62 @@ import java.io.File
 @Config(sdk = [36])
 class ImportedShareShelfBehaviorTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test
+    fun lateOrdinaryDraftRestoreKeepsPrivateShelfFiles() {
+        assertBothRestoresKeepPrivateFiles(draftFirst = false)
+    }
+
+    @Test
+    fun ordinaryDraftRestoreBeforeShareRestoreKeepsPrivateShelfFiles() {
+        assertBothRestoresKeepPrivateFiles(draftFirst = true)
+    }
+
+    private fun assertBothRestoresKeepPrivateFiles(draftFirst: Boolean) {
+        val files = PrivateShareFiles(RuntimeEnvironment.getApplication())
+        val (uri, file) = files.newFile()
+        file.writeBytes(byteArrayOf(1))
+        files.finish(uri, "shared.png", "image/png", 1)
+        files.leases.saveShelf("restore-account", "restore-chat", listOf(uri))
+        val media = mutableStateOf<List<PendingMediaSlot>>(emptyList())
+        val documents = mutableStateOf<List<Uri>>(emptyList())
+        val ordinary =
+            RestoredConversationAttachments(
+                listOf(PendingMediaSlot("native", Uri.parse("content://native/photo"))),
+                listOf(Uri.parse("content://native/document")),
+            )
+        val restoreOrdinary = {
+            val merged = mergeRestoredComposerAttachments(media.value, documents.value, ordinary, files::owns)
+            media.value = merged.mediaSlots
+            documents.value = merged.documentUris
+        }
+        var restored = false
+        try {
+            if (draftFirst) restoreOrdinary()
+            composeRule.setContent {
+                ImportedShareShelf(
+                    account = "restore-account",
+                    group = "restore-chat",
+                    uris = media.value.map { it.uri } + documents.value,
+                    revision = 0,
+                ) {
+                    val staging = it.getOrThrow()
+                    media.value = restoreImportedMediaSlots(media.value, staging.mediaUris, 10, files::owns)
+                    documents.value = (documents.value.filterNot(files::owns) + staging.documentUris).distinct()
+                    restored = true
+                }
+                Text("Items: ${media.value.size + documents.value.size}")
+            }
+            composeRule.waitUntil(10_000) { restored }
+            composeRule.waitForIdle()
+            if (!draftFirst) composeRule.runOnIdle { restoreOrdinary() }
+            composeRule.onNodeWithText("Items: 3").assertExists()
+            assertNotNull(files.metadata(uri))
+            assertEquals(listOf(uri), files.leases.loadShelf("restore-account", "restore-chat"))
+        } finally {
+            files.leases.saveShelf("restore-account", "restore-chat", emptyList())
+        }
+    }
 
     @Test
     fun revisionRestoreCannotResurrectRemovalWhileStorageIsBlocked() {

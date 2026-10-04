@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.share
 
+import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -15,6 +17,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -35,6 +38,24 @@ class ShareFileImporterTest {
 
     @After fun cleanup() {
         root.deleteRecursively()
+    }
+
+    @Test fun constructionAndOwnershipChecksDoNotTouchAndroidStorage() {
+        var directoryReads = 0
+        val context =
+            object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+                override fun getApplicationContext(): Context = this
+
+                override fun getNoBackupFilesDir(): File {
+                    directoryReads++
+                    return root
+                }
+            }
+        val lazyFiles = PrivateShareFiles(context)
+        assertTrue(lazyFiles.owns(Uri.parse("content://${context.packageName}.private-share/file")))
+        assertEquals(0, directoryReads)
+        lazyFiles.newFile()
+        assertEquals(1, directoryReads)
     }
 
     @Test fun bytesAndSafeMetadataSurviveSourceRevocationAndStoreRecreation() =

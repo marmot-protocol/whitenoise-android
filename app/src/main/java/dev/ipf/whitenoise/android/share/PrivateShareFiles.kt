@@ -17,16 +17,19 @@ private const val PRIVATE_SHARE_STORAGE_BUDGET = PRIVATE_SHARE_BATCH_MAX_BYTES
 internal const val PRIVATE_SHARE_MAX_AGE_MS = 24L * 60 * 60 * 1000
 
 /** Android intake files, never protocol data. Only the non-exported provider can read them. */
-internal class PrivateShareFiles(
-    private val root: File,
+internal class PrivateShareFiles private constructor(
+    rootForIo: () -> File,
     private val authority: String,
 ) {
+    constructor(root: File, authority: String) : this({ root }, authority)
+
     constructor(context: Context) : this(
-        File(context.applicationContext.noBackupFilesDir, PRIVATE_SHARE_DIRECTORY),
+        privateShareRootForIo(context),
         "${context.packageName}.private-share",
     )
 
-    val leases = PrivateShareLeases(root, ::owns, ::metadata, ::delete)
+    private val root by lazy(rootForIo)
+    val leases by lazy { PrivateShareLeases(root, ::owns, ::metadata, ::delete) }
 
     fun owns(uri: Uri): Boolean = uri.scheme == "content" && uri.authority == authority
 
@@ -51,9 +54,8 @@ internal class PrivateShareFiles(
     /** Only serialized intake writes source bytes; retained shelves and sends can release them concurrently. */
     fun availableBytes(): Long =
         synchronized(privateShareLock) {
-            (PRIVATE_SHARE_STORAGE_BUDGET -
-                root.listFiles().orEmpty().sumOf { if (it.extension == "bin") it.length() else 0L })
-                .coerceAtLeast(0)
+            val used = root.listFiles().orEmpty().sumOf { if (it.extension == "bin") it.length() else 0L }
+            (PRIVATE_SHARE_STORAGE_BUDGET - used).coerceAtLeast(0)
         }
 
     fun resolve(uri: Uri): File? {
@@ -118,6 +120,12 @@ internal class PrivateShareFiles(
     private companion object {
         val UUID_PATTERN = Regex("[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}")
     }
+}
+
+/** Composition can create an ownership checker without creating Android's no-backup directory on Main. */
+private fun privateShareRootForIo(context: Context): () -> File {
+    val app = context.applicationContext
+    return { File(app.noBackupFilesDir, PRIVATE_SHARE_DIRECTORY) }
 }
 
 internal fun validateImportedShare(
