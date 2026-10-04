@@ -93,6 +93,11 @@ class DevicePrivacyScreenScreenshotTest {
         runBlocking { state.refreshSecurityPrivacySettings() }
         val shell = presentBootstrappedApp(state, AppPhase.Ready)
         composeRule.onNodeWithText("Help Improve White Noise").assertIsDisplayed()
+        // This privacy-only fake rejects chat-list reads. Pin its settled error backdrop rather
+        // than race the seeded empty list; the prompt and its committed golden stay unchanged.
+        val chats = composeRule.runOnIdle { shell.chatsController(state.activeAccountRef, state.runtimeGeneration) }
+        composeRule.waitUntil(5_000L) { !chats.isLoading && chats.error != null }
+        composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/audit_upload_renewal_prompt.png")
         composeRule.onAllNodes(isToggleable())[1].performClick()
         composeRule.onNodeWithText("Cancel").performClick()

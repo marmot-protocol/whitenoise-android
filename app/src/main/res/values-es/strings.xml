@@ -2200,4 +2200,5 @@
     <string name="onboarding_details_accessibility">%1$s: %2$s</string>
     <string name="onboarding_details_expanded">Expandido</string>
     <string name="onboarding_details_collapsed">Contraído</string>
+    <string name="group_svg_rejected_detail">No se pudo preparar este SVG. Elige un SVG sencillo, PNG o JPEG.</string>
 </resources>

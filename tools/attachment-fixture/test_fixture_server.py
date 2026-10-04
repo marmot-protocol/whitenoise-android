@@ -8,8 +8,9 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
-from fixture_server import Control, FixtureServer, Ledger
+from fixture_server import Control, FixtureServer, Handler, Ledger
 
 
 class FixtureContractTest(unittest.TestCase):
@@ -84,6 +85,94 @@ class FixtureContractTest(unittest.TestCase):
         self.assertEqual(2, sum(e["kind"] == "get" for e in events))
         self.assertEqual(1024, sum(e["value"] for e in events if e["kind"] == "body_bytes"))
         self.assertEqual(1, sum(e["kind"] == "acquisition_unavailable" for e in events))
+
+    def test_not_found_and_restore_are_counted_and_never_reset_the_ledger(self):
+        """A permanent-miss phase is a counted attempt, and restoring service keeps every earlier attempt."""
+        source = self.server.generate("missing", 2048)
+        self.assertEqual(200, self.get("/__acquisition-not-found", method="POST")[0])
+        self.assertEqual(404, self.get("/missing")[0])
+        self.assertEqual(200, self.get("/__restore-acquisition", method="POST")[0])
+        self.assertEqual(source.read_bytes(), self.get("/missing")[2])
+        events = self.await_event("complete", 2)
+        self.assertEqual(2, sum(e["kind"] == "get" for e in events))
+        self.assertEqual([404, 200], [e["value"] for e in events if e["kind"] == "status"])
+        self.assertEqual(2048, sum(e["value"] for e in events if e["kind"] == "body_bytes"))
+        self.assertEqual(1, sum(e["kind"] == "acquisition_not_found" for e in events))
+        self.assertEqual(1, sum(e["kind"] == "restore_acquisition" for e in events))
+
+    def test_restore_also_lifts_the_service_unavailable_denial(self):
+        """One restore control clears either denial so a deliberate Retry can be exercised."""
+        self.server.generate("denied", 1024)
+        self.assertEqual(200, self.get("/__acquisition-unavailable", method="POST")[0])
+        self.assertEqual(503, self.get("/denied")[0])
+        self.assertEqual(200, self.get("/__restore-acquisition", method="POST")[0])
+        self.assertEqual(200, self.get("/denied")[0])
+
+    def test_pacing_slows_existing_bodies_without_holding_or_truncating_them(self):
+        """Pacing is applied to uploaded bodies after creation and still delivers every byte."""
+        source = self.server.generate("paced", 3 * 16 * 1024)
+        self.assertEqual(0, self.server.controls["paced"].interval)
+        self.assertEqual(200, self.get("/__pace-acquisition", method="POST")[0])
+        self.assertGreater(self.server.controls["paced"].interval, 0)
+        self.assertIsNone(self.server.controls["paced"].hold_after)
+        started = time.monotonic()
+        self.assertEqual(source.read_bytes(), self.get("/paced")[2])
+        self.assertGreaterEqual(time.monotonic() - started, 2 * self.server.controls["paced"].interval)
+        events = self.await_event("complete")
+        self.assertEqual(0, sum(e["kind"] == "held" for e in events))
+        self.assertEqual(1, sum(e["kind"] == "pace_acquisition" for e in events))
+
+    def test_shaping_bounds_download_throughput_and_adds_latency_without_resetting_the_ledger(self):
+        """A shaped link is deterministic and verifiable outside the app, and restoring it keeps every earlier attempt."""
+        source = self.server.generate("shaped", 128 * 1024)
+        started = time.monotonic()
+        self.assertEqual(source.read_bytes(), self.get("/shaped")[2])
+        unshaped = time.monotonic() - started
+        self.assertEqual(200, self.get("/__shape/2000/0/200", method="POST")[0])
+        started = time.monotonic()
+        self.assertEqual(source.read_bytes(), self.get("/shaped")[2])
+        shaped = time.monotonic() - started
+        # 128 KiB at 2 Mbit/s is about 0.52 s on the wire, plus 0.2 s of latency.
+        self.assertGreaterEqual(shaped, 0.55)
+        self.assertLess(unshaped, shaped)
+        self.assertEqual(200, self.get("/__shape/0/0/0", method="POST")[0])
+        events = self.await_event("complete", 2)
+        self.assertEqual(2, sum(e["kind"] == "get" for e in events))
+        self.assertEqual([2000, 0], [e["value"] for e in events if e["kind"] == "shape_down_kbps"])
+        self.assertEqual([200, 0], [e["value"] for e in events if e["kind"] == "shape_latency_ms"])
+
+    def test_shaping_bounds_upload_throughput(self):
+        """The upload path honors the same declared link, so an upload cell is a controlled measurement too."""
+        self.assertEqual(200, self.get("/__shape/0/2000/0", method="POST")[0])
+        body = bytes(range(256)) * 512
+        started = time.monotonic()
+        status, _, _ = self.get("/upload", method="PUT", body=body)
+        elapsed = time.monotonic() - started
+        self.assertEqual(200, status)
+        # 128 KiB at 2 Mbit/s.
+        self.assertGreaterEqual(elapsed, 0.45)
+
+    def test_numbered_markers_delimit_samples_in_the_ledger(self):
+        """A marker is a ledger boundary only; it changes no behavior and rejects out-of-range numbers."""
+        self.server.generate("sampled", 1024)
+        self.assertEqual(200, self.get("/__marker/7", method="POST")[0])
+        self.get("/sampled")
+        self.assertEqual(200, self.get("/__marker/8", method="POST")[0])
+        for path in ("/__marker/-1", "/__marker/x", "/__marker/1000001"):
+            self.assertEqual(400, self.get(path, method="POST")[0], path)
+        events = self.await_event("complete")
+        kinds = [(e["kind"], e["value"]) for e in events if e["kind"] in ("marker", "get")]
+        self.assertEqual([("marker", 7), ("get", 0), ("marker", 8)], kinds)
+
+    def test_shape_rejects_values_outside_the_bounded_range(self):
+        """A malformed or unbounded shape never changes the link and is answered as a bad request."""
+        for path in ("/__shape/-1/0/0", "/__shape/1/2", "/__shape/a/b/c", "/__shape/99999999/0/0"):
+            self.assertEqual(400, self.get(path, method="POST")[0], path)
+        self.assertEqual(0, self.server.shape.down_bps)
+        started = time.monotonic()
+        self.server.generate("unbound", 128 * 1024)
+        self.get("/unbound")
+        self.assertLess(time.monotonic() - started, 1.5)
 
     def test_global_hold_release_does_not_hold_the_deliberate_retry(self):
         """The release control removes the hold rather than reporting a second fake hold event."""
@@ -250,6 +339,46 @@ class FixtureContractTest(unittest.TestCase):
         self.assertNotIn("127.0.0.1", serialized)
         self.assertEqual(len(original), sum(e["value"] for e in events if e["kind"] == "upload_bytes"))
         self.assertEqual(len(original), sum(e["value"] for e in events if e["kind"] == "body_bytes"))
+
+    def test_an_idle_pooled_connection_survives_past_the_request_timeout_and_the_next_upload_lands(self):
+        """A client that reuses a connection after a gap longer than the request timeout must not be cut off."""
+        client = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=10)
+        try:
+            for index in range(2):
+                client.request("PUT", "/upload", body=bytes([index]) * 64)
+                response = client.getresponse()
+                response.read()
+                self.assertEqual(200, response.status)
+                if index == 0:
+                    time.sleep(Handler.request_timeout + 0.5)
+        finally:
+            client.close()
+        self.assertEqual(2, sum(e["kind"] == "upload_complete" for e in self.server.ledger.snapshot()))
+
+    def test_a_stalled_request_is_still_bounded_by_the_request_timeout(self):
+        """Only the idle wait is long: once a request line arrives, a peer that stops sending is dropped promptly."""
+        with mock.patch.object(Handler, "request_timeout", 0.3):
+            stalled = socket.create_connection(("127.0.0.1", self.server.server_port), timeout=5)
+            try:
+                stalled.sendall(b"PUT /upload HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\nabc")
+                started = time.monotonic()
+                self.assertEqual(b"", stalled.recv(1))
+                self.assertLess(time.monotonic() - started, 3)
+            finally:
+                stalled.close()
+        self.await_event("upload_disconnect")
+
+    def test_a_peer_that_stalls_inside_the_request_line_is_bounded_by_the_request_timeout(self):
+        """The long idle bound ends at the first byte, so half a request line cannot hold a handler for minutes."""
+        with mock.patch.object(Handler, "request_timeout", 0.3):
+            stalled = socket.create_connection(("127.0.0.1", self.server.server_port), timeout=5)
+            try:
+                stalled.sendall(b"PUT /up")
+                started = time.monotonic()
+                self.assertEqual(b"", stalled.recv(1))
+                self.assertLess(time.monotonic() - started, 3)
+            finally:
+                stalled.close()
 
     def test_rejects_path_escape_and_oversize_upload(self):
         """Fixture paths cannot escape the private run root and upload admission is bounded."""

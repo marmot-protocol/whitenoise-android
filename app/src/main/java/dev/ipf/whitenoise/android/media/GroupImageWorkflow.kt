@@ -3,7 +3,9 @@ package dev.ipf.whitenoise.android.media
 import android.content.ContentResolver
 import android.net.Uri
 import dev.ipf.marmotkit.InitialGroupImageFfi
+import dev.ipf.whitenoise.android.core.DiagnosticErrorMetadata
 import dev.ipf.whitenoise.android.core.SafeHttpsGet
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
@@ -112,6 +114,11 @@ internal sealed class ImageUploadPreparationException : Exception() {
 
     data object UnsupportedImage : ImageUploadPreparationException()
 
+    data object UnsupportedSvg : ImageUploadPreparationException(), DiagnosticErrorMetadata {
+        override val diagnosticErrorCode = "UNSUPPORTED_SVG"
+        override val diagnosticTechnicalDetail = "format=SVG reason=UNSAFE_OR_UNSUPPORTED"
+    }
+
     data object PreparedImageTooLarge : ImageUploadPreparationException()
 }
 
@@ -171,6 +178,20 @@ internal object GroupImageDraftProcessor {
                 dim = "${prepared.width}x${prepared.height}",
                 thumbhash = prepared.thumbhash,
             )
+        }
+
+    /** Group-only SVG support; other identity surfaces keep their stream-based raster decoder. */
+    suspend fun fromGroupContentUri(
+        contentResolver: ContentResolver,
+        uri: Uri,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ): ImageUploadDraft =
+        withContext(ioDispatcher) {
+            if (isGroupSvgDocument(contentResolver, uri)) {
+                fromBytes(readGroupIdentityImageSource(contentResolver, uri), sourceUrl = null)
+            } else {
+                fromContentUri(contentResolver, uri)
+            }
         }
 
     internal fun fromBytes(

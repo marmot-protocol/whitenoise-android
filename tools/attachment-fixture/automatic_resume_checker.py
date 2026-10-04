@@ -1,14 +1,22 @@
 """Require actual ordinary-worker interruption plus compatible native Range recovery, without process-death claims."""
 
 import math
+import re
 
 PAYLOAD_BYTES = 4 * 1024 * 1024
 PREFIX_BYTES = 2 * 1024 * 1024
 
 
+def _closed(value):
+    """A step or exception name kept to a short closed alphabet, so a failure row can never carry free text."""
+    return value if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", value) else "unknown"
+
+
 def check_automatic_resume(metrics, events):
     """Successful byte transfer alone cannot qualify a scheduler stop or a resumed ordinary WorkSpec."""
     violations = []
+    for failure in (m for m in metrics if m.get("phase") == "automatic-platform-resume-failure"):
+        violations.append(f"the probe failed at step {_closed(failure.get('step'))} ({_closed(failure.get('exception'))})")
     result = [m for m in metrics if m.get("phase") == "automatic-platform-resume"]
     expected = {"success": True, "same_work_resumed": True, "actual_platform_stop": True,
                 "ordinary_work": True, "interactive_intent": False, "deliberate_retry_used": False,

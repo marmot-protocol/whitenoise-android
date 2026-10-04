@@ -44,6 +44,10 @@ on:
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsReadAloudHighlight.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaReferenceSupportFuzzIntegrationTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaReferenceSupport.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/AnimationSource*.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AnimatedAttachmentImage.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AnimationSourceAdmissionDeviceTest.kt'
       - 'cryptoBenchmark/**'
       - 'settings.gradle.kts'
       - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt'
@@ -59,6 +63,13 @@ on:
       - 'tools/attachment-fixture/**'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/ControlledAttachmentProbe.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaAttachmentLatencyProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/NativePhaseAttachmentProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AndroidAttachmentFixtureSender.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaLifecycleAttachmentProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/FixtureMediaAssets.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/ApkInstallerAttachmentProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/FixtureSession.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MatrixAttachmentProbe.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt'
       # Stored direct-peer title and membership separation (#2149) against the real native runtime.
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/state/ChatListColdStartDirectPeerPresentationFfiIntegrationTest.kt'
@@ -111,6 +122,10 @@ jobs:
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-lock
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-automatic-resume
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-phases
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-media
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-matrix unshaped,quick
       - name: Preserve redacted ledger and measurements on success or failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
