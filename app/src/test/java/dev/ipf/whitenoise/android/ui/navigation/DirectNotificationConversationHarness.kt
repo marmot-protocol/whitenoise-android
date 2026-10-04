@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineGroupRoster
 import dev.ipf.whitenoise.android.state.conversationTimelineMemberSnapshot
@@ -30,6 +31,12 @@ internal class DirectNotificationConversationHarness(
         val group = conversationTimelineTestGroup()
         val row = notificationChatListRow()
         val appState = conversationTimelineTestAppState(liveSubscriptions)
+        // Foreground ownership tests require an opted-in message before mounting the screen.
+        appState.chatMutePreferences.setNotifyForMode(
+            ConversationTimelineTestIds.ACCOUNT_REF,
+            ConversationTimelineTestIds.GROUP_ID,
+            dev.ipf.whitenoise.android.state.ChatNotifyMode.ALL,
+        )
         val memberSnapshot = conversationTimelineMemberSnapshot()
         val controller =
             ConversationController(
