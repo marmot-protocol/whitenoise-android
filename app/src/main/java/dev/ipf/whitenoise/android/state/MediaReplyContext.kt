@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -22,7 +23,9 @@ internal fun requireMediaReplyDraft(
     draftTarget: String?,
     matchingAttachments: Boolean,
 ) {
-    if ((capturedTarget != null && !matchingAttachments) || (matchingAttachments && draftTarget != capturedTarget)) {
+    val missingDraft = capturedTarget != null && !matchingAttachments
+    val changedTarget = matchingAttachments && draftTarget != capturedTarget
+    if (missingDraft || changedTarget) {
         throw MediaReplyDraftUnavailableException()
     }
 }
@@ -36,15 +39,38 @@ internal suspend fun WhiteNoiseAppState.captureMediaReplyDraft(
     account: String,
     group: String,
     attachments: List<PendingAttachment>,
-    target: String,
+    target: String?,
 ): SelectedMessageDraftFfi? =
     marmotIo {
         val selected = selectedDraftOrNull(account, group)
-        val draft = selected?.draft ?: return@marmotIo null
+        val draft = selected?.draft
         val descriptorsMatch =
-            draft.mediaAttachments.size == attachments.size &&
+            draft != null &&
+                draft.mediaAttachments.size == attachments.size &&
                 draft.mediaAttachments.zip(attachments).all { (descriptor, attachment) ->
                     descriptor.fileName == attachment.fileName && descriptor.mediaType == attachment.mediaType
                 }
-        selected.takeIf { draft.replyToMessageIdHex == target && descriptorsMatch }
+        requireMediaReplyDraft(target, draft?.replyToMessageIdHex, descriptorsMatch)
+        selected.takeIf { target != null }
     }
+
+/** Refresh only the same accepted content; never consume a newer user's draft to repair a stale revision. */
+internal fun MarmotInterface.currentMediaReplyDraft(
+    account: String,
+    group: String,
+    context: ComposerMediaSendContext,
+    caption: String?,
+): SelectedMessageDraftFfi? {
+    val selected = selectedDraftOrNull(account, group)
+    val captured = context.replyDraft?.draft ?: return selected
+    val current = selected?.draft
+    val sameIntent =
+        current != null &&
+            current.replyToMessageIdHex == captured.replyToMessageIdHex &&
+            current.mediaAttachments == captured.mediaAttachments
+    val sameContent = current?.content == captured.content || current?.content == caption.orEmpty()
+    if (!sameIntent || !sameContent) {
+        throw MediaReplyDraftUnavailableException()
+    }
+    return selected
+}

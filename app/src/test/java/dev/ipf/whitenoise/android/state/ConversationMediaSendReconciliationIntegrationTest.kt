@@ -30,8 +30,12 @@ import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MediaUploadSubmissionFfi
+import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
+import dev.ipf.marmotkit.SelectedMessageDraftAttachmentFfi
+import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
+import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
@@ -696,6 +700,197 @@ class ConversationMediaSendReconciliationIntegrationTest {
         assertEquals(MessageStatus.Pending, controller.timeline.single().status)
         assertFalse(controller.deleteMessage(pending, presentFailure = false))
     }
+}
+
+/** Exercises the real queue/upload/token-admission pipeline, including native revision movement. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class ConversationMediaReplyAdmissionIntegrationTest {
+    @Test
+    fun mixedReplyKeepsTargetAndClearsOnlyOriginalChoice() = assertReplyAdmission(ReplyDraftMovement.NONE)
+
+    @Test
+    fun harmlessNativeRewriteUsesFreshRevision() = assertReplyAdmission(ReplyDraftMovement.REVISION)
+
+    @Test
+    fun changedReplyFailsAndManualRetryRecoversOriginalTarget() = assertReplyAdmission(ReplyDraftMovement.TARGET)
+
+    @Test
+    fun newerContentIsNotOverwrittenAndRetryCanRecover() = assertReplyAdmission(ReplyDraftMovement.CONTENT)
+
+    @Test
+    fun acceptedReplyDoesNotClearNewerUiChoice() = assertReplyAdmission(ReplyDraftMovement.NEW_UI_CHOICE)
+
+    @Test
+    fun nativeReplyDisagreementIsRejectedBeforePlainAcceptance() = assertReplyAdmission(ReplyDraftMovement.NO_UI_REPLY)
+
+    @Test
+    fun mixedDescriptorOrderMismatchIsRejectedBeforeAcceptance() = assertReplyAdmission(ReplyDraftMovement.ORDER)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // One fixture asserts native admission, movement and retained retry.
+    private fun assertReplyAdmission(movement: ReplyDraftMovement) =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            try {
+                val boundary = ReplyAdmissionBoundary(movement)
+                val references = boundary.references
+                val appState =
+                    mediaSendReconciliationAppState().also {
+                        WhiteNoiseAppState::class.java
+                            .getDeclaredField("marmotRuntime")
+                            .apply { isAccessible = true }
+                            .set(it, AppMarmotRuntime("test", boundary.engine))
+                    }
+                val controller =
+                    ConversationController(
+                        appState = appState,
+                        initialGroup = group(),
+                        initialMemberSnapshot = memberSnapshot(),
+                        groupRosterReader = { _, _ -> authoritativeRoster() },
+                        mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                        markdownParser = { emptyMarkdownDocument() },
+                    )
+                controller.retryMembers()
+                val target =
+                    projectedMediaMessage(1u, references.first())
+                        .let(TimelineProjector::toAppMessageRecord)
+                        .copy(kind = 1068uL)
+                if (movement != ReplyDraftMovement.NO_UI_REPLY) controller.replyingTo = target
+                val attachments =
+                    references.map {
+                        PendingAttachment(byteArrayOf(1, 2, 3, 4), it.mediaType, it.fileName)
+                    }
+                val queued = controller.queueAttachments(attachments, "cap")
+                if (movement in listOf(ReplyDraftMovement.NO_UI_REPLY, ReplyDraftMovement.ORDER)) {
+                    assertNull(queued)
+                    assertEquals(0, boundary.uploads)
+                    assertEquals(0, boundary.admissions)
+                    assertTrue(controller.timeline.isEmpty())
+                    return@runTest
+                }
+                requireNotNull(queued)
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID,
+                    dev.ipf.whitenoise.android.core.MessageProjector
+                        .replyTargetMessageId(controller.timeline.single().record),
+                )
+                val newerChoice = target.copy(messageIdHex = "later-choice")
+                if (movement == ReplyDraftMovement.NEW_UI_CHOICE) controller.replyingTo = newerChoice
+                controller.uploadQueued(queued)
+                if (movement in listOf(ReplyDraftMovement.TARGET, ReplyDraftMovement.CONTENT)) {
+                    assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                    assertEquals(target, controller.replyingTo)
+                    assertEquals(0, boundary.admissions)
+                    assertEquals(
+                        if (movement == ReplyDraftMovement.CONTENT) "new unsent text" else "cap",
+                        boundary.draft.content,
+                    )
+                    boundary.restoreOriginal()
+                    controller.retryFailedSend(controller.timeline.single())
+                }
+                assertEquals(1, boundary.uploads)
+                assertEquals(1, boundary.admissions)
+                assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID,
+                    dev.ipf.whitenoise.android.core.MessageProjector
+                        .replyTargetMessageId(controller.timeline.single().record),
+                )
+                assertEquals(
+                    if (movement == ReplyDraftMovement.NEW_UI_CHOICE) newerChoice else null,
+                    controller.replyingTo,
+                )
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+}
+
+private class ReplyAdmissionBoundary(
+    private val movement: ReplyDraftMovement,
+) {
+    private val document = mediaReference().copy(fileName = "report.pdf", mediaType = "application/pdf")
+    val references = listOf(mediaReference(), document)
+    private val descriptors =
+        references.map {
+            SelectedMessageDraftAttachmentFfi(
+                it.fileName,
+                it.fileName,
+                it.mediaType,
+                4uL,
+                null,
+                null,
+                null,
+                emptyList(),
+            )
+        }
+    private val original = SelectedMessageDraftContentFfi(GROUP_ID, "cap", CONFIRMED_MESSAGE_ID, descriptors, 1L, 1L)
+    var draft =
+        when (movement) {
+            ReplyDraftMovement.ORDER -> original.copy(mediaAttachments = descriptors.reversed())
+            else -> original
+        }
+    private var revision = replyAdmissionRevision()
+    var uploads = 0
+    var admissions = 0
+    val engine =
+        Proxy.newProxyInstance(
+            MarmotInterface::class.java.classLoader,
+            arrayOf(MarmotInterface::class.java),
+        ) { proxy, method, args ->
+            when (val name = method.name.substringBefore('-')) {
+                "toString" -> "staged-reply-boundary"
+                "hashCode" -> System.identityHashCode(proxy)
+                "equals" -> proxy === args?.firstOrNull()
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "localSendStatus" -> null
+                "selectedMessageDraft" -> SelectedMessageDraftFfi(revision, draft)
+                "uploadMediaWithClientToken" -> upload(args!![2] as MediaUploadRequestFfi)
+                "sendMessageDraftWithClientToken" -> admit(requireNotNull(args))
+                else -> error("Unexpected staged reply call: $name")
+            }
+        } as MarmotInterface
+
+    fun restoreOriginal() {
+        draft = original
+        revision = replyAdmissionRevision()
+    }
+
+    private fun upload(request: MediaUploadRequestFfi): MediaUploadSubmissionFfi {
+        uploads++
+        assertFalse(request.send)
+        assertEquals(references.map { it.fileName }, request.attachments.map { it.fileName })
+        if (movement != ReplyDraftMovement.NONE) revision = replyAdmissionRevision()
+        draft =
+            when (movement) {
+                ReplyDraftMovement.TARGET -> draft.copy(replyToMessageIdHex = "different")
+                ReplyDraftMovement.CONTENT -> draft.copy(content = "new unsent text")
+                else -> draft
+            }
+        return MediaUploadSubmissionFfi(
+            MediaUploadResultFfi(references.map { MediaUploadAttachmentResultFfi(it, 4uL) }, null),
+            null,
+        )
+    }
+
+    private fun admit(args: Array<out Any?>): LocalSendAcceptanceFfi {
+        assertTrue(args[1] === revision)
+        assertEquals(CONFIRMED_MESSAGE_ID, draft.replyToMessageIdHex)
+        assertEquals("cap", draft.content)
+        admissions++
+        return LocalSendAcceptanceFfi(args[3] as String, CONFIRMED_MESSAGE_ID)
+    }
+}
+
+private enum class ReplyDraftMovement { NONE, REVISION, TARGET, CONTENT, NEW_UI_CHOICE, NO_UI_REPLY, ORDER }
+
+/** Native revision identity only; no JNI constructor is invoked by the controlled boundary. */
+private fun replyAdmissionRevision(): MessageDraftRevisionFfi {
+    val type = Class.forName("sun.misc.Unsafe")
+    val unsafe = type.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
+    val allocate = type.getMethod("allocateInstance", Class::class.java)
+    return allocate.invoke(unsafe, MessageDraftRevisionFfi::class.java) as MessageDraftRevisionFfi
 }
 
 /** Mounts the existing chat-list bridge so accepted media preview replacement remains observable. */

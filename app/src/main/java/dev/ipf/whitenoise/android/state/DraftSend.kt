@@ -67,7 +67,7 @@ internal suspend fun MarmotInterface.sendComposerMedia(
     val clientToken = context.clientToken
     val replyTargetMessageIdHex = context.replyTargetMessageIdHex
     if (clientToken != null) recoveredLocalSend(accountRef, groupIdHex, clientToken)?.let { return it }
-    val selected = context.replyDraft ?: selectedDraftOrNull(accountRef, groupIdHex)
+    val selected = currentMediaReplyDraft(accountRef, groupIdHex, context, caption)
     val content = selected?.draft
     requireMediaReplyDraft(
         replyTargetMessageIdHex,
@@ -88,8 +88,7 @@ internal suspend fun MarmotInterface.sendComposerMedia(
                         }
                     }
             } catch (conflict: MarmotKitException.MessageDraftRevisionConflict) {
-                if (replyTargetMessageIdHex != null) throw MediaReplyDraftUnavailableException(conflict)
-                throw conflict
+                throw if (replyTargetMessageIdHex != null) MediaReplyDraftUnavailableException(conflict) else conflict
             }
         if (submitted != null) return submitted
     }

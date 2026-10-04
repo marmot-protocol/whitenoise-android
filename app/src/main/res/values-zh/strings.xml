@@ -2169,5 +2169,5 @@
     <string name="onboarding_details_expanded">已展开</string>
     <string name="onboarding_details_collapsed">已收起</string>
     <string name="group_svg_rejected_detail">无法处理此 SVG。请选择简单的 SVG、PNG 或 JPEG。</string>
-    <string name="toast_media_reply_unavailable">此附件回复不可用。请保留回复选择并重新添加文件，或取消回复后单独发送。</string>
+    <string name="toast_media_reply_unavailable">此内容无法作为所选消息的回复发送。取消回复即可单独发送，或保留回复并选择支持的附件。</string>
 </resources>

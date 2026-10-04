@@ -152,39 +152,6 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         }
     }
 
-    /** Pending and failed file replies retain the safe poll preview, without exposing poll JSON. */
-    @Test
-    fun fileRepliesKeepSafePollPreview() {
-        val pending =
-            fileTimelineMessage(
-                16,
-                "report.pdf",
-                mine = true,
-                hasReply = true,
-                status = MessageStatus.Pending,
-            )
-        val failed = fileTimelineMessage(17, "notes.txt", mine = true, hasReply = true, status = MessageStatus.Failed)
-
-        fun pollReply(item: TimelineMessage): TimelineMessage =
-            item.copy(
-                projected =
-                    checkNotNull(item.projected).copy(
-                        replyPreview = replyPreview().copy(kind = 1068uL, plaintext = "private poll JSON"),
-                    ),
-            )
-        composeRule.setContent {
-            WhiteNoiseTheme {
-                Surface(Modifier.width(360.dp)) {
-                    Column {
-                        FileMessage(pollReply(pending))
-                        FileMessage(pollReply(failed))
-                    }
-                }
-            }
-        }
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_file_poll_reply_light.png")
-    }
-
     /** Captures real message bubbles across incoming, outgoing, captioned, pending, and selected layouts. */
     @Test
     fun realMessageBubblePathKeepsFileCardsReadableAcrossParentVariants() {
@@ -737,6 +704,140 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertTrue(inner.top >= outer.top)
         assertTrue(inner.right <= outer.right)
         assertTrue(inner.bottom <= outer.bottom)
+    }
+
+    /** Composes a file message bubble fixture. */
+    @Composable
+    @Suppress("LongMethod") // Exercises the real MessageBubble interaction and layout contract.
+    private fun FileMessage(
+        item: TimelineMessage,
+        showSenderAvatar: Boolean = false,
+        selectionMode: Boolean = false,
+        selected: Boolean = false,
+    ) {
+        MessageBubble(
+            item = item,
+            controller = controller,
+            appState = appState,
+            composerTextState = composerTextState,
+            highlighted = false,
+            selectionMode = selectionMode,
+            textSelectionMode = false,
+            onTextSelectionModeChange = {},
+            onTextSelectionBoundsChange = {},
+            batchSelectable = true,
+            selected = selected,
+            onToggleSelection = {},
+            rangeDragActive = false,
+            onDragSelectionStart = {},
+            onDragSelection = { false },
+            onDragSelectionEnd = {},
+            onDragSelectionCancel = {},
+            quickReactionEmojis = emptyList(),
+            recentEmojis = emptyList(),
+            onEmojiUsed = {},
+            isActionMenuOpen = false,
+            onActionMenuOpenChange = {},
+            onQuickReactionsSave = {},
+            onReplyPreviewClick = {},
+            composerGate = ComposerGate.COMPOSER,
+            inviteMutationInFlight = false,
+            onJoinInvite = {},
+            onDeclineInvite = {},
+            mentionCandidates = emptyList(),
+            mentionPickerEnabled = false,
+            showSenderAvatar = showSenderAvatar,
+            parseMarkdown = ::markdown,
+        )
+    }
+}
+
+/** Covers poll reply previews without growing the general file layout test class. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h1100dp-mdpi")
+@OptIn(ExperimentalCoroutinesApi::class)
+class MessageBubblePollMediaReplyScreenshotTest : MessageBubbleFileAttachmentFixtures() {
+    @get:Rule
+    val composeRule = createComposeRule(effectContext = UnconfinedTestDispatcher())
+
+    private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    private val appState = fileFooterAppState(context)
+    private val controller =
+        ConversationController(
+            appState = appState,
+            initialGroup = group(),
+            initialMemberSnapshot = memberSnapshot(),
+            groupRosterReader = { _, _ -> authoritativeRoster() },
+        )
+    private val composerTextState = ComposerTextState(TextFieldValue(""))
+    private var originalTimeFormat: String? = null
+
+    /** Pins the 12-hour and UTC clock inputs; each Robolectric config supplies the fixture locale. */
+    @Before
+    fun setDeterministicClockPreferences() {
+        originalTimeFormat =
+            Settings.System.getString(
+                context.contentResolver,
+                Settings.System.TIME_12_24,
+            )
+        Settings.System.putString(
+            context.contentResolver,
+            Settings.System.TIME_12_24,
+            "12",
+        )
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    /** Releases controller work and restores every process-level clock preference changed by setup. */
+    @After
+    fun tearDownFixture() {
+        try {
+            controller.onCleared()
+        } finally {
+            try {
+                Settings.System.putString(
+                    context.contentResolver,
+                    Settings.System.TIME_12_24,
+                    originalTimeFormat,
+                )
+            } finally {
+                TimeZone.setDefault(originalTimeZone)
+            }
+        }
+    }
+
+    /** Pending and failed file replies retain the safe poll preview, without exposing poll JSON. */
+    @Test
+    fun fileRepliesKeepSafePollPreview() {
+        val pending =
+            fileTimelineMessage(
+                16,
+                "report.pdf",
+                mine = true,
+                hasReply = true,
+                status = MessageStatus.Pending,
+            )
+        val failed = fileTimelineMessage(17, "notes.txt", mine = true, hasReply = true, status = MessageStatus.Failed)
+
+        fun pollReply(item: TimelineMessage): TimelineMessage =
+            item.copy(
+                projected =
+                    checkNotNull(item.projected).copy(
+                        replyPreview = replyPreview().copy(kind = 1068uL, plaintext = "private poll JSON"),
+                    ),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp)) {
+                    Column {
+                        FileMessage(pollReply(pending))
+                        FileMessage(pollReply(failed))
+                    }
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_file_poll_reply_light.png")
     }
 
     /** Composes a file message bubble fixture. */

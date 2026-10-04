@@ -2201,5 +2201,5 @@
     <string name="onboarding_details_expanded">Développé</string>
     <string name="onboarding_details_collapsed">Réduit</string>
     <string name="group_svg_rejected_detail">Impossible de préparer ce SVG. Choisissez un SVG simple, un PNG ou un JPEG.</string>
-    <string name="toast_media_reply_unavailable">Cette réponse avec pièce jointe est indisponible. Gardez la réponse sélectionnée et joignez à nouveau le fichier, ou annulez la réponse pour envoyer séparément.</string>
+    <string name="toast_media_reply_unavailable">Ce contenu ne peut pas être envoyé avec la réponse sélectionnée. Annulez la réponse pour l’envoyer séparément, ou conservez-la et choisissez une pièce jointe compatible.</string>
 </resources>

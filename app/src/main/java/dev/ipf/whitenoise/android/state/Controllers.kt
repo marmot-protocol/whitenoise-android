@@ -1898,7 +1898,14 @@ internal class RetainedMediaUpload(
     var recoveredWithoutUpload: Boolean = false,
     var acceptedPending: Boolean = false,
     var acceptedPendingMessageIdHex: String? = null,
-)
+) {
+    fun sendContext(clientToken: String? = null) =
+        ComposerMediaSendContext(
+            clientToken = clientToken,
+            replyTargetMessageIdHex = replyTargetMessageIdHex,
+            replyDraft = replyDraft,
+        )
+}
 
 private data class OptimisticChatListPreviewMatch(
     val entryKey: String?,
@@ -8602,24 +8609,9 @@ class ConversationController(
             appState.present(R.string.media_album_too_large)
             return null
         }
-        val replyDraft =
-            replyTargetMessageIdHex?.let {
-                appState.captureMediaReplyDraft(account, group.groupIdHex, attachments, it)
-            }
-        if (replyTargetMessageIdHex != null && replyDraft == null) {
-            appState.present(R.string.toast_media_reply_unavailable)
-            return null
-        }
-        if (!canQueue() ||
-            !shouldAcceptMediaUploadForAccount(
-                account,
-                mediaUploadSessionEpoch,
-                appState.activeAccountRef,
-                appState.mediaUploadSessionEpoch(),
-            )
-        ) {
-            return null
-        }
+        val replyContext =
+            captureMediaReplyContextForQueue(account, attachments, replyTargetMessageIdHex, canQueue) ?: return null
+        val replyDraft = replyContext.replyDraft
         val tempId = UUID.randomUUID().toString()
         val key = "msg:$tempId"
         val outboundVisibleAttempt =
@@ -8694,6 +8686,44 @@ class ConversationController(
         )
         appState.pendingSendDiagnostics.startMediaSend(tempId)
         return QueuedAttachmentSend(account, key, tempId, optimisticOrder, optimistic)
+    }
+
+    /** Resolves native reply intent before accepting presentation, and rejects stale owners without a toast. */
+    private suspend fun captureMediaReplyContextForQueue(
+        account: String,
+        attachments: List<PendingAttachment>,
+        target: String?,
+        canQueue: () -> Boolean,
+    ): ComposerMediaSendContext? {
+        val result =
+            runCatchingCancellable {
+                if (mediaUploader == null || target != null) {
+                    appState.captureMediaReplyDraft(account, group.groupIdHex, attachments, target)
+                } else {
+                    null
+                }
+            }
+        val currentOwner =
+            canQueue() &&
+                canSendMessages &&
+                shouldAcceptMediaUploadForAccount(
+                    account,
+                    mediaUploadSessionEpoch,
+                    appState.activeAccountRef,
+                    appState.mediaUploadSessionEpoch(),
+                )
+        return if (!currentOwner) {
+            null
+        } else {
+            result.fold(
+                onSuccess = { ComposerMediaSendContext(replyTargetMessageIdHex = target, replyDraft = it) },
+                onFailure = {
+                    if (it !is MediaReplyDraftUnavailableException) throw it
+                    appState.present(R.string.toast_media_reply_unavailable)
+                    null
+                },
+            )
+        }
     }
 
     /** Builds the optimistic pending record that carries staged attachments until the send confirms. */
@@ -8854,7 +8884,7 @@ class ConversationController(
                                                             group.groupIdHex,
                                                             request,
                                                             tempId,
-                                                            retained.replyTargetMessageIdHex,
+                                                            retained.sendContext(),
                                                         )
                                                     }
                                                 outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
@@ -8908,11 +8938,7 @@ class ConversationController(
                                                     group.groupIdHex,
                                                     references,
                                                     retained.caption,
-                                                    ComposerMediaSendContext(
-                                                        tempId,
-                                                        retained.replyTargetMessageIdHex,
-                                                        retained.replyDraft,
-                                                    ),
+                                                    retained.sendContext(tempId),
                                                 )
                                             }
                                     recordOptimisticSendAcceptance(key, accepted)

@@ -2218,5 +2218,5 @@
     <string name="onboarding_details_expanded">Ausgeklappt</string>
     <string name="onboarding_details_collapsed">Eingeklappt</string>
     <string name="group_svg_rejected_detail">Diese SVG konnte nicht verarbeitet werden. Wähle eine einfache SVG, PNG oder JPEG.</string>
-    <string name="toast_media_reply_unavailable">Diese Antwort mit Anhang ist nicht verfügbar. Lassen Sie die Antwort ausgewählt und hängen Sie die Datei erneut an, oder brechen Sie die Antwort ab, um separat zu senden.</string>
+    <string name="toast_media_reply_unavailable">Dieser Inhalt kann nicht mit der ausgewählten Antwort gesendet werden. Hebe die Antwort auf, um ihn separat zu senden, oder behalte sie und wähle einen unterstützten Anhang.</string>
 </resources>

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotInterface
@@ -113,9 +114,12 @@ class DraftSendTest {
                 "group",
                 listOf(reference("a.jpg", "image/jpeg")),
                 "cap",
-                context = ComposerMediaSendContext(replyTargetMessageIdHex = "poll"),
+                context = ComposerMediaSendContext(clientToken = "token", replyTargetMessageIdHex = "poll"),
             )
-            assertEquals(listOf("selectedMessageDraft", "sendMessageDraft"), engine.calls)
+            assertEquals(
+                listOf("localSendStatus", "selectedMessageDraft", "localSendStatus", "sendMessageDraftWithClientToken"),
+                engine.calls,
+            )
         }
 
     /** Changed, missing and unrelated drafts cannot silently detach or retarget media replies. */
@@ -166,16 +170,22 @@ class DraftSendTest {
                 val engine = ScriptedEngine(draft = draft)
                 val failure =
                     runCatching {
-                        engine.marmot.uploadOrAdmitComposerMediaWithToken("acct", "group", request, "token", "poll")
+                        engine.marmot.uploadOrAdmitComposerMediaWithToken(
+                            "acct",
+                            "group",
+                            request,
+                            "token",
+                            ComposerMediaSendContext(replyTargetMessageIdHex = "poll"),
+                        )
                     }.exceptionOrNull()
                 assertTrue(failure is MediaReplyDraftUnavailableException)
                 assertEquals(listOf("localSendStatus", "selectedMessageDraft"), engine.calls)
             }
         }
 
-    /** Publication uses the captured revision; a newer draft cannot be overwritten during upload. */
+    /** Publication checks captured content before refreshing a revision; a newer draft cannot be overwritten. */
     @Test
-    fun capturedReplyRevisionConflictFailsClosed() =
+    fun capturedReplyRejectsNewerDraftBeforeSaving() =
         runBlocking {
             val engine =
                 ScriptedEngine(
@@ -198,7 +208,7 @@ class DraftSendTest {
                     )
                 }.exceptionOrNull()
             assertTrue(failure is MediaReplyDraftUnavailableException)
-            assertEquals(listOf("messageDraft", "saveMessageDraftIfRevision"), engine.calls)
+            assertEquals(listOf("selectedMessageDraft"), engine.calls)
             assertFalse("sendMediaAttachments" in engine.calls)
         }
 
@@ -287,6 +297,16 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
         savedContent = content
         val updated = draft?.copy(content = content, replyToMessageIdHex = replyToMessageIdHex)
         return SelectedMessageDraftFfi(this.revision, updated)
+    }
+
+    override suspend fun sendMessageDraftWithClientToken(
+        accountRef: String,
+        revision: MessageDraftRevisionFfi,
+        attachments: List<MediaAttachmentReferenceFfi>,
+        clientToken: String,
+    ): LocalSendAcceptanceFfi {
+        calls += "sendMessageDraftWithClientToken"
+        return LocalSendAcceptanceFfi(clientToken, "draft")
     }
 
     override suspend fun sendMessageDraft(

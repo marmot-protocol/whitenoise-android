@@ -2269,5 +2269,5 @@
     <string name="onboarding_details_expanded">Развёрнуто</string>
     <string name="onboarding_details_collapsed">Свёрнуто</string>
     <string name="group_svg_rejected_detail">Не удалось обработать этот SVG. Выберите простой SVG, PNG или JPEG.</string>
-    <string name="toast_media_reply_unavailable">Этот ответ с вложением недоступен. Оставьте ответ выбранным и прикрепите файл заново или отмените ответ, чтобы отправить отдельно.</string>
+    <string name="toast_media_reply_unavailable">Это содержимое нельзя отправить с выбранным ответом. Отмените ответ, чтобы отправить его отдельно, или сохраните ответ и выберите поддерживаемое вложение.</string>
 </resources>
