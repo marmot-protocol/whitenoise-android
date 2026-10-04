@@ -141,14 +141,37 @@ class AnimationSourceAdmissionDeviceTest {
             }
         assertEquals("RIFF", String(encoded, 0, 4, Charsets.US_ASCII))
         assertEquals("WEBP", String(encoded, 8, 4, Charsets.US_ASCII))
-        assertEquals("VP8L", String(encoded, 12, 4, Charsets.US_ASCII))
-        // Preserve the platform's complete compressed chunk including padding.
-        val payloadSize = u32le(encoded, 16)
-        assertEquals(encoded.size.toLong(), 20L + payloadSize + (payloadSize and 1L))
-        return encoded.copyOfRange(12, encoded.size)
+        assertEquals(encoded.size.toLong(), 8L + u32le(encoded, 4))
+        return encodedLosslessChunk(encoded)
     }
 
-    private fun webpChunk(tag: String, payload: ByteArray): ByteArray =
+    /** The platform may wrap its VP8L chunk in VP8X plus colour/metadata chunks. */
+    private fun encodedLosslessChunk(encoded: ByteArray): ByteArray {
+        var offset = 12
+        var losslessChunk: ByteArray? = null
+        while (offset < encoded.size) {
+            assertTrue(offset <= encoded.size - 8)
+            val tag = String(encoded, offset, 4, Charsets.US_ASCII)
+            val size = u32le(encoded, offset + 4)
+            val end = offset.toLong() + 8L + size + (size and 1L)
+            assertTrue(end <= encoded.size.toLong())
+            if (tag == "VP8L") {
+                assertNull(losslessChunk)
+                // Keep the encoder's entire compressed chunk, including padding.
+                losslessChunk = encoded.copyOfRange(offset, end.toInt())
+            } else {
+                assertTrue(tag in setOf("VP8X", "ICCP", "EXIF", "XMP "))
+            }
+            offset = end.toInt()
+        }
+        assertTrue(losslessChunk != null)
+        return requireNotNull(losslessChunk)
+    }
+
+    private fun webpChunk(
+        tag: String,
+        payload: ByteArray,
+    ): ByteArray =
         tag.encodeToByteArray() + littleEndianSize(payload.size) + payload +
             if (payload.size and 1 == 1) byteArrayOf(0) else byteArrayOf()
 
