@@ -720,7 +720,12 @@ internal fun SettingsHomeContent(
                         SettingsHomeSection.Support,
                         ->
                             state.groups.firstOrNull { it.section == section }?.let { group ->
-                                SettingsHubSection(group, onOpenDetail, onChatWithSupport, profileReadiness)
+                                SettingsHubSection(
+                                    group,
+                                    onOpenDetail,
+                                    onChatWithSupport,
+                                    profileReadiness.takeIf { account != null },
+                                )
                             }
                         SettingsHomeSection.SignOut -> SignOutGroup(onSignOut)
                         SettingsHomeSection.Version -> SettingsVersionFooter(versionName)
@@ -874,7 +879,7 @@ internal fun SettingsHubSection(
     group: SettingsHomeGroup,
     onOpenDetail: (SettingsDetail) -> Unit,
     onChatWithSupport: () -> Unit,
-    profileReadiness: ProfileReadiness,
+    profileReadiness: ProfileReadiness?,
 ) {
     Column(
         modifier = Modifier.testTag("settings.section.${group.section.name}"),
@@ -897,7 +902,7 @@ private fun SettingsHubGroup(
     rows: List<SettingsHomeRow>,
     onOpenDetail: (SettingsDetail) -> Unit,
     onChatWithSupport: () -> Unit,
-    profileReadiness: ProfileReadiness,
+    profileReadiness: ProfileReadiness?,
 ) {
     SettingsGroup {
         rows.forEach { entry ->
@@ -905,7 +910,12 @@ private fun SettingsHubGroup(
                 SettingsHubLink(
                     context = context,
                     row = entry,
-                    subtitle = if (entry == SettingsHomeRow.Profile) stringResource(profileReadiness.summary) else null,
+                    subtitle =
+                        if (entry == SettingsHomeRow.Profile && profileReadiness != null) {
+                            stringResource(profileReadiness.summary)
+                        } else {
+                            null
+                        },
                     onClick = {
                         val detail = entry.detail
                         if (detail != null) onOpenDetail(detail) else onChatWithSupport()

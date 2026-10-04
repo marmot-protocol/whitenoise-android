@@ -55,6 +55,7 @@ internal class ProfileReadinessState(
     var value by mutableStateOf(cached?.let(::profileReadiness) ?: ProfileReadiness.Loading)
         private set
     private var generation = 0
+    private var readSucceeded = false
 
     /** The newest native read wins; cancellation and obsolete completions cannot overwrite it. */
     @Suppress("TooGenericExceptionCaught")
@@ -63,7 +64,7 @@ internal class ProfileReadinessState(
         read: suspend () -> UserProfileMetadataFfi?,
     ) {
         val current = ++generation
-        cached?.let { value = profileReadiness(it) }
+        if (!readSucceeded) cached?.let { value = profileReadiness(it) }
         val profile =
             try {
                 read()
@@ -74,6 +75,7 @@ internal class ProfileReadinessState(
             }
         if (current != generation) return
         if (profile != null) {
+            readSucceeded = true
             value = profileReadiness(profile)
         } else if (value == ProfileReadiness.Loading) {
             value = ProfileReadiness.Unavailable

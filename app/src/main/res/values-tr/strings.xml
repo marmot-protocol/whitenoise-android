@@ -2209,4 +2209,19 @@
     <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
     <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplar için geçerlidir.</string>
     <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>
+    <string name="profile_readiness_loading">Profil kontrol ediliyor…</string>
+    <string name="profile_readiness_unavailable">Profil durumu kullanılamıyor · Düzenlemek için dokunun</string>
+    <string name="profile_readiness_setup">Profilinizi oluşturun</string>
+    <string name="profile_readiness_ready">Profil hazır</string>
+    <string name="profile_readiness_optional">Profil hazır · İsteğe bağlı bilgiler eklenebilir</string>
+    <string name="profile_readiness_name">Görünen ad</string>
+    <string name="profile_readiness_picture">Profil fotoğrafı</string>
+    <string name="profile_readiness_bio">Biyografi</string>
+    <string name="profile_readiness_banner">Kapak görseli</string>
+    <string name="profile_readiness_address">Doğrulanmış adres</string>
+    <string name="profile_readiness_lightning">Lightning adresi</string>
+    <string name="profile_readiness_added">Eklendi</string>
+    <string name="profile_readiness_recommended">Önerilen</string>
+    <string name="profile_readiness_field_optional">İsteğe bağlı</string>
+    <string name="profile_readiness_field">%1$s · %2$s</string>
 </resources>

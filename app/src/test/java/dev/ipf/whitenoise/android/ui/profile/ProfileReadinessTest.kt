@@ -51,6 +51,16 @@ class ProfileReadinessTest {
             assertEquals(R.string.profile_readiness_setup, state.value.summary)
         }
 
+    /** A fresh successful read stays authoritative over an unchanged stale cache after unrelated invalidation. */
+    @Test fun failedRefreshCannotRestoreOlderCachedReadiness() =
+        runTest {
+            val empty = profileEditMetadata("", "", "", "", "", "")
+            val state = ProfileReadinessState(empty)
+            state.refresh(empty) { empty.copy(name = "Alice") }
+            state.refresh(empty) { null }
+            assertEquals(R.string.profile_readiness_optional, state.value.summary)
+        }
+
     /** An older in-flight read cannot roll back a later read after publication. */
     @Test fun supersededReadCannotUndoReadback() =
         runTest {

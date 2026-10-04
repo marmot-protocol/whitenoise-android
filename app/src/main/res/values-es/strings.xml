@@ -2211,4 +2211,19 @@
     <string name="notification_show_previews">Mostrar vistas previas de notificaciones</string>
     <string name="notification_show_previews_detail">Al desactivarlo, se ocultan los nombres y el contenido de los mensajes. Se aplica a todas las cuentas.</string>
     <string name="notification_preview_update_failed">Los cambios pueden perderse al reiniciar.</string>
+    <string name="profile_readiness_loading">Comprobando el perfil…</string>
+    <string name="profile_readiness_unavailable">Estado del perfil no disponible · Toca para editar</string>
+    <string name="profile_readiness_setup">Configura tu perfil</string>
+    <string name="profile_readiness_ready">Perfil listo</string>
+    <string name="profile_readiness_optional">Perfil listo · Puedes añadir datos opcionales</string>
+    <string name="profile_readiness_name">Nombre para mostrar</string>
+    <string name="profile_readiness_picture">Foto de perfil</string>
+    <string name="profile_readiness_bio">Biografía</string>
+    <string name="profile_readiness_banner">Banner</string>
+    <string name="profile_readiness_address">Dirección verificada</string>
+    <string name="profile_readiness_lightning">Dirección Lightning</string>
+    <string name="profile_readiness_added">Añadido</string>
+    <string name="profile_readiness_recommended">Recomendado</string>
+    <string name="profile_readiness_field_optional">Opcional</string>
+    <string name="profile_readiness_field">%1$s · %2$s</string>
 </resources>
