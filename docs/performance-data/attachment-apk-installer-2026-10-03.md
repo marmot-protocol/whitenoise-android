@@ -97,4 +97,5 @@ during the download), a 30 to 50 MiB package (the Android controller sends at mo
 needs a host-built signed payload and anything above 32 MiB needs the separate MDK sender), the
 no-installer-available state on a device, the rendered
 file card and notification, and any actual installation. Private raw reports, logs and checksums are retained outside the
-repository.
+repository. The prepared, not yet executed, physical runbook is the
+[physical gate plan](attachment-apk-physical-gate-plan.md).

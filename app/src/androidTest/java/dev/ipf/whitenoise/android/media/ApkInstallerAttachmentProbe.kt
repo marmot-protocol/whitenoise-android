@@ -2,14 +2,17 @@ package dev.ipf.whitenoise.android.media
 
 import android.accessibilityservice.AccessibilityService
 import android.app.UiAutomation
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Bundle
 import android.os.Process
 import android.os.SystemClock
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentAcquisitionModeFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
@@ -37,6 +40,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -56,6 +61,32 @@ private class ReceivedApk(
     val mediaType: String,
 )
 
+/** The gaps a host run opts into; every selector is absent by default, so the emulator qualification is unchanged. */
+private class ApkOptions(
+    val cancelRetry: Boolean,
+    val largePayload: String?,
+    val noInstaller: Boolean,
+)
+
+private const val NO_INSTALLER_MESSAGE = "fixture: no installer available"
+
+/**
+ * Lets the real open path meet the exception the platform raises when no activity handles the install intent.
+ * Classification, permission state and the FileProvider grant stay genuine, only the final launch is absent.
+ */
+private class NoInstallerContext(
+    base: Context,
+) : ContextWrapper(base) {
+    /** The platform throws this when no installer activity resolves. */
+    override fun startActivity(intent: Intent): Unit = throw ActivityNotFoundException(NO_INSTALLER_MESSAGE)
+
+    /** The options overload is absent for the same reason. */
+    override fun startActivity(
+        intent: Intent,
+        options: Bundle?,
+    ): Unit = throw ActivityNotFoundException(NO_INSTALLER_MESSAGE)
+}
+
 /**
  * Sends genuine APK-shaped files through the shipping controller, receives and verifies them, then drives each one
  * through the real Android open path under every install-permission state this distribution can reach. It never
@@ -64,6 +95,8 @@ private class ReceivedApk(
 internal object ApkInstallerAttachmentProbe {
     private const val DEADLINE_MILLIS = 600_000L
     private const val INSTALLER_TIMEOUT_MILLIS = 10_000L
+    private const val STAGING_TIMEOUT_MILLIS = 60_000L
+    private const val PROGRESS_BAR_CLASS = "android.widget.ProgressBar"
     private const val POLL_MILLIS = 100L
     private const val UNEXPECTED_OBSERVE_MILLIS = 1_000L
     private const val DISMISS_ATTEMPTS = 3
@@ -75,11 +108,16 @@ internal object ApkInstallerAttachmentProbe {
     private val PRESERVING_STAGES = setOf("prepare", "dispatch-denied")
     private val FINAL_STAGES = setOf("dispatch-allowed", "dispatch-na")
     private const val NANOS_PER_MILLI = 1_000_000.0
+    private const val LARGE_CASE = "large"
+    private const val LARGE_MIN_BYTES = 30 * 1024 * 1024
+    private const val PAYLOAD_TIMEOUT_MILLIS = 60_000
+    private const val NO_INSTALLER_PERMISSION = "no-installer-simulated"
+    private val PAYLOAD_TOKEN = Regex("[a-z0-9-]{1,64}")
 
     /**
-     * Runs one stage against generated peers on a disposable emulator; no personal account or file is read.
-     * Changing the install-unknown-apps app-op kills the app process, so the host toggles it between stages and
-     * each dispatch stage reopens the restored runtime in a new process.
+     * Runs one stage against generated peers on a disposable emulator or an explicitly authorized physical device;
+     * no personal account or file is read. Changing the install-unknown-apps app-op kills the app process, so the
+     * host toggles it between stages and each dispatch stage reopens the restored runtime in a new process.
      */
     suspend fun run() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -89,6 +127,7 @@ internal object ApkInstallerAttachmentProbe {
         check(context.packageName == "dev.ipf.whitenoise.android.medialatency")
         val stage = requireNotNull(arguments.getString("fixtureApkStage"))
         require(stage in STAGES)
+        val options = options(arguments)
         val blobPort = requireNotNull(arguments.getString("fixtureBlobPort")).toInt()
         val relayPort = requireNotNull(arguments.getString("fixtureRelayPort")).toInt()
         require(blobPort in 1024..65535 && relayPort in 1024..65535)
@@ -102,12 +141,20 @@ internal object ApkInstallerAttachmentProbe {
         try {
             withTimeout(DEADLINE_MILLIS) {
                 marmot.start()
-                if (stage == "prepare") prepare(session) else dispatchStage(session, stage)
+                if (stage == "prepare") prepare(session, options) else dispatchStage(session, stage, options)
             }
         } finally {
             // Every stage but the last keeps the generated runtime for the next separately launched process.
             session.close(preserve = stage in PRESERVING_STAGES)
         }
+    }
+
+    /** Reads the closed gap selectors; the no-installer branch exists only where self-update is enabled. */
+    private fun options(arguments: Bundle): ApkOptions {
+        val payload = arguments.getString("fixtureApkLargePayload")?.also { require(PAYLOAD_TOKEN.matches(it)) }
+        val noInstaller = arguments.getString("fixtureApkNoInstaller") == "true"
+        require(!noInstaller || BuildConfig.SELF_UPDATE_ENABLED) { "the no-installer branch needs a self-update build" }
+        return ApkOptions(arguments.getString("fixtureApkCancelRetry") == "true", payload, noInstaller)
     }
 
     /** Opens the generated loopback-only runtime used by every fixture probe. */
@@ -125,11 +172,14 @@ internal object ApkInstallerAttachmentProbe {
         )
 
     /** Sends and receives every case once, verifies the bytes, then makes acquisition unavailable for later stages. */
-    private suspend fun prepare(session: FixtureSession) {
+    private suspend fun prepare(
+        session: FixtureSession,
+        options: ApkOptions,
+    ) {
         val peers = session.createPeers()
         val manifest = JSONArray()
-        for (case in cases()) {
-            val received = receive(session, peers.sender, peers.receiver, peers.group, case)
+        for (case in cases(session.blobPort, options.largePayload)) {
+            val received = receive(session, peers, case, cancelRetry = options.cancelRetry && case.key == "valid")
             manifest.put(received)
         }
         HeldAttachmentCancellationProbe.control(session.blobPort, "/__acquisition-unavailable")
@@ -142,6 +192,7 @@ internal object ApkInstallerAttachmentProbe {
     private suspend fun dispatchStage(
         session: FixtureSession,
         stage: String,
+        options: ApkOptions,
     ) {
         val receipt = JSONObject(File(session.root, MANIFEST).readText())
         val previousPid = receipt.getInt("prepare_pid")
@@ -157,12 +208,19 @@ internal object ApkInstallerAttachmentProbe {
                 dispatch(session.context, received("valid"), "allowed", expectInstaller = true)
                 dispatch(session.context, received("generic"), "allowed", expectInstaller = true)
                 dispatch(session.context, received("conflict"), "allowed", expectInstaller = false)
+                if (options.largePayload != null) {
+                    dispatch(session.context, received(LARGE_CASE), "allowed", expectInstaller = true)
+                }
+                if (options.noInstaller) {
+                    dispatch(NoInstallerContext(session.context), received("valid"), NO_INSTALLER_PERMISSION)
+                }
                 invalidCases(session, ::received, "any")
             }
             else -> {
                 dispatch(session.context, received("valid"), "n/a")
                 dispatch(session.context, received("generic"), "n/a")
                 dispatch(session.context, received("conflict"), "n/a", expectInstaller = false)
+                if (options.largePayload != null) dispatch(session.context, received(LARGE_CASE), "n/a")
                 invalidCases(session, ::received, "any")
             }
         }
@@ -186,8 +244,14 @@ internal object ApkInstallerAttachmentProbe {
         dispatch(session.context, received("truncated"), permission)
     }
 
-    /** A valid signed package (this fixture's own APK), the same bytes mislabelled, and malformed lookalikes. */
-    private fun cases(): List<ApkCase> {
+    /**
+     * A valid signed package (this fixture's own APK), the same bytes mislabelled, malformed lookalikes and, when the
+     * host registered one, a host-built signed package of 30 to 31 MiB that still fits the Android sender's cap.
+     */
+    private suspend fun cases(
+        blobPort: Int,
+        largePayload: String?,
+    ): List<ApkCase> {
         val own =
             File(
                 InstrumentationRegistry
@@ -195,14 +259,35 @@ internal object ApkInstallerAttachmentProbe {
                     .context.packageCodePath,
             ).readBytes()
         check(own.size <= MAX_SENDABLE_BYTES) { "fixture APK exceeds the Android sender's file limit" }
-        return listOf(
-            ApkCase("valid", "valid.apk", ANDROID_PACKAGE_MIME, own),
-            ApkCase("generic", "generic.apk", "application/octet-stream", own),
-            ApkCase("conflict", "conflict.apk", "image/png", own),
-            ApkCase("no-manifest", "no-manifest.apk", ANDROID_PACKAGE_MIME, zipWithoutManifest()),
-            ApkCase("truncated", "truncated.apk", ANDROID_PACKAGE_MIME, own.copyOf(own.size / 2)),
-        )
+        val base =
+            listOf(
+                ApkCase("valid", "valid.apk", ANDROID_PACKAGE_MIME, own),
+                ApkCase("generic", "generic.apk", "application/octet-stream", own),
+                ApkCase("conflict", "conflict.apk", "image/png", own),
+                ApkCase("no-manifest", "no-manifest.apk", ANDROID_PACKAGE_MIME, zipWithoutManifest()),
+                ApkCase("truncated", "truncated.apk", ANDROID_PACKAGE_MIME, own.copyOf(own.size / 2)),
+            )
+        val large = largePayload?.let { fetchPayload(blobPort, it) } ?: return base
+        check(large.size in LARGE_MIN_BYTES..MAX_SENDABLE_BYTES) { "large payload is outside the 30 to 31 MiB range" }
+        return base + ApkCase(LARGE_CASE, "large.apk", ANDROID_PACKAGE_MIME, large)
     }
+
+    /** Fetches the host-built payload from the loopback fixture server, outside its counted acquisition ledger. */
+    private suspend fun fetchPayload(
+        port: Int,
+        token: String,
+    ): ByteArray =
+        withContext(Dispatchers.IO) {
+            val connection = URL("http://127.0.0.1:$port/__payload/$token").openConnection() as HttpURLConnection
+            try {
+                connection.connectTimeout = PAYLOAD_TIMEOUT_MILLIS
+                connection.readTimeout = PAYLOAD_TIMEOUT_MILLIS
+                check(connection.responseCode == HttpURLConnection.HTTP_OK) { "payload $token is not registered" }
+                connection.inputStream.use { it.readBytes() }
+            } finally {
+                connection.disconnect()
+            }
+        }
 
     /** A real ZIP with a dex entry but no AndroidManifest.xml, which must not be treated as an installable package. */
     private fun zipWithoutManifest(): ByteArray =
@@ -215,31 +300,40 @@ internal object ApkInstallerAttachmentProbe {
             buffer.toByteArray()
         }
 
-    /** One genuine send, one genuine receiver download and the production verified-file publication. */
+    /**
+     * One genuine send, one genuine receiver download and the production verified-file publication. With
+     * [cancelRetry] the shared held-body probe first cancels a real held download of this case and admits one
+     * deliberate Retry, so the verified file comes from the retried transfer, never from a partial body.
+     */
     private suspend fun receive(
         session: FixtureSession,
-        sender: AccountSummaryFfi,
-        receiver: AccountSummaryFfi,
-        group: String,
+        peers: FixturePeers,
         case: ApkCase,
+        cancelRetry: Boolean,
     ): JSONObject {
         val sent =
             sendAndroidFixtureMedia(
                 session.context,
                 session.root,
                 session.marmot,
-                sender,
-                group,
+                peers.sender,
+                peers.group,
                 session.blobPort,
                 listOf(PendingAttachment(case.bytes, case.mediaType, case.fileName)),
             )
         session.marmot.catchUpAccounts()
         val request =
-            MediaLifecycleAttachmentProbe.projectRequests(session.marmot, receiver, group, sent.references).single()
-        val state = session.state(receiver.label)
+            MediaLifecycleAttachmentProbe
+                .projectRequests(session.marmot, peers.receiver, peers.group, sent.references)
+                .single()
+        val state = session.state(peers.receiver.label)
+        val reference = sent.references.single()
+        if (cancelRetry) {
+            HeldAttachmentCancellationProbe.run(state, request, reference, session.blobPort, case.bytes)
+        }
         var file: File? = null
         ControlledAttachmentProbe.measure("apk-transfer-${case.key}", case.bytes.size) {
-            file = materializeVerified(session.context, state, request, sent.references.single())
+            file = materializeVerified(session.context, state, request, reference)
         }
         val verified = requireNotNull(file).readBytes()
         assertArrayEquals("received bytes differ from sent bytes for ${case.key}", case.bytes, verified)
@@ -248,7 +342,7 @@ internal object ApkInstallerAttachmentProbe {
         return JSONObject()
             .put("case", case.key)
             .put("file", case.fileName)
-            .put("mediaType", sent.references.single().mediaType)
+            .put("mediaType", reference.mediaType)
             .put("request", request.toJson())
     }
 
@@ -338,21 +432,40 @@ internal object ApkInstallerAttachmentProbe {
                 .put("result", result.name)
                 .put("installer_shown", installer.shown)
                 .put("installer_observed_ms", installer.observedMillis)
+                .put("installer_settled", installer.settled)
+                .put("installer_progress_seen", installer.progressSeen)
+                .put("installer_staging_ms", installer.stagingMillis)
                 .put("dispatch_ms", dispatchMillis)
                 .put("transfer_reused", received.file.isFile),
         )
     }
 
-    /** Whether the system installer reached the screen after one dispatch, and for how long the screen was watched. */
+    /**
+     * Whether the installer reached the screen after one dispatch, for how long the screen was watched, whether the
+     * installer had finished staging the package before Back was sent, whether its progress indicator was ever seen,
+     * and how long the wait for it lasted. A package whose indicator was never seen was not proven to have finished
+     * staging, because an installer that draws it under another class name looks the same as one that never staged.
+     */
     private class InstallerObservation(
         val shown: Boolean,
         val observedMillis: Long,
+        val settled: Boolean,
+        val progressSeen: Boolean,
+        val stagingMillis: Long,
+    )
+
+    /** The outcome of waiting for staging to finish and whether the progress indicator was seen at any poll. */
+    private class StagingWait(
+        val settled: Boolean,
+        val progressSeen: Boolean,
     )
 
     /**
      * Watches the screen after any dispatch result. When an installer is expected it waits for it, and otherwise it
-     * watches for [UNEXPECTED_OBSERVE_MILLIS] so a launch behind a non-Opened status is still seen. The installer, or
-     * whatever an Opened dispatch left on screen, is dismissed with Back without installing.
+     * watches for [UNEXPECTED_OBSERVE_MILLIS] so a launch behind a non-Opened status is still seen. An installer that
+     * appeared is given time to finish staging the package before it is dismissed with Back without installing, since
+     * Back sent while a large package is still being copied from the file provider does not cancel the staging and the
+     * dialog outlives the probe's process. Whatever an Opened dispatch left on screen is dismissed as well.
      */
     private suspend fun awaitInstallerAndDismiss(
         context: Context,
@@ -371,13 +484,17 @@ internal object ApkInstallerAttachmentProbe {
                 watchForInstaller(automation, installers)
             }
         val observedMillis = SystemClock.elapsedRealtime() - started
+        val stagingStarted = SystemClock.elapsedRealtime()
+        val staging =
+            if (shown) awaitStagingFinished(automation) else StagingWait(settled = false, progressSeen = false)
+        val stagingMillis = if (shown) SystemClock.elapsedRealtime() - stagingStarted else 0L
         if (shown || opened) {
             repeat(DISMISS_ATTEMPTS) {
                 automation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
                 delay(POLL_MILLIS)
             }
         }
-        return InstallerObservation(shown, observedMillis)
+        return InstallerObservation(shown, observedMillis, staging.settled, staging.progressSeen, stagingMillis)
     }
 
     /** Polls for the whole observation window and reports whether an installer package owned the screen at any poll. */
@@ -392,6 +509,31 @@ internal object ApkInstallerAttachmentProbe {
         }
         return false
     }
+
+    /**
+     * Polls until the installer window no longer shows the progress indicator it draws while staging a package, and
+     * records whether the indicator was visible at any poll, so a wait that never saw it is told apart from one that
+     * watched it disappear.
+     */
+    private suspend fun awaitStagingFinished(automation: UiAutomation): StagingWait {
+        var progressSeen = false
+        val settled =
+            runCatching {
+                withTimeout(STAGING_TIMEOUT_MILLIS) {
+                    while (automation.rootInActiveWindow?.let(::showsProgress) == true) {
+                        progressSeen = true
+                        delay(POLL_MILLIS)
+                    }
+                    true
+                }
+            }.getOrDefault(false)
+        return StagingWait(settled, progressSeen)
+    }
+
+    /** True when this window or any descendant is a progress bar. */
+    private fun showsProgress(node: AccessibilityNodeInfo): Boolean =
+        node.className?.toString() == PROGRESS_BAR_CLASS ||
+            (0 until node.childCount).any { index -> node.getChild(index)?.let(::showsProgress) == true }
 
     /** Resolves the package that handles APK installation on this device instead of assuming a vendor package. */
     private fun installerPackages(context: Context): Set<String> {

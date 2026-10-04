@@ -58,6 +58,26 @@ class FixtureContractTest(unittest.TestCase):
             time.sleep(0.01)
         self.fail(f"missing ledger event: {kind}")
 
+    def test_host_payload_is_served_exactly_outside_the_counted_acquisitions(self):
+        """A registered host file streams byte-exact under its own ledger kinds and never becomes a GET attempt."""
+        payload = Path(self.directory.name) / "large.apk"
+        payload.write_bytes(bytes(range(256)) * 300)
+        for token, path in (("bad token!", payload), ("missing", payload.with_name("absent"))):
+            with self.assertRaises(ValueError):
+                self.server.add_payload(token, path)
+        self.server.add_payload("large-apk", payload)
+        with self.assertRaises(ValueError):
+            self.server.add_payload("large-apk", payload)
+        status, headers, body = self.get("/__payload/large-apk")
+        self.assertEqual((200, str(payload.stat().st_size), payload.read_bytes()),
+                         (status, headers["Content-Length"], body))
+        self.assertEqual(404, self.get("/__payload/unknown")[0])
+        self.assertEqual(404, self.get("/__payload/bad%20token!")[0])
+        events = self.await_event("payload_complete")
+        self.assertEqual(1, sum(e["kind"] == "payload_fetch" for e in events))
+        self.assertEqual(payload.stat().st_size, next(e["value"] for e in events if e["kind"] == "payload_fetch"))
+        self.assertEqual(0, sum(e["kind"] in ("get", "head", "status", "body_bytes") for e in events))
+
     def test_full_body_range_and_validator_change_count_repeated_bytes(self):
         """Count compatible remainder bytes and the incompatible-validator full restart separately."""
         source = self.server.generate("range", 65537)

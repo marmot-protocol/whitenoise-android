@@ -47,13 +47,17 @@ def passed(result):
 
 
 def wait_for_completion(ledger, start, uploads=len(EXPECTED), gets=len(EXPECTED),
-                        timeout=LEDGER_COMPLETION_TIMEOUT_SECONDS):
-    """Wait until every expected upload and request has a committed terminal event, or keep the timeout evidence."""
+                        timeout=LEDGER_COMPLETION_TIMEOUT_SECONDS, terminal_kinds=("complete",)):
+    """Wait until every expected upload and request has a committed terminal event, or keep the timeout evidence.
+
+    A request is terminal when it carries one of ``terminal_kinds``. A run that cancels a body on purpose passes
+    ``disconnect`` as well, because the cancelled attempt ends with the client's disconnect and never completes.
+    """
     deadline = time.monotonic() + timeout
     while True:
         events = ledger.snapshot()[start:]
         requests = {e["seq"] for e in events if e["kind"] in ("get", "head")}
-        completed = {e["request"] for e in events if e["kind"] == "complete"}
+        completed = {e["request"] for e in events if e["kind"] in terminal_kinds}
         uploaded = {e["request"] for e in events if e["kind"] == "upload_complete"}
         sent = {e["seq"] for e in events if e["kind"] == "upload"}
         if len(sent) == uploads and sent <= uploaded and len(requests) == gets and requests <= completed:

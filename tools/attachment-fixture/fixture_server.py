@@ -131,6 +131,7 @@ class FixtureServer(ThreadingHTTPServer):
         self.upload_extension = upload_extension
         self.ledger = Ledger(root)
         self.controls = {}
+        self.payloads = {}
         self.stopping = threading.Event()
         self.acquisition_unavailable = threading.Event()
         self.acquisition_not_found = threading.Event()
@@ -168,6 +169,16 @@ class FixtureServer(ThreadingHTTPServer):
         self.ledger.register(token, digest.hexdigest(), size)
         self.controls[token] = control or Control()
         return path
+
+    def add_payload(self, token, path):
+        """Expose one host-built file to the probe outside the counted acquisition ledger, never as a blob."""
+        path = Path(path)
+        if not TOKEN.fullmatch(token) or token in self.payloads or path.is_symlink() or not path.is_file():
+            raise ValueError("invalid fixture payload")
+        size = path.stat().st_size
+        if not 0 < size <= MAX_BYTES:
+            raise ValueError("fixture payload outside bounded range")
+        self.payloads[token] = (path, size)
 
     def server_close(self):
         """Release held responses before closing the listening socket."""
@@ -377,11 +388,36 @@ class Handler(BaseHTTPRequestHandler):
         self.download(head=True)
 
     def do_GET(self):
-        """Export a complete durable ledger or deliver one counted body attempt."""
+        """Export a complete durable ledger, a host payload, or deliver one counted body attempt."""
         if self.path == "/__ledger":
             self.reply(200, self.server.ledger.snapshot())
+        elif self.path.startswith("/__payload/"):
+            self.payload(self.path.removeprefix("/__payload/"))
         else:
             self.download()
+
+    def payload(self, token):
+        """Stream a host-supplied payload under its own ledger kinds, so it is never a counted acquisition."""
+        entry = self.server.payloads.get(token) if TOKEN.fullmatch(token) else None
+        if entry is None:
+            self.reply(404, {})
+            return
+        path, size = entry
+        request = self.server.ledger.event(None, token, "payload_fetch", size)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(size))
+            self.end_headers()
+            with path.open("rb") as source:
+                chunk = source.read(CHUNK)
+                while chunk:
+                    self.wfile.write(chunk)
+                    chunk = source.read(CHUNK)
+            self.server.ledger.event(request, token, "payload_complete")
+        except (OSError, TimeoutError):
+            self.server.ledger.event(request, token, "payload_disconnect")
+            self.close_connection = True
 
     def disconnected(self):
         """Detect peer FIN/reset during a held body, without writing more payload bytes."""
