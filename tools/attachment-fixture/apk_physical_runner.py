@@ -168,6 +168,8 @@ def run(adb, serial, root, output, distribution, physical_fixture_serial=None, b
               "no_installer_simulated": no_installer_branch, "install_app_op_original": None}
     start = len(server.ledger.snapshot())
     forwards, threads, started, failure = [], [], [], None
+    # The mode is restored only once captured, so an earlier setup failure never rewrites the owner's setting.
+    app_op_captured = False
     try:
         for service in (server, relay):
             thread = threading.Thread(target=service.serve_forever, daemon=True)
@@ -181,6 +183,7 @@ def run(adb, serial, root, output, distribution, physical_fixture_serial=None, b
             forwards.append(port)
         if distribution == "Zapstore":
             report["install_app_op_original"] = install_app_op(adb, serial)
+            app_op_captured = True
         _stages(adb, serial, ports, distribution, probe_arguments(cancel_retry, payload is not None,
                                                                   no_installer_branch), report, root, private_debug)
     except (subprocess.SubprocessError, OSError, ValueError) as error:
@@ -205,11 +208,11 @@ def run(adb, serial, root, output, distribution, physical_fixture_serial=None, b
         report["budget_check"] = {"applicable": False, "passed": False,
                                   "reason": "representative performance remains unqualified"}
         report["deferred"] = deferred_for(cancel_retry, payload is not None, no_installer_branch)
-        report["install_app_op_restored"] = distribution != "Zapstore"
-        if distribution == "Zapstore":
+        # Nothing changed the app-op before it was captured, so an uncaptured mode needs no restore.
+        report["install_app_op_restored"] = True
+        if distribution == "Zapstore" and app_op_captured:
             try:
-                set_install_permission(adb, serial, report["install_app_op_original"] or "default")
-                report["install_app_op_restored"] = True
+                set_install_permission(adb, serial, report["install_app_op_original"])
             except (subprocess.SubprocessError, OSError, ValueError):
                 report["install_app_op_restored"] = False
         report["reverse_cleanup_failed"] = False
@@ -293,6 +296,8 @@ def install_isolated(adb, serial, physical_fixture_serial, app_apk, test_apk, ba
         raise ValueError("app and test APKs are signed by different keys")
     installed = installed_identity(adb, serial)
     backup_dir = _private_directory(backup_dir)
+    if any(backup_dir.iterdir()):
+        raise ValueError("backup directory already holds files, use a new one so no restore copy is overwritten")
     receipt = {"schema": 1, "retained": {}, "installed": {}, "fresh": [p for p in IDENTITY if p not in installed]}
     if receipt["fresh"] and not allow_fresh_install:
         raise ValueError("absent on the device: " + " ".join(receipt["fresh"])
