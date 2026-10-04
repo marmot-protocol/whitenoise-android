@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
@@ -83,6 +84,18 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachmentFeed(
         marmotIo { subscribeAttachmentTransfers(request.accountRef, request.groupIdHex, listOf(target.toFfi())) },
     )
 
+/** Reads the authoritative state of one target without demanding, retrying or cancelling anything. */
+private suspend fun WhiteNoiseAppState.peekNativeTransferState(
+    request: AttachmentTransferRequest,
+    ffiTarget: AttachmentLocalTargetFfi,
+): AttachmentTransferStateFfi? =
+    marmotIo {
+        attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(ffiTarget))
+            .items
+            .singleOrNull()
+            ?.state
+    }
+
 /**
  * Observes native-owned acquisition. Interactive demand joins live work;
  * only the explicit Retry intent permits terminal recovery.
@@ -136,6 +149,7 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
             )
         },
         onState = { state -> diagnostics?.transferUpdate(state) },
+        peek = { peekNativeTransferState(request, ffiTarget) },
     ) {
         marmotIo {
             if (priority == AttachmentDownloadPriority.Automatic) {
@@ -158,12 +172,13 @@ internal suspend fun awaitNativeAttachment(
     open: suspend () -> NativeTransferFeed,
     onDemand: () -> Unit = {},
     onState: (AttachmentTransferStateFfi) -> Unit = {},
+    peek: NativeStatePeek? = null,
     demand: suspend () -> AttachmentTransferStateFfi?,
 ) {
     var owned: NativeTransferFeed? = null
     try {
         withContext(NonCancellable) { owned = open() }
-        observeNativeAttachment(checkNotNull(owned), demand, onDemand, onState)
+        observeNativeAttachment(checkNotNull(owned), demand, onDemand, onState, peek)
     } finally {
         withContext(NonCancellable + Dispatchers.IO) { owned?.close() }
     }
@@ -174,9 +189,10 @@ internal suspend fun awaitNativeAttachment(
     feed: NativeTransferFeed,
     onDemand: () -> Unit = {},
     onState: (AttachmentTransferStateFfi) -> Unit = {},
+    peek: NativeStatePeek? = null,
     demand: suspend () -> AttachmentTransferStateFfi?,
 ) {
-    feed.use { observeNativeAttachment(it, demand, onDemand, onState) }
+    feed.use { observeNativeAttachment(it, demand, onDemand, onState, peek) }
 }
 
 /** Waits for one demanded acquisition after ownership has already been made cancellation-safe. */
@@ -185,22 +201,29 @@ private suspend fun observeNativeAttachment(
     demand: suspend () -> AttachmentTransferStateFfi?,
     onDemand: () -> Unit,
     onState: (AttachmentTransferStateFfi) -> Unit,
+    peek: NativeStatePeek?,
 ) {
     // The subscription starts with a pre-demand snapshot; it must not be
     // mistaken for the terminal outcome of the acquisition we are starting.
     updates.nextState().also(onState)
     onDemand()
     var state = demand()?.also(onState)
-    while (state != AttachmentTransferStateFfi.READY) {
-        if (state in NATIVE_TRANSFER_TERMINAL_FAILURES) {
-            throw NativeAttachmentTerminalException(requireNotNull(state))
+    // The engine coalesces feed updates to one per 250 ms, so a fast transfer's READY would otherwise wait for it.
+    val pending = PendingFeedWait(updates)
+    try {
+        while (state != AttachmentTransferStateFfi.READY) {
+            if (state in NATIVE_TRANSFER_TERMINAL_FAILURES) {
+                throw NativeAttachmentTerminalException(requireNotNull(state))
+            }
+            state = pending.next(state, peek).also(onState)
         }
-        state = updates.nextState().also(onState)
+    } finally {
+        pending.cancel()
     }
 }
 
 /** A complete one-target replacement is required before interpreting native progress. */
-private suspend fun NativeTransferFeed.nextState(): AttachmentTransferStateFfi =
+internal suspend fun NativeTransferFeed.nextState(): AttachmentTransferStateFfi =
     // UniFFI wakes under a scheduler lock; dispatch before a resumed read polls it again.
     withContext(Dispatchers.IO) {
         next()?.items?.singleOrNull()?.state ?: throw IOException("native attachment transfer closed")

@@ -2621,6 +2621,24 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): String? = draftFor(accountRef, groupIdHex)
 
+    /** Applies accepted-send presentation without changing MDK's durable draft or selected projection. */
+    internal fun chatRowSelectedPreviewFor(
+        accountRef: String?,
+        groupIdHex: String,
+        nativePreview: dev.ipf.marmotkit.SelectedChatPreviewFfi?,
+        hasOptimisticSendPreview: Boolean = false,
+    ): dev.ipf.marmotkit.SelectedChatPreviewFfi? =
+        if (accountRef == null) {
+            nativePreview
+        } else {
+            composerDraftExpansionBridge.selectedPreview(
+                accountRef = accountRef,
+                groupIdHex = groupIdHex,
+                nativePreview = nativePreview,
+                hasOptimisticSendPreview = hasOptimisticSendPreview,
+            )
+        }
+
     /** Return [accountRef]'s restored composer draft for [groupIdHex]. */
     fun draftSnapshotFor(
         accountRef: String?,
@@ -6175,6 +6193,15 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
+     * Applies what an account switch does to the media session, in the production order: the in-memory media caches
+     * are cleared and the session epoch advances, then [activeAccountRef] moves to [label] when one is given.
+     */
+    internal fun switchMediaSessionForTest(label: String?) {
+        clearInMemoryMediaCaches()
+        if (label != null) activeAccountRef = label
+    }
+
+    /**
      * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
      * the established local fail-open behavior; a structured unfinished-local
      * outcome retains the active session. Returns null when no account is active.
@@ -6211,6 +6238,7 @@ class WhiteNoiseAppState private constructor(
         // Preserve per-account durable state for later account switching, but
         // synchronously drop plaintext memory and await the decrypted-disk wipe.
         composerExpansionStateRetention.removeAccount(signedOutRef)
+        composerDraftExpansionBridge.removeAccount(signedOutRef)
         pendingMessageEditHandoff.removeAccount(signedOutRef)
         conversationDictation.onAccountUnavailable(signedOutRef)
         stopTtsForRemovedAccount(signedOutRef)
@@ -6304,6 +6332,7 @@ class WhiteNoiseAppState private constructor(
             }
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
+            composerDraftExpansionBridge.removeAccount(wipedRef)
             pendingMessageEditHandoff.removeAccount(wipedRef)
             clearConversationShortcutsForAccount(
                 accountRef = wipedRef,

@@ -370,6 +370,18 @@
         "test_ids": ["CHL-017"]
       },
       {
+        "surface": "Accepted send native draft presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SentComposerDraftPresentation.kt",
+        "anchor": "fun selectedPreview(",
+        "test_ids": ["CHL-004", "CHL-002"]
+      },
+      {
+        "surface": "Pending send preview preparation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.sending",
+        "test_ids": ["CHL-004", "CHL-002"]
+      },
+      {
         "surface": "Composer cursor updates during dictation Send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
         "anchor": "fun setDraft(",
@@ -612,10 +624,22 @@
         "test_ids": ["NAV-005", "ACC-017", "SET-001"]
       },
       {
+        "surface": "Cache-only image render from MDK retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageCacheMaterialization.kt",
+        "anchor": "internal suspend fun imageAttachmentBytes(",
+        "test_ids": ["MED-023"]
+      },
+      {
         "surface": "Native attachment transfer observation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentTransfers.kt",
-        "anchor": "private suspend fun NativeTransferFeed.nextState()",
-        "test_ids": ["MED-019", "MED-020"]
+        "anchor": "internal suspend fun NativeTransferFeed.nextState()",
+        "test_ids": ["MED-019", "MED-020", "MED-025"]
+      },
+      {
+        "surface": "Prompt native READY observation beside the engine feed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentFastReady.kt",
+        "anchor": "internal class PendingFeedWait(",
+        "test_ids": ["MED-025"]
       },
       {
         "surface": "Interactive attachment demand and post-admission native state",
