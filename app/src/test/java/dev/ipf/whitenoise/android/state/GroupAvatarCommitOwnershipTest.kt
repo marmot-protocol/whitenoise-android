@@ -165,7 +165,10 @@ class GroupAvatarCommitOwnershipTest {
             }
         } as MarmotInterface
 
-    private fun appState(writes: AtomicInteger, ioDispatcher: CoroutineDispatcher = Dispatchers.IO): WhiteNoiseAppState =
+    private fun appState(
+        writes: AtomicInteger,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
             draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
