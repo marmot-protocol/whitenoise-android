@@ -118,6 +118,7 @@ internal enum class ConversationDictationFailure {
     MicrophoneInUse,
     AudioFocusUnavailable,
     NoSpeech,
+    NoMatch,
     Network,
     ProviderDisconnected,
     RecognizerBusy,
@@ -127,6 +128,10 @@ internal enum class ConversationDictationFailure {
     SendBlocked,
     Unknown,
 }
+
+/** Empty recognition outcomes share recovery policy without treating a no-match as proof of silence. */
+private val ConversationDictationFailure.isEmptyRecognition: Boolean
+    get() = this == ConversationDictationFailure.NoSpeech || this == ConversationDictationFailure.NoMatch
 
 /** Distinguishes completed text from recognition interrupted before its final result. */
 private enum class DictationFailureCapture {
@@ -283,6 +288,9 @@ internal interface ConversationDictationRecognitionSession {
 
     /** Pipe closure alone is not proof that the provider received the entire owned chunk. */
     fun callerAudioFullyFed(): Boolean = false
+
+    /** True only when this generation owns the sealed capture's last remaining chunk. */
+    fun callerAudioIsFinalChunk(): Boolean = false
 
     /** Requeues the exact caller-audio chunk when this generation failed before a usable final. */
     fun retryCallerAudio(): Boolean = false
@@ -2079,7 +2087,7 @@ internal class ConversationDictationController internal constructor(
                     val failure =
                         if (error == ConversationDictationFailure.PermissionDenied) {
                             recognitionPermissionFailure()
-                        } else if (error == ConversationDictationFailure.NoSpeech) {
+                        } else if (error.isEmptyRecognition) {
                             unresolvedRecognitionFailure ?: error
                         } else {
                             error
@@ -2087,14 +2095,24 @@ internal class ConversationDictationController internal constructor(
                     if (!owns(sessionId, generationId)) return
                     unresolvedRecognitionFailure = failure
                     if (finishRequested) {
-                        if (error == ConversationDictationFailure.NoSpeech && acknowledgeFullyFedSilentCallerAudio()) {
+                        if (error.isEmptyRecognition && acknowledgeFullyFedSilentCallerAudio()) {
                             unresolvedRecognitionFailure = null
                             clearRecognitionGeneration(cancel = false)
                             continueOrFinalizeCallerAudioDrain(sessionId, target)
                             return
                         }
+                        if (
+                            error == ConversationDictationFailure.NoMatch &&
+                            recognitionSession?.callerAudioFullyFed() == true &&
+                            recognitionSession?.callerAudioIsFinalChunk() == true
+                        ) {
+                            // Sealed final PCM cannot gain context. Keep it recoverable instead of
+                            // repeating the same rejected input before showing explicit recovery.
+                            failWithRetainedCallerAudio(sessionId, target, failure)
+                            return
+                        }
                         val retainedCallerAudio =
-                            if (error == ConversationDictationFailure.NoSpeech) {
+                            if (error.isEmptyRecognition) {
                                 recognitionSession?.retryCallerAudioWithFollowingAudio() == true
                             } else {
                                 recognitionSession?.retryCallerAudio() == true
@@ -2112,7 +2130,7 @@ internal class ConversationDictationController internal constructor(
                     val callerAudioChunkId = recognitionSession?.callerAudioChunkId()
                     val callerAudioContainsSpeech = recognitionSession?.callerAudioContainsSpeech()
                     val repeatedSpeechRejection =
-                        error == ConversationDictationFailure.NoSpeech &&
+                        error.isEmptyRecognition &&
                             callerAudioContainsSpeech == true &&
                             callerAudioChunkId != null
                     val rejectedCallerAudioExhausted =
@@ -2124,11 +2142,11 @@ internal class ConversationDictationController internal constructor(
                         return
                     }
                     val advancedPastConfirmedSilence =
-                        error == ConversationDictationFailure.NoSpeech &&
+                        error.isEmptyRecognition &&
                             acknowledgeFullyFedSilentCallerAudio()
                     val retainedCallerAudio =
                         !advancedPastConfirmedSilence &&
-                            if (error == ConversationDictationFailure.NoSpeech) {
+                            if (error.isEmptyRecognition) {
                                 recognitionSession?.retryCallerAudioWithFollowingAudio() == true
                             } else {
                                 recognitionSession?.retryCallerAudio() == true
@@ -2161,7 +2179,7 @@ internal class ConversationDictationController internal constructor(
                             )
                             restartAfterNoSpeech(sessionId, target, readyAt)
                         }
-                        error == ConversationDictationFailure.NoSpeech ->
+                        error.isEmptyRecognition ->
                             restartAfterNoSpeech(sessionId, target, readyAt)
                         error == ConversationDictationFailure.PermissionDenied ->
                             recoverPermissionFailure(sessionId, target)
@@ -2444,7 +2462,7 @@ internal class ConversationDictationController internal constructor(
         val readyDurationMillis = readyAtElapsedMillis?.let { elapsedRealtime() - it }
         val manualNoSpeech =
             target.finishAfterSilenceMillis == null &&
-                unresolvedRecognitionFailure == ConversationDictationFailure.NoSpeech
+                unresolvedRecognitionFailure?.isEmptyRecognition == true
         val ordinarySilence = readyDurationMillis != null && readyDurationMillis >= ORDINARY_SILENCE_MILLIS
         if (manualNoSpeech || ordinarySilence) {
             // "Finish manually" is an explicit session-lifetime choice. Some
@@ -2770,7 +2788,7 @@ internal class ConversationDictationController internal constructor(
     /** An explicit finish can still use committed text during a transient reconnect. */
     private val ConversationDictationFailure.shouldPreserveTranscript: Boolean
         get() =
-            this != ConversationDictationFailure.NoSpeech &&
+            !isEmptyRecognition &&
                 this != ConversationDictationFailure.ProviderDisconnected
 
     /** Releases capture but preserves useful text when a later generation fails fatally. */
@@ -3516,7 +3534,7 @@ internal class ConversationDictationController internal constructor(
 
     private val ConversationDictationFailure.canRetryRetainedCallerAudio: Boolean
         get() =
-            this == ConversationDictationFailure.NoSpeech ||
+            isEmptyRecognition ||
                 this == ConversationDictationFailure.ProviderDisconnected ||
                 this == ConversationDictationFailure.Network ||
                 this == ConversationDictationFailure.RecognizerBusy ||
@@ -4433,6 +4451,9 @@ private class AndroidConversationDictationRecognitionSession(
     /** Distinguishes a successful exact-chunk write from cancellation, stalls and broken pipes. */
     override fun callerAudioFullyFed(): Boolean = callerAudio?.fullyFed() == true
 
+    /** Reports exact final-chunk ownership while the sealed PCM still belongs to this generation. */
+    override fun callerAudioIsFinalChunk(): Boolean = callerAudio?.isFinalChunk() == true
+
     /** Returns this recognizer generation’s unacknowledged caller audio for a replacement request. */
     override fun retryCallerAudio(): Boolean = callerAudio?.retry() == true
 
@@ -4465,9 +4486,8 @@ private fun Bundle?.hasRecognitionText(): Boolean =
 internal fun Int.toConversationDictationFailure(): ConversationDictationFailure =
     when (this) {
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> ConversationDictationFailure.PermissionDenied
-        SpeechRecognizer.ERROR_NO_MATCH,
-        SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
-        -> ConversationDictationFailure.NoSpeech
+        SpeechRecognizer.ERROR_NO_MATCH -> ConversationDictationFailure.NoMatch
+        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> ConversationDictationFailure.NoSpeech
         SpeechRecognizer.ERROR_NETWORK,
         SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
         -> ConversationDictationFailure.Network

@@ -8,6 +8,46 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationDictationAudioChunkBufferTest {
+    /** Exact ownership and sealed capture are both required; inspection never releases retained bytes. */
+    @Test
+    fun finalChunkRequiresSealedCaptureAndExactInflightOwnership() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 1L, chunkBytes = 4, maxBufferedBytes = 12)
+        val pcm = byteArrayOf(1, 2, 3, 4)
+        assertTrue(buffer.append(pcm, pcm.size, hasSpeech = true))
+        val chunk = checkNotNull(buffer.poll())
+        assertFalse(buffer.isFinalChunk(chunk.chunkId))
+        buffer.finish()
+        assertTrue(buffer.isFinalChunk(chunk.chunkId))
+        assertFalse(buffer.isFinalChunk(chunk.chunkId + 1))
+        assertEquals(4, buffer.bufferedBytes)
+        assertTrue(buffer.retry(chunk.chunkId))
+        assertFalse(buffer.isFinalChunk(chunk.chunkId))
+        val retried = checkNotNull(buffer.poll())
+        assertEquals(chunk.chunkId, retried.chunkId)
+        assertArrayEquals(pcm, retried.pcm)
+        assertTrue(buffer.isFinalChunk(retried.chunkId))
+        assertTrue(buffer.acknowledge(retried.chunkId))
+        assertFalse(buffer.isFinalChunk(retried.chunkId))
+        assertEquals(0, buffer.bufferedBytes)
+    }
+
+    /** A queued successor or partially captured remainder prevents claiming the rejected input is final. */
+    @Test
+    fun followingPcmPreventsFinalChunkClassification() {
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 1L, chunkBytes = 4, maxBufferedBytes = 12)
+        assertTrue(buffer.append(byteArrayOf(1, 2, 3, 4), 4, hasSpeech = true))
+        val first = checkNotNull(buffer.poll())
+        assertTrue(buffer.append(byteArrayOf(5, 6), 2, hasSpeech = true))
+        assertFalse(buffer.isFinalChunk(first.chunkId))
+        buffer.finish()
+        assertFalse(buffer.isFinalChunk(first.chunkId))
+        assertNull("another chunk cannot be claimed while the first owns the input", buffer.poll())
+        assertTrue(buffer.acknowledge(first.chunkId))
+        val last = checkNotNull(buffer.poll())
+        assertTrue(buffer.isFinalChunk(last.chunkId))
+        assertEquals(2, buffer.bufferedBytes)
+    }
+
     /** Verifies an hour of bounded capture preserves every ordered sample range across 120 acknowledgments. */
     @Test
     fun oneHourOfAcknowledgedAudioKeepsExactOrderedSampleRangesWithinTheBound() {

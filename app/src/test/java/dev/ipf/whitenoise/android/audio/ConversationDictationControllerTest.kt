@@ -3787,6 +3787,129 @@ class ConversationDictationControllerTest {
             }
         }
 
+    /** Android's distinct outcomes preserve timeout retries without labelling a no-match as silence. */
+    @Test
+    fun noMatchAndSpeechTimeoutHaveDistinctRecoveryOutcomes() {
+        assertEquals(
+            ConversationDictationFailure.NoMatch,
+            SpeechRecognizer.ERROR_NO_MATCH.toConversationDictationFailure(),
+        )
+        assertEquals(
+            ConversationDictationFailure.NoSpeech,
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT.toConversationDictationFailure(),
+        )
+        assertEquals(
+            ConversationDictationRecovery.Retry,
+            dictationFailureRecovery(ConversationDictationFailure.NoMatch),
+        )
+    }
+
+    /** A final no-match stops unchanged replay while retaining PCM and requiring an explicit recovery choice. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun fullyFedFinalNoMatchRetainsTextAndAudioWithoutAutomaticDelivery() =
+        runTest {
+            for (send in listOf(false, true)) {
+                val sent = mutableListOf<String>()
+                val fixture =
+                    fixture(
+                        draft = TextFieldValue(""),
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = {
+                            sent += it.payload
+                            true
+                        },
+                    )
+                fixture.platform.pendingCallerAudio = true
+                fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+                fixture.platform.listener.onResult("first")
+                fixture.scheduler.runDelay(500L)
+                if (send) fixture.controller.send() else fixture.controller.paste()
+                val rejected = fixture.platform.session
+                rejected.callerAudioFinalChunk = true
+                val staleListener = fixture.platform.listener
+                staleListener.onError(ConversationDictationFailure.NoMatch)
+                advanceUntilIdle()
+                val failed = fixture.controller.state as ConversationDictationState.Failed
+                assertEquals("first", failed.retainedTranscript)
+                assertEquals(ConversationDictationFailure.NoMatch, failed.cause ?: failed.reason)
+                assertTrue(failed.recognitionIncomplete)
+                assertTrue(fixture.controller.canRetryRetainedAudio)
+                assertTrue(fixture.platform.pendingCallerAudio)
+                assertTrue(sent.isEmpty())
+                assertEquals("", fixture.drafts.getValue(key()).text)
+                assertEquals(0, rejected.acknowledgedCallerAudio)
+                fixture.scheduler.advanceBy(10_000L)
+                assertEquals(2, fixture.platform.sessions.size)
+                staleListener.onResult("stale tail")
+                assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+                fixture.controller.retry()
+                fixture.scheduler.runDelay(500L)
+                fixture.platform.pendingCallerAudio = false
+                fixture.platform.listener.onResult("recovered tail")
+                advanceUntilIdle()
+                if (send) {
+                    assertEquals(listOf("first recovered tail"), sent)
+                } else {
+                    assertEquals("first recovered tail", fixture.drafts.getValue(key()).text)
+                }
+                assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+            }
+        }
+
+    /** Unsealed, nonfinal, incompletely supplied and timed-out input still gets bounded retries. */
+    @Test
+    fun finalNoMatchPolicyDoesNotReplaceExistingTransientRetries() {
+        for (mode in listOf("nonfinal", "incomplete", "timeout")) {
+            val fixture = fixture(draft = TextFieldValue(""))
+            fixture.platform.pendingCallerAudio = true
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+            fixture.controller.paste()
+            val session = fixture.platform.session
+            session.callerAudioFinalChunk = mode != "nonfinal"
+            session.callerAudioFeedComplete = mode != "incomplete"
+            fixture.platform.listener.onError(
+                if (mode == "timeout") ConversationDictationFailure.NoSpeech else ConversationDictationFailure.NoMatch,
+            )
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+            assertEquals(1, session.retriedCallerAudioWithFollowingAudio)
+            assertEquals(0, session.acknowledgedCallerAudio)
+            fixture.scheduler.runDelay(500L)
+            assertEquals(2, fixture.platform.sessions.size)
+        }
+    }
+
+    /** The same no-match while recording can gain context from following PCM. */
+    @Test
+    fun recordingNoMatchStillCoalescesFollowingCallerAudio() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.session.callerAudioFinalChunk = true
+        fixture.platform.listener.onError(ConversationDictationFailure.NoMatch)
+        assertEquals(1, fixture.platform.session.retriedCallerAudioWithFollowingAudio)
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+    }
+
+    /** Digital silence is acknowledged before final no-match recovery, never inferred from error 7 alone. */
+    @Test
+    fun finalNoMatchAcknowledgesOnlyFullyFedKnownSilentAudio() {
+        val fixture = fixture(draft = TextFieldValue(""))
+        fixture.platform.pendingCallerAudio = true
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.platform.listener.onResult("first")
+        fixture.scheduler.runDelay(500L)
+        fixture.controller.paste()
+        val session = fixture.platform.session
+        session.callerAudioFinalChunk = true
+        session.callerAudioHasSpeech = false
+        fixture.platform.pendingCallerAudio = false
+        fixture.platform.listener.onError(ConversationDictationFailure.NoMatch)
+        assertEquals(1, session.acknowledgedCallerAudio)
+        assertEquals("first", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
     /** Reproduces a recognized segment followed by a provider-rejected nonzero tail. */
     private fun failRecognizedTail(
         fixture: Fixture,
@@ -6312,6 +6435,7 @@ class ConversationDictationControllerTest {
         var retriedCallerAudioWithFollowingAudio = 0
         var callerAudioHasSpeech = true
         var callerAudioFeedComplete = true
+        var callerAudioFinalChunk = false
         var callerAudioRetryAvailable = callerAudioOwned
         private val captureFinished = mutableListOf<() -> Unit>()
         private var captureClosed = false
@@ -6399,6 +6523,8 @@ class ConversationDictationControllerTest {
         override fun callerAudioContainsSpeech(): Boolean? = callerAudioHasSpeech.takeIf { callerAudioOwned }
 
         override fun callerAudioFullyFed(): Boolean = callerAudioOwned && callerAudioFeedComplete
+
+        override fun callerAudioIsFinalChunk(): Boolean = callerAudioOwned && callerAudioFinalChunk
 
         /** Tracks exact-chunk retry so blank and failed finals cannot consume retained PCM. */
         override fun retryCallerAudio(): Boolean {
