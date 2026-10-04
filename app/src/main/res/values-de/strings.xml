@@ -2217,4 +2217,5 @@
     <string name="onboarding_details_accessibility">%1$s: %2$s</string>
     <string name="onboarding_details_expanded">Ausgeklappt</string>
     <string name="onboarding_details_collapsed">Eingeklappt</string>
+    <string name="group_svg_rejected_detail">Diese SVG konnte nicht verarbeitet werden. Wähle eine einfache SVG, PNG oder JPEG.</string>
 </resources>
