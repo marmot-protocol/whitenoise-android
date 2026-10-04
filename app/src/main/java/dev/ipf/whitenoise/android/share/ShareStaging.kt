@@ -136,7 +136,7 @@ fun classifyShareStreams(
     return ShareStreamStaging(mediaUris = media.distinct(), documentUris = documents.distinct())
 }
 
-/** Actual private-file sizes share the same 10-item/32 MiB recoverable shelf budget. */
+/** Actual private-file sizes share the 10-item/256 MiB raw-source shelf budget. */
 internal fun capPrivateShareShelf(
     uris: List<Uri>,
     metadata: (Uri) -> org.json.JSONObject?,
@@ -145,7 +145,7 @@ internal fun capPrivateShareShelf(
     val accepted = mutableListOf<Uri>()
     uris.distinct().forEach { uri ->
         val size = metadata(uri)?.optLong("size", -1) ?: -1
-        if (size > 0 && bytes + size <= PRIVATE_SHARE_MAX_BYTES && accepted.size < SHARE_STREAM_MAX_ITEMS) {
+        if (size > 0 && bytes + size <= PRIVATE_SHARE_BATCH_MAX_BYTES && accepted.size < SHARE_STREAM_MAX_ITEMS) {
             accepted += uri
             bytes += size
         }

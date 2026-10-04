@@ -50,6 +50,17 @@ class PendingShareRequestStoreTest {
     }
 
     @Test
+    fun futureErrorNamesPreserveTheRecoverableRequest() {
+        val original = request("future", text = "retained caption")
+        val json = org.json.JSONObject(String(encodePendingShareRequest(original), Charsets.UTF_8))
+        json.put("import_errors", org.json.JSONArray(listOf("FutureProviderFailure")))
+        val recovered = decodePendingShareRequest(json.toString().toByteArray(), "future")!!
+        assertEquals(original.payload.streamUris, recovered.payload.streamUris)
+        assertEquals(original.payload.text, recovered.payload.text)
+        assertEquals(listOf(ShareImportError.Interrupted), recovered.payload.importErrors)
+    }
+
+    @Test
     fun requestRoundTripsAcrossStoreRecreationWithoutPlaintextOnDisk() {
         val request = request("request-1", text = "private shared text")
         val first = store()

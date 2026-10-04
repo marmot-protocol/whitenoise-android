@@ -9,8 +9,9 @@ import java.nio.file.Files
 import java.util.UUID
 
 internal const val PRIVATE_SHARE_DIRECTORY = "inbound-share-files"
-internal const val PRIVATE_SHARE_MAX_BYTES = 32L * 1024 * 1024
-private const val PRIVATE_SHARE_STORAGE_BUDGET = 256L * 1024 * 1024
+internal const val PRIVATE_SHARE_MAX_BYTES = 64L * 1024 * 1024
+internal const val PRIVATE_SHARE_BATCH_MAX_BYTES = 256L * 1024 * 1024
+private const val PRIVATE_SHARE_STORAGE_BUDGET = PRIVATE_SHARE_BATCH_MAX_BYTES
 internal const val PRIVATE_SHARE_MAX_AGE_MS = 24L * 60 * 60 * 1000
 
 /** Android intake files, never protocol data. Only the non-exported provider can read them. */

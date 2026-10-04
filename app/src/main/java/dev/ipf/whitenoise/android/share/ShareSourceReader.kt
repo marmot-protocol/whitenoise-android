@@ -55,14 +55,13 @@ internal class ShareSourceReader(
                 }
             try {
                 val info = providerRead { metadata(source, signal) }
-                val name = requireNotNull(sanitizeShareFilename(info.name))
+                val name = sanitizeShareFilename(info.name) ?: "file"
                 val stream = providerRead { open(source, signal) } ?: throw ShareSourceUnavailable()
                 input.set(stream)
                 currentCoroutineContext().ensureActive()
                 val hint = info.size?.takeIf { it > 0 && it <= remaining }
                 val size = stream.use { copyStream(it, file, remaining, hint, progress) }
                 if (size == 0L) throw EmptyShareSource()
-                require(info.size == null || info.size < 0 || size == info.size) { "Changed shared content" }
                 progress(size, size)
                 CopiedShareSource(name, info.mime, size)
             } finally {

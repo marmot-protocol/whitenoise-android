@@ -107,49 +107,8 @@ internal fun ShareChatPickerFullScreenContent(
             controllerBinder = controllerBinder,
         )
     val presentedTargets = rememberShareChatPickerPresentations(appState, pickerState)
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
-    val stageRejectedMessage = stringResource(R.string.no_share_target_available)
-    val finishingState = remember(requestId) { mutableStateOf(false) }
-    var finishing by finishingState
-    pickerState.isCommitting = { finishingState.value }
-    val dismissPicker: () -> Unit = {
-        if (!finishing) {
-            finishing = true
-            runShareChatPickerDismissal(
-                clearFocus = { focusManager.clearFocus(force = true) },
-                hideKeyboard = { keyboardController?.hide() },
-                dismiss = onDismiss,
-            )
-        }
-    }
-    val scaffoldActions =
-        ShareChatPickerScaffoldActions(
-            dismiss = dismissPicker,
-            stage = {
-                if (!finishing) {
-                    finishing = true
-                    coroutineScope.launch {
-                        try {
-                            if (pickerState.stage(onStage)) {
-                                runShareChatPickerDismissal(
-                                    clearFocus = { focusManager.clearFocus(force = true) },
-                                    hideKeyboard = { keyboardController?.hide() },
-                                    dismiss = onDismiss,
-                                )
-                            } else {
-                                snackbarHostState.currentSnackbarData?.dismiss()
-                                snackbarHostState.showSnackbar(stageRejectedMessage)
-                            }
-                        } finally {
-                            finishing = false
-                        }
-                    }
-                }
-            },
-        )
+    val scaffoldActions = rememberShareChatPickerActions(requestId, pickerState, snackbarHostState, onDismiss, onStage)
     ShareChatPickerScaffold(
         pickerState = pickerState,
         presentedTargets = presentedTargets,
@@ -167,6 +126,57 @@ internal fun ShareChatPickerFullScreenContent(
             onDismiss = { pickerState.accountSelectorOpen = false },
         )
     }
+}
+
+@Composable
+private fun rememberShareChatPickerActions(
+    requestId: String,
+    pickerState: ShareChatPickerState,
+    snackbarHostState: SnackbarHostState,
+    onDismiss: () -> Unit,
+    onStage: suspend (String, List<String>) -> Boolean,
+): ShareChatPickerScaffoldActions {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val coroutineScope = rememberCoroutineScope()
+    val stageRejectedMessage = stringResource(R.string.no_share_target_available)
+    val finishingState = remember(requestId) { mutableStateOf(false) }
+    var finishing by finishingState
+    pickerState.isCommitting = { finishingState.value }
+    val dismissPicker: () -> Unit = {
+        if (!finishing) {
+            finishing = true
+            runShareChatPickerDismissal(
+                clearFocus = { focusManager.clearFocus(force = true) },
+                hideKeyboard = { keyboardController?.hide() },
+                dismiss = onDismiss,
+            )
+        }
+    }
+    return ShareChatPickerScaffoldActions(
+        dismiss = dismissPicker,
+        stage = {
+            if (!finishing) {
+                finishing = true
+                coroutineScope.launch {
+                    try {
+                        if (pickerState.stage(onStage)) {
+                            runShareChatPickerDismissal(
+                                clearFocus = { focusManager.clearFocus(force = true) },
+                                hideKeyboard = { keyboardController?.hide() },
+                                dismiss = onDismiss,
+                            )
+                        } else {
+                            snackbarHostState.currentSnackbarData?.dismiss()
+                            snackbarHostState.showSnackbar(stageRejectedMessage)
+                        }
+                    } finally {
+                        finishing = false
+                    }
+                }
+            }
+        },
+    )
 }
 
 private data class ShareChatPickerScaffoldActions(

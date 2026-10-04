@@ -69,7 +69,11 @@ class InboundShareTaskReuseDeviceTest {
         assertEquals(1, whiteNoiseTaskCount(targetContext))
 
         instrumentation.runOnMainSync { secondDelivery.recreate() }
-        val recreated = awaitResumedMainActivity(excluding = secondDelivery)
+        val recreated = awaitResumedMainActivity(excluding = secondDelivery) { activity ->
+            activity.pendingInboundShareRequestForTest?.let { request ->
+                request.requestId == secondRequest.requestId && request.payload.importReady
+            } == true
+        }
         assertNotSame(secondDelivery, recreated)
         assertEquals(secondRequest.requestId, recreated.pendingInboundShareRequestForTest?.requestId)
         assertEquals(1, whiteNoiseTaskCount(targetContext))
@@ -296,6 +300,7 @@ class InboundShareTaskReuseDeviceTest {
         val deadline = SystemClock.uptimeMillis() + TIMEOUT_MILLIS
         var lastState = "no resumed MainActivity"
         while (SystemClock.uptimeMillis() < deadline) {
+            composeRule.waitForIdle()
             instrumentation.waitForIdleSync()
             var match: MainActivity? = null
             instrumentation.runOnMainSync {

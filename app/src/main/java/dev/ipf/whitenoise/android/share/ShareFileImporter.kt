@@ -46,11 +46,17 @@ internal class ShareFileImporter(
     private val files: PrivateShareFiles,
     private val metadata: (Uri, CancellationSignal) -> ShareSourceMetadata,
     private val open: (Uri, CancellationSignal) -> InputStream?,
+    private val isAppOwnedProvider: (Uri) -> Boolean = { false },
+    private val timeoutMs: Long = IMPORT_TIMEOUT_MS,
 ) {
     constructor(context: Context) : this(
         PrivateShareFiles(context),
         { uri, signal -> readShareSourceMetadata(context, uri, signal) },
         { uri, signal -> context.contentResolver.openAssetFileDescriptor(uri, "r", signal)?.createInputStream() },
+        { uri ->
+            val provider = context.packageManager.resolveContentProvider(uri.authority.orEmpty(), 0)
+            provider?.applicationInfo?.uid == context.applicationInfo.uid
+        },
     )
 
     suspend fun import(
@@ -67,7 +73,7 @@ internal class ShareFileImporter(
             if (sources.size > SHARE_STREAM_MAX_ITEMS) batch.errors += ShareImportError.TooMany
             var retained = false
             try {
-                withTimeout(IMPORT_TIMEOUT_MS) {
+                withTimeout(timeoutMs) {
                     importSources(sources, request.payload.intentMimeType, batch, progress, request.requestId)
                 }
                 files.leases.holdRequest(request.requestId, batch.accepted)
@@ -82,13 +88,16 @@ internal class ShareFileImporter(
                         ),
                 )
             } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                currentCoroutineContext().ensureActive()
+                files.leases.holdRequest(request.requestId, batch.accepted)
+                retained = true
                 request.copy(
                     payload =
                         request.payload.copy(
-                            streamUris = emptyList(),
+                            streamUris = batch.accepted,
                             importReady = true,
-                            importErrors = listOf(ShareImportError.Interrupted),
-                            importRejectedCount = sources.size,
+                            importErrors = batch.errors + ShareImportError.Interrupted,
+                            importRejectedCount = sources.size - batch.accepted.size,
                         ),
                 )
             } finally {
@@ -106,13 +115,13 @@ internal class ShareFileImporter(
         sources.take(SHARE_STREAM_MAX_ITEMS).forEachIndexed { index, uri ->
             currentCoroutineContext().ensureActive()
             val result =
-                if (uri.scheme != "content" || uri.authority.isNullOrBlank() || files.owns(uri)) {
+                if (!isExternalContent(uri) || files.owns(uri) || isAppOwnedProvider(uri)) {
                     ImportedFile(error = ShareImportError.Scheme)
                 } else {
                     importOne(
                         uri,
                         intentMime,
-                        PRIVATE_SHARE_MAX_BYTES - batch.used,
+                        minOf(PRIVATE_SHARE_MAX_BYTES, PRIVATE_SHARE_BATCH_MAX_BYTES - batch.used),
                         progress = { bytes, total ->
                             progress(
                                 ShareImportProgress(
@@ -129,6 +138,8 @@ internal class ShareFileImporter(
             batch.add(result)
         }
     }
+
+    private fun isExternalContent(uri: Uri): Boolean = uri.scheme == "content" && !uri.authority.isNullOrBlank()
 
     private class ImportedBatch {
         val accepted = mutableListOf<Uri>()

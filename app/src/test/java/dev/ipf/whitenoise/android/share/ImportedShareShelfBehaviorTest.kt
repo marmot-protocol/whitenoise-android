@@ -23,6 +23,57 @@ class ImportedShareShelfBehaviorTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
+    fun revisionRestoreCannotResurrectRemovalWhileStorageIsBlocked() {
+        val context = RuntimeEnvironment.getApplication()
+        val files = PrivateShareFiles(context)
+        val (uri, file) = files.newFile()
+        file.writeBytes(byteArrayOf(1))
+        files.finish(uri, "file.bin", "application/octet-stream", 1)
+        files.leases.saveShelf("race-account", "race-chat", listOf(uri))
+        val visible = mutableStateOf(listOf(uri))
+        val revision = mutableStateOf(0)
+        val outcomes = java.util.concurrent.CopyOnWriteArrayList<ShareStreamStaging>()
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        var blocker: Thread? = null
+        try {
+            composeRule.setContent {
+                ImportedShareShelf("race-account", "race-chat", visible.value, revision.value) { result ->
+                    result.onSuccess { staging ->
+                        outcomes += staging
+                        visible.value = staging.documentUris
+                    }
+                }
+                Text("Items: ${visible.value.size}")
+            }
+            composeRule.waitUntil(10_000) { outcomes.isNotEmpty() }
+            composeRule.waitForIdle()
+            blocker = Thread {
+                synchronized(privateShareLock) {
+                    entered.countDown()
+                    check(release.await(10, java.util.concurrent.TimeUnit.SECONDS))
+                }
+            }.apply { start() }
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            composeRule.runOnIdle {
+                visible.value = emptyList()
+                revision.value = 1
+            }
+            composeRule.onNodeWithText("Items: 0").assertExists()
+            release.countDown()
+            composeRule.waitUntil(10_000) { outcomes.size >= 2 }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithText("Items: 0").assertExists()
+            assertTrue(outcomes.last().documentUris.isEmpty())
+            composeRule.waitUntil(10_000) { files.leases.loadShelf("race-account", "race-chat").isEmpty() }
+        } finally {
+            release.countDown()
+            blocker?.join(5_000)
+            files.leases.saveShelf("race-account", "race-chat", emptyList())
+        }
+    }
+
+    @Test
     fun failedComposerPersistenceReportsRecoveryWithoutCrashingOrDeletingSources() {
         val context = RuntimeEnvironment.getApplication()
         val files = PrivateShareFiles(context)

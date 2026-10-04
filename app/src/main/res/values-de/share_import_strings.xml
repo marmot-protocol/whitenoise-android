@@ -6,8 +6,8 @@
     <string name="share_import_unreadable">Eine Datei ist nicht lesbar oder der Zugriff ist abgelaufen.</string>
     <string name="share_import_scheme">Nur Dateien von Inhaltsanbietern werden unterstützt.</string>
     <string name="share_import_empty">Eine geteilte Datei ist leer.</string>
-    <string name="share_import_file_limit">Eine Datei überschreitet das Limit von 32 MiB.</string>
-    <string name="share_import_batch_limit">Die Dateien überschreiten zusammen 32 MiB.</string>
+    <string name="share_import_file_limit">Eine Datei überschreitet das Limit von 64 MiB.</string>
+    <string name="share_import_batch_limit">Die Dateien überschreiten zusammen 256 MiB.</string>
     <string name="share_import_count_limit">Nur die ersten 10 Dateien können importiert werden.</string>
     <string name="share_import_metadata">Eine Datei hat ungültige Metadaten oder ihre Größe hat sich geändert.</string>
     <string name="share_import_storage">Privater Speicher ist nicht verfügbar oder voll.</string>

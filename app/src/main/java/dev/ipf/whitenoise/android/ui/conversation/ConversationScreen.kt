@@ -1735,10 +1735,10 @@ internal fun ConversationScreen(
             .firstOrNull { it.label == conversationAccountRef }
             ?.accountIdHex
             .orEmpty()
-    var pendingMediaSlots by rememberSaveable(importedShareAccount, chat.id, stateSaver = PendingMediaSlotListSaver) {
+    var pendingMediaSlots by rememberSaveable(conversationAccountRef, chat.id, stateSaver = PendingMediaSlotListSaver) {
         mutableStateOf<List<PendingMediaSlot>>(emptyList())
     }
-    var pendingDocumentUris by rememberSaveable(importedShareAccount, chat.id, stateSaver = UriListSaver) {
+    var pendingDocumentUris by rememberSaveable(conversationAccountRef, chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
     }
     val importedShareFiles =
@@ -1746,7 +1746,7 @@ internal fun ConversationScreen(
             dev.ipf.whitenoise.android.share
                 .PrivateShareFiles(context)
         }
-    val exitConversation: () -> Unit = {
+    val exitConversation = {
         val exitingUris = (pendingMediaSlots.map { it.uri } + pendingDocumentUris).filter(importedShareFiles::owns)
         pendingMediaSlots = pendingMediaSlots.filterNot { importedShareFiles.owns(it.uri) }
         pendingDocumentUris = pendingDocumentUris.filterNot(importedShareFiles::owns)
@@ -1761,8 +1761,8 @@ internal fun ConversationScreen(
                     )
                 }
             }.onFailure { appState.present(R.string.share_import_storage) }
-            exitConversationRoute()
         }
+        exitConversationRoute()
     }
     dev.ipf.whitenoise.android.share.ImportedShareShelf(
         importedShareAccount,

@@ -218,7 +218,8 @@ internal fun decodePendingShareRequest(
                             .optJSONArray("import_errors")
                             ?.let { errors ->
                                 List(errors.length().coerceAtMost(SHARE_STREAM_MAX_ITEMS + 1)) {
-                                    ShareImportError.valueOf(errors.getString(it))
+                                    runCatching { ShareImportError.valueOf(errors.getString(it)) }
+                                        .getOrDefault(ShareImportError.Interrupted)
                                 }
                             }.orEmpty(),
                 ),

@@ -6,8 +6,8 @@
     <string name="share_import_unreadable">檔案無法讀取或存取權限已過期。</string>
     <string name="share_import_scheme">僅支援內容提供者的檔案。</string>
     <string name="share_import_empty">共享檔案為空。</string>
-    <string name="share_import_file_limit">檔案超過 32 MiB 限制。</string>
-    <string name="share_import_batch_limit">檔案總大小超過 32 MiB 限制。</string>
+    <string name="share_import_file_limit">檔案超過 64 MiB 限制。</string>
+    <string name="share_import_batch_limit">檔案總大小超過 256 MiB 限制。</string>
     <string name="share_import_count_limit">只能匯入前 10 個檔案。</string>
     <string name="share_import_metadata">檔案中繼資料無效或大小已變更。</string>
     <string name="share_import_storage">私有儲存空間無法使用或已滿。</string>

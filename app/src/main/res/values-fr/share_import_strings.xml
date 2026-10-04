@@ -6,8 +6,8 @@
     <string name="share_import_unreadable">Un fichier est illisible ou son accès a expiré.</string>
     <string name="share_import_scheme">Seuls les fichiers des fournisseurs de contenu sont pris en charge.</string>
     <string name="share_import_empty">Un fichier partagé est vide.</string>
-    <string name="share_import_file_limit">Un fichier dépasse la limite de 32 Mio.</string>
-    <string name="share_import_batch_limit">Les fichiers dépassent la limite totale de 32 Mio.</string>
+    <string name="share_import_file_limit">Un fichier dépasse la limite de 64 Mio.</string>
+    <string name="share_import_batch_limit">Les fichiers dépassent la limite totale de 256 Mio.</string>
     <string name="share_import_count_limit">Seuls les 10 premiers fichiers peuvent être importés.</string>
     <string name="share_import_metadata">Les métadonnées d’un fichier sont invalides ou sa taille a changé.</string>
     <string name="share_import_storage">Le stockage privé est indisponible ou plein.</string>

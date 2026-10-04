@@ -6,6 +6,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -22,11 +23,14 @@ internal fun ImportedShareShelf(
     revision: Int,
     restore: (Result<ShareStreamStaging>) -> Unit,
 ) {
+    if (account.isBlank() || group.isBlank()) return
+    val currentUris by rememberUpdatedState(uris)
     val context = LocalContext.current
     var loadedRevision by remember(account, group) { mutableStateOf<Int?>(null) }
     var previous by remember(account, group) { mutableStateOf<List<Uri>>(emptyList()) }
     val files = remember(context) { PrivateShareFiles(context) }
     LaunchedEffect(account, group, revision) {
+        val baseline = if (loadedRevision == null) uris.filter(files::owns) else previous
         val retained =
             runCatchingCancellable {
                 withContext(Dispatchers.IO) {
@@ -44,7 +48,16 @@ internal fun ImportedShareShelf(
             previous = it.mediaUris + it.documentUris
             loadedRevision = revision
         }
-        restore(retained)
+        restore(
+            retained.map { staging ->
+                // A completed disk read must not undo a removal made while it was in flight.
+                val removed = baseline.toSet() - currentUris.toSet()
+                ShareStreamStaging(
+                    staging.mediaUris.filterNot { it in removed },
+                    staging.documentUris.filterNot { it in removed },
+                )
+            },
+        )
     }
     LaunchedEffect(account, group, loadedRevision, revision, uris) {
         if (loadedRevision == revision) {

@@ -6,8 +6,8 @@
     <string name="share_import_unreadable">Um arquivo não pode ser lido ou seu acesso expirou.</string>
     <string name="share_import_scheme">Apenas arquivos de provedores de conteúdo são compatíveis.</string>
     <string name="share_import_empty">Um arquivo compartilhado está vazio.</string>
-    <string name="share_import_file_limit">Um arquivo excede o limite de 32 MiB.</string>
-    <string name="share_import_batch_limit">Os arquivos excedem o limite total de 32 MiB.</string>
+    <string name="share_import_file_limit">Um arquivo excede o limite de 64 MiB.</string>
+    <string name="share_import_batch_limit">Os arquivos excedem o limite total de 256 MiB.</string>
     <string name="share_import_count_limit">Apenas os primeiros 10 arquivos podem ser importados.</string>
     <string name="share_import_metadata">Um arquivo tem metadados inválidos ou seu tamanho mudou.</string>
     <string name="share_import_storage">O armazenamento privado está indisponível ou cheio.</string>

@@ -21,6 +21,25 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class PrivateSharePlatformPersistenceDeviceTest {
     @Test
+    fun externalIntentCannotImportOurOtherPrivateFileProvider() =
+        kotlinx.coroutines.runBlocking {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val directory = File(context.cacheDir, "shared_media").apply { mkdirs() }
+            val file = File(directory, "share-ownership-${UUID.randomUUID()}.bin")
+            try {
+                file.writeBytes(byteArrayOf(4, 5, 6))
+                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val request = ShareRequest(SharePayload(null, listOf(uri), null), null, UUID.randomUUID().toString())
+                val result = ShareFileImporter(context).import(request)
+                assertEquals(listOf(ShareImportError.Scheme), result.payload.importErrors)
+                assertTrue(result.payload.streamUris.isEmpty())
+                assertArrayEquals(byteArrayOf(4, 5, 6), file.readBytes())
+            } finally {
+                file.delete()
+            }
+        }
+
+    @Test
     fun privateMetadataAndReadOnlyProviderSurviveRepositoryRecreation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val files = PrivateShareFiles(context)
