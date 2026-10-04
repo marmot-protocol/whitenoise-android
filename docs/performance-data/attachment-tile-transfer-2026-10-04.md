@@ -60,13 +60,13 @@ serves all 3,145,744 bytes and completes.
 
 ## Results
 
-Measured at `8784bfd31` (code identical to the commit that follows it, which only adds this report and the guide
-entries), clean tree, both distributions:
+Measured at `09819d7ca` (code identical to the commit that follows it, which only updates this report), clean tree,
+both distributions:
 
 | Environment | Known length, cancel, download again | Permanent miss, retry | Undeclared length |
 | --- | --- | --- | --- |
-| API 30 arm64, Play | bytes `352.0 KB of 3.0 MB`, Cancel acknowledged in **134 ms**, restarted and completed | `Tap to retry` shown, completed | `312.0 KB received`, no total, completed |
-| API 36 arm64, Zapstore | bytes `352.0 KB of 3.0 MB`, Cancel acknowledged in **102 ms**, restarted and completed | `Tap to retry` shown, completed | `360.0 KB received`, no total, completed |
+| API 30 arm64, Play | bytes `336.0 KB of 3.0 MB`, Cancel acknowledged in **149 ms**, restarted and completed | `Tap to retry` shown, completed | `312.0 KB received`, no total, completed |
+| API 36 arm64, Zapstore | bytes `320.0 KB of 3.0 MB`, Cancel acknowledged in **150 ms**, restarted and completed | `Tap to retry` shown, completed | `328.0 KB received`, no total, completed |
 
 Both reports are `qualified` with no checker violations. Earlier failed and partial attempts are preserved with checksums
 beside the passing runs.
@@ -80,6 +80,12 @@ beside the passing runs.
 - `AttachmentPresentationTest`: the reader's own Cancel returns accepted work to Idle so the tile offers Download again.
 - `TileTransferScreenshotTest`: Roborazzi baselines in light, dark, and large-font RTL, for the image tile, the grid
   cell and the file card side by side across every state.
+- `TileCancelPendingTapTest`: taps on the ring and beside it, on the production image and video album tiles while Cancel
+  awaits acknowledgement, neither open the viewer nor restart the transfer.
+- `VideoAlbumTileFailureTest`: a production album video driven through a real failed download shows only the Retry
+  control at its centre, with no warning badge over it.
+- `TileTransferTest` also pins when the engine feed opens: for a materializing tile or a download another surface
+  started, never for an idle tile or an own send.
 
 ## Not claimed
 
