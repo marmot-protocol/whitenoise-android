@@ -101,15 +101,16 @@ class ChatMutePreferences(
         }
     }
 
-    /** Erasing an identity removes only that account's host notification choices. */
+    /** Erases only this identity's choices, retrying transient disk failures before wipe cleanup continues. */
     internal fun removeAccount(accountRef: String) {
         val account = accountRef.trim().takeIf(String::isNotEmpty) ?: return
         synchronized(mutationLock) {
             val updated =
                 _state.value.notificationModes.filterKeys { it.substringBeforeLast(COMPOSITE_SEPARATOR) != account }
-            // Finish the disk write before account cleanup returns. A disk failure must not
-            // interrupt the remaining native-wipe cleanup, but is visible in diagnostics.
-            if (!persistModes(preferences.edit(), updated).commit()) {
+            // Recreate each transaction even when a failed commit already changed preference
+            // memory. Bound retries so persistent disk failure cannot stall native-wipe cleanup.
+            val persisted = (1..ACCOUNT_REMOVAL_ATTEMPTS).any { persistModes(preferences.edit(), updated).commit() }
+            if (!persisted) {
                 android.util.Log.w("ChatMutePreferences", "Could not persist erased account notification choices")
             }
             _state.value = ChatNotificationState(updated)
@@ -171,6 +172,7 @@ class ChatMutePreferences(
         private const val EXPIRY_FIELD_SEPARATOR = "\u0000"
         private const val EXPIRY_FIELD_COUNT = 3
         private const val COMPOSITE_SEPARATOR = '|'
+        private const val ACCOUNT_REMOVAL_ATTEMPTS = 3
 
         fun encodeMuteExpiry(entry: Map.Entry<String, MuteExpiry>): String {
             val expiryField = entry.value.expiryMillis?.toString() ?: ""

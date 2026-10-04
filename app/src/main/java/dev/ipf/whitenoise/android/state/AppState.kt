@@ -4441,6 +4441,10 @@ class WhiteNoiseAppState private constructor(
         bootstrap()
     }
 
+    /**
+     * Initializes the process-owned runtime under the bootstrap barrier. Existing notification
+     * choices are preserved before native workers start; migration failure keeps startup retryable.
+     */
     private suspend fun bootstrapLocked() {
         try {
             if (resumeCompletedBootstrap()) return
