@@ -455,8 +455,8 @@ internal fun GroupDetailsScreen(
         val vibrationSelections by appState.conversationVibrationPreferences.state.collectAsState()
         val notificationModes = chatNotificationState.notificationModes
         val conversationNotifyMode =
-            remember(appState.activeAccountRef, controller.group.groupIdHex, notificationModes) {
-                appState.conversationNotifyMode(controller.group.groupIdHex)
+            remember(appState.activeAccountRef, controller.group.groupIdHex, isDm, notificationModes) {
+                appState.conversationNotifyMode(controller.group.groupIdHex, isDm)
             }
         val conversationVibrationPattern =
             remember(appState.activeAccountRef, controller.group.groupIdHex, vibrationSelections) {
@@ -487,8 +487,9 @@ internal fun GroupDetailsScreen(
                 appState.activeAccountRef,
                 controller.group.groupIdHex,
                 notificationModes,
+                isDm,
             ) {
-                appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
+                appState.conversationRestoreNotifyMode(controller.group.groupIdHex, isDm)
             }
         val conversationMuteExpiry =
             if (muteOverride != null) {

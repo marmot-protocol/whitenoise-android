@@ -41,18 +41,23 @@ class ChatMutePreferences(
     private val _state = MutableStateFlow(ChatNotificationState(readNotificationModes(preferences)))
     val state: StateFlow<ChatNotificationState> = _state.asStateFlow()
 
+    /** Explicit choices win; only newly discovered non-DM groups default to mentions. */
     fun mode(
         accountRef: String,
         groupIdHex: String,
+        isDm: Boolean = true,
     ): ChatNotifyMode =
         compositeKeyOrNull(accountRef, groupIdHex)?.let(_state.value.notificationModes::get)
-            ?: ChatNotifyMode.ALL
+            ?: if (isDm) ChatNotifyMode.ALL else ChatNotifyMode.MENTIONS_ONLY
 
+    /** Returns the delivery preference retained beneath the independent native mute. */
     fun restoreNotifyMode(
         accountRef: String,
         groupIdHex: String,
-    ): ChatNotifyMode = mode(accountRef, groupIdHex)
+        isDm: Boolean = true,
+    ): ChatNotifyMode = mode(accountRef, groupIdHex, isDm)
 
+    /** Persists explicit opt-in or mentions-only without modifying native mute state. */
     fun setNotifyForMode(
         accountRef: String,
         groupIdHex: String,
@@ -62,17 +67,54 @@ class ChatMutePreferences(
         if (mode != ChatNotifyMode.NONE && key != null) {
             synchronized(mutationLock) {
                 val updated = _state.value.notificationModes.toMutableMap()
-                if (mode == ChatNotifyMode.ALL) updated.remove(key) else updated[key] = mode
+                updated[key] = mode
                 if (updated != _state.value.notificationModes) {
                     _state.value = ChatNotificationState(updated.toMap())
-                    val mentionOnly = updated.filterValues { it == ChatNotifyMode.MENTIONS_ONLY }.keys
-                    preferences
-                        .edit()
-                        .putStringSet(KEY_MENTION_ONLY_CONVERSATIONS, mentionOnly)
-                        .apply()
+                    persistModes(preferences.edit(), updated).apply()
                 }
             }
         }
+    }
+
+    /** One installation-wide barrier, completed before native workers can discover new groups. */
+    internal val needsDefaultsMigration: Boolean
+        get() = !preferences.getBoolean(KEY_DEFAULTS_MIGRATED, false)
+
+    /** Atomically preserves every old implicit All choice; a failed write leaves migration retryable. */
+    internal fun preserveExistingModes(existingGroups: Map<String, List<String>>) {
+        synchronized(mutationLock) {
+            if (!needsDefaultsMigration) return
+            val updated = _state.value.notificationModes.toMutableMap()
+            existingGroups.forEach { (account, groups) ->
+                groups.forEach { group ->
+                    compositeKeyOrNull(account, group)?.let { updated.putIfAbsent(it, ChatNotifyMode.ALL) }
+                }
+            }
+            check(persistModes(preferences.edit(), updated).putBoolean(KEY_DEFAULTS_MIGRATED, true).commit()) {
+                "Could not preserve existing notification preferences"
+            }
+            _state.value = ChatNotificationState(updated.toMap())
+        }
+    }
+
+    /** Erasing an identity removes only that account's host notification choices. */
+    internal fun removeAccount(accountRef: String) {
+        synchronized(mutationLock) {
+            val updated =
+                _state.value.notificationModes.filterKeys { !it.startsWith("$accountRef$COMPOSITE_SEPARATOR") }
+            persistModes(preferences.edit(), updated).apply()
+            _state.value = ChatNotificationState(updated)
+        }
+    }
+
+    /** Writes both explicit modes together; All must no longer collapse into an absent override. */
+    private fun persistModes(
+        editor: SharedPreferences.Editor,
+        modes: Map<String, ChatNotifyMode>,
+    ): SharedPreferences.Editor {
+        val mentions = modes.filterValues { it == ChatNotifyMode.MENTIONS_ONLY }.keys
+        val all = modes.filterValues { it == ChatNotifyMode.ALL }.keys
+        return editor.putStringSet(KEY_MENTION_ONLY_CONVERSATIONS, mentions).putStringSet(KEY_ALL_CONVERSATIONS, all)
     }
 
     fun setMode(
@@ -112,6 +154,8 @@ class ChatMutePreferences(
 
     internal companion object {
         private const val PREFERENCES_NAME = "whitenoise.chat_mute"
+        private const val KEY_DEFAULTS_MIGRATED = "groupDefaultsMigrated"
+        private const val KEY_ALL_CONVERSATIONS = "allConversations"
         private const val KEY_MUTED_CONVERSATIONS = "mutedConversations"
         private const val KEY_MENTION_ONLY_CONVERSATIONS = "mentionOnlyConversations"
         private const val KEY_MUTE_EXPIRIES = "muteExpiries"
@@ -164,9 +208,10 @@ class ChatMutePreferences(
         fun readMutedSet(preferences: SharedPreferences): Set<String> = preferences.getStringSet(KEY_MUTED_CONVERSATIONS, emptySet())?.toSet().orEmpty()
 
         fun readNotificationModes(preferences: SharedPreferences): Map<String, ChatNotifyMode> =
-            preferences
-                .getStringSet(KEY_MENTION_ONLY_CONVERSATIONS, emptySet())
-                .orEmpty()
-                .associateWith { ChatNotifyMode.MENTIONS_ONLY }
+            preferences.getStringSet(KEY_ALL_CONVERSATIONS, emptySet()).orEmpty().associateWith { ChatNotifyMode.ALL } +
+                preferences
+                    .getStringSet(KEY_MENTION_ONLY_CONVERSATIONS, emptySet())
+                    .orEmpty()
+                    .associateWith { ChatNotifyMode.MENTIONS_ONLY }
     }
 }

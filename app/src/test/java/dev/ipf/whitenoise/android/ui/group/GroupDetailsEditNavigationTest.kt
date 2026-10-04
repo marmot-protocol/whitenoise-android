@@ -81,6 +81,37 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
     }
 
+    /** Real details/settings show the new default and retain an explicit All choice after store recreation. */
+    @Test
+    fun newGroupNotifyModeCanOptInAndReturnToMentions() {
+        context
+            .getSharedPreferences("whitenoise.chat_mute", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
+        val fixture = controller(group())
+        render(fixture)
+        composeRule
+            .onNodeWithText(context.getString(R.string.sounds_and_notifications))
+            .performScrollTo()
+            .performClick()
+        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_mentions.png")
+        composeRule.onNodeWithText(context.getString(R.string.notify_for)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.notify_all_messages)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.notify_all_messages)).assertIsDisplayed()
+        val restored =
+            dev.ipf.whitenoise.android.state
+                .ChatMutePreferences(context)
+        assertEquals(
+            dev.ipf.whitenoise.android.state.ChatNotifyMode.ALL,
+            restored.mode(ACCOUNT_REF, fixture.controller.group.groupIdHex, false),
+        )
+        composeRule.onNodeWithText(context.getString(R.string.notify_for)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).assertIsDisplayed()
+    }
+
     /** Unavailable call actions do not occupy the primary action row. */
     @Test
     fun unavailableCallActionsDoNotOccupyThePrimaryActionRow() {

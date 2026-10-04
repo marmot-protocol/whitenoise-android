@@ -97,6 +97,46 @@ class ChatMutePreferencesTest {
         assertEquals(ChatNotifyMode.ALL, legacy.restoreMode)
     }
 
+    /** Upgrade records all old implicit defaults, including inactive-account and archived groups. */
+    @Test
+    fun upgradePreservesOldModesAndDefaultsOnlyNewGroupsToMentions() {
+        val context = RuntimeEnvironment.getApplication()
+        clear(context)
+        val preferences = ChatMutePreferences(context)
+        preferences.setNotifyForMode("alice", "mentions", ChatNotifyMode.MENTIONS_ONLY)
+        preferences.preserveExistingModes(mapOf("alice" to listOf("old", "mentions"), "bob" to listOf("archived")))
+        val restored = ChatMutePreferences(context)
+        assertFalse(restored.needsDefaultsMigration)
+        assertEquals(ChatNotifyMode.ALL, restored.mode("alice", "old", false))
+        assertEquals(ChatNotifyMode.ALL, restored.mode("bob", "archived", false))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("alice", "mentions", false))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("alice", "new", false))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("new-account", "old", false))
+        assertEquals(ChatNotifyMode.ALL, restored.mode("alice", "new-dm", true))
+        restored.preserveExistingModes(mapOf("alice" to listOf("new")))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("alice", "new", false))
+    }
+
+    /** Explicit opt-in survives recreation/rejoin; another account retains the new group default. */
+    @Test
+    fun explicitAllSurvivesRestartAndSubsequentMentionsChoice() {
+        val context = RuntimeEnvironment.getApplication()
+        clear(context)
+        val preferences = ChatMutePreferences(context)
+        preferences.preserveExistingModes(emptyMap())
+        preferences.setNotifyForMode("alice", "group", ChatNotifyMode.ALL)
+        val restored = ChatMutePreferences(context)
+        assertEquals(ChatNotifyMode.ALL, restored.mode("alice", "group", false))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("bob", "group", false))
+        restored.setNotifyForMode("alice", "group", ChatNotifyMode.MENTIONS_ONLY)
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, ChatMutePreferences(context).mode("alice", "group", false))
+        restored.setNotifyForMode("alice", "group", ChatNotifyMode.ALL)
+        restored.removeAccount("bob")
+        assertEquals(ChatNotifyMode.ALL, ChatMutePreferences(context).mode("alice", "group", false))
+        restored.removeAccount("alice")
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, ChatMutePreferences(context).mode("alice", "group", false))
+    }
+
     private fun clear(context: Context) {
         context
             .getSharedPreferences("whitenoise.chat_mute", Context.MODE_PRIVATE)
