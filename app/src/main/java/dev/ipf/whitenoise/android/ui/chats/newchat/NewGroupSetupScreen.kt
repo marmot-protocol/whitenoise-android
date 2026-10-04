@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.ui.group.GroupEmojiImagePickerSheet
 import dev.ipf.whitenoise.android.ui.group.GroupImageFailureScope
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
+import dev.ipf.whitenoise.android.ui.group.groupImageFailureDetail
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import kotlinx.coroutines.CancellationException
 
@@ -426,6 +427,7 @@ private fun NewGroupSetupAccountScreen(
                     R.string.toast_couldnt_prepare_image,
                     "NEW_GROUP_IMAGE_PREPARE",
                     error,
+                    detail = groupImageFailureDetail(error),
                 )
                 imageFailureScope.captureFailure(failureAttempt)
             } finally {
@@ -610,7 +612,7 @@ private fun NewGroupSetupAccountScreen(
             pendingCropUri = null
         },
         onUnreadable = { uri ->
-            prepareImage { GroupImageDraftProcessor.fromContentUri(context.contentResolver, uri) }
+            prepareImage { GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, uri) }
         },
         onCropped = { bytes, crop ->
             pendingCropUri = null

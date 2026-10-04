@@ -465,35 +465,38 @@ object MediaPipeline {
 
     /**
      * Decode animated GIF/WebP bytes to an [AnimatedImageDrawable], downscaling
-     * so the longer edge is ≈ [maxEdgePx]. Returns null for static images or
-     * undecodable payloads.
+     * so the longer edge is ≈ [maxEdgePx]. Returns null for static images,
+     * undecodable payloads, and any source [admitAnimationSource] does not admit;
+     * refused bytes never reach [ImageDecoder].
      */
     fun decodeAnimatedDrawable(
         bytes: ByteArray,
         maxEdgePx: Int = ANIMATED_IMAGE_MAX_EDGE_PX,
     ): Drawable? {
         if (bytes.isEmpty()) return null
-        return try {
-            val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
-            val drawable =
-                ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
-                    val width = info.size.width
-                    val height = info.size.height
-                    if (width <= 0 || height <= 0) return@decodeDrawable
-                    val maxDim = maxOf(width, height)
-                    if (maxDim > maxEdgePx) {
-                        val scale = maxEdgePx.toFloat() / maxDim
-                        decoder.setTargetSize(
-                            (width * scale).toInt().coerceAtLeast(1),
-                            (height * scale).toInt().coerceAtLeast(1),
-                        )
+        return decodeAdmittedNativeAnimation(bytes) {
+            try {
+                val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
+                val drawable =
+                    ImageDecoder.decodeDrawable(source) { decoder, info, _ ->
+                        val width = info.size.width
+                        val height = info.size.height
+                        if (width <= 0 || height <= 0) return@decodeDrawable
+                        val maxDim = maxOf(width, height)
+                        if (maxDim > maxEdgePx) {
+                            val scale = maxEdgePx.toFloat() / maxDim
+                            decoder.setTargetSize(
+                                (width * scale).toInt().coerceAtLeast(1),
+                                (height * scale).toInt().coerceAtLeast(1),
+                            )
+                        }
                     }
-                }
-            drawable as? AnimatedImageDrawable
-        } catch (_: OutOfMemoryError) {
-            null
-        } catch (_: Exception) {
-            null
+                drawable as? AnimatedImageDrawable
+            } catch (_: OutOfMemoryError) {
+                null
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 

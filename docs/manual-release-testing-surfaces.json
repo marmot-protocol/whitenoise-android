@@ -3,6 +3,36 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "ConversationViewportRestorationEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationViewportRestorationEffects(",
+        "test_ids": ["CON-027", "CON-002", "CON-013", "CON-014"]
+      },
+      {
+        "surface": "ConversationViewportStructureEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationViewportStructureEffect(",
+        "test_ids": ["CON-027", "CON-003"]
+      },
+      {
+        "surface": "ConversationSavedViewportEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationSavedViewportEffect(",
+        "test_ids": ["CON-027"]
+      },
+      {
+        "surface": "ConversationEntryViewportEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationEntryViewportEffect(",
+        "test_ids": ["CON-027", "CON-002"]
+      },
+      {
+        "surface": "rememberConversationViewportRestorationOwner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationOwner.kt",
+        "anchor": "fun rememberConversationViewportRestorationOwner(",
+        "test_ids": ["CON-027"]
+      },
+      {
         "surface": "folderDragRowModifier",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
         "anchor": "internal fun folderDragRowModifier(",
@@ -274,6 +304,18 @@
         "test_ids": ["CHL-017"]
       },
       {
+        "surface": "Accepted send native draft presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SentComposerDraftPresentation.kt",
+        "anchor": "fun selectedPreview(",
+        "test_ids": ["CHL-004", "CHL-002"]
+      },
+      {
+        "surface": "Pending send preview preparation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.sending",
+        "test_ids": ["CHL-004", "CHL-002"]
+      },
+      {
         "surface": "Composer cursor updates during dictation Send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
         "anchor": "fun setDraft(",
@@ -514,6 +556,12 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/QuickAccountSwitchingPreference.kt",
         "anchor": "internal class QuickAccountSwitchingPreference",
         "test_ids": ["NAV-005", "ACC-017", "SET-001"]
+      },
+      {
+        "surface": "Cache-only image render from MDK retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageCacheMaterialization.kt",
+        "anchor": "internal suspend fun imageAttachmentBytes(",
+        "test_ids": ["MED-023"]
       },
       {
         "surface": "Native attachment transfer observation",
@@ -12643,6 +12691,26 @@
         "test_ids": [
           "NCH-002",
           "ACC-017"
+        ]
+      },
+      {
+        "surface": "Group image failure fallback retry copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageFailureDetail.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "GRP-003",
+          "GRP-025",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "setting:group_svg_rejected_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageFailureDetail.kt",
+        "anchor": "R.string.group_svg_rejected_detail",
+        "test_ids": [
+          "GRP-003",
+          "GRP-025",
+          "NCH-002"
         ]
       },
       {
@@ -25137,6 +25205,30 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Content-based animated image source admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AnimationSourceAdmission.kt",
+        "anchor": "internal fun admitAnimationSource(",
+        "test_ids": [
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "Attachment decoder dispatch after animation admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AnimatedAttachmentImage.kt",
+        "anchor": "suspend fun decodeMessageAttachmentImage(",
+        "test_ids": [
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "Native animated decoder admission chokepoint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt",
+        "anchor": "fun decodeAnimatedDrawable(",
+        "test_ids": [
+          "MED-026"
+        ]
+      },
       {
         "surface": "automatic-attachment-permission-commit-order",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",

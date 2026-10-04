@@ -39,6 +39,26 @@ class AutomaticResumeEvidenceTest(unittest.TestCase):
             self.assertFalse(result["android_process_restart_qualified"])
             self.assertFalse(result["performance_qualified"])
 
+    def test_a_probe_failure_row_fails_and_names_its_step_without_free_text(self):
+        """The probe's own failure row is surfaced as a violation, and only a closed step and exception name pass through."""
+        metrics, events = evidence()
+        metrics.append({"phase": "automatic-platform-resume-failure", "step": "resume-request",
+                        "exception": "TimeoutCancellationException", "work_states": ["RUNNING", "ENQUEUED"],
+                        "ledger_kinds": {"get": 1}, "ms_since_stop": 30000})
+        result = check_automatic_resume(metrics, events)
+        self.assertFalse(result["passed"])
+        self.assertIn("the probe failed at step resume-request (TimeoutCancellationException)", result["violations"])
+        metrics[-1]["step"] = "secret: some free text with a path /data/x"
+        result = check_automatic_resume(metrics, events)
+        self.assertTrue(any("step unknown" in v for v in result["violations"]))
+        self.assertFalse(any("secret" in v or "/data" in v for v in result["violations"]))
+
+    def test_optional_resume_timing_fields_do_not_change_a_passing_verdict(self):
+        """The measured stop-to-running and running-to-request times are diagnostics, never a qualification input."""
+        metrics, events = evidence()
+        metrics[0].update({"resume_running_ms": 27000, "resume_request_ms": 7})
+        self.assertTrue(check_automatic_resume(metrics, events)["passed"])
+
     def test_each_missing_event_fails(self):
         """No marker, byte, hold, range or terminal event can be dropped from provenance."""
         metrics, events = evidence()
