@@ -2168,4 +2168,8 @@
     <string name="onboarding_details_accessibility">%1$s：%2$s</string>
     <string name="onboarding_details_expanded">已展开</string>
     <string name="onboarding_details_collapsed">已收起</string>
+    <string name="local_delete_retry_detail">\u2068删除已停止。请再次选择“从此设备删除”，系统会先检查上次的结果。如果仍然失败，请重启应用。\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068聊天已删除。本地数据清理将自动重试。\u2069</string>
+    <string name="chat_list_delete_stopped">删除已停止</string>
+    <string name="chat_list_delete_stopped_detail">\u2068已确认 %1$d 次删除，共 %2$d 次。请重试“从此设备删除”以检查结果。若仍然失败，请重启应用。\u2069</string>
 </resources>

@@ -18,6 +18,7 @@ internal data class PendingLocalGroupDeleteCleanup(
  * A durable pre-delete intent. It lives beside, not inside, MDK because the referenced caches,
  * draft projection and notifications belong to Android. AtomicFile prevents a process death
  * between the native commit and its lost response from losing the cleanup instructions.
+ * This does not guarantee power-loss recovery: the unsynced directory rename can leave cache residue.
  */
 internal class LocalGroupDeleteCleanupJournal(
     private val directory: File,
@@ -34,8 +35,13 @@ internal class LocalGroupDeleteCleanupJournal(
         val output = file.startWrite()
         try {
             output.write(encode(pending).toByteArray(Charsets.UTF_8))
+            // AtomicFile logs sync/rename errors instead of throwing; do not admit a delete on that basis.
+            output.fd.sync()
             file.finishWrite(output)
             pendingKnown = true
+            check(decode(String(file.readFully(), Charsets.UTF_8)) == pending) {
+                "local delete journal commit could not be verified"
+            }
         } catch (failure: Throwable) {
             file.failWrite(output)
             throw failure
@@ -62,6 +68,22 @@ internal class LocalGroupDeleteCleanupJournal(
                 result.onFailure { appStateDebug(it) { "local delete cleanup journal read failed" } }
                 result.getOrNull()
             }
+
+    /** Explicit retries must fail closed on a corrupt intent rather than overwrite its cleanup keys. */
+    fun find(
+        account: String,
+        groupIdHex: String,
+    ): PendingLocalGroupDeleteCleanup? {
+        val file = atomicFile(account, groupIdHex)
+        val base = file.baseFile
+        // A .new-only file means stage never committed, so the native delete was never admitted.
+        if (!base.exists() && !File(base.path + ".bak").exists()) return null
+        val pending = decode(String(file.readFully(), Charsets.UTF_8))
+        check(pending.account == account && pending.groupIdHex == groupIdHex) {
+            "local delete journal identity mismatch"
+        }
+        return pending
+    }
 
     fun finish(pending: PendingLocalGroupDeleteCleanup) {
         atomicFile(pending.account, pending.groupIdHex).delete()
@@ -127,11 +149,11 @@ internal suspend fun reconcilePendingLocalGroupDeleteCleanup(
 ): Boolean {
     if (!accountReady()) return false
     val present = runCatchingCancellable { isGroupPresent() }.getOrElse { return false }
+    if (!accountReady()) return false
     if (present) {
         finish(pending)
         return true
     }
-    if (!accountReady()) return false
     if (!cleanup(pending)) return false
     finish(pending)
     return true

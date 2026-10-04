@@ -59,15 +59,59 @@ class LocalGroupDeleteCleanupJournalTest {
     }
 
     @Test
+    fun loggedAtomicFileRenameFailureCannotAuthorizeNativeMutation() {
+        val directory = folder.newFolder("failed-atomic-rename")
+        val journal = LocalGroupDeleteCleanupJournal(directory)
+        journal.stage(pending)
+        val base = requireNotNull(directory.listFiles()).single()
+        assertTrue(base.delete())
+        assertTrue(base.mkdirs())
+        java.io.File(base, "nonempty").writeText("prevent replacement")
+        var nativeDeletes = 0
+        val result =
+            runCatching {
+                journal.stage(pending)
+                nativeDeletes++
+            }
+        assertTrue(result.isFailure)
+        assertEquals(0, nativeDeletes)
+        assertTrue(base.isDirectory)
+    }
+
+    @Test
     fun mismatchedJournalIdentityCannotAuthorizeCleanup() {
         val directory = folder.newFolder("mismatched-identity")
         val journal = LocalGroupDeleteCleanupJournal(directory)
         journal.stage(pending)
-        val file = directory.listFiles().single()
+        val file = requireNotNull(directory.listFiles()).single()
         file.writeText(JSONObject(file.readText()).put("account", "account-b").toString())
 
         assertTrue(journal.pending().isEmpty())
         assertTrue(file.exists())
+        assertTrue(runCatching { journal.find(pending.account, pending.groupIdHex) }.isFailure)
+    }
+
+    @Test
+    fun explicitRetryFindsOriginalIntentAfterRecreationAndDoesNotAcceptOtherAccount() {
+        val directory = folder.newFolder("explicit-retry")
+        LocalGroupDeleteCleanupJournal(directory).stage(pending)
+        val recreated = LocalGroupDeleteCleanupJournal(directory)
+        assertEquals(pending, recreated.find(pending.account, pending.groupIdHex))
+        assertEquals(null, recreated.find("another-account", pending.groupIdHex))
+        recreated.finish(pending)
+        assertEquals(null, recreated.find(pending.account, pending.groupIdHex))
+    }
+
+    @Test
+    fun incompleteFirstStageDoesNotPretendANativeDeleteWasAdmitted() {
+        val directory = folder.newFolder("new-only")
+        val journal = LocalGroupDeleteCleanupJournal(directory)
+        journal.stage(pending)
+        val committed = requireNotNull(directory.listFiles()).single()
+        val incomplete = java.io.File(committed.path + ".new")
+        incomplete.writeText("incomplete")
+        committed.delete()
+        assertEquals(null, LocalGroupDeleteCleanupJournal(directory).find(pending.account, pending.groupIdHex))
     }
 
     @Test
@@ -166,6 +210,29 @@ class LocalGroupDeleteCleanupJournalTest {
                 ),
             )
             assertTrue(journal.pending().isEmpty())
+        }
+
+    @Test
+    fun ownerChangeDuringReadRetainsIntent() =
+        runTest {
+            for (present in listOf(true, false)) {
+                var ready = true
+                val journal = LocalGroupDeleteCleanupJournal(folder.newFolder("owner-$present"))
+                journal.stage(pending)
+                assertFalse(
+                    reconcilePendingLocalGroupDeleteCleanup(
+                        pending = pending,
+                        accountReady = { ready },
+                        isGroupPresent = {
+                            ready = false
+                            present
+                        },
+                        cleanup = { error("stale read must not clean") },
+                        finish = journal::finish,
+                    ),
+                )
+                assertEquals(listOf(pending), journal.pending())
+            }
         }
 
     @Test(expected = CancellationException::class)

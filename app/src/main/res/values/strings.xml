@@ -2356,4 +2356,9 @@
     <string name="onboarding_details_accessibility">%1$s, %2$s</string>
     <string name="onboarding_details_expanded">Expanded</string>
     <string name="onboarding_details_collapsed">Collapsed</string>
+    <!-- Keep first-strong isolation balanced so counts and punctuation stay readable in RTL layouts. -->
+    <string name="local_delete_retry_detail">\u2068Deletion stopped. Try Delete from this device again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068The chat was deleted. Cleanup of local data will retry automatically.\u2069</string>
+    <string name="chat_list_delete_stopped">Deletion stopped</string>
+    <string name="chat_list_delete_stopped_detail">\u2068%1$d of %2$d deletions confirmed. Retry Delete from this device to check the result. If it keeps failing, restart the app.\u2069</string>
 </resources>

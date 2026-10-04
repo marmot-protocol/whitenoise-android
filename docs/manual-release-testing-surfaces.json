@@ -3,6 +3,60 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Original local-delete confirmation owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PendingLocalChatDelete.kt",
+        "anchor": "internal class PendingLocalChatDelete private constructor(",
+        "test_ids": ["CHL-010", "CHL-024"]
+      },
+      {
+        "surface": "Local-delete retry guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.local_delete_retry_detail",
+        "test_ids": ["CHL-024"]
+      },
+      {
+        "surface": "Local-delete deferred cleanup notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "R.string.local_delete_cleanup_pending",
+        "test_ids": ["CHL-024"]
+      },
+      {
+        "surface": "Stopped local-delete batch notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
+        "anchor": "R.string.chat_list_delete_stopped",
+        "test_ids": ["CHL-024"]
+      },
+      {
+        "surface": "Confirmed local-delete batch count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
+        "anchor": "R.string.chat_list_delete_stopped_detail",
+        "test_ids": ["CHL-024"]
+      },
+      {
+        "surface": "Local-delete batch owner and uncertainty fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
+        "anchor": "internal suspend fun deleteLocalChatsBatch(",
+        "test_ids": ["CHL-010", "CHL-024"]
+      },
+      {
+        "surface": "Recoverable explicit local-delete gesture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(",
+        "test_ids": ["CHL-010", "CHL-024"]
+      },
+      {
+        "surface": "Bounded local-delete phase diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupDeleteAttempt.kt",
+        "anchor": "internal class LocalGroupDeleteFailure(",
+        "test_ids": ["CHL-024"]
+      },
+      {
+        "surface": "R.string.toast_chat_deleted_local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "R.string.toast_chat_deleted_local",
+        "test_ids": ["CHL-024"]
+      },
+      {
         "surface": "folderDragRowModifier",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
         "anchor": "internal fun folderDragRowModifier(",

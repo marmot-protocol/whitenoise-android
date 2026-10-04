@@ -16,7 +16,7 @@ class ChatListBulkDeleteCoverageTest {
         val source = chatsScreenSource().readText()
         val confirmBlock =
             source.requiredSection(
-                start = "pendingBulkDelete?.let { items ->",
+                start = "pendingBulkDelete?.let { request ->",
                 end = "\n}\n\n/**\n * Resolution state for a chat-list search query",
             )
 
@@ -32,6 +32,40 @@ class ChatListBulkDeleteCoverageTest {
             "bulk local delete must not gate sole admins or route them through transfer-and-leave",
             "soleAdminTransferCandidates" in confirmBlock ||
                 "transferAdminThenDeleteFromChatList" in confirmBlock,
+        )
+        assertDeleteRecoveryWiring(confirmBlock)
+    }
+
+    private fun assertDeleteRecoveryWiring(confirmBlock: String) {
+        assertTrue(
+            "bulk deletion must stop when the original account/runtime changes",
+            "deleteLocalChatsBatch" in confirmBlock,
+        )
+        assertTrue(
+            "bulk confirmation must reject a stale origin",
+            "if (!isCurrent()) return@ChatDeleteConfirmationDialog" in confirmBlock,
+        )
+        assertTrue(
+            "bulk results must not notify a replacement account",
+            "if (isCurrent() && result.deleted" in confirmBlock,
+        )
+        assertTrue("stopped batches must report the full total", "result.deleted < result.total" in confirmBlock)
+        assertTrue(
+            "the dialog must use its original captured owner",
+            "request.isCurrent(appState, controller)" in confirmBlock,
+        )
+        assertTrue(
+            "stopped batches must retain the exact failure diagnostic",
+            "onFailure = { failure = it }" in confirmBlock,
+        )
+        assertTrue("the whole batch must share one readiness budget", "observer = observer" in confirmBlock)
+        assertTrue(
+            "stopped batches must not use a success banner",
+            "presentStoppedLocalChatDeleteBatch(result, failure)" in confirmBlock,
+        )
+        assertTrue(
+            "deferred cleanup must not also show a usual success banner",
+            "result.deleted > 0 && !cleanupDeferred" in confirmBlock,
         )
     }
 
@@ -51,10 +85,13 @@ class ChatListBulkDeleteCoverageTest {
             "local chat-list wipe must optimistically hide and restore the row",
             "removeChatRow" in body && "restoreRemovedChatRow" in body,
         )
-        assertTrue("local wipe must fence account and bind changes", "isActiveBindEpoch(epoch)" in body)
+        assertTrue(
+            "local wipe must fence account, bind, runtime, sign-out and wipe changes",
+            "chatListDepartureIsCurrent(account, epoch, runtime)" in body,
+        )
         assertTrue(
             "local wipe must report only a current terminal failure",
-            "if (isCurrent()) appState.presentFailure" in body,
+            "if (isCurrent()) {" in body && "appState.presentFailure(" in body,
         )
     }
 
@@ -74,7 +111,7 @@ class ChatListBulkDeleteCoverageTest {
         assertTrue("appState.runtimeGeneration != originRuntime" in departure)
         assertTrue("appState.signOutInProgress || appState.wipeInProgress" in departure.replace(Regex("\\s+"), " "))
         val localDelete = source.requiredSection("pendingBulkDelete?.let", "onDismiss = { pendingBulkDelete = null }")
-        assertTrue("it.group.groupIdHex in leavingAndDeleting" in localDelete)
+        assertTrue("request.groupIds.any { it in leavingAndDeleting }" in localDelete)
     }
 
     private fun chatsScreenSource(): File =

@@ -2217,4 +2217,8 @@
     <string name="onboarding_details_accessibility">%1$s: %2$s</string>
     <string name="onboarding_details_expanded">Ausgeklappt</string>
     <string name="onboarding_details_collapsed">Eingeklappt</string>
+    <string name="local_delete_retry_detail">\u2068Löschen gestoppt. Versuche „Von diesem Gerät löschen“ erneut; zuerst wird das vorherige Ergebnis geprüft. Wenn es weiter fehlschlägt, starte die App neu.\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068Der Chat wurde gelöscht. Die Bereinigung lokaler Daten wird automatisch erneut versucht.\u2069</string>
+    <string name="chat_list_delete_stopped">Löschen gestoppt</string>
+    <string name="chat_list_delete_stopped_detail">\u2068%1$d von %2$d Löschungen bestätigt. Versuche erneut „Von diesem Gerät löschen“, um das Ergebnis zu prüfen. Bei weiteren Fehlern starte die App neu.\u2069</string>
 </resources>
