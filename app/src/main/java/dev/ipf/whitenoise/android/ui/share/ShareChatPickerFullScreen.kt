@@ -104,6 +104,7 @@ internal fun ShareChatPickerFullScreenContent(
     val scaffoldActions =
         rememberShareChatPickerActions(
             requestId = requestId,
+            snackbarHostState = snackbarHostState,
             onDismiss = onDismiss,
             stage = { pickerState.stage(onStage) },
             bindCommitting = { pickerState.isCommitting = it },
