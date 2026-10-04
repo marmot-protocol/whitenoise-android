@@ -2219,11 +2219,10 @@
     <string name="profile_readiness_name">Nombre para mostrar</string>
     <string name="profile_readiness_picture">Foto de perfil</string>
     <string name="profile_readiness_bio">Biografía</string>
-    <string name="profile_readiness_banner">Banner</string>
+    <string name="profile_readiness_banner">Portada</string>
     <string name="profile_readiness_address">Dirección verificada</string>
     <string name="profile_readiness_lightning">Dirección Lightning</string>
     <string name="profile_readiness_added">Añadido</string>
     <string name="profile_readiness_recommended">Recomendado</string>
     <string name="profile_readiness_field_optional">Opcional</string>
-    <string name="profile_readiness_field">%1$s · %2$s</string>
 </resources>

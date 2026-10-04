@@ -2223,5 +2223,4 @@
     <string name="profile_readiness_added">Eklendi</string>
     <string name="profile_readiness_recommended">Önerilen</string>
     <string name="profile_readiness_field_optional">İsteğe bağlı</string>
-    <string name="profile_readiness_field">%1$s · %2$s</string>
 </resources>

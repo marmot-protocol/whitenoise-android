@@ -2193,5 +2193,4 @@
     <string name="profile_readiness_added">已添加</string>
     <string name="profile_readiness_recommended">建议填写</string>
     <string name="profile_readiness_field_optional">选填</string>
-    <string name="profile_readiness_field">%1$s · %2$s</string>
 </resources>

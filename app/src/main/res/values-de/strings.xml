@@ -2235,12 +2235,11 @@
     <string name="profile_readiness_optional">Profil bereit · Optionale Angaben verfügbar</string>
     <string name="profile_readiness_name">Anzeigename</string>
     <string name="profile_readiness_picture">Profilbild</string>
-    <string name="profile_readiness_bio">Bio</string>
-    <string name="profile_readiness_banner">Banner</string>
+    <string name="profile_readiness_bio">Über mich</string>
+    <string name="profile_readiness_banner">Titelbild</string>
     <string name="profile_readiness_address">Verifizierte Adresse</string>
     <string name="profile_readiness_lightning">Lightning-Adresse</string>
     <string name="profile_readiness_added">Hinzugefügt</string>
     <string name="profile_readiness_recommended">Empfohlen</string>
-    <string name="profile_readiness_field_optional">Optional</string>
-    <string name="profile_readiness_field">%1$s · %2$s</string>
+    <string name="profile_readiness_field_optional">Freiwillig</string>
 </resources>

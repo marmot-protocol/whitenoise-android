@@ -2293,5 +2293,4 @@
     <string name="profile_readiness_added">Добавлено</string>
     <string name="profile_readiness_recommended">Рекомендуется</string>
     <string name="profile_readiness_field_optional">Необязательно</string>
-    <string name="profile_readiness_field">%1$s · %2$s</string>
 </resources>

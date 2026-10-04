@@ -2225,5 +2225,4 @@
     <string name="profile_readiness_added">Ajouté</string>
     <string name="profile_readiness_recommended">Recommandé</string>
     <string name="profile_readiness_field_optional">Facultatif</string>
-    <string name="profile_readiness_field">%1$s · %2$s</string>
 </resources>
