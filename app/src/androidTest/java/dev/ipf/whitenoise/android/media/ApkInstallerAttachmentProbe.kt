@@ -11,6 +11,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Process
 import android.os.SystemClock
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AttachmentAcquisitionModeFfi
 import dev.ipf.marmotkit.Marmot
@@ -94,6 +95,8 @@ private class NoInstallerContext(
 internal object ApkInstallerAttachmentProbe {
     private const val DEADLINE_MILLIS = 600_000L
     private const val INSTALLER_TIMEOUT_MILLIS = 10_000L
+    private const val STAGING_TIMEOUT_MILLIS = 60_000L
+    private const val PROGRESS_BAR_CLASS = "android.widget.ProgressBar"
     private const val POLL_MILLIS = 100L
     private const val UNEXPECTED_OBSERVE_MILLIS = 1_000L
     private const val DISMISS_ATTEMPTS = 3
@@ -429,21 +432,31 @@ internal object ApkInstallerAttachmentProbe {
                 .put("result", result.name)
                 .put("installer_shown", installer.shown)
                 .put("installer_observed_ms", installer.observedMillis)
+                .put("installer_settled", installer.settled)
+                .put("installer_staging_ms", installer.stagingMillis)
                 .put("dispatch_ms", dispatchMillis)
                 .put("transfer_reused", received.file.isFile),
         )
     }
 
-    /** Whether the system installer reached the screen after one dispatch, and for how long the screen was watched. */
+    /**
+     * Whether the installer reached the screen after one dispatch, for how long the screen was watched, whether the
+     * installer had finished staging the package before Back was sent, and how long its progress indicator was visible.
+     * Zero staging time for a large package means the indicator was never recognized, so the wait proved nothing.
+     */
     private class InstallerObservation(
         val shown: Boolean,
         val observedMillis: Long,
+        val settled: Boolean,
+        val stagingMillis: Long,
     )
 
     /**
      * Watches the screen after any dispatch result. When an installer is expected it waits for it, and otherwise it
-     * watches for [UNEXPECTED_OBSERVE_MILLIS] so a launch behind a non-Opened status is still seen. The installer, or
-     * whatever an Opened dispatch left on screen, is dismissed with Back without installing.
+     * watches for [UNEXPECTED_OBSERVE_MILLIS] so a launch behind a non-Opened status is still seen. An installer that
+     * appeared is given time to finish staging the package before it is dismissed with Back without installing, since
+     * Back sent while a large package is still being copied from the file provider does not cancel the staging and the
+     * dialog outlives the probe's process. Whatever an Opened dispatch left on screen is dismissed as well.
      */
     private suspend fun awaitInstallerAndDismiss(
         context: Context,
@@ -462,13 +475,16 @@ internal object ApkInstallerAttachmentProbe {
                 watchForInstaller(automation, installers)
             }
         val observedMillis = SystemClock.elapsedRealtime() - started
+        val stagingStarted = SystemClock.elapsedRealtime()
+        val settled = shown && awaitStagingFinished(automation)
+        val stagingMillis = if (shown) SystemClock.elapsedRealtime() - stagingStarted else 0L
         if (shown || opened) {
             repeat(DISMISS_ATTEMPTS) {
                 automation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
                 delay(POLL_MILLIS)
             }
         }
-        return InstallerObservation(shown, observedMillis)
+        return InstallerObservation(shown, observedMillis, settled, stagingMillis)
     }
 
     /** Polls for the whole observation window and reports whether an installer package owned the screen at any poll. */
@@ -483,6 +499,20 @@ internal object ApkInstallerAttachmentProbe {
         }
         return false
     }
+
+    /** Polls until the installer window no longer shows the progress indicator it draws while staging a package. */
+    private suspend fun awaitStagingFinished(automation: UiAutomation): Boolean =
+        runCatching {
+            withTimeout(STAGING_TIMEOUT_MILLIS) {
+                while (automation.rootInActiveWindow?.let(::showsProgress) == true) delay(POLL_MILLIS)
+                true
+            }
+        }.getOrDefault(false)
+
+    /** True when this window or any descendant is a progress bar. */
+    private fun showsProgress(node: AccessibilityNodeInfo): Boolean =
+        node.className?.toString() == PROGRESS_BAR_CLASS ||
+            (0 until node.childCount).any { index -> node.getChild(index)?.let(::showsProgress) == true }
 
     /** Resolves the package that handles APK installation on this device instead of assuming a vendor package. */
     private fun installerPackages(context: Context): Set<String> {
