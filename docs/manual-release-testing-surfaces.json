@@ -3916,6 +3916,18 @@
         ]
       },
       {
+        "surface": "ConversationDictationEmptyRecognitionStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_no_speech",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "ConversationDictationFinalNoMatchRecovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "error == ConversationDictationFailure.NoMatch",
+        "test_ids": ["DIC-002"]
+      },
+      {
         "surface": "ConversationDictationAudioBufferFull",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
         "anchor": "R.string.dictation_audio_buffer_full",

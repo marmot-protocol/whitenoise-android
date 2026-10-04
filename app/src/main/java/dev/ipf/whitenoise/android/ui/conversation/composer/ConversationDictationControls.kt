@@ -438,7 +438,9 @@ private fun dictationFailureLabel(reason: ConversationDictationFailure): String 
             ConversationDictationFailure.MicrophoneMuted -> R.string.dictation_microphone_muted
             ConversationDictationFailure.MicrophoneInUse -> R.string.dictation_microphone_in_use
             ConversationDictationFailure.AudioFocusUnavailable -> R.string.dictation_audio_focus_unavailable
-            ConversationDictationFailure.NoSpeech -> R.string.dictation_no_speech
+            ConversationDictationFailure.NoSpeech,
+            ConversationDictationFailure.NoMatch,
+            -> R.string.dictation_no_speech
             ConversationDictationFailure.Network -> R.string.dictation_network_error
             ConversationDictationFailure.ProviderDisconnected -> R.string.dictation_provider_unavailable
             ConversationDictationFailure.RecognizerBusy -> R.string.dictation_recognizer_busy

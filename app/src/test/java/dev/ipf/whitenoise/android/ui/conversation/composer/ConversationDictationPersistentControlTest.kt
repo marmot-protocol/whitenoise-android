@@ -348,6 +348,41 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
     }
 
+    /** A final no-match retains the same localized failure and requires a partial-send confirmation. */
+    @Test
+    fun finalNoMatchSendFailureRequiresExplicitTextConfirmation() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        val initial = fixture.controller.state
+        render(
+            fixture,
+            fontScale = 2f,
+            rtl = true,
+            displayedState =
+                ConversationDictationState.Failed(
+                    requireNotNull(initial.sessionId),
+                    requireNotNull(initial.target),
+                    ConversationDictationFailure.SendBlocked,
+                    "Recognized prefix",
+                    cause = ConversationDictationFailure.NoMatch,
+                    recognitionIncomplete = true,
+                ),
+        )
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val status =
+            context.getString(R.string.dictation_send_blocked) + " · " +
+                context.getString(R.string.dictation_no_speech)
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
+        )
+        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Retry Send").performClick()
+        composeRule.onNodeWithText("Incomplete dictation").assertIsDisplayed()
+        composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
+    }
+
     /** A failed Paste tail keeps its recognized prefix accessible alongside audio Retry and Dismiss. */
     @Test
     fun failedAudioPrefixOffersPasteAtLargeRtl() {
