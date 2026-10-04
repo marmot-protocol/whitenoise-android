@@ -279,6 +279,8 @@ class PendingSendDraftPresentationTest {
                 settleChatRowRecompute()
                 composeRule.onNodeWithText("Draft: sending now", useUnmergedTree = true).assertExists()
                 assertEquals("sending now", state.draftFor(ACCOUNT_REF, GROUP_ID))
+                assertEquals(false, chats.items.single().awaitingSendPreview)
+                assertEquals(OutgoingMessageIndicator.Sent, chats.items.single().projectedDeliveryIndicator())
                 assertEquals(
                     ChatListMessageDeliveryStateFfi.DELIVERED,
                     chats.items
