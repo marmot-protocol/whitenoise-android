@@ -122,6 +122,58 @@ class FixtureContractTest(unittest.TestCase):
         self.assertEqual(0, sum(e["kind"] == "held" for e in events))
         self.assertEqual(1, sum(e["kind"] == "pace_acquisition" for e in events))
 
+    def test_shaping_bounds_download_throughput_and_adds_latency_without_resetting_the_ledger(self):
+        """A shaped link is deterministic and verifiable outside the app, and restoring it keeps every earlier attempt."""
+        source = self.server.generate("shaped", 128 * 1024)
+        started = time.monotonic()
+        self.assertEqual(source.read_bytes(), self.get("/shaped")[2])
+        unshaped = time.monotonic() - started
+        self.assertEqual(200, self.get("/__shape/2000/0/200", method="POST")[0])
+        started = time.monotonic()
+        self.assertEqual(source.read_bytes(), self.get("/shaped")[2])
+        shaped = time.monotonic() - started
+        # 128 KiB at 2 Mbit/s is about 0.52 s on the wire, plus 0.2 s of latency.
+        self.assertGreaterEqual(shaped, 0.55)
+        self.assertLess(unshaped, shaped)
+        self.assertEqual(200, self.get("/__shape/0/0/0", method="POST")[0])
+        events = self.await_event("complete", 2)
+        self.assertEqual(2, sum(e["kind"] == "get" for e in events))
+        self.assertEqual([2000, 0], [e["value"] for e in events if e["kind"] == "shape_down_kbps"])
+        self.assertEqual([200, 0], [e["value"] for e in events if e["kind"] == "shape_latency_ms"])
+
+    def test_shaping_bounds_upload_throughput(self):
+        """The upload path honors the same declared link, so an upload cell is a controlled measurement too."""
+        self.assertEqual(200, self.get("/__shape/0/2000/0", method="POST")[0])
+        body = bytes(range(256)) * 512
+        started = time.monotonic()
+        status, _, _ = self.get("/upload", method="PUT", body=body)
+        elapsed = time.monotonic() - started
+        self.assertEqual(200, status)
+        # 128 KiB at 2 Mbit/s.
+        self.assertGreaterEqual(elapsed, 0.45)
+
+    def test_numbered_markers_delimit_samples_in_the_ledger(self):
+        """A marker is a ledger boundary only; it changes no behavior and rejects out-of-range numbers."""
+        self.server.generate("sampled", 1024)
+        self.assertEqual(200, self.get("/__marker/7", method="POST")[0])
+        self.get("/sampled")
+        self.assertEqual(200, self.get("/__marker/8", method="POST")[0])
+        for path in ("/__marker/-1", "/__marker/x", "/__marker/1000001"):
+            self.assertEqual(400, self.get(path, method="POST")[0], path)
+        events = self.await_event("complete")
+        kinds = [(e["kind"], e["value"]) for e in events if e["kind"] in ("marker", "get")]
+        self.assertEqual([("marker", 7), ("get", 0), ("marker", 8)], kinds)
+
+    def test_shape_rejects_values_outside_the_bounded_range(self):
+        """A malformed or unbounded shape never changes the link and is answered as a bad request."""
+        for path in ("/__shape/-1/0/0", "/__shape/1/2", "/__shape/a/b/c", "/__shape/99999999/0/0"):
+            self.assertEqual(400, self.get(path, method="POST")[0], path)
+        self.assertEqual(0, self.server.shape.down_bps)
+        started = time.monotonic()
+        self.server.generate("unbound", 128 * 1024)
+        self.get("/unbound")
+        self.assertLess(time.monotonic() - started, 1.5)
+
     def test_global_hold_release_does_not_hold_the_deliberate_retry(self):
         """The release control removes the hold rather than reporting a second fake hold event."""
         source = self.server.generate("released", 1040)

@@ -125,6 +125,32 @@ bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Zapstore referen
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-apk
 ```
 
+The `controller-matrix` mode is the controlled latency matrix for [#2785](https://github.com/marmot-protocol/whitenoise-android/issues/2785).
+For each declared link (`unshaped`, `wifi` at 50/20 Mbit/s and 20 ms, `constrained` at 4/1 Mbit/s and 120 ms) the
+**server** shapes bandwidth and latency in both directions, so a constrained label is verified outside the app: the
+checker rejects a sample whose server-observed throughput exceeds the declared link. Each link runs genuine uploads
+through the shipping controller (split into its synchronous preparation half and its upload-and-publish half), a cold
+download, and a warm retained read, for 64 KiB, 1 MiB, 8 MiB and 30 MiB generated files (the 4/1 Mbit/s link stops at
+8 MiB: a 30 MiB upload needs about 4.5 minutes there and the engine rejected its reference once the group epoch moved). The cold download records the
+authoritative phase times from a 2 ms read-only poll next to the production subscription feed, plus sampled Java and
+native peaks, so a delay is attributed to Android preparation, the FFI and engine, storage or transport instead of
+guessed. A numbered ledger marker brackets every sample, so each sample owns exactly its own requests, bytes and
+retries. The host then force-stops only the isolated package and a new process reads one kept file per size offline.
+Every sample carries only a size, a repetition and measurements: no file name, identifier, URL, key or content.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-matrix unshaped,wifi
+# A short harness proof, never a measurement:
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-matrix unshaped,quick
+python3 tools/attachment-fixture/matrix_compare.py --baseline base-1.json base-2.json base-3.json --candidate cand-1.json cand-2.json cand-3.json
+```
+
+`matrix_report.py` pools repeated runs at the sample level, so the observed spread includes run-to-run variation, and
+aggregates samples into per-cell distributions (a p95 only from twenty samples or more), names the
+dominant component and its layer for upload and download, and compares a candidate with a baseline: a change counts only
+when it exceeds both the observed run spread and ten percent, and any difference in request count, byte count or
+retries rejects the candidate whatever its latency. Emulator shaping does not establish physical Wi-Fi performance.
+
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
 the report, but representative 4 MiB performance is explicitly unqualified;
