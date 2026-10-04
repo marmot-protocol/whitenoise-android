@@ -11,7 +11,7 @@ import zipfile
 import apk_installer_runner
 import apk_physical_runner as runner
 
-SERIAL = "46131FDAS003CG"
+SERIAL = "PHYSICAL000TEST"
 PROFILE = runner.PHYSICAL_PROFILE
 CONFIRMED = {"owner_present_device_idle": True, "allow_installer_on_screen": True,
              "allow_install_app_op_toggle": True}

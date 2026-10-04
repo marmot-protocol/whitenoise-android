@@ -1,36 +1,36 @@
-# Physical received-APK gate for #2781, prepared 2026-10-03, not yet run
+# Physical received-APK gate runbook
 
-Refs [#2781](https://github.com/marmot-protocol/whitenoise-android/issues/2781) and tracker
+Context: [#2781](https://github.com/marmot-protocol/whitenoise-android/issues/2781) and tracker
 [#2779](https://github.com/marmot-protocol/whitenoise-android/issues/2779). The
 [emulator qualification](attachment-apk-installer-2026-10-03.md) covers the received-APK open boundary on disposable
-emulators. The issue additionally requires **exact-head physical-device coverage**. This document is the runbook for
-that gate: what is ready, what each step changes on the phone, what evidence each criterion produces, and what still
-needs owner decisions or further probe work.
+emulators. This runbook covers the same probe on one explicitly authorized physical device: what each step changes on
+the phone, what evidence each criterion produces, and what it does not cover.
 
-**Status: nothing in this plan has been executed on a physical device. The gate is prepared, not qualified. No
-criterion of #2781 is closed by this document.** The host tooling is unit-tested, the probe additions compile, and
-neither has run against a phone.
+**Status (2026-10-04):** run on a Pixel 9 Pro XL (Android 17, API 37) at a clean head. The Zapstore base run, the
+cancel-retry run, the 31.8 MB package with the simulated no-installer branch, the Play base run and the Play
+cancel-retry plus large-package run all qualified with no checker violations. Installation of a received APK is never
+confirmed, because the probe dismisses the installer, and the gaps under "Not covered" remain.
 
-## What the issue requires and what is ready
+## Physical criteria and how each is covered
 
-| Physical criterion named by #2781 | Mechanism | Ready to run | Notes |
+| Physical criterion | Mechanism | Status | Notes |
 | --- | --- | --- | --- |
-| Valid received APK downloads, verifies, launches the system installer | Existing `valid` case, stage `dispatch-allowed` | Yes | Same probe as the emulator run, driven by `apk_physical_runner.py run` |
-| Invalid APK-shaped file settles as a distinct state | Existing `no-manifest` and `truncated` cases, plus `generic` and `conflict` | Yes | `InvalidPackage` before any launch |
-| Install permission denied, then granted | Host toggles the app-op on the isolated package between stages | Yes | Requires `--allow-install-app-op-toggle`; the original mode is recorded and restored |
-| Cancellation and retry | `--cancel-retry`: the shared held-body cancellation probe runs on the `valid` case before publication | Yes, compile-only | New probe path, never executed on any device yet, see risks |
-| 30 to 50 MiB package | `--large-apk`: a host-built, genuinely signed 30 to 31 MiB package sent through the shipping controller | Yes, compile-only | 31 MiB is inside the issue's range and under the 32 MiB Android sender cap, above 32 MiB is not sendable, see below |
-| No installer available | `--no-installer-branch`: the real open path meets `ActivityNotFoundException` through a context wrapper | Partially | Exercises the app's `NoInstaller` branch on the device, does not induce a genuine installer-less platform state |
-| Process recreation during download | Not implemented | No | Design and open questions below, belongs on an owned emulator first |
+| Valid received APK downloads, verifies, launches the system installer | Existing `valid` case, stage `dispatch-allowed` | Run, qualified | Same probe as the emulator run, driven by `apk_physical_runner.py run` |
+| Invalid APK-shaped file settles as a distinct state | Existing `no-manifest` and `truncated` cases, plus `generic` and `conflict` | Run, qualified | `InvalidPackage` before any launch |
+| Install permission denied, then granted | Host toggles the app-op on the isolated package between stages | Run, qualified | Requires `--allow-install-app-op-toggle`; the original mode is recorded and restored |
+| Cancellation and retry | `--cancel-retry`: the shared held-body cancellation probe runs on the `valid` case before publication | Run, qualified | Cancel acknowledged and the socket closed within 0.2 s, ten ordinary joins refused, 30 s quiet, exact bytes on the deliberate retry |
+| 30 to 50 MiB package | `--large-apk`: a host-built, genuinely signed 30 to 31 MiB package sent through the shipping controller | Run, qualified | 31 MiB is inside the issue's range and under the 32 MiB Android sender cap, above 32 MiB is not sendable, see below |
+| No installer available | `--no-installer-branch`: the real open path meets `ActivityNotFoundException` through a context wrapper | Simulated branch only | Exercises the app's `NoInstaller` branch on the device, does not induce a genuine installer-less platform state |
+| Process recreation during download | `controller-apk-recreation` | Emulator only | Qualified separately on owned emulators; not run on a physical device |
 
 ## Device facts gathered read-only on 2026-10-03
 
-Only read-only adb queries were issued against the Pixel, each with an explicit `-s 46131FDAS003CG`. Nothing was
+Only read-only adb queries were issued against the Pixel, each with an explicit `-s <serial>`. Nothing was
 installed, launched, toggled or removed.
 
 | Command | Result |
 | --- | --- |
-| `adb devices -l` | Pixel 9 Pro XL (`komodo`), plus two emulators owned by other work |
+| `adb devices -l` | Pixel 9 Pro XL, plus any owned emulators |
 | `shell getprop ro.build.version.sdk` / `ro.build.version.release` / `ro.product.cpu.abi` / `ro.build.type` | `37` / `17` / `arm64-v8a` / `user` (release keys) |
 | `shell getprop ro.kernel.qemu` | empty, a physical device |
 | `shell pm list packages dev.ipf.whitenoise` | `dev.ipf.whitenoise.android.medialatency.test` is installed, the app `dev.ipf.whitenoise.android.medialatency` is **absent** |
@@ -60,7 +60,7 @@ Host:
 - A worktree at the exact head under test, clean and committed. The physical evidence must name that head and the APK
   SHA-256 pairs it installed.
 - `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home`,
-  `ANDROID_HOME=/Users/mubarak/Library/Android/sdk`, build-tools `36.1.0` (`aapt2`, `apksigner`, `zipalign` present).
+  `ANDROID_HOME` (for example `~/Library/Android/sdk`), build-tools `36.1.0` (`aapt2`, `apksigner`, `zipalign` present).
 - The developer debug keystore at `~/.android/debug.keystore`. The payload builder signs with it, the install command
   compares signer certificates with it, neither prints it.
 - `python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'` passes at that head.
@@ -102,12 +102,12 @@ Each item is a separate, explicit decision. The tooling refuses without the corr
 Shell variables used below:
 
 ```bash
-cd /Users/mubarak/Workspace/marmot-protocol/wn-2781-physical-gate
+cd <worktree at the exact head under test>
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
-export ANDROID_HOME=/Users/mubarak/Library/Android/sdk
+export ANDROID_HOME="$HOME/Library/Android/sdk"
 ADB="$ANDROID_HOME/platform-tools/adb"
 TOOLS="$ANDROID_HOME/build-tools/36.1.0"
-SERIAL=46131FDAS003CG
+SERIAL=<serial from adb devices>
 RUN=/private/tmp/wn-2781-pixel
 mkdir -p "$RUN" && chmod 700 "$RUN"
 ```
@@ -221,9 +221,9 @@ mkdir -p "$RUN" && chmod 700 "$RUN"
 Every `run` exits non-zero and raises unless its report is `qualified`. A failed or partial run keeps its ledger and
 report in place, never reset. Use a new `--root` per attempt.
 
-## What the first two attempts found
+## Known pitfalls
 
-Two attempts on the Pixel (2026-10-04) found four things that the emulator runs could not, three in this tooling:
+Four things a physical run exposes that emulator runs do not:
 
 1. **A foreign UiAutomation holder.** Android allows one UiAutomation connection per device. The `android` CLI leaves
    `com.android.cli.interact.instrumentation` running on a device after a session, and while it is active the probe
@@ -231,22 +231,20 @@ Two attempts on the Pixel (2026-10-04) found four things that the emulator runs 
    `dumpsys activity processes` for any `mInstr=ActiveInstrumentation` before every run and stop on one. Stopping a
    holder is a device-state change that needs its own owner approval, and nothing else on the phone should use the
    `android` CLI during a gate.
-2. **A five-second keep-alive bound in the fixture server.** It closed idle pooled connections exactly when a Pixel's
-   slower per-case cycle sent the next upload, and a request whose body has started is not replayed, so the native
-   upload failed before any byte arrived. Fixed in `fixture_server.py`: the wait for a request line has its own much
-   longer bound.
-3. **A cancel run could never finalize.** The runner waited for a `complete` event on every GET, but a body cancelled
-   on purpose ends with the client's disconnect. A cancel-retry run now treats a disconnect as terminal; the checker
-   still requires the exact shape.
-4. **The installer outlived a large dismissal.** For a 31 MiB package the system installer was still staging the file
-   when the probe pressed Back, Back did not cancel the staging, and the dialog stayed on the owner's screen. The probe
-   now waits, bounded, for the installer's progress indicator to disappear and reports `installer_settled` and
-   `installer_staging_ms`. A large package with a staging time of zero means the indicator was never recognized and
-   the wait proved nothing, so read that field before trusting the large case.
+2. **The fixture server's idle bound.** A pooled client sends its next upload whenever it is ready, and a request whose
+   body has started is not replayed. The fixture therefore waits for a request line under a long idle bound and applies
+   its five-second bound only once a request has begun, so a slower per-case cycle than an emulator's is not cut off.
+3. **A cancelled attempt never completes.** It ends with the client's disconnect, so a cancel-retry run treats a
+   disconnect as terminal for finalization while the checker still requires the exact shape.
+4. **Large packages stage slowly.** For a 31 MiB package the system installer is still copying the file when the probe
+   would press Back, and Back does not cancel the staging. The probe waits, bounded, for the installer's progress
+   indicator to disappear and reports `installer_settled` and `installer_staging_ms`. A large package with a staging
+   time of zero means the indicator was never recognized and the wait proved nothing, so read that field before
+   trusting the large case.
 
-The owner should expect the system installer to appear for a few seconds on each allowed dispatch and to be dismissed
-without installing. Press Home and leave the phone idle before every run: the probe's Back presses would otherwise
-land on whatever app is underneath.
+The system installer appears for a few seconds on each allowed dispatch and is dismissed without installing. Put the
+phone on the home screen and leave it idle before every run: the probe's Back presses would otherwise land on whatever
+app is underneath.
 
 ## Evidence per criterion and how it is checked
 
@@ -305,16 +303,10 @@ APKs. The report's `environment` is API and ABI only, no serial, model, account 
 
 ## Not covered, and the minimal work each needs
 
-- **Process recreation during download.** Not implemented. Proposed shape: in the prepare process, receive every
-  other case, send `valid`, write the manifest early, hold the body at 1024 bytes, start the download and report
-  `held`; the host force-stops only the isolated package, waits for the ledger `disconnect`, releases the hold; a new
-  `recover` stage reopens the runtime, asserts the open path answers `MissingArtifact` before any retry (no partial
-  file reaches the installer), calls the shipping `retryAttachmentDownload`, requires exact bytes, then continues with
-  the dispatch stages. The checker would require two attempts for `valid` (one disconnected, one complete), a host
-  force-stop marker and a changed process id. Open questions that need a device, so an owned emulator first: the
-  native transfer state after process death, whether an ordinary read auto-resumes or needs the deliberate Retry, and
-  how `am instrument -w` reports a process that was force-stopped mid-run. Scheduler-driven interruption belongs with
-  #2878.
+- **Process recreation during download.** Qualified on owned emulators by `controller-apk-recreation`, where the
+  probe ends its own process while a real download is held and a new process completes it from the committed prefix.
+  Not run on a physical device: it needs the owner's approval for the probe to end its own process on the phone, in
+  addition to the authorizations above.
 - **A genuine installer-less platform state.** Not inducible on the owner's phone without disabling the system
   package installer, which is a system change this plan does not request. The simulated branch covers the app's
   `NoInstaller` handling only. A disposable emulator with the installer disabled for user 0 is the only truthful
