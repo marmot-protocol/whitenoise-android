@@ -148,6 +148,7 @@ class ForwardProductionBoundaryCoverageTest {
             .forEach { denied -> assertFalse("Unexpected diagnostic input: $denied", denied in diagnostics) }
     }
 
+    /** Locates the production forward diagnostics source in root- and module-scoped test layouts. */
     private fun forwardDiagnosticsSource(): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/state/ForwardDiagnostics.kt"),
