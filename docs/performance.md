@@ -102,6 +102,23 @@ reported as durable ownership rather than success, with
 `engine_phase_unavailable` making clear that Android cannot see the deeper MDK
 queue, MLS, storage, transport, or acknowledgement phases.
 
+`op=message_forward` follows one forwarding operation from acceptance to its
+terminal state. For each source attachment it emits `forward_source_lookup`
+(`result=success` when the plaintext was already in the Android memory or disk
+cache, `pending` on a miss), the `forward_source_download_start`/`_return` pair
+around the native source download, and `forward_source_ready` for the whole
+materialization; `forward_source_reference_resolved` appears only when an
+optimistic reference had to be resolved through native history. Each destination
+then emits `media_upload_start`/`_return`, `commit_lock_acquired` (how long the
+batch waited for the shared group commit lock, omitted below 5 ms),
+`media_publish_start`/`_return` per message and, on an uncertain-publish retry,
+`convergence_start`/`_return`. `forward_complete` closes the operation with
+`result=success`, `failure` or `dropped` (cancelled) and `count` set to the
+completed destinations. A retry that reuses destination references shows
+`media_publish_start` with no preceding `media_upload_start`. As with media
+sends, a start phase without its return names the phase that stopped
+answering, and no line carries a group, account, message, file, hash or URL.
+
 `op=attachment_fetch` distinguishes explicit taps from automatic fetches and
 records memory and disk probes, acquisition start, native snapshot and demand,
 closed native transfer states, plaintext readiness, cancellation, and failure.

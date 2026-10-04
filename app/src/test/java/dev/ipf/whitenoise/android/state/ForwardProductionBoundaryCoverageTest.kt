@@ -12,7 +12,7 @@ class ForwardProductionBoundaryCoverageTest {
         val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
 
         assertTrue("resolveAttachmentReference(request)" in body)
-        assertTrue("materializeAttachmentPlaintextIsolated(request, reference)" in body)
+        assertTrue("materializeAttachmentPlaintextIsolated(request, reference, diagnostics)" in body)
         assertTrue("uploadMedia(" in body)
         assertTrue("send = false" in body)
         assertTrue("uploadedReferences[messageIndex]" in body)
@@ -28,7 +28,7 @@ class ForwardProductionBoundaryCoverageTest {
         val body = transportSource().readText().functionBody("WhiteNoiseAppState.forwardTransport")
         val start = appStateSource().readText().functionBody("startForwardMessages")
 
-        assertTrue("forwardTransport(sourceAccount, account, messages.size)" in start)
+        assertTrue("forwardTransport(sourceAccount, account, messages.size, diagnostics)" in start)
 
         assertTrue("fun requireSourceAccount()" in body)
         assertTrue("fun requireDestinationAccount()" in body)
@@ -118,6 +118,36 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("candidate.state.first { !it.isActive }" in owner)
         assertTrue("candidate.retryFailed()" in retry)
     }
+
+    /** Every forward phase the issue names is timed on the production path and reported at the terminal. */
+    @Test
+    fun productionTransportTimesSourceUploadLockAndPublishPhasesWithoutIdentifiers() {
+        val transportFile = transportSource().readText()
+        val body = transportFile.functionBody("WhiteNoiseAppState.forwardTransport")
+        val isolated = transportFile.functionBody("WhiteNoiseAppState.materializeAttachmentPlaintextIsolated")
+        val appState = appStateSource().readText()
+        val diagnostics = forwardDiagnosticsSource().readText()
+
+        assertTrue("ForwardDiagnostics.begin()" in appState.functionBody("startForwardMessages"))
+        assertTrue("activeForwardDiagnostics?.terminal(snapshot)" in appState)
+        assertTrue("diagnostics.span({}, ForwardDiagnostics::sourceReady)" in body)
+        assertTrue("diagnostics.span({}, ForwardDiagnostics::sourceReferenceResolved)" in body)
+        assertTrue("ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn" in body)
+        assertTrue("diagnostics?.commitLockAcquired(lockRequestedAtMs)" in body)
+        assertTrue("ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn" in body)
+        assertTrue("ForwardDiagnostics::convergenceStart, ForwardDiagnostics::convergenceReturn" in body)
+        assertTrue("diagnostics?.sourceLookup(hit = cached != null" in isolated)
+        assertTrue("ForwardDiagnostics::sourceDownloadStart, ForwardDiagnostics::sourceDownloadReturn" in isolated)
+        // The diagnostics owner has no String, identifier or byte inputs to serialize.
+        listOf("String", "groupIdHex", "messageIdHex", "accountRef", "fileName", "ByteArray", "Throwable.message")
+            .forEach { denied -> assertFalse("Unexpected diagnostic input: $denied", denied in diagnostics) }
+    }
+
+    private fun forwardDiagnosticsSource(): File =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/state/ForwardDiagnostics.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/state/ForwardDiagnostics.kt"),
+        ).firstOrNull(File::exists) ?: error("Missing ForwardDiagnostics.kt source file")
 
     private fun appStateSource(): File =
         listOf(
