@@ -5964,6 +5964,8 @@ internal typealias MediaPublisher =
 
 internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
 
+private const val MESSAGE_EDIT_EVENT_KIND = 1009uL
+
 class ConversationController(
     internal val appState: WhiteNoiseAppState,
     initialGroup: AppGroupRecordFfi,
@@ -6278,7 +6280,8 @@ class ConversationController(
             optimisticMessages["msg:$messageId"]?.status != MessageStatus.Sent &&
             "msg:$messageId" in optimisticMessages
         ) {
-            pendingMessageEditHandoff.begin(pendingEditKey(messageId), messageId)
+            val originalToken = timelineRecords[messageId]?.clientToken ?: messageId
+            pendingMessageEditHandoff.begin(pendingEditKey(messageId), originalToken)
         }
         editSessionRevision += 1
         editingMessageId = messageId
@@ -7884,9 +7887,17 @@ class ConversationController(
         // [editsByTarget] picks it up.
         val editTarget = editingMessageId
         if (editTarget != null) {
+            // A retained token alone does not turn a published original into a pending send.
+            // Keep native ordering for an existing pending revision or an unconfirmed original.
             val originalToken =
                 pendingMessageEditHandoff.originalClientToken(pendingEditKey(editTarget))
-                    ?: timelineRecords[editTarget]?.clientToken
+                    ?: optimisticEdits[editTarget]
+                        ?.takeIf { it.status != MessageStatus.Sent }
+                        ?.durableIntent
+                        ?.originalClientToken
+                    ?: timelineRecords[editTarget]
+                        ?.takeIf { it.sourceMessageIdHex == null }
+                        ?.clientToken
             if (originalToken != null && (textPublisher == null || pendingMessageEditPublisher != null)) {
                 var session = editSessionRevision
                 // Local admission is independent of relay publication. Until it succeeds the editor
@@ -9705,7 +9716,6 @@ class ConversationController(
             optimisticEdits.entries
                 .firstOrNull { it.value.durableIntent == intent }
                 ?.key
-                ?.let(timelineRecords::get)
                 ?.let(::recoverPendingEditStatus)
         }
     }
@@ -9783,7 +9793,7 @@ class ConversationController(
                 }.keys
                 .toList()
         recoverPendingEditStatus(record)
-        if (record.kind == 1009uL && record.sourceMessageIdHex != null) {
+        if (record.kind == MESSAGE_EDIT_EVENT_KIND && record.sourceMessageIdHex != null) {
             targets.forEach { target ->
                 optimisticEdits[target]?.let { edit ->
                     edit.durableIntent
@@ -9805,7 +9815,12 @@ class ConversationController(
 
     /** Recover native engine ownership or terminal rejection when the target reprojects. */
     private fun recoverPendingEditStatus(record: TimelineMessageRecordFfi) {
-        val edit = optimisticEdits[record.messageIdHex]
+        recoverPendingEditStatus(record.messageIdHex)
+    }
+
+    private fun recoverPendingEditStatus(target: String) {
+        if (controllerCleared) return
+        val edit = optimisticEdits[target]
         val intent = edit?.durableIntent
         val account = conversationAccountRef
         if (edit == null || intent == null || account == null) return
@@ -9818,25 +9833,29 @@ class ConversationController(
         if (!pendingEditStatusReads.add(intent.editClientToken)) {
             pendingEditStatusRechecks.add(intent.editClientToken)
         } else {
-            appState.launchMutation {
+            controllerScope.launch {
                 try {
                     val status =
                         runCatchingCancellable {
                             pendingEditStatusReader(account, group.groupIdHex, intent.editClientToken)
                         }.getOrNull()
+                    if (controllerCleared) return@launch
                     val current =
-                        optimisticEdits[record.messageIdHex]?.takeIf {
-                            it.durableIntent == intent && it.status != MessageStatus.Sent
+                        optimisticEdits.entries.firstOrNull {
+                            it.value.durableIntent == intent && it.value.status != MessageStatus.Sent
                         }
                     if (current != null) {
-                        optimisticEdits[record.messageIdHex] = current.withNativeEditStatus(status)
+                        optimisticEdits[current.key] = current.value.withNativeEditStatus(status)
                         publishTimelineFromIndexes()
                     }
                 } finally {
                     pendingEditStatusReads.remove(intent.editClientToken)
                     // Coalesce native events received during the read, including identical rows.
-                    if (pendingEditStatusRechecks.remove(intent.editClientToken)) {
-                        timelineRecords[record.messageIdHex]?.let(::recoverPendingEditStatus)
+                    if (pendingEditStatusRechecks.remove(intent.editClientToken) && !controllerCleared) {
+                        optimisticEdits.entries
+                            .firstOrNull { it.value.durableIntent == intent }
+                            ?.key
+                            ?.let(::recoverPendingEditStatus)
                     }
                 }
             }
@@ -13201,13 +13220,7 @@ class ConversationController(
         // own native publication and exact revision agree.
         optimisticEdits.entries
             .filter { (target, edit) ->
-                val confirmedWireEdit = aggregated[target]?.latestText == edit.text
-                val record = timelineRecords[target]
-                val confirmedNativeEdit =
-                    edit.nativeEditMessageId != null &&
-                        record?.edit?.latestEditMessageIdHex == edit.nativeEditMessageId &&
-                        record.plaintext == edit.text
-                edit.status == MessageStatus.Sent && (confirmedWireEdit || confirmedNativeEdit)
+                isConfirmedOptimisticEdit(target, edit, aggregated)
             }.map { it.key }
             .forEach(optimisticEdits::remove)
         timeline =
@@ -13226,6 +13239,20 @@ class ConversationController(
         }
         editsByTarget = applyOptimisticEdits(aggregated)
         signalForegroundSweepScheduleChanged()
+    }
+
+    private fun isConfirmedOptimisticEdit(
+        target: String,
+        edit: OptimisticEdit,
+        aggregated: Map<String, EditState>,
+    ): Boolean {
+        val confirmedWireEdit = aggregated[target]?.latestText == edit.text
+        val record = timelineRecords[target]
+        val confirmedNativeEdit =
+            edit.nativeEditMessageId != null &&
+                record?.edit?.latestEditMessageIdHex == edit.nativeEditMessageId &&
+                record.plaintext == edit.text
+        return edit.status == MessageStatus.Sent && (confirmedWireEdit || confirmedNativeEdit)
     }
 
     /**

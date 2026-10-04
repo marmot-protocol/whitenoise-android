@@ -70,6 +70,200 @@ import java.util.concurrent.TimeUnit
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun confirmedTokenBearingMessageUsesTheWireEditPathInProduction() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            var nativeEdits = 0
+            val wireEdits = mutableListOf<Pair<String, String>>()
+            val controller =
+                ConversationController(
+                    appState = appState(),
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    pendingMessageEditPublisher = { _, _, _, _, _ ->
+                        nativeEdits += 1
+                        pendingLocalSend()
+                    },
+                    messageEditPublisher = { _, _, target, text -> wireEdits += target to text },
+                )
+            try {
+                controller.retryMembers()
+                applyProjection(
+                    controller,
+                    projectedMessage(5uL, null, null).copy(clientToken = "retained-original-token"),
+                )
+                controller.beginMessageEdit(CONFIRMED_MESSAGE_ID)
+                controller.send("confirmed revision")
+                assertEquals(listOf(CONFIRMED_MESSAGE_ID to "confirmed revision"), wireEdits)
+                assertEquals(0, nativeEdits)
+                assertNull(controller.editingMessageId)
+            } finally {
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun canonicalPendingTargetKeepsTheOriginalNativeClientToken() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val originalTokens = mutableListOf<String>()
+            val controller =
+                nativeEditController(CompletableDeferred<Unit>().also { it.complete(Unit) }) { _, _, original, _, _ ->
+                    originalTokens += original
+                    pendingLocalSend()
+                }
+            try {
+                controller.retryMembers()
+                controller.send("hello")
+                val originalToken =
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex
+                applyProjection(
+                    controller,
+                    projectedMessage(5uL, null, null, sourceMessageIdHex = null).copy(clientToken = originalToken),
+                )
+                settleNativePresentation()
+                controller.beginMessageEdit(CONFIRMED_MESSAGE_ID)
+                controller.send("canonical pending revision")
+                assertEquals(listOf(originalToken), originalTokens)
+                assertNull(controller.editingMessageId)
+            } finally {
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun temporaryTargetRetryReplacesAnAuthoritativelyRejectedEditToken() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val editTokens = mutableListOf<String>()
+            var reads = 0
+            val controller =
+                nativeEditControllerWithStatus(
+                    CompletableDeferred<Unit>().also { it.complete(Unit) },
+                    { _, _, _, _, token ->
+                        editTokens += token
+                        if (editTokens.size == 1) throw MarmotKitException.Runtime("definite native rejection")
+                        pendingLocalSend()
+                    },
+                    { _, _, _ ->
+                        reads += 1
+                        if (reads == 1) LocalSendStatusFfi.Rejected else LocalSendStatusFfi.Queued
+                    },
+                )
+            try {
+                controller.retryMembers()
+                controller.send("hello")
+                controller.beginMessageEdit(
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex,
+                )
+                controller.send("retained revision")
+                settleNativePresentation()
+                assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                controller.retryFailedSend(controller.timeline.single())
+                settleNativePresentation()
+                assertEquals(2, editTokens.size)
+                assertFalse(editTokens[0] == editTokens[1])
+                assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+            } finally {
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun disposingControllerCancelsItsPendingEditStatusRead() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var completedRead = false
+            val controller =
+                nativeEditControllerWithStatus(
+                    CompletableDeferred<Unit>().also { it.complete(Unit) },
+                    { _, _, _, _, _ -> pendingLocalSend(listOf("edit-id")) },
+                    { _, _, _ ->
+                        started.complete(Unit)
+                        release.await()
+                        completedRead = true
+                        publishedNativeEditStatus("edit-id")
+                    },
+                )
+            try {
+                controller.retryMembers()
+                controller.send("hello")
+                val originalToken =
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex
+                controller.beginMessageEdit(originalToken)
+                controller.send("revision")
+                applyNativeEditProjection(controller, originalToken, "revision", "edit-id")
+                started.await()
+                controller.onCleared()
+                release.complete(Unit)
+                settleNativePresentation()
+                assertFalse(completedRead)
+                assertEquals(MessageStatus.Pending, controller.timeline.single().status)
+            } finally {
+                release.complete(Unit)
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun durableEditThroughAppStatePreservesThePreEditDraft() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = appState()
+            var editCalls = 0
+            var sendCallbacks = 0
+            val controller =
+                nativeEditControllerWithStatus(
+                    CompletableDeferred<Unit>().also { it.complete(Unit) },
+                    { _, _, _, _, _ ->
+                        editCalls += 1
+                        pendingLocalSend()
+                    },
+                    { _, _, _ -> LocalSendStatusFfi.Queued },
+                    state,
+                )
+            try {
+                controller.retryMembers()
+                controller.send("hello")
+                state.setDraft(GROUP_ID, TextFieldValue("separate unsent draft"))
+                controller.beginMessageEdit(
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex,
+                )
+                val newMessageAccepted = state.sendConversationText(controller, "edited body") { sendCallbacks += 1 }
+                settleNativePresentation()
+                assertFalse(newMessageAccepted)
+                assertEquals(0, sendCallbacks)
+                assertEquals(1, editCalls)
+                assertEquals("separate unsent draft", state.draftFor(GROUP_ID))
+                assertNull(controller.editingMessageId)
+                assertEquals("edited body", controller.displayedText(controller.timeline.single().record))
+            } finally {
+                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
     fun editPublicationBeforeAdmissionReplyDismissesTheEditor() = publicationBeforeAdmissionReply(false)
 
     @Test
@@ -112,7 +306,10 @@ class ConversationSendRetryIntegrationTest {
                     ),
                 )
                 settleNativePresentation()
-                assertEquals("revision", controller.displayedText(controller.timeline.first { it.record.kind == 9uL }.record))
+                assertEquals(
+                    "revision",
+                    controller.displayedText(controller.timeline.first { it.record.kind == 9uL }.record),
+                )
                 assertNotNull(controller.editingMessageId)
                 reply.complete(Unit)
                 edit.await()
