@@ -9,9 +9,9 @@ import androidx.core.app.NotificationManagerCompat
 import kotlinx.coroutines.delay
 
 /** Scrubs live OS cards only; never reconstructs a dismissed card or changes channel settings. */
-internal suspend fun redactActiveNotificationPreviews(
-    context: Context,
-): Boolean = NotificationPreviewRedactor(context).redact()
+internal suspend fun redactActiveNotificationPreviews(context: Context): Boolean {
+    return NotificationPreviewRedactor(context).redact()
+}
 
 @SuppressLint("MissingPermission")
 internal class NotificationPreviewRedactor(
@@ -35,6 +35,7 @@ internal class NotificationPreviewRedactor(
     suspend fun redact(): Boolean {
         synchronized(UserEventNotificationGroup.mutationLock) {
             if (!redactNotificationShortcuts(context)) succeeded = false
+            if (!redactNotificationChannelNames(context)) succeeded = false
         }
         val settling =
             synchronized(UserEventNotificationGroup.mutationLock) {
@@ -86,9 +87,17 @@ internal class NotificationPreviewRedactor(
     private fun writeHidden(live: StatusBarNotification) {
         val generation = live.notification.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION)
         val pending = ConversationCardPostedRegistry.latestGeneration(live.tag.orEmpty(), live.id)
-        // Android may still show an older snapshot while a newer generic write is queued in NMS.
-        if (pending != null && pending != generation) return
-        if (!NotificationCardGenerations.isDismissed(generation)) writeForGeneration(live, generation)
+        if (NotificationCardGenerations.isDismissed(generation)) return
+        // Wait briefly for an accepted write, then fail closed if Android never makes it visible.
+        // Never overwrite a newer queued card with this older snapshot.
+        if (pending != null && pending != generation) {
+            val key = "${live.key}:$generation"
+            val skipped = attempts.getOrDefault(key, 0)
+            attempts[key] = skipped + 1
+            if (skipped >= REWRITE_ATTEMPTS) cancelVisible(live)
+        } else {
+            writeForGeneration(live, generation)
+        }
     }
 
     private fun writeForGeneration(
@@ -99,8 +108,7 @@ internal class NotificationPreviewRedactor(
         val attempt = attempts.getOrDefault(key, 0)
         attempts[key] = attempt + 1
         if (attempt >= REWRITE_ATTEMPTS) {
-            succeeded = false
-            runCatching { cancel(compat, live.tag, live.id) }.onFailure { succeeded = false }
+            cancelVisible(live)
         } else {
             val hidden = notificationWithoutPreview(context, live.notification, silent = true)
             hidden.extras.putLong(
@@ -116,6 +124,11 @@ internal class NotificationPreviewRedactor(
                 attempts[key] = REWRITE_ATTEMPTS
             }
         }
+    }
+
+    private fun cancelVisible(live: StatusBarNotification) {
+        succeeded = false
+        runCatching { cancel(compat, live.tag, live.id) }.onFailure { succeeded = false }
     }
 
     companion object {

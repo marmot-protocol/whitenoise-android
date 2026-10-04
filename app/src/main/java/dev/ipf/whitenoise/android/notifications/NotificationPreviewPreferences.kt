@@ -19,6 +19,7 @@ internal data class NotificationPreviewToken(
 /** Device presentation only. One transaction covers the choice and cleanup across every presenter. */
 internal object NotificationPreviewPreferences {
     const val KEY = "show_notification_previews"
+    private const val EPOCH_KEY = "notification_preview_epoch"
     const val EXTRA_REVISION = "dev.ipf.whitenoise.android.notify.preview_revision"
     const val EXTRA_SESSION = "dev.ipf.whitenoise.android.notify.preview_session"
     const val EXTRA_ALLOWED = "dev.ipf.whitenoise.android.notify.preview_allowed"
@@ -26,30 +27,32 @@ internal object NotificationPreviewPreferences {
     const val EXTRA_CORRECTION = "dev.ipf.whitenoise.android.notify.preview_correction"
     private const val CLEANUP_TIMEOUT_MS = 25_000L
     private val writes = Mutex()
+    private val stateLock = Any()
     private var application: Context? = null
     private var session = UUID.randomUUID().toString()
     private var revision = 0L
     private var blocked = false
 
-    /** Test applications cannot inherit a failure fence; old process stamps cannot authorize history. */
+    /** Test applications cannot inherit a failure fence; only current persisted epochs can authorize live history. */
     private fun bind(context: Context) {
         if (application !== context.applicationContext) {
             application = context.applicationContext
             session = UUID.randomUUID().toString()
-            revision = 0L
-            blocked = false
+            val savedEpoch = runCatching { preferences(context).getLong(EPOCH_KEY, 0L) }.getOrNull()
+            revision = savedEpoch?.takeIf { it >= 0L } ?: 0L
+            blocked = savedEpoch == null || savedEpoch < 0L
         }
     }
 
     /** Missing keeps current presentation; corrupt or failed preferences fail closed. */
     fun enabled(context: Context): Boolean =
-        synchronized(UserEventNotificationGroup.mutationLock) {
+        synchronized(stateLock) {
             bind(context)
             !blocked && runCatching { preferences(context).getBoolean(KEY, true) }.getOrDefault(false)
         }
 
     fun capture(context: Context): NotificationPreviewToken =
-        synchronized(UserEventNotificationGroup.mutationLock) {
+        synchronized(stateLock) {
             bind(context)
             NotificationPreviewToken(session, revision, enabled(context))
         }
@@ -76,15 +79,29 @@ internal object NotificationPreviewPreferences {
         scrub: suspend () -> Boolean = { redactActiveNotificationPreviews(context) },
     ): Boolean =
         writes.withLock {
+            val savedEpoch =
+                synchronized(UserEventNotificationGroup.mutationLock) {
+                    synchronized(stateLock) {
+                        bind(context)
+                        revision++
+                        blocked = true
+                        revision + if (value) 1L else 0L
+                    }
+                }
+            val saved =
+                runCatching {
+                    preferences(context)
+                        .edit()
+                        .apply {
+                            putBoolean(KEY, value)
+                            putLong(EPOCH_KEY, savedEpoch)
+                        }.commit()
+                }.getOrDefault(false)
             synchronized(UserEventNotificationGroup.mutationLock) {
-                bind(context)
-                revision++
-                blocked = true
-            }
-            val saved = runCatching { preferences(context).edit().putBoolean(KEY, value).commit() }.getOrDefault(false)
-            synchronized(UserEventNotificationGroup.mutationLock) {
-                if (saved && value) revision++
-                blocked = !saved
+                synchronized(stateLock) {
+                    if (saved && value) revision++
+                    blocked = !saved
+                }
             }
             val cleaned = if (!value || !saved) boundedCleanup(scrub) else true
             saved && cleaned
@@ -121,26 +138,35 @@ internal object NotificationPreviewPreferences {
         ) {
             return false
         }
-        // Existing callers can create their first card silently. Only the untouched default may
-        // expose such a post without a live card; any persisted choice keeps corrections fail-closed.
-        val initialDefaultPost =
-            current == null && capture(context).revision == 0L &&
-                runCatching { !preferences(context).contains(KEY) }.getOrDefault(false)
+        val prepared = hasCurrentProvenance(context, notification)
+        val visible = current != null && canRetainPreview(context, current)
+        val sameGeneration =
+            current != null &&
+                current.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION) ==
+                notification.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION)
+        val copiedVisible = visible && sameGeneration && canRetainPreview(context, notification)
         val correctionAllowed =
-            !notification.extras.getBoolean(EXTRA_CORRECTION) ||
-                current?.extras?.getBoolean(EXTRA_HIDDEN) == false || initialDefaultPost
-        return correctionAllowed && canRetainPreview(context, notification)
+            !notification.extras.getBoolean(EXTRA_CORRECTION) || current == null || visible
+        return correctionAllowed && (prepared || copiedVisible)
     }
 
-    /** Unstamped OS cards from before this feature retain existing behavior until a privacy transition. */
+    /** Live OS cards may survive a process restart, but never a later privacy transition. */
     fun canRetainPreview(
         context: Context,
         notification: Notification,
     ): Boolean {
         val token = capture(context)
-        if (!token.allowed || notification.extras.getBoolean(EXTRA_HIDDEN)) return false
-        val untouchedLegacy = token.revision == 0L && !notification.extras.containsKey(EXTRA_SESSION)
-        return untouchedLegacy || hasCurrentProvenance(context, notification)
+        if (
+            !token.allowed ||
+            notification.extras.getBoolean(EXTRA_HIDDEN) ||
+            notification.extras.getBoolean(EXTRA_CONTENT_REDACTED)
+        ) {
+            return false
+        }
+        val extras = notification.extras
+        val legacy = token.revision == 0L && !extras.containsKey(EXTRA_SESSION)
+        val allowedEpoch = extras.getBoolean(EXTRA_ALLOWED) && extras.getLong(EXTRA_REVISION, -1L) == token.revision
+        return legacy || allowedEpoch
     }
 
     fun hasCurrentProvenance(
@@ -153,8 +179,9 @@ internal object NotificationPreviewPreferences {
             notification.extras.getLong(EXTRA_REVISION, -1L) == token.revision
     }
 
-    private fun preferences(context: Context) = context.applicationContext.getSharedPreferences(
-        "whitenoise",
-        Context.MODE_PRIVATE,
-    )
+    private fun preferences(context: Context) =
+        context.applicationContext.getSharedPreferences(
+            "whitenoise",
+            Context.MODE_PRIVATE,
+        )
 }

@@ -134,6 +134,6 @@ private fun preserveGenericConversation(
             .addMessage(context.getString(R.string.notification_hidden_content), original.`when`, person),
     )
     original.shortcutId?.takeIf(::isConversationShortcutId)?.let { id ->
-        if (redactNotificationShortcut(context, id)) builder.setShortcutId(id)
+        if (redactNotificationShortcut(context, id, original)) builder.setShortcutId(id)
     }
 }

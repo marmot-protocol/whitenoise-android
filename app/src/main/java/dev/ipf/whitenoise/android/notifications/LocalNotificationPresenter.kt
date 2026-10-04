@@ -731,7 +731,11 @@ class LocalNotificationPresenter(
                         NotificationCompat
                             .Builder(context, channelId)
                             .apply {
-                                NotificationPreviewPreferences.stamp(this, previewToken, silentUpdate || replaceCurrentMessage)
+                                NotificationPreviewPreferences.stamp(
+                                    this,
+                                    previewToken,
+                                    silentUpdate || replaceCurrentMessage,
+                                )
                                 UserEventNotificationGroup.decorateChild(
                                     context,
                                     this,
@@ -1338,16 +1342,9 @@ class LocalNotificationPresenter(
                     sender = enrichedSender,
                     directShareEligible = directShareEligible,
                     isPublishAllowed = {
-                        val latest = activeConversationCard(content.notificationTag, content.notificationId)
-                        val sameGeneration =
-                            latest != null &&
-                                latest.extras.getString(EXTRA_GENERATION) == active.extras.getString(EXTRA_GENERATION)
-                        val privateContentAllowed =
-                            latest != null &&
-                                NotificationPreviewPreferences.canExpose(context, latest, latest) &&
-                                !latest.extras.getBoolean(EXTRA_CONTENT_REDACTED)
-                        val currentShow = isPostStillAllowed() && ConversationCardPostSynchronizer.isShowCurrent(showToken)
-                        sameGeneration && privateContentAllowed && currentShow
+                        isPostStillAllowed() &&
+                            ConversationCardPostSynchronizer.isShowCurrent(showToken) &&
+                            canPublishPreviewShortcut(content, active)
                     },
                 )
             }
@@ -1528,18 +1525,7 @@ class LocalNotificationPresenter(
                         }
                     },
                 ) {
-                    val current =
-                        if (notification.extras.getBoolean(NotificationPreviewPreferences.EXTRA_CORRECTION)) {
-                            activeConversationCard(tag, id)
-                        } else {
-                            null
-                        }
-                    val payload =
-                        if (NotificationPreviewPreferences.canExpose(context, notification, current)) {
-                            notification
-                        } else {
-                            notificationWithoutPreview(context, notification)
-                        }
+                    val payload = previewPayload(notification, tag, id)
                     notificationPoster(manager, tag, id, payload)
                 }
             if (written) {
@@ -1560,6 +1546,31 @@ class LocalNotificationPresenter(
             }
             NotificationCardWriteResult.FAILED
         }
+
+    private fun canPublishPreviewShortcut(
+        content: LocalNotificationContent,
+        expected: Notification,
+    ): Boolean {
+        val latest = activeConversationCard(content.notificationTag, content.notificationId) ?: return false
+        val sameGeneration = latest.extras.getString(EXTRA_GENERATION) == expected.extras.getString(EXTRA_GENERATION)
+        return sameGeneration && NotificationPreviewPreferences.canExpose(context, latest, latest)
+    }
+
+    private fun previewPayload(
+        notification: Notification,
+        tag: String,
+        id: Int,
+    ): Notification {
+        val needsLiveProof =
+            notification.extras.getBoolean(NotificationPreviewPreferences.EXTRA_CORRECTION) ||
+                !NotificationPreviewPreferences.hasCurrentProvenance(context, notification)
+        val current = if (needsLiveProof) activeConversationCard(tag, id) else null
+        return if (NotificationPreviewPreferences.canExpose(context, notification, current)) {
+            notification
+        } else {
+            notificationWithoutPreview(context, notification)
+        }
+    }
 
     private fun cancelNotification(
         manager: NotificationManagerCompat,

@@ -97,12 +97,14 @@ class NotificationPreviewPreferencesTest {
         assertFalse(NotificationPreviewPreferences.hasCurrentProvenance(otherApplication, builder.build()))
     }
 
-    /** A first silent default-on card is supported; persisted choices cannot restore missing corrections. */
+    /** A current-epoch first silent post remains rich even after the preference was persisted on. */
     @Test
-    fun firstSilentPostRequiresTheUntouchedDefaultOrALiveVisibleCard() {
+    fun firstSilentPostWithPersistedOnKeepsCurrentEpochProvenance() {
         val preferences = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
         preferences.edit().remove(NotificationPreviewPreferences.KEY).commit()
-        val builder = androidx.core.app.NotificationCompat.Builder(context, "channel")
+        val builder =
+            androidx.core.app.NotificationCompat
+                .Builder(context, "channel")
         NotificationPreviewPreferences.stamp(
             builder,
             NotificationPreviewPreferences.capture(context),
@@ -111,7 +113,7 @@ class NotificationPreviewPreferencesTest {
         val card = builder.build()
         assertTrue(NotificationPreviewPreferences.canExpose(context, card))
         preferences.edit().putBoolean(NotificationPreviewPreferences.KEY, true).commit()
-        assertFalse(NotificationPreviewPreferences.canExpose(context, card))
+        assertTrue(NotificationPreviewPreferences.canExpose(context, card))
         assertTrue(NotificationPreviewPreferences.canExpose(context, card, current = card))
     }
 

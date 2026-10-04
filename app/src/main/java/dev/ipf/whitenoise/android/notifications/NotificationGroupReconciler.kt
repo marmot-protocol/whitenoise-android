@@ -45,9 +45,9 @@ internal class NotificationGroupReconciler(
 
     private val worker =
         scope.launch {
+            NotificationPreviewPreferences.recover(context)
             for (request in requests) {
                 delay(SETTLE_DELAY_MS)
-                NotificationPreviewPreferences.recover(context)
                 reconcile()
             }
         }
@@ -192,17 +192,7 @@ internal class NotificationGroupReconciler(
                         }
                         val generation =
                             live.notification.extras.getString(EXTRA_GENERATION) ?: UUID.randomUUID().toString()
-                        val builder =
-                            NotificationCompat
-                                .Builder(context, live.notification)
-                                .addExtras(
-                                    android.os.Bundle().apply {
-                                        putLong(
-                                            EXTRA_LEGACY_POST_TIME,
-                                            UserEventNotificationGroup.dismissalTime(live),
-                                        )
-                                    },
-                                )
+                        val builder = legacyCardBuilder(live)
                         val adopted =
                             UserEventNotificationGroup
                                 .decorateChild(
@@ -214,7 +204,7 @@ internal class NotificationGroupReconciler(
                                 .setSilent(true)
                                 .build()
                         val payload =
-                            if (NotificationPreviewPreferences.canExpose(context, adopted, live.notification)) {
+                            if (NotificationPreviewPreferences.canRetainPreview(context, live.notification)) {
                                 adopted
                             } else {
                                 notificationWithoutPreview(context, adopted, silent = true)
@@ -233,6 +223,13 @@ internal class NotificationGroupReconciler(
             }
         return changed
     }
+
+    private fun legacyCardBuilder(live: StatusBarNotification): NotificationCompat.Builder =
+        NotificationCompat.Builder(context, live.notification).addExtras(
+            android.os.Bundle().apply {
+                putLong(EXTRA_LEGACY_POST_TIME, UserEventNotificationGroup.dismissalTime(live))
+            },
+        )
 
     companion object {
         private const val SETTLE_DELAY_MS = 150L

@@ -31,6 +31,7 @@ class NotificationPreviewRedactionTest {
     @Before
     fun setup() {
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        NotificationGroupReconciler.shared(context).close()
         manager.cancelAll()
         NotificationChannels.ensureChannels(context)
         context
@@ -53,7 +54,7 @@ class NotificationPreviewRedactionTest {
     fun startupRecoveryScrubsCardsAndKeepsTheirDismissalAge() =
         runBlocking {
             postPrivate()
-            val age = UserEventNotificationGroup.dismissalTime(manager.activeNotifications.single())
+            val age = UserEventNotificationGroup.dismissalTime(manager.activeNotifications.single { it.tag == TAG })
             context
                 .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
                 .edit()
@@ -111,7 +112,7 @@ class NotificationPreviewRedactionTest {
             assertEquals(
                 "Private content",
                 manager.activeNotifications
-                    .single()
+                    .single { it.tag == TAG }
                     .notification.extras
                     .getCharSequence(Notification.EXTRA_TITLE),
             )
@@ -145,7 +146,7 @@ class NotificationPreviewRedactionTest {
             val cleanup =
                 NotificationPreviewRedactor(context, pacer = pacer, read = {
                     if (++reads == 3) {
-                        val original = manager.activeNotifications.single().notification
+                        val original = manager.activeNotifications.single { it.tag == TAG }.notification
                         val newer = notificationWithoutPreview(context, original)
                         newer.extras.putString(UserEventNotificationGroup.EXTRA_GENERATION, "new")
                         manager.notify(TAG, MESSAGE_NOTIFICATION_ID, newer)
@@ -157,10 +158,30 @@ class NotificationPreviewRedactionTest {
             assertEquals(
                 "new",
                 manager.activeNotifications
-                    .single()
+                    .single { it.tag == TAG }
                     .notification.extras
                     .getString(UserEventNotificationGroup.EXTRA_GENERATION),
             )
+        }
+
+    /** A write accepted locally but shed by Android cannot leave an older private card forever. */
+    @Test
+    fun pendingGenerationThatNeverAppearsCancelsOnlyTheOldPrivateCard() =
+        runBlocking {
+            postPrivate()
+            ConversationCardPostedRegistry.markPosted(TAG, MESSAGE_NOTIFICATION_ID, generationId = "never-visible")
+            var writes = 0
+            val cleanup =
+                NotificationPreviewRedactor(
+                    context,
+                    pacer = pacer,
+                    post = { _, _, _, _ -> writes++ },
+                    sleep = {},
+                )
+            assertFalse(cleanup.redact())
+            assertEquals(0, writes)
+            assertTrue(manager.activeNotifications.none { it.tag == TAG })
+            assertTrue(NotificationPreviewRedactor(context, pacer = pacer, sleep = {}).redact())
         }
 
     private fun postPrivate() {

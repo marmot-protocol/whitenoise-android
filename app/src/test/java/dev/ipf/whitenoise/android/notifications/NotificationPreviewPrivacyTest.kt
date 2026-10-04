@@ -68,7 +68,7 @@ class NotificationPreviewPrivacyTest {
             card.extras.getCharSequence(Notification.EXTRA_TEXT),
         )
         assertNull(card.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
-        assertNull(card.shortcutId)
+        assertGenericShortcut(card)
         assertSafeActions(card)
         assertGenericConversation(card)
     }
@@ -102,7 +102,7 @@ class NotificationPreviewPrivacyTest {
                     card.extras.getCharSequence(Notification.EXTRA_TITLE),
                 )
                 assertNull(card.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
-                assertNull(card.shortcutId)
+                assertGenericShortcut(card)
                 assertNull(card.largeIcon)
                 assertNull(card.locusId)
                 assertGenericConversation(card)
@@ -143,7 +143,7 @@ class NotificationPreviewPrivacyTest {
                 card.extras.getCharSequence(Notification.EXTRA_TITLE),
             )
             assertNull(card.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
-            assertNull(card.shortcutId)
+            assertGenericShortcut(card)
             assertNull(card.largeIcon)
             assertGenericConversation(card)
         }
@@ -339,14 +339,7 @@ class NotificationPreviewPrivacyTest {
                 .notification.extras
                 .getCharSequence(Notification.EXTRA_TITLE),
         )
-        runBlocking {
-            assertTrue(
-                presenter.show(
-                    update().copy(messageIdHex = "fresh", previewText = "Fresh text"),
-                    shortNpub = { "Private sender" },
-                ),
-            )
-        }
+        showFreshMessage(presenter)
         val fresh = manager.activeNotifications.single().notification
         assertTrue(
             fresh.extras
@@ -385,6 +378,26 @@ class NotificationPreviewPrivacyTest {
     }
 
     /** A group message with deliberately private identity and text sent through the real formatter. */
+    private fun showFreshMessage(presenter: LocalNotificationPresenter) =
+        runBlocking {
+            assertTrue(
+                presenter.show(
+                    update().copy(messageIdHex = "fresh", previewText = "Fresh text"),
+                    shortNpub = { "Private sender" },
+                ),
+            )
+        }
+
+    private fun assertGenericShortcut(card: Notification) {
+        card.shortcutId?.let { id ->
+            assertTrue(isConversationShortcutId(id))
+            val shortcut = ShortcutManagerCompat.getDynamicShortcuts(context).single { it.id == id }
+            assertEquals(context.getString(R.string.app_name), shortcut.longLabel)
+            assertTrue(shortcut.categories.isNullOrEmpty())
+            assertTrue(shortcut.extras!!.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
+        }
+    }
+
     private fun update() =
         NotificationUpdateFfi(
             notificationKey = "key",

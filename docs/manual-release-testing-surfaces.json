@@ -4,7 +4,7 @@
     "composable_surfaces": [
       {
         "surface": "NotificationPreviewControl",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "fun NotificationPreviewControl(",
         "test_ids": [
           "NTF-030"
@@ -10640,7 +10640,7 @@
     "settings_controls": [
       {
         "surface": "string:retry",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "R.string.retry",
         "test_ids": [
           "NTF-030"
@@ -10648,7 +10648,7 @@
       },
       {
         "surface": "string:toast_notification_scope_update_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "R.string.toast_notification_scope_update_failed",
         "test_ids": [
           "NTF-030"
@@ -10656,7 +10656,7 @@
       },
       {
         "surface": "string:notification_show_previews",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "R.string.notification_show_previews",
         "test_ids": [
           "NTF-030"
@@ -10664,7 +10664,7 @@
       },
       {
         "surface": "string:notification_show_previews_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControl.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "R.string.notification_show_previews_detail",
         "test_ids": [
           "NTF-030"
@@ -30758,6 +30758,24 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "Generic conversation channel description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewChannelNames.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic new conversation channel title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic new conversation channel description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": ["NTF-030"]
+      },
       {
         "surface": "Generic conversation shortcut display metadata",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewShortcuts.kt",

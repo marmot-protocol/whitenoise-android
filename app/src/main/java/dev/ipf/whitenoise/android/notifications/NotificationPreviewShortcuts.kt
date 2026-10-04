@@ -23,7 +23,10 @@ internal fun genericNotificationShortcut(
             putBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN, true)
         }
     return ShortcutInfoCompat
-        .Builder(original)
+        .Builder(context, original.id)
+        .setIntents(original.intents)
+        .setRank(original.rank)
+        .apply { original.locusId?.let { setLocusId(it) } }
         .setShortLabel(name)
         .setLongLabel(name)
         .setDisabledMessage(name)
@@ -60,9 +63,29 @@ internal fun redactNotificationShortcuts(context: Context): Boolean =
 internal fun redactNotificationShortcut(
     context: Context,
     id: String,
+    notification: android.app.Notification,
 ): Boolean =
     runCatching {
-        val original = notificationShortcuts(context).firstOrNull { it.id == id } ?: return@runCatching false
+        val original = notificationShortcuts(context).firstOrNull { it.id == id }
+        if (original == null) {
+            val account = notification.extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF)
+            val group = notification.extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID)
+            if (account == null || group == null) return@runCatching false
+            if (conversationShortcutId(account, group) != id) return@runCatching false
+            val captured =
+                conversationSettingsShortcut(
+                    context,
+                    id,
+                    account,
+                    group,
+                    context.getString(R.string.app_name),
+                    null,
+                )
+            return@runCatching ShortcutManagerCompat.pushDynamicShortcut(
+                context,
+                genericNotificationShortcut(context, captured),
+            )
+        }
         shortcutPreviewHidden(original) ||
             ShortcutManagerCompat.updateShortcuts(
                 context,
@@ -70,9 +93,9 @@ internal fun redactNotificationShortcut(
             )
     }.getOrDefault(false)
 
-private fun shortcutPreviewHidden(
-    shortcut: ShortcutInfoCompat,
-): Boolean = shortcut.extras?.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN) == true
+private fun shortcutPreviewHidden(shortcut: ShortcutInfoCompat): Boolean {
+    return shortcut.extras?.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN) == true
+}
 
 internal fun stampShortcutPreview(
     token: NotificationPreviewToken,
