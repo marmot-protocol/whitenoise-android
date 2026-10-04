@@ -2,6 +2,8 @@
 
 import math
 
+from apk_checker import OBSERVE_MIN_MS
+
 SCOPE = "received-apk-process-recreation-during-download"
 CIPHERTEXT_OVERHEAD = 16
 HOLD_OFFSET = 2 * 1024 * 1024
@@ -52,6 +54,10 @@ def _check_metrics(metrics, distribution, violations):
             or row.get("transfer_reused") is not True or not _finite(row.get("dispatch_ms"))
             or (distribution == "Zapstore" and row.get("installer_settled") is not True)):
         violations.append("the platform dispatch of the recreated file is not the expected outcome")
+    # Whatever the status, the screen must have been watched: an absent installer only counts if it was looked for.
+    observed = None if row is None else row.get("installer_observed_ms")
+    if row is not None and (not _finite(observed) or (not expected[2] and observed < OBSERVE_MIN_MS)):
+        violations.append("the screen was not watched for an installer after the recreated dispatch")
     done = _one(metrics, "apk-recreate-complete")
     if done is None or done.get("self_update_enabled") is not (distribution == "Zapstore"):
         violations.append("the recreated process did not reach its checkpoint for this distribution")

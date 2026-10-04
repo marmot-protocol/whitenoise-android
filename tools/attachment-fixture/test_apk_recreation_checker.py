@@ -21,6 +21,7 @@ def evidence(distribution="Zapstore", resumed_at=HOLD_OFFSET):
         {"phase": "apk-received", "case": "valid", "bytes": PAYLOAD, "exact": True},
         {"phase": "apk-dispatch", "case": "valid", "permission": "allowed" if zapstore else "n/a",
          "result": "Opened" if zapstore else "InstallUnsupported", "installer_shown": zapstore,
+         "installer_observed_ms": 200 if zapstore else 1000,
          "installer_settled": zapstore, "installer_staging_ms": 200 if zapstore else 0, "dispatch_ms": 30.0,
          "transfer_reused": True},
         {"phase": "apk-recreate-complete", "self_update_enabled": zapstore},
@@ -104,6 +105,21 @@ class RecreationCheckerTest(unittest.TestCase):
         play = evidence("Play")
         self.assertFalse(verdict(*play, "Zapstore")["passed"])
         self.assertFalse(verdict(*evidence(), "Play")["passed"])
+
+    def test_the_dispatch_must_have_been_watched_for_an_installer(self):
+        """A missing, non-numeric or short observation means an absent installer was never actually looked for."""
+        for distribution in ("Zapstore", "Play"):
+            metrics, events = evidence(distribution)
+            for observed in (None, "1000", True, -1, float("nan")):
+                altered = deepcopy(metrics)
+                if observed is None:
+                    del altered[4]["installer_observed_ms"]
+                else:
+                    altered[4]["installer_observed_ms"] = observed
+                self.assertFalse(verdict(altered, events, distribution)["passed"], (distribution, observed))
+        metrics, events = evidence("Play")
+        metrics[4]["installer_observed_ms"] = 100
+        self.assertFalse(verdict(metrics, events, "Play")["passed"])
 
     def test_the_interrupted_acquisition_must_be_held_and_never_complete(self):
         """The first GET carries the hold and a disconnect, and a completion would mean nothing was interrupted."""
