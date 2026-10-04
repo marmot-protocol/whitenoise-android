@@ -226,17 +226,18 @@ internal fun GroupEditScreen(
             imageSaving = true
             controller.clearLastMutationError()
             appState.launchMutation {
+                val attemptIsCurrent = { imageAttemptIsCurrent(failureAttempt, accountRef) }
                 try {
-                    val change = ScopedGroupImageMutation(safeUrl) { imageAttemptIsCurrent(failureAttempt, accountRef) }
+                    val change = ScopedGroupImageMutation(safeUrl, attemptIsCurrent)
                     if (controller.updateGroupAvatarUrl(change)) {
                         showImageSearch = false
-                    } else if (controller.lastMutationError != null) {
+                    } else if (attemptIsCurrent() && controller.lastMutationError != null) {
                         imageFailureScope.captureFailure(failureAttempt)
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
-                    if (!imageFailureScope.isCurrent(failureAttempt)) return@launchMutation
+                    if (!attemptIsCurrent()) return@launchMutation
                     appState.presentFailure(
                         R.string.toast_couldnt_upload_group_image,
                         "GROUP_AVATAR_UPDATE",
