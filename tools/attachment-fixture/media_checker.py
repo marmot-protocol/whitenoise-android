@@ -16,6 +16,8 @@ ROLES = ("sent", "received")
 # The 24 MiB send holds its host copy in a root-local cache to prove native retention comes first, so its default
 # host cache is intentionally empty after restart; every other own send must hit the encrypted host cache.
 HOLD_PATH_MESSAGE = "video-24mib"
+# The memory cache admits only entries up to this size, so only a smaller attachment can be a memory hit at all.
+MEMORY_ENTRY_MAX_BYTES = 8 * MIB
 
 
 def _finite(value):
@@ -76,6 +78,20 @@ def _check_prepare(prepare, violations):
     return sizes
 
 
+def _check_layers(named, row, label, payload, violations):
+    """Each local layer that could serve this attachment was timed on its own, and no layer it cannot serve was."""
+    eligible = payload is not None and payload <= MEMORY_ENTRY_MAX_BYTES
+    if row.get("memory_eligible") is not eligible:
+        violations.append(f"wrong memory eligibility for {label}")
+    for stage, expected in (("media-host-disk-read", row.get("host_disk_hit") is True),
+                            ("media-memory-hit", eligible)):
+        metric = named.get(f"{stage}-{label}")
+        if expected and not _valid_measure(metric, payload):
+            violations.append(f"missing exact {stage} for {label}")
+        if not expected and metric is not None:
+            violations.append(f"unexpected {stage} for {label}")
+
+
 def _check_read(read, sizes, violations):
     """Both directions of every attachment stayed exact, resolved without acquisition and decoded a preview."""
     named, duplicates = _measures(read)
@@ -102,6 +118,8 @@ def _check_read(read, sizes, violations):
                     or row.get("preview_ok") is not True or not _finite(row.get("preview_ms"))
                     or not isinstance(row.get("host_disk_hit"), bool) or row.get("bytes") != payload):
                 violations.append(f"missing exact readback for {label}")
+            if row is not None:
+                _check_layers(named, row, label, payload, violations)
     if len(rows) != len(EXPECTED) * len(ROLES):
         violations.append("unexpected readback rows")
     complete = [m for m in read if m.get("phase") == "media-readback-complete"]

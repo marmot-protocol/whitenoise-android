@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -14,6 +15,43 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DurableLocalSendsTest {
+    @Test
+    fun pendingEditAdmissionUsesNativeOriginalTokenAndRecoversWithoutResendingOriginal() =
+        runTest {
+            val calls = mutableListOf<String>()
+            var admitted = false
+            val statusEngine =
+                nativeBoundary { method, _ ->
+                    calls += method
+                    check(method == "localSendStatus")
+                    if (admitted) LocalSendStatusFfi.Queued else null
+                }
+            // A JVM proxy wraps checked native exceptions; this override preserves the binding's real failure.
+            val engine =
+                object : MarmotInterface by statusEngine {
+                    override suspend fun editLocalMessageWithClientToken(
+                        accountRef: String,
+                        groupIdHex: String,
+                        originalClientToken: String,
+                        content: String,
+                        editClientToken: String,
+                    ): LocalSendAcceptanceFfi {
+                        calls += "editLocalMessageWithClientToken"
+                        assertEquals("original-token", originalClientToken)
+                        assertEquals("revised text", content)
+                        assertEquals("edit-token", editClientToken)
+                        admitted = true
+                        throw MarmotKitException.Runtime("transport closed after durable edit admission")
+                    }
+                }
+            val intent = DurablePendingEditIntent("original-token", "edit-token")
+            val first = engine.admitPendingMessageEdit("account", "group", intent, "revised text")
+            assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, first.acceptDisposition)
+            val retry = engine.admitPendingMessageEdit("account", "group", intent, "revised text")
+            assertEquals(SendAcceptDispositionFfi.ACCEPTED_PENDING, retry.acceptDisposition)
+            assertEquals(1, calls.count { it == "editLocalMessageWithClientToken" })
+        }
+
     /** Fresh local acceptance skips recovery I/O, remains pending, and preserves the optimistic token. */
     @Test
     fun textAndReplyUseStableTokenWithoutClaimingDelivery() =

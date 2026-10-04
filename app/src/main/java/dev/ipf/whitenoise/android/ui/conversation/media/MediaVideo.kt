@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
@@ -228,10 +229,12 @@ internal fun MediaVideoGridTile(
     var tileDurationMs by remember(messageIdHex, attachmentIndex, epoch) { mutableLongStateOf(0L) }
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
+    val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
     val policyAllowsMaterialization =
         shouldStartVideoAttachmentDownload(
             mine = mine,
-            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video) && !cancelledByReader,
             automaticDownloadsPaused = automaticDownloadsPaused,
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasCachedFile = localFile != null,
@@ -243,11 +246,33 @@ internal fun MediaVideoGridTile(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
+    val transfer =
+        rememberTileTransfer(
+            controller,
+            messageIdHex,
+            attachmentIndex,
+            reference,
+            mine,
+            cancelledByReader,
+            startDownload,
+            failedLocally = failed && localFile == null,
+        )
+    // The transfer owns the play disc while it is queued, running, being cancelled, cancelled or failed.
+    val transferShown = transfer.visible && localFile == null
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableIntStateOf(0) }
 
-    /** Promotes the tap to interactive priority and delegates ownership before this tile can dispose. */
+    /**
+     * Promotes the tap to interactive priority and delegates ownership before this tile can dispose. While the reader's
+     * Cancel awaits acknowledgement a tap anywhere on the tile does nothing, so it cannot restart that transfer.
+     */
     fun dispatchViewerOpen() {
+        if (transfer.cancelling) return
         val open = {
+            // An accepted Retry re-materializes the tile itself, not only the viewer it hands off to.
+            if (failed) {
+                failed = false
+                reloadToken++
+            }
             materializationIntent = materializationIntent.afterInteractiveRequest()
             onTap()
         }
@@ -411,41 +436,62 @@ internal fun MediaVideoGridTile(
             else ->
                 Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface))
         }
-        Surface(
-            color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
-            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-            shape = CircleShape,
-            modifier =
-                Modifier
-                    .align(Alignment.Center)
-                    .size(VIDEO_PLAY_DISC_SIZE),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                when {
-                    failed ->
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.voice_message_failed),
-                            modifier = Modifier.size(24.dp),
+        if (transferShown) {
+            TileTransferControl(
+                transfer = transfer,
+                onRetry = {
+                    // A failed materialization already retries inside the open hand-off.
+                    if (failed) {
+                        dispatchViewerOpen()
+                    } else {
+                        controller.retryAttachmentTransfer(
+                            messageIdHex,
+                            attachmentIndex,
+                            onAccepted = { dispatchViewerOpen() },
+                            onFailure = { failed = true },
                         )
-                    !startDownload && localFile == null ->
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = stringResource(R.string.media_open),
-                            modifier = Modifier.size(24.dp),
-                        )
-                    localFile == null ->
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
-                            color = LocalContentColor.current,
-                        )
-                    else ->
-                        Icon(
-                            painter = painterResource(R.drawable.ic_play_arrow),
-                            contentDescription = stringResource(R.string.reply_media_video),
-                            modifier = Modifier.size(24.dp),
-                        )
+                    }
+                },
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+        if (!transferShown) {
+            Surface(
+                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                shape = CircleShape,
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(VIDEO_PLAY_DISC_SIZE),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    when {
+                        failed ->
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.voice_message_failed),
+                                modifier = Modifier.size(24.dp),
+                            )
+                        !startDownload && localFile == null ->
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = stringResource(R.string.media_open),
+                                modifier = Modifier.size(24.dp),
+                            )
+                        localFile == null ->
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp,
+                                color = LocalContentColor.current,
+                            )
+                        else ->
+                            Icon(
+                                painter = painterResource(R.drawable.ic_play_arrow),
+                                contentDescription = stringResource(R.string.reply_media_video),
+                                modifier = Modifier.size(24.dp),
+                            )
+                    }
                 }
             }
         }
@@ -464,7 +510,8 @@ internal fun MediaVideoGridTile(
                 )
             }
         }
-        // An unplayable clip is dimmed and badged rather than left looking merely slow.
+        // An unplayable clip is dimmed and badged rather than left looking merely slow. While the transfer control owns
+        // the centre its Retry glyph is the failure cue, so the badge only dims the tile instead of covering it.
         if (failed) {
             Box(
                 modifier =
@@ -473,12 +520,14 @@ internal fun MediaVideoGridTile(
                         .background(Color.Black.copy(alpha = VIDEO_UNAVAILABLE_SCRIM_ALPHA)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_warning),
-                    contentDescription = stringResource(R.string.voice_message_failed),
-                    modifier = Modifier.size(VIDEO_UNAVAILABLE_GLYPH),
-                    tint = MaterialTheme.colorScheme.inverseOnSurface,
-                )
+                if (!transferShown) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_warning),
+                        contentDescription = stringResource(R.string.voice_message_failed),
+                        modifier = Modifier.size(VIDEO_UNAVAILABLE_GLYPH),
+                        tint = MaterialTheme.colorScheme.inverseOnSurface,
+                    )
+                }
             }
         }
         if (overflowCount > 0) {
@@ -591,10 +640,12 @@ internal fun MediaVideoBubble(
     // materialization intent so the user always has a path to fetch — never
     // "looks present but can't be opened". See PR #191 reviewer feedback.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
+    val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
     val policyAllowsMaterialization =
         shouldStartVideoAttachmentDownload(
             mine = mine,
-            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video),
+            videoAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Video) && !cancelledByReader,
             automaticDownloadsPaused = automaticDownloadsPaused,
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasCachedFile = localFile != null,
@@ -606,6 +657,53 @@ internal fun MediaVideoBubble(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
+    val transfer =
+        rememberTileTransfer(
+            controller,
+            messageIdHex,
+            attachmentIndex,
+            reference,
+            mine,
+            cancelledByReader,
+            startDownload,
+            failedLocally = failed && localFile == null && !loading,
+        )
+    // The transfer owns the play disc while it is queued, running, being cancelled, cancelled or failed.
+    val transferShown = transfer.visible && localFile == null
+
+    /** Re-materializes a clip whose playback failed once the engine accepts a fresh Retry. */
+    fun retryFailedPlayback() {
+        controller.retryAttachmentTransfer(
+            messageIdHex,
+            attachmentIndex,
+            onAccepted = {
+                loading = true
+                playbackRecoveryJob.value =
+                    scope.launch {
+                        try {
+                            localFile =
+                                rematerializeVideoAttachmentAfterPlaybackFailure(
+                                    context = context,
+                                    controller = controller,
+                                    messageIdHex = messageIdHex,
+                                    attachmentIndex = attachmentIndex,
+                                    reference = reference,
+                                    mine = mine,
+                                )
+                            failed = false
+                        } catch (t: Throwable) {
+                            currentCoroutineContext().ensureActive()
+                            if (t is CancellationException) throw t
+                            failed = true
+                            localFile = null
+                        } finally {
+                            loading = false
+                        }
+                    }
+            },
+            onFailure = { failed = true },
+        )
+    }
     var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
 
     LaunchedEffect(
@@ -645,6 +743,11 @@ internal fun MediaVideoBubble(
     /** Opens the logical video immediately so materialization can continue after bubble disposal. */
     fun dispatchViewerOpen() {
         val open = {
+            // An accepted Retry re-materializes the tile itself, not only the viewer it hands off to.
+            if (failed) {
+                failed = false
+                reloadToken++
+            }
             materializationIntent = materializationIntent.afterInteractiveRequest()
             onOpenConversationMedia(
                 ConversationMediaViewerOpenRequest(
@@ -792,100 +895,90 @@ internal fun MediaVideoBubble(
             // so the user sees the send is in flight (matches the image bubble).
             // When startDownload is gated off (policy says no auto-fetch), the
             // triangle becomes a download icon and tap consents to the fetch.
-            Surface(
-                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
-                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                shape = CircleShape,
-                modifier =
-                    Modifier
-                        .size(VIDEO_PLAY_DISC_SIZE)
-                        .testTag(videoAttachmentOpenTestTag(messageIdHex, attachmentIndex))
-                        .combinedClickable(
-                            onLongClick = onLongPress,
-                            onClick = {
-                                when {
-                                    uploadFailed -> onRetryUpload?.invoke()
-                                    localFile != null -> scope.launch { dispatchReadyVideo() }
-                                    else -> dispatchViewerOpen()
-                                }
-                            },
-                        ),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    when {
-                        uploadFailed ->
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = stringResource(R.string.voice_message_failed),
-                                modifier =
-                                    Modifier
-                                        .size(28.dp)
-                                        .clickable { onRetryUpload?.invoke() },
+            if (transferShown) {
+                TileTransferControl(
+                    transfer = transfer,
+                    onRetry = {
+                        // A failed materialization already retries inside the open hand-off.
+                        if (failed) {
+                            dispatchViewerOpen()
+                        } else {
+                            controller.retryAttachmentTransfer(
+                                messageIdHex,
+                                attachmentIndex,
+                                onAccepted = { dispatchViewerOpen() },
+                                onFailure = { failed = true },
                             )
-                        uploading ->
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.5.dp,
-                                color = LocalContentColor.current,
-                            )
-                        !startDownload && localFile == null ->
-                            Icon(
-                                Icons.Default.Download,
-                                contentDescription = stringResource(R.string.media_open),
-                                modifier = Modifier.size(24.dp),
-                            )
-                        loading ->
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp,
-                                color = LocalContentColor.current,
-                            )
-                        failed ->
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = stringResource(R.string.voice_message_failed),
-                                modifier =
-                                    Modifier
-                                        .size(28.dp)
-                                        .clickable(enabled = !loading) {
-                                            controller.retryAttachmentTransfer(
-                                                messageIdHex,
-                                                attachmentIndex,
-                                                onAccepted = {
-                                                    loading = true
-                                                    playbackRecoveryJob.value =
-                                                        scope.launch {
-                                                            try {
-                                                                localFile =
-                                                                    rematerializeVideoAttachmentAfterPlaybackFailure(
-                                                                        context = context,
-                                                                        controller = controller,
-                                                                        messageIdHex = messageIdHex,
-                                                                        attachmentIndex = attachmentIndex,
-                                                                        reference = reference,
-                                                                        mine = mine,
-                                                                    )
-                                                                failed = false
-                                                            } catch (t: Throwable) {
-                                                                currentCoroutineContext().ensureActive()
-                                                                if (t is CancellationException) throw t
-                                                                failed = true
-                                                                localFile = null
-                                                            } finally {
-                                                                loading = false
-                                                            }
-                                                        }
-                                                },
-                                                onFailure = { failed = true },
-                                            )
-                                        },
-                            )
-                        else ->
-                            Icon(
-                                painter = painterResource(R.drawable.ic_play_arrow),
-                                contentDescription = stringResource(R.string.reply_media_video),
-                                modifier = Modifier.size(24.dp),
-                            )
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
+            if (!transferShown) {
+                Surface(
+                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = VIDEO_PLAY_DISC_ALPHA),
+                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    shape = CircleShape,
+                    modifier =
+                        Modifier
+                            .size(VIDEO_PLAY_DISC_SIZE)
+                            .testTag(videoAttachmentOpenTestTag(messageIdHex, attachmentIndex))
+                            .combinedClickable(
+                                onLongClick = onLongPress,
+                                onClick = {
+                                    when {
+                                        uploadFailed -> onRetryUpload?.invoke()
+                                        localFile != null -> scope.launch { dispatchReadyVideo() }
+                                        else -> dispatchViewerOpen()
+                                    }
+                                },
+                            ),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        when {
+                            uploadFailed ->
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = stringResource(R.string.voice_message_failed),
+                                    modifier =
+                                        Modifier
+                                            .size(28.dp)
+                                            .clickable { onRetryUpload?.invoke() },
+                                )
+                            uploading ->
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.5.dp,
+                                    color = LocalContentColor.current,
+                                )
+                            !startDownload && localFile == null ->
+                                Icon(
+                                    Icons.Default.Download,
+                                    contentDescription = stringResource(R.string.media_open),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            loading ->
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                    color = LocalContentColor.current,
+                                )
+                            failed ->
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = stringResource(R.string.voice_message_failed),
+                                    modifier =
+                                        Modifier
+                                            .size(28.dp)
+                                            .clickable(enabled = !loading) { retryFailedPlayback() },
+                                )
+                            else ->
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_play_arrow),
+                                    contentDescription = stringResource(R.string.reply_media_video),
+                                    modifier = Modifier.size(24.dp),
+                                )
+                        }
                     }
                 }
             }

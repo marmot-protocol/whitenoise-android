@@ -254,6 +254,7 @@ class ConversationDictationCallerAudioTest {
         try {
             assertTrue(stream.start())
             assertTrue(device.readStarted.await(2, TimeUnit.SECONDS))
+            assertFalse(stream.isFinalChunk())
 
             stream.finishCapture(captureClosed::countDown)
             stream.finishCapture(duplicateFinishClosed::countDown)
@@ -265,8 +266,12 @@ class ConversationDictationCallerAudioTest {
             assertEquals(6, device.readCount.get())
             assertEquals(24, writes.sum())
             assertTrue(stream.fullyFed())
+            assertTrue(stream.isFinalChunk())
             assertEquals(true, stream.containsSpeech())
             assertTrue(buffer.hasPending)
+            assertTrue(stream.retry())
+            assertFalse(stream.isFinalChunk())
+            assertEquals(24, buffer.bufferedBytes)
         } finally {
             device.completeRead.countDown()
             stream.cancel()

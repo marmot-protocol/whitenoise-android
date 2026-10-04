@@ -19,13 +19,14 @@ PROBE = "dev.ipf.whitenoise.android.media.MediaAttachmentLatencyProbe#measureCon
 INSTRUMENT_TIMEOUT_SECONDS = 900
 
 
-def instrument(adb, serial, ports, stage, session):
-    """Run one probe process for a stage; it never confirms an installation."""
+def instrument(adb, serial, ports, stage, session, extra=()):
+    """Run one probe process for a stage with optional closed `-e` gap selectors; it never confirms an installation."""
     command = [
         adb, "-s", serial, "shell", "am", "instrument", "-w", "-r",
         "-e", "class", PROBE, "-e", "allowControlledAttachmentProbe", "true",
         "-e", "fixtureBlobPort", str(ports[0]), "-e", "fixtureRelayPort", str(ports[1]),
         "-e", "fixtureApkStage", stage, "-e", "fixtureRestartSession", session,
+        *extra,
         APP + ".test/androidx.test.runner.AndroidJUnitRunner",
     ]
     return subprocess.run(command, check=True, capture_output=True, text=True,

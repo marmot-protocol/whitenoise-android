@@ -28,7 +28,9 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.state.DurablePendingEditIntent
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.OptimisticEdit
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.MediaCaptionFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
@@ -165,7 +167,31 @@ class MessageBubbleChromeScreenshotTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_pending_revision_dark.png")
     }
 
-    private fun renderPendingRevision(darkTheme: Boolean) {
+    @Test
+    fun durablyAdmittedRevisionLight() = captureDurableRevision(dark = false)
+
+    @Test
+    fun durablyAdmittedRevisionDark() = captureDurableRevision(dark = true)
+
+    private fun captureDurableRevision(dark: Boolean) {
+        renderPendingRevision(
+            darkTheme = dark,
+            edit =
+                OptimisticEdit(
+                    "Revision retained for delivery",
+                    "Original message",
+                    MessageStatus.Pending,
+                    DurablePendingEditIntent("original-token", "edit-token"),
+                ),
+        )
+        val theme = if (dark) "dark" else "light"
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/message_durable_revision_$theme.png")
+    }
+
+    private fun renderPendingRevision(
+        darkTheme: Boolean,
+        edit: OptimisticEdit? = null,
+    ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = darkTheme) {
                 Surface(color = MaterialTheme.colorScheme.background) {
@@ -179,12 +205,12 @@ class MessageBubbleChromeScreenshotTest {
                             modifier = Modifier.align(Alignment.End),
                         ) {
                             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
-                                Text("Revised before delivery")
+                                Text(edit?.text ?: "Revised before delivery")
                                 MessageInlineFooter(
                                     timeText = "12:36",
                                     color = messageBubbleTimestampColor(mine = true, deleted = false),
                                     showStatus = true,
-                                    status = MessageStatus.Pending,
+                                    status = edit?.status ?: MessageStatus.Pending,
                                     editedLabel = "Edited",
                                     onEditedClick = null,
                                     modifier = Modifier.align(Alignment.End),

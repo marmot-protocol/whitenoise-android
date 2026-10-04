@@ -505,6 +505,9 @@ internal class ConversationDictationCallerAudioStream(
     /** Returns the stable identity of this generation's exact claimed chunk. */
     fun chunkId(): Long? = chunk.get()?.chunkId
 
+    /** Checks sealed final ownership without acknowledging or changing retained PCM. */
+    fun isFinalChunk(): Boolean = chunk.get()?.let { buffer.isFinalChunk(it.chunkId) } == true
+
     /** Returns this generation’s chunk to the front of the queue without duplicating its byte accounting. */
     fun retry(): Boolean = settle(requeue = true)
 

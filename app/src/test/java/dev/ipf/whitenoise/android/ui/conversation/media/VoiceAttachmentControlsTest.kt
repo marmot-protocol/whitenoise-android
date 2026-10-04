@@ -2,13 +2,20 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
+import dev.ipf.whitenoise.android.state.AttachmentCancellationState
+import dev.ipf.whitenoise.android.state.AttachmentTransferState
+import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -83,6 +90,83 @@ class VoiceAttachmentControlsTest {
         assertEquals("1×", voiceSpeedLabel(1.2f))
         assertEquals("1.5×", voiceSpeedLabel(1.5f))
         assertEquals("2×", voiceSpeedLabel(2f))
+    }
+
+    /** A downloading clip shows real bytes, exposes Cancel as its one 48 dp action and never offers Play. */
+    @Test
+    fun aDownloadingClipOffersCancelAndShowsItsBytes() {
+        var cancels = 0
+        renderTransfer(
+            TileTransfer(
+                AttachmentTransferState.Downloading,
+                NativeAttachmentProgress(
+                    AttachmentTransferStateFfi.DOWNLOADING,
+                    1u,
+                    2_097_152uL,
+                    4_194_304uL,
+                    null,
+                    "body",
+                ),
+                AttachmentCancellationState.None,
+                suppressed = false,
+                onCancel = { cancels++ },
+            ),
+        )
+
+        composeRule.onNodeWithContentDescription("2.0 MB of 4.0 MB").assertHasClickAction().assertWidthIsAtLeast(48.dp)
+        composeRule.onAllNodesWithContentDescription("Play", substring = true).assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("2.0 MB of 4.0 MB").performClick()
+
+        assertEquals(1, cancels)
+    }
+
+    /** A cancelled clip offers Download again on one tap instead of Play. */
+    @Test
+    fun aCancelledClipOffersDownloadAgain() {
+        var retries = 0
+        renderTransfer(
+            TileTransfer(
+                AttachmentTransferState.Cancelled,
+                null,
+                AttachmentCancellationState.None,
+                suppressed = true,
+                onCancel = {},
+            ),
+            onRetry = { retries++ },
+        )
+
+        composeRule.onNodeWithContentDescription("Download cancelled", substring = true).performClick()
+
+        assertEquals(1, retries)
+    }
+
+    /** Composes the production voice row for a clip that is not local yet, with the given transfer. */
+    private fun renderTransfer(
+        transfer: TileTransfer,
+        onRetry: () -> Unit = {},
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                VoiceAttachmentContent(
+                    loading = true,
+                    failed = false,
+                    startDownload = true,
+                    localFileAvailable = false,
+                    isPlaying = false,
+                    isPaused = false,
+                    activePositionMs = 0,
+                    activeDurationMs = 0,
+                    totalDurationMs = 0,
+                    progressFraction = 0f,
+                    outgoing = false,
+                    onLongPress = {},
+                    onActionClick = {},
+                    transfer = transfer,
+                    onRetryTransfer = onRetry,
+                )
+            }
+        }
+        composeRule.waitForIdle()
     }
 
     /** Composes the production voice row with the given playback fixture. */

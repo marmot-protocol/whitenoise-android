@@ -370,6 +370,24 @@
         "test_ids": ["CHL-017"]
       },
       {
+        "surface": "Pending edit admission failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun failPendingEditAdmission(",
+        "test_ids": ["MSG-007"]
+      },
+      {
+        "surface": "Pending edit failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_edit_message",
+        "test_ids": ["MSG-007"]
+      },
+      {
+        "surface": "Durable pending message edit admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DurablePendingEditIntent.kt",
+        "anchor": "fun MarmotInterface.admitPendingMessageEdit(",
+        "test_ids": ["MSG-007"]
+      },
+      {
         "surface": "Accepted send native draft presentation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SentComposerDraftPresentation.kt",
         "anchor": "fun selectedPreview(",
@@ -676,6 +694,110 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentProgressDescription.kt",
         "anchor": "R.string.media_download_cancelled",
         "test_ids": ["MED-025"]
+      },
+      {
+        "surface": "TileTransferControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "internal fun TileTransferControl(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "TileTransferGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "internal fun TileTransferGlyph(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "TileTransferCaption",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "private fun TileTransferCaption(",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "R.string.media_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:reply_media_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "R.string.reply_media_video",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancel_download",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.media_cancel_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancel_download (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_cancel_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancel_unconfirmed (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_cancel_unconfirmed",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_cancelling_download (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_cancelling_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_download_cancelled (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_download_cancelled",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_downloading (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_downloading",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_tap_to_download (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_tap_to_download",
+        "test_ids": [
+          "MED-025"
+        ]
+      },
+      {
+        "surface": "string:media_tap_to_retry (tile)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
+        "anchor": "R.string.media_tap_to_retry",
+        "test_ids": [
+          "MED-025"
+        ]
       },
       {
         "surface": "FileBodyProgressIndicator",
@@ -3992,6 +4114,18 @@
           "CON-013",
           "CON-017"
         ]
+      },
+      {
+        "surface": "ConversationDictationEmptyRecognitionStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_no_speech",
+        "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "ConversationDictationFinalNoMatchRecovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "error == ConversationDictationFailure.NoMatch",
+        "test_ids": ["DIC-002"]
       },
       {
         "surface": "ConversationDictationAudioBufferFull",
@@ -25316,6 +25450,12 @@
           "SYS-004",
           "SYS-005"
         ]
+      },
+      {
+        "surface": "Failed original send precedence for Retry and Discard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun failedEditForAction(",
+        "test_ids": ["MSG-004", "MSG-007"]
       },
       {
         "surface": "Content-based animated image source admission",
