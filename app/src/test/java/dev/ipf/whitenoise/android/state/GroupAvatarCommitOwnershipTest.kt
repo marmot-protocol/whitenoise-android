@@ -139,7 +139,10 @@ class GroupAvatarCommitOwnershipTest {
     private class QueuedIoDispatcher : CoroutineDispatcher() {
         private val queued = ArrayDeque<Runnable>()
 
-        override fun dispatch(context: CoroutineContext, block: Runnable) {
+        override fun dispatch(
+            context: CoroutineContext,
+            block: Runnable,
+        ) {
             queued.addLast(block)
         }
 
