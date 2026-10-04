@@ -209,8 +209,8 @@ internal fun GroupEditScreen(
         /** Validate and publish a public HTTPS avatar URL for this group's current editor. */
         @Suppress("TooGenericExceptionCaught") // The FFI boundary can surface unchecked non-cancellation failures.
         fun setPublicAvatarUrl(url: String) {
-            val accountRef = appState.activeAccountRef ?: return
-            if (imageSaving || controller.mutationInFlight) return
+            val accountRef = appState.activeAccountRef
+            if (accountRef == null || imageSaving || controller.mutationInFlight) return
             val failureAttempt = imageFailureScope.begin()
             // Same HTTPS/credential/loopback policy the upload path enforces, but a
             // hand-typed URL earns a toast rather than safeAvatarUploadUrl's throw.
