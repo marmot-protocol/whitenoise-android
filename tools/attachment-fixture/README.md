@@ -123,8 +123,7 @@ bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-a
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
 the report, but representative 4 MiB performance is explicitly unqualified;
-the 1 KiB performance checker is inapplicable rather than relaxed. Full issue
-closure requires the remaining [five-issue qualification](../../docs/attachment-remaining-closure.md).
+the 1 KiB performance checker is inapplicable rather than relaxed.
 
 Performance checks use explicit environment profiles: local API30 arm64 defaults to `reference-api30-arm64`; CI passes `ci-api34-x86_64` as the script's third argument. The runner verifies actual API/ABI and enforces every sample through `budget_checker.py` before transport qualification. Violations are included in the saved report and fail the command; no successful HTTP transfer can override them. To check only the performance fields of an existing report:
 

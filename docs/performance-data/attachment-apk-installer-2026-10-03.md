@@ -1,9 +1,9 @@
 # Genuine received APKs at the Android open boundary, 2026-10-03
 
-Refs [#2781](https://github.com/marmot-protocol/whitenoise-android/issues/2781) and tracker
+Context: [#2781](https://github.com/marmot-protocol/whitenoise-android/issues/2781) and tracker
 [#2779](https://github.com/marmot-protocol/whitenoise-android/issues/2779). This report qualifies, on disposable
 emulators, what the real Android open path does with files that were genuinely sent and received. It changes no shipping
-behavior, installs nothing and **does not replace the exact-head physical-device coverage that #2781 requires**.
+behavior and installs nothing. It is an emulator measurement and does not cover a physical device.
 
 ## Method
 
@@ -22,7 +22,7 @@ The prepare stage requires exact bytes and publishes each verified file with the
 Later stages run in **new processes**: the host sets the install-unknown-apps app-op for only the isolated fixture
 package, and each stage reopens the restored runtime with acquisition unavailable, republishes the file from native
 retention and calls the real `openAttachmentExternally`. The host toggles the app-op between stages because changing it
-kills the app process, which a first draft that toggled it in-process found the hard way. The probe records the exact
+kills the app process. The probe records the exact
 `OpenAttachmentResult` and whether the system package installer actually reached the screen, by polling the active window
 for the package that handles APK installs, then dismisses it with Back. Nothing is ever installed or replaced.
 
@@ -31,8 +31,8 @@ dispatch reuses the completed download. `apk_checker.py` fails closed and record
 
 ## Source cohort
 
-- Signed commit `da7dad7cdab3abcbd45c227723a3f19553d73cd6` on the head of #3026, which rests on #3025, #3021 and master
-  `60988a94eb4c431fb35e36251d4aa60ac5204218`. The tree was clean and committed when each case was built.
+- Signed commit `da7dad7cdab3abcbd45c227723a3f19553d73cd6`, on master `60988a94eb4c431fb35e36251d4aa60ac5204218` plus the
+  fixture changes. The tree was clean and committed when each case was built.
 - MDK pin `122bd90ffac60bb6311346e228d0f609a18521ee`, native bytes unchanged.
 - Owned AVDs only: `wn_2779_fixture_api30` and `wn_2779_fixture_api36`, both arm64-v8a.
 
@@ -88,8 +88,8 @@ and API 36. Dispatch time is the call into the open path, in milliseconds (API 3
 
 ## Not qualified here
 
-Exact-head physical-device coverage, which #2781 names explicitly (a valid and an invalid package, deny then grant,
-cancel and retry, and process recreation during the download), a 30 to 50 MiB package (the Android controller cannot send
+Physical-device coverage (a valid and an invalid package, deny then grant, cancel and retry, and process recreation
+during the download), a 30 to 50 MiB package (the Android controller cannot send
 more than 32 MiB, so this needs the separate MDK sender), the no-installer-available state on a device, the rendered
 file card and notification, and any actual installation. Private raw reports, logs and checksums are retained outside the
 repository.
