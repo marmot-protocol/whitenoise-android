@@ -6,52 +6,32 @@ Context: [#2781](https://github.com/marmot-protocol/whitenoise-android/issues/27
 emulators. This runbook covers the same probe on one explicitly authorized physical device: what each step changes on
 the phone, what evidence each criterion produces, and what it does not cover.
 
-**Status (2026-10-04):** run on a Pixel 9 Pro XL (Android 17, API 37) at a clean head. The Zapstore base run, the
-cancel-retry run, the 31.8 MB package with the simulated no-installer branch, the Play base run and the Play
-cancel-retry plus large-package run all qualified with no checker violations. Installation of a received APK is never
-confirmed, because the probe dismisses the installer, and the gaps under "Not covered" remain.
+**Status (2026-10-04):** run on a Pixel 9 Pro XL (Android 17, API 37) at the clean master head `6cee08a06`, with the
+probe and checker that observe the screen after every dispatch, force the readback and gate the large package. The
+Zapstore base run, the cancel-retry run, the 30.95 MiB package with the simulated no-installer branch, the Play base run
+and the Play cancel-retry plus large-package run all qualified with no checker violations ([results](#results-at-the-master-head)).
+Installation of a received APK is never confirmed, because the probe dismisses the installer, and the gaps under "Not
+covered" remain.
 
 ## Physical criteria and how each is covered
 
 | Physical criterion | Mechanism | Status | Notes |
 | --- | --- | --- | --- |
-| Valid received APK downloads, verifies, launches the system installer | Existing `valid` case, stage `dispatch-allowed` | Run, qualified | Same probe as the emulator run, driven by `apk_physical_runner.py run` |
-| Invalid APK-shaped file settles as a distinct state | Existing `no-manifest` and `truncated` cases, plus `generic` and `conflict` | Run, qualified | `InvalidPackage` before any launch |
-| Install permission denied, then granted | Host toggles the app-op on the isolated package between stages | Run, qualified | Requires `--allow-install-app-op-toggle`; the original mode is recorded and restored |
-| Cancellation and retry | `--cancel-retry`: the shared held-body cancellation probe runs on the `valid` case before publication | Run, qualified | Cancel acknowledged and the socket closed within 0.2 s, ten ordinary joins refused, 30 s quiet, exact bytes on the deliberate retry |
-| 30 to 50 MiB package | `--large-apk`: a host-built, genuinely signed 30 to 31 MiB package sent through the shipping controller | Run at 30.3 MiB, qualified with the earlier probe | 31 MiB is inside the issue's range and under the 32 MiB Android sender cap, above 32 MiB is not sendable, see below |
+| Valid received APK downloads, verifies, launches the system installer | Existing `valid` case, stage `dispatch-allowed` | Run at the master head, qualified | Same probe as the emulator run, driven by `apk_physical_runner.py run` |
+| Invalid APK-shaped file settles as a distinct state | Existing `no-manifest` and `truncated` cases, plus `generic` and `conflict` | Run at the master head, qualified | `InvalidPackage` before any launch |
+| Install permission denied, then granted | Host toggles the app-op on the isolated package between stages | Run at the master head, qualified | Requires `--allow-install-app-op-toggle`; the original mode is recorded and restored |
+| Cancellation and retry | `--cancel-retry`: the shared held-body cancellation probe runs on the `valid` case before publication | Run at the master head, qualified | Cancel acknowledged and the socket closed within 0.25 s, ten ordinary joins refused, 30 s quiet, exact bytes on the deliberate retry |
+| 30 to 50 MiB package | `--large-apk`: a host-built, genuinely signed 30 to 31 MiB package sent through the shipping controller | Run at 30.95 MiB (32,450,112 bytes), qualified | Inside the issue's 30 to 50 MiB range and under the 32 MiB Android sender cap; above 32 MiB is not sendable from Android, see below |
 | No installer available | `--no-installer-branch`: the real open path meets `ActivityNotFoundException` through a context wrapper | Simulated branch only | Exercises the app's `NoInstaller` branch on the device, does not induce a genuine installer-less platform state |
 | Process recreation during download | `controller-apk-recreation` | Emulator only | Qualified separately on owned emulators; not run on a physical device |
 
-## Device facts gathered read-only on 2026-10-03
+## Device facts at the master-head run
 
-Only read-only adb queries were issued against the Pixel, each with an explicit `-s <serial>`. Nothing was
-installed, launched, toggled or removed.
-
-| Command | Result |
-| --- | --- |
-| `adb devices -l` | Pixel 9 Pro XL, plus any owned emulators |
-| `shell getprop ro.build.version.sdk` / `ro.build.version.release` / `ro.product.cpu.abi` / `ro.build.type` | `37` / `17` / `arm64-v8a` / `user` (release keys) |
-| `shell getprop ro.kernel.qemu` | empty, a physical device |
-| `shell pm list packages dev.ipf.whitenoise` | `dev.ipf.whitenoise.android.medialatency.test` is installed, the app `dev.ipf.whitenoise.android.medialatency` is **absent** |
-| `shell pm path dev.ipf.whitenoise.android.medialatency` | exit 1, confirms the app is absent |
-| `shell dumpsys package dev.ipf.whitenoise.android.medialatency.test` (filtered) | `minSdk 30`, `targetSdk 36`, installed for user 0 and user 10 (Private space), last updated 2026-10-02 16:47, signer hash `779511c1` |
-| `shell dumpsys package dev.ipf.whitenoise.android.dev` (filtered) | same signer hash `779511c1` |
-| local `keytool -exportcert` on `~/.android/debug.keystore`, hashed as `Signature.hashCode()` | `779511c1`, so locally built debug APKs are in-place compatible with the installed test package |
-| `shell cmd package resolve-activity --brief -a android.intent.action.INSTALL_PACKAGE -d content://fixture/apk -t application/vnd.android.package-archive` | `com.google.android.packageinstaller/com.android.packageinstaller.InstallStart` |
-| `shell dumpsys package com.google.android.packageinstaller` (filtered) | installed and enabled for both users |
-| `shell appops get dev.ipf.whitenoise.android.medialatency REQUEST_INSTALL_PACKAGES` | `No UID`, the app is absent so no app-op exists yet |
-| `shell dumpsys user` (filtered) | no device-policy or user restrictions |
-| `shell settings get secure install_non_market_apps` | `1` |
-| `shell pm list users` | `0:Owner` running, `10:Private space` |
-| `shell df -h /data` | 11 GiB free of 109 GiB |
-| `shell dumpsys battery` (filtered) | 26 %, AC powered |
-| `reverse --list` | empty |
-| `shell ls -l` on the installed test `base.apk` | world-readable, so a read-only `adb pull` can retain it as the restore copy |
-
-Surprises: the isolated **app** package is gone although its test package remains, so the first install on the Pixel is
-a fresh install of that package, not an in-place update. The emulator report's own APK bytes differ from the Pixel's
-retained test package, so the first step is necessarily a rebuild at the exact head.
+Read-only checks before every run, each with an explicit `-s <serial>`: the phone on the launcher, awake and unlocked,
+on AC power (54 %), no active instrumentation, no `adb reverse` mappings, and the isolated app and test packages
+installed. The runner's own preflight reported API 37, `arm64-v8a`, a complete isolated identity, no existing reverses and
+the install app-op at `default`, and `ready_for_run: true`. Both candidate signers were identical to the installed test
+package, and the device's `sha256sum` of each installed `base.apk` equalled the candidate for both distributions.
 
 ## Preconditions
 
@@ -69,7 +49,7 @@ Host:
 
 Phone:
 
-- USB attached, authorized for adb, screen unlocked and kept awake, on power (26 % at preflight is low for a run set).
+- USB attached, authorized for adb, screen unlocked and kept awake, on power.
 - Nobody else is using the Pixel: no concurrent installs, no other `adb reverse` mappings, no scripted input from
   another agent. The two emulators may keep running, they are not touched by this gate.
 - The owner is present for every `run`: the system installer sheet reaches the screen during the allowed stage and is
@@ -79,11 +59,11 @@ Phone:
 
 Each item is a separate, explicit decision. The tooling refuses without the corresponding flag.
 
-1. **Fresh install** of `dev.ipf.whitenoise.android.medialatency` and **in-place update** of
+1. **In-place update** of `dev.ipf.whitenoise.android.medialatency` and
    `dev.ipf.whitenoise.android.medialatency.test` for user 0 (`adb install -r -t --user 0`, never `-d`, never `-g`,
-   never `uninstall`, never `pm clear`). Flags: `--confirm-in-place-update --allow-fresh-install-of-isolated-identity`
-   the first time, `--confirm-in-place-update` alone for later heads and for the Play flavor, which replaces the
-   Zapstore build of the same package id.
+   never `uninstall`, never `pm clear`). Flag: `--confirm-in-place-update`, which is also all the Play flavor needs,
+   because it replaces the Zapstore build of the same package id. `--allow-fresh-install-of-isolated-identity` is needed
+   only when the app package is absent from the phone.
 2. **App-op toggling** of `REQUEST_INSTALL_PACKAGES` on that one package only (`default`, `deny`, `allow`, then the
    recorded original). Android kills the isolated app's process on each change, by design. Flag:
    `--allow-install-app-op-toggle` (Zapstore only, refused for Play).
@@ -149,7 +129,7 @@ mkdir -p "$RUN" && chmod 700 "$RUN"
    python3 tools/attachment-fixture/apk_physical_runner.py install --adb "$ADB" \
      --serial "$SERIAL" --physical-fixture-serial "$SERIAL" \
      --app-apk "$APP_APK" --test-apk "$TEST_APK" --backup-dir "$RUN/backup-zapstore" --build-tools "$TOOLS" \
-     --confirm-in-place-update --allow-fresh-install-of-isolated-identity
+     --confirm-in-place-update
    ```
 
 5. **Base Zapstore run. State changes: app-op `default`, `deny`, `allow`, then restored, installer sheet on screen,
@@ -249,6 +229,34 @@ The system installer appears for a few seconds on each allowed dispatch and is d
 phone on the home screen and leave it idle before every run: the probe's Back presses would otherwise land on whatever
 app is underneath.
 
+## Results at the master head
+
+Clean master head `6cee08a06`, Pixel 9 Pro XL, API 37 arm64, every run preceded by the read-only state checks above and
+followed by a restore check (install app-op back at `default`, no reverses, phone on the launcher). Isolated builds
+installed in place with no uninstall and no clearing; the device `sha256sum` of each installed `base.apk` equalled the
+candidate.
+
+| Build | App APK SHA-256 | Test APK SHA-256 |
+| --- | --- | --- |
+| Zapstore | `839357037b545f7c35cd4b53d549abf6a40c0f49a9179f5fa6a1a0b0bd5a7f9a` | `4e42e8b4029629759c85ea7bc94bfc87d7145e1d6678b47a8aa460eff1019b8d` |
+| Play | `5aa0b1c351d784f72ea6dd127abbc9164cadd2c2232b4569fc66b200dda46a21` | `227d0d4a8cc138f7ac0c1ab08a1bfebec40a6c7d79188f1d0bc33faebda8ea5e` |
+
+The large payload is 32,450,112 bytes (30.95 MiB), signed with the debug key and accepted by `apksigner` before the device
+was contacted (SHA-256 `c7b19fa22b7506673807b325861251b803bbfa3392161e2282646215793ea7f8`).
+
+| Run | Result | Installer and platform outcomes |
+| --- | --- | --- |
+| Zapstore base | qualified, 5 uploads and 5 acquisitions | valid denied: `InstallPermissionRequired`, no installer in 1.08 s; valid and generic allowed: `Opened`, installer seen after 144 and 112 ms and settled after 135 and 139 ms of staging; conflict: `Opened`, no installer; no-manifest and truncated: `InvalidPackage` |
+| Zapstore cancel-retry | qualified, 6 acquisitions | Cancel acknowledged in 187 ms, socket closed in 196 ms, ten ordinary joins refused, 30 s quiet, exact bytes on the deliberate retry; the same dispatch outcomes as the base run |
+| Zapstore large and simulated no-installer | qualified, 6 uploads and 6 acquisitions | large allowed: `Opened`, installer seen after 109 ms, progress indicator seen, settled after 354 ms of staging; valid with the simulated branch: `NoInstaller`, reported as simulated |
+| Play base | qualified, 5 uploads and 5 acquisitions | valid and generic: `InstallUnsupported`, no installer in 1.09 s; conflict: `Opened`, no installer; no-manifest and truncated: `InvalidPackage` |
+| Play cancel-retry and large | qualified, 6 uploads and 7 acquisitions | Cancel acknowledged in 190 ms, socket closed in 230 ms, ten ordinary joins refused, 30 s quiet, exact retry; large: `InstallUnsupported`, no installer |
+
+Every run reached `ledger_finalized`, recorded the original app-op and restored it, removed its reverses, and reported
+`installation_confirmed: false`. The ledger shows each package acquired once, the cancel-retry runs adding exactly one
+more acquisition, and the large payload fetched once outside the counted ledger. The raw reports, ledgers, install
+receipts, APK digests and checksums stay in a private directory outside the repository.
+
 ## Evidence per criterion and how it is checked
 
 All checks are `apk_checker.check_apk`, applied by the runner with the selected gaps, and recorded in the report's
@@ -263,7 +271,7 @@ All checks are `apk_checker.check_apk`, applied by the runner with the selected 
 | Denied then granted | `(valid, denied)` then `(valid, allowed)` in separate processes | `InstallPermissionRequired` then `Opened`, ledger still shows one acquisition, so the denied dispatch reused the completed download |
 | Cancel and retry | `held-body-cancellation` row, ledger `hold_acquisition`, `held` at 1024 bytes, `cancel_marker`, `disconnect`, `release_acquisition`, a second `get` that completes | socket close within 5 s, `deliberate_retry_exact_bytes`, `no_work_cancel_confirmed`, exactly two attempts for the valid fixture, body bytes equal uploads plus the 1024 byte held prefix, no other case touched |
 | No partial file to the installer | structural plus the cancel run | the production materializer publishes only a complete file, the probe asserts exact bytes before publication, and the retried transfer is the only completed one |
-| 30 to 31 MiB package | `apk-transfer-large`, `apk-received large` exact, `(large, allowed)` or `(large, n/a)`, one `payload_fetch` and `payload_complete` | `Opened` with installer on Zapstore, `InstallUnsupported` on Play, exactly one genuine upload and acquisition of 32,440,336 ciphertext bytes |
+| 30 to 31 MiB package | `apk-transfer-large`, `apk-received large` exact, `(large, allowed)` or `(large, n/a)`, one `payload_fetch` and `payload_complete` | `Opened` with installer on Zapstore, `InstallUnsupported` on Play, exactly one genuine upload and acquisition of the payload plus its 16-byte tag; at the master head the Zapstore case also needs `installer_settled`, `installer_progress_seen` and a staging time above zero |
 | No installer, app branch | `(valid, no-installer-simulated)` | `NoInstaller`, installer not shown, file still reused, reported as simulated |
 | Transfer separate from dispatch | per-case transfer rows versus per-dispatch rows | the two phases are different metrics and the ledger counts only transfers |
 
@@ -285,19 +293,15 @@ APKs. The report's `environment` is API and ABI only, no serial, model, account 
 ## Known risks and open questions
 
 - **Installer visibility.** The probe resolves the installer package with `queryIntentActivities` from the app
-  context. It worked on API 30 and 36 emulators. If Android 17 package visibility hides it on the Pixel, the valid
-  dispatch would report `Opened` with `installer_shown` false and the checker would fail truthfully. The mitigation
-  would be a test-only `<queries>` intent entry in the androidTest manifest, which means a new head and a rerun.
+  context. On the Android 17 Pixel the system installer was found and shown for every allowed valid, generic and large
+  dispatch, so package visibility did not hide it.
 - **Installer sheet shape.** The dispatched valid package is the fixture's own test APK, so the installer shows an
   update prompt for the installed test package. The probe presses Back three times, nobody taps Install.
-- **`appops set` on a user build.** Expected to work from the adb shell. If it is refused, the deny and grant stages
-  cannot be driven by the host, the run stops, and the alternative is the owner toggling Install unknown apps for
-  "Media Latency Lab" in Settings, outside this runner.
-- **Untested probe additions.** The cancel-retry reuse, the payload fetch and the no-installer wrapper compiled but
-  never ran on any device. The first execution may surface a probe defect rather than a product fact, which is why
-  the report keeps `instrumentation_passed` and the JUnit outcome per stage.
+- **`appops set` on a user build.** It worked from the adb shell, so the deny and grant stages were driven by the host.
+  If a build refuses it, the run stops and the alternative is the owner toggling Install unknown apps for "Media Latency
+  Lab" in Settings, outside this runner.
 - **Timing.** Each stage has a 600 s probe deadline and a 900 s host timeout, the cancel run adds a 30 s quiet
-  interval, the large run uploads and downloads 31 MiB over USB adb reverse.
+  interval, and the large run uploads and downloads 31 MiB over USB adb reverse.
 - **Private space.** User 10 also holds the orphan test package. `--user 0` installs update the shared code and
   leave user 10's install state alone, they do not add the app to the private space.
 - **Shared adb server.** The emulators used by other work share the host adb server. The fixture servers bind
@@ -308,16 +312,8 @@ APKs. The report's `environment` is API and ABI only, no serial, model, account 
 
 - **Process recreation during download.** Qualified on owned emulators by `controller-apk-recreation`, where the
   probe ends its own process while a real download is held and a new process completes it from the committed prefix.
-  Not run on a physical device: it needs the owner's approval for the probe to end its own process on the phone, in
-  addition to the authorizations above.
-- **A forced native-retention readback on the phone.** The physical runs predate the probe change that deletes the
-  published copy of each file before a dispatch stage reads it back. On the phone the later stages therefore reused the
-  copy the prepare process had published, and the retained bytes were not re-read. The forced readback is qualified on
-  emulators only.
-- **Installer observation after every dispatch on the phone.** The physical runs also predate the probe change that
-  watches the screen after every dispatch result. On the phone the screen was watched only after an `Opened` result, so
-  an absent installer behind `InvalidPackage`, `InstallPermissionRequired` or `InstallUnsupported` was recorded without
-  being looked for. The all-results observation is qualified on emulators only.
+  Not run on a physical device: the recreation runner refuses a non-emulator serial by design, and the probe ending its
+  own process on a phone is a separate owner decision.
 - **A genuine installer-less platform state.** Not inducible on the owner's phone without disabling the system
   package installer, which is a system change this plan does not request. The simulated branch covers the app's
   `NoInstaller` handling only. A disposable emulator with the installer disabled for user 0 is the only truthful
@@ -326,6 +322,5 @@ APKs. The report's `environment` is API and ABI only, no serial, model, account 
   `ConversationController.MEDIA_RETAINED_MAX_BYTES` (32 MiB), so a 33 to 50 MiB package cannot be sent from
   Android. The native `Marmot.uploadMedia` path documents no size cap in the 0.12.0 binding, and the app does not
   configure a receive-side `transferLimit`, so a larger package would need the native sender and a separate probe to
-  establish the receive-side limit empirically. The 31 MiB payload here satisfies the issue's 30 to 50 MiB range
-  without weakening any budget.
+  establish the receive-side limit empirically. The 30.95 MiB payload here is the largest the Android sender can send.
 - **Manual flows.** The rendered file card, notifications and MED-018 outcomes remain manual and unchecked.
