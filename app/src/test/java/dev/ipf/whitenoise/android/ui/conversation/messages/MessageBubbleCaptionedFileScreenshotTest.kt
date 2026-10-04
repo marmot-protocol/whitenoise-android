@@ -13,6 +13,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -23,6 +26,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
@@ -127,6 +131,14 @@ class MessageBubbleCaptionedFileScreenshotTest : MessageBubbleFileAttachmentFixt
 
         val sentCard = fileAttachmentCardTestTag(sent.record.messageIdHex, 0)
         val receivedCard = fileAttachmentCardTestTag(received.record.messageIdHex, 0)
+        // Compose idleness does not await the outgoing file's IO cache probe. Capture its settled
+        // failure state, not the transient "Preparing download" frame from that probe.
+        val sentRetry =
+            hasContentDescription(context.getString(R.string.media_tap_to_retry)) and
+                hasAnyAncestor(hasTestTag(sentCard))
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodes(sentRetry, useUnmergedTree = true).fetchSemanticsNodes().size == 1
+        }
         composeRule.onNodeWithText(SENT_CAPTION, useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText(RECEIVED_CAPTION, useUnmergedTree = true).assertIsDisplayed()
         assertNodeBelowCard(sentCard, text = SENT_CAPTION)
