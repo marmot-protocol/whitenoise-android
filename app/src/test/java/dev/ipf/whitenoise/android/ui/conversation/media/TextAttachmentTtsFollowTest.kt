@@ -48,7 +48,14 @@ class TextAttachmentTtsFollowTest {
             assertNull(textAttachmentPlaybackPassage(playback.copy(entry = entry.copy(projectionId = "different"))))
             val otherAttachment = playback.copy(entry = entry.copy(messageIdHex = "attachment:message:1"))
             assertNull(textAttachmentPlaybackPassage(otherAttachment))
-            val selected = textAttachmentTtsEntry(preview.copy(text = "Second sentence."), "alice", "Alice", "message", 0)
+            val selected =
+                textAttachmentTtsEntry(
+                    preview.copy(text = "Second sentence."),
+                    "alice",
+                    "Alice",
+                    "message",
+                    0,
+                )
             harness.speakEntries(listOf(selected))
             assertNull(textAttachmentPlaybackPassage(playback.copy(state = harness.controller.state.value)))
         }

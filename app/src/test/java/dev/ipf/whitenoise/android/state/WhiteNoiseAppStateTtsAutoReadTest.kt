@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
+import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -124,6 +125,26 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         assertEquals(listOf("Sender: Second.", "Third."), engine.spoken.map { it.text })
         assertTrue(appState.ownsTtsAutoReadSession(groupA))
     }
+
+    @Test
+    fun conversationPreparedStartRejectsAnUnmappableHitWithoutReadingFromTheTop() =
+        runBlocking {
+            val appState = testAppState()
+            val engine = FakeSessionEngine()
+            appState.ttsController.attachEngine(engine)
+            assertFalse(
+                appState.speakAloudAutoRead(
+                    groupIdHex = groupA,
+                    entries = listOf(TtsSpeakableEntry("s", "Sender", "First. Second.")),
+                    locale = Locale.US,
+                    startRenderedHit = PreparedRenderedHit("missing", "changed", 0),
+                    backgroundPreparation = true,
+                ),
+            )
+            assertTrue(engine.spoken.isEmpty())
+            assertFalse(appState.ownsTtsAutoReadSession(groupA))
+            assertTrue(appState.ttsController.state.value is TtsState.Idle)
+        }
 
     @Test
     fun disablingAutoReadDoesNotStopManualSpeech() {

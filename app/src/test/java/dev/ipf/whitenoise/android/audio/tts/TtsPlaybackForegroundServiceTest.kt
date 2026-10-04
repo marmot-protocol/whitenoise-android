@@ -152,7 +152,18 @@ class TtsPlaybackForegroundServiceTest {
                 ?.sentenceIndex,
         )
         val notification = requireNotNull(shadowOf(service as Service).lastForegroundNotification)
-        assertFalse(notification.extras.toString().contains("private"))
+        val visibleFields =
+            listOf(
+                notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE),
+                notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT),
+                notification.extras.getCharSequence(android.app.Notification.EXTRA_SUB_TEXT),
+                notification.tickerText,
+            )
+        visibleFields.forEach { value ->
+            val visible = value?.toString().orEmpty()
+            assertFalse("notification must not leak the filename", visible.contains("private-notes.txt"))
+            assertFalse("notification must not leak document text", visible.contains("private sentence"))
+        }
         service.onStartCommand(
             Intent(context, service::class.java).setAction(TtsPlaybackForegroundService.ACTION_PLAY),
             0,
