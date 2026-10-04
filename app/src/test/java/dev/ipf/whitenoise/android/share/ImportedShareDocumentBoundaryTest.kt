@@ -66,7 +66,12 @@ class ImportedShareDocumentBoundaryTest {
                         )
                     val reader = ConversationAttachmentReader(state, context)
                     val uri = imported.payload.streamUris.single()
-                    val attachment = if (mime == "image/png") reader.readVisualDraft(uri)!! else reader.readDocumentDraft(uri)!!
+                    val attachment =
+                        if (mime == "image/png") {
+                            reader.readVisualDraft(uri)!!
+                        } else {
+                            reader.readDocumentDraft(uri)!!
+                        }
                     assertEquals("image/jpeg", attachment.mediaType)
                     assertTrue(attachment.plaintextBytes.size < 32 * 1024 * 1024)
                 }

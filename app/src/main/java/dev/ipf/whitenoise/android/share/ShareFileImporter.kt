@@ -194,8 +194,11 @@ internal class ShareFileImporter(
             ImportedFile(uri, copied.size)
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
-        } catch (failure: Exception) {
-            currentCoroutineContext().ensureActive()
+        } catch (_: EmptyShareSource) {
+            importFailure(ShareImportError.Empty)
+        } catch (_: SecurityException) {
+            importFailure(ShareImportError.Unreadable)
+        } catch (failure: IOException) {
             val error =
                 when (failure) {
                     is ShareSizeExceeded ->
@@ -204,15 +207,20 @@ internal class ShareFileImporter(
                             copyLimit < remaining -> ShareImportError.Storage
                             else -> ShareImportError.BatchTooLarge
                         }
-                    is EmptyShareSource -> ShareImportError.Empty
-                    is SecurityException, is ShareSourceUnavailable -> ShareImportError.Unreadable
-                    is IOException -> ShareImportError.Storage
-                    else -> ShareImportError.Metadata
+                    is ShareSourceUnavailable -> ShareImportError.Unreadable
+                    else -> ShareImportError.Storage
                 }
-            ImportedFile(error = error)
+            importFailure(error)
+        } catch (_: Exception) {
+            importFailure(ShareImportError.Metadata)
         } finally {
             staged?.let(files::delete)
         }
+    }
+
+    private suspend fun importFailure(error: ShareImportError): ImportedFile {
+        currentCoroutineContext().ensureActive()
+        return ImportedFile(error = error)
     }
 
     private data class ImportedFile(
