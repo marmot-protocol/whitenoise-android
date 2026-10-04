@@ -71,36 +71,90 @@ import java.util.concurrent.TimeUnit
 class ConversationSendRetryIntegrationTest {
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun confirmedTokenBearingMessageUsesTheWireEditPathInProduction() =
+    fun confirmedProjectionUsesNativeEditsOnlyWhenItsLedgerTokenIsRetained() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-            var nativeEdits = 0
-            val wireEdits = mutableListOf<Pair<String, String>>()
-            val controller =
-                ConversationController(
-                    appState = appState(),
-                    initialGroup = group(),
-                    initialMemberSnapshot = memberSnapshot(),
-                    groupRosterReader = { _, _ -> authoritativeRoster() },
-                    pendingMessageEditPublisher = { _, _, _, _, _ ->
-                        nativeEdits += 1
-                        pendingLocalSend()
-                    },
-                    messageEditPublisher = { _, _, target, text -> wireEdits += target to text },
-                )
             try {
-                controller.retryMembers()
-                applyProjection(
-                    controller,
-                    projectedMessage(5uL, null, null).copy(clientToken = "retained-original-token"),
-                )
-                controller.beginMessageEdit(CONFIRMED_MESSAGE_ID)
-                controller.send("confirmed revision")
-                assertEquals(listOf(CONFIRMED_MESSAGE_ID to "confirmed revision"), wireEdits)
-                assertEquals(0, nativeEdits)
-                assertNull(controller.editingMessageId)
+                for (originalToken in listOf(null, "retained-original-token")) {
+                    val nativeEdits = mutableListOf<Pair<String, String>>()
+                    val wireEdits = mutableListOf<Pair<String, String>>()
+                    val controller =
+                        ConversationController(
+                            appState = appState(),
+                            initialGroup = group(),
+                            initialMemberSnapshot = memberSnapshot(),
+                            groupRosterReader = { _, _ -> authoritativeRoster() },
+                            pendingMessageEditPublisher = { _, _, original, text, _ ->
+                                nativeEdits += original to text
+                                pendingLocalSend()
+                            },
+                            messageEditPublisher = { _, _, target, text -> wireEdits += target to text },
+                        )
+                    try {
+                        controller.retryMembers()
+                        applyProjection(controller, projectedMessage(5uL, null, null).copy(clientToken = originalToken))
+                        controller.beginMessageEdit(CONFIRMED_MESSAGE_ID)
+                        controller.send("confirmed revision")
+                        val expectedNative = originalToken?.let { listOf(it to "confirmed revision") }.orEmpty()
+                        val expectedWire =
+                            if (originalToken == null) {
+                                listOf(CONFIRMED_MESSAGE_ID to "confirmed revision")
+                            } else {
+                                emptyList()
+                            }
+                        assertEquals(expectedNative, nativeEdits)
+                        assertEquals(expectedWire, wireEdits)
+                        assertNull(controller.editingMessageId)
+                    } finally {
+                        controller.onCleared()
+                    }
+                }
             } finally {
-                controller.onCleared()
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun replacementControllerKeepsNewRevisionsInTheNativeSubmissionOrder() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val originalTokens = mutableListOf<String>()
+            val revisionTokens = mutableListOf<String>()
+            val state = appState()
+            try {
+                repeat(2) { revision ->
+                    val controller =
+                        ConversationController(
+                            appState = state,
+                            initialGroup = group(),
+                            initialMemberSnapshot = memberSnapshot(),
+                            groupRosterReader = { _, _ -> authoritativeRoster() },
+                            pendingMessageEditPublisher = { _, _, original, _, token ->
+                                originalTokens += original
+                                revisionTokens += token
+                                pendingLocalSend()
+                            },
+                            messageEditPublisher = { _, _, _, _ ->
+                                error("retained native original must keep ordering")
+                            },
+                        )
+                    try {
+                        controller.retryMembers()
+                        applyProjection(
+                            controller,
+                            projectedMessage(5uL, null, null).copy(clientToken = "retained-original-token"),
+                        )
+                        controller.beginMessageEdit(CONFIRMED_MESSAGE_ID)
+                        controller.send("revision $revision")
+                        assertNull(controller.editingMessageId)
+                    } finally {
+                        controller.onCleared()
+                    }
+                }
+                assertEquals(listOf("retained-original-token", "retained-original-token"), originalTokens)
+                assertEquals(2, revisionTokens.distinct().size)
+            } finally {
                 Dispatchers.resetMain()
             }
         }

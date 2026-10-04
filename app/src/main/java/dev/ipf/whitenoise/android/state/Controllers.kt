@@ -7900,17 +7900,15 @@ class ConversationController(
         // [editsByTarget] picks it up.
         val editTarget = editingMessageId
         if (editTarget != null) {
-            // A retained token alone does not turn a published original into a pending send.
-            // Keep native ordering for an existing pending revision or an unconfirmed original.
+            // Native projection tokens come from MDK's retained submission ledger.
+            // Keep native edit ordering after publication and controller replacement too.
             val originalToken =
                 pendingMessageEditHandoff.originalClientToken(pendingEditKey(editTarget))
                     ?: optimisticEdits[editTarget]
                         ?.takeIf { it.status != MessageStatus.Sent }
                         ?.durableIntent
                         ?.originalClientToken
-                    ?: timelineRecords[editTarget]
-                        ?.takeIf { it.sourceMessageIdHex == null }
-                        ?.clientToken
+                    ?: timelineRecords[editTarget]?.clientToken
             if (originalToken != null && (textPublisher == null || pendingMessageEditPublisher != null)) {
                 var session = editSessionRevision
                 // Local admission is independent of relay publication. Until it succeeds the editor
