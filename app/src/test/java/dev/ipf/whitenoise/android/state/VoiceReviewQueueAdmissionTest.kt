@@ -51,6 +51,8 @@ class VoiceReviewQueueAdmissionTest {
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     groupRosterReader = { _, _ -> authoritativeRoster() },
+                    // This fixture exercises queue revocation without a native uploader/runtime.
+                    mediaUploader = { _, _, _ -> error("Queue-only fixture must not upload") },
                     markdownParser = {
                         parseStarted.complete(Unit)
                         releaseParse.await()

@@ -50,8 +50,19 @@ internal suspend fun WhiteNoiseAppState.captureMediaReplyDraft(
                 draft.mediaAttachments.zip(attachments).all { (descriptor, attachment) ->
                     descriptor.fileName == attachment.fileName && descriptor.mediaType == attachment.mediaType
                 }
-        requireMediaReplyDraft(target, draft?.replyToMessageIdHex, descriptorsMatch)
-        selected.takeIf { target != null }
+        if (!descriptorsMatch) {
+            requireMediaReplyDraft(target, null, false)
+            null
+        } else {
+            checkNotNull(selected)
+            checkNotNull(draft)
+            // Reply selection is UI state; the coalescing draft writer owns text only.
+            // Bind the captured selection here through MDK, without waiting for a text debounce.
+            val revision =
+                saveDraftForSend(account, selected, draft.content, target)
+                    ?: throw MediaReplyDraftUnavailableException()
+            SelectedMessageDraftFfi(revision, draft.copy(replyToMessageIdHex = target))
+        }
     }
 
 /** Refresh only the same accepted content; never consume a newer user's draft to repair a stale revision. */

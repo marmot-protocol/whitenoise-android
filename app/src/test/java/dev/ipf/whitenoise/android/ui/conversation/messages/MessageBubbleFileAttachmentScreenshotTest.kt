@@ -114,6 +114,8 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             initialGroup = group(),
             initialMemberSnapshot = memberSnapshot(),
             groupRosterReader = { _, _ -> authoritativeRoster() },
+            // Render-only optimistic fixtures deliberately do not initialize or upload through MDK.
+            mediaUploader = { _, _, _ -> error("Rendering fixtures must not upload media") },
         )
     private val composerTextState = ComposerTextState(TextFieldValue(""))
     private var originalTimeFormat: String? = null

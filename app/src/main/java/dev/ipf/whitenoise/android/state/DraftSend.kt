@@ -79,13 +79,7 @@ internal suspend fun MarmotInterface.sendComposerMedia(
             try {
                 saveDraftForSend(accountRef, selected, caption.orEmpty(), content.replyToMessageIdHex)
                     ?.let { revision ->
-                        if (clientToken == null) {
-                            sendDraftOrNull(accountRef, revision, references)
-                        } else {
-                            admitLocalSend(accountRef, groupIdHex, clientToken) {
-                                sendMessageDraftWithClientToken(accountRef, revision, references, clientToken)
-                            }
-                        }
+                        submitComposerMediaDraft(accountRef, groupIdHex, revision, references, context)
                     }
             } catch (conflict: MarmotKitException.MessageDraftRevisionConflict) {
                 throw if (replyTargetMessageIdHex != null) MediaReplyDraftUnavailableException(conflict) else conflict
@@ -95,6 +89,25 @@ internal suspend fun MarmotInterface.sendComposerMedia(
     if (replyTargetMessageIdHex != null) throw MediaReplyDraftUnavailableException()
     check(clientToken == null) { "client-token media send requires a matching draft revision" }
     return sendMediaAttachments(accountRef, groupIdHex, references, caption)
+}
+
+/** Reply submissions propagate native validation errors instead of disguising them as a missing reply. */
+private suspend fun MarmotInterface.submitComposerMediaDraft(
+    accountRef: String,
+    groupIdHex: String,
+    revision: MessageDraftRevisionFfi,
+    references: List<MediaAttachmentReferenceFfi>,
+    context: ComposerMediaSendContext,
+): SendSummaryFfi? {
+    val clientToken = context.clientToken
+    return when {
+        clientToken != null ->
+            admitLocalSend(accountRef, groupIdHex, clientToken) {
+                sendMessageDraftWithClientToken(accountRef, revision, references, clientToken)
+            }
+        context.replyTargetMessageIdHex != null -> sendMessageDraft(accountRef, revision, references)
+        else -> sendDraftOrNull(accountRef, revision, references)
+    }
 }
 
 /** Whether the selected draft's attachment descriptors line up one-to-one with the prepared references. */
@@ -132,7 +145,7 @@ internal fun MarmotInterface.selectedDraftOrNull(
  * Makes the selected draft say exactly what is being sent, keeping attachments MDK already holds.
  * Returns the revision to submit, or null when there is no draft or it moved underneath the send.
  */
-private fun MarmotInterface.saveDraftForSend(
+internal fun MarmotInterface.saveDraftForSend(
     accountRef: String,
     selected: SelectedMessageDraftFfi,
     content: String,

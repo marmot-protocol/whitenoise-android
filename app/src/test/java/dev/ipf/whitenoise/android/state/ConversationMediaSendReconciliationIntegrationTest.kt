@@ -30,6 +30,8 @@ import dev.ipf.marmotkit.MediaUploadAttachmentResultFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MediaUploadSubmissionFfi
+import dev.ipf.marmotkit.MessageDraftAttachmentFfi
+import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
@@ -722,7 +724,12 @@ class ConversationMediaReplyAdmissionIntegrationTest {
     fun acceptedReplyDoesNotClearNewerUiChoice() = assertReplyAdmission(ReplyDraftMovement.NEW_UI_CHOICE)
 
     @Test
-    fun nativeReplyDisagreementIsRejectedBeforePlainAcceptance() = assertReplyAdmission(ReplyDraftMovement.NO_UI_REPLY)
+    fun cancellingReplyImmediatelyClearsStoredTargetBeforePlainAcceptance() {
+        assertReplyAdmission(ReplyDraftMovement.NO_UI_REPLY)
+    }
+
+    @Test
+    fun selectingReplyImmediatelyBindsTargetBeforeAcceptance() = assertReplyAdmission(ReplyDraftMovement.SELECT_REPLY)
 
     @Test
     fun mixedDescriptorOrderMismatchIsRejectedBeforeAcceptance() = assertReplyAdmission(ReplyDraftMovement.ORDER)
@@ -762,7 +769,7 @@ class ConversationMediaReplyAdmissionIntegrationTest {
                         PendingAttachment(byteArrayOf(1, 2, 3, 4), it.mediaType, it.fileName)
                     }
                 val queued = controller.queueAttachments(attachments, "cap")
-                if (movement in listOf(ReplyDraftMovement.NO_UI_REPLY, ReplyDraftMovement.ORDER)) {
+                if (movement == ReplyDraftMovement.ORDER) {
                     assertNull(queued)
                     assertEquals(0, boundary.uploads)
                     assertEquals(0, boundary.admissions)
@@ -771,7 +778,7 @@ class ConversationMediaReplyAdmissionIntegrationTest {
                 }
                 requireNotNull(queued)
                 assertEquals(
-                    CONFIRMED_MESSAGE_ID,
+                    if (movement == ReplyDraftMovement.NO_UI_REPLY) null else CONFIRMED_MESSAGE_ID,
                     dev.ipf.whitenoise.android.core.MessageProjector
                         .replyTargetMessageId(controller.timeline.single().record),
                 )
@@ -793,7 +800,7 @@ class ConversationMediaReplyAdmissionIntegrationTest {
                 assertEquals(1, boundary.admissions)
                 assertEquals(MessageStatus.Pending, controller.timeline.single().status)
                 assertEquals(
-                    CONFIRMED_MESSAGE_ID,
+                    if (movement == ReplyDraftMovement.NO_UI_REPLY) null else CONFIRMED_MESSAGE_ID,
                     dev.ipf.whitenoise.android.core.MessageProjector
                         .replyTargetMessageId(controller.timeline.single().record),
                 )
@@ -829,6 +836,7 @@ private class ReplyAdmissionBoundary(
     var draft =
         when (movement) {
             ReplyDraftMovement.ORDER -> original.copy(mediaAttachments = descriptors.reversed())
+            ReplyDraftMovement.SELECT_REPLY -> original.copy(replyToMessageIdHex = null)
             else -> original
         }
     private var revision = replyAdmissionRevision()
@@ -846,11 +854,42 @@ private class ReplyAdmissionBoundary(
                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                 "localSendStatus" -> null
                 "selectedMessageDraft" -> SelectedMessageDraftFfi(revision, draft)
+                "messageDraft" -> hydratedDraft()
+                "saveMessageDraftIfRevision" -> save(requireNotNull(args))
                 "uploadMediaWithClientToken" -> upload(args!![2] as MediaUploadRequestFfi)
                 "sendMessageDraftWithClientToken" -> admit(requireNotNull(args))
                 else -> error("Unexpected staged reply call: $name")
             }
         } as MarmotInterface
+
+    private fun hydratedDraft() =
+        MessageDraftFfi(
+            GROUP_ID,
+            draft.content,
+            draft.replyToMessageIdHex,
+            references.map {
+                MessageDraftAttachmentFfi(
+                    it.fileName,
+                    it.fileName,
+                    it.mediaType,
+                    byteArrayOf(1, 2, 3, 4),
+                    null,
+                    null,
+                    null,
+                    emptyList(),
+                )
+            },
+            1L,
+            1L,
+        )
+
+    private fun save(args: Array<out Any?>): SelectedMessageDraftFfi {
+        assertTrue(args[1] === revision)
+        assertEquals(draft.content, args[2])
+        draft = draft.copy(replyToMessageIdHex = args[3] as String?)
+        revision = replyAdmissionRevision()
+        return SelectedMessageDraftFfi(revision, draft)
+    }
 
     fun restoreOriginal() {
         draft = original
@@ -876,14 +915,26 @@ private class ReplyAdmissionBoundary(
 
     private fun admit(args: Array<out Any?>): LocalSendAcceptanceFfi {
         assertTrue(args[1] === revision)
-        assertEquals(CONFIRMED_MESSAGE_ID, draft.replyToMessageIdHex)
+        assertEquals(
+            if (movement == ReplyDraftMovement.NO_UI_REPLY) null else CONFIRMED_MESSAGE_ID,
+            draft.replyToMessageIdHex,
+        )
         assertEquals("cap", draft.content)
         admissions++
         return LocalSendAcceptanceFfi(args[3] as String, CONFIRMED_MESSAGE_ID)
     }
 }
 
-private enum class ReplyDraftMovement { NONE, REVISION, TARGET, CONTENT, NEW_UI_CHOICE, NO_UI_REPLY, ORDER }
+private enum class ReplyDraftMovement {
+    NONE,
+    REVISION,
+    TARGET,
+    CONTENT,
+    NEW_UI_CHOICE,
+    NO_UI_REPLY,
+    SELECT_REPLY,
+    ORDER,
+}
 
 /** Native revision identity only; no JNI constructor is invoked by the controlled boundary. */
 private fun replyAdmissionRevision(): MessageDraftRevisionFfi {

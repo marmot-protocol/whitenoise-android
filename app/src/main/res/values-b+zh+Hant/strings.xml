@@ -2169,5 +2169,5 @@
     <string name="onboarding_details_expanded">已展開</string>
     <string name="onboarding_details_collapsed">已收合</string>
     <string name="group_svg_rejected_detail">無法處理此 SVG。請選擇簡單的 SVG、PNG 或 JPEG。</string>
-    <string name="toast_media_reply_unavailable">此內容無法作為所選訊息的回覆傳送。取消回覆即可單獨傳送，或保留回覆並選擇支援的附件。</string>
+    <string name="toast_media_reply_unavailable">所選回覆和附件無法一起傳送。沒有傳送不帶回覆的內容；您的內容已保留。</string>
 </resources>

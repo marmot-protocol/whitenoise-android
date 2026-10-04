@@ -2357,5 +2357,5 @@
     <string name="onboarding_details_expanded">Expanded</string>
     <string name="onboarding_details_collapsed">Collapsed</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
-    <string name="toast_media_reply_unavailable">This content cannot be sent with the selected reply. Cancel the reply to send separately, or keep it and choose a supported attachment.</string>
+    <string name="toast_media_reply_unavailable">The selected reply and attachments could not be sent together. Nothing was sent without the reply; your content is kept.</string>
 </resources>
