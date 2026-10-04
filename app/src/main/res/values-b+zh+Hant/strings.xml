@@ -192,8 +192,8 @@
     <string name="invite">邀請</string>
     <string name="new_chat">新聊天</string>
     <string name="error_not_white_noise_profile_qr">該 QR 程式碼不是 White Noise 設定檔。</string>
-    <string name="error_missing_key_package">未找到此使用者的可用聊天金鑰。請對方更新並開啟 White Noise，然後重試。</string>
-    <string name="error_missing_key_package_for">未找到%1$s的可用聊天金鑰。請對方更新並開啟 White Noise，然後重試。</string>
+    <string name="error_missing_key_package">未找到此使用者的可用聊天金鑰。請對方安裝或更新 White Noise 並開啟應用程式，然後重試。</string>
+    <string name="error_missing_key_package_for">未找到%1$s的可用聊天金鑰。請對方安裝或更新 White Noise 並開啟應用程式，然後重試。</string>
     <string name="invite_to_white_noise">邀請加入 White Noise</string>
     <string name="invite_friends">邀請朋友</string>
     <string name="invite_to_white_noise_description">%1$s 尚未加入 White Noise。分享此應用程式即可開始安全聊天。</string>

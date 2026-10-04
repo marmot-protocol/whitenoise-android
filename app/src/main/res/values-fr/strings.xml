@@ -203,8 +203,8 @@
     <string name="invite">Inviter</string>
     <string name="new_chat">Nouveau chat</string>
     <string name="error_not_white_noise_profile_qr">Ce code QR n’est pas un profil White Noise.</string>
-    <string name="error_missing_key_package">Aucune clé de discussion utilisable n’a été trouvée pour cette personne. Demandez-lui de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
-    <string name="error_missing_key_package_for">Aucune clé de discussion utilisable n’a été trouvée pour %1$s. Demandez-lui de mettre à jour et d’ouvrir White Noise, puis réessayez.</string>
+    <string name="error_missing_key_package">Aucune clé de discussion utilisable n’a été trouvée pour cette personne. Demandez-lui d’installer ou de mettre à jour White Noise et de l’ouvrir, puis réessayez.</string>
+    <string name="error_missing_key_package_for">Aucune clé de discussion utilisable n’a été trouvée pour %1$s. Demandez-lui d’installer ou de mettre à jour White Noise et de l’ouvrir, puis réessayez.</string>
     <string name="invite_to_white_noise">Inviter sur White Noise</string>
     <string name="invite_friends">Inviter des amis</string>
     <string name="invite_to_white_noise_description">%1$s n\'est pas encore sur White Noise. Partagez l\'application pour démarrer une discussion sécurisée.</string>

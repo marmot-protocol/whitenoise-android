@@ -8,7 +8,7 @@ import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
-import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
+import dev.ipf.whitenoise.android.ui.chats.newchat.startChatErrorUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -102,16 +102,19 @@ class InviteFailurePresentationTest {
     }
 
     @Test
-    fun startProfileChatInviteCopyUsesKnownNameOrGenericFallback() {
-        assertEquals(
-            AppText.Resource(R.string.invite_to_white_noise_description, listOf("Alice")),
-            startProfileChatInviteDetail("Alice"),
-        )
-        assertEquals(
-            AppText.Resource(R.string.unknown_invite_to_white_noise_description),
-            startProfileChatInviteDetail("  "),
-        )
-        assertTrue(startProfileChatFailureIsMissingSetup(MarmotKitException.MissingKeyPackage("deadbeef")))
+    fun startChatCreationAndReadFailuresUseTheSameFallback() {
+        val failures =
+            listOf(
+                MarmotKitException.Publish("relay unreachable"),
+                MarmotKitException.Runtime("relay unreachable"),
+                IllegalStateException("unexpected failure"),
+            )
+        failures.forEach { failure ->
+            val state = startChatErrorUiState("npub", "progress", failure, "Alice") { "Alice" }
+            assertEquals(startProfileChatFailureDetail(failure) { "Alice" }, state.detail)
+            assertEquals(AppText.Resource(R.string.error_group_create_failed_retry), state.detail)
+            assertFalse(state.invitation)
+        }
     }
 
     @Test

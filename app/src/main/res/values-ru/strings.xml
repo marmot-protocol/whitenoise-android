@@ -225,8 +225,8 @@
     <string name="invite">Пригласить</string>
     <string name="new_chat">Новый чат</string>
     <string name="error_not_white_noise_profile_qr">Этот код QR не является профилем White Noise.</string>
-    <string name="error_missing_key_package">Не удалось найти пригодный ключ чата для этого человека. Попросите обновить и открыть White Noise, затем повторите попытку.</string>
-    <string name="error_missing_key_package_for">Не удалось найти пригодный ключ чата для %1$s. Попросите обновить и открыть White Noise, затем повторите попытку.</string>
+    <string name="error_missing_key_package">Не удалось найти пригодный ключ чата для этого человека. Попросите установить или обновить White Noise и открыть приложение, затем повторите попытку.</string>
+    <string name="error_missing_key_package_for">Не удалось найти пригодный ключ чата для %1$s. Попросите установить или обновить White Noise и открыть приложение, затем повторите попытку.</string>
     <string name="invite_to_white_noise">Пригласить в White Noise</string>
     <string name="invite_friends">Пригласить друзей</string>
     <string name="invite_to_white_noise_description">%1$s ещё не в White Noise. Поделитесь приложением, чтобы начать безопасный чат.</string>

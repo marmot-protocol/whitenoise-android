@@ -25059,6 +25059,15 @@
       },
       {
         "surface": "setting:error_group_create_failed_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "R.string.error_group_create_failed_retry",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "setting:error_group_create_failed_retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
         "anchor": "R.string.error_group_create_failed_retry",
         "test_ids": [
@@ -25075,15 +25084,6 @@
           "NCH-001",
           "NCH-002",
           "GRP-005"
-        ]
-      },
-      {
-        "surface": "setting:invite_to_white_noise_description",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
-        "anchor": "R.string.invite_to_white_noise_description",
-        "test_ids": [
-          "NCH-001",
-          "NCH-002"
         ]
       },
       {
@@ -25104,15 +25104,6 @@
           "NCH-001",
           "NCH-002",
           "GRP-005"
-        ]
-      },
-      {
-        "surface": "setting:unknown_invite_to_white_noise_description",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
-        "anchor": "R.string.unknown_invite_to_white_noise_description",
-        "test_ids": [
-          "NCH-001",
-          "NCH-002"
         ]
       },
       {

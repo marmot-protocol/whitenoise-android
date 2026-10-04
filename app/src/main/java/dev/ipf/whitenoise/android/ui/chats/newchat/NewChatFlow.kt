@@ -126,7 +126,13 @@ internal fun startChatErrorUiState(
     return StartChatErrorUiState(
         npub = npub,
         progressHex = progressHex,
-        detail = inviteFailureDetail(error, displayName, recipientName),
+        detail =
+            inviteFailureDetail(
+                error,
+                displayName,
+                recipientName,
+                fallbackResource = R.string.error_group_create_failed_retry,
+            ),
         diagnosticReport = startChatFailureReport(error),
         recipientName = recipientName,
         invitation = invitation,

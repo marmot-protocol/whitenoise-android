@@ -255,8 +255,8 @@
     <string name="invite">Invite</string>
     <string name="new_chat">New Chat</string>
     <string name="error_not_white_noise_profile_qr">That QR code doesn’t contain a White Noise profile.</string>
-    <string name="error_missing_key_package">We couldn’t find a usable chat key for this person. Ask them to update White Noise and open it, then retry.</string>
-    <string name="error_missing_key_package_for">We couldn’t find a usable chat key for %1$s. Ask them to update White Noise and open it, then retry.</string>
+    <string name="error_missing_key_package">We couldn’t find a usable chat key for this person. Ask them to install or update White Noise and open it, then retry.</string>
+    <string name="error_missing_key_package_for">We couldn’t find a usable chat key for %1$s. Ask them to install or update White Noise and open it, then retry.</string>
     <string name="invite_to_white_noise">Invite to White Noise</string>
     <string name="invite_friends">Invite friends</string>
     <string name="invite_to_white_noise_description">%1$s isn\'t on White Noise yet. Share the app to start a secure chat.</string>

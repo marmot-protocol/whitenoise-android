@@ -59,11 +59,6 @@ internal fun groupCreateFailureDetail(
 /** Sharing an install link is optional help for a missing package, never an invalid-package diagnosis. */
 internal fun startProfileChatFailureIsMissingSetup(throwable: Throwable): Boolean = throwable is MissingKeyPackage
 
-internal fun startProfileChatInviteDetail(recipientName: String?): AppText =
-    recipientName?.trim()?.takeIf { it.isNotEmpty() }?.let {
-        AppText.Resource(R.string.invite_to_white_noise_description, listOf(it))
-    } ?: AppText.Resource(R.string.unknown_invite_to_white_noise_description)
-
 internal fun startProfileChatFailureDetail(
     throwable: Throwable,
     displayName: (String) -> String,

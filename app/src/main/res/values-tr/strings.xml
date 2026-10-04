@@ -203,8 +203,8 @@
     <string name="invite">Davet etmek</string>
     <string name="new_chat">Yeni sohbet</string>
     <string name="error_not_white_noise_profile_qr">Bu QR kodu bir White Noise profili değil.</string>
-    <string name="error_missing_key_package">Bu kişi için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını güncelleyip açmasını isteyin, sonra tekrar deneyin.</string>
-    <string name="error_missing_key_package_for">%1$s için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını güncelleyip açmasını isteyin, sonra tekrar deneyin.</string>
+    <string name="error_missing_key_package">Bu kişi için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını yüklemesini veya güncellemesini ve açmasını isteyin, sonra tekrar deneyin.</string>
+    <string name="error_missing_key_package_for">%1$s için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını yüklemesini veya güncellemesini ve açmasını isteyin, sonra tekrar deneyin.</string>
     <string name="invite_to_white_noise">White Noise\'a Davet Et</string>
     <string name="invite_friends">Arkadaşlarını davet et</string>
     <string name="invite_to_white_noise_description">%1$s henüz White Noise\'da değil. Güvenli bir sohbet başlatmak için uygulamayı paylaşın.</string>
