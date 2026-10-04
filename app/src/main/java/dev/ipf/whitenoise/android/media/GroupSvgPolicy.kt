@@ -77,6 +77,7 @@ internal object GroupSvgPolicy {
     private val number = Regex("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
     private val localUrl = Regex("url\\(\\s*['\"]?#([A-Za-z_][A-Za-z0-9_.-]*)['\"]?\\s*\\)", RegexOption.IGNORE_CASE)
     private val identifier = Regex("[A-Za-z_][A-Za-z0-9_.-]{0,127}")
+    private val urlFunction = Regex("url\\s*\\(", RegexOption.IGNORE_CASE)
 
     fun validate(bytes: ByteArray): String {
         val xml = validatedXml(bytes)
@@ -165,7 +166,7 @@ internal object GroupSvgPolicy {
             require(!name.startsWith("on", ignoreCase = true) && name !in forbidden)
             require(value.length <= MAX_ATTRIBUTE_LENGTH && '\\' !in value && '@' !in value)
             val matches = localUrl.findAll(value).toList()
-            require(!localUrl.replace(value, "").contains("url", ignoreCase = true))
+            require(!urlFunction.containsMatchIn(localUrl.replace(value, "")))
             require(matches.isEmpty() || name in setOf("fill", "stroke", "style"))
             matches.forEach { references.add(it.groupValues[1]) }
             validateRootDimension(parser.depth, name, value)

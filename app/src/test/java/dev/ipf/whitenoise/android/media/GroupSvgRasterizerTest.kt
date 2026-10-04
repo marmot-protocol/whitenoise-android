@@ -176,7 +176,9 @@ class GroupSvgRasterizerTest {
     @Test
     fun builtinAndNumericReferencesInMetadataAreSafe() =
         runTest {
-            val source = "$header<title>A &amp; B &#160;</title><rect width=\"100\" height=\"100\"/></svg>"
+            val source =
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+                    "$header<title>A &amp; B &#160;</title><rect id=\"curl\" width=\"100\" height=\"100\"/></svg>"
             assertTrue(GroupSvgRasterizer.rasterize(source.toByteArray()).isNotEmpty())
         }
 
