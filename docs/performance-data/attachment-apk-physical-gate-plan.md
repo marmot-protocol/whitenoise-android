@@ -311,6 +311,10 @@ APKs. The report's `environment` is API and ABI only, no serial, model, account 
   published copy of each file before a dispatch stage reads it back. On the phone the later stages therefore reused the
   copy the prepare process had published, and the retained bytes were not re-read. The forced readback is qualified on
   emulators only.
+- **Installer observation after every dispatch on the phone.** The physical runs also predate the probe change that
+  watches the screen after every dispatch result. On the phone the screen was watched only after an `Opened` result, so
+  an absent installer behind `InvalidPackage`, `InstallPermissionRequired` or `InstallUnsupported` was recorded without
+  being looked for. The all-results observation is qualified on emulators only.
 - **A genuine installer-less platform state.** Not inducible on the owner's phone without disabling the system
   package installer, which is a system change this plan does not request. The simulated branch covers the app's
   `NoInstaller` handling only. A disposable emulator with the installer disabled for user 0 is the only truthful
