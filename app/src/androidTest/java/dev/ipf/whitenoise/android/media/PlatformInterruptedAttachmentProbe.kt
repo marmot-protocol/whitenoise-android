@@ -5,6 +5,7 @@ import android.app.job.JobScheduler
 import android.content.Context
 import android.os.Build
 import android.os.Process
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.IntState
 import androidx.lifecycle.Lifecycle
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -43,6 +45,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /** Stops one real ordinary WorkManager job, preserving native automatic demand and its received checkpoint. */
 internal object PlatformInterruptedAttachmentProbe {
+    private const val FAILURE_STATE_LIMIT = 12
+
     /** Automatic demand receives no interactive read, deliberate Retry, force-run or seeded checkpoint. */
     @Suppress("LongMethod") // One lifetime owns the generated platform job and its cleanup.
     suspend fun run(
@@ -65,6 +69,8 @@ internal object PlatformInterruptedAttachmentProbe {
                     infos.singleOrNull()?.let(states::add)
                 }
             }
+        var step = "start"
+        var stoppedAt = 0L
         try {
             HeldAttachmentCancellationProbe.control(port, "/__hold-resumable-acquisition")
             ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
@@ -72,8 +78,10 @@ internal object PlatformInterruptedAttachmentProbe {
                 withContext(Dispatchers.Main.immediate) {
                     AttachmentDownloadWorker.enqueue(context, request, AttachmentDownloadPriority.Automatic)
                 }
+                step = "first-run"
                 withTimeout(20_000L) { while (states.none { it.state == WorkInfo.State.RUNNING }) delay(25L) }
                 val firstRun = states.first { it.state == WorkInfo.State.RUNNING }
+                step = "held-prefix"
                 val progress = awaitAutomaticProgress(state, request)
                 assertEquals((bytes.size + 16).toULong(), progress.total)
                 HeldAttachmentCancellationProbe.awaitLedger(port) { events ->
@@ -87,6 +95,7 @@ internal object PlatformInterruptedAttachmentProbe {
                     while (scenario.state != Lifecycle.State.CREATED) delay(10L)
                 }
                 withContext(Dispatchers.Main.immediate) { state.setAppInForeground(false) }
+                step = "stop-job"
                 val job = findScheduledWork(context, firstRun.id.toString())
                 val beforeLogs = workerStopLogs()
                 HeldAttachmentCancellationProbe.control(port, "/__platform-stop-marker")
@@ -95,6 +104,8 @@ internal object PlatformInterruptedAttachmentProbe {
                 check(stopped.contains("Timing out:") || stopped.contains("Stopping job:")) {
                     "Android did not stop the selected job: $stopped"
                 }
+                stoppedAt = SystemClock.elapsedRealtime()
+                step = "work-reenqueued"
                 val firstRunIndex = states.indexOfFirst { it == firstRun }
                 withTimeout(10_000L) {
                     while (states.drop(firstRunIndex + 1).none {
@@ -104,14 +115,20 @@ internal object PlatformInterruptedAttachmentProbe {
                         delay(25L)
                     }
                 }
+                step = "stop-diagnostics"
                 withTimeout(10_000L) { while (workerStopLogs() == beforeLogs) delay(25L) }
                 val stopDiagnostic = assertStopDiagnostics(beforeLogs, request)
                 assertFalse(store.isInteractive(request))
                 HeldAttachmentCancellationProbe.control(port, "/__interrupt-acquisition-held-resume")
+                step = "resumed-run"
                 awaitResumedRun(states, firstRun)
+                val runningAt = SystemClock.elapsedRealtime()
+                step = "resume-request"
                 HeldAttachmentCancellationProbe.awaitLedger(port) { e ->
                     e.any { it.getString("kind") == "held" && it.getLong("value") == 3L * 1024 * 1024 }
                 }
+                val requestedAt = SystemClock.elapsedRealtime()
+                step = "resumed-completion"
                 assertNull("resumed partial ciphertext cannot be published", state.openNativeAttachment(request))
                 HeldAttachmentCancellationProbe.control(port, "/__release-acquisition")
                 withTimeout(20_000L) {
@@ -143,9 +160,14 @@ internal object PlatformInterruptedAttachmentProbe {
                         .put("android_api", Build.VERSION.SDK_INT)
                         .put("worker_stop_reason", stopDiagnostic.first)
                         .put("worker_run_attempt", stopDiagnostic.second)
+                        .put("resume_running_ms", runningAt - stoppedAt)
+                        .put("resume_request_ms", requestedAt - runningAt)
                         .put("android_process_restart_qualified", false),
                 )
             }
+        } catch (failure: Throwable) {
+            reportFailure(step, failure, states, port, stoppedAt)
+            throw failure
         } finally {
             withContext(NonCancellable) {
                 observer.cancel()
@@ -211,6 +233,37 @@ internal object PlatformInterruptedAttachmentProbe {
         withTimeout(15_000L) { while (revision.intValue == before) delay(25L) }
         ControlledAttachmentProbe.report(
             JSONObject().put("phase", "fixture-stage").put("stage", "automatic-policy-ready"),
+        )
+    }
+
+    /**
+     * Records which step failed and what the platform and server had shown by then, as closed facts only: step name,
+     * exception class, the order of work states, ledger event counts and time since the stop. Nothing identifies the
+     * generated attachment, so a failed hosted run says where it stopped instead of only that it did.
+     */
+    private suspend fun reportFailure(
+        step: String,
+        failure: Throwable,
+        states: List<WorkInfo>,
+        port: Int,
+        stoppedAt: Long,
+    ) {
+        val counts =
+            withContext(NonCancellable) {
+                runCatching { HeldAttachmentCancellationProbe.ledger(port) }
+                    .getOrDefault(emptyList())
+                    .groupingBy { it.optString("kind") }
+                    .eachCount()
+            }
+        val sinceStop = if (stoppedAt == 0L) JSONObject.NULL else SystemClock.elapsedRealtime() - stoppedAt
+        ControlledAttachmentProbe.report(
+            JSONObject()
+                .put("phase", "automatic-platform-resume-failure")
+                .put("step", step)
+                .put("exception", failure.javaClass.simpleName)
+                .put("work_states", JSONArray(states.takeLast(FAILURE_STATE_LIMIT).map { it.state.name }))
+                .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
+                .put("ms_since_stop", sinceStop),
         )
     }
 

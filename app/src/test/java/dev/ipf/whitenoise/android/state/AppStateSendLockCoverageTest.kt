@@ -410,19 +410,34 @@ class AppStateSendLockCoverageTest {
 
     @Test
     fun conversationHistoryReanchorIgnoresSameRowHydration() {
-        val source = conversationScreenSource().readText().replace(Regex("\\s+"), " ")
+        val screenFile = conversationScreenSource()
+        val source = screenFile.readText().replace(Regex("\\s+"), " ")
+        val owner =
+            screenFile.parentFile
+                .resolve("ConversationViewportRestorationOwner.kt")
+                .readText()
+                .replace(Regex("\\s+"), " ")
+        val effects =
+            screenFile.parentFile
+                .resolve("ConversationViewportRestorationEffects.kt")
+                .readText()
+                .replace(Regex("\\s+"), " ")
 
         assertTrue(
             "startup materialization and same-row media hydration must not restart durable history anchoring",
             "val renderedTimelineAnchorKeys = remember(renderedTimeline)" in source &&
                 "renderedTimeline.map { it.id to it.record.messageIdHex }" in source &&
-                "scrollCoordinator.commitInitialAnchor(" in source &&
-                "scrollCoordinator.commitInitialTailAnchor(" in source &&
-                "while (!commitInitialPosition())" in source &&
-                "postInitialReanchorGate.commit(" in source &&
-                "postInitialReanchorGate.onStructure(" in source &&
-                "initialTimelineAnchored && structureChanged" in source &&
-                "LaunchedEffect(controller, renderedTimeline, olderHeaderCount" !in source,
+                "ConversationViewportRestorationEffects(" in source &&
+                "ConversationViewportStructureEffect(" in source &&
+                "coordinator.commitInitialAnchor(" in owner &&
+                "coordinator.commitInitialTailAnchor(" in owner &&
+                "while (!owner.commitInitialPosition(" in effects &&
+                "reanchorGate.commit(" in owner &&
+                "reanchorGate.onStructure(" in owner &&
+                "anchored && changed" in owner &&
+                "structure.rowKeys, structure.olderHeaderCount, structure.inlineTopErrorCount, anchored," in effects &&
+                "LaunchedEffect(controller, renderedTimeline, olderHeaderCount" !in source &&
+                "LaunchedEffect(controller, renderedTimeline, olderHeaderCount" !in effects,
         )
     }
 

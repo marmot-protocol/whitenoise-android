@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.decodeAdmittedAttachmentImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -25,7 +26,13 @@ sealed interface DecodedAttachmentPresentation {
     ) : DecodedAttachmentPresentation
 }
 
-/** Decode attachment bytes for in-bubble or viewer rendering. */
+/**
+ * Decode attachment bytes for in-bubble or viewer rendering. Content-based
+ * animation admission picks the decoder: a refused GIF/WebP returns null (the
+ * caller's failed placeholder) without reaching either native decoder, and only
+ * an admitted animation may fall back to a sampled still.
+ */
+@Suppress("UNUSED_PARAMETER") // Callers pass the advertised MIME; admission deliberately trusts content only.
 suspend fun decodeMessageAttachmentImage(
     bytes: ByteArray,
     mediaType: String,
@@ -33,14 +40,19 @@ suspend fun decodeMessageAttachmentImage(
     animatedMaxEdgePx: Int = MediaPipeline.ANIMATED_IMAGE_MAX_EDGE_PX,
 ): DecodedAttachmentPresentation? =
     withContext(Dispatchers.Default) {
-        if (MediaPipeline.isAnimatedImageAttachment(mediaType, bytes)) {
-            MediaPipeline.decodeAnimatedDrawable(bytes, animatedMaxEdgePx)?.let {
-                return@withContext DecodedAttachmentPresentation.Animated(it)
-            }
-        }
-        MediaPipeline.decodeSampledBitmap(bytes, staticMaxEdgePx)?.let {
-            DecodedAttachmentPresentation.Static(it)
-        }
+        decodeAdmittedAttachmentImage<DecodedAttachmentPresentation>(
+            bytes = bytes,
+            decodeAnimated = {
+                MediaPipeline.decodeAnimatedDrawable(bytes, animatedMaxEdgePx)?.let {
+                    DecodedAttachmentPresentation.Animated(it)
+                }
+            },
+            decodeStill = {
+                MediaPipeline.decodeSampledBitmap(bytes, staticMaxEdgePx)?.let {
+                    DecodedAttachmentPresentation.Static(it)
+                }
+            },
+        )
     }
 
 @Composable

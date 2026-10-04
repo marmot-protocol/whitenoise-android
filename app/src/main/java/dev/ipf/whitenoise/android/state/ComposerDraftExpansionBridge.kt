@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.MessageDraftConditionalDeleteResult
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGeneration
@@ -23,6 +24,8 @@ internal class ComposerDraftExpansionBridge(
     private val onDraftPresentationRestored: () -> Unit,
     private val onCleanupFailure: (groupIdHex: String, cause: Throwable) -> Unit,
 ) {
+    private val sentPresentation = SentComposerDraftPresentation()
+
     /** Stores editor presentation and advances the stale-send fence only for changed text. */
     fun setDraft(
         accountRef: String,
@@ -35,6 +38,7 @@ internal class ComposerDraftExpansionBridge(
         // content would invalidate a dictation Send captured before this UI-only update.
         if (currentText == value.text) return
         val generation = draftWriter.submit(accountRef, groupIdHex, value.text)
+        sentPresentation.onDraftChanged(accountRef, groupIdHex, generation, value.text)
         expansionRetention.onDraftGenerationAdvanced(accountRef, groupIdHex, generation.value)
     }
 
@@ -61,6 +65,7 @@ internal class ComposerDraftExpansionBridge(
                 content = value.text,
             ) ?: return null
         draftStore.set(accountRef, groupIdHex, value)
+        sentPresentation.onDraftChanged(accountRef, groupIdHex, generation, value.text)
         expansionRetention.onDraftGenerationAdvanced(accountRef, groupIdHex, generation.value)
         return generation.value
     }
@@ -97,6 +102,7 @@ internal class ComposerDraftExpansionBridge(
                 }
             }
         if (claimed) {
+            sentPresentation.hide(token)
             expansionRetention.onSendAccepted(
                 token.accountRef,
                 token.groupIdHex,
@@ -110,6 +116,7 @@ internal class ComposerDraftExpansionBridge(
     /** Restores a definite failure and publishes a revision so the mounted field rehydrates. */
     fun restoreAfterTerminalFailure(token: DraftSendClearToken) {
         draftWriter.runIfCurrent(token.accountRef, token.groupIdHex, token.generation) {
+            sentPresentation.restore(token)
             token.recoveryDraft?.let { recovery ->
                 draftStore.restoreSnapshot(token.accountRef, token.groupIdHex, recovery)
             }
@@ -135,6 +142,7 @@ internal class ComposerDraftExpansionBridge(
             draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, sentGeneration) {
                 draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
             } ?: return
+        sentPresentation.hide(token, cleanupGeneration)
         expansionRetention.onSendDurablyAccepted(
             accountRef,
             groupIdHex,
@@ -158,6 +166,27 @@ internal class ComposerDraftExpansionBridge(
             }
         }
     }
+
+    /** Keeps native draft selection behind the same account/group/generation fence as the composer. */
+    fun selectedPreview(
+        accountRef: String,
+        groupIdHex: String,
+        nativePreview: SelectedChatPreviewFfi?,
+        hasOptimisticSendPreview: Boolean = false,
+    ): SelectedChatPreviewFfi? =
+        sentPresentation.selectedPreview(
+            accountRef,
+            groupIdHex,
+            draftWriter.generation(accountRef, groupIdHex),
+            draftStore.get(accountRef, groupIdHex),
+            if (hasOptimisticSendPreview && nativePreview == SelectedChatPreviewFfi.Empty) {
+                SelectedChatPreviewFfi.Message
+            } else {
+                nativePreview
+            },
+        )
+
+    fun removeAccount(accountRef: String) = sentPresentation.removeAccount(accountRef)
 
     /** Flushes queued edits before the owning group removes its authoritative draft. */
     suspend fun deleteBeforeGroupRemoval(

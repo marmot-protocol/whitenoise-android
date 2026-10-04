@@ -92,7 +92,7 @@ class MeteredImageAutoDownloadTest {
         }
         composeRule.waitForIdle()
         assertEquals(0, fixture.calls.size)
-        composeRule.onNodeWithContentDescription(downloadLabel()).assertIsDisplayed()
+        awaitDownloadAffordance()
     }
 
     /** Cached bytes still render on a metered connection without any remote request. */
@@ -115,7 +115,7 @@ class MeteredImageAutoDownloadTest {
         composeRule.setContent { WhiteNoiseTheme { Bubble() } }
         composeRule.waitForIdle()
         assertEquals(0, fixture.calls.size)
-        composeRule.onNodeWithContentDescription(downloadLabel()).assertIsDisplayed()
+        awaitDownloadAffordance()
 
         assertFalse(fixture.state.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
         assertTrue(
@@ -169,6 +169,15 @@ class MeteredImageAutoDownloadTest {
             .getDeclaredField("activeNetworkTypesSnapshot")
             .apply { isAccessible = true }
             .set(fixture.state, networks)
+    }
+
+    /** Download is offered once the host and MDK probes have answered that nothing is retained locally. */
+    private fun awaitDownloadAffordance() {
+        composeRule.waitUntil(WAIT_MS) {
+            composeRule.waitForIdle()
+            composeRule.onAllNodesWithContentDescription(downloadLabel()).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithContentDescription(downloadLabel()).assertIsDisplayed()
     }
 
     /** The localized Download affordance shown while a remote image is un-materialized. */

@@ -188,6 +188,7 @@ internal fun GroupEditScreen(
                         R.string.toast_couldnt_prepare_image,
                         "GROUP_IMAGE_PREPARE",
                         error,
+                        detail = groupImageFailureDetail(error),
                     )
                     imageFailureScope.captureFailure(failureAttempt)
                 } finally {
@@ -293,6 +294,7 @@ internal fun GroupEditScreen(
                             },
                         operationCode = uploadFailure?.stage?.operationCode ?: "GROUP_IMAGE_UPLOAD",
                         throwable = error,
+                        detail = groupImageFailureDetail(error),
                     )
                     imageFailureScope.captureFailure(failureAttempt)
                 } finally {
@@ -325,7 +327,7 @@ internal fun GroupEditScreen(
                 pendingCropUri = null
             },
             onUnreadable = { picked ->
-                uploadPublicAvatar { GroupImageDraftProcessor.fromContentUri(context.contentResolver, picked) }
+                uploadPublicAvatar { GroupImageDraftProcessor.fromGroupContentUri(context.contentResolver, picked) }
             },
             onCropped = { bytes, crop ->
                 pendingCropUri = null
