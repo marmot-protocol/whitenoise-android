@@ -23,6 +23,8 @@ ENTRY_OVERHEAD = 30 + 46 + 2 * len(PAD_ENTRY) + 64
 MIN_SDK = "30"
 DEFAULT_KEYSTORE = Path.home() / ".android" / "debug.keystore"
 DEFAULT_ALIAS = "androiddebugkey"
+# The environment variable that carries the signing password to apksigner, never the command line.
+PASSWORD_ENVIRONMENT_VARIABLE = "WN_APK_PAYLOAD_STORE_PASSWORD"
 # The AOSP debug keystore ships with this fixed, documented password, it protects nothing.
 DEBUG_STORE_PASSWORD = "android"
 DIGEST_LINE = re.compile(r"Signer #\d+ certificate SHA-256 digest: ([0-9a-f]{64})")
@@ -85,16 +87,21 @@ def padded_apk(source, target_bytes, output, minimum=MIN_BYTES, maximum=MAX_BYTE
 
 
 def align_and_sign(unsigned, output, tools, keystore, alias, store_password, run=subprocess.run):
-    """zipalign first, then sign with the given key and verify, the order APK signature schemes require."""
+    """zipalign first, then sign with the given key and verify, the order APK signature schemes require.
+
+    The password reaches apksigner through its `env:` option, so it never appears in the command line, and therefore
+    never in an exception raised by a failed signing command.
+    """
     tools, output = Path(tools), Path(output)
+    signing_environment = {**os.environ, PASSWORD_ENVIRONMENT_VARIABLE: store_password}
     with tempfile.TemporaryDirectory(prefix="wn-apk-payload-") as scratch:
         aligned = Path(scratch) / "aligned.apk"
         run([str(tools / "zipalign"), "-p", "-f", "4", str(unsigned), str(aligned)], check=True,
             capture_output=True, text=True)
         run([str(tools / "apksigner"), "sign", "--ks", str(keystore), "--ks-key-alias", alias,
-             "--ks-pass", f"pass:{store_password}", "--key-pass", f"pass:{store_password}",
+             "--ks-pass", f"env:{PASSWORD_ENVIRONMENT_VARIABLE}", "--key-pass", f"env:{PASSWORD_ENVIRONMENT_VARIABLE}",
              "--min-sdk-version", MIN_SDK, "--out", str(output), str(aligned)], check=True,
-            capture_output=True, text=True)
+            capture_output=True, text=True, env=signing_environment)
     run([str(tools / "apksigner"), "verify", "--min-sdk-version", MIN_SDK, str(output)], check=True,
         capture_output=True, text=True)
     os.chmod(output, 0o600)

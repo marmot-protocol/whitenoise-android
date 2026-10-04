@@ -241,6 +241,27 @@ class RunTest(unittest.TestCase):
         self.assertIsNone(report["install_app_op_original"])
         self.assertTrue(report["install_app_op_restored"])
 
+    def test_a_setup_failure_before_the_app_op_is_captured_never_rewrites_it(self):
+        """If the reverses cannot be set up, the owner's existing install permission is left exactly as it was."""
+
+        class FailingReverse(FakeDevice):
+            """A device whose reverse mapping is refused, as when another task already owns the port."""
+
+            def adb(self, adb, serial, *args):
+                """Refuse every reverse that adds a mapping, answer the rest as the scripted Pixel does."""
+                if args[:1] == ("reverse",) and "--no-rebind" in args:
+                    self.calls.append((serial,) + args)
+                    raise subprocess.CalledProcessError(1, "adb")
+                return super().adb(adb, serial, *args)
+
+        device = FailingReverse(op_line="REQUEST_INSTALL_PACKAGES: allow; time=+1d ago")
+        with tempfile.TemporaryDirectory() as directory:
+            report = self.execute(device, "Zapstore", directory)
+        self.assertEqual([], [c for c in device.calls if c[1:4] == ("shell", "appops", "set")])
+        self.assertIsNone(report["install_app_op_original"])
+        self.assertTrue(report["install_app_op_restored"])
+        self.assertEqual([], report["stages"])
+
     def test_a_failed_stage_stops_the_sequence_but_still_restores_everything(self):
         """A failing prepare process ends the stages, yet the app-op and the reverses are restored."""
         device = FakeDevice()
@@ -347,6 +368,18 @@ class InstallTest(unittest.TestCase):
             self.assertFalse(any(c[1] == "install" for c in scripted.calls), scripted.calls)
             self.assertFalse(any(FORBIDDEN & set(call) for call in scripted.calls))
 
+    def test_an_occupied_backup_directory_is_refused_before_any_copy_or_install(self):
+        """Reusing a backup directory would overwrite the earlier restore copies, so nothing is touched."""
+        self.backup.mkdir(mode=0o700)
+        earlier = self.backup / f"{runner.APP}.previous.apk"
+        earlier.write_bytes(b"earlier restore copy")
+        device = FakeDevice()
+        with self.assertRaises(ValueError):
+            self.install(device, confirm_in_place_update=True)
+        self.assertEqual(b"earlier restore copy", earlier.read_bytes())
+        self.assertEqual([], [c for c in device.calls if c[1] in ("install", "pull")])
+        self.assertEqual([earlier.name], [p.name for p in self.backup.iterdir()])
+
     def test_install_updates_app_then_test_in_place_for_user_zero_and_proves_the_bytes(self):
         """Exactly -r -t --user 0 per isolated package, previous APKs retained, device digests compared, receipt saved."""
         digests = {f"/data/app/~~x/{p}-y/base.apk": runner.sha256_of(apk)
@@ -380,6 +413,9 @@ class InstallTest(unittest.TestCase):
         """The receipt is only written when adb reported Success and the device holds the candidate bytes."""
         with self.assertRaises(RuntimeError):
             self.install(FakeDevice(), confirm_in_place_update=True)
+        self.assertFalse((self.backup / "install-receipt.json").exists())
+        # Every attempt needs its own backup directory, so the earlier attempt's restore copies are never overwritten.
+        self.backup = self.root / "backup-second-attempt"
         failing = mock.Mock(return_value=mock.Mock(stdout="Failure [INSTALL_FAILED_TEST_ONLY]"))
         with self.assertRaises(RuntimeError):
             self.install(FakeDevice(), run_command=failing, confirm_in_place_update=True)

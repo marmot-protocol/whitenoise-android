@@ -123,7 +123,8 @@ mkdir -p "$RUN" && chmod 700 "$RUN"
    signers are identical, pulls every installed isolated APK as the retained restore copy and refuses if its signer
    differs, then installs app first and test second, each with `-r -t --user 0`, and proves the device's
    `sha256sum` of each installed `base.apk` equals the candidate. Writes `install-receipt.json` into the backup
-   directory.
+   directory. The backup directory must be absent or empty: an occupied one is refused before anything is copied or
+   installed, so an earlier attempt's restore copies are never overwritten, and every attempt uses a new directory.
 
    ```bash
    python3 tools/attachment-fixture/apk_physical_runner.py install --adb "$ADB" \
@@ -283,6 +284,8 @@ APKs. The report's `environment` is API and ABI only, no serial, model, account 
 - The app-op is restored to the recorded original in `finally`. Verify with
   `adb -s "$SERIAL" shell appops get dev.ipf.whitenoise.android.medialatency REQUEST_INSTALL_PACKAGES`.
 - Reverses are removed in `finally`. Verify with `adb -s "$SERIAL" reverse --list`.
+- The app-op is restored only when its original mode was captured. A setup failure before that point, such as a
+  refused reverse mapping, leaves the owner's setting untouched.
 - The retained previous APKs under each backup directory are the restore copies. Reinstalling one may be a version
   downgrade that Android accepts only with `-d`, which this tooling never passes, so restoring an older build is an
   owner decision performed by hand.
