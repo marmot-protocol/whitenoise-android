@@ -59,8 +59,11 @@ internal fun ImportedShareShelf(
             },
         )
     }
-    LaunchedEffect(account, group, loadedRevision, revision, uris) {
-        if (loadedRevision == revision) {
+    // Bind the write gate to this composition's URI projection. An initial empty projection must
+    // not become eligible merely because a faster restore has changed the live state before launch.
+    val renderedLoadedRevision = loadedRevision
+    LaunchedEffect(account, group, renderedLoadedRevision, revision, uris) {
+        if (renderedLoadedRevision == revision) {
             val owned = uris.filter(files::owns)
             val prior = previous
             runCatchingCancellable {
