@@ -92,10 +92,8 @@ and API 36. Dispatch time is the call into the open path, in milliseconds (API 3
 
 ## Not qualified here
 
-Physical-device coverage (a valid and an invalid package, deny then grant, cancel and retry, and process recreation
-during the download), a 30 to 50 MiB package (the Android controller sends at most 32 MiB in total, so 30 to 32 MiB
-needs a host-built signed payload and anything above 32 MiB needs the separate MDK sender), the
-no-installer-available state on a device, the rendered
-file card and notification, and any actual installation. Private raw reports, logs and checksums are retained outside the
-repository. The prepared, not yet executed, physical runbook is the
-[physical gate plan](attachment-apk-physical-gate-plan.md).
+Process recreation during the download on a physical device, a package above 32 MiB (the Android controller sends at
+most 32 MiB in total, so anything larger needs the separate MDK sender), a genuinely installer-less platform state, the
+rendered file card and notification, and any actual installation. Private raw reports, logs and checksums are retained
+outside the repository. The physical-device results (a valid and an invalid package, deny then grant, cancel and retry,
+and a 30.95 MiB package) and the runbook are in the [physical gate plan](attachment-apk-physical-gate-plan.md).

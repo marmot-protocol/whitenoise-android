@@ -108,6 +108,30 @@ class SigningCommandTest(unittest.TestCase):
         self.assertEqual(["verify", "--min-sdk-version", payload.MIN_SDK], commands[2][1:4])
         self.assertFalse(any("adb" in part for command in commands for part in command))
 
+    def test_the_signing_password_never_reaches_a_command_line_or_a_failure_message(self):
+        """apksigner reads the password from the environment, so a failed signing command cannot print it."""
+        password = "correct-horse-battery-staple"
+        seen = []
+
+        def failing_run(command, **options):
+            """Record the command and its environment, then fail the signing step like subprocess.run does."""
+            seen.append((command, options.get("env")))
+            if command[1] == "sign":
+                raise subprocess.CalledProcessError(1, command)
+            return mock.Mock(stdout="")
+
+        with tempfile.TemporaryDirectory() as directory:
+            unsigned = Path(directory) / "unsigned.apk"
+            unsigned.write_bytes(b"zip")
+            with self.assertRaises(subprocess.CalledProcessError) as caught:
+                payload.align_and_sign(unsigned, Path(directory) / "signed.apk", "/tools", "/ks/release.keystore",
+                                       "alias", password, failing_run)
+        self.assertNotIn(password, str(caught.exception))
+        self.assertFalse(any(password in part for command, _ in seen for part in command))
+        sign_command, sign_environment = next((c, e) for c, e in seen if c[1] == "sign")
+        self.assertIn(f"env:{payload.PASSWORD_ENVIRONMENT_VARIABLE}", sign_command)
+        self.assertEqual(password, sign_environment[payload.PASSWORD_ENVIRONMENT_VARIABLE])
+
     def test_signer_digest_requires_exactly_one_signer(self):
         """One SHA-256 digest line is returned, zero or several are refused."""
         line = "Signer #1 certificate SHA-256 digest: " + "ab" * 32

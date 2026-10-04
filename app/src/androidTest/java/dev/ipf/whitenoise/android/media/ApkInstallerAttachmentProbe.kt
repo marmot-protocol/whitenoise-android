@@ -14,6 +14,8 @@ import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AttachmentAcquisitionModeFfi
+import dev.ipf.marmotkit.AttachmentLocalTargetFfi
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
@@ -24,12 +26,16 @@ import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.downloadAttachmentPlaintextSource
+import dev.ipf.whitenoise.android.state.nativeProgress
 import dev.ipf.whitenoise.android.ui.conversation.media.ANDROID_PACKAGE_MIME
 import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeDocumentAttachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.openAttachmentExternally
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
@@ -42,6 +48,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -104,8 +111,18 @@ internal object ApkInstallerAttachmentProbe {
     private const val MAX_SENDABLE_BYTES = 31 * 1024 * 1024
     private const val MANIFEST = "apk-installer.json"
     private const val PUBLISHED_PREFIX = "document_"
-    private val STAGES = setOf("prepare", "dispatch-denied", "dispatch-allowed", "dispatch-na")
-    private val PRESERVING_STAGES = setOf("prepare", "dispatch-denied")
+    private const val RECREATE_HOLD = "recreate-hold"
+    private const val RECREATE_RESUME = "recreate-resume"
+    private const val RECREATE_MANIFEST = "apk-recreate.json"
+    private const val RECREATE_MIN_PREFIX_BYTES = 1024L * 1024L
+    private const val RECREATE_HOLD_TIMEOUT_MILLIS = 30_000L
+    private const val RECREATE_FLUSH_MILLIS = 500L
+    private const val RECREATE_RESUME_TIMEOUT_MILLIS = 120_000L
+    private const val CIPHERTEXT_TAG_BYTES = 16
+    private const val HASH_BUFFER_BYTES = 64 * 1024
+    private val STAGES =
+        setOf("prepare", "dispatch-denied", "dispatch-allowed", "dispatch-na", RECREATE_HOLD, RECREATE_RESUME)
+    private val PRESERVING_STAGES = setOf("prepare", "dispatch-denied", RECREATE_HOLD)
     private val FINAL_STAGES = setOf("dispatch-allowed", "dispatch-na")
     private const val NANOS_PER_MILLI = 1_000_000.0
     private const val LARGE_CASE = "large"
@@ -132,7 +149,7 @@ internal object ApkInstallerAttachmentProbe {
         val relayPort = requireNotNull(arguments.getString("fixtureRelayPort")).toInt()
         require(blobPort in 1024..65535 && relayPort in 1024..65535)
         MarmotAndroid.initialize(context)
-        val role = if (stage == "prepare") "prepare" else "read"
+        val role = if (stage == "prepare" || stage == RECREATE_HOLD) "prepare" else "read"
         val restartSession = arguments.getString("fixtureRestartSession")
         val root = RestartAttachmentRetentionProbe.createRoot(context, role, restartSession)
         val relays = listOf("ws://127.0.0.1:$relayPort")
@@ -141,7 +158,12 @@ internal object ApkInstallerAttachmentProbe {
         try {
             withTimeout(DEADLINE_MILLIS) {
                 marmot.start()
-                if (stage == "prepare") prepare(session, options) else dispatchStage(session, stage, options)
+                when (stage) {
+                    "prepare" -> prepare(session, options)
+                    RECREATE_HOLD -> recreateHold(session, options)
+                    RECREATE_RESUME -> recreateResume(session)
+                    else -> dispatchStage(session, stage, options)
+                }
             }
         } finally {
             // Every stage but the last keeps the generated runtime for the next separately launched process.
@@ -300,17 +322,12 @@ internal object ApkInstallerAttachmentProbe {
             buffer.toByteArray()
         }
 
-    /**
-     * One genuine send, one genuine receiver download and the production verified-file publication. With
-     * [cancelRetry] the shared held-body probe first cancels a real held download of this case and admits one
-     * deliberate Retry, so the verified file comes from the retried transfer, never from a partial body.
-     */
-    private suspend fun receive(
+    /** One genuine send through the shipping controller and the receiver's projected request for it. */
+    private suspend fun send(
         session: FixtureSession,
         peers: FixturePeers,
         case: ApkCase,
-        cancelRetry: Boolean,
-    ): JSONObject {
+    ): Pair<AttachmentTransferRequest, MediaAttachmentReferenceFfi> {
         val sent =
             sendAndroidFixtureMedia(
                 session.context,
@@ -326,8 +343,22 @@ internal object ApkInstallerAttachmentProbe {
             MediaLifecycleAttachmentProbe
                 .projectRequests(session.marmot, peers.receiver, peers.group, sent.references)
                 .single()
+        return request to sent.references.single()
+    }
+
+    /**
+     * One genuine send, one genuine receiver download and the production verified-file publication. With
+     * [cancelRetry] the shared held-body probe first cancels a real held download of this case and admits one
+     * deliberate Retry, so the verified file comes from the retried transfer, never from a partial body.
+     */
+    private suspend fun receive(
+        session: FixtureSession,
+        peers: FixturePeers,
+        case: ApkCase,
+        cancelRetry: Boolean,
+    ): JSONObject {
+        val (request, reference) = send(session, peers, case)
         val state = session.state(peers.receiver.label)
-        val reference = sent.references.single()
         if (cancelRetry) {
             HeldAttachmentCancellationProbe.run(state, request, reference, session.blobPort, case.bytes)
         }
@@ -344,6 +375,140 @@ internal object ApkInstallerAttachmentProbe {
             .put("file", case.fileName)
             .put("mediaType", reference.mediaType)
             .put("request", request.toJson())
+    }
+
+    /**
+     * Starts a real receiver download of one package, holds its body part-way, records the identity the next process
+     * needs and then ends this process abruptly, as the system does when it reclaims memory. Nothing here cancels,
+     * pauses or releases the transfer: the process simply stops while bytes are in flight.
+     */
+    private suspend fun recreateHold(
+        session: FixtureSession,
+        options: ApkOptions,
+    ) = coroutineScope {
+        val peers = session.createPeers()
+        val case = cases(session.blobPort, options.largePayload).first { it.key == recreationCase(options) }
+        val (request, reference) = send(session, peers, case)
+        val state = session.state(peers.receiver.label)
+        HeldAttachmentCancellationProbe.control(session.blobPort, "/__hold-resumable-acquisition")
+        val ciphertextBytes = (case.bytes.size + CIPHERTEXT_TAG_BYTES).toULong()
+        val download = async { runCatching { materializeVerified(session.context, state, request, reference) } }
+        val progress =
+            withTimeout(RECREATE_HOLD_TIMEOUT_MILLIS) {
+                state.nativeProgress(request).first {
+                    it?.phase == AttachmentTransferStateFfi.DOWNLOADING &&
+                        it.total == ciphertextBytes &&
+                        it.received >= RECREATE_MIN_PREFIX_BYTES.toULong()
+                }
+            }
+        HeldAttachmentCancellationProbe.awaitLedger(session.blobPort, ::anyHeld)
+        check(!download.isCompleted) { "the download finished before the process could be ended" }
+        val receipt =
+            JSONObject()
+                .put("schema", 1)
+                .put("hold_pid", Process.myPid())
+                .put("case", case.key)
+                .put("file", case.fileName)
+                .put("mediaType", reference.mediaType)
+                .put("bytes", case.bytes.size)
+                .put("sha256", sha256Hex(case.bytes))
+                .put("request", request.toJson())
+        File(session.root, RECREATE_MANIFEST).writeText(receipt.toString())
+        ControlledAttachmentProbe.report(
+            JSONObject()
+                .put("phase", "apk-recreate-held")
+                .put("case", case.key)
+                .put("received_bytes", requireNotNull(progress).received.toLong())
+                .put("total_ciphertext_bytes", ciphertextBytes.toLong()),
+        )
+        // The status line must reach the host before the process goes, then the process ends with no cleanup at all.
+        delay(RECREATE_FLUSH_MILLIS)
+        Process.killProcess(Process.myPid())
+        delay(Long.MAX_VALUE)
+    }
+
+    /** True once the fixture server has recorded a body held part-way. */
+    private fun anyHeld(events: List<JSONObject>): Boolean = events.any { it.optString("kind") == "held" }
+
+    /** The case a recreation run drives: the host-built package when one was registered, otherwise the valid one. */
+    private fun recreationCase(options: ApkOptions): String = if (options.largePayload != null) LARGE_CASE else "valid"
+
+    /**
+     * In a new process, retries the interrupted transfer through the same production path a reader's tap uses, proves
+     * the published file is the complete verified package, and only then hands it to the platform installer.
+     */
+    private suspend fun recreateResume(session: FixtureSession) {
+        val receipt = JSONObject(File(session.root, RECREATE_MANIFEST).readText())
+        assertNotEquals("stage did not cross an Android process boundary", receipt.getInt("hold_pid"), Process.myPid())
+        val request = requestFrom(receipt.getJSONObject("request"))
+        session.accounts += request.accountRef
+        val reference = MediaLifecycleAttachmentProbe.publishedReference(session.marmot, request)
+        val state = session.state(request.accountRef)
+        val target =
+            AttachmentLocalTargetFfi(
+                request.messageIdHex,
+                requireNotNull(request.sourceMessageIdHex),
+                request.attachmentIndex.toUInt(),
+            )
+        val before =
+            state.marmotIo {
+                attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(target)).items.single()
+            }
+        ControlledAttachmentProbe.report(
+            JSONObject()
+                .put("phase", "apk-recreate-found")
+                .put("native_state", before.state.name)
+                .put("attempt", before.attempt.toLong()),
+        )
+
+        /** Retries through the production path with a bound, so a transfer that never resumes fails with evidence. */
+        suspend fun retry(): File {
+            val published =
+                withTimeout(RECREATE_RESUME_TIMEOUT_MILLIS) {
+                    materializeVerified(session.context, state, request, reference)
+                }
+            return published
+        }
+        var file: File? = null
+        ControlledAttachmentProbe.measure("apk-transfer-recreated", receipt.getInt("bytes")) { file = retry() }
+        val verified = requireNotNull(file)
+        val sizeMatches = verified.length() == receipt.getInt("bytes").toLong()
+        val exact = sizeMatches && sha256Hex(verified) == receipt.getString("sha256")
+        ControlledAttachmentProbe.report(
+            JSONObject()
+                .put("phase", "apk-received")
+                .put("case", receipt.getString("case"))
+                .put("bytes", verified.length())
+                .put("exact", exact),
+        )
+        assertTrue("recreated download is not the complete verified package", exact)
+        val received =
+            ReceivedApk(receipt.getString("case"), receipt.getString("file"), verified, receipt.getString("mediaType"))
+        val installs = BuildConfig.SELF_UPDATE_ENABLED
+        dispatch(session.context, received, if (installs) "allowed" else "n/a", expectInstaller = installs)
+        ControlledAttachmentProbe.report(
+            JSONObject().put("phase", "apk-recreate-complete").put("self_update_enabled", installs),
+        )
+    }
+
+    /** Streams the bytes through SHA-256 so a 31 MiB package never needs a second copy on the Java heap. */
+    private fun sha256Hex(file: File): String =
+        MessageDigest.getInstance("SHA-256").let { digest ->
+            file.inputStream().use { input ->
+                val buffer = ByteArray(HASH_BUFFER_BYTES)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        }
+
+    /** The digest of bytes already in memory, for the sender's own copy. */
+    private fun sha256Hex(bytes: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+        return digest.joinToString("") { "%02x".format(it) }
     }
 
     /** Reopens one received artifact from native retention in a new process; acquisition is unavailable. */

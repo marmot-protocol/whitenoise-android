@@ -97,7 +97,7 @@ internal suspend fun ConversationController.castPollVote(
         } catch (throwable: Throwable) {
             rethrowIfCancellation(throwable)
             Log.i("WNPolls", "event=vote_result outcome=failed elapsed_ms=${SystemClock.elapsedRealtime() - startedAt}")
-            appState.presentFailure(R.string.poll_vote_failed, "POLL_VOTE", throwable)
+            appState.presentFailure(R.string.poll_vote_failed, "POLL_VOTE", throwable.withPollVoteFailureAttribution())
             null
         }
     }
