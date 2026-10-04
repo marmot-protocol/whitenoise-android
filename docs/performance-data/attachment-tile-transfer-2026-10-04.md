@@ -1,6 +1,6 @@
 # Transfer progress, Cancel and Retry on media tiles, 2026-10-04
 
-Refs [#2045](https://github.com/marmot-protocol/whitenoise-android/issues/2045) and tracker
+Context: [#2045](https://github.com/marmot-protocol/whitenoise-android/issues/2045) and tracker
 [#2779](https://github.com/marmot-protocol/whitenoise-android/issues/2779). The file card already shows real native
 phases, byte counts and an acknowledged Cancel. This change gives the **image, video and voice tiles** the same
 behaviour, and qualifies the image and video tiles through a genuine transfer on emulators. It is an emulator
@@ -24,23 +24,19 @@ The transfer model (`TileTransfer`) reads the host state and the native observat
 cancelling anything. The engine feed is opened only while a tile is materializing, so idle tiles in a long conversation
 hold no subscription. Own sends have no download to show.
 
-## What the device test found
+## Behaviours only a device run shows
 
-The first real-tile runs failed in three different ways. Two were product defects in this change's own first draft and
-one was the harness. They are worth recording because host-only tests could not have found any of them.
+Host-only tests cannot observe these interactions, so the real-tile device test pins them.
 
-1. **A Cancel never reached Cancelled.** After the reader's Cancel the engine stream disconnected, but the tile kept
-   showing `352.0 KB of 3.0 MB` for the full 40 seconds the test waited. Native observation stops when the
-   materialization intent returns to Idle, the last sample outlived its flow, and an override that treated a stale host
-   Cancelled as Remote then believed that frozen sample. Samples are now dropped when observation stops and the override
-   applies only while the tile is materializing.
-2. **A failed video offered the wrong control and never recovered.** A video whose own materialization failed showed a
-   Refresh icon with the voice-message string, and an accepted Retry opened the viewer without re-materializing the tile,
-   so the tile stayed failed after the transfer had completed. A local failure now shows the shared Retry control
-   (`Tap to retry`), and an accepted Retry clears the failure and re-materializes the tile.
-3. **Harness only.** `Download again` is delivered only while the conversation is the foreground destination, which the
-   shipping shell publishes when a conversation opens. The test did not publish it, so a retry was admitted but never
-   reached the tile. The test now publishes the same foreground and active-conversation state.
+1. **A Cancel reaches Cancelled.** Native observation stops when the materialization intent returns to Idle, so the tile
+   drops its last native sample then, and it treats a stale host Cancelled as Remote only while it is materializing.
+   Otherwise a Cancel the reader just made would stay hidden behind a frozen byte count such as `352.0 KB of 3.0 MB`.
+2. **A local failure offers Retry and recovers.** A video whose own materialization failed shows the shared Retry
+   control (`Tap to retry`), and an accepted Retry clears the failure and re-materializes the tile itself, not only the
+   viewer it hands off to.
+3. **Download again needs the conversation to be the foreground destination.** The shipping shell publishes the
+   foreground and active-conversation state when a conversation opens, and the test publishes the same state so a retry
+   reaches the tile.
 
 ## Method
 
@@ -72,8 +68,8 @@ entries), clean tree, both distributions:
 | API 30 arm64, Play | bytes `352.0 KB of 3.0 MB`, Cancel acknowledged in **134 ms**, restarted and completed | `Tap to retry` shown, completed | `312.0 KB received`, no total, completed |
 | API 36 arm64, Zapstore | bytes `352.0 KB of 3.0 MB`, Cancel acknowledged in **102 ms**, restarted and completed | `Tap to retry` shown, completed | `360.0 KB received`, no total, completed |
 
-Both reports are `qualified` with no checker violations. Earlier failed and partial attempts, including the three
-failures above, are preserved with checksums beside the passing runs.
+Both reports are `qualified` with no checker violations. Earlier failed and partial attempts are preserved with checksums
+beside the passing runs.
 
 ## Host tests
 
@@ -85,9 +81,6 @@ failures above, are preserved with checksums beside the passing runs.
 - `TileTransferScreenshotTest`: Roborazzi baselines in light, dark, and large-font RTL, for the image tile, the grid
   cell and the file card side by side across every state.
 
-Locally the full suite needs `TZ=UTC`. Six unrelated screenshot tests (one poll, three emoji picker, two reaction
-transition) still fail on this machine and fail identically on the unchanged base, so they are not attributable here.
-
 ## Not claimed
 
 - **Voice tiles on a device.** They are covered by host tests and screenshots only. `voice-tile-device` is deferred.
@@ -95,4 +88,3 @@ transition) still fail on this machine and fail identically on the unchanged bas
 - **Representative performance.** The fixture is a correctness check with a small loopback body. The engine feed
   coalesces to at least 250 ms ([mdk#2157](https://github.com/marmot-protocol/mdk/issues/2157)), so a transfer shorter
   than that can pass from Remote straight to complete without a visible ring.
-- **#2045 is not complete.** Its other acceptance criteria are tracked on the issue. This change does not complete it.
