@@ -4773,7 +4773,12 @@ class ChatsController private constructor(
             var nativeCommitted = false
             val wipe =
                 runCatching {
-                    appState.deleteChatGroupLocalWithRecovery(account, groupIdHex, isCurrent, observer.readinessBudget) {
+                    appState.deleteChatGroupLocalWithRecovery(
+                        account,
+                        groupIdHex,
+                        isCurrent,
+                        observer.readinessBudget,
+                    ) {
                         nativeCommitted = true
                     }
                 }
