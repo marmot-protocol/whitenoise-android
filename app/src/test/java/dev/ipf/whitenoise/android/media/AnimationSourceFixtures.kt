@@ -52,7 +52,9 @@ internal object AnimationSourceFixtures {
             write(byteArrayOf(2, 0x4c, 0x01, 0)) // One filler sub-block, then the terminator.
         }
 
-    fun gifLoopExtension(): ByteArray = byteArrayOf(0x21, 0xff.toByte(), 11) + "NETSCAPE2.0".encodeToByteArray() + byteArrayOf(3, 1, 0, 0, 0)
+    fun gifLoopExtension(): ByteArray {
+        return byteArrayOf(0x21, 0xff.toByte(), 11) + "NETSCAPE2.0".encodeToByteArray() + byteArrayOf(3, 1, 0, 0, 0)
+    }
 
     fun gifExtension(
         label: Int,
@@ -148,9 +150,17 @@ internal object AnimationSourceFixtures {
 
     fun u16le(value: Int): ByteArray = byteArrayOf((value and 0xff).toByte(), ((value shr 8) and 0xff).toByte())
 
-    fun u24le(value: Int): ByteArray = byteArrayOf((value and 0xff).toByte(), ((value shr 8) and 0xff).toByte(), ((value shr 16) and 0xff).toByte())
+    fun u24le(value: Int): ByteArray {
+        return byteArrayOf(
+            (value and 0xff).toByte(),
+            ((value shr 8) and 0xff).toByte(),
+            ((value shr 16) and 0xff).toByte(),
+        )
+    }
 
     fun u32le(value: Long): ByteArray = ByteArray(4) { index -> ((value shr (8 * index)) and 0xff).toByte() }
 
-    private inline fun bytes(block: ByteArrayOutputStream.() -> Unit): ByteArray = ByteArrayOutputStream().apply(block).toByteArray()
+    private inline fun bytes(block: ByteArrayOutputStream.() -> Unit): ByteArray {
+        return ByteArrayOutputStream().apply(block).toByteArray()
+    }
 }
