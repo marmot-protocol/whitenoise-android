@@ -294,21 +294,29 @@ class InboundShareTaskReuseDeviceTest {
     ): MainActivity {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val deadline = SystemClock.uptimeMillis() + TIMEOUT_MILLIS
+        var lastState = "no resumed MainActivity"
         while (SystemClock.uptimeMillis() < deadline) {
             instrumentation.waitForIdleSync()
             var match: MainActivity? = null
             instrumentation.runOnMainSync {
-                match =
+                val activities =
                     ActivityLifecycleMonitorRegistry
                         .getInstance()
                         .getActivitiesInStage(Stage.RESUMED)
                         .filterIsInstance<MainActivity>()
-                        .firstOrNull { activity -> activity !== excluding && predicate(activity) }
+                lastState =
+                    activities.joinToString { activity ->
+                        val request = activity.pendingInboundShareRequestForTest
+                        val payload = request?.payload
+                        "excluded=${activity === excluding}, ready=${payload?.importReady}, " +
+                            "streams=${payload?.streamUris?.size}, errors=${payload?.importErrors}"
+                    }
+                match = activities.firstOrNull { activity -> activity !== excluding && predicate(activity) }
             }
             match?.let { return it }
             SystemClock.sleep(POLL_MILLIS)
         }
-        error("Timed out waiting for a resumed MainActivity")
+        error("Timed out waiting for the expected resumed MainActivity: $lastState")
     }
 
     private fun whiteNoiseTaskCount(context: Context): Int {

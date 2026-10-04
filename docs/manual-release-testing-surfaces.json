@@ -30506,6 +30506,159 @@
         "test_ids": [
           "FLD-004"
         ]
+      },
+      {
+        "surface": "Inbound share recovery: cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_batch_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_batch_limit",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_count_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_count_limit",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_empty",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_error_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_error_title",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_file_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_file_limit",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_interrupted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_interrupted",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_metadata",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_progress",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_recovery",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_rejected_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_rejected_count",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_scheme",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_scheme",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_storage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_title",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_unreadable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_unreadable",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_to",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_to",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
       }
     ],
     "notification_content_contracts": [
