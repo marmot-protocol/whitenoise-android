@@ -83,7 +83,11 @@ class ForwardProductionBoundaryCoverageTest {
         assertFalse("diskMediaCache.put" in isolated)
         // MarmotKit's retained copy is read before the network, and only after both Android caches miss.
         assertTrue("runCatchingCancellable { readRetained(request) }" in isolated)
-        assertTrue("openNativeAttachment(request)?.use { it.toByteArray() }" in transportFile)
+        assertTrue("readRetainedForwardPlaintext { openNativeAttachment(request) }" in transportFile)
+        // The whole-file read leaves the main dispatcher a forward session starts on.
+        assertTrue(
+            "open()?.use { lease -> withContext(Dispatchers.IO) { lease.toByteArray() } }" in transportFile,
+        )
         assertTrue("downloadMedia(request.accountRef, request.groupIdHex, reference)" in isolated)
     }
 

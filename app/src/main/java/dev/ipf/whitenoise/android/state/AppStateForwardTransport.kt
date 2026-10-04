@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.toByteArray
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -339,4 +340,14 @@ internal suspend fun WhiteNoiseAppState.materializeAttachmentPlaintextIsolated(
 
 /** Copies MarmotKit's verified retained plaintext for one attachment into a private buffer, or null when absent. */
 private suspend fun WhiteNoiseAppState.retainedForwardPlaintext(request: AttachmentTransferRequest): ByteArray? =
-    openNativeAttachment(request)?.use { it.toByteArray() }
+    readRetainedForwardPlaintext { openNativeAttachment(request) }
+
+/**
+ * Copies an opened retained lease into a private buffer on the IO dispatcher and closes it on every path.
+ *
+ * A forward session runs on the main dispatcher, and opening a lease returns to that context, so the whole-file read
+ * is moved to IO explicitly. A forward cancelled while the copy runs stops at the end of the copy, and the lease is
+ * released either way.
+ */
+internal suspend fun readRetainedForwardPlaintext(open: suspend () -> AttachmentPlaintext?): ByteArray? =
+    open()?.use { lease -> withContext(Dispatchers.IO) { lease.toByteArray() } }

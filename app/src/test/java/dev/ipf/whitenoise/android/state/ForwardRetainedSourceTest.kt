@@ -14,15 +14,20 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.OutputStream
 import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
@@ -71,6 +76,54 @@ class ForwardRetainedSourceTest {
         val result: PerformanceResult,
         val layer: PerformanceLayer,
     )
+
+    /** The whole-file read of a retained lease must not run on the main thread a forward session starts on. */
+    @Test
+    fun retainedLeaseIsCopiedOffTheMainThreadAndReleased() {
+        val lease = RecordingLease(DOWNLOADED)
+
+        val bytes = runBlocking { readRetainedForwardPlaintext { lease } }
+
+        assertArrayEquals(DOWNLOADED, bytes)
+        val copyThread = checkNotNull(lease.copiedOn) { "the lease was never copied" }
+        assertTrue("the lease was copied on the main thread", copyThread !== Looper.getMainLooper().thread)
+        assertTrue("the lease was not released", lease.closed)
+    }
+
+    /** An absent lease reads as null, and a copy that fails still releases the lease. */
+    @Test
+    fun absentOrFailingRetainedLeaseIsNullOrReleased() {
+        assertNull(runBlocking { readRetainedForwardPlaintext { null } })
+
+        val failing = RecordingLease(DOWNLOADED, failCopy = true)
+        runCatching { runBlocking { readRetainedForwardPlaintext { failing } } }
+
+        assertTrue("a failed copy left the lease open", failing.closed)
+    }
+
+    /** Records the thread that copied it and whether it was closed, like the lease the viewer reads. */
+    private class RecordingLease(
+        private val bytes: ByteArray,
+        private val failCopy: Boolean = false,
+    ) : AttachmentPlaintext {
+        @Volatile var copiedOn: Thread? = null
+
+        @Volatile var closed = false
+
+        override val size: Long = bytes.size.toLong()
+
+        /** Notes the copying thread, then streams the bytes or fails as scripted. */
+        override fun copyTo(output: OutputStream) {
+            copiedOn = Thread.currentThread()
+            check(!failCopy) { "scripted copy failure" }
+            output.write(bytes)
+        }
+
+        /** Notes that the lease was released. */
+        override fun close() {
+            closed = true
+        }
+    }
 
     /** A retained copy is served without any network download and the lookup is attributed to MarmotKit. */
     @Test
