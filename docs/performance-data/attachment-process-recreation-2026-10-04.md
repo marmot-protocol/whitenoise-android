@@ -34,14 +34,14 @@ makes several of them fail.
 
 ## Results
 
-Ten runs with no other device activity, five on each environment, at the clean head `901f63ddf` (code identical to the commit that follows it, which only updates this report), **all qualified with no
+Ten runs with no other device activity, five on each environment, at the clean head `57a3d33af` (code identical to the commit that follows it, which only updates this report), **all qualified with no
 checker violations** under the checker that also requires the screen to have been watched for an installer after the
 recreated dispatch:
 
 | Environment | Runs | Native state found | Replacement request | Retry to verified file | Platform outcome |
 | --- | --- | --- | --- | --- | --- |
-| API 30 arm64, Play | 5 of 5 | `DOWNLOADING`, attempt 1 (attempt 2 in one run) | `206`, ranged from byte 2,097,152, `If-Range` matched | 2,207 to 2,281 ms (median 2,256) | `InstallUnsupported`, no installer (watched for 1.05 to 1.06 s) |
-| API 36 arm64, Zapstore | 5 of 5 | `DOWNLOADING`, attempt 1 | `206`, ranged from byte 2,097,152, `If-Range` matched | 2,275 to 2,332 ms (median 2,295) | `Opened`, installer shown and settled (13 to 154 ms of staging) |
+| API 30 arm64, Play | 5 of 5 | `DOWNLOADING`, attempt 1 (attempt 2 in 3 runs) | `206`, ranged from byte 2,097,152, `If-Range` matched | 3,095 to 3,321 ms (median 3,204) | `InstallUnsupported`, no installer (watched for 1.05 to 1.08 s) |
+| API 36 arm64, Zapstore | 5 of 5 | `DOWNLOADING`, attempt 1 | `206`, ranged from byte 2,097,152, `If-Range` matched | 3,097 to 3,224 ms (median 3,198) | `Opened`, installer shown and settled (32 to 121 ms of staging) |
 
 The native bytes received when the process died were 1.0 to 1.4 MB, behind the 2 MiB the server had written because the
 engine coalesces progress, and the replacement still resumed from the full committed 2 MiB prefix. **The interrupted
