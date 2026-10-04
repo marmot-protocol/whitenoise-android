@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.content.ActivityNotFoundException
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.state.AttachmentOpenIntentClaim
+import dev.ipf.whitenoise.android.state.AttachmentTransferCancelledByUserException
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.AutomaticBacklogStoppedException
 import kotlinx.coroutines.CancellationException
@@ -554,6 +555,22 @@ class AttachmentPresentationTest {
             AttachmentMaterializationIntent.Automatic,
             idle.withPolicyAllowed(allowed = true),
         )
+    }
+
+    /** The reader's own Cancel returns a materializing tile to Idle so it offers Download again, not a spinner. */
+    @Test
+    fun theReadersOwnCancelReturnsAcceptedWorkToIdle() {
+        val cancelled =
+            AttachmentMaterializationIntent.Interactive.afterProducerCancellation(
+                AttachmentTransferCancelledByUserException(),
+            )
+
+        assertEquals(AttachmentMaterializationIntent.Idle, cancelled)
+        val wrapped =
+            AttachmentMaterializationIntent.Automatic.afterProducerCancellation(
+                CancellationException("detached", AttachmentTransferCancelledByUserException()),
+            )
+        assertEquals(AttachmentMaterializationIntent.Idle, wrapped)
     }
 
     @Test

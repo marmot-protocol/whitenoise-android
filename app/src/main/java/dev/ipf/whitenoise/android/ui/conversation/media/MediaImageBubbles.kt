@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
@@ -201,17 +202,16 @@ internal fun MediaImageBubble(
     // idle network fallback obeys policy. Once accepted, materialization stays
     // latched across policy recomposition so an active UI waiter is not lost.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
+    val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(key, attachmentIndex)
+    val autoAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image) && !cancelledByReader
     val automaticNetworkAllowed by rememberUpdatedState(
-        shouldMaterializeAttachmentAutomatically(
-            mine,
-            appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
-            automaticDownloadsPaused,
-        ),
+        shouldMaterializeAttachmentAutomatically(mine, autoAllowed, automaticDownloadsPaused),
     )
     val policyAllowsMaterialization =
         shouldMaterializeAttachmentAutomatically(
             mine = mine,
-            mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+            mediaAutoDownloadAllowed = autoAllowed,
             automaticDownloadsPaused = automaticDownloadsPaused,
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasRetainedPlaintext = retainedPlaintextOnEntry,
@@ -227,6 +227,8 @@ internal fun MediaImageBubble(
     val cacheAvailabilityResolved by cacheAvailability.resolved
     // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
     val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
+    val transfer =
+        rememberTileTransfer(controller, key, attachmentIndex, reference, mine, cancelledByReader, startDownload)
 
     /** Hands the logical image to the conversation-owned viewer before row disposal can occur. */
     fun dispatchViewerOpen() {
@@ -388,6 +390,19 @@ internal fun MediaImageBubble(
                                         onFailure = { failed = true },
                                     )
                                 },
+                            )
+                        transfer.visible ->
+                            TileTransferControl(
+                                transfer = transfer,
+                                onRetry = {
+                                    controller.retryAttachmentTransfer(
+                                        key,
+                                        attachmentIndex,
+                                        onAccepted = { controller.requestAttachmentOpen(key, attachmentIndex) },
+                                        onFailure = { failed = true },
+                                    )
+                                },
+                                showCaption = true,
                             )
                         // Until the retained-bytes probes answer, a file MDK holds must not flash a Download action.
                         !startDownload && !downloadActionReady -> Unit
@@ -653,17 +668,16 @@ internal fun MediaImageGridTile(
     // materialize during a pause, but a cache-missing network fallback waits
     // for restart or a tap. Tightening policy never abandons accepted work.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
+    val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
+    val autoAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image) && !cancelledByReader
     val automaticNetworkAllowed by rememberUpdatedState(
-        shouldMaterializeAttachmentAutomatically(
-            mine,
-            appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
-            automaticDownloadsPaused,
-        ),
+        shouldMaterializeAttachmentAutomatically(mine, autoAllowed, automaticDownloadsPaused),
     )
     val policyAllowsMaterialization =
         shouldMaterializeAttachmentAutomatically(
             mine = mine,
-            mediaAutoDownloadAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+            mediaAutoDownloadAllowed = autoAllowed,
             automaticDownloadsPaused = automaticDownloadsPaused,
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasRetainedPlaintext = retainedPlaintextOnEntry,
@@ -679,6 +693,16 @@ internal fun MediaImageGridTile(
     val cacheAvailabilityResolved by cacheAvailability.resolved
     // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
     val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
+    val transfer =
+        rememberTileTransfer(
+            controller,
+            messageIdHex,
+            attachmentIndex,
+            reference,
+            mine,
+            cancelledByReader,
+            startDownload,
+        )
 
     LaunchedEffect(decodeKey, materializationIntent, reloadToken) {
         if (presentation != null) return@LaunchedEffect
@@ -754,8 +778,10 @@ internal fun MediaImageGridTile(
                 //   - Bytes ready (`bitmap != null`): tap opens the viewer.
                 //   - Bytes pending: tap persists interactive open intent, so
                 //     the promoted transfer opens once after verified decode.
+                // While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot restart it.
                 onClick = {
                     when {
+                        transfer.cancelling -> Unit
                         failed ->
                             controller.retryAttachmentTransfer(
                                 messageIdHex,
@@ -802,6 +828,18 @@ internal fun MediaImageGridTile(
                             icon = Icons.Default.Refresh,
                             contentDescription = stringResource(R.string.media_tap_to_retry),
                             onClick = {
+                                controller.retryAttachmentTransfer(
+                                    messageIdHex,
+                                    attachmentIndex,
+                                    onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                                    onFailure = { failed = true },
+                                )
+                            },
+                        )
+                    transfer.visible ->
+                        TileTransferControl(
+                            transfer = transfer,
+                            onRetry = {
                                 controller.retryAttachmentTransfer(
                                     messageIdHex,
                                     attachmentIndex,

@@ -72,5 +72,27 @@ class GroupImageFailureScopeTest {
         assertEquals("latest error", (current?.title as AppText.Plain).value)
     }
 
+    /** A cleanup callback cannot still admit the replaced attempt to native IO. */
+    @Test
+    fun replacementInvalidatesBeforeRetiringItsNotice() {
+        lateinit var guardedScope: GroupImageFailureScope
+        var attempt = 0L
+        guardedScope =
+            GroupImageFailureScope(
+                currentNotice = { current },
+                retireNotice = {
+                    assertFalse(guardedScope.isCurrent(attempt))
+                    current = null
+                },
+            )
+        attempt = guardedScope.begin()
+        current = notice("old image failed")
+        guardedScope.captureFailure(attempt)
+
+        guardedScope.begin()
+
+        assertNull(current)
+    }
+
     private fun notice(title: String): ToastMessage = ToastMessage(AppText.Plain(title))
 }

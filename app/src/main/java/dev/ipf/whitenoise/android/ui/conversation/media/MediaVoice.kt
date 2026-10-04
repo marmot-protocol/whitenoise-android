@@ -73,6 +73,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.KeyedMutexPool
 import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
@@ -304,10 +305,12 @@ internal fun MediaVoiceBubble(
     // revoke accepted work; a tap promotes the intent so manual fetch/playback
     // remains available even when auto-download is off.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
+    // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
+    val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
     val policyAllowsMaterialization =
         shouldStartVoiceAttachmentDownload(
             mine = mine,
-            audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio),
+            audioAutoDownload = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Audio) && !cancelledByReader,
             automaticDownloadsPaused = automaticDownloadsPaused,
             hasCachedAttachment = cachedPlaintextOnEntry,
             hasCachedFile = localFile != null,
@@ -319,6 +322,16 @@ internal fun MediaVoiceBubble(
             policyAllowsMaterialization = policyAllowsMaterialization,
         )
     val startDownload = materializationIntent.shouldMaterialize
+    val transfer =
+        rememberTileTransfer(
+            controller,
+            messageIdHex,
+            attachmentIndex,
+            reference,
+            mine,
+            cancelledByReader,
+            startDownload,
+        )
     var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
 
     val playback by remember(pillKey, presentationRuntime) {
@@ -490,6 +503,15 @@ internal fun MediaVoiceBubble(
             },
         onCycleSpeed = presentationRuntime::cycleSpeed,
         onLongPress = onLongPress,
+        transfer = transfer,
+        onRetryTransfer = {
+            controller.retryAttachmentTransfer(
+                messageIdHex,
+                attachmentIndex,
+                onAccepted = { controller.requestAttachmentOpen(messageIdHex, attachmentIndex) },
+                onFailure = { failed = true },
+            )
+        },
         onActionClick = {
             when {
                 failed ->
@@ -547,6 +569,8 @@ internal fun VoiceAttachmentContent(
     outgoing: Boolean,
     onLongPress: () -> Unit,
     onActionClick: () -> Unit,
+    transfer: TileTransfer? = null,
+    onRetryTransfer: () -> Unit = {},
     playbackSpeed: Float? = null,
     onSeek: ((Float) -> Unit)? = null,
     onCycleSpeed: () -> Unit = {},
@@ -564,7 +588,8 @@ internal fun VoiceAttachmentContent(
             MaterialTheme.colorScheme.onSurfaceVariant
         }
     val actionVisual = voiceActionVisual(loading, failed, startDownload, localFileAvailable, isPlaying)
-    val actionDescription = stringResource(actionVisual.descriptionResource)
+    val action = voiceAction(transfer?.takeUnless { localFileAvailable }, actionVisual, onActionClick, onRetryTransfer)
+    val actionDescription = action.description
     Surface(
         color = container,
         contentColor = content,
@@ -581,7 +606,11 @@ internal fun VoiceAttachmentContent(
                     Modifier
                         .size(48.dp)
                         .semantics(mergeDescendants = true) { contentDescription = actionDescription }
-                        .combinedClickable(onLongClick = onLongPress, onClick = onActionClick),
+                        .combinedClickable(
+                            onClickLabel = action.clickLabel,
+                            onLongClick = onLongPress,
+                            onClick = action.onClick,
+                        ),
                 contentAlignment = Alignment.Center,
             ) {
                 Surface(
@@ -590,7 +619,18 @@ internal fun VoiceAttachmentContent(
                     shape = CircleShape,
                     modifier = Modifier.size(40.dp),
                 ) {
-                    Box(contentAlignment = Alignment.Center) { VoiceActionGlyph(actionVisual) }
+                    Box(contentAlignment = Alignment.Center) {
+                        if (action.transfer != null) {
+                            TileTransferGlyph(
+                                action.transfer,
+                                ringSize = 40.dp,
+                                color = LocalContentColor.current,
+                                glyphSize = 22.dp,
+                            )
+                        } else {
+                            VoiceActionGlyph(actionVisual)
+                        }
+                    }
                 }
             }
             VoiceSeekTrack(
@@ -601,7 +641,12 @@ internal fun VoiceAttachmentContent(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs),
+                text =
+                    if (action.transfer != null) {
+                        action.description
+                    } else {
+                        voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs)
+                    },
                 style = MaterialTheme.typography.labelMedium,
                 color = secondaryContent,
                 maxLines = 1,
@@ -727,6 +772,39 @@ private fun Modifier.voiceSeekGesture(
             }
         }
     }
+
+/** What the voice row's one 48 dp action looks, sounds and does like for the current step. */
+private class VoiceAction(
+    val description: String,
+    val clickLabel: String?,
+    val onClick: () -> Unit,
+    /** Non-null while the transfer owns the action, so the row draws its ring and text instead of play. */
+    val transfer: TileTransfer?,
+)
+
+/**
+ * Resolves the action: a visible [transfer] owns it (Cancel while active, nothing while Cancel awaits acknowledgement,
+ * Retry or Download again otherwise), and otherwise it is the ordinary play, pause or download action.
+ */
+@Composable
+private fun voiceAction(
+    transfer: TileTransfer?,
+    visual: VoiceActionVisual,
+    onActionClick: () -> Unit,
+    onRetryTransfer: () -> Unit,
+): VoiceAction {
+    if (transfer == null || !transfer.visible) {
+        return VoiceAction(stringResource(visual.descriptionResource), null, onActionClick, null)
+    }
+    val onClick =
+        when {
+            transfer.cancelling -> ({})
+            transfer.active -> transfer.onCancel
+            else -> onRetryTransfer
+        }
+    val label = if (transfer.active) stringResource(R.string.media_cancel_download) else null
+    return VoiceAction(tileTransferDescription(transfer), label, onClick, transfer)
+}
 
 /** The 24dp glyph inside the play button for each action variant. */
 @Suppress("FunctionNaming")

@@ -60,6 +60,8 @@ class DictationDiagnosticStoreTest {
                     mapOf("action" to "PasteIntoDraft", "source" to "automatic", "accepted" to true),
                 "event=failure_recovery failure=SendBlocked" to
                     mapOf("failure" to "SendBlocked"),
+                "event=callback_error failure=NoMatch generation=2" to
+                    mapOf("failure" to "NoMatch", "generation" to 2L),
                 "event=caller_audio_retry_exhausted attempts=3 action=retain" to
                     mapOf("attempts" to 3L, "action" to "retain"),
                 "event=caller_audio_silence_acknowledged action=advance" to

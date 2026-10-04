@@ -35,6 +35,7 @@ class ConversationDictationRecoveryTest {
     fun transientFailuresStillOfferRetry() {
         listOf(
             ConversationDictationFailure.NoSpeech,
+            ConversationDictationFailure.NoMatch,
             ConversationDictationFailure.Network,
             ConversationDictationFailure.RecognizerBusy,
             ConversationDictationFailure.TimedOut,
