@@ -34,12 +34,14 @@ makes several of them fail.
 
 ## Results
 
-Ten runs with no other device activity, five on each environment, **all qualified with no checker violations**:
+Ten runs with no other device activity, five on each environment, at the clean head `901f63ddf` (code identical to the commit that follows it, which only updates this report), **all qualified with no
+checker violations** under the checker that also requires the screen to have been watched for an installer after the
+recreated dispatch:
 
 | Environment | Runs | Native state found | Replacement request | Retry to verified file | Platform outcome |
 | --- | --- | --- | --- | --- | --- |
-| API 30 arm64, Play | 5 of 5 | `DOWNLOADING`, attempt 1 (attempt 2 in one run) | `206`, ranged from byte 2,097,152, `If-Range` matched | 2,230 to 2,296 ms (median 2,237) | `InstallUnsupported`, no installer |
-| API 36 arm64, Zapstore | 5 of 5 | `DOWNLOADING`, attempt 1 | `206`, ranged from byte 2,097,152, `If-Range` matched | 2,122 to 2,374 ms (median 2,365) | `Opened`, installer shown and settled (25 to 154 ms of staging) |
+| API 30 arm64, Play | 5 of 5 | `DOWNLOADING`, attempt 1 (attempt 2 in one run) | `206`, ranged from byte 2,097,152, `If-Range` matched | 2,207 to 2,281 ms (median 2,256) | `InstallUnsupported`, no installer (watched for 1.05 to 1.06 s) |
+| API 36 arm64, Zapstore | 5 of 5 | `DOWNLOADING`, attempt 1 | `206`, ranged from byte 2,097,152, `If-Range` matched | 2,275 to 2,332 ms (median 2,295) | `Opened`, installer shown and settled (13 to 154 ms of staging) |
 
 The native bytes received when the process died were 1.0 to 1.4 MB, behind the 2 MiB the server had written because the
 engine coalesces progress, and the replacement still resumed from the full committed 2 MiB prefix. **The interrupted
@@ -49,6 +51,12 @@ retry time is end to end: process start, runtime reopen, the ranged fetch of the
 
 The existing `controller-apk` fixture qualifies unchanged on both environments after the probe's send path was factored
 out for this stage.
+
+## Earlier runs, kept
+
+An earlier batch of ten runs qualified under the checker as it was then. That checker did not yet require the screen to be
+watched for an installer after the recreated dispatch, so the current checker rejects those reports for missing
+`installer_observed_ms`, and they are not claimed. They are preserved with the runs above.
 
 ## A failed run, kept
 
