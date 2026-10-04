@@ -778,8 +778,10 @@ internal fun MediaImageGridTile(
                 //   - Bytes ready (`bitmap != null`): tap opens the viewer.
                 //   - Bytes pending: tap persists interactive open intent, so
                 //     the promoted transfer opens once after verified decode.
+                // While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot restart it.
                 onClick = {
                     when {
+                        transfer.cancelling -> Unit
                         failed ->
                             controller.retryAttachmentTransfer(
                                 messageIdHex,

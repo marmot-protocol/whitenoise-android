@@ -261,8 +261,12 @@ internal fun MediaVideoGridTile(
     val transferShown = transfer.visible && localFile == null
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableIntStateOf(0) }
 
-    /** Promotes the tap to interactive priority and delegates ownership before this tile can dispose. */
+    /**
+     * Promotes the tap to interactive priority and delegates ownership before this tile can dispose. While the reader's
+     * Cancel awaits acknowledgement a tap anywhere on the tile does nothing, so it cannot restart that transfer.
+     */
     fun dispatchViewerOpen() {
+        if (transfer.cancelling) return
         val open = {
             // An accepted Retry re-materializes the tile itself, not only the viewer it hands off to.
             if (failed) {

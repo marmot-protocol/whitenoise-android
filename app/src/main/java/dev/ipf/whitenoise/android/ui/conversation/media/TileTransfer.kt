@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -191,7 +193,8 @@ internal fun tileTransferDescription(transfer: TileTransfer): String =
  * The tile's single transfer control in a fixed 52 dp slot: a progress ring with a Cancel glyph while a transfer is
  * queued or running, an indeterminate ring while Cancel awaits acknowledgement, Download again after a confirmed
  * Cancel and Retry after a failure. The whole slot is the target, so a tap on it never reaches the tile's own open
- * handler. With [showCaption] the step and byte counts are also drawn for sighted readers, for tiles large enough.
+ * handler, including while Cancel awaits acknowledgement and the slot takes no action. With [showCaption] the step
+ * and byte counts are also drawn for sighted readers, for tiles large enough.
  */
 @Composable
 internal fun TileTransferControl(
@@ -230,7 +233,9 @@ internal fun TileTransferControl(
                                 onClick = action,
                             )
                         } else {
-                            Modifier
+                            // Awaiting acknowledgement there is nothing to do, but the tap must not fall through to the
+                            // tile's open handler and promote the transfer the reader just cancelled.
+                            Modifier.pointerInput(Unit) { detectTapGestures { } }
                         },
                     ).semantics(mergeDescendants = true) { contentDescription = description },
         ) {
