@@ -6290,8 +6290,10 @@ class ConversationController(
         if (editingMessageId != messageId) cancelMessageEdit()
         if (
             "msg:$messageId" in optimisticMessages &&
-            (optimisticMessages["msg:$messageId"]?.status != MessageStatus.Sent ||
-                timelineRecords[messageId]?.sourceMessageIdHex == null)
+            (
+                optimisticMessages["msg:$messageId"]?.status != MessageStatus.Sent ||
+                    timelineRecords[messageId]?.sourceMessageIdHex == null
+            )
         ) {
             val originalToken = timelineRecords[messageId]?.clientToken ?: messageId
             pendingMessageEditHandoff.begin(pendingEditKey(messageId), originalToken)
