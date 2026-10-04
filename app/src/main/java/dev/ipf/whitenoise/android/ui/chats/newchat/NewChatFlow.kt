@@ -54,13 +54,13 @@ import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.createProfileChatGroup
+import dev.ipf.whitenoise.android.state.inviteFailureDetail
 import dev.ipf.whitenoise.android.state.privacySafeErrorPresentation
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
 import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
 import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
-import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
@@ -126,21 +126,11 @@ internal fun startChatErrorUiState(
     return StartChatErrorUiState(
         npub = npub,
         progressHex = progressHex,
-        detail =
-            if (invitation) {
-                startProfileChatInviteDetail(recipientName)
-            } else {
-                startProfileChatFailureDetail(error, displayName)
-            },
+        detail = inviteFailureDetail(error, displayName, recipientName),
         diagnosticReport = startChatFailureReport(error),
         recipientName = recipientName,
         invitation = invitation,
-        title =
-            if (invitation) {
-                AppText.Resource(R.string.invite_to_white_noise)
-            } else {
-                AppText.Resource(R.string.toast_couldnt_start_chat)
-            },
+        title = AppText.Resource(R.string.toast_couldnt_start_chat),
     )
 }
 

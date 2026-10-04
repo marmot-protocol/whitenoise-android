@@ -203,8 +203,8 @@
     <string name="invite">Invita</string>
     <string name="new_chat">Nuova chat</string>
     <string name="error_not_white_noise_profile_qr">Quel codice QR non è un profilo White Noise.</string>
-    <string name="error_missing_key_package">Questa persona non ha ancora configurato i messaggi crittografati. Chiedile di installare White Noise e aprire l’app una volta, poi riprova.</string>
-    <string name="error_missing_key_package_for">%1$s non ha ancora configurato i messaggi crittografati. Chiedile di installare White Noise e aprire l’app una volta, poi riprova.</string>
+    <string name="error_missing_key_package">Non abbiamo trovato una chiave di chat utilizzabile per questa persona. Chiedi di aggiornare e aprire White Noise, poi riprova.</string>
+    <string name="error_missing_key_package_for">Non abbiamo trovato una chiave di chat utilizzabile per %1$s. Chiedi di aggiornare e aprire White Noise, poi riprova.</string>
     <string name="invite_to_white_noise">Invita su White Noise</string>
     <string name="invite_friends">Invita amici</string>
     <string name="invite_to_white_noise_description">%1$s non è ancora su White Noise. Condividi l\'app per avviare una chat sicura.</string>
@@ -2201,4 +2201,8 @@
     <string name="onboarding_details_expanded">Espanso</string>
     <string name="onboarding_details_collapsed">Compresso</string>
     <string name="group_svg_rejected_detail">Impossibile preparare questo SVG. Scegli un SVG semplice, PNG o JPEG.</string>
+    <string name="error_invalid_key_package">Non è stato possibile convalidare la chiave di chat pubblicata per questa persona. Chiedi di aggiornare White Noise e pubblicare una nuova chiave di chat, poi riprova.</string>
+    <string name="error_invalid_key_package_for">Non è stato possibile convalidare la chiave di chat pubblicata per %1$s. Chiedi di aggiornare White Noise e pubblicare una nuova chiave di chat, poi riprova.</string>
+    <string name="error_missing_member_inbox">Non c’è un relay di ricezione utilizzabile per questa persona. Chiedi di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
+    <string name="error_missing_member_inbox_for">Non c’è un relay di ricezione utilizzabile per %1$s. Chiedi di controllare i relay di ricezione nelle impostazioni di White Noise, poi riprova.</string>
 </resources>

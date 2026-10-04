@@ -11082,7 +11082,16 @@ class ConversationController(
                         )
                         false
                     } else {
-                        recordMutationFailure(R.string.toast_couldnt_add_members, "GROUP_INVITE_MEMBER", throwable)
+                        recordMutationFailure(
+                            R.string.toast_couldnt_add_members,
+                            "GROUP_INVITE_MEMBER",
+                            throwable,
+                            inviteFailureDetail(
+                                throwable,
+                                appState::displayName,
+                                refs.singleOrNull()?.let(appState::displayName),
+                            ),
+                        )
                         false
                     }
                 }
