@@ -88,8 +88,8 @@ internal fun hasAnimationSourceRange(
 
 /** Charges each discovered frame the full canvas and stops the walk at the first exceeded limit. */
 internal class AnimationSourceBudget(
-    private val canvasWidth: Int,
-    private val canvasHeight: Int,
+    val canvasWidth: Int,
+    val canvasHeight: Int,
 ) {
     private val canvasPixels = canvasWidth.toLong() * canvasHeight.toLong()
 
