@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.media
 
-import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.os.Process
@@ -15,18 +14,13 @@ import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AttachmentTransferRequest
-import dev.ipf.whitenoise.android.state.DraftPersistence
-import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.downloadAttachmentPlaintextSource
-import dev.ipf.whitenoise.android.state.enforceAppOwnedAttachmentAcquisitionPolicy
 import dev.ipf.whitenoise.android.state.openNativeAttachment
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -100,7 +94,7 @@ internal object MediaLifecycleAttachmentProbe {
                     attachmentAcquisitionMode = AttachmentAcquisitionModeFfi.HOST_MANAGED,
                 ),
             )
-        val session = Session(context, root, marmot, relays, blobPort)
+        val session = FixtureSession(context, root, marmot, relays, blobPort)
         try {
             withTimeout(DEADLINE_MILLIS) {
                 marmot.start()
@@ -108,50 +102,6 @@ internal object MediaLifecycleAttachmentProbe {
             }
         } finally {
             session.close(preserve = role == "prepare")
-        }
-    }
-
-    /** The runtime, generated accounts and per-account states for one process, always released on every path. */
-    private class Session(
-        val context: Context,
-        val root: File,
-        val marmot: Marmot,
-        val relays: List<String>,
-        val blobPort: Int,
-    ) {
-        val accounts = mutableListOf<String>()
-        val states = mutableMapOf<String, WhiteNoiseAppState>()
-
-        /** Builds a fixture-only state for [account]; its drafts and caches never touch the installed app. */
-        suspend fun state(account: String): WhiteNoiseAppState =
-            states.getOrPut(account) {
-                withContext(Dispatchers.Main.immediate) {
-                    WhiteNoiseAppState(
-                        context = context,
-                        draftStore = DraftStore(DiscardedDrafts),
-                        accountIdHexResolver = { null },
-                        accounts = emptyList(),
-                        activeAccountRef = account,
-                        initialMarmotRuntime = AppMarmotRuntime(root.absolutePath, marmot),
-                    )
-                }
-            }
-
-        /** Cancels fixture work, removes only generated accounts and, unless preserved, the generated root. */
-        suspend fun close(preserve: Boolean) {
-            states.values.forEach { it.mutationsScope.cancel() }
-            val cleanup =
-                if (preserve) {
-                    emptyList()
-                } else {
-                    accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
-                }
-            try {
-                marmot.shutdownAndClose()
-            } finally {
-                if (!preserve) root.deleteRecursively()
-            }
-            check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
         }
     }
 
@@ -193,14 +143,11 @@ internal object MediaLifecycleAttachmentProbe {
     ) = FixtureMediaAssets.attachment(bytes, "video/mp4", name, "320x240")
 
     /** Sends every message genuinely, reads the sender's retained copy, then downloads each as the receiver. */
-    private suspend fun prepare(session: Session) {
-        val sender = session.marmot.createIdentity(session.relays, session.relays)
-        session.accounts += sender.label
-        val receiver = session.marmot.createIdentity(session.relays, session.relays)
-        session.accounts += receiver.label
-        session.marmot.enforceAppOwnedAttachmentAcquisitionPolicy(listOf(receiver.label, sender.label))
-        val group = session.marmot.createGroup(sender.label, "Generated fixture", listOf(receiver.accountIdHex), null)
-        ControlledAttachmentProbe.awaitReceivedGroup(session.marmot, receiver.label, group)
+    private suspend fun prepare(session: FixtureSession) {
+        val peers = session.createPeers()
+        val sender = peers.sender
+        val receiver = peers.receiver
+        val group = peers.group
         val manifest = JSONArray()
         for (message in messages()) {
             val attachments = message.build()
@@ -280,7 +227,7 @@ internal object MediaLifecycleAttachmentProbe {
     }
 
     /** Verifies, in a new process with acquisition unavailable, every attachment in both directions. */
-    private suspend fun read(session: Session) {
+    private suspend fun read(session: FixtureSession) {
         val manifest = JSONObject(File(session.root, MANIFEST).readText())
         check(manifest.getInt("schema") == 1)
         val previousPid = manifest.getInt("prepare_pid")
@@ -300,7 +247,7 @@ internal object MediaLifecycleAttachmentProbe {
 
     /** One direction of one attachment: no memory hit, exact retained bytes, resolver parity and a decoded preview. */
     private suspend fun verifyLocal(
-        session: Session,
+        session: FixtureSession,
         attachment: ManifestAttachment,
         role: String,
         request: AttachmentTransferRequest,
@@ -341,7 +288,7 @@ internal object MediaLifecycleAttachmentProbe {
 
     /** Decodes what a tile would show first: a bitmap for an image, a first frame and duration for a video. */
     private suspend fun decodePreview(
-        session: Session,
+        session: FixtureSession,
         state: WhiteNoiseAppState,
         request: AttachmentTransferRequest,
         attachment: ManifestAttachment,
@@ -363,7 +310,7 @@ internal object MediaLifecycleAttachmentProbe {
 
     /** Writes the lease to a private temp file and extracts frame zero, as the poster path does. */
     private suspend fun decodeVideoFrame(
-        session: Session,
+        session: FixtureSession,
         lease: AttachmentPlaintext,
     ): Boolean =
         withContext(Dispatchers.IO) {
@@ -395,7 +342,7 @@ internal object MediaLifecycleAttachmentProbe {
     }
 
     /** Native history, not the manifest, supplies the reference after restart. */
-    private suspend fun publishedReference(
+    internal suspend fun publishedReference(
         marmot: Marmot,
         request: AttachmentTransferRequest,
     ): MediaAttachmentReferenceFfi {
@@ -415,7 +362,7 @@ internal object MediaLifecycleAttachmentProbe {
     }
 
     /** Resolves the receiver's canonical identity for every reference, preserving each album index. */
-    private suspend fun projectRequests(
+    internal suspend fun projectRequests(
         marmot: Marmot,
         receiver: AccountSummaryFfi,
         group: String,
@@ -531,16 +478,4 @@ internal object MediaLifecycleAttachmentProbe {
             requestFrom(value.getJSONObject("sender")),
             requestFrom(value.getJSONObject("receiver")),
         )
-
-    /** The generated session has no persisted user draft. */
-    private object DiscardedDrafts : DraftPersistence {
-        /** Never reads installed draft storage. */
-        override fun read(): Map<String, String> = emptyMap()
-
-        /** Discards only generated-fixture draft writes. */
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
 }
