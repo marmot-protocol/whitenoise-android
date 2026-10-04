@@ -1,6 +1,6 @@
 # Native READY without the engine's feed cadence, 2026-10-03
 
-Refs [#2785](https://github.com/marmot-protocol/whitenoise-android/issues/2785) and [#2045](https://github.com/marmot-protocol/whitenoise-android/issues/2045).
+Context: [#2785](https://github.com/marmot-protocol/whitenoise-android/issues/2785) and [#2045](https://github.com/marmot-protocol/whitenoise-android/issues/2045).
 This compares one Android change against the [controlled matrix baseline](attachment-latency-matrix-2026-10-03.md) on
 the same emulator, links, sizes and procedure, and publishes the latency and memory budgets the matrix now enforces.
 It is an emulator and loopback measurement, not a physical-device or production-network result.
@@ -26,9 +26,9 @@ Play, `.medialatency` installed in place) from clean signed commits, MDK pin `12
 | Baseline | `3436010c5233e568296e07115aed21cedaebe520` | `564a645365e6f1690752c52bcc2496221485bcbc937906608e41af25c0572a09` | `94f6ced2746d215858c5cd7dec3913b9e08c9ea935f77ec168b0e9bfe627a210` |
 | Candidate | `ee19c3548bb53dff61cf4cfffbd0602958fb365c` | `02b02e1907ef543336efeb052aebd8716c8f2b2290aeb072831b6d622a809349` | `13c897e3cced31af15d7bc3423128053dfc5544869ab76b4a0487aae948fbae2` |
 
-The runs were taken before #3023 landed and the branches were then rebased onto master, so the exact heads are the
-commits above, preserved privately, not the rebased ones. The candidate source is this change on the same tip; later commits on both branches change only documentation,
-comments and host tooling. Baseline runs 1, 3 and 4 and candidate runs 1 to 3 pass every stage. Baseline run 2 failed
+The runs were taken before the permission-ordering fix of #3023 was part of the build, so the exact heads are the
+commits above, preserved privately. The candidate source is this change on the same tip, and later commits on both
+branches change only documentation, comments and host tooling. Baseline runs 1, 3 and 4 and candidate runs 1 to 3 pass every stage. Baseline run 2 failed
 and is preserved, as are the earlier failed attempts described in the baseline report.
 
 ## Result
