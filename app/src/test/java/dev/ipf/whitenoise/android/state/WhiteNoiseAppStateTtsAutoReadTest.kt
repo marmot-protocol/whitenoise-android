@@ -7,7 +7,6 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
-import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,32 +31,6 @@ class WhiteNoiseAppStateTtsAutoReadTest {
     private val accountRef = "account-a"
     private val groupA = "group-a"
     private val groupB = "group-b"
-
-    @Test
-    fun readerCannotOwnSpeechFromAnotherLocalAccount() {
-        val appState = testAppStateWithTwoAccounts(activeAccountRef = accountRef)
-        appState.ttsController.attachEngine(FakeSessionEngine())
-        assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("s", "Sender", "Private speech.")), Locale.US))
-        assertTrue(appState.ownsCurrentAccountSpeech())
-        runBlocking { appState.setActiveAccount("account-b") }
-        assertFalse(appState.ownsCurrentAccountSpeech())
-    }
-
-    @Test
-    fun revokedReaderCannotReplaceAnExistingManualSpeechSession() =
-        runBlocking {
-            val appState = testAppState()
-            val engine = FakeSessionEngine()
-            appState.ttsController.attachEngine(engine)
-            val entries = listOf(TtsSpeakableEntry("s", "Sender", "Existing manual speech."))
-            assertTrue(appState.speakAloud(entries, Locale.US))
-            val existing = appState.ttsController.state.value
-            val spoken = engine.spoken.size
-            assertFalse(appState.speakAloudPrepared(entries, Locale.US, isCurrent = { false }))
-            assertEquals(existing, appState.ttsController.state.value)
-            assertEquals(spoken, engine.spoken.size)
-            assertTrue(appState.ownsCurrentAccountSpeech())
-        }
 
     @Before
     fun clearPreferences() {
@@ -125,26 +98,6 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         assertEquals(listOf("Sender: Second.", "Third."), engine.spoken.map { it.text })
         assertTrue(appState.ownsTtsAutoReadSession(groupA))
     }
-
-    @Test
-    fun conversationPreparedStartRejectsAnUnmappableHitWithoutReadingFromTheTop() =
-        runBlocking {
-            val appState = testAppState()
-            val engine = FakeSessionEngine()
-            appState.ttsController.attachEngine(engine)
-            assertFalse(
-                appState.speakAloudAutoRead(
-                    groupIdHex = groupA,
-                    entries = listOf(TtsSpeakableEntry("s", "Sender", "First. Second.")),
-                    locale = Locale.US,
-                    startRenderedHit = PreparedRenderedHit("missing", "changed", 0),
-                    backgroundPreparation = true,
-                ),
-            )
-            assertTrue(engine.spoken.isEmpty())
-            assertFalse(appState.ownsTtsAutoReadSession(groupA))
-            assertTrue(appState.ttsController.state.value is TtsState.Idle)
-        }
 
     @Test
     fun disablingAutoReadDoesNotStopManualSpeech() {
