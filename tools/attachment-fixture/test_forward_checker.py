@@ -199,6 +199,18 @@ class ForwardEvidenceTest(unittest.TestCase):
             with self.subTest(field=field):
                 self.assertFalse(check_forward(rows, events())["passed"])
 
+    def test_an_uncached_forward_without_its_source_lookup_timing_is_not_qualified(self):
+        """A missed lookup still has a duration, so a sample whose lookup was never timed cannot qualify."""
+        for variant in ("uncached", "retained", "cached"):
+            rows = metrics()
+            sampled = rows[sample_index(rows, variant, 3)]
+            sampled["source_lookup_ms"] = None
+            sampled["wnperf_lines"] = [line for line in sampled["wnperf_lines"] if "forward_source_lookup" not in line]
+            with self.subTest(variant=variant):
+                result = check_forward(rows, events())
+                self.assertFalse(result["passed"])
+                self.assertTrue(any("source_lookup_ms was not timed" in v for v in result["violations"]), result)
+
     def test_every_phase_must_be_timed_and_the_lock_wait_must_be_a_measurement_when_present(self):
         """Each phase duration is individually required; the lock wait may be absent but never malformed."""
         for field in PHASE_FIELDS:

@@ -25,7 +25,8 @@ SOURCE = {
 CEILING_MS = {"uncached": 30_000, "retained": 15_000, "cached": 15_000}
 # The issue's relation to a direct send of the same bytes; reported per variant, since loopback fixed costs dominate.
 DIRECT_RATIO_TARGET = 2.0
-PHASE_FIELDS = ("source_ready_ms", "upload_ms", "publish_ms")
+# Every forward times its source lookup, even one that misses every local layer, so the lookup is a required phase.
+PHASE_FIELDS = ("source_lookup_ms", "source_ready_ms", "upload_ms", "publish_ms")
 
 
 def expected_uploads():
