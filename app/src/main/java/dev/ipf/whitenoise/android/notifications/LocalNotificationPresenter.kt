@@ -699,6 +699,10 @@ class LocalNotificationPresenter(
                         }
                     val messagingShortcutId =
                         channelShortcutId.takeIf { decision.style == NotificationStyleChoice.Messaging }
+                    val hiddenShortcut: (() -> ShortcutInfoCompat)? =
+                        messagingShortcutId?.let { id ->
+                            { prepareGenericNotificationShortcut(context, id, update.accountRef, update.groupIdHex) }
+                        }
                     val vibrationPattern =
                         if (
                             decision.channelId == NotificationChannelSpec.DIRECT_MESSAGES.id ||
@@ -734,7 +738,7 @@ class LocalNotificationPresenter(
                                 NotificationPreviewPreferences.stamp(
                                     this,
                                     previewToken,
-                                    silentUpdate || replaceCurrentMessage,
+                                    rewriteGeneration != null,
                                 )
                                 UserEventNotificationGroup.decorateChild(
                                     context,
@@ -996,6 +1000,7 @@ class LocalNotificationPresenter(
                                             notification,
                                             writeObserver,
                                             mustBeLive = rewriteGeneration != null,
+                                            hiddenShortcut = hiddenShortcut,
                                             finalPostAllowed = {
                                                 isPostStillAllowed() &&
                                                     showGenerationAllowsPost() &&
@@ -1052,6 +1057,7 @@ class LocalNotificationPresenter(
                                                     cleanNotification,
                                                     writeObserver,
                                                     mustBeLive = rewriteGeneration != null,
+                                                    hiddenShortcut = hiddenShortcut,
                                                     finalPostAllowed = {
                                                         isPostStillAllowed() &&
                                                             showGenerationAllowsPost() &&
@@ -1129,6 +1135,7 @@ class LocalNotificationPresenter(
                                             notification,
                                             writeObserver,
                                             mustBeLive = rewriteGeneration != null,
+                                            hiddenShortcut = hiddenShortcut,
                                             finalPostAllowed = {
                                                 isPostStillAllowed() &&
                                                     showGenerationAllowsPost() &&
@@ -1352,25 +1359,34 @@ class LocalNotificationPresenter(
                 conversationAvatarBitmap !== messaging.conversationAvatarBitmap ||
                     senderAvatarBitmap !== messaging.senderAvatarBitmap
             if (!avatarChanged) return@withLock
-            val enrichedStyle = enrichedMessagingStyle(active, enrichedSender) ?: return@withLock
-            val enriched = buildEnrichedMessagingNotification(active, enrichedStyle)
-            val manager = NotificationManagerCompat.from(context)
-            if (
-                postNotificationSafely(
-                    manager,
-                    content.notificationTag,
-                    content.notificationId,
-                    enriched,
-                    mustBeLive = true,
-                ) == NotificationCardWriteResult.WRITTEN
-            ) {
-                retainPostedCardUnlessDismissed(
-                    showToken,
-                    manager,
-                    content.notificationTag,
-                    content.notificationId,
-                )
-            }
+            postEnrichedAvatarCard(content, active, enrichedSender, showToken)
+        }
+    }
+
+    private fun postEnrichedAvatarCard(
+        content: LocalNotificationContent,
+        active: Notification,
+        sender: Person,
+        showToken: ConversationCardShowToken,
+    ) {
+        val enrichedStyle = enrichedMessagingStyle(active, sender) ?: return
+        val enriched = buildEnrichedMessagingNotification(active, enrichedStyle)
+        val manager = NotificationManagerCompat.from(context)
+        if (
+            postNotificationSafely(
+                manager,
+                content.notificationTag,
+                content.notificationId,
+                enriched,
+                mustBeLive = true,
+            ) == NotificationCardWriteResult.WRITTEN
+        ) {
+            retainPostedCardUnlessDismissed(
+                showToken,
+                manager,
+                content.notificationTag,
+                content.notificationId,
+            )
         }
     }
 
@@ -1494,6 +1510,7 @@ class LocalNotificationPresenter(
         recordedAtMs: Long? = null,
         mustBeLive: Boolean = false,
         finalPostAllowed: (() -> Boolean)? = null,
+        hiddenShortcut: (() -> ShortcutInfoCompat)? = null,
     ): NotificationCardWriteResult =
         try {
             if (finalPostAllowed != null) {
@@ -1525,7 +1542,7 @@ class LocalNotificationPresenter(
                         }
                     },
                 ) {
-                    val payload = previewPayload(notification, tag, id)
+                    val payload = previewPayload(notification, tag, id, hiddenShortcut)
                     notificationPoster(manager, tag, id, payload)
                 }
             if (written) {
@@ -1560,6 +1577,7 @@ class LocalNotificationPresenter(
         notification: Notification,
         tag: String,
         id: Int,
+        hiddenShortcut: (() -> ShortcutInfoCompat)?,
     ): Notification {
         val needsLiveProof =
             notification.extras.getBoolean(NotificationPreviewPreferences.EXTRA_CORRECTION) ||
@@ -1568,7 +1586,7 @@ class LocalNotificationPresenter(
         return if (NotificationPreviewPreferences.canExpose(context, notification, current)) {
             notification
         } else {
-            notificationWithoutPreview(context, notification)
+            notificationWithoutPreview(context, notification, shortcut = hiddenShortcut?.invoke())
         }
     }
 
@@ -1861,6 +1879,10 @@ class LocalNotificationPresenter(
                 val resolved =
                     NotificationCompat
                         .Builder(context, active.notification)
+                        .apply {
+                            extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
+                            extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
+                        }
                         .setRemoteInputHistory(arrayOf(handledText))
                         .setSilent(true)
                         .setOnlyAlertOnce(true)
@@ -1919,6 +1941,10 @@ class LocalNotificationPresenter(
                 val resolved =
                     NotificationCompat
                         .Builder(context, active.notification)
+                        .apply {
+                            extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
+                            extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
+                        }
                         .setRemoteInputHistory(arrayOf(failureNotice))
                         .setSilent(true)
                         .setOnlyAlertOnce(true)

@@ -10647,14 +10647,6 @@
         ]
       },
       {
-        "surface": "string:toast_notification_scope_update_failed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
-        "anchor": "R.string.toast_notification_scope_update_failed",
-        "test_ids": [
-          "NTF-030"
-        ]
-      },
-      {
         "surface": "string:notification_show_previews",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "R.string.notification_show_previews",
@@ -30758,6 +30750,18 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "Direct Share preview privacy fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
+        "anchor": "genericNotificationShortcut(context, shortcut)",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Notification preview failure restart guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_preview_update_failed",
+        "test_ids": ["NTF-030"]
+      },
       {
         "surface": "Generic conversation channel description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewChannelNames.kt",

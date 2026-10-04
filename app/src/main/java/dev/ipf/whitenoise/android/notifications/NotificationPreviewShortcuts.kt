@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
-import android.os.Bundle
 import android.os.PersistableBundle
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -36,7 +35,6 @@ internal fun genericNotificationShortcut(
         // Compat inventory reconstruction omits this framework flag; all owned conversation IDs are long-lived.
         .setLongLived(true)
         .setExtras(extras)
-        .setTransientExtras(Bundle())
         .build()
 }
 
@@ -63,24 +61,12 @@ internal fun redactNotificationShortcuts(context: Context): Boolean =
 internal fun redactNotificationShortcut(
     context: Context,
     id: String,
-    notification: android.app.Notification,
+    prepared: ShortcutInfoCompat?,
 ): Boolean =
     runCatching {
         val original = notificationShortcuts(context).firstOrNull { it.id == id }
         if (original == null) {
-            val account = notification.extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF)
-            val group = notification.extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID)
-            if (account == null || group == null) return@runCatching false
-            if (conversationShortcutId(account, group) != id) return@runCatching false
-            val captured =
-                conversationSettingsShortcut(
-                    context,
-                    id,
-                    account,
-                    group,
-                    context.getString(R.string.app_name),
-                    null,
-                )
+            val captured = prepared?.takeIf { it.id == id } ?: return@runCatching false
             return@runCatching ShortcutManagerCompat.pushDynamicShortcut(
                 context,
                 genericNotificationShortcut(context, captured),
@@ -118,3 +104,15 @@ internal fun shortcutPreviewAllowed(
             extras.getLong(NotificationPreviewPreferences.EXTRA_REVISION, -1L) == token.revision
     return token.allowed && preparedAllowed
 }
+
+/** Captured routing stays in-process; the generic notification need not expose account/group extras. */
+internal fun prepareGenericNotificationShortcut(
+    context: Context,
+    id: String,
+    accountRef: String,
+    groupIdHex: String,
+): ShortcutInfoCompat =
+    genericNotificationShortcut(
+        context,
+        conversationSettingsShortcut(context, id, accountRef, groupIdHex, context.getString(R.string.app_name), null),
+    )

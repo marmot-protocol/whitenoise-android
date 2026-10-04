@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.share
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.PersistableBundle
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -12,11 +13,17 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
+import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
+import dev.ipf.whitenoise.android.notifications.NotificationPreviewToken
+import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountExtras
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.conversationShortcutIsRich
+import dev.ipf.whitenoise.android.notifications.genericNotificationShortcut
 import dev.ipf.whitenoise.android.notifications.notificationConversationIcon
 import dev.ipf.whitenoise.android.notifications.preferredConversationShortcutTitle
+import dev.ipf.whitenoise.android.notifications.shortcutPreviewAllowed
+import dev.ipf.whitenoise.android.notifications.stampShortcutPreview
 import dev.ipf.whitenoise.android.state.ChatListItem
 import kotlin.math.min
 
@@ -64,6 +71,7 @@ internal fun buildShareShortcut(
     target: ShareShortcutTarget,
     existingTitle: String? = null,
     rank: Int = 0,
+    previewToken: NotificationPreviewToken? = null,
 ): ShortcutInfoCompat? {
     val shortcutId = conversationShortcutId(target.accountRef, target.groupIdHex) ?: return null
     val title = preferredConversationShortcutTitle(target.title, existingTitle)
@@ -81,7 +89,7 @@ internal fun buildShareShortcut(
         .setRank(rank)
         .setLongLived(true)
         .setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
-        .setExtras(checkNotNull(conversationShortcutAccountExtras(target.accountRef)))
+        .setExtras(shareShortcutExtras(target.accountRef, null, previewToken))
         .build()
 }
 
@@ -95,6 +103,7 @@ private fun rebuildRichShareShortcut(
     target: ShareShortcutTarget,
     existing: ShortcutInfoCompat,
     rank: Int,
+    previewToken: NotificationPreviewToken,
 ): ShortcutInfoCompat {
     val title = preferredConversationShortcutTitle(target.title, existing.longLabel?.toString())
     val icon =
@@ -122,8 +131,7 @@ private fun rebuildRichShareShortcut(
             .setLongLived(true)
             .setCategories(existing.categories.orEmpty() + CONVERSATION_SHARE_TARGET_CATEGORY)
             .setExtras(
-                existing.extras
-                    ?: checkNotNull(conversationShortcutAccountExtras(target.accountRef)),
+                shareShortcutExtras(target.accountRef, existing.extras, previewToken),
             )
     existing.activity?.let(builder::setActivity)
     existing.disabledMessage?.let(builder::setDisabledMessage)
@@ -132,6 +140,19 @@ private fun rebuildRichShareShortcut(
         builder.setExcludedFromSurfaces(existing.excludedFromSurfaces)
     }
     return builder.build()
+}
+
+private fun shareShortcutExtras(
+    accountRef: String,
+    original: PersistableBundle?,
+    token: NotificationPreviewToken?,
+): PersistableBundle {
+    val extras = PersistableBundle(original ?: checkNotNull(conversationShortcutAccountExtras(accountRef)))
+    if (token != null) {
+        extras.remove(NotificationPreviewPreferences.EXTRA_HIDDEN)
+        stampShortcutPreview(token, extras)
+    }
+    return extras
 }
 
 class ShareShortcutPublisher(
@@ -161,6 +182,7 @@ class ShareShortcutPublisher(
         displayTitle: (ChatListItem) -> String,
     ) {
         if (accountRef.isBlank()) return
+        val previewToken = NotificationPreviewPreferences.capture(context)
         val maxShortcuts = maxShortcutCount().coerceAtLeast(0)
         val limit = min(MAX_SHARE_SHORTCUTS, maxShortcuts)
         val targets = selectShareShortcutTargets(accountRef, chats, limit, displayTitle)
@@ -176,17 +198,28 @@ class ShareShortcutPublisher(
                             ?: return@mapIndexedNotNull null
                     val existing = existingById[shortcutId]
                     if (existing != null && conversationShortcutIsRich(existing)) {
-                        rebuildRichShareShortcut(context, target, existing, rank)
+                        rebuildRichShareShortcut(context, target, existing, rank, previewToken)
                     } else {
                         buildShareShortcut(
                             context,
                             target,
                             existing?.longLabel?.toString(),
                             rank,
+                            previewToken,
                         )
                     }
                 }
             }
-        setDynamicShortcuts(shortcuts)
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            setDynamicShortcuts(
+                shortcuts.map { shortcut ->
+                    if (shortcutPreviewAllowed(context, shortcut)) {
+                        shortcut
+                    } else {
+                        genericNotificationShortcut(context, shortcut)
+                    }
+                },
+            )
+        }
     }
 }

@@ -34,7 +34,7 @@ internal fun NotificationPreviewControl(
                 SettingsAction(
                     context = context,
                     title = stringResource(R.string.retry),
-                    subtitle = stringResource(R.string.toast_notification_scope_update_failed),
+                    subtitle = stringResource(R.string.notification_preview_update_failed),
                     enabled = !state.busy,
                     onClick = onRetry,
                 )

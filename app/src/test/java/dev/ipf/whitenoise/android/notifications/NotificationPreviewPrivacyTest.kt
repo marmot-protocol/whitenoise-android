@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ShortcutManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -16,6 +17,7 @@ import dev.ipf.marmotkit.NotificationUserFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -68,6 +70,8 @@ class NotificationPreviewPrivacyTest {
             card.extras.getCharSequence(Notification.EXTRA_TEXT),
         )
         assertNull(card.extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
+        assertNotNull(card.shortcutId)
+        assertNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(card))
         assertGenericShortcut(card)
         assertSafeActions(card)
         assertGenericConversation(card)
@@ -377,7 +381,28 @@ class NotificationPreviewPrivacyTest {
         )
     }
 
-    /** A group message with deliberately private identity and text sent through the real formatter. */
+    /** A new silent generation after enabling is new content; the older hidden line stays absent. */
+    @Test
+    fun newSilentMessageAfterEnablingDoesNotCarryHiddenHistory() =
+        runBlocking {
+            val presenter = LocalNotificationPresenter(context, enrichmentLauncher = {}, groupReconciliation = {})
+            presenter.ensureChannels()
+            assertTrue(presenter.show(update(), shortNpub = { "sender" }))
+            assertTrue(NotificationPreviewPreferences.setEnabled(context, true))
+            assertTrue(
+                presenter.show(
+                    update().copy(messageIdHex = "new", previewText = "New text"),
+                    silentUpdate = true,
+                    shortNpub = { "sender" },
+                ),
+            )
+            val card = manager.activeNotifications.single().notification
+            assertTrue(!card.extras.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
+            val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(card)!!
+            assertEquals(listOf("New text"), style.messages.map { it.text.toString() })
+            assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        }
+
     private fun showFreshMessage(presenter: LocalNotificationPresenter) =
         runBlocking {
             assertTrue(
@@ -393,6 +418,9 @@ class NotificationPreviewPrivacyTest {
             assertTrue(isConversationShortcutId(id))
             val shortcut = ShortcutManagerCompat.getDynamicShortcuts(context).single { it.id == id }
             assertEquals(context.getString(R.string.app_name), shortcut.longLabel)
+            val framework =
+                context.getSystemService(ShortcutManager::class.java).dynamicShortcuts.single { it.id == id }
+            assertTrue(ReflectionHelpers.callInstanceMethod<Boolean>(framework, "isLongLived"))
             assertTrue(shortcut.categories.isNullOrEmpty())
             assertTrue(shortcut.extras!!.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
         }

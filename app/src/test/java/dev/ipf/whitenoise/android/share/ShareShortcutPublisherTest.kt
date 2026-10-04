@@ -8,11 +8,14 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA
+import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.state.ChatListItem
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -205,6 +208,50 @@ class ShareShortcutPublisherTest {
 
         assertEquals(listOf(conversationShortcutId("acct", "g1")), published)
     }
+
+    @Test
+    fun publishWithPreviewsOffNeverRestoresPrivateShareMetadata() =
+        runBlocking {
+            val context = RuntimeEnvironment.getApplication()
+            assertTrue(NotificationPreviewPreferences.setEnabled(context, false, scrub = { true }))
+            var result = emptyList<ShortcutInfoCompat>()
+            val publisher =
+                ShareShortcutPublisher(
+                    context,
+                    maxShortcutCount = { 2 },
+                    setDynamicShortcuts = { result = it },
+                    existingShortcuts = { emptyList() },
+                )
+            publisher.publish("account", listOf(chat("group", pending = false))) { "Private title" }
+            val shortcut = result.single()
+            assertEquals(context.getString(R.string.app_name), shortcut.longLabel)
+            assertTrue(shortcut.categories.isNullOrEmpty())
+            assertTrue(shortcut.extras!!.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
+        }
+
+    @Test
+    fun publishPreparedBeforeOffThenOnStaysGeneric() =
+        runBlocking {
+            val context = RuntimeEnvironment.getApplication()
+            assertTrue(NotificationPreviewPreferences.setEnabled(context, true, scrub = { true }))
+            var result = emptyList<ShortcutInfoCompat>()
+            val publisher =
+                ShareShortcutPublisher(
+                    context,
+                    maxShortcutCount = { 2 },
+                    setDynamicShortcuts = { result = it },
+                    existingShortcuts = { emptyList() },
+                )
+            publisher.publish("account", listOf(chat("group", pending = false))) {
+                runBlocking {
+                    assertTrue(NotificationPreviewPreferences.setEnabled(context, false, scrub = { true }))
+                    assertTrue(NotificationPreviewPreferences.setEnabled(context, true, scrub = { true }))
+                }
+                "Private title"
+            }
+            assertEquals(context.getString(R.string.app_name), result.single().longLabel)
+            assertTrue(result.single().extras!!.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
+        }
 }
 
 private fun chat(

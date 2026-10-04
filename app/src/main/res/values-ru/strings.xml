@@ -2271,4 +2271,5 @@
     <string name="group_svg_rejected_detail">Не удалось обработать этот SVG. Выберите простой SVG, PNG или JPEG.</string>
     <string name="notification_show_previews">Показывать содержимое уведомлений</string>
     <string name="notification_show_previews_detail">При отключении скрывает имена и содержимое сообщений. Применяется ко всем аккаунтам.</string>
+    <string name="notification_preview_update_failed">Изменения могут потеряться после перезапуска.</string>
 </resources>

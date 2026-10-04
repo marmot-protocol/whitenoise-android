@@ -45,7 +45,6 @@ internal class NotificationGroupReconciler(
 
     private val worker =
         scope.launch {
-            NotificationPreviewPreferences.recover(context)
             for (request in requests) {
                 delay(SETTLE_DELAY_MS)
                 reconcile()

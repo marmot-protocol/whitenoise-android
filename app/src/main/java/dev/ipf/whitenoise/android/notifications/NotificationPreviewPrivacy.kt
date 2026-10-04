@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
+import androidx.core.content.pm.ShortcutInfoCompat
 import dev.ipf.whitenoise.android.R
 
 /** Rebuilds generic OS cards from allowlisted routing fields, never from a recovered rich builder. */
@@ -12,6 +13,7 @@ internal fun notificationWithoutPreview(
     context: Context,
     original: Notification,
     silent: Boolean = original.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0,
+    shortcut: ShortcutInfoCompat? = null,
 ): Notification {
     val builder =
         NotificationCompat
@@ -36,7 +38,7 @@ internal fun notificationWithoutPreview(
             .setSilent(silent)
             .setAllowSystemGeneratedContextualActions(false)
             .addExtras(previewRoutingExtras(original))
-    preserveGenericConversation(context, original, builder)
+    preserveGenericConversation(context, original, builder, shortcut)
     addSafeNotificationActions(context, original, builder)
     return builder.build().also { it.publicVersion = genericPublicVersion(context, original) }
 }
@@ -123,6 +125,7 @@ private fun preserveGenericConversation(
     context: Context,
     original: Notification,
     builder: NotificationCompat.Builder,
+    shortcut: ShortcutInfoCompat?,
 ) {
     if (NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(original) == null) return
     val name = context.getString(R.string.app_name)
@@ -134,6 +137,6 @@ private fun preserveGenericConversation(
             .addMessage(context.getString(R.string.notification_hidden_content), original.`when`, person),
     )
     original.shortcutId?.takeIf(::isConversationShortcutId)?.let { id ->
-        if (redactNotificationShortcut(context, id, original)) builder.setShortcutId(id)
+        if (redactNotificationShortcut(context, id, shortcut)) builder.setShortcutId(id)
     }
 }

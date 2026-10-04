@@ -85,8 +85,7 @@ class NotificationPreviewRestartTest {
             assertTrue(restarted.markDirectReplyFailed(target.tag, target.id, "msg-a", "Retry sending"))
             val failed = manager.activeNotifications.single().notification
             assertRichReply(failed)
-            val history = failed.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)
-            assertEquals("Retry sending", history!!.first())
+            assertEquals(listOf("Retry sending"), remoteInputHistory(failed))
         }
 
     @Test
@@ -123,6 +122,18 @@ class NotificationPreviewRestartTest {
         assertFalse(card.extras.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN))
         assertTrue(card.actions.orEmpty().any { !it.remoteInputs.isNullOrEmpty() })
         assertTrue(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(card) != null)
+    }
+
+    private fun remoteInputHistory(notification: Notification): List<String>? {
+        val legacy = notification.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)
+        if (legacy != null) return legacy.map(CharSequence::toString)
+        return notification.extras.getParcelableArray("android.remoteInputHistoryItems")?.map { item ->
+            item.javaClass
+                .getMethod("getText")
+                .invoke(item)
+                ?.toString()
+                .orEmpty()
+        }
     }
 
     private fun update() =

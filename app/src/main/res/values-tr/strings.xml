@@ -2201,4 +2201,5 @@
     <string name="group_svg_rejected_detail">Bu SVG hazırlanamadı. Basit bir SVG, PNG veya JPEG seçin.</string>
     <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
     <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplar için geçerlidir.</string>
+    <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>
 </resources>
