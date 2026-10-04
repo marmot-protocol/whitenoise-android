@@ -183,7 +183,10 @@ Raw reports, logs, APK digests and verified checksums for the passing, failed an
 durable. Compare a candidate with `matrix_compare.py --baseline ... --candidate ...`: a change counts only when it
 exceeds the observed spread and ten percent, any difference in requests, bytes or retries rejects the candidate, a
 profile or size measured on only one side rejects it as incomplete, and only reader-visible metrics can reject it for
-being slower. Every baseline and candidate run is first held to the same correctness check that gated its own report,
-and the command exits with status 2 without comparing anything when one fails: an extra HEAD inside a sample leaves
-every aggregate unchanged, so it can only be seen there. The preserved baseline run that failed its checks (run 2 of
-the first pairing attempt) is rejected by this check, which is why the comparison uses runs 1, 3 and 4.
+being slower. Every baseline and candidate report is first required to have qualified, so the surviving profiles of a failed or
+partial run can never stand in for the whole matrix, and its raw matrix is held to the same correctness check that gated
+its own report. The command exits with status 2 without comparing anything when a report fails either, or when the runs
+of one cohort disagree on environment or link shape: an extra HEAD inside a sample leaves every aggregate unchanged, so
+it can only be seen there. A candidate taken in a different environment, or on a differently shaped link, is reported as
+a difference rather than as a speed change. The preserved baseline run that failed (run 2 of the first pairing attempt)
+is rejected because it did not qualify, which is why the comparison uses runs 1, 3 and 4.

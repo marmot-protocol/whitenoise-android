@@ -4,28 +4,17 @@ import argparse
 import json
 from pathlib import Path
 
-from matrix_report import aggregate, check_matrix, compare
+from matrix_report import aggregate, compare, load_checked_runs
 
-
-def load_checked(paths):
-    """Read each preserved run and return its raw matrix, or the violations of every run that fails correctness.
-
-    Aggregation drops counters such as HEAD requests, so a run is only comparable after the same correctness checks
-    that gated its own report: a run that fails them cannot make a candidate pass.
-    """
-    runs, violations = [], []
-    for path in paths:
-        raw = json.loads(path.read_text())["raw"]
-        verdict = check_matrix(raw)
-        violations.extend(f"{path.name}: {violation}" for violation in verdict["violations"])
-        runs.append(raw)
-    return runs, violations
+# Kept under its original name for callers; the check lives beside the aggregation it protects.
+load_checked = load_checked_runs
 
 
 def main():
     """Print the per-cell verdicts and exit non-zero when correctness differs or any cell is materially slower.
 
-    Exits with status 2, before comparing anything, when any baseline or candidate run fails correctness.
+    Exits with status 2, before comparing anything, when any baseline or candidate run did not qualify, fails
+    correctness, or was taken in a different environment or link shape than the others of its cohort.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", type=Path, nargs="+", required=True, help="One or more repeats of the baseline")
@@ -36,8 +25,12 @@ def main():
     if baseline_violations or candidate_violations:
         print(json.dumps({"accepted": False, "invalid_runs": baseline_violations + candidate_violations}, indent=2))
         raise SystemExit(2)
-    baseline = aggregate(baseline_runs)
-    candidate = aggregate(candidate_runs)
+    try:
+        baseline = aggregate(baseline_runs)
+        candidate = aggregate(candidate_runs)
+    except ValueError as error:
+        print(json.dumps({"accepted": False, "invalid_runs": [str(error)]}, indent=2))
+        raise SystemExit(2)
     result = compare(baseline, candidate)
     print(json.dumps({k: result[k] for k in ("accepted", "correctness_diffs")}, indent=2))
     for cell in result["faster"] + result["slower"]:

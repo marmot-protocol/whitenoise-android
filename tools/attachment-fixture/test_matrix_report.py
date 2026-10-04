@@ -244,7 +244,7 @@ class MatrixTest(unittest.TestCase):
             paths = {}
             for name, run in (("good", good), ("bad", bad)):
                 paths[name] = Path(folder) / f"{name}.json"
-                paths[name].write_text(json.dumps({"raw": run}))
+                paths[name].write_text(json.dumps({"qualified": True, "raw": run}))
             runs, violations = load_checked([paths["good"]])
             self.assertEqual(1, len(runs))
             self.assertEqual([], violations)
@@ -257,6 +257,73 @@ class MatrixTest(unittest.TestCase):
                     compare_main()
             self.assertEqual(2, raised.exception.code)
             self.assertFalse(json.loads(out.getvalue())["accepted"])
+
+    def run_compare(self, baseline, candidate):
+        """Write each report dict to a file, run the comparison command and return its exit code and printed JSON."""
+        with tempfile.TemporaryDirectory() as folder:
+            groups = {}
+            for side, reports in (("baseline", baseline), ("candidate", candidate)):
+                groups[side] = []
+                for index, report in enumerate(reports):
+                    path = Path(folder) / f"{side}-{index}.json"
+                    path.write_text(json.dumps(report))
+                    groups[side].append(str(path))
+            argv = ["matrix_compare.py", "--baseline", *groups["baseline"], "--candidate", *groups["candidate"]]
+            with mock.patch.object(sys, "argv", argv), contextlib.redirect_stdout(io.StringIO()) as out:
+                with self.assertRaises(SystemExit) as raised:
+                    compare_main()
+        text = out.getvalue()
+        return raised.exception.code, json.loads(text[:text.index("\n}") + 2]) if text.startswith("{") else None
+
+    def test_a_report_that_did_not_qualify_is_never_used_even_when_its_survivors_look_clean(self):
+        """If one profile completed and another timed out, the survivors must not stand in for the whole matrix."""
+        survivors = raw(profile([(65536, 2)]))
+        good = {"qualified": True, "raw": survivors}
+        partial = {"qualified": False, "stages_passed": False, "failure_class": "TimeoutExpired", "raw": survivors}
+        self.assertTrue(check_matrix(survivors)["passed"], "the surviving profile on its own is clean")
+        code, printed = self.run_compare([good], [partial])
+        self.assertEqual(2, code)
+        self.assertFalse(printed["accepted"])
+        self.assertTrue(any("did not qualify" in v for v in printed["invalid_runs"]))
+        code, _ = self.run_compare([partial], [good])
+        self.assertEqual(2, code)
+        for missing in ({"raw": survivors}, {"qualified": "yes", "raw": survivors}):
+            self.assertEqual(2, self.run_compare([good], [missing])[0], missing)
+
+    def test_a_report_without_a_raw_matrix_or_environment_is_rejected(self):
+        """A qualified flag cannot vouch for data that is not there, or for data with no environment to compare."""
+        good = {"qualified": True, "raw": raw(profile([(65536, 2)]))}
+        for broken in ({"qualified": True, "raw": None}, {"qualified": True},
+                       {"qualified": True, "raw": {**good["raw"], "environment": None}}):
+            self.assertEqual(2, self.run_compare([good], [broken])[0], broken)
+
+    def test_runs_from_different_environments_or_link_shapes_cannot_be_pooled(self):
+        """Pooling hardware or links that differ would show a change of setup as a change of code."""
+        other_environment = raw(profile([(65536, 2)]))
+        other_environment["environment"] = {"api": "36", "abi": "arm64-v8a"}
+        with self.assertRaises(ValueError):
+            aggregate([raw(profile([(65536, 2)])), other_environment])
+        with self.assertRaises(ValueError):
+            aggregate([raw(profile([(65536, 2)], down=4000)), raw(profile([(65536, 2)], down=8000))])
+
+    def test_a_candidate_from_another_environment_or_link_shape_is_not_accepted(self):
+        """The same cells and counters on different hardware, or a differently shaped link, differ in setup, not code."""
+        base = aggregate(raw(profile([(65536, 4)])))
+        elsewhere = raw(profile([(65536, 4)]))
+        elsewhere["environment"] = {"api": "36", "abi": "arm64-v8a"}
+        verdict = compare(base, aggregate(elsewhere))
+        self.assertFalse(verdict["accepted"])
+        self.assertTrue(any("environment" in diff for diff in verdict["correctness_diffs"]))
+        reshaped = compare(base, aggregate(raw(profile([(65536, 4)], down=4000))))
+        self.assertFalse(reshaped["accepted"])
+        self.assertTrue(any("shape" in diff for diff in reshaped["correctness_diffs"]))
+        self.assertTrue(compare(base, aggregate(raw(profile([(65536, 4)]))))["accepted"])
+        good = {"qualified": True, "raw": raw(profile([(65536, 4)]))}
+        moved = {"qualified": True, "raw": elsewhere}
+        code, printed = self.run_compare([good], [moved])
+        self.assertEqual(1, code)
+        self.assertFalse(printed["accepted"])
+        self.assertEqual(2, self.run_compare([good, moved], [good])[0], "a mixed cohort is invalid input")
 
     def test_report_tables_render_every_cell_and_the_comparison_verdicts(self):
         """The markdown tables carry one row per cell and a verdict per compared metric."""

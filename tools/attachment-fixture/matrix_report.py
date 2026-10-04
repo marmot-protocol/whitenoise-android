@@ -1,5 +1,6 @@
 """Aggregate, check and compare controlled attachment latency matrices; every value is a privacy-safe measurement."""
 
+import json
 import math
 
 CIPHERTEXT_OVERHEAD = 16
@@ -136,10 +137,15 @@ def aggregate(raw):
     observed spread includes run-to-run variation.
     """
     raws = raw if isinstance(raw, list) else [raw]
+    # Pooling runs from different hardware or links would present a change of setup as a change of code.
+    if any(run.get("environment") != raws[0].get("environment") for run in raws):
+        raise ValueError("the runs were taken in different environments")
     by_profile = {}
     for run in raws:
         for profile in run["profiles"]:
             entry = by_profile.setdefault(profile["name"], {"shape": profile["shape"], "samples": [], "recreated": {}})
+            if entry["shape"] != profile["shape"]:
+                raise ValueError(f"profile {profile['name']} was shaped differently between runs")
             entry["samples"].extend(build_samples(profile))
             for m in profile["recreated_metrics"]:
                 if m.get("phase") == "matrix-recreated":
@@ -246,6 +252,15 @@ def compare(baseline, candidate):
     difference, so a candidate cannot be accepted on the cells it happened to measure.
     """
     result = {"cells": [], "correctness_diffs": []}
+    # The same code on different hardware or links is not comparable, so a setup difference is never a speed change.
+    if baseline.get("environment") != candidate.get("environment"):
+        result["correctness_diffs"].append({"environment": {"baseline": baseline.get("environment"),
+                                                            "candidate": candidate.get("environment")}})
+    base_shapes = {p["name"]: p["shape"] for p in baseline["profiles"]}
+    for p in candidate["profiles"]:
+        if p["name"] in base_shapes and base_shapes[p["name"]] != p["shape"]:
+            result["correctness_diffs"].append({"profile": p["name"], "shape": {"baseline": base_shapes[p["name"]],
+                                                                                "candidate": p["shape"]}})
     base = {(p["name"], c["size"]): c for p in baseline["profiles"] for c in p["cells"]}
     cand = {(p["name"], c["size"]): c for p in candidate["profiles"] for c in p["cells"]}
     # A cell present on only one side is incomplete evidence, never an unchanged cell.
@@ -274,3 +289,25 @@ def compare(baseline, candidate):
     result["diagnostic_changes"] = [c for c in result["cells"] if not c["gating"] and c["verdict"] != "unchanged"]
     result["accepted"] = not result["correctness_diffs"] and not result["slower"]
     return result
+
+
+def load_checked_runs(paths):
+    """Read preserved reports and return their raw matrices, or the reasons any report cannot be trusted.
+
+    A report is used only when the run that wrote it qualified: a failed or partial run keeps whatever profiles
+    finished, and those survivors must never stand in for the whole matrix. Each raw matrix must also pass the same
+    correctness check that gated its own report, because aggregation drops counters such as HEAD requests.
+    """
+    runs, violations = [], []
+    for path in paths:
+        report = json.loads(path.read_text())
+        raw = report.get("raw") if isinstance(report, dict) else None
+        if not isinstance(report, dict) or report.get("qualified") is not True:
+            violations.append(f"{path.name}: the run that wrote this report did not qualify")
+        elif not isinstance(raw, dict) or raw.get("environment") is None:
+            violations.append(f"{path.name}: the report carries no raw matrix or environment")
+        else:
+            verdict = check_matrix(raw)
+            violations.extend(f"{path.name}: {violation}" for violation in verdict["violations"])
+            runs.append(raw)
+    return runs, violations
