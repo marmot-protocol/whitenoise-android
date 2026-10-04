@@ -63,6 +63,7 @@ internal fun chatListItemFromProjection(
     removed: Boolean = false,
     activitySequence: ULong = 0uL,
     awaitingSendPreview: Boolean = false,
+    hasOptimisticSendPreview: Boolean = false,
 ): ChatListItem {
     val baseGroup = group ?: emptyGroupRecord(row)
     val presentation = members?.let { chatListMemberPresentation(it, activeAccountIdHex) } ?: presentationMembers
@@ -121,6 +122,7 @@ internal fun chatListItemFromProjection(
         removed = removed,
         activitySequence = activitySequence,
         awaitingSendPreview = awaitingSendPreview,
+        hasOptimisticSendPreview = hasOptimisticSendPreview,
     )
 }
 
@@ -151,6 +153,7 @@ data class ChatListItem(
     /** MarmotKit-selected message, draft, invitation, or empty preview for this row. */
     val selectedPreview: SelectedChatPreviewFfi? = null,
     val awaitingSendPreview: Boolean = false,
+    val hasOptimisticSendPreview: Boolean = false,
     /** All ten advisory row capabilities from the same native snapshot as [projection]. */
     val actions: ChatListRowActionsFfi? = null,
     /**

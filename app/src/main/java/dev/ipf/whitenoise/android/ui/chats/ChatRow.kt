@@ -197,7 +197,13 @@ internal fun ChatRow(
     menuHighlighted: Boolean = false,
     onActionsHeldChange: (Boolean) -> Unit = {},
 ) {
-    val selectedPreview = appState.chatRowSelectedPreviewFor(accountRef, item.group.groupIdHex, item.selectedPreview)
+    val selectedPreview =
+        appState.chatRowSelectedPreviewFor(
+            accountRef = accountRef,
+            groupIdHex = item.group.groupIdHex,
+            nativePreview = item.selectedPreview,
+            hasOptimisticSendPreview = item.hasOptimisticSendPreview,
+        )
     val haptics = LocalHapticFeedback.current
     val rowCoordinates = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val actionsLabel = stringResource(R.string.actions)

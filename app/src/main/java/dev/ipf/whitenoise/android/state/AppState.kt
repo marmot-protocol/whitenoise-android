@@ -2626,11 +2626,17 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
         nativePreview: dev.ipf.marmotkit.SelectedChatPreviewFfi?,
+        hasOptimisticSendPreview: Boolean = false,
     ): dev.ipf.marmotkit.SelectedChatPreviewFfi? =
         if (accountRef == null) {
             nativePreview
         } else {
-            composerDraftExpansionBridge.selectedPreview(accountRef, groupIdHex, nativePreview)
+            composerDraftExpansionBridge.selectedPreview(
+                accountRef = accountRef,
+                groupIdHex = groupIdHex,
+                nativePreview = nativePreview,
+                hasOptimisticSendPreview = hasOptimisticSendPreview,
+            )
         }
 
     /** Return [accountRef]'s restored composer draft for [groupIdHex]. */

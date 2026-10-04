@@ -3722,7 +3722,10 @@ class ChatsController private constructor(
                 ?.let { chatListMemberPresentation(it, activeAccountIdHex) }
     }
 
-    private fun awaitingSendPreview(groupIdHex: String): Boolean = optimisticChatListPreviewByGroup[chatRowKey(groupIdHex)]?.awaitingSendPreview() == true
+    private fun awaitingSendPreview(groupIdHex: String): Boolean {
+        val key = chatRowKey(groupIdHex)
+        return optimisticChatListPreviewByGroup[key]?.awaitingSendPreview() == true
+    }
 
     /** Projects current rows using MDK Markdown first and the exact-text cache only as fallback. */
     private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
@@ -3743,6 +3746,8 @@ class ChatsController private constructor(
                 removed = row.groupIdHex in removedGroupIds,
                 activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
                 awaitingSendPreview = awaitingSendPreview(row.groupIdHex),
+                hasOptimisticSendPreview =
+                    optimisticChatListPreviewByGroup[chatRowKey(row.groupIdHex)]?.hasOptimisticSendPreview() == true,
             )
         }
 
@@ -3772,6 +3777,8 @@ class ChatsController private constructor(
             removed = row.groupIdHex in removedGroupIds,
             activitySequence = activitySequenceByGroup[chatRowKey(row.groupIdHex)] ?: 0uL,
             awaitingSendPreview = awaitingSendPreview(row.groupIdHex),
+            hasOptimisticSendPreview =
+                optimisticChatListPreviewByGroup[chatRowKey(row.groupIdHex)]?.hasOptimisticSendPreview() == true,
         )
     }
 

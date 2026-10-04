@@ -172,13 +172,18 @@ internal class ComposerDraftExpansionBridge(
         accountRef: String,
         groupIdHex: String,
         nativePreview: SelectedChatPreviewFfi?,
+        hasOptimisticSendPreview: Boolean = false,
     ): SelectedChatPreviewFfi? =
         sentPresentation.selectedPreview(
             accountRef,
             groupIdHex,
             draftWriter.generation(accountRef, groupIdHex),
             draftStore.get(accountRef, groupIdHex),
-            nativePreview,
+            if (hasOptimisticSendPreview && nativePreview == SelectedChatPreviewFfi.Empty) {
+                SelectedChatPreviewFfi.Message
+            } else {
+                nativePreview
+            },
         )
 
     fun removeAccount(accountRef: String) = sentPresentation.removeAccount(accountRef)

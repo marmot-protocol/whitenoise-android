@@ -134,7 +134,7 @@ class PendingSendDraftPresentationTest {
             val controller =
                 ConversationController(
                     appState = appState,
-                    initialGroup = group(),
+                    initialGroup = pendingSendGroup(GROUP_ID, ACCOUNT_ID),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         throw MarmotKitException.Publish("relay rejected event")
@@ -162,7 +162,7 @@ class PendingSendDraftPresentationTest {
             val controller =
                 ConversationController(
                     appState = appState,
-                    initialGroup = group(),
+                    initialGroup = pendingSendGroup(GROUP_ID, ACCOUNT_ID),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         // The coalesced MDK save may acknowledge after the UI
@@ -187,7 +187,7 @@ class PendingSendDraftPresentationTest {
             val controller =
                 ConversationController(
                     appState = appState,
-                    initialGroup = group(),
+                    initialGroup = pendingSendGroup(GROUP_ID, ACCOUNT_ID),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
                         throw MarmotKitException.Publish("send event timed out")
@@ -329,7 +329,7 @@ class PendingSendDraftPresentationTest {
         composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_row_send_${stage}_$theme.png")
     }
 
-    private fun nativeDraftFixture(): NativeDraftFixture {
+    private fun nativeDraftFixture(failPublication: Boolean = false): NativeDraftFixture {
         val state = appState()
         state.setDraft(TextFieldValue("sending now"))
         val row = requireNotNull(ChatRowPortFixtures.item().projection).copy(groupIdHex = GROUP_ID)
@@ -349,7 +349,7 @@ class PendingSendDraftPresentationTest {
         val conversation =
             ConversationController(
                 appState = state,
-                initialGroup = group(),
+                initialGroup = pendingSendGroup(GROUP_ID, ACCOUNT_ID),
                 initialMemberSnapshot = memberSnapshot(),
                 markdownParser = {
                     parserStarted.complete(Unit)
@@ -359,6 +359,7 @@ class PendingSendDraftPresentationTest {
                 textPublisher = { _, _, _, _ ->
                     publishStarted.complete(Unit)
                     finishPublish.await()
+                    if (failPublication) throw MarmotKitException.Publish("relay rejected event")
                     SendSummaryFfi(
                         1u,
                         listOf(CONFIRMED_MESSAGE_ID),
@@ -369,6 +370,52 @@ class PendingSendDraftPresentationTest {
             )
         return NativeDraftFixture(state, chats, conversation, parserStarted, finishParse, publishStarted, finishPublish)
     }
+
+    @Test
+    fun cancellingBeforeParsingCompletesRemovesThePreparingRowIndicator() = stoppedSendPreview(cancel = true)
+
+    @Test
+    fun terminalPublicationFailureReplacesThePreparingRowIndicatorWithFailure() = stoppedSendPreview(cancel = false)
+
+    private fun stoppedSendPreview(cancel: Boolean) =
+        runTest {
+            val fixture = nativeDraftFixture(failPublication = !cancel)
+            try {
+                val send = async { fixture.state.sendConversationText(fixture.conversation, "sending now") }
+                fixture.parserStarted.await()
+                fixture.chats.setChatListVisible(true)
+                assertEquals(
+                    true,
+                    fixture.chats.items
+                        .single()
+                        .awaitingSendPreview,
+                )
+                if (cancel) {
+                    val pending =
+                        fixture.conversation.timeline
+                            .single()
+                            .record
+                    assertEquals(true, fixture.conversation.deleteMessage(pending, presentFailure = false))
+                }
+                fixture.finishParse.complete(Unit)
+                if (!cancel) fixture.publishStarted.await()
+                fixture.finishPublish.complete(Unit)
+                send.await()
+                settleChatRowRecompute()
+                val item = fixture.chats.items.single()
+                assertEquals(false, item.awaitingSendPreview)
+                if (cancel) {
+                    assertEquals(false, item.hasOptimisticSendPreview)
+                    assertEquals(false, fixture.publishStarted.isCompleted)
+                } else {
+                    assertEquals(OutgoingMessageIndicator.Failed, item.projectedDeliveryIndicator())
+                }
+                val native = nativeDraft("sending now")
+                assertEquals(native, fixture.state.chatRowSelectedPreviewFor(ACCOUNT_REF, GROUP_ID, native))
+            } finally {
+                fixture.close()
+            }
+        }
 
     private data class NativeDraftFixture(
         val state: WhiteNoiseAppState,
@@ -400,10 +447,11 @@ class PendingSendDraftPresentationTest {
             presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, generation, null, native),
         )
         assertEquals(
-            SelectedChatPreviewFfi.Message,
+            SelectedChatPreviewFfi.Empty,
             presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, generation, null, SelectedChatPreviewFfi.Empty),
         )
-        assertEquals(null, presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, next, "newer draft", native))
+        val selectedNewDraft = presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, next, "newer draft", native)
+        assertEquals("newer draft", (selectedNewDraft as SelectedChatPreviewFfi.Draft).draft.text)
         presentation.onDraftChanged(ACCOUNT_REF, GROUP_ID, next, "")
         assertEquals(
             SelectedChatPreviewFfi.Message,
@@ -412,6 +460,53 @@ class PendingSendDraftPresentationTest {
         assertEquals(native, presentation.selectedPreview("other-account", GROUP_ID, next, null, native))
         presentation.removeAccount(ACCOUNT_REF)
         assertEquals(native, presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, next, null, native))
+    }
+
+    @Test
+    fun deletingALaterCaptionPreservesTheAttachmentOnlyNativeDraft() =
+        runTest {
+            val fixture = nativeDraftFixture()
+            val state = fixture.state
+            try {
+                val send = async { state.sendConversationText(fixture.conversation, "sending now") }
+                fixture.parserStarted.await()
+                state.setDraft(TextFieldValue("later caption"))
+                state.setDraft(TextFieldValue(""))
+                val attachment = nativeAttachmentDraft()
+                assertEquals(attachment, state.chatRowSelectedPreviewFor(ACCOUNT_REF, GROUP_ID, attachment))
+                val empty = state.chatRowSelectedPreviewFor(ACCOUNT_REF, GROUP_ID, SelectedChatPreviewFfi.Empty)
+                assertEquals(SelectedChatPreviewFfi.Empty, empty)
+                val outgoing =
+                    state.chatRowSelectedPreviewFor(
+                        accountRef = ACCOUNT_REF,
+                        groupIdHex = GROUP_ID,
+                        nativePreview = SelectedChatPreviewFfi.Empty,
+                        hasOptimisticSendPreview = true,
+                    )
+                assertEquals(SelectedChatPreviewFfi.Message, outgoing)
+                fixture.finishParse.complete(Unit)
+                fixture.finishPublish.complete(Unit)
+                send.await()
+            } finally {
+                fixture.close()
+            }
+        }
+
+    @Test
+    fun aNewerNativeCaptionKeepsItsAttachmentMetadata() {
+        val presentation = SentComposerDraftPresentation()
+        val first = MessageDraftGeneration(1L)
+        val snapshot = ComposerDraftSnapshot(TextFieldValue("sent"), false)
+        val token = DraftSendClearToken(ACCOUNT_REF, GROUP_ID, first, snapshot, null)
+        presentation.hide(token)
+        val attachment = nativeAttachmentDraft("new caption", 2uL)
+        val next = MessageDraftGeneration(2L)
+        val selected = presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, next, "new caption", attachment)
+        assertEquals(attachment, selected)
+        assertEquals(attachment, presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, first, null, attachment))
+        val truncated = nativeAttachmentDraft("new", 2uL)
+        truncated.draft.textTruncated = true
+        assertEquals(truncated, presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, next, "new caption", truncated))
     }
 
     @Test
@@ -481,7 +576,7 @@ class PendingSendDraftPresentationTest {
             val failed =
                 ConversationController(
                     appState = state,
-                    initialGroup = group(),
+                    initialGroup = pendingSendGroup(GROUP_ID, ACCOUNT_ID),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ -> throw MarmotKitException.Publish("relay rejected event") },
                 )
@@ -497,6 +592,11 @@ class PendingSendDraftPresentationTest {
             sent.onCleared()
         }
 
+    private fun nativeAttachmentDraft(
+        text: String = "",
+        count: ULong = 1uL,
+    ) = SelectedChatPreviewFfi.Draft(ChatListDraftPreviewFfi(text, false, count, ChatListAttachmentKindFfi.PHOTO))
+
     private fun nativeDraft(text: String) =
         SelectedChatPreviewFfi.Draft(
             ChatListDraftPreviewFfi(text, false, 0uL, null),
@@ -508,7 +608,7 @@ class PendingSendDraftPresentationTest {
         finishPublish: CompletableDeferred<Unit>,
     ) = ConversationController(
         appState = appState,
-        initialGroup = group(),
+        initialGroup = pendingSendGroup(GROUP_ID, ACCOUNT_ID),
         initialMemberSnapshot = memberSnapshot(),
         textPublisher = { _, _, _, _ ->
             publishStarted.complete(Unit)
@@ -555,51 +655,6 @@ class PendingSendDraftPresentationTest {
             ),
         )
 
-    private fun group() =
-        AppGroupRecordFfi(
-            groupIdHex = GROUP_ID,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Pending draft group",
-            description = "",
-            admins = listOf(ACCOUNT_ID),
-            relays = listOf("wss://relay.example"),
-            nostrGroupIdHex = "04".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.example",
-                            ),
-                        ),
-                ),
-            disappearingMessageSecs = 0uL,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
-
     private class TestDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
 
@@ -616,3 +671,50 @@ class PendingSendDraftPresentationTest {
         val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
     }
 }
+
+private fun pendingSendGroup(
+    groupIdHex: String,
+    accountIdHex: String,
+) = AppGroupRecordFfi(
+    groupIdHex = groupIdHex,
+    protocolProfile = AppProtocolProfileFfi.LEGACY,
+    endpoint = "wss://relay.example",
+    profilePresent = true,
+    name = "Pending draft group",
+    description = "",
+    admins = listOf(accountIdHex),
+    relays = listOf("wss://relay.example"),
+    nostrGroupIdHex = "04".repeat(32),
+    avatarUrl = null,
+    avatarDim = null,
+    avatarThumbhash = null,
+    imageHashHex = null,
+    encryptedMedia =
+        AppGroupEncryptedMediaComponentFfi(
+            componentId = 0x8008u,
+            component = "marmot.group.encrypted-media.v1",
+            required = true,
+            version = EncryptedMediaVersionFfi.V1,
+            mediaFormat = "encrypted-media-v1",
+            allowedLocatorKinds = listOf("blossom-v1"),
+            defaultBlobEndpoints =
+                listOf(
+                    AppBlobEndpointFfi(
+                        locatorKind = "blossom-v1",
+                        baseUrl = "https://blossom.example",
+                    ),
+                ),
+        ),
+    disappearingMessageSecs = 0uL,
+    archived = false,
+    pendingConfirmation = false,
+    unrecoverable = false,
+    selfMembership = SelfMembershipFfi.MEMBER,
+    leaveRequestPending = false,
+    leaveRequestedAtMs = null,
+    disbanding = false,
+    disbandRequest = null,
+    disbanded = false,
+    welcomerAccountIdHex = null,
+    viaWelcomeMessageIdHex = null,
+)
