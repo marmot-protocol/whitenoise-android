@@ -55,6 +55,17 @@ class TileTransferTest {
         assertNull(verifying.fraction)
     }
 
+    /** The feed opens for a materializing tile or a download another surface started, never for an idle one. */
+    @Test
+    fun theEngineFeedOpensOnlyForMaterializingOrSharedDownloads() {
+        val downloading = AttachmentTransferState.Downloading
+        assertTrue(tileObservesNative(materializing = true, mine = false, host = AttachmentTransferState.Remote))
+        assertTrue("a download another surface started must show bytes", tileObservesNative(false, false, downloading))
+        assertFalse(tileObservesNative(materializing = false, mine = false, host = AttachmentTransferState.Remote))
+        assertFalse(tileObservesNative(false, false, AttachmentTransferState.Cancelled))
+        assertFalse("own sends have no download to show", tileObservesNative(true, true, downloading))
+    }
+
     /** Each step owns exactly one meaning, and an idle or finished attachment shows no control. */
     @Test
     fun cancelFailureAndIdleStatesAreDistinct() {

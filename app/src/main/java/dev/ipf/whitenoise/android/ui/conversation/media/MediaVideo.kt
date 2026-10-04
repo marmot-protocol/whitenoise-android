@@ -510,7 +510,8 @@ internal fun MediaVideoGridTile(
                 )
             }
         }
-        // An unplayable clip is dimmed and badged rather than left looking merely slow.
+        // An unplayable clip is dimmed and badged rather than left looking merely slow. While the transfer control owns
+        // the centre its Retry glyph is the failure cue, so the badge only dims the tile instead of covering it.
         if (failed) {
             Box(
                 modifier =
@@ -519,12 +520,14 @@ internal fun MediaVideoGridTile(
                         .background(Color.Black.copy(alpha = VIDEO_UNAVAILABLE_SCRIM_ALPHA)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_warning),
-                    contentDescription = stringResource(R.string.voice_message_failed),
-                    modifier = Modifier.size(VIDEO_UNAVAILABLE_GLYPH),
-                    tint = MaterialTheme.colorScheme.inverseOnSurface,
-                )
+                if (!transferShown) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_warning),
+                        contentDescription = stringResource(R.string.voice_message_failed),
+                        modifier = Modifier.size(VIDEO_UNAVAILABLE_GLYPH),
+                        tint = MaterialTheme.colorScheme.inverseOnSurface,
+                    )
+                }
             }
         }
         if (overflowCount > 0) {

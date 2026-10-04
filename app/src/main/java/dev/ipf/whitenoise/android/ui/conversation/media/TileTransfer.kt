@@ -113,8 +113,9 @@ internal class TileTransfer(
 /**
  * Observes the shared native transfer of one attachment for a tile, without requesting, restarting or cancelling it.
  *
- * The engine feed is opened only while [observeNative] is true, that is while the tile is materializing, so idle tiles
- * in a long conversation hold no subscription. Own sends have no download to show and ignore native phases.
+ * The engine feed is opened only while [observeNative] is true, that is while the tile is materializing, or while the
+ * host reports another surface downloading the attachment ([tileObservesNative]), so idle tiles in a long conversation
+ * hold no subscription. Own sends have no download to show and ignore native phases.
  */
 @Composable
 internal fun rememberTileTransfer(
@@ -141,19 +142,31 @@ internal fun rememberTileTransfer(
     val cancellation by remember(controller, key) {
         controller.attachmentCancellationState(messageIdHex, attachmentIndex)
     }.collectAsStateWithLifecycle()
-    val observing = observeNative && !mine
+    val materializing = observeNative && !mine
+    val observing = tileObservesNative(observeNative, mine, host)
     val observed by remember(controller, key, reference.ciphertextSha256, reference.sourceEpoch, observing) {
         if (observing) controller.attachmentNativeProgress(messageIdHex, attachmentIndex) else emptyFlow()
     }.collectAsStateWithLifecycle(initialValue = null)
     // A sample outlives its flow, so once observation stops the last one would describe a transfer that is over.
     val native = if (observing) observed else null
-    val state = attachmentFilePresentationState(tileHostState(host, native, observing), native, cancellation)
+    val state = attachmentFilePresentationState(tileHostState(host, native, materializing), native, cancellation)
     return remember(state, native, cancellation, suppressed, failedLocally, controller, key) {
         TileTransfer(state, native, cancellation, suppressed, failedLocally) {
             controller.cancelAttachmentTransfer(messageIdHex, attachmentIndex)
         }
     }
 }
+
+/**
+ * The engine feed is opened only while this tile is materializing or another surface is downloading its attachment,
+ * so idle tiles in a long conversation hold no subscription yet a shared download still shows its received bytes.
+ * Own sends have no download to show.
+ */
+internal fun tileObservesNative(
+    materializing: Boolean,
+    mine: Boolean,
+    host: AttachmentTransferState,
+): Boolean = !mine && (materializing || host == AttachmentTransferState.Downloading)
 
 /**
  * A tile restarts its download without the coordinator that publishes Downloading for a file card, so a Cancelled left
