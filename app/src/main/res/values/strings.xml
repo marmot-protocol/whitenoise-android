@@ -2367,4 +2367,19 @@
     <string name="notification_show_previews">Show notification previews</string>
     <string name="notification_show_previews_detail">Hide names and message content when off. Applies to all accounts.</string>
     <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>
+    <string name="profile_readiness_loading">Loading profile…</string>
+    <string name="profile_readiness_unavailable">Profile status unavailable · Tap to edit</string>
+    <string name="profile_readiness_setup">Set up your profile</string>
+    <string name="profile_readiness_ready">Profile ready</string>
+    <string name="profile_readiness_optional">Profile ready · Optional details available</string>
+    <string name="profile_readiness_name">Display name</string>
+    <string name="profile_readiness_picture">Profile picture</string>
+    <string name="profile_readiness_bio">Bio</string>
+    <string name="profile_readiness_banner">Banner</string>
+    <string name="profile_readiness_address">Verified address</string>
+    <string name="profile_readiness_lightning">Lightning address</string>
+    <string name="profile_readiness_added">Added</string>
+    <string name="profile_readiness_recommended">Recommended</string>
+    <string name="profile_readiness_field_optional">Optional</string>
+    <string name="profile_readiness_field">%1$s · %2$s</string>
 </resources>

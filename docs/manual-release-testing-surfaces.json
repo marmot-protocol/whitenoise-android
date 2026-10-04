@@ -23,6 +23,12 @@
         ]
       },
       {
+        "surface": "ProfileReadinessChecklist",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "fun ProfileReadinessChecklist(",
+        "test_ids": ["ACC-002"]
+      },
+      {
         "surface": "ConversationViewportRestorationEffects",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
         "anchor": "fun ConversationViewportRestorationEffects(",
