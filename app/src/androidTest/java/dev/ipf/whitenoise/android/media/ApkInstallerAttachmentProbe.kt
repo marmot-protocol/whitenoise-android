@@ -25,12 +25,15 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ANDROID_PACKAGE_MIME
 import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeDocumentAttachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.openAttachmentExternally
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -66,6 +69,7 @@ internal object ApkInstallerAttachmentProbe {
     private const val ZERO_BYTE_PAD = 4096
     private const val MAX_SENDABLE_BYTES = 31 * 1024 * 1024
     private const val MANIFEST = "apk-installer.json"
+    private const val PUBLISHED_PREFIX = "document_"
     private val STAGES = setOf("prepare", "dispatch-denied", "dispatch-allowed", "dispatch-na")
     private val PRESERVING_STAGES = setOf("prepare", "dispatch-denied")
     private val FINAL_STAGES = setOf("dispatch-allowed", "dispatch-na")
@@ -255,18 +259,36 @@ internal object ApkInstallerAttachmentProbe {
         val request = requestFrom(entry.getJSONObject("request"))
         val reference = MediaLifecycleAttachmentProbe.publishedReference(session.marmot, request)
         val state = session.state(request.accountRef)
-        val file = materializeVerified(session.context, state, request, reference)
+        // The materializer returns a valid published copy before it asks for the source, so remove every copy first.
+        removePublishedCopies(session.context)
+        var readRetention = false
+        val file = materializeVerified(session.context, state, request, reference) { readRetention = true }
+        assertTrue("readback was served without reading the retained bytes", readRetention)
         return ReceivedApk(entry.getString("case"), entry.getString("file"), file, entry.getString("mediaType"))
     }
 
-    /** Publishes the completed download exactly as the installer handoff does, never a partial file. */
+    /** Deletes the published copies, so a readback must republish from native retention, not from the cache. */
+    private suspend fun removePublishedCopies(context: Context) =
+        withContext(Dispatchers.IO) {
+            val shared = File(context.cacheDir, MediaCacheDirs.SHARED)
+            shared.listFiles { file -> file.name.startsWith(PUBLISHED_PREFIX) }?.forEach { file ->
+                check(file.delete()) { "could not remove a published copy before readback" }
+            }
+        }
+
+    /**
+     * Publishes the completed download exactly as the installer handoff does, never a partial file. [onResolve] runs
+     * only when the materializer actually asks for the source, that is, when no valid published copy existed.
+     */
     private suspend fun materializeVerified(
         context: Context,
         state: WhiteNoiseAppState,
         request: AttachmentTransferRequest,
         reference: MediaAttachmentReferenceFfi,
+        onResolve: () -> Unit = {},
     ): File =
         materializeDocumentAttachmentSource(context, request.messageIdHex, request.attachmentIndex, reference) {
+            onResolve()
             state.downloadAttachmentPlaintextSource(request, reference, persistInteractiveIntent = false)
         }
 

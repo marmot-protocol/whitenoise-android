@@ -95,8 +95,9 @@ directions of every attachment must then read exact bytes natively and through t
 and decode a first frame (a bitmap for an image, a frame and duration for a video). The 24 MiB send also holds its host
 copy to prove native retention does not wait for it. `media_checker.py` reads the server ledger: one upload and one
 acquisition per attachment before the restart boundary and **none** after it. Generated MP4 padding is a top-level
-`free` box, so it decodes and plays; it tests size thresholds, not throughput. Above-64 MiB media cannot be sent by the
-Android controller and is deferred, as are the conversation tiles themselves and physical devices.
+`free` box, so it decodes and plays; it tests size thresholds, not throughput. Attachment albums whose total payload
+exceeds 32 MiB cannot be sent by the Android controller and are deferred, as are the conversation tiles themselves and
+physical devices.
 
 ```bash
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-media
@@ -106,8 +107,8 @@ The `controller-apk` mode qualifies the received-APK boundary on a disposable em
 generated files through the shipping controller, receives each genuinely, and requires exact bytes: a valid signed
 package (this fixture's own APK), the same bytes labelled `application/octet-stream`, the same bytes labelled
 `image/png`, a ZIP with a dex entry but no `AndroidManifest.xml`, and a truncated package. Each later stage reopens the
-restored runtime in a new process with acquisition unavailable, republishes the verified file from native retention,
-and calls the real `openAttachmentExternally`. A self-update build is run with the install-unknown-apps app-op denied and
+restored runtime in a new process with acquisition unavailable, deletes the published copy of the file, republishes it
+from native retention (the stage fails if that read did not happen), and calls the real `openAttachmentExternally`. A self-update build is run with the install-unknown-apps app-op denied and
 then allowed, which the **host** toggles between stages because changing it kills the app process; a Play build has no
 installer and must answer `InstallUnsupported`. `apk_checker.py` requires, per distribution, the exact
 `OpenAttachmentResult` and whether the system installer actually reached the screen (the probe polls the active

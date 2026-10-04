@@ -20,8 +20,9 @@ generated peer over loopback and receives each one genuinely:
 
 The prepare stage requires exact bytes and publishes each verified file with the production document materializer.
 Later stages run in **new processes**: the host sets the install-unknown-apps app-op for only the isolated fixture
-package, and each stage reopens the restored runtime with acquisition unavailable, republishes the file from native
-retention and calls the real `openAttachmentExternally`. The host toggles the app-op between stages because changing it
+package, and each stage reopens the restored runtime with acquisition unavailable, deletes the published copy of the
+file, republishes it from native retention (the stage fails if that read did not happen) and calls the real
+`openAttachmentExternally`. The host toggles the app-op between stages because changing it
 kills the app process. The probe records the exact
 `OpenAttachmentResult` and whether the system package installer actually reached the screen, by polling the active window
 for the package that handles APK installs, then dismisses it with Back. Nothing is ever installed or replaced.
@@ -89,7 +90,8 @@ and API 36. Dispatch time is the call into the open path, in milliseconds (API 3
 ## Not qualified here
 
 Physical-device coverage (a valid and an invalid package, deny then grant, cancel and retry, and process recreation
-during the download), a 30 to 50 MiB package (the Android controller cannot send
-more than 32 MiB, so this needs the separate MDK sender), the no-installer-available state on a device, the rendered
+during the download), a 30 to 50 MiB package (the Android controller sends at most 32 MiB in total, so 30 to 32 MiB
+needs a host-built signed payload and anything above 32 MiB needs the separate MDK sender), the
+no-installer-available state on a device, the rendered
 file card and notification, and any actual installation. Private raw reports, logs and checksums are retained outside the
 repository.
