@@ -3,6 +3,66 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "restorePendingShareImport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImport.kt",
+        "anchor": "fun restorePendingShareImport(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "persistInboundShareImport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImport.kt",
+        "anchor": "fun persistInboundShareImport(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "createInboundShareImportStore",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImport.kt",
+        "anchor": "fun createInboundShareImportStore(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "rememberInboundShareImport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImport.kt",
+        "anchor": "fun rememberInboundShareImport(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "ImportedShareShelf",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ImportedShareShelf.kt",
+        "anchor": "fun ImportedShareShelf(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "ShareImportErrorDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "fun ShareImportErrorDialog(",
+        "test_ids": ["SYS-004", "SYS-005"]
+      },
+      {
+        "surface": "ShareImportStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "fun ShareImportStatus(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
         "surface": "folderDragRowModifier",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
         "anchor": "internal fun folderDragRowModifier(",
@@ -24979,6 +25039,15 @@
         ]
       },
       {
+        "surface": "intent:*/*",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "*/*",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
         "surface": "intent:android.intent.action.SEND",
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.intent.action.SEND",
@@ -25058,22 +25127,6 @@
         ]
       },
       {
-        "surface": "intent:application/*",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "application/*",
-        "test_ids": [
-          "SYS-004"
-        ]
-      },
-      {
-        "surface": "intent:audio/*",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "audio/*",
-        "test_ids": [
-          "SYS-004"
-        ]
-      },
-      {
         "surface": "intent:com.google.firebase.MESSAGING_EVENT",
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "com.google.firebase.MESSAGING_EVENT",
@@ -25083,14 +25136,6 @@
           "NTF-006",
           "NTF-019",
           "NTF-020"
-        ]
-      },
-      {
-        "surface": "intent:image/*",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "image/*",
-        "test_ids": [
-          "SYS-004"
         ]
       },
       {
@@ -25112,22 +25157,6 @@
         ]
       },
       {
-        "surface": "intent:text/plain",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "text/plain",
-        "test_ids": [
-          "SYS-004"
-        ]
-      },
-      {
-        "surface": "intent:video/*",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "video/*",
-        "test_ids": [
-          "SYS-004"
-        ]
-      },
-      {
         "surface": "android-direct-share:conversation-shortcuts",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
         "anchor": "class ShareShortcutPublisher",
@@ -25137,6 +25166,30 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Share-owned attachment discard storage recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "Share destination storage recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Share destination identity recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "R.string.toast_notification_account_unavailable",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
       {
         "surface": "automatic-attachment-permission-commit-order",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",

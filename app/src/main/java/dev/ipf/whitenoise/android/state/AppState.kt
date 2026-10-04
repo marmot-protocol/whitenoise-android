@@ -3047,6 +3047,7 @@ class WhiteNoiseAppState private constructor(
                 dev.ipf.whitenoise.android.media.ByteSizeLruCache(
                     maxBytes = ConversationController.MEDIA_RETAINED_MAX_BYTES,
                     sizeOf = { upload -> upload.attachments.sumOf { it.plaintextBytes.size } },
+                    onEntryRemoved = RetainedMediaUpload::releaseSource,
                 )
             }
         }
@@ -3127,7 +3128,7 @@ class WhiteNoiseAppState private constructor(
         acceptedPendingTextOptimisticIdsByConversation.remove(staleKey)
         optimisticSendPhasesByConversation.remove(staleKey)
         optimisticCancellationGenerationByConversation.remove(staleKey)
-        retainedMediaUploadsByConversation.remove(staleKey)
+        retainedMediaUploadsByConversation.remove(staleKey)?.clear()
         activeUploadKeysByConversation.remove(staleKey)
         pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
     }
@@ -3520,21 +3521,40 @@ class WhiteNoiseAppState private constructor(
         accountRef: String,
         targetGroupIds: List<String>,
         payload: SharePayload,
+        shouldCommit: () -> Boolean = { true },
     ): Boolean {
         val initialTarget = validatedInboundShareTarget(accountRef, targetGroupIds)
-        if (initialTarget == null) return false
+        if (initialTarget == null || !shouldCommit()) return false
         val prepared = withContext(Dispatchers.IO) { shareInboundStager.prepare(appContext, payload) }
-        val target = validatedInboundShareTarget(accountRef, targetGroupIds)
-        return if (target == initialTarget) {
-            shareInboundStager.stagePreparedToChats(
-                accountIdHex = target.accountIdHex,
-                groupIds = target.groupIds,
-                prepared = prepared,
-                draftAccountRef = accountRef,
-            )
-            true
-        } else {
-            false
+        return dev.ipf.whitenoise.android.share.retainShareAtDestination(
+            appContext,
+            initialTarget.accountIdHex,
+            initialTarget.groupIds,
+            payload,
+        ) { droppedCount ->
+            if (!shouldCommit() || validatedInboundShareTarget(accountRef, targetGroupIds) != initialTarget) {
+                false
+            } else {
+                shareInboundStager.stagePreparedToChats(
+                    initialTarget.accountIdHex,
+                    initialTarget.groupIds,
+                    if (payload.importReady) prepared.copy(streamStaging = null) else prepared,
+                    accountRef,
+                )
+                if (payload.importReady && payload.streamUris.isNotEmpty()) shareStaging.notifyTextStaged()
+                if (droppedCount > 0) {
+                    presentText(
+                        AppText.Plain(
+                            appContext.resources.getQuantityString(
+                                R.plurals.toast_share_attachments_dropped,
+                                droppedCount,
+                                droppedCount,
+                            ),
+                        ),
+                    )
+                }
+                true
+            }
         }
     }
 

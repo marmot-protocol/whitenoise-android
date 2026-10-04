@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_import_title">Importing shared files</string>
+    <string name="share_import_error_title">Some files could not be imported</string>
+    <string name="share_import_recovery">Cancel and share again from the source app, or continue with the available items.</string>
+    <string name="share_import_unreadable">A file is unreadable or its access expired.</string>
+    <string name="share_import_scheme">Only content-provider files are supported.</string>
+    <string name="share_import_empty">A shared file is empty.</string>
+    <string name="share_import_file_limit">A file exceeds the 32 MiB limit.</string>
+    <string name="share_import_batch_limit">The files exceed the combined 32 MiB limit.</string>
+    <string name="share_import_count_limit">Only the first 10 files can be imported.</string>
+    <string name="share_import_metadata">A file has invalid metadata or its size changed.</string>
+    <string name="share_import_storage">Private storage is unavailable or full.</string>
+    <string name="share_import_interrupted">The import was interrupted. Share the files again.</string>
+    <string name="share_import_progress">File %1$d of %2$d: %3$d bytes</string>
+    <string name="share_import_rejected_count">Files not imported: %1$d</string>
+</resources>

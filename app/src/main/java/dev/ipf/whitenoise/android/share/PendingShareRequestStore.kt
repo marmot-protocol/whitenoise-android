@@ -39,13 +39,36 @@ internal interface PendingShareRequestStore {
 internal class SerializedPendingShareRequestStore(
     private val delegate: PendingShareRequestStore,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val importRequest: (suspend (ShareRequest) -> ShareRequest)? = null,
+    private val releaseRequest: (String) -> Unit = {},
+    private val validateRequest: (ShareRequest) -> ShareRequest = { it },
+    private val releaseAllRequests: () -> Unit = {},
 ) {
     /** Persists one request, clearing any superseded entry when the replacement cannot be retained. */
     suspend fun save(request: ShareRequest): Boolean =
         processMutex.withLock {
             withContext(ioDispatcher) {
-                delegate.save(request).also { saved ->
-                    if (!saved) delegate.clear()
+                val prepared =
+                    if (importRequest != null && !request.payload.importReady) {
+                        val interrupted =
+                            request.copy(
+                                payload =
+                                    request.payload.copy(
+                                        streamUris = emptyList(),
+                                        importReady = true,
+                                        importErrors = listOf(ShareImportError.Interrupted),
+                                    ),
+                            )
+                        if (!delegate.save(interrupted)) return@withContext false
+                        importRequest.invoke(request)
+                    } else {
+                        request
+                    }
+                delegate.save(prepared).also { saved ->
+                    if (!saved) {
+                        delegate.clear()
+                        releaseRequest(request.requestId)
+                    }
                 }
             }
         }
@@ -53,17 +76,27 @@ internal class SerializedPendingShareRequestStore(
     /** Loads one request without racing a newer replacement or dismissal. */
     suspend fun load(requestId: String): ShareRequest? =
         processMutex.withLock {
-            withContext(ioDispatcher) { delegate.load(requestId) }
+            withContext(ioDispatcher) { delegate.load(requestId)?.let(validateRequest) }
         }
 
     /** Removes only the matching request after prior replacements settle. */
     suspend fun remove(requestId: String) {
-        processMutex.withLock { withContext(ioDispatcher) { delegate.remove(requestId) } }
+        processMutex.withLock {
+            withContext(ioDispatcher) {
+                delegate.remove(requestId)
+                releaseRequest(requestId)
+            }
+        }
     }
 
     /** Clears unresolved encrypted state after every earlier operation settles. */
     suspend fun clear() {
-        processMutex.withLock { withContext(ioDispatcher) { delegate.clear() } }
+        processMutex.withLock {
+            withContext(ioDispatcher) {
+                delegate.clear()
+                releaseAllRequests()
+            }
+        }
     }
 
     private companion object {
@@ -150,6 +183,9 @@ internal fun encodePendingShareRequest(request: ShareRequest): ByteArray {
         .put(KEY_STREAM_URIS, streamUris)
         .putNullable(KEY_MIME_TYPE, request.payload.intentMimeType)
         .putNullable(KEY_SHORTCUT_ID, request.shortcutId)
+        .put("import_ready", request.payload.importReady)
+        .put("import_rejected_count", request.payload.importRejectedCount)
+        .put("import_errors", JSONArray(request.payload.importErrors.map { it.name }))
         .toString()
         .toByteArray(Charsets.UTF_8)
 }
@@ -175,6 +211,16 @@ internal fun decodePendingShareRequest(
                             Uri.parse(uriArray.getString(index)).also { require(it.toString().isNotBlank()) }
                         },
                     intentMimeType = json.nullableString(KEY_MIME_TYPE),
+                    importReady = json.optBoolean("import_ready"),
+                    importRejectedCount = json.optInt("import_rejected_count").coerceAtLeast(0),
+                    importErrors =
+                        json
+                            .optJSONArray("import_errors")
+                            ?.let { errors ->
+                                List(errors.length().coerceAtMost(SHARE_STREAM_MAX_ITEMS + 1)) {
+                                    ShareImportError.valueOf(errors.getString(it))
+                                }
+                            }.orEmpty(),
                 ),
             shortcutId = json.nullableString(KEY_SHORTCUT_ID),
             requestId = requestId,

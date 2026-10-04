@@ -1,0 +1,255 @@
+package dev.ipf.whitenoise.android.share
+
+import android.content.Context
+import android.net.Uri
+import android.os.CancellationSignal
+import android.provider.OpenableColumns
+import dev.ipf.whitenoise.android.ui.conversation.media.normalizeDocumentMime
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import java.io.IOException
+import java.io.InputStream
+
+private const val IMPORT_TIMEOUT_MS = 60_000L
+private const val MAX_SHARE_FILENAME_CHARS = 120
+
+enum class ShareImportError {
+    Unreadable,
+    Scheme,
+    Empty,
+    FileTooLarge,
+    BatchTooLarge,
+    TooMany,
+    Metadata,
+    Storage,
+    Interrupted,
+}
+
+internal data class ShareImportProgress(
+    val item: Int,
+    val count: Int,
+    val bytes: Long,
+    val total: Long?,
+)
+
+internal data class ShareSourceMetadata(
+    val name: String?,
+    val mime: String?,
+    val size: Long?,
+)
+
+/** Copies untrusted Android streams once. No sender, relay, encryption or upload dependency. */
+internal class ShareFileImporter(
+    private val files: PrivateShareFiles,
+    private val metadata: (Uri, CancellationSignal) -> ShareSourceMetadata,
+    private val open: (Uri, CancellationSignal) -> InputStream?,
+) {
+    constructor(context: Context) : this(
+        PrivateShareFiles(context),
+        { uri, signal -> readShareSourceMetadata(context, uri, signal) },
+        { uri, signal -> context.contentResolver.openAssetFileDescriptor(uri, "r", signal)?.createInputStream() },
+    )
+
+    suspend fun import(
+        request: ShareRequest,
+        progress: (ShareImportProgress) -> Unit = {},
+    ): ShareRequest =
+        withContext(Dispatchers.IO) {
+            if (request.payload.importReady) return@withContext request
+            files.cleanStale()
+            files.recoverIncomplete()
+            files.leases.releasePendingRequests()
+            val sources = request.payload.streamUris.distinct()
+            val batch = ImportedBatch()
+            if (sources.size > SHARE_STREAM_MAX_ITEMS) batch.errors += ShareImportError.TooMany
+            var retained = false
+            try {
+                withTimeout(IMPORT_TIMEOUT_MS) {
+                    importSources(sources, request.payload.intentMimeType, batch, progress, request.requestId)
+                }
+                files.leases.holdRequest(request.requestId, batch.accepted)
+                retained = true
+                request.copy(
+                    payload =
+                        request.payload.copy(
+                            streamUris = batch.accepted,
+                            importReady = true,
+                            importErrors = batch.errors,
+                            importRejectedCount = sources.size - batch.accepted.size,
+                        ),
+                )
+            } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                request.copy(
+                    payload =
+                        request.payload.copy(
+                            streamUris = emptyList(),
+                            importReady = true,
+                            importErrors = listOf(ShareImportError.Interrupted),
+                            importRejectedCount = sources.size,
+                        ),
+                )
+            } finally {
+                if (!retained) batch.accepted.forEach(files::delete)
+            }
+        }
+
+    private suspend fun importSources(
+        sources: List<Uri>,
+        intentMime: String?,
+        batch: ImportedBatch,
+        progress: (ShareImportProgress) -> Unit,
+        requestId: String,
+    ) {
+        sources.take(SHARE_STREAM_MAX_ITEMS).forEachIndexed { index, uri ->
+            currentCoroutineContext().ensureActive()
+            val result =
+                if (uri.scheme != "content" || uri.authority.isNullOrBlank() || files.owns(uri)) {
+                    ImportedFile(error = ShareImportError.Scheme)
+                } else {
+                    importOne(
+                        uri,
+                        intentMime,
+                        PRIVATE_SHARE_MAX_BYTES - batch.used,
+                        progress = { bytes, total ->
+                            progress(
+                                ShareImportProgress(
+                                    index + 1,
+                                    sources.size.coerceAtMost(SHARE_STREAM_MAX_ITEMS),
+                                    bytes,
+                                    total,
+                                ),
+                            )
+                        },
+                        onStaged = { files.leases.holdRequest(requestId, batch.accepted + it) },
+                    )
+                }
+            batch.add(result)
+        }
+    }
+
+    private class ImportedBatch {
+        val accepted = mutableListOf<Uri>()
+        val errors = mutableListOf<ShareImportError>()
+        var used = 0L
+
+        fun add(result: ImportedFile) {
+            val uri = result.uri
+            if (uri == null) {
+                errors += requireNotNull(result.error)
+            } else {
+                accepted += uri
+                used += result.size
+            }
+        }
+    }
+
+    private suspend fun importOne(
+        source: Uri,
+        intentMime: String?,
+        remaining: Long,
+        progress: (Long, Long?) -> Unit,
+        onStaged: (Uri) -> Unit,
+    ): ImportedFile {
+        var staged: Uri? = null
+        return try {
+            if (remaining <= 0) return ImportedFile(error = ShareImportError.BatchTooLarge)
+            val (uri, file) = files.newFile()
+            staged = uri
+            onStaged(uri)
+            val copied = ShareSourceReader(metadata, open).copy(source, file, remaining, progress)
+            files.finish(uri, copied.name, resolveShareMime(copied.mime, intentMime), copied.size)
+            staged = null
+            ImportedFile(uri, copied.size)
+        } catch (_: ShareSizeExceeded) {
+            val error =
+                if (remaining == PRIVATE_SHARE_MAX_BYTES) {
+                    ShareImportError.FileTooLarge
+                } else {
+                    ShareImportError.BatchTooLarge
+                }
+            ImportedFile(error = error)
+        } catch (cancel: kotlinx.coroutines.CancellationException) {
+            throw cancel
+        } catch (_: EmptyShareSource) {
+            ImportedFile(error = ShareImportError.Empty)
+        } catch (_: SecurityException) {
+            ImportedFile(error = ShareImportError.Unreadable)
+        } catch (_: ShareSourceUnavailable) {
+            ImportedFile(error = ShareImportError.Unreadable)
+        } catch (_: IOException) {
+            ImportedFile(error = ShareImportError.Storage)
+        } catch (_: Exception) {
+            ImportedFile(error = ShareImportError.Metadata)
+        } finally {
+            staged?.let(files::delete)
+        }
+    }
+
+    private data class ImportedFile(
+        val uri: Uri? = null,
+        val size: Long = 0,
+        val error: ShareImportError? = null,
+    )
+}
+
+internal fun sanitizeShareFilename(name: String?): String? {
+    val safe =
+        (name ?: "file")
+            .map { char ->
+                when {
+                    char == '/' || char == '\\' -> '_'
+                    char.isISOControl() || Character.getType(char) == Character.FORMAT.toInt() -> '_'
+                    else -> char
+                }
+            }.joinToString("")
+            .trim()
+            .trim('.')
+    if (safe.isBlank()) return null
+    val dot = safe.lastIndexOf('.')
+    val extension = if (dot in 1 until safe.lastIndex && safe.length - dot <= 16) safe.substring(dot) else ""
+    val stem = if (extension.isEmpty()) safe else safe.dropLast(extension.length)
+    return stem.take(MAX_SHARE_FILENAME_CHARS - extension.length) + extension
+}
+
+private fun readShareSourceMetadata(
+    context: Context,
+    uri: Uri,
+    signal: CancellationSignal,
+): ShareSourceMetadata {
+    var name: String? = null
+    var size: Long? = null
+    context.contentResolver
+        .query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+            null,
+            null,
+            null,
+            signal,
+        )?.use {
+            if (it.moveToFirst()) {
+                val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = it.getColumnIndex(OpenableColumns.SIZE)
+                if (nameIndex >= 0 && !it.isNull(nameIndex)) name = it.getString(nameIndex)
+                if (sizeIndex >= 0 && !it.isNull(sizeIndex)) size = it.getLong(sizeIndex)
+            }
+        }
+    return ShareSourceMetadata(name, context.contentResolver.getType(uri), size)
+}
+
+internal fun resolveShareMime(
+    providerMime: String?,
+    intentMime: String?,
+): String {
+    val provider =
+        providerMime
+            .orEmpty()
+            .substringBefore(';')
+            .trim()
+            .lowercase(java.util.Locale.ROOT)
+    val concrete = Regex("[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+")
+    return if (concrete.matches(provider)) provider else normalizeDocumentMime(intentMime)
+}

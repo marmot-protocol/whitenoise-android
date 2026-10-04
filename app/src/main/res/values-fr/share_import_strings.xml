@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_import_title">Importation des fichiers partagés</string>
+    <string name="share_import_error_title">Certains fichiers n’ont pas pu être importés</string>
+    <string name="share_import_recovery">Annulez et partagez à nouveau depuis l’application source, ou continuez avec les éléments disponibles.</string>
+    <string name="share_import_unreadable">Un fichier est illisible ou son accès a expiré.</string>
+    <string name="share_import_scheme">Seuls les fichiers des fournisseurs de contenu sont pris en charge.</string>
+    <string name="share_import_empty">Un fichier partagé est vide.</string>
+    <string name="share_import_file_limit">Un fichier dépasse la limite de 32 Mio.</string>
+    <string name="share_import_batch_limit">Les fichiers dépassent la limite totale de 32 Mio.</string>
+    <string name="share_import_count_limit">Seuls les 10 premiers fichiers peuvent être importés.</string>
+    <string name="share_import_metadata">Les métadonnées d’un fichier sont invalides ou sa taille a changé.</string>
+    <string name="share_import_storage">Le stockage privé est indisponible ou plein.</string>
+    <string name="share_import_interrupted">L’importation a été interrompue. Partagez à nouveau les fichiers.</string>
+    <string name="share_import_progress">Fichier %1$d sur %2$d : %3$d octets</string>
+    <string name="share_import_rejected_count">Fichiers non importés : %1$d</string>
+</resources>

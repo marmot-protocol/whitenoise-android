@@ -80,6 +80,16 @@ class ShareInboundStagerTest {
         assertNull(draftStore.get("acct", "g1"))
     }
 
+    @Test
+    fun importedMixedFilesKeepTheirSuppliedOrderThroughTheOrdinaryDocumentShelf() {
+        val context = RuntimeEnvironment.getApplication()
+        val doc = Uri.parse("content://private/doc.pdf")
+        val image = Uri.parse("content://private/photo.jpg")
+        val prepared = stager.prepare(context, SharePayload(null, listOf(doc, image), "*/*", importReady = true))
+        assertEquals(emptyList<Uri>(), prepared.streamStaging?.mediaUris)
+        assertEquals(listOf(doc, image), prepared.streamStaging?.documentUris)
+    }
+
     /** Provider preparation is side-effect free until the Main-thread apply boundary. */
     @Test
     fun preparedStreamsDoNotMutateDraftOrComposerStateBeforeApply() {

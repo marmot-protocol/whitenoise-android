@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_import_title">Импорт общих файлов</string>
+    <string name="share_import_error_title">Некоторые файлы не удалось импортировать</string>
+    <string name="share_import_recovery">Отмените и поделитесь снова из исходного приложения или продолжите с доступными файлами.</string>
+    <string name="share_import_unreadable">Файл недоступен для чтения или доступ истёк.</string>
+    <string name="share_import_scheme">Поддерживаются только файлы поставщиков содержимого.</string>
+    <string name="share_import_empty">Общий файл пуст.</string>
+    <string name="share_import_file_limit">Файл превышает лимит 32 МиБ.</string>
+    <string name="share_import_batch_limit">Общий размер файлов превышает 32 МиБ.</string>
+    <string name="share_import_count_limit">Можно импортировать только первые 10 файлов.</string>
+    <string name="share_import_metadata">У файла неверные метаданные или изменился размер.</string>
+    <string name="share_import_storage">Личное хранилище недоступно или заполнено.</string>
+    <string name="share_import_interrupted">Импорт прерван. Поделитесь файлами снова.</string>
+    <string name="share_import_progress">Файл %1$d из %2$d: %3$d байт</string>
+    <string name="share_import_rejected_count">Не импортировано файлов: %1$d</string>
+</resources>

@@ -13,8 +13,11 @@ data class SharePayload(
     val text: String?,
     val streamUris: List<Uri>,
     val intentMimeType: String?,
+    val importReady: Boolean = false,
+    val importErrors: List<ShareImportError> = emptyList(),
+    val importRejectedCount: Int = 0,
 ) {
-    fun isSupported(): Boolean = !text.isNullOrBlank() || streamUris.isNotEmpty()
+    fun isSupported(): Boolean = !text.isNullOrBlank() || streamUris.isNotEmpty() || importErrors.isNotEmpty()
 }
 
 /** Returns a supported share payload, or null for empty/malformed/unsupported intents. */
@@ -54,8 +57,7 @@ private fun parseSendMultipleIntent(intent: Intent): SharePayload? {
 private fun Intent.extractShareText(): String? =
     getCharSequenceExtra(Intent.EXTRA_TEXT)
         ?.toString()
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
+        ?.takeIf { it.isNotBlank() }
 
 private fun Intent.extractSingleStream(): List<Uri> {
     val stream = IntentCompat.getParcelableExtra(this, Intent.EXTRA_STREAM, Uri::class.java) ?: return emptyList()

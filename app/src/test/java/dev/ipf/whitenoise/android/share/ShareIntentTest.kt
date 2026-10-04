@@ -81,4 +81,14 @@ class ShareIntentTest {
     fun malformedNullIntent_returnsNull() {
         assertNull(parseShareIntent(null))
     }
+
+    @Test
+    fun plainTextPreservesWhitespaceWithoutReadingFileContents() {
+        val intent =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, "  original text\n")
+            }
+        assertEquals("  original text\n", parseShareIntent(intent)?.text)
+    }
 }

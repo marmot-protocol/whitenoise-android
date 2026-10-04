@@ -51,11 +51,7 @@ class AndroidManifestShareTargetTest {
             "share-target must declare the Direct Share category",
             shareTarget.categories.contains(CONVERSATION_SHARE_TARGET_CATEGORY),
         )
-        assertTrue(shareTarget.mimeTypes.contains("text/plain"))
-        assertTrue(shareTarget.mimeTypes.contains("image/*"))
-        assertTrue(shareTarget.mimeTypes.contains("video/*"))
-        assertTrue(shareTarget.mimeTypes.contains("application/*"))
-        assertTrue(shareTarget.mimeTypes.contains("audio/*"))
+        assertEquals(setOf("*/*"), shareTarget.mimeTypes)
     }
 
     @Test
@@ -78,13 +74,33 @@ class AndroidManifestShareTargetTest {
     }
 
     @Test
-    fun sendFiltersAvoidCatchAllMimeType() {
-        val manifest =
+    fun allSupportedFileFamiliesResolveExactlyOnceForBothActions() {
+        val context = RuntimeEnvironment.getApplication()
+        val types =
             listOf(
-                java.io.File("src/main/AndroidManifest.xml"),
-                java.io.File("app/src/main/AndroidManifest.xml"),
-            ).first { it.exists() }.readText()
-        assertTrue(!manifest.contains("android:mimeType=\"*/*\""))
+                "text/markdown",
+                "text/x-markdown",
+                "text/csv",
+                "font/ttf",
+                "model/gltf-binary",
+                "chemical/x-pdb",
+                "application/octet-stream",
+                "text/plain",
+                "image/png",
+                "video/mp4",
+                "audio/ogg",
+            )
+        for (action in listOf(Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE)) {
+            for (mime in types) {
+                val matches =
+                    context.packageManager
+                        .queryIntentActivities(
+                            Intent(action).apply { type = mime },
+                            PackageManager.MATCH_DEFAULT_ONLY,
+                        ).count { it.activityInfo.name == MainActivity::class.java.name }
+                assertEquals("$action $mime", 1, matches)
+            }
+        }
     }
 
     @Test
@@ -98,6 +114,37 @@ class AndroidManifestShareTargetTest {
         assertTrue(manifest.contains("ExternalShareDispatchActivity"))
         assertTrue(!manifest.contains("android:process="))
         assertTrue(!manifest.contains("android:taskAffinity="))
+    }
+
+    @Test
+    fun privateIntakeCannotBeExportedOrIncludedInBackup() {
+        val context = RuntimeEnvironment.getApplication()
+        val info = context.packageManager.resolveContentProvider("${context.packageName}.private-share", 0)!!
+        assertTrue(!info.exported && !info.grantUriPermissions)
+        val res =
+            listOf(java.io.File("src/main/res/xml"), java.io.File("app/src/main/res/xml"))
+                .first { it.isDirectory }
+        val factory =
+            javax.xml.parsers.DocumentBuilderFactory
+                .newInstance()
+        val paths =
+            factory
+                .newDocumentBuilder()
+                .parse(java.io.File(res, "file_paths.xml"))
+                .documentElement.childNodes
+        for (index in 0 until paths.length) {
+            val node = paths.item(index)
+            if (node.nodeType == org.w3c.dom.Node.ELEMENT_NODE) assertEquals("cache-path", node.nodeName)
+        }
+        for (name in listOf("backup_rules.xml", "data_extraction_rules.xml")) {
+            val exclusions = factory.newDocumentBuilder().parse(java.io.File(res, name)).getElementsByTagName("exclude")
+            assertTrue(
+                (0 until exclusions.length).any {
+                    val attrs = exclusions.item(it).attributes
+                    attrs.getNamedItem("domain").nodeValue == "file" && attrs.getNamedItem("path").nodeValue == "."
+                },
+            )
+        }
     }
 
     private data class ParsedShareTarget(

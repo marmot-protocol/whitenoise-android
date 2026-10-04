@@ -46,7 +46,18 @@ class ShareInboundStager(
                             uris = uris,
                             resolveMime = { uri -> resolveMime(context, uri) },
                             intentMimeType = payload.intentMimeType,
-                        )
+                        ).let { staging ->
+                            // Mixed file shares follow Files' ordered document path; media-only shares remain albums.
+                            if (
+                                payload.importReady &&
+                                staging.mediaUris.isNotEmpty() &&
+                                staging.documentUris.isNotEmpty()
+                            ) {
+                                ShareStreamStaging(emptyList(), uris)
+                            } else {
+                                staging
+                            }
+                        }
                     },
         )
 

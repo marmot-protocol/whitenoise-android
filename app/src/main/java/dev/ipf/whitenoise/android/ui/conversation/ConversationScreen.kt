@@ -148,6 +148,7 @@ import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
@@ -1619,7 +1620,7 @@ internal fun ConversationScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val exitConversation =
+    val exitConversationRoute =
         rememberConversationExitHandler(
             identity = chat.id,
             imeIsOpen = imeIsOpen,
@@ -1730,11 +1731,73 @@ internal fun ConversationScreen(
     // shelf — ConversationScreen is reused when `selectedChat` changes in
     // place, and an unkeyed state would otherwise carry URIs from chat A into
     // chat B (where a Send would attach them to the wrong recipient).
-    var pendingMediaSlots by rememberSaveable(chat.id, stateSaver = PendingMediaSlotListSaver) {
+    val importedShareAccount =
+        appState.accounts
+            .firstOrNull { it.label == conversationAccountRef }
+            ?.accountIdHex
+            .orEmpty()
+    var pendingMediaSlots by rememberSaveable(importedShareAccount, chat.id, stateSaver = PendingMediaSlotListSaver) {
         mutableStateOf<List<PendingMediaSlot>>(emptyList())
     }
-    var pendingDocumentUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
+    var pendingDocumentUris by rememberSaveable(importedShareAccount, chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
+    val importedShareFiles =
+        remember(context) {
+            dev.ipf.whitenoise.android.share
+                .PrivateShareFiles(context)
+        }
+    val exitConversation: () -> Unit = {
+        val exitingUris = (pendingMediaSlots.map { it.uri } + pendingDocumentUris).filter(importedShareFiles::owns)
+        pendingMediaSlots = pendingMediaSlots.filterNot { importedShareFiles.owns(it.uri) }
+        pendingDocumentUris = pendingDocumentUris.filterNot(importedShareFiles::owns)
+        appState.launchMutation {
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) {
+                    importedShareFiles.leases.changeShelf(
+                        importedShareAccount,
+                        chat.group.groupIdHex,
+                        exitingUris,
+                        emptyList(),
+                    )
+                }
+            }.onFailure { appState.present(R.string.share_import_storage) }
+            exitConversationRoute()
+        }
+    }
+    dev.ipf.whitenoise.android.share.ImportedShareShelf(
+        importedShareAccount,
+        chat.group.groupIdHex,
+        pendingMediaSlots.map { it.uri } + pendingDocumentUris,
+        appState.inboundShareRevision,
+    ) { restored ->
+        val staging =
+            restored.getOrElse {
+                appState.present(R.string.share_import_storage)
+                return@ImportedShareShelf
+            }
+        val retainedMedia = pendingMediaSlots.filterNot { importedShareFiles.owns(it.uri) }
+        val retainedDocuments = pendingDocumentUris.filterNot(importedShareFiles::owns)
+        val capped =
+            dev.ipf.whitenoise.android.share.capShareStreamStaging(
+                staging,
+                retainedMedia.size,
+                retainedDocuments.size,
+                MEDIA_PICKER_MAX_ITEMS,
+            )
+        pendingMediaSlots = appendPendingMediaSlots(retainedMedia, capped.accepted.mediaUris, MEDIA_PICKER_MAX_ITEMS)
+        pendingDocumentUris = (retainedDocuments + capped.accepted.documentUris).distinct()
+        if (capped.droppedCount > 0) {
+            appState.presentText(
+                AppText.Plain(
+                    context.resources.getQuantityString(
+                        R.plurals.toast_share_attachments_dropped,
+                        capped.droppedCount,
+                        capped.droppedCount,
+                    ),
+                ),
+            )
+        }
     }
     LaunchedEffect(chat.id, appState.inboundShareRevision, pendingMediaSlots.size, pendingDocumentUris.size) {
         val capped =

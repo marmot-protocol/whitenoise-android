@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_import_title">Paylaşılan dosyalar içe aktarılıyor</string>
+    <string name="share_import_error_title">Bazı dosyalar içe aktarılamadı</string>
+    <string name="share_import_recovery">İptal edip kaynak uygulamadan yeniden paylaşın veya kullanılabilir öğelerle devam edin.</string>
+    <string name="share_import_unreadable">Bir dosya okunamıyor veya erişim süresi doldu.</string>
+    <string name="share_import_scheme">Yalnızca içerik sağlayıcısı dosyaları desteklenir.</string>
+    <string name="share_import_empty">Paylaşılan bir dosya boş.</string>
+    <string name="share_import_file_limit">Bir dosya 32 MiB sınırını aşıyor.</string>
+    <string name="share_import_batch_limit">Dosyaların toplamı 32 MiB sınırını aşıyor.</string>
+    <string name="share_import_count_limit">Yalnızca ilk 10 dosya içe aktarılabilir.</string>
+    <string name="share_import_metadata">Bir dosyanın meta verileri geçersiz veya boyutu değişti.</string>
+    <string name="share_import_storage">Özel depolama kullanılamıyor veya dolu.</string>
+    <string name="share_import_interrupted">İçe aktarma kesildi. Dosyaları yeniden paylaşın.</string>
+    <string name="share_import_progress">%2$d dosyadan %1$d: %3$d bayt</string>
+    <string name="share_import_rejected_count">İçe aktarılmayan dosyalar: %1$d</string>
+</resources>

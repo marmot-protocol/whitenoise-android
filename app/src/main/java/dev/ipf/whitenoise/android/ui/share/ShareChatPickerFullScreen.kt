@@ -91,7 +91,7 @@ internal fun ShareChatPickerFullScreenContent(
     requestId: String = "",
     payload: SharePayload,
     onDismiss: () -> Unit,
-    onStage: (String, List<String>) -> Boolean,
+    onStage: suspend (String, List<String>) -> Boolean,
     overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar? = null,
     controllerFactory: (WhiteNoiseAppState) -> ChatsController = { ChatsController(it) },
     controllerBinder: suspend (ChatsController, String) -> Unit = { controller, accountRef ->
@@ -112,7 +112,9 @@ internal fun ShareChatPickerFullScreenContent(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val stageRejectedMessage = stringResource(R.string.no_share_target_available)
-    var finishing by remember(requestId) { mutableStateOf(false) }
+    val finishingState = remember(requestId) { mutableStateOf(false) }
+    var finishing by finishingState
+    pickerState.isCommitting = { finishingState.value }
     val dismissPicker: () -> Unit = {
         if (!finishing) {
             finishing = true
@@ -128,12 +130,21 @@ internal fun ShareChatPickerFullScreenContent(
             dismiss = dismissPicker,
             stage = {
                 if (!finishing) {
-                    if (pickerState.stage(onStage)) {
-                        dismissPicker()
-                    } else {
-                        coroutineScope.launch {
-                            snackbarHostState.currentSnackbarData?.dismiss()
-                            snackbarHostState.showSnackbar(stageRejectedMessage)
+                    finishing = true
+                    coroutineScope.launch {
+                        try {
+                            if (pickerState.stage(onStage)) {
+                                runShareChatPickerDismissal(
+                                    clearFocus = { focusManager.clearFocus(force = true) },
+                                    hideKeyboard = { keyboardController?.hide() },
+                                    dismiss = onDismiss,
+                                )
+                            } else {
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                                snackbarHostState.showSnackbar(stageRejectedMessage)
+                            }
+                        } finally {
+                            finishing = false
                         }
                     }
                 }
@@ -502,7 +513,10 @@ private class ShareChatPickerState(
         }
     }
 
+    var isCommitting: () -> Boolean = { false }
+
     fun toggleSelection(groupId: String) {
+        if (isCommitting()) return
         selectedState.value =
             ArrayList(selected).apply {
                 if (contains(groupId)) remove(groupId) else add(groupId)
@@ -510,6 +524,7 @@ private class ShareChatPickerState(
     }
 
     fun chooseAccount(accountRef: String) {
+        if (isCommitting()) return
         if (accountRef == selectedAccountRef || accounts.none { it.label == accountRef }) return
         selectedAccountRefState.value = accountRef
         selectedState.value = arrayListOf()
@@ -528,7 +543,7 @@ private class ShareChatPickerState(
         retryLoadAction()
     }
 
-    fun stage(onStage: (String, List<String>) -> Boolean): Boolean =
+    suspend fun stage(onStage: suspend (String, List<String>) -> Boolean): Boolean =
         selectedAccountRef?.let { accountRef ->
             accounts.any { it.label == accountRef && it.isSignedInSigningAccount() } &&
                 canStage &&
@@ -547,7 +562,7 @@ private fun ShareChatPickerAccountRow(
         appState = pickerState.appState,
         account = account,
         multipleAccounts = pickerState.accounts.size > 1,
-        onOpenSelector = { pickerState.accountSelectorOpen = true },
+        onOpenSelector = { if (!pickerState.isCommitting()) pickerState.accountSelectorOpen = true },
         modifier = modifier,
         compact = compact,
     )

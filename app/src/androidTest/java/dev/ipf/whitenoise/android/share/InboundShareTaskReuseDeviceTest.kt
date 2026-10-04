@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -60,9 +61,9 @@ class InboundShareTaskReuseDeviceTest {
         assertSame(firstDelivery, secondDelivery)
         assertTrue(secondRequest.requestId != firstRequestId)
         val secondStreamUri = secondRequest.payload.streamUris.single()
-        assertEquals("second.bin", secondStreamUri.lastPathSegment)
+        assertEquals("second.bin", sharedName(secondStreamUri))
         assertEquals(
-            "${instrumentation.context.packageName}.external-share-test-files",
+            "${targetContext.packageName}.private-share",
             secondStreamUri.authority,
         )
         assertEquals(1, whiteNoiseTaskCount(targetContext))
@@ -130,6 +131,67 @@ class InboundShareTaskReuseDeviceTest {
         assertSame(priorRoute, application.mainShellProcessState.selectedChat.value)
     }
 
+    /** Real cross-UID grant boundary, private provider and destination recovery, without a signed-in fixture. */
+    @Test
+    fun privateImportSurvivesRevokedGrantAndDestinationStoreRecreation() =
+        kotlinx.coroutines.runBlocking {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val target = instrumentation.targetContext
+            dispatchExternalMultiple("intake.md", "arbitrary.bin")
+            val delivery = awaitPendingStreams(listOf("intake.md", "arbitrary.bin"))
+            val imported = checkNotNull(delivery.pendingInboundShareRequestForTest)
+            val files = PrivateShareFiles(target)
+            assertTrue(imported.payload.importErrors.isEmpty())
+            assertEquals(2, imported.payload.streamUris.size)
+            val sources =
+                listOf("intake.md", "arbitrary.bin").map { name ->
+                    ExternalShareTestFileProvider.uriFor(
+                        instrumentation.context,
+                        java.io.File(instrumentation.context.cacheDir, name),
+                    )
+                }
+            target.contentResolver
+                .query(
+                    sources.first(),
+                    arrayOf("private_readable"),
+                    null,
+                    arrayOf(
+                        imported.payload.streamUris
+                            .first()
+                            .toString(),
+                    ),
+                    null,
+                )!!
+                .use { cursor ->
+                    assertTrue(cursor.moveToFirst())
+                    assertEquals("A separate provider UID must not read private intake", 0, cursor.getInt(0))
+                }
+            sources.forEach { source ->
+                target.contentResolver.query(source, arrayOf("revoke_read_grant"), null, null, null)!!.close()
+                try {
+                    target.contentResolver.openInputStream(source)
+                    org.junit.Assert.fail("External grant should have been revoked")
+                } catch (_: SecurityException) {
+                }
+            }
+            imported.payload.streamUris.forEach { uri ->
+                target.contentResolver.openInputStream(uri)!!.use { input ->
+                    org.junit.Assert.assertArrayEquals(byteArrayOf(1, 2, 3), input.readBytes())
+                }
+            }
+            assertEquals("text/markdown", target.contentResolver.getType(imported.payload.streamUris.first()))
+            files.leases.saveShelf("disposable-account", "disposable-chat", imported.payload.streamUris)
+            files.leases.releaseRequest(imported.requestId)
+            assertEquals(
+                imported.payload.streamUris,
+                PrivateShareFiles(target).leases.loadShelf("disposable-account", "disposable-chat"),
+            )
+            assertTrue(files.leases.loadShelf("different-account", "disposable-chat").isEmpty())
+            files.leases.saveShelf("disposable-account", "disposable-chat", emptyList())
+            imported.payload.streamUris.forEach { assertNull(files.resolve(it)) }
+            instrumentation.runOnMainSync { delivery.acknowledgeInboundShareForTest(imported.requestId) }
+        }
+
     private fun dispatchExternalShare(streamName: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.context.startActivity(
@@ -162,13 +224,28 @@ class InboundShareTaskReuseDeviceTest {
         )
     }
 
+    private fun sharedName(uri: android.net.Uri): String? {
+        if (uri.authority?.endsWith(".private-share") != true) return uri.lastPathSegment
+        return InstrumentationRegistry
+            .getInstrumentation()
+            .targetContext.contentResolver
+            .query(
+                uri,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    }
+
     private fun awaitPendingShare(streamName: String): MainActivity =
         awaitResumedMainActivity { activity ->
             activity.pendingInboundShareRequestForTest
                 ?.payload
                 ?.streamUris
                 ?.singleOrNull()
-                ?.lastPathSegment == streamName
+                ?.let(::sharedName) == streamName &&
+                activity.pendingInboundShareRequestForTest?.payload?.importReady == true
         }
 
     /** Waits for the exact text request delivered through `onNewIntent`. */
@@ -183,7 +260,8 @@ class InboundShareTaskReuseDeviceTest {
             activity.pendingInboundShareRequestForTest
                 ?.payload
                 ?.streamUris
-                ?.mapNotNull { it.lastPathSegment } == streamNames
+                ?.map(::sharedName) == streamNames &&
+                activity.pendingInboundShareRequestForTest?.payload?.importReady == true
         }
 
     /** Asserts actual draw evidence, not only synchronous intent state. */
@@ -197,6 +275,9 @@ class InboundShareTaskReuseDeviceTest {
             WarmResumeRenderedSurface.SharePicker,
             frames.first().surface,
         )
+        composeRule.waitUntil(timeoutMillis = TIMEOUT_MILLIS) {
+            composeRule.onAllNodesWithTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG).assertExists()
     }
 

@@ -56,4 +56,17 @@ class ShareStagingCapTest {
         assertEquals(1, capped.droppedCount)
         assertNull(store.consumeCapped("acct", "group", 0, 0, 10))
     }
+
+    @Test
+    fun mixedMediaAndDocumentsShareOneTenItemShelf() {
+        val capped =
+            capShareStreamStaging(
+                ShareStreamStaging(listOf(uri(1), uri(2)), listOf(uri(3), uri(4), uri(5))),
+                existingMediaCount = 4,
+                existingDocumentCount = 3,
+            )
+        assertEquals(2, capped.accepted.mediaUris.size)
+        assertEquals(1, capped.accepted.documentUris.size)
+        assertEquals(2, capped.droppedCount)
+    }
 }

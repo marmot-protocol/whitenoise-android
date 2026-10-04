@@ -67,6 +67,28 @@ class PendingShareRequestStoreTest {
     }
 
     @Test
+    fun importBridgePersistsAnInterruptedOutcomeBeforeTouchingSources() =
+        runTest {
+            val request = request("interrupted", text = "private")
+            val delegate = store()
+            val serialized =
+                SerializedPendingShareRequestStore(delegate, importRequest = {
+                    val restored = delegate.load(it.requestId)!!
+                    assertTrue(restored.payload.streamUris.isEmpty())
+                    assertEquals(listOf(ShareImportError.Interrupted), restored.payload.importErrors)
+                    throw kotlinx.coroutines.CancellationException()
+                })
+            try {
+                serialized.save(request)
+                org.junit.Assert.fail("cancelled")
+            } catch (_: kotlinx.coroutines.CancellationException) {
+            }
+            val restored = store().load(request.requestId)!!
+            assertEquals(listOf(ShareImportError.Interrupted), restored.payload.importErrors)
+            assertTrue(restored.payload.importReady)
+        }
+
+    @Test
     fun newRequestReplacesThePreviousPendingShare() {
         val first = request("request-1", text = "first")
         val second = request("request-2", text = "second")

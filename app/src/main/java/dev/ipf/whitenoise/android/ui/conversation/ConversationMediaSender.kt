@@ -475,6 +475,7 @@ internal class ConversationMediaSender(
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             var accepted = false
+            var sourceLease: dev.ipf.whitenoise.android.share.PrivateShareSendLease? = null
             try {
                 val prepared =
                     prepareStagedAttachments(
@@ -490,6 +491,11 @@ internal class ConversationMediaSender(
                     prepared.documents.copy(
                         attachments = addMissingThumbhashes(prepared.documents.attachments),
                     )
+                sourceLease =
+                    withContext(Dispatchers.IO) {
+                        dev.ipf.whitenoise.android.share.PrivateShareSendLease
+                            .acquire(context, imageSlots.map { it.uri } + documentUris)
+                    }
                 val seeded =
                     seedPreparedAttachments(
                         prepared.copy(documents = readyDocuments),
@@ -498,6 +504,15 @@ internal class ConversationMediaSender(
                     )
                 if (seeded.isEmpty()) {
                     return@launchMutation
+                }
+                val sourceReleases =
+                    sourceLease?.ownerReleases(seeded.size) { lease ->
+                        appState.launchMutation { withContext(Dispatchers.IO) { lease.release() } }
+                    }
+                seeded.forEachIndexed { index, queued ->
+                    sourceReleases?.get(index)?.let { release ->
+                        if (!controller.retainQueuedAttachmentSource(queued, release)) release()
+                    }
                 }
                 accepted = true
                 onAccepted()
@@ -509,11 +524,17 @@ internal class ConversationMediaSender(
                 seeded.forEachIndexed { index, queued ->
                     controller.uploadQueued(
                         seeded = queued,
-                        onDurablyAccepted = if (index == 0) clearDraftAfterDurableAcceptance else null,
+                        onDurablyAccepted = {
+                            if (index == 0) clearDraftAfterDurableAcceptance?.invoke()
+                            sourceReleases?.get(index)?.invoke()
+                        },
                     )
                 }
             } finally {
-                if (!accepted) onRejected()
+                if (!accepted) {
+                    withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { sourceLease?.release() }
+                    onRejected()
+                }
             }
         }
     }

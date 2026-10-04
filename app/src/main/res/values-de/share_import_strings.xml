@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_import_title">Geteilte Dateien importieren</string>
+    <string name="share_import_error_title">Einige Dateien konnten nicht importiert werden</string>
+    <string name="share_import_recovery">Abbrechen und in der Quell-App erneut teilen oder mit verfügbaren Elementen fortfahren.</string>
+    <string name="share_import_unreadable">Eine Datei ist nicht lesbar oder der Zugriff ist abgelaufen.</string>
+    <string name="share_import_scheme">Nur Dateien von Inhaltsanbietern werden unterstützt.</string>
+    <string name="share_import_empty">Eine geteilte Datei ist leer.</string>
+    <string name="share_import_file_limit">Eine Datei überschreitet das Limit von 32 MiB.</string>
+    <string name="share_import_batch_limit">Die Dateien überschreiten zusammen 32 MiB.</string>
+    <string name="share_import_count_limit">Nur die ersten 10 Dateien können importiert werden.</string>
+    <string name="share_import_metadata">Eine Datei hat ungültige Metadaten oder ihre Größe hat sich geändert.</string>
+    <string name="share_import_storage">Privater Speicher ist nicht verfügbar oder voll.</string>
+    <string name="share_import_interrupted">Der Import wurde unterbrochen. Teile die Dateien erneut.</string>
+    <string name="share_import_progress">Datei %1$d von %2$d: %3$d Bytes</string>
+    <string name="share_import_rejected_count">Nicht importierte Dateien: %1$d</string>
+</resources>

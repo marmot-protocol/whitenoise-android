@@ -86,6 +86,45 @@ class InboundShareAccountOwnershipTest {
         assertEquals(1, appState.shareStaging.revision)
     }
 
+    @Test
+    fun supersededPickerCannotCommitAfterProviderPreparation() =
+        kotlinx.coroutines.runBlocking {
+            val personal = account("personal", "a0".repeat(32))
+            val state = appState(listOf(personal), personal.label)
+            var validations = 0
+            assertFalse(
+                state.stageInboundShareForFirstFrame(
+                    personal.label,
+                    listOf("chat"),
+                    SharePayload("private draft", emptyList(), "text/plain"),
+                ) { ++validations == 1 },
+            )
+            assertNull(state.draftStore.get(personal.label, "chat"))
+            assertNull(state.shareStaging.consume(personal.accountIdHex, "chat"))
+        }
+
+    @Test
+    fun signOutAtCommitKeepsTheShareRecoverableWithoutStaging() =
+        kotlinx.coroutines.runBlocking {
+            val personal = account("personal", "a0".repeat(32))
+            val accounts = mutableListOf(personal)
+            val state = appState(accounts, personal.label)
+            var validations = 0
+            assertFalse(
+                state.stageInboundShareForFirstFrame(
+                    personal.label,
+                    listOf("chat"),
+                    SharePayload("private draft", emptyList(), "text/plain"),
+                ) {
+                    if (++validations > 1) {
+                        accounts[0] = account(personal.label, personal.accountIdHex, signedOut = true)
+                    }
+                    true
+                },
+            )
+            assertNull(state.draftStore.get(personal.label, "chat"))
+        }
+
     private fun appState(
         accounts: List<AccountSummaryFfi>,
         activeAccountRef: String,
