@@ -200,18 +200,20 @@ class ChatMutePreferences(
             }
         }
 
+        /** Joins a public local identity label and group id for a preference lookup; contains no credentials. */
         fun compositeKey(
-            accountRef: String,
+            identityLabel: String,
             groupIdHex: String,
-        ): String = "$accountRef$COMPOSITE_SEPARATOR$groupIdHex"
+        ): String = "$identityLabel$COMPOSITE_SEPARATOR$groupIdHex"
 
+        /** Normalizes the host label/id tuple while retaining the existing on-disk preference format. */
         fun compositeKeyOrNull(
-            accountRef: String?,
+            identityLabel: String?,
             groupIdHex: String?,
         ): String? {
-            val account = accountRef?.trim()?.takeIf(String::isNotEmpty) ?: return null
+            val label = identityLabel?.trim()?.takeIf(String::isNotEmpty) ?: return null
             val group = groupIdHex?.trim()?.takeIf(String::isNotEmpty) ?: return null
-            return compositeKey(account, group)
+            return compositeKey(label, group)
         }
 
         fun readMutedSet(preferences: SharedPreferences): Set<String> = preferences.getStringSet(KEY_MUTED_CONVERSATIONS, emptySet())?.toSet().orEmpty()
