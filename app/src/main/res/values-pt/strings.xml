@@ -2201,7 +2201,7 @@
     <string name="onboarding_details_expanded">Expandido</string>
     <string name="onboarding_details_collapsed">Recolhido</string>
     <string name="group_svg_rejected_detail">Não foi possível preparar este SVG. Escolha um SVG simples, PNG ou JPEG.</string>
-    <string name="error_invalid_key_package">Não foi possível validar a chave de conversa publicada de esta pessoa. Pede-lhe para atualizar o White Noise e publicar uma nova chave de conversa e tenta novamente.</string>
+    <string name="error_invalid_key_package">Não foi possível validar a chave de conversa publicada desta pessoa. Pede-lhe para atualizar o White Noise e publicar uma nova chave de conversa e tenta novamente.</string>
     <string name="error_invalid_key_package_for">Não foi possível validar a chave de conversa publicada de %1$s. Pede-lhe para atualizar o White Noise e publicar uma nova chave de conversa e tenta novamente.</string>
     <string name="error_missing_member_inbox">Não existe um relay de entrada utilizável para esta pessoa. Pede-lhe para verificar os relays de entrada nas definições do White Noise e tenta novamente.</string>
     <string name="error_missing_member_inbox_for">Não existe um relay de entrada utilizável para %1$s. Pede-lhe para verificar os relays de entrada nas definições do White Noise e tenta novamente.</string>
