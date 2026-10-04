@@ -86,7 +86,20 @@ private fun gifExtensionEnd(
         }
     val firstBlockMatches =
         requiredFirstBlockSize == GIF_ANY_BLOCK_SIZE || u8(bytes, firstBlock) == requiredFirstBlockSize
-    return if (firstBlockMatches) gifSubBlockChainEnd(bytes, firstBlock.toLong()) else GIF_INVALID
+    val graphicControlTerminator = firstBlock.toLong() + 1L + GIF_GRAPHIC_CONTROL_BLOCK_SIZE
+    return when {
+        !firstBlockMatches -> GIF_INVALID
+        requiredFirstBlockSize == GIF_GRAPHIC_CONTROL_BLOCK_SIZE ->
+            if (
+                hasAnimationSourceRange(bytes, graphicControlTerminator, 1L) &&
+                u8(bytes, graphicControlTerminator.toInt()) == 0
+            ) {
+                graphicControlTerminator + 1L
+            } else {
+                GIF_INVALID
+            }
+        else -> gifSubBlockChainEnd(bytes, firstBlock.toLong())
+    }
 }
 
 /** Returns the offset after a zero-terminated sub-block chain, or [GIF_INVALID] when truncated. */

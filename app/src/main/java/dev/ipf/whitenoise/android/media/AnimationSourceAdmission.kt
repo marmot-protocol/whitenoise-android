@@ -120,5 +120,10 @@ internal class AnimationSourceBudget(
 
     /** The admission for a completely walked source of [kind]. */
     fun admitted(kind: AnimationSourceKind): AnimationSourceAdmission =
-        AnimationSourceAdmission.Admitted(kind, canvasWidth, canvasHeight, frames)
+        AnimationSourceAdmission.Admitted(
+            kind,
+            canvasWidth,
+            canvasHeight,
+            frames,
+        )
 }

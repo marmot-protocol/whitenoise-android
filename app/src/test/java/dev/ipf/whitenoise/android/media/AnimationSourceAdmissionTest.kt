@@ -132,6 +132,11 @@ class AnimationSourceAdmissionTest {
     }
 
     @Test
+    fun gif_graphicControlRejectsAdditionalDataSubBlocks() {
+        assertRefused(gif(extensions = listOf(gifExtension(0xf9, ByteArray(4), byteArrayOf(1)))))
+    }
+
+    @Test
     fun gif_localColorTablesAndLzwHeaderAreChecked() {
         val fullLocalTable = gifFrame(packed = 0x87, localTableBytes = 768)
         assertGif(gif(frames = listOf(fullLocalTable)), width = 4, height = 4, frames = 1)
@@ -314,7 +319,9 @@ class AnimationSourceAdmissionTest {
     }
 
     private fun webpFrame(vararg data: ByteArray): ByteArray =
-        animatedWebp(frames = listOf(anmf(width = 2, height = 2, frameData = data.toList())))
+        animatedWebp(
+            frames = listOf(anmf(width = 2, height = 2, frameData = data.toList())),
+        )
 
     private fun mutate(
         source: ByteArray,
