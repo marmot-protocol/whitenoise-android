@@ -3330,12 +3330,6 @@ class WhiteNoiseAppState private constructor(
      * The row key is a bare group id, so an account-pinned conversation must never write
      * into a different account's row for that group.
      */
-    internal fun chatEditPreviewOwner(accountRef: String?): ChatsController? {
-        val controller = chatsController
-        return controller?.takeIf { it.boundAccountRef == accountRef }
-    }
-
-    /** Applies a sending preview only to its captured account. */
     internal fun applyOptimisticSentPreview(
         accountRef: String?,
         groupIdHex: String,

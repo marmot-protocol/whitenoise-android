@@ -98,7 +98,7 @@ class ChatListFirstFrameMarkdownScreenshotTest {
 
     /** Captures the first row only after proving styled text rendered and raw Markdown never did. */
     @Test
-    fun optimisticEditHasParsedTokensOnTheFirstVisibleFrame() {
+    fun acceptedEditHasParsedTokensOnTheFirstVisibleFrame() {
         val appState = appState()
         val tokens =
             MarkdownDocumentFfi(
@@ -115,11 +115,15 @@ class ChatListFirstFrameMarkdownScreenshotTest {
                 blankLinesBefore = ByteArray(0),
             )
         val row = notificationChatListRow().copy(lastMessage = notifiedMessagePreview().copy(plaintext = "Before edit"))
-        val edits =
-            dev.ipf.whitenoise.android.state
-                .OptimisticChatEditPreviews()
-        edits.begin(row, row.lastMessage!!.messageIdHex, "edit-action", "**Rendered first** after launch", tokens)
-        val item = chatListItemFromProjection(edits.project(row))
+        val accepted =
+            row.copy(
+                lastMessage =
+                    row.lastMessage!!.copy(
+                        plaintext = "**Rendered first** after launch",
+                        contentTokens = tokens,
+                    ),
+            )
+        val item = chatListItemFromProjection(accepted)
 
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {

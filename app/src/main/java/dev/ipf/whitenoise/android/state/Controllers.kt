@@ -724,8 +724,6 @@ data class OptimisticEdit(
     val durableIntent: DurablePendingEditIntent? = null,
     val nativeEditMessageId: String? = null,
     val nativeRevisionRejected: Boolean = false,
-    val actionId: String = UUID.randomUUID().toString(),
-    val chatPreview: ChatEditPreview? = null,
 )
 
 /**
@@ -2550,7 +2548,6 @@ class ChatsController private constructor(
     }
 
     private val chatRowsByGroup = LinkedHashMap<String, ChatListRowFfi>()
-    private val optimisticChatEdits = OptimisticChatEditPreviews()
     private var selectedAvatarAssetsByGroup: Map<String, AvatarAssetFfi> = emptyMap()
 
     private var selectedPresentationsByGroup = emptyMap<String, ConversationPresentationFfi>()
@@ -3423,37 +3420,6 @@ class ChatsController private constructor(
     // section). Callers in ConversationController forward the updated record
     // here via AppState so the chat list reflects the new archived flag.
 
-    /** Stage a parsed local edit without reserving fresh activity or mutating durable read state. */
-    internal fun beginChatEditPreview(
-        epoch: Long,
-        group: String,
-        target: String,
-        action: String,
-        text: String,
-        tokens: MarkdownDocumentFfi,
-    ) {
-        if (!isActiveBindEpoch(epoch)) return
-        val row = chatRowsByGroup[chatRowKey(group)] ?: return
-        optimisticChatEdits.begin(row, target, action, text, tokens)
-        recompute()
-    }
-
-    /** Fence completion and cancellation against both account binding and exact edit action. */
-    internal fun finishChatEditPreview(
-        epoch: Long,
-        group: String,
-        action: String,
-        status: MessageStatus?,
-    ) {
-        if (!isActiveBindEpoch(epoch)) return
-        if (status == null) {
-            optimisticChatEdits.discard(group, action)
-        } else {
-            optimisticChatEdits.finish(group, action, status)
-        }
-        recompute()
-    }
-
     /**
      * Publishes a ready optimistic preview with publication-time activity order.
      * Returning to the list shows it immediately while the real stream catches up (#900).
@@ -3767,7 +3733,7 @@ class ChatsController private constructor(
     /** Projects current rows using MDK Markdown first and the exact-text cache only as fallback. */
     private fun currentProjectedItems(activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex): List<ChatListItem> =
         chatRows.map { authoritativeRow ->
-            val row = optimisticChatEdits.project(optimisticArchiveRow(authoritativeRow))
+            val row = optimisticArchiveRow(authoritativeRow)
             chatListItemFromProjection(
                 row = row,
                 selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
@@ -3798,7 +3764,7 @@ class ChatsController private constructor(
         authoritativeRow: ChatListRowFfi,
         activeAccountIdHex: String? = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex,
     ): ChatListItem {
-        val row = optimisticChatEdits.project(optimisticArchiveRow(authoritativeRow))
+        val row = optimisticArchiveRow(authoritativeRow)
         return chatListItemFromProjection(
             row = row,
             selectedPresentation = selectedPresentationsByGroup[chatRowKey(row.groupIdHex)],
@@ -5233,7 +5199,6 @@ class ChatsController private constructor(
         nextActivitySequence = 0uL
         optimisticChatListPreviewByGroup.clear()
         optimisticArchiveByGroup.clear()
-        optimisticChatEdits.clear()
         memberCacheByGroup = emptyMap()
         presentationMembersByGroup = emptyMap()
         memberSnapshotsRevision += 1L
@@ -9671,66 +9636,38 @@ class ConversationController(
         // priority over the now-stale displayed text) so a failure reverts
         // verbatim. Pending drives a brief sending indicator on the bubble.
         val preEditText = optimisticEdits[target]?.preEditText ?: currentDisplayedText(target)
-        val attempt = OptimisticEdit(trimmed, preEditText, MessageStatus.Pending)
-        optimisticEdits[target] = attempt
+        optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Pending)
         publishTimelineFromIndexes()
         try {
-            if (!stageEditPreview(account, target, attempt)) return
             appState.withGroupCommitLock(account, group.groupIdHex) {
-                if (ownsEditAttempt(target, attempt) && !isAccountTeardownRequested()) {
-                    messageEditPublisher(account, group.groupIdHex, target, trimmed)
-                }
+                messageEditPublisher(account, group.groupIdHex, target, trimmed)
             }
-            completeRegularEdit(target, attempt, MessageStatus.Sent)
-        } catch (cancelled: CancellationException) {
-            if (ownsEditAttempt(target, attempt)) {
-                optimisticEdits.remove(target)?.chatPreview?.finish(null)
-                publishTimelineFromIndexes()
-            }
-            throw cancelled
+            // Publish accepted: drop the Pending indicator but keep the text
+            // overlay so the bubble doesn't flicker back to the old body in the
+            // gap before the kind-1009 lands in the timeline. The overlay is
+            // pruned once MDK reflects the same latest text.
+            // Only act if this attempt still owns the overlay: if the user
+            // re-edited the same target while this publish was in flight, a
+            // newer Pending overlay (different text) has superseded us, and
+            // flipping it to Sent would wrongly confirm the newer attempt.
+            optimisticEdits[target]
+                ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
+                ?.let { optimisticEdits[target] = it.copy(status = MessageStatus.Sent) }
+            publishTimelineFromIndexes()
         } catch (throwable: Throwable) {
-            if (completeRegularEdit(target, attempt, MessageStatus.Failed)) {
-                appState.presentFailure(R.string.toast_couldnt_edit_message, "MESSAGE_EDIT", throwable)
-            }
+            throwable.rethrowIfCancellation()
+            // Revert the displayed body to the pre-edit text and flip the
+            // bubble to Failed, lighting the same retry/discard affordance a
+            // failed send shows. Retry re-runs this edit; discard clears the
+            // overlay and restores the original body. Guarded the same way as
+            // the success path: a newer in-flight attempt's overlay must not be
+            // clobbered back to this stale attempt's Failed/pre-edit text.
+            optimisticEdits[target]
+                ?.takeIf { it.status == MessageStatus.Pending && it.text == trimmed }
+                ?.let { optimisticEdits[target] = OptimisticEdit(trimmed, preEditText, MessageStatus.Failed) }
+            publishTimelineFromIndexes()
+            appState.presentFailure(R.string.toast_couldnt_edit_message, "MESSAGE_EDIT", throwable)
         }
-    }
-
-    /** Every completion belongs to one submission, including repeated edits with identical text. */
-    private fun ownsEditAttempt(
-        target: String,
-        attempt: OptimisticEdit,
-    ): Boolean = optimisticEdits[target]?.actionId == attempt.actionId
-
-    /** Capture the account binding before parsing; publish text and tokens together before native admission. */
-    private suspend fun stageEditPreview(
-        account: String,
-        target: String,
-        attempt: OptimisticEdit,
-    ): Boolean {
-        val owner = appState.chatEditPreviewOwner(account) ?: return true
-        val epoch = owner.bindEpoch
-        val tokens = markdownParser(attempt.text)
-        val current = ownsEditAttempt(target, attempt) && !isAccountTeardownRequested()
-        if (current) {
-            owner.beginChatEditPreview(epoch, group.groupIdHex, target, attempt.actionId, attempt.text, tokens)
-            optimisticEdits[target] =
-                attempt.copy(
-                    chatPreview = ChatEditPreview(owner, epoch, group.groupIdHex, attempt.actionId),
-                )
-        }
-        return current
-    }
-
-    /** Complete only the current edit and publish bubble/list status in the same main-thread turn. */
-    private fun completeRegularEdit(
-        target: String,
-        attempt: OptimisticEdit,
-        status: MessageStatus,
-    ): Boolean {
-        val current = optimisticEdits[target]?.takeIf { it.actionId == attempt.actionId } ?: return false
-        optimisticEdits[target] = current.copy(status = status)
-        publishTimelineFromIndexes()
-        return true
     }
 
     /** Transfers the revision to MDK before dismissing the editor, with immutable tokens for safe retries. */
@@ -9771,14 +9708,10 @@ class ConversationController(
         text: String,
     ): Boolean {
         val previous = optimisticEdits[resolvedTarget]?.preEditText ?: currentDisplayedText(resolvedTarget)
-        val attempt = OptimisticEdit(text, previous, MessageStatus.Pending, intent)
-        optimisticEdits[resolvedTarget] = attempt
+        optimisticEdits[resolvedTarget] = OptimisticEdit(text, previous, MessageStatus.Pending, intent)
         publishTimelineFromIndexes()
         return try {
-            runCatchingCancellable {
-                stageEditPreview(account, resolvedTarget, attempt)
-                publishPendingEdit(account, intent, text)
-            }.fold(
+            runCatchingCancellable { publishPendingEdit(account, intent, text) }.fold(
                 onSuccess = { summary -> completePendingEditAdmission(intent, summary, text) },
                 onFailure = { cause ->
                     if (intent.editClientToken in pendingEditPublicationObserved) {
@@ -10768,9 +10701,6 @@ class ConversationController(
             val intent = edit.durableIntent
             if (intent == null) {
                 optimisticEdits.remove(item.record.messageIdHex)
-                appState.chatEditPreviewOwner(conversationAccountRef)?.let { owner ->
-                    owner.finishChatEditPreview(owner.bindEpoch, group.groupIdHex, edit.actionId, null)
-                }
                 publishTimelineFromIndexes()
             } else {
                 discardPendingEdit(item.record.messageIdHex, intent)
@@ -10821,10 +10751,7 @@ class ConversationController(
                     )
                 }
             }
-            status == null || status == LocalSendStatusFfi.Rejected -> {
-                optimisticEdits.remove(target)
-                current.chatPreview?.finish(null)
-            }
+            status == null || status == LocalSendStatusFfi.Rejected -> optimisticEdits.remove(target)
             else -> optimisticEdits[target] = current.withNativeEditStatus(status)
         }
         publishTimelineFromIndexes()
@@ -13331,7 +13258,6 @@ class ConversationController(
         // Admission projects the revised body before publication. The original row's
         // delivery state cannot confirm its edit; retain the overlay until the edit's
         // own native publication and exact revision agree.
-        optimisticEdits.values.forEach { edit -> edit.chatPreview?.finish(edit.status) }
         optimisticEdits.entries
             .filter { (target, edit) ->
                 isConfirmedOptimisticEdit(target, edit, aggregated)
