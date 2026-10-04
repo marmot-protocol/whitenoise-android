@@ -99,3 +99,5 @@
 *.VoiceReviewRecoveryTest.finalizedReviewRecreationShowsUnavailableNoticeAndExplicitRecordAgain
 
 *.ReceivedFileCachedFirstFrameTest.ownFileRemainsVisibleDuringLocalPreparation
+
+dev.ipf.whitenoise.android.ui.group.GroupDetailsEditNavigationTest.newGroupNotifyModeCanOptInAndReturnToMentions

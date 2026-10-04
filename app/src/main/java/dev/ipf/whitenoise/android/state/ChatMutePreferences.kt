@@ -90,8 +90,12 @@ class ChatMutePreferences(
                     compositeKeyOrNull(account, group)?.let { updated.putIfAbsent(it, ChatNotifyMode.ALL) }
                 }
             }
-            check(persistModes(preferences.edit(), updated).putBoolean(KEY_DEFAULTS_MIGRATED, true).commit()) {
-                "Could not preserve existing notification preferences"
+            val persisted = persistModes(preferences.edit(), updated).putBoolean(KEY_DEFAULTS_MIGRATED, true).commit()
+            if (!persisted) {
+                // commit() mutates SharedPreferences memory even on disk failure. Do not let a
+                // same-process bootstrap retry mistake that unpersisted marker for success.
+                preferences.edit().remove(KEY_DEFAULTS_MIGRATED).apply()
+                error("Could not preserve existing notification preferences")
             }
             _state.value = ChatNotificationState(updated.toMap())
         }

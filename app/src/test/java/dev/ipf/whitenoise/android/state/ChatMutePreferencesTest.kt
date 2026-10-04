@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -135,6 +136,52 @@ class ChatMutePreferencesTest {
         assertEquals(ChatNotifyMode.ALL, ChatMutePreferences(context).mode("alice", "group", false))
         restored.removeAccount("alice")
         assertEquals(ChatNotifyMode.MENTIONS_ONLY, ChatMutePreferences(context).mode("alice", "group", false))
+    }
+
+    /** A failed disk commit has already changed preference memory; retry must not skip the migration barrier. */
+    @Test
+    fun failedCommitCannotLeaveASuccessMarkerInMemory() {
+        val context = RuntimeEnvironment.getApplication()
+        clear(context)
+        val underlying = context.getSharedPreferences("whitenoise.chat_mute", Context.MODE_PRIVATE)
+        var fail = true
+        val failing =
+            object : SharedPreferences by underlying {
+                override fun edit(): SharedPreferences.Editor {
+                    val editor = underlying.edit()
+                    return object : SharedPreferences.Editor by editor {
+                        override fun putStringSet(
+                            key: String?,
+                            values: Set<String>?,
+                        ): SharedPreferences.Editor {
+                            editor.putStringSet(key, values)
+                            return this
+                        }
+
+                        override fun putBoolean(
+                            key: String?,
+                            value: Boolean,
+                        ): SharedPreferences.Editor {
+                            editor.putBoolean(key, value)
+                            return this
+                        }
+
+                        override fun commit(): Boolean {
+                            editor.commit()
+                            return !fail
+                        }
+                    }
+                }
+            }
+        val preferences = ChatMutePreferences(context, failing)
+        val result = runCatching { preferences.preserveExistingModes(mapOf("alice" to listOf("old"))) }
+        assertTrue(result.isFailure)
+        assertTrue(preferences.needsDefaultsMigration)
+        assertTrue(ChatMutePreferences(context).needsDefaultsMigration)
+        fail = false
+        preferences.preserveExistingModes(mapOf("alice" to listOf("old")))
+        assertFalse(preferences.needsDefaultsMigration)
+        assertEquals(ChatNotifyMode.ALL, preferences.mode("alice", "old", false))
     }
 
     private fun clear(context: Context) {
