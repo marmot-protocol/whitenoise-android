@@ -32,6 +32,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -427,6 +428,7 @@ private fun MarkdownBodyText(
     }
 
     val speechActions = ttsSentenceAccessibilityActions(leafId, text.text, LocalTtsSentenceActions.current)
+    LaunchedEffect(sentenceLayoutReporter) { reportIfReady() }
     val accessibilityModifier =
         Modifier.semantics {
             customActions = speechActions +

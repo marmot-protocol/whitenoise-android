@@ -6,11 +6,14 @@ import android.content.ClipData
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -57,13 +60,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
+import dev.ipf.whitenoise.android.ui.conversation.messages.RenderedTextHit
+import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHitFromRenderedHit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -87,6 +94,7 @@ private suspend fun WhiteNoiseAppState.speakTextAttachment(
     messageIdHex: String,
     attachmentIndex: Int,
     actions: TextAttachmentNativeActions,
+    hit: RenderedTextHit? = null,
 ) {
     val entry =
         withContext(Dispatchers.Default) {
@@ -99,7 +107,17 @@ private suspend fun WhiteNoiseAppState.speakTextAttachment(
             )
         }
     if (!actions.isCurrent()) return
-    if (entry.text.isBlank() || !speakAloudPrepared(listOf(entry), Locale.getDefault())) {
+    val preparedHit = hit?.let { preparedHitFromRenderedHit(entry, it) }
+    if (hit != null && preparedHit == null) return
+    val started =
+        entry.text.isNotBlank() &&
+            speakAloudPrepared(
+                listOf(entry),
+                Locale.getDefault(),
+                startRenderedHit = preparedHit,
+                isCurrent = actions::isCurrent,
+            )
+    if (!started && actions.isCurrent()) {
         present(if (entry.text.isBlank()) R.string.tts_bar_error else ttsStartFailureMessage())
     }
 }
@@ -127,11 +145,53 @@ internal fun TextAttachmentReaderDialog(
     val clipboard = LocalClipboard.current
     val speechState by appState.ttsController.state.collectAsState()
     var speechRequested by remember(actions) { mutableStateOf(false) }
-    val isReading = actions.isCurrent() && textAttachmentOwnsSpeech(speechState, messageIdHex, attachmentIndex)
+    var entry by remember(actions, state) { mutableStateOf<TtsSpeakableEntry?>(null) }
+    val speechOwner =
+        remember(actions, appState) {
+            TextAttachmentSpeechOwner(appState.ttsController, actions::isCurrent, appState::ownsCurrentAccountSpeech)
+        }
+    val isReading = speechOwner.ownsAttachment(speechState, messageIdHex, attachmentIndex)
+    LaunchedEffect(actions, state) {
+        val preview = (state as? TextAttachmentReaderState.Ready)?.preview ?: return@LaunchedEffect
+        val prepared =
+            withContext(Dispatchers.Default) {
+                textAttachmentTtsEntry(preview, senderKey, senderDisplayName, messageIdHex, attachmentIndex)
+            }
+        if (actions.isCurrent()) entry = prepared
+    }
+
+    fun start(
+        preview: TextAttachmentPreview,
+        hit: RenderedTextHit? = null,
+    ) {
+        if (!actions.isCurrent() || speechRequested) return
+        speechRequested = true
+        scope.launch {
+            try {
+                appState.speakTextAttachment(
+                    preview,
+                    senderKey,
+                    senderDisplayName,
+                    messageIdHex,
+                    attachmentIndex,
+                    actions,
+                    hit,
+                )
+            } finally {
+                speechRequested = false
+            }
+        }
+    }
+    val playback =
+        entry?.let { document ->
+            speechOwner.playback(document, speechState) { hit ->
+                (state as? TextAttachmentReaderState.Ready)?.preview?.let { start(it, hit) }
+            }
+        }
 
     LaunchedEffect(candidate, actions, loadGeneration) {
         state = TextAttachmentReaderState.Loading
-        state =
+        val loaded =
             runCatchingCancellable {
                 loadTextAttachmentPreview(
                     candidate = candidate,
@@ -141,6 +201,7 @@ internal fun TextAttachmentReaderDialog(
             }.getOrElse {
                 TextAttachmentReaderState.Unavailable(TextAttachmentUnavailableReason.DownloadFailed)
             }
+        if (actions.isCurrent()) state = loaded
     }
 
     Dialog(
@@ -165,24 +226,10 @@ internal fun TextAttachmentReaderDialog(
             },
             onReadAloud = { preview ->
                 if (actions.isCurrent() && !speechRequested) {
-                    if (textAttachmentOwnsSpeech(appState.ttsController.state.value, messageIdHex, attachmentIndex)) {
+                    if (speechOwner.ownsAttachment(appState.ttsController.state.value, messageIdHex, attachmentIndex)) {
                         appState.stopSpeaking()
                     } else {
-                        speechRequested = true
-                        scope.launch {
-                            try {
-                                appState.speakTextAttachment(
-                                    preview,
-                                    senderKey,
-                                    senderDisplayName,
-                                    messageIdHex,
-                                    attachmentIndex,
-                                    actions,
-                                )
-                            } finally {
-                                speechRequested = false
-                            }
-                        }
+                        start(preview)
                     }
                 }
             },
@@ -193,6 +240,8 @@ internal fun TextAttachmentReaderDialog(
             mentionDisplayName = appState::mentionDisplayName,
             onNostrProfileTap = appState::presentProfile,
             transport = { TtsTransportBar(appState) },
+            playback = playback,
+            onReadFromTop = { preview -> start(preview) },
         )
     }
 }
@@ -216,10 +265,14 @@ internal fun TextAttachmentReaderScreen(
     mentionDisplayName: ((String) -> String?)? = null,
     onNostrProfileTap: ((String) -> Unit)? = null,
     transport: @Composable () -> Unit = {},
+    playback: TextAttachmentPlayback? = null,
+    onReadFromTop: (TextAttachmentPreview) -> Unit = onReadAloud,
 ) {
     val selection = rememberTextAttachmentSelectionController(candidate, state)
     val preview = (state as? TextAttachmentReaderState.Ready)?.preview
     val onBack = { if (selection.active) selection.reset() else onDismiss() }
+    val scroll = rememberScrollState()
+    val speech = rememberTextAttachmentTtsUi(playback, selection, scroll)
     BackHandler(enabled = selection.active, onBack = onBack)
     Scaffold(
         modifier =
@@ -227,7 +280,13 @@ internal fun TextAttachmentReaderScreen(
                 .fillMaxSize()
                 .testTag(TEXT_ATTACHMENT_READER_TAG),
         topBar = {
-            TextAttachmentReaderTopBar(onDismiss = onBack, onOpenExternal = onOpenExternal, onSave = onSave)
+            TextAttachmentReaderTopBar(
+                onDismiss = onBack,
+                onOpenExternal = onOpenExternal,
+                onSave = onSave,
+                onReadFromTop = { preview?.let(onReadFromTop) },
+                canRead = !readAloudBusy && preview?.text?.isNotBlank() == true,
+            )
         },
         bottomBar = {
             TextAttachmentReaderBottomBar(
@@ -241,18 +300,26 @@ internal fun TextAttachmentReaderScreen(
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
-            TextAttachmentMetadata(candidate = candidate, byteCount = preview?.byteCount, onCopy = onCopy)
-            HorizontalDivider()
-            TextAttachmentReaderContent(
-                state = state,
-                selection = selection,
-                onRetry = onRetry,
-                onOpenExternal = onOpenExternal,
-                onCopyLink = onCopy,
-                mentionDisplayName = mentionDisplayName,
-                onNostrProfileTap = onNostrProfileTap,
-            )
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding).then(speech.viewportModifier)) {
+            val trailingHeight = maxHeight
+            Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
+                TextAttachmentMetadata(candidate = candidate, byteCount = preview?.byteCount, onCopy = onCopy)
+                HorizontalDivider()
+                TextAttachmentReaderContent(
+                    state = state,
+                    selection = selection,
+                    onRetry = onRetry,
+                    onOpenExternal = onOpenExternal,
+                    onCopyLink = onCopy,
+                    mentionDisplayName = mentionDisplayName,
+                    onNostrProfileTap = onNostrProfileTap,
+                    speech = speech,
+                )
+                if (textAttachmentPlaybackPassage(playback) != null) Spacer(Modifier.height(trailingHeight))
+            }
+            if (speech.showResumeFollow) {
+                TtsResumeFollowButton(speech.resumeFollow, Modifier.align(Alignment.BottomEnd).padding(16.dp))
+            }
         }
     }
 }
@@ -264,6 +331,8 @@ private fun TextAttachmentReaderTopBar(
     onDismiss: () -> Unit,
     onOpenExternal: () -> Unit,
     onSave: () -> Unit,
+    onReadFromTop: () -> Unit,
+    canRead: Boolean,
 ) {
     var more by remember { mutableStateOf(false) }
     TopAppBar(
@@ -274,6 +343,9 @@ private fun TextAttachmentReaderTopBar(
             }
         },
         actions = {
+            IconButton(onClick = onReadFromTop, enabled = canRead) {
+                Icon(painterResource(R.drawable.ic_volume_up), contentDescription = stringResource(R.string.read_aloud))
+            }
             Box {
                 IconButton(onClick = { more = true }) {
                     Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.more_options))
@@ -446,6 +518,7 @@ private fun TextAttachmentReaderContent(
     mentionDisplayName: ((String) -> String?)?,
     onNostrProfileTap: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
+    speech: TextAttachmentTtsUi? = null,
 ) {
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         when (state) {
@@ -460,6 +533,7 @@ private fun TextAttachmentReaderContent(
                     onNostrProfileTap = onNostrProfileTap,
                     onCopyLink = onCopyLink,
                     onOpenExternal = onOpenExternal,
+                    speech = speech,
                 )
         }
     }
@@ -485,12 +559,14 @@ private fun TextAttachmentReadyBody(
     onNostrProfileTap: ((String) -> Unit)?,
     onCopyLink: (String) -> Unit,
     onOpenExternal: () -> Unit,
+    speech: TextAttachmentTtsUi? = null,
 ) {
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
+                .then(speech?.bodyModifier ?: Modifier)
                 .textAttachmentSelectionLongPress(preview, selection::requestSelection)
                 .testTag(TEXT_ATTACHMENT_READER_BODY_TAG),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -509,6 +585,7 @@ private fun TextAttachmentReadyBody(
                 mentionDisplayName = mentionDisplayName,
                 onNostrProfileTap = onNostrProfileTap,
                 onCopyLink = onCopyLink,
+                speech = speech,
             )
         }
     }

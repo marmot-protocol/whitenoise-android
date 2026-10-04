@@ -361,14 +361,18 @@ class TtsController internal constructor(
         locale: Locale,
         startSentenceIndex: Int = 0,
         startRenderedHit: PreparedRenderedHit? = null,
+        isCurrent: () -> Boolean = { true },
         onPreparing: () -> Boolean,
     ): Boolean {
-        val ticket = synchronized(this) { preparationTicket(entries, locale) } ?: return false
+        val ticket =
+            synchronized(this) {
+                if (isCurrent()) preparationTicket(entries, locale) else null
+            } ?: return false
         try {
             return if (!onPreparing()) {
                 false
             } else {
-                completePreparation(ticket, entries, startSentenceIndex, startRenderedHit)
+                completePreparation(ticket, entries, startSentenceIndex, startRenderedHit, isCurrent)
             }
         } finally {
             synchronized(this) {
@@ -382,6 +386,7 @@ class TtsController internal constructor(
         entries: List<TtsSpeakableEntry>,
         startSentenceIndex: Int,
         startRenderedHit: PreparedRenderedHit?,
+        isCurrent: () -> Boolean,
     ): Boolean {
         val preparedStart =
             withContext(Dispatchers.Default) {
@@ -400,13 +405,19 @@ class TtsController internal constructor(
                                 PreparedSeekResolver.resolve(prepared, hit)
                             }
                         }.let { target ->
-                            (target as? PreparedSeekTarget.Sentence)?.ordinal ?: startSentenceIndex
+                            if (startRenderedHit == null) {
+                                startSentenceIndex
+                            } else {
+                                (target as? PreparedSeekTarget.Sentence)?.ordinal
+                            }
                         }
                 messages to resolvedStart
             }
         val (messages, resolvedStart) = preparedStart
+        if (resolvedStart == null) return false
         return synchronized(this) {
-            if (!preparationRequests.isCurrent(ticket.first) ||
+            val currentOwner = isCurrent() && preparationRequests.isCurrent(ticket.first)
+            if (!currentOwner ||
                 engine !== ticket.second ||
                 (ticket.second.effectiveLocale ?: ticket.third) != ticket.third
             ) {

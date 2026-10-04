@@ -1568,6 +1568,9 @@ class WhiteNoiseAppState private constructor(
     // owns decrypted text that must stop when its account is removed.
     private var ttsSpeechAccountRef: String? = null
 
+    /** Reader controls may only address speech owned by the current local account. */
+    internal fun ownsCurrentAccountSpeech(): Boolean = ttsSpeechAccountRef?.let { it == activeAccountRef } == true
+
     fun ownsTtsAutoReadSession(groupIdHex: String): Boolean {
         val key = ttsAutoReadSessionKey ?: return false
         return key == ttsAutoReadKey(activeAccountRef, groupIdHex)
@@ -1625,10 +1628,17 @@ class WhiteNoiseAppState private constructor(
         locale: Locale,
         startSentenceIndex: Int = 0,
         startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
+        isCurrent: () -> Boolean = { true },
     ): Boolean {
         val ownerAccount = activeAccountRef
         return ttsController
-            .speakAsync(entries, locale, startSentenceIndex, startRenderedHit) {
+            .speakAsync(
+                entries,
+                locale,
+                startSentenceIndex,
+                startRenderedHit,
+                isCurrent = { activeAccountRef == ownerAccount && isCurrent() },
+            ) {
                 ttsSpeechAccountRef = ownerAccount
                 TtsPlaybackForegroundService.start(appContext)
             }.also { started ->

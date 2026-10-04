@@ -27,11 +27,17 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
+import dev.ipf.whitenoise.android.ui.TtsLeafHighlightResolver
+import dev.ipf.whitenoise.android.ui.TtsSentenceActions
+import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
+import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
 
 /**
  * Activates Compose's native selection only after a reader long-press. Keeping
@@ -110,6 +116,16 @@ internal class ReaderTextSelectionController(
             fullText
         }
 
+    /** Resolves a seek from the same current leaf geometry used by native selection. */
+    fun renderedHitAt(position: Offset): RenderedTextHit? =
+        renderedTextHitAtWindowPosition(
+            selectableLayouts.values,
+            position,
+        )
+
+    /** Preserves immediate link taps outside an active reader speech session. */
+    fun hasLinkAt(position: Offset): Boolean = markdownLinkDestinationAt(markdownLinkLayouts.values, position) != null
+
     /** Ends the current native selection session without dismissing the reader. */
     fun reset() {
         active = false
@@ -170,31 +186,52 @@ internal fun Modifier.readerTextSelectionLongPress(
 
 /** Reports a plain-text layout so native selection can seed the pressed word. */
 @Composable
+@Suppress("LongParameterList") // Optional speech hooks keep existing plain reader callers source-compatible.
 internal fun ReaderSelectablePlainText(
     text: String,
     onSelectableTextLayoutChanged: (Any, TextLayoutResult?, LayoutCoordinates?) -> Unit,
+    leafId: String? = null,
+    highlightResolver: TtsLeafHighlightResolver? = null,
+    highlightStyle: TtsReadAloudHighlightStyle? = null,
+    sentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
+    sentenceActions: TtsSentenceActions? = null,
 ) {
-    val key = remember(text) { Any() }
+    val key = remember(text, leafId) { leafId ?: Any() }
     var layoutResult by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
     var coordinates by remember(text) { mutableStateOf<LayoutCoordinates?>(null) }
+    val rendered = remember(text) { EmojiShortcodes.annotate(AnnotatedString(text)) }
+    val highlight = highlightResolver?.invoke(leafId.orEmpty(), rendered.text)
+    val actions = ttsSentenceAccessibilityActions(leafId.orEmpty(), rendered.text, sentenceActions)
 
     /** Publishes only after both text layout and window coordinates are available. */
     fun reportIfReady() {
         val layout = layoutResult ?: return
         val layoutCoordinates = coordinates ?: return
         onSelectableTextLayoutChanged(key, layout, layoutCoordinates)
+        leafId?.let { sentenceLayoutReporter?.invoke(it, rendered.text, layout, layoutCoordinates) }
     }
 
-    DisposableEffect(key, onSelectableTextLayoutChanged) {
-        onDispose { onSelectableTextLayoutChanged(key, null, null) }
+    DisposableEffect(key, onSelectableTextLayoutChanged, sentenceLayoutReporter) {
+        onDispose {
+            onSelectableTextLayoutChanged(key, null, null)
+            leafId?.let { sentenceLayoutReporter?.invoke(it, rendered.text, null, null) }
+        }
     }
+    LaunchedEffect(sentenceLayoutReporter) { reportIfReady() }
     Text(
-        text = remember(text) { EmojiShortcodes.annotate(AnnotatedString(text)) },
+        text = rendered,
         inlineContent = EmojiShortcodes.content(),
         style = MaterialTheme.typography.bodyLarge,
         modifier =
             Modifier
                 .fillMaxWidth()
+                .then(
+                    if (highlightStyle != null) {
+                        Modifier.ttsReadAloudHighlight(layoutResult, highlight, highlightStyle)
+                    } else {
+                        Modifier
+                    },
+                ).semantics { if (actions.isNotEmpty()) customActions = actions }
                 .onGloballyPositioned {
                     coordinates = it
                     reportIfReady()
