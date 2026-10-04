@@ -179,8 +179,11 @@ class ShareFileImporterTest {
                         files,
                         { _, _ -> ShareSourceMetadata("file", null, null) },
                         { uri, signal ->
-                            if (uri != stalled) ByteArrayInputStream(byteArrayOf(1)) else
+                            if (uri != stalled) {
+                                ByteArrayInputStream(byteArrayOf(1))
+                            } else {
                                 cancelledSource(mode, signal, closed)
+                            }
                         },
                         timeoutMs = 1_000,
                     )
@@ -211,7 +214,9 @@ class ShareFileImporterTest {
                 return -1
             }
 
-            override fun close() { closed.countDown() }
+            override fun close() {
+                closed.countDown()
+            }
         }
     }
 
@@ -220,39 +225,43 @@ class ShareFileImporterTest {
     @Test fun externalUserIdPrefixIsPreservedForTheGrantedRead() =
         runBlocking {
             val granted = Uri.parse("content://10@external/document")
-            val importer = ShareFileImporter(
-                files,
-                { uri, _ ->
-                    assertEquals(granted, uri)
-                    ShareSourceMetadata("file.txt", "text/plain", null)
-                },
-                { uri, _ ->
-                    assertEquals(granted, uri)
-                    ByteArrayInputStream(byteArrayOf(1))
-                },
-                isAppOwnedProvider = { uri ->
-                    assertEquals("external", uri.authority)
-                    false
-                },
-            )
-            assertTrue(importer.import(request(listOf(granted))).payload.importErrors.isEmpty())
+            val importer =
+                ShareFileImporter(
+                    files,
+                    { uri, _ ->
+                        assertEquals(granted, uri)
+                        ShareSourceMetadata("file.txt", "text/plain", null)
+                    },
+                    { uri, _ ->
+                        assertEquals(granted, uri)
+                        ByteArrayInputStream(byteArrayOf(1))
+                    },
+                    isAppOwnedProvider = { uri ->
+                        assertEquals("external", uri.authority)
+                        false
+                    },
+                )
+            val imported = importer.import(request(listOf(granted)))
+            assertTrue(imported.payload.importErrors.isEmpty())
         }
 
     @Test fun tinyShareUsesTheActualFreeSpaceAlongsideLargeRetainedDrafts() =
         runBlocking {
-            val retained = List(4) { index ->
-                val size = if (index < 3) PRIVATE_SHARE_MAX_BYTES else 1024L * 1024
-                val (uri, file) = files.newFile()
-                java.io.RandomAccessFile(file, "rw").use { it.setLength(size) }
-                files.finish(uri, "retained.png", "image/png", size)
-                uri
-            }
+            val retained =
+                List(4) { index ->
+                    val size = if (index < 3) PRIVATE_SHARE_MAX_BYTES else 1024L * 1024
+                    val (uri, file) = files.newFile()
+                    java.io.RandomAccessFile(file, "rw").use { it.setLength(size) }
+                    files.finish(uri, "retained.png", "image/png", size)
+                    uri
+                }
             files.leases.saveShelf("account", "existing", retained)
-            val importer = ShareFileImporter(
-                files,
-                { _, _ -> ShareSourceMetadata("tiny.txt", "text/plain", null) },
-                { _, _ -> ByteArrayInputStream(byteArrayOf(1)) },
-            )
+            val importer =
+                ShareFileImporter(
+                    files,
+                    { _, _ -> ShareSourceMetadata("tiny.txt", "text/plain", null) },
+                    { _, _ -> ByteArrayInputStream(byteArrayOf(1)) },
+                )
             val imported = importer.import(request(listOf(source)))
             assertTrue(imported.payload.importErrors.isEmpty())
             assertEquals(1L, files.metadata(imported.payload.streamUris.single())!!.getLong("size"))

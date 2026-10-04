@@ -130,7 +130,9 @@ class AccountWipeMemberMuteRetentionTest {
     fun successfulWipePurgesItsPrivateShareShelfAndPreservesAnotherAccount() =
         runBlocking {
             val state = appState()
-            val files = dev.ipf.whitenoise.android.share.PrivateShareFiles(context)
+            val files =
+                dev.ipf.whitenoise.android.share
+                    .PrivateShareFiles(context)
             val removed = stagedFile(files, localAccount(WIPED_ACCOUNT).accountIdHex)
             val retained = stagedFile(files, localAccount(SURVIVING_ACCOUNT).accountIdHex)
             try {
@@ -148,7 +150,9 @@ class AccountWipeMemberMuteRetentionTest {
         runBlocking {
             localCleanupCompleted = false
             val state = appState()
-            val files = dev.ipf.whitenoise.android.share.PrivateShareFiles(context)
+            val files =
+                dev.ipf.whitenoise.android.share
+                    .PrivateShareFiles(context)
             val uri = stagedFile(files, localAccount(WIPED_ACCOUNT).accountIdHex)
             try {
                 state.signOutAndWipeActiveAccount()
