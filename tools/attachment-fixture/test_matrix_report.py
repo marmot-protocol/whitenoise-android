@@ -1,8 +1,16 @@
 """Matrix contracts: samples own their ledger segment, shaped labels are true, and comparisons demand correctness."""
 
+import contextlib
 from copy import deepcopy
+import io
+import json
+from pathlib import Path
+import sys
+import tempfile
 import unittest
+from unittest import mock
 
+from matrix_compare import load_checked, main as compare_main
 from matrix_report import CIPHERTEXT_OVERHEAD, aggregate, attribute, check_matrix, compare, segment, stats
 from matrix_tables import comparison, tables
 
@@ -208,6 +216,47 @@ class MatrixTest(unittest.TestCase):
         changed["profiles"][0]["cells"][0]["requests"]["retries"] = 1
         self.assertFalse(compare(base, changed)["accepted"])
         self.assertTrue(compare(base, changed)["correctness_diffs"])
+
+    def test_a_cell_missing_from_either_side_is_a_correctness_difference(self):
+        """A candidate that measured only some of the baseline's profiles or sizes is incomplete, not unchanged."""
+        both = aggregate(raw(profile([(65536, 4)]), profile([(65536, 4)], name="wifi")))
+        only_unshaped = aggregate(raw(profile([(65536, 4)])))
+        verdict = compare(both, only_unshaped)
+        self.assertFalse(verdict["accepted"])
+        self.assertEqual([{"cell": ("wifi", 65536), "missing_from": "candidate"}], verdict["correctness_diffs"])
+        extra = compare(only_unshaped, both)
+        self.assertFalse(extra["accepted"])
+        self.assertEqual([{"cell": ("wifi", 65536), "missing_from": "baseline"}], extra["correctness_diffs"])
+        fewer_sizes = aggregate(raw(profile([(65536, 4)])))
+        more_sizes = aggregate(raw(profile([(65536, 4), (MIB, 2)])))
+        self.assertFalse(compare(more_sizes, fewer_sizes)["accepted"])
+        self.assertTrue(compare(more_sizes, more_sizes)["accepted"])
+
+    def test_the_comparison_command_rejects_a_run_that_fails_correctness(self):
+        """An extra HEAD inside a sample leaves every aggregate unchanged, so only the correctness check can see it."""
+        good = raw(profile([(65536, 2)]))
+        bad = deepcopy(good)
+        ledger = bad["profiles"][0]["ledger"]
+        marker = next(i for i, e in enumerate(ledger) if e["kind"] == "marker" and e["value"] == 2)
+        ledger.insert(marker, {"seq": 900, "request": None, "kind": "head", "value": 0, "fixture": "u", "at_ns": 1})
+        bad["profiles"][0]["boundary"] += 1
+        with tempfile.TemporaryDirectory() as folder:
+            paths = {}
+            for name, run in (("good", good), ("bad", bad)):
+                paths[name] = Path(folder) / f"{name}.json"
+                paths[name].write_text(json.dumps({"raw": run}))
+            runs, violations = load_checked([paths["good"]])
+            self.assertEqual(1, len(runs))
+            self.assertEqual([], violations)
+            _, violations = load_checked([paths["bad"]])
+            self.assertTrue(violations)
+            self.assertTrue(all(v.startswith("bad.json: ") for v in violations))
+            argv = ["matrix_compare.py", "--baseline", str(paths["good"]), "--candidate", str(paths["bad"])]
+            with mock.patch.object(sys, "argv", argv), contextlib.redirect_stdout(io.StringIO()) as out:
+                with self.assertRaises(SystemExit) as raised:
+                    compare_main()
+            self.assertEqual(2, raised.exception.code)
+            self.assertFalse(json.loads(out.getvalue())["accepted"])
 
     def test_report_tables_render_every_cell_and_the_comparison_verdicts(self):
         """The markdown tables carry one row per cell and a verdict per compared metric."""

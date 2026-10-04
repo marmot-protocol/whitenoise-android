@@ -240,10 +240,18 @@ def _check_recreated(name, profile, violations):
 
 
 def compare(baseline, candidate):
-    """Per-cell median change, flagged only when it exceeds both run spread and 10 percent, plus correctness equality."""
+    """Per-cell median change, flagged only when it exceeds both run spread and 10 percent, plus correctness equality.
+
+    The two matrices must cover the same profiles and sizes: a cell missing from either side is a correctness
+    difference, so a candidate cannot be accepted on the cells it happened to measure.
+    """
     result = {"cells": [], "correctness_diffs": []}
     base = {(p["name"], c["size"]): c for p in baseline["profiles"] for c in p["cells"]}
     cand = {(p["name"], c["size"]): c for p in candidate["profiles"] for c in p["cells"]}
+    # A cell present on only one side is incomplete evidence, never an unchanged cell.
+    for key in sorted(set(base) ^ set(cand)):
+        missing = "candidate" if key in base else "baseline"
+        result["correctness_diffs"].append({"cell": key, "missing_from": missing})
     for key in sorted(set(base) & set(cand)):
         before, after = base[key], cand[key]
         if before["requests"] != after["requests"] or before["bytes"] != after["bytes"] \
