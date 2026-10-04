@@ -6,22 +6,35 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
+import dev.ipf.marmotkit.ChatListAttachmentKindFfi
+import dev.ipf.marmotkit.ChatListDraftPreviewFfi
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.media.editor.MessageDraftGeneration
+import dev.ipf.whitenoise.android.ui.chats.ChatRow
+import dev.ipf.whitenoise.android.ui.chats.ChatRowPortFixtures
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -33,9 +46,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLooper
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36], qualifiers = "en")
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PendingSendDraftPresentationTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -231,6 +248,259 @@ class PendingSendDraftPresentationTest {
 
             assertEquals("same words", appState.draftFor(ACCOUNT_REF, GROUP_ID))
         }
+
+    /** The native Draft selection is deliberately held across parser and send settlement. */
+    @Test
+    fun nativeDraftCannotFlashDuringAcceptedSendLight() = acceptedSendNativeDraft(dark = false)
+
+    @Test
+    fun nativeDraftCannotFlashDuringAcceptedSendDark() = acceptedSendNativeDraft(dark = true)
+
+    private fun acceptedSendNativeDraft(dark: Boolean) =
+        runTest {
+            val fixture = nativeDraftFixture()
+            val state = fixture.state
+            val chats = fixture.chats
+            val staleNative = nativeDraft("sending now")
+            try {
+                val send = async { state.sendConversationText(fixture.conversation, "sending now") }
+                fixture.parserStarted.await()
+                chats.setChatListVisible(true)
+                renderNativeDraftRow(fixture, staleNative, dark)
+                assertSendPreview("preparing", dark, "Sending")
+                fixture.finishParse.complete(Unit)
+                fixture.publishStarted.await()
+                settleChatRowRecompute()
+                assertSendPreview("pending", dark, "sending now")
+                composeRule.runOnIdle { state.setDraft(TextFieldValue("sending now")) }
+                composeRule.onNodeWithText("Draft: sending now", useUnmergedTree = true).assertExists()
+                fixture.finishPublish.complete(Unit)
+                send.await()
+                settleChatRowRecompute()
+                composeRule.onNodeWithText("Draft: sending now", useUnmergedTree = true).assertExists()
+                assertEquals("sending now", state.draftFor(ACCOUNT_REF, GROUP_ID))
+                assertEquals(
+                    ChatListMessageDeliveryStateFfi.DELIVERED,
+                    chats.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.deliveryState,
+                )
+            } finally {
+                fixture.close()
+            }
+        }
+
+    private fun renderNativeDraftRow(
+        fixture: NativeDraftFixture,
+        staleNative: SelectedChatPreviewFfi,
+        dark: Boolean,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark) {
+                fixture.chats.items.singleOrNull()?.let { item ->
+                    ChatRow(
+                        item = item.copy(selectedPreview = staleNative),
+                        appState = fixture.state,
+                        onClick = {},
+                        onOpenProfile = {},
+                    )
+                }
+            }
+        }
+    }
+
+    private fun settleChatRowRecompute() {
+        ShadowLooper.idleMainLooper(32, TimeUnit.MILLISECONDS)
+        composeRule.waitForIdle()
+    }
+
+    private fun assertSendPreview(
+        stage: String,
+        dark: Boolean,
+        text: String,
+    ) {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        composeRule.onNodeWithText(text, useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.sending)).assertExists()
+        composeRule.onNodeWithText("Draft: sending now", useUnmergedTree = true).assertDoesNotExist()
+        val theme = if (dark) "dark" else "light"
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_row_send_${stage}_$theme.png")
+    }
+
+    private fun nativeDraftFixture(): NativeDraftFixture {
+        val state = appState()
+        state.setDraft(TextFieldValue("sending now"))
+        val row = requireNotNull(ChatRowPortFixtures.item().projection).copy(groupIdHex = GROUP_ID)
+        val chats =
+            ChatsController(
+                state,
+                initialAccountRef = ACCOUNT_REF,
+                memberSnapshotLoader = { _, _ -> emptyList() },
+            )
+        state.attachChatsController(chats)
+        chats.setChatListVisible(false)
+        chats.applyChatListRow(row)
+        val parserStarted = CompletableDeferred<Unit>()
+        val finishParse = CompletableDeferred<Unit>()
+        val publishStarted = CompletableDeferred<Unit>()
+        val finishPublish = CompletableDeferred<Unit>()
+        val conversation =
+            ConversationController(
+                appState = state,
+                initialGroup = group(),
+                initialMemberSnapshot = memberSnapshot(),
+                markdownParser = {
+                    parserStarted.complete(Unit)
+                    finishParse.await()
+                    EMPTY_MARKDOWN_DOCUMENT
+                },
+                textPublisher = { _, _, _, _ ->
+                    publishStarted.complete(Unit)
+                    finishPublish.await()
+                    SendSummaryFfi(
+                        1u,
+                        listOf(CONFIRMED_MESSAGE_ID),
+                        SendAcceptDispositionFfi.PUBLISHED,
+                        SendMaintenanceDispositionFfi.READY,
+                    )
+                },
+            )
+        return NativeDraftFixture(state, chats, conversation, parserStarted, finishParse, publishStarted, finishPublish)
+    }
+
+    private data class NativeDraftFixture(
+        val state: WhiteNoiseAppState,
+        val chats: ChatsController,
+        val conversation: ConversationController,
+        val parserStarted: CompletableDeferred<Unit>,
+        val finishParse: CompletableDeferred<Unit>,
+        val publishStarted: CompletableDeferred<Unit>,
+        val finishPublish: CompletableDeferred<Unit>,
+    ) {
+        fun close() {
+            finishParse.complete(Unit)
+            finishPublish.complete(Unit)
+            conversation.onCleared()
+            chats.onCleared()
+        }
+    }
+
+    @Test
+    fun clearingANewerDraftCannotReviveTheSentNativeDraftAndSignOutClearsTheFence() {
+        val presentation = SentComposerDraftPresentation()
+        val generation = MessageDraftGeneration(1L)
+        val next = MessageDraftGeneration(2L)
+        val token = DraftSendClearToken(ACCOUNT_REF, GROUP_ID, generation, null, null)
+        val native = nativeDraft("sent draft")
+        presentation.hide(token)
+        assertEquals(
+            SelectedChatPreviewFfi.Message,
+            presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, generation, null, native),
+        )
+        assertEquals(
+            SelectedChatPreviewFfi.Message,
+            presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, generation, null, SelectedChatPreviewFfi.Empty),
+        )
+        assertEquals(null, presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, next, "newer draft", native))
+        presentation.onDraftChanged(ACCOUNT_REF, GROUP_ID, next, "")
+        assertEquals(
+            SelectedChatPreviewFfi.Message,
+            presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, next, null, native),
+        )
+        assertEquals(native, presentation.selectedPreview("other-account", GROUP_ID, next, null, native))
+        presentation.removeAccount(ACCOUNT_REF)
+        assertEquals(native, presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, next, null, native))
+    }
+
+    @Test
+    fun aNewerAttachmentMutationPreservesItsNativeDraftWithoutLocalText() {
+        val presentation = SentComposerDraftPresentation()
+        presentation.hide(DraftSendClearToken(ACCOUNT_REF, GROUP_ID, MessageDraftGeneration(1L), null, null))
+        val attachmentDraft =
+            SelectedChatPreviewFfi.Draft(
+                ChatListDraftPreviewFfi("", true, 1uL, ChatListAttachmentKindFfi.PHOTO),
+            )
+        assertEquals(
+            attachmentDraft,
+            presentation.selectedPreview(ACCOUNT_REF, GROUP_ID, MessageDraftGeneration(2L), null, attachmentDraft),
+        )
+    }
+
+    @Test
+    fun nativeDraftFenceAndPendingPreviewSurviveChatControllerReplacement() =
+        runTest {
+            val fixture = nativeDraftFixture()
+            val replacement =
+                ChatsController(
+                    fixture.state,
+                    initialAccountRef = ACCOUNT_REF,
+                    memberSnapshotLoader = { _, _ -> emptyList() },
+                )
+            try {
+                val send = async { fixture.state.sendConversationText(fixture.conversation, "sending now") }
+                fixture.parserStarted.await()
+                fixture.state.replaceChatsController(fixture.chats, replacement)
+                replacement.setChatListVisible(true)
+                assertEquals(true, replacement.items.single().awaitingSendPreview)
+                assertEquals(
+                    SelectedChatPreviewFfi.Message,
+                    fixture.state.chatRowSelectedPreviewFor(
+                        ACCOUNT_REF,
+                        GROUP_ID,
+                        nativeDraft("sending now"),
+                    ),
+                )
+                fixture.finishParse.complete(Unit)
+                fixture.publishStarted.await()
+                // Controller debounce belongs to the Android main looper, separately from Compose frames.
+                settleChatRowRecompute()
+                assertEquals(
+                    "sending now",
+                    replacement.items
+                        .single()
+                        .projection
+                        ?.lastMessage
+                        ?.plaintext,
+                )
+                fixture.finishPublish.complete(Unit)
+                send.await()
+            } finally {
+                fixture.close()
+                replacement.onCleared()
+            }
+        }
+
+    @Test
+    fun definiteFailureRestoresNativeDraftButDurableCleanupKeepsItHidden() =
+        runTest {
+            val state = appState()
+            state.setDraft(TextFieldValue("try again"))
+            val native = nativeDraft("try again")
+            val failed =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    textPublisher = { _, _, _, _ -> throw MarmotKitException.Publish("relay rejected event") },
+                )
+            state.sendConversationText(failed, "try again")
+            assertEquals(native, state.chatRowSelectedPreviewFor(ACCOUNT_REF, GROUP_ID, native))
+            val started = CompletableDeferred<Unit>()
+            val finish = CompletableDeferred<Unit>().also { it.complete(Unit) }
+            val sent = controller(state, started, finish)
+            state.sendConversationText(sent, "try again")
+            assertEquals(SelectedChatPreviewFfi.Message, state.chatRowSelectedPreviewFor(ACCOUNT_REF, GROUP_ID, native))
+            assertEquals(native, state.chatRowSelectedPreviewFor("another-account", GROUP_ID, native))
+            failed.onCleared()
+            sent.onCleared()
+        }
+
+    private fun nativeDraft(text: String) =
+        SelectedChatPreviewFfi.Draft(
+            ChatListDraftPreviewFfi(text, false, 0uL, null),
+        )
 
     private fun controller(
         appState: WhiteNoiseAppState,

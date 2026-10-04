@@ -30,6 +30,11 @@ internal data class OptimisticChatListPreviewState(
             baselineActivitySequenceByLastMessage = LinkedHashMap(baselineActivitySequenceByLastMessage),
         )
 
+    /** A newer accepted send has a truthful pending state even while its Markdown document is unavailable. */
+    internal fun awaitingSendPreview(): Boolean =
+        (reservedActivitySequenceById.values.maxOrNull() ?: 0uL) >
+            maxOf(baselineActivitySequence, entries.values.maxOfOrNull { it.activitySequence } ?: 0uL)
+
     /** Returns true only after reservations, pending entries, failures, and confirmations are drained. */
     internal fun hasNoOptimisticPreviewWork(): Boolean =
         entries.isEmpty() &&
