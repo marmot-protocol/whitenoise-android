@@ -274,6 +274,18 @@
         "test_ids": ["CHL-017"]
       },
       {
+        "surface": "Pending edit admission failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_edit_message",
+        "test_ids": ["MSG-007"]
+      },
+      {
+        "surface": "Durable pending message edit admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DurablePendingEditIntent.kt",
+        "anchor": "fun MarmotInterface.admitPendingMessageEdit(",
+        "test_ids": ["MSG-007"]
+      },
+      {
         "surface": "Composer cursor updates during dictation Send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
         "anchor": "fun setDraft(",
