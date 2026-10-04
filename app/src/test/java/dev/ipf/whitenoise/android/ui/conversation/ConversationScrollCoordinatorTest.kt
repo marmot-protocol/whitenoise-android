@@ -1801,11 +1801,14 @@ class ConversationScrollCoordinatorTest {
         // bytecode verifier accepts.
         val screen = sourceFile("ConversationScreen.kt").readText()
         val effects = sourceFile("ConversationForegroundRestoreEffects.kt").readText()
+        val owner = sourceFile("ConversationViewportRestorationOwner.kt").readText()
         val presentation = sourceFile("ConversationForegroundPresentation.kt").readText()
 
         assertTrue(effects.contains("scrollCoordinator.beginForegroundRestore("))
         assertTrue(effects.contains("scrollCoordinator.completeForegroundRestore("))
-        assertTrue(screen.contains("scrollCoordinator.foregroundRestoreInProgress"))
+        assertTrue(screen.contains("ConversationViewportRestorationEffects("))
+        assertTrue(screen.contains("ConversationViewportStructureEffect("))
+        assertTrue(owner.contains("coordinator.foregroundRestoreInProgress"))
         assertTrue(effects.contains("ConversationForegroundDrawGateEffect"))
         assertTrue(effects.contains("foregroundPreDrawSignals"))
         assertTrue(effects.contains("awaitConversationForegroundPresentation("))

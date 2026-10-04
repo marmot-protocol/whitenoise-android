@@ -3,6 +3,36 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "ConversationViewportRestorationEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationViewportRestorationEffects(",
+        "test_ids": ["CON-027", "CON-002", "CON-013", "CON-014"]
+      },
+      {
+        "surface": "ConversationViewportStructureEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationViewportStructureEffect(",
+        "test_ids": ["CON-027", "CON-003"]
+      },
+      {
+        "surface": "ConversationSavedViewportEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationSavedViewportEffect(",
+        "test_ids": ["CON-027"]
+      },
+      {
+        "surface": "ConversationEntryViewportEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
+        "anchor": "fun ConversationEntryViewportEffect(",
+        "test_ids": ["CON-027", "CON-002"]
+      },
+      {
+        "surface": "rememberConversationViewportRestorationOwner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationOwner.kt",
+        "anchor": "fun rememberConversationViewportRestorationOwner(",
+        "test_ids": ["CON-027"]
+      },
+      {
         "surface": "folderDragRowModifier",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt",
         "anchor": "internal fun folderDragRowModifier(",
