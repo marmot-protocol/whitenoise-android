@@ -59,8 +59,8 @@ internal class GroupAttachmentPager(
     suspend fun refresh() =
         operation {
             val previous = baseline
-            if (previous == null) {
-                readNext()
+            if (previous == null || !state.initialized) {
+                restoreRange()
             } else {
                 retryProbe = true
                 val change = reader.version().use { it.changeSince(previous) }
@@ -74,7 +74,7 @@ internal class GroupAttachmentPager(
                             null
                         }
                     restoreCount = state.entries.size
-                    clearCollection()
+                    clearCollection(keepBaseline = change == AttachmentHistoryChangeFfi.ADDITIONS)
                     restoreRange()
                 }
             }
@@ -121,13 +121,13 @@ internal class GroupAttachmentPager(
                     val destructive =
                         previous != null &&
                             page.version.changeSince(previous) == AttachmentHistoryChangeFfi.RESTART_REQUIRED
-                    if (destructive) {
+                    if (destructive && state.initialized) {
                         restart(restartAllowed)
                     } else {
                         check(page.hasMore == (page.nextCursor != null)) { "Invalid attachment page continuation" }
                         cursor?.close()
                         cursor = page.nextCursor
-                        if (previous == null) baseline = page.version
+                        adoptHeadVersion(page.version, destructive)
                         adopted = true
                         state =
                             state.copy(
@@ -148,6 +148,17 @@ internal class GroupAttachmentPager(
             }
             AttachmentPageReadFfi.InvalidLimit -> throw IOException("Attachment page limit rejected")
         }
+    }
+
+    /** Replaces the head witness and stops searching for a tail deleted before the head arrived. */
+    private fun adoptHeadVersion(
+        version: AttachmentHistoryVersion,
+        destructive: Boolean,
+    ) {
+        if (state.initialized) return
+        if (destructive) restoreThrough = null
+        baseline?.close()
+        baseline = version
     }
 
     /** Bounds automatic retries when another destructive change races the replacement page. */
@@ -187,12 +198,14 @@ internal class GroupAttachmentPager(
         if (closed || !isCurrent()) throw CancellationException("Attachment library owner ended")
     }
 
-    /** Drops the entire obsolete generation before any replacement read can suspend. */
-    private fun clearCollection() {
+    /** Drops rows/cursor, optionally retaining a version witness until the replacement head arrives. */
+    private fun clearCollection(keepBaseline: Boolean = false) {
         cursor?.close()
-        baseline?.close()
         cursor = null
-        baseline = null
+        if (!keepBaseline) {
+            baseline?.close()
+            baseline = null
+        }
         state = GroupAttachmentState()
     }
 

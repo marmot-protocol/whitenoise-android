@@ -131,6 +131,42 @@ class GroupAttachmentPagingReducerTest {
             pager.close()
         }
 
+    /** A tail removed after an additions probe restores a bounded range, including after a failed head read. */
+    @Test
+    fun deletionBetweenAdditionsProbeAndHeadReadKeepsRestorationBounded() =
+        runTest {
+            for (retry in listOf("none", "loadMore", "refresh")) {
+                val source = GroupAttachmentFixture((300 downTo 0).map { historyEntry(it) })
+                val pager = GroupAttachmentPager(source)
+                pager.refresh()
+                pager.loadMore()
+                val oldTail = pager.state.entries.last()
+                source.rows = listOf(historyEntry(999)) + source.rows
+                source.additions++
+                source.beforePage = {
+                    source.beforePage = {}
+                    source.rows = source.rows.filterNot { it == oldTail }
+                    source.removals++
+                    source.failNext = retry != "none"
+                }
+                pager.refresh()
+                if (retry != "none") {
+                    assertTrue(pager.state.failed)
+                    if (retry == "loadMore") pager.loadMore() else pager.refresh()
+                }
+                assertEquals(26, pager.state.entries.size)
+                assertEquals(source.rows.take(26), pager.state.entries)
+                assertTrue(pager.state.hasMore)
+                assertEquals(if (retry != "none") 5 else 4, source.calls)
+                val calls = source.calls
+                pager.refresh()
+                assertEquals(calls, source.calls)
+                pager.close()
+                assertTrue(source.cursors.all { it.closes == 1 })
+                assertTrue(source.versions.all { it.closes == 1 })
+            }
+        }
+
     /** A deletion racing continuation must replace, rather than append to, the obsolete collection. */
     @Test
     fun typedStaleCursorRestartsAtHead() =
