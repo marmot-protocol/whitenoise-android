@@ -92,7 +92,13 @@ private fun animatedWebpChunkIsValid(
         FOURCC_ANIM -> !animationSeen && budget.frames == 0 && chunks.payloadSize == ANIM_PAYLOAD_BYTES
         FOURCC_ANMF ->
             animationSeen &&
-                webpFrameIsValid(bytes, chunks.payloadOffset, chunks.payloadSize, budget.canvasWidth, budget.canvasHeight)
+                webpFrameIsValid(
+                    bytes,
+                    chunks.payloadOffset,
+                    chunks.payloadSize,
+                    budget.canvasWidth,
+                    budget.canvasHeight,
+                )
         else -> !isWebpStructureChunk(chunks.fourCc)
     }
 
