@@ -8,8 +8,9 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
-from fixture_server import Control, FixtureServer, Ledger
+from fixture_server import Control, FixtureServer, Handler, Ledger
 
 
 class FixtureContractTest(unittest.TestCase):
@@ -286,6 +287,34 @@ class FixtureContractTest(unittest.TestCase):
         self.assertNotIn("127.0.0.1", serialized)
         self.assertEqual(len(original), sum(e["value"] for e in events if e["kind"] == "upload_bytes"))
         self.assertEqual(len(original), sum(e["value"] for e in events if e["kind"] == "body_bytes"))
+
+    def test_an_idle_pooled_connection_survives_past_the_request_timeout_and_the_next_upload_lands(self):
+        """A client that reuses a connection after a gap longer than the request timeout must not be cut off."""
+        client = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=10)
+        try:
+            for index in range(2):
+                client.request("PUT", "/upload", body=bytes([index]) * 64)
+                response = client.getresponse()
+                response.read()
+                self.assertEqual(200, response.status)
+                if index == 0:
+                    time.sleep(Handler.request_timeout + 0.5)
+        finally:
+            client.close()
+        self.assertEqual(2, sum(e["kind"] == "upload_complete" for e in self.server.ledger.snapshot()))
+
+    def test_a_stalled_request_is_still_bounded_by_the_request_timeout(self):
+        """Only the idle wait is long: once a request line arrives, a peer that stops sending is dropped promptly."""
+        with mock.patch.object(Handler, "request_timeout", 0.3):
+            stalled = socket.create_connection(("127.0.0.1", self.server.server_port), timeout=5)
+            try:
+                stalled.sendall(b"PUT /upload HTTP/1.1\r\nHost: x\r\nContent-Length: 100\r\n\r\nabc")
+                started = time.monotonic()
+                self.assertEqual(b"", stalled.recv(1))
+                self.assertLess(time.monotonic() - started, 3)
+            finally:
+                stalled.close()
+        self.await_event("upload_disconnect")
 
     def test_rejects_path_escape_and_oversize_upload(self):
         """Fixture paths cannot escape the private run root and upload admission is bounded."""

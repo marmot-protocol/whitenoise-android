@@ -156,13 +156,30 @@ class Handler(BaseHTTPRequestHandler):
 
     protocol_version = "HTTP/1.1"
 
+    # Reads and writes inside one request stay bounded so a dead peer cannot hold a handler.
+    request_timeout = 5
+    # A keep-alive connection that is merely idle between requests is not dead. A pooled client sends its next
+    # request whenever it is ready, so this must outlast any client's own idle limit (90 s by default for the common
+    # HTTP stacks): a server that closes first drops an upload whose body has already started and is never replayed.
+    idle_timeout = 300
+
     def log_message(self, *_):
         """Suppress HTTP access logs, which otherwise contain private ciphertext locators."""
 
     def setup(self):
-        """Bound dead sockets; disable output buffering so ledger writes follow socket writes."""
+        """Bound dead sockets; the wait for a request line is bounded separately from the request itself."""
         super().setup()
-        self.connection.settimeout(5)
+        self.connection.settimeout(self.idle_timeout)
+
+    def handle_one_request(self):
+        """Wait out a pooled connection's idle gap with the long idle bound before reading the next request."""
+        self.connection.settimeout(self.idle_timeout)
+        super().handle_one_request()
+
+    def parse_request(self):
+        """Once a request line has arrived, bound every further read and write by the request timeout."""
+        self.connection.settimeout(self.request_timeout)
+        return super().parse_request()
 
     def reply(self, status, value):
         """Return a bounded JSON control response without retaining request contents."""
