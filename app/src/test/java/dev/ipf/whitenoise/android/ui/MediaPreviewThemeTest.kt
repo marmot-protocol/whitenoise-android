@@ -16,7 +16,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -50,6 +50,7 @@ import java.io.ByteArrayOutputStream
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
 class MediaPreviewThemeTest {
+    // Queue decode completions on the test scheduler so IO cannot re-enter an active layout pass.
     @get:Rule val rule = createComposeRule()
     private val app: Application = ApplicationProvider.getApplicationContext()
     private var surfaceColor = Color.Unspecified
