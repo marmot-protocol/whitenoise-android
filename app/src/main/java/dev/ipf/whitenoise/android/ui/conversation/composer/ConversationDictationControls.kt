@@ -425,7 +425,12 @@ private fun dictationStatusLabel(
         is ConversationDictationState.Idle -> ""
     }
 
-/** Maps terminal recognition failures to actionable, localized status text. */
+/**
+ * Maps terminal recognition failures to actionable, localized status text.
+ *
+ * NoSpeech and NoMatch share "No speech was recognized"; the label does not claim the PCM was silent.
+ * Their internal distinction controls retry policy and diagnostics without changing recovery copy.
+ */
 @Composable
 @Suppress("CyclomaticComplexMethod") // Exhaustive enum-to-resource mapping is intentionally flat.
 private fun dictationFailureLabel(reason: ConversationDictationFailure): String =
@@ -438,7 +443,9 @@ private fun dictationFailureLabel(reason: ConversationDictationFailure): String 
             ConversationDictationFailure.MicrophoneMuted -> R.string.dictation_microphone_muted
             ConversationDictationFailure.MicrophoneInUse -> R.string.dictation_microphone_in_use
             ConversationDictationFailure.AudioFocusUnavailable -> R.string.dictation_audio_focus_unavailable
-            ConversationDictationFailure.NoSpeech -> R.string.dictation_no_speech
+            ConversationDictationFailure.NoSpeech,
+            ConversationDictationFailure.NoMatch,
+            -> R.string.dictation_no_speech
             ConversationDictationFailure.Network -> R.string.dictation_network_error
             ConversationDictationFailure.ProviderDisconnected -> R.string.dictation_provider_unavailable
             ConversationDictationFailure.RecognizerBusy -> R.string.dictation_recognizer_busy

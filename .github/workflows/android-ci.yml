@@ -68,6 +68,14 @@ jobs:
         if: matrix.phase == 'tooling'
         run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_check_viewport_restoration_coverage.py
 
+      # This must run outside the path-filtered fuzz workflow: missing a parser
+      # trigger would otherwise also skip the check intended to catch it.
+      - name: Validate fuzz PR production triggers
+        if: matrix.phase == 'tooling'
+        run: |
+          python3 scripts/check_fuzz_pr_triggers.py
+          python3 -m unittest scripts/test_check_fuzz_pr_triggers.py
+
       - name: Test attachment fixture HTTP ledger and cancellation contracts
         if: matrix.phase == 'tooling'
         run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'

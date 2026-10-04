@@ -96,6 +96,14 @@ internal class ConversationDictationAudioChunkBuffer(
             queued.pollFirst()?.also { chunk -> inFlight[chunk.chunkId] = chunk }
         }
 
+    /** A final chunk is proven only after capture seals and no later PCM can extend its input. */
+    @Synchronized
+    fun isFinalChunk(chunkId: Long): Boolean =
+        when {
+            !finished || currentSize != 0 || queued.isNotEmpty() -> false
+            else -> inFlight.size == 1 && inFlight.containsKey(chunkId)
+        }
+
     /** Releases one successfully transcribed chunk exactly once. */
     @Synchronized
     fun acknowledge(chunkId: Long): Boolean {
