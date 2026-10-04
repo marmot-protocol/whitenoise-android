@@ -90,7 +90,8 @@ class ShareFileImporterTest {
                     { _, _ -> ByteArrayInputStream(byteArrayOf(1)) },
                 )
             val imported = importer.import(request(List(4) { Uri.parse("content://external/$it") }))
-            val (first, second, shared, queued) = imported.payload.streamUris
+            val (first, second, shared) = imported.payload.streamUris
+            val queued = imported.payload.streamUris.last()
             files.leases.saveShelf("first-account", "chat", listOf(first, shared))
             files.leases.saveShelf("second-account", "chat", listOf(second, shared))
             files.leases.holdSend("queued", listOf(queued), "first-account")
@@ -287,6 +288,29 @@ class ShareFileImporterTest {
             assertTrue(imported.payload.importErrors.isEmpty())
             assertEquals(1L, files.metadata(imported.payload.streamUris.single())!!.getLong("size"))
             assertEquals(retained, files.leases.loadShelf("account", "existing"))
+        }
+
+    @Test fun fullRetainedShelfRejectsNewIntakeWithoutOpeningTheSource() =
+        runBlocking {
+            val retained =
+                List(4) {
+                    val (uri, file) = files.newFile()
+                    java.io.RandomAccessFile(file, "rw").use { it.setLength(PRIVATE_SHARE_MAX_BYTES) }
+                    files.finish(uri, "retained.png", "image/png", PRIVATE_SHARE_MAX_BYTES)
+                    uri
+                }
+            files.leases.saveShelf("account", "existing", retained)
+            val importer =
+                ShareFileImporter(
+                    files,
+                    { _, _ -> error("Full storage must reject before metadata access") },
+                    { _, _ -> error("Full storage must reject before opening the source") },
+                )
+            val imported = importer.import(request(listOf(source)))
+            assertEquals(listOf(ShareImportError.Storage), imported.payload.importErrors)
+            assertTrue(imported.payload.streamUris.isEmpty())
+            assertEquals(retained, files.leases.loadShelf("account", "existing"))
+            retained.forEach { assertEquals(PRIVATE_SHARE_MAX_BYTES, files.metadata(it)!!.getLong("size")) }
         }
 
     @Test fun oversizedStreamingInputReadsAtMostBudgetPlusOneAndDeletesPartial() =

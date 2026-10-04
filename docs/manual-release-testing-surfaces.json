@@ -508,6 +508,12 @@
         "test_ids": ["MSG-022", "MSG-023", "MSG-024"]
       },
       {
+        "surface": "Private share send lease storage failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": ["SYS-005"]
+      },
+      {
         "surface": "Empty document send feedback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
         "anchor": "R.string.media_file_empty",
