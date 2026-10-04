@@ -43,13 +43,18 @@ internal class ForwardDiagnostics private constructor(
         result: PerformanceResult,
     ) = phase(PerformancePhase.FORWARD_SOURCE_REFERENCE_RESOLVED, result, PerformanceLayer.MDK, since(startedAtMs))
 
-    /** Records the local cache probe for one source attachment, SUCCESS when the bytes were already local. */
+    /**
+     * Records the local probe for one source attachment: SUCCESS when a local layer held the bytes, attributed to
+     * storage for the Android caches or to mdk when MarmotKit's retained copy served them.
+     */
     fun sourceLookup(
         hit: Boolean,
         startedAtMs: Long,
+        native: Boolean = false,
     ) {
         val result = if (hit) PerformanceResult.SUCCESS else PerformanceResult.PENDING
-        phase(PerformancePhase.FORWARD_SOURCE_LOOKUP, result, PerformanceLayer.STORAGE, since(startedAtMs))
+        val layer = if (native) PerformanceLayer.MDK else PerformanceLayer.STORAGE
+        phase(PerformancePhase.FORWARD_SOURCE_LOOKUP, result, layer, since(startedAtMs))
     }
 
     /** Marks the start of the native source download so a missing return identifies a stalled source. */

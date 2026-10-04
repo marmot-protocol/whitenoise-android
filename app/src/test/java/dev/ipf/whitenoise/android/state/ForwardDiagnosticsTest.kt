@@ -97,6 +97,20 @@ class ForwardDiagnosticsTest {
             assertTrue(events.all { it.count == null })
         }
 
+    /** A source served from MarmotKit's retained copy is a hit attributed to the engine, not to Android storage. */
+    @Test
+    fun retainedSourceHitIsAttributedToTheEngineLayer() {
+        val diagnostics = diagnostics()
+        val lookupStart = diagnostics.startSpan()
+        now += 6
+        diagnostics.sourceLookup(hit = true, startedAtMs = lookupStart, native = true)
+
+        assertEquals(PerformancePhase.FORWARD_SOURCE_LOOKUP, events.single().phase)
+        assertEquals(PerformanceResult.SUCCESS, events.single().result)
+        assertEquals(PerformanceLayer.MDK, events.single().layer)
+        assertEquals(6L, events.single().durationMs)
+    }
+
     /** A cache miss opens the native download pair, and a failed download closes it as failure. */
     @Test
     fun uncachedForwardRecordsMissAndDownloadOutcomeShapeOnly() =

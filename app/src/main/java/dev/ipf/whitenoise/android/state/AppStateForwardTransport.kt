@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.media.toByteArray
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -286,20 +287,27 @@ internal fun WhiteNoiseAppState.forwardTransport(
 }
 
 /**
- * Downloads one attachment's plaintext for forwarding without joining the
+ * Materializes one attachment's plaintext for forwarding without joining the
  * shared memoized download pool and without writing any cache. An unrelated
  * active-account switch cancels and clears that shared pool for UI hygiene;
  * a forwarding operation binds its accounts explicitly and must survive such
- * invalidation, so it reads the existing caches opportunistically and
- * otherwise downloads within its own session scope. The forwarding session
+ * invalidation, so it reads the existing local layers opportunistically and
+ * otherwise downloads within its own session scope. The local layers are the
+ * Android memory and disk caches and then MarmotKit's own retained copy of the
+ * attachment, the canonical local store that holds every received attachment
+ * the user has already opened and every own send, so an attachment the device
+ * already holds never crosses the network again. The forwarding session
  * retains and later zeroes its own private copy of the bytes, so skipping
  * cache writes leaks nothing and keeps switch-time cache policy intact.
- * [diagnostics] records the cache probe and the native download span only.
+ * [diagnostics] records the local probe and the native download span only, and
+ * [readRetained] is the retained read, injectable so JVM tests can stand in for
+ * the native asset.
  */
 internal suspend fun WhiteNoiseAppState.materializeAttachmentPlaintextIsolated(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,
     diagnostics: ForwardDiagnostics? = null,
+    readRetained: suspend (AttachmentTransferRequest) -> ByteArray? = { retainedForwardPlaintext(it) },
 ): ByteArray {
     val cacheKey =
         mediaCacheKey(
@@ -312,10 +320,23 @@ internal suspend fun WhiteNoiseAppState.materializeAttachmentPlaintextIsolated(
     val cached =
         withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
             ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
-    if (lookupStartedAtMs != null) diagnostics?.sourceLookup(hit = cached != null, startedAtMs = lookupStartedAtMs)
+    // A retained read that fails for any reason only means the network path is used, as before.
+    val retained = if (cached == null) runCatchingCancellable { readRetained(request) }.getOrNull() else null
+    if (lookupStartedAtMs != null) {
+        diagnostics?.sourceLookup(
+            hit = cached != null || retained != null,
+            startedAtMs = lookupStartedAtMs,
+            native = retained != null,
+        )
+    }
     return cached
+        ?: retained
         ?: diagnostics
             .span(ForwardDiagnostics::sourceDownloadStart, ForwardDiagnostics::sourceDownloadReturn) {
                 marmotIo { downloadMedia(request.accountRef, request.groupIdHex, reference) }
             }.plaintext
 }
+
+/** Copies MarmotKit's verified retained plaintext for one attachment into a private buffer, or null when absent. */
+private suspend fun WhiteNoiseAppState.retainedForwardPlaintext(request: AttachmentTransferRequest): ByteArray? =
+    openNativeAttachment(request)?.use { it.toByteArray() }

@@ -188,9 +188,9 @@ materialization, destination upload, commit-lock wait, publication, terminal), t
 author's genuine receipt and exact read of the forwarded copy. A numbered ledger marker brackets every sample.
 `forward_checker.py` requires every phase to be timed, exactly one completed message and one attachment per forward with
 no retry or convergence, the memory, host-disk and native layers in the state the variant declares, a source download
-exactly where that contract says the source is fetched, exactly one receipt per forwarded copy, one distinct destination
-message per send, and the issue's per-forward ceilings (15 s for a retained or cached source, 30 s uncached) as loopback
-regression guards. It reports each variant's slowest forward against the direct-send median and the issue's two-times
+only for the uncached source (a retained or host-cached source is served locally and never crosses the network again),
+exactly one receipt per forwarded copy, one distinct destination message per send, and the issue's per-forward ceilings
+(15 s for a retained or cached source, 30 s uncached) as loopback regression guards. It reports each variant's slowest forward against the direct-send median and the issue's two-times
 relation, but does not fail on that relation, because loopback fixed costs dominate both numbers. It records
 `physical_device_qualified: false`; the physical cached and uncached matrices on known-responsive infrastructure remain
 separate.

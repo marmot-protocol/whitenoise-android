@@ -104,8 +104,9 @@ queue, MLS, storage, transport, or acknowledgement phases.
 
 `op=message_forward` follows one forwarding operation from acceptance to its
 terminal state. For each source attachment it emits `forward_source_lookup`
-(`result=success` when the plaintext was already in the Android memory or disk
-cache, `pending` on a miss), the `forward_source_download_start`/`_return` pair
+(`result=success layer=storage` when the plaintext was already in the Android
+memory or disk cache, `result=success layer=mdk` when MarmotKit's retained copy
+served it, `pending` on a miss), the `forward_source_download_start`/`_return` pair
 around the native source download, and `forward_source_ready` for the whole
 materialization; `forward_source_reference_resolved` appears only when an
 optimistic reference had to be resolved through native history. Each destination

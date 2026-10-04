@@ -81,6 +81,9 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("diskMediaCache.get(cacheKey)" in isolated)
         assertFalse("cacheMediaPlaintext(" in isolated)
         assertFalse("diskMediaCache.put" in isolated)
+        // MarmotKit's retained copy is read before the network, and only after both Android caches miss.
+        assertTrue("runCatchingCancellable { readRetained(request) }" in isolated)
+        assertTrue("openNativeAttachment(request)?.use { it.toByteArray() }" in transportFile)
         assertTrue("downloadMedia(request.accountRef, request.groupIdHex, reference)" in isolated)
     }
 
@@ -136,7 +139,9 @@ class ForwardProductionBoundaryCoverageTest {
         assertTrue("diagnostics?.commitLockAcquired(lockRequestedAtMs)" in body)
         assertTrue("ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn" in body)
         assertTrue("ForwardDiagnostics::convergenceStart, ForwardDiagnostics::convergenceReturn" in body)
-        assertTrue("diagnostics?.sourceLookup(hit = cached != null" in isolated)
+        assertTrue("diagnostics?.sourceLookup(" in isolated)
+        assertTrue("hit = cached != null || retained != null" in isolated)
+        assertTrue("native = retained != null" in isolated)
         assertTrue("ForwardDiagnostics::sourceDownloadStart, ForwardDiagnostics::sourceDownloadReturn" in isolated)
         // The diagnostics owner has no String, identifier or byte inputs to serialize.
         listOf("String", "groupIdHex", "messageIdHex", "accountRef", "fileName", "ByteArray", "Throwable.message")

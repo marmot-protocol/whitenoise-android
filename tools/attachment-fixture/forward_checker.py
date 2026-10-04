@@ -14,10 +14,11 @@ MARKERS = {"direct": 0, "uncached": 10, "retained": 20, "cached": 30}
 SETUP_STAGES = ("retained",)
 FINAL_MARKER = 40
 # What each variant's source phase must look like: which local layers hold the bytes before the forward, whether the
-# forward's own cache lookup hits, and whether the forward downloads the source again over HTTP.
+# forward's own local lookup hits (the Android caches or MarmotKit's retained copy), and whether the forward downloads
+# the source again over HTTP. Only a source no local layer holds may be downloaded.
 SOURCE = {
     "uncached": {"memory": False, "host_disk": False, "native": False, "lookup_hit": False, "download": True},
-    "retained": {"memory": False, "host_disk": False, "native": True, "lookup_hit": False, "download": True},
+    "retained": {"memory": False, "host_disk": False, "native": True, "lookup_hit": True, "download": False},
     "cached": {"memory": False, "host_disk": True, "native": True, "lookup_hit": True, "download": False},
 }
 # The issue's per-forward ceilings, applied on the loopback fixture as regression guards rather than device budgets.
