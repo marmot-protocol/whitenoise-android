@@ -25,8 +25,19 @@ import org.junit.jupiter.api.Tag
 class ImageContainerBytesFuzzTest {
     /** Lets uncaught parser failures reach Jazzer while asserting successful-output invariants. */
     @DictionaryEntries(
-        "hex:", "RIFF", "WEBP", "GIF87a", "GIF89a", "IEND", "EXIF", "XMP ",
-        "VP8X", "ANIM", "ANMF", "ALPH", "VP8L",
+        "hex:",
+        "RIFF",
+        "WEBP",
+        "GIF87a",
+        "GIF89a",
+        "IEND",
+        "EXIF",
+        "XMP ",
+        "VP8X",
+        "ANIM",
+        "ANMF",
+        "ALPH",
+        "VP8L",
     )
     @DictionaryFile(resourcePath = "/fuzz-grammar.dict")
     @FuzzTest
