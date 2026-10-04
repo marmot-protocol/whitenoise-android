@@ -8695,15 +8695,7 @@ class ConversationController(
         target: String?,
         canQueue: () -> Boolean,
     ): ComposerMediaSendContext? {
-        val result =
-            runCatchingCancellable {
-                if (mediaUploader == null || target != null) {
-                    appState.captureMediaReplyDraft(account, group.groupIdHex, attachments, target)
-                } else {
-                    null
-                }
-            }
-        val currentOwner =
+        val currentOwner = {
             canQueue() &&
                 canSendMessages &&
                 shouldAcceptMediaUploadForAccount(
@@ -8712,7 +8704,17 @@ class ConversationController(
                     appState.activeAccountRef,
                     appState.mediaUploadSessionEpoch(),
                 )
-        return if (!currentOwner) {
+        }
+        if (!currentOwner()) return null
+        val result =
+            runCatchingCancellable {
+                if (mediaUploader == null || target != null) {
+                    appState.captureMediaReplyDraft(account, group.groupIdHex, attachments, target)
+                } else {
+                    null
+                }
+            }
+        return if (!currentOwner()) {
             null
         } else {
             result.fold(

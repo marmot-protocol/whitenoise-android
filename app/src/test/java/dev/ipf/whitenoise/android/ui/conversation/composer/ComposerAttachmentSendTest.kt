@@ -37,6 +37,7 @@ class ComposerAttachmentSendTest {
         var result: ((Boolean) -> Unit)? = null
         val sent = mutableListOf<String>()
         var plainSends = 0
+        val draftWrites = mutableListOf<String>()
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface(Modifier.width(360.dp)) {
@@ -46,6 +47,7 @@ class ComposerAttachmentSendTest {
                         onCancelReply = {},
                         onSend = { _, _ -> plainSends++ },
                         initialDraft = TextFieldValue("Caption"),
+                        onDraftChange = { draftWrites += it.text },
                         hasPendingAttachments = true,
                         onSendAttachments = { text, callback ->
                             sent += text
@@ -66,6 +68,32 @@ class ComposerAttachmentSendTest {
         composeRule.runOnIdle { result!!(true) }
         composeRule.onNodeWithText("Next message").assertExists()
         assertEquals(0, plainSends)
+        assertEquals(listOf("Next message"), draftWrites)
+    }
+
+    /** Acceptance clears UI text without scheduling an empty native draft write during the upload. */
+    @Test
+    fun acceptedMediaClearsComposerWithoutPersistingEmptyText() {
+        var result: ((Boolean) -> Unit)? = null
+        val draftWrites = mutableListOf<String>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ComposerBar(
+                    replyingTo = null,
+                    messageTextCopy = MessageTextCopy.Default,
+                    onCancelReply = {},
+                    onSend = { _, _ -> error("Media must use attachment admission") },
+                    initialDraft = TextFieldValue("Caption"),
+                    hasPendingAttachments = true,
+                    onDraftChange = { draftWrites += it.text },
+                    onSendAttachments = { _, callback -> result = callback },
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
+        composeRule.runOnIdle { result!!(true) }
+        composeRule.onNodeWithText("Caption").assertDoesNotExist()
+        assertEquals(emptyList<String>(), draftWrites)
     }
 
     /** Attachment without caption uses media send path. */

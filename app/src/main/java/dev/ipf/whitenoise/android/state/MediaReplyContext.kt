@@ -44,6 +44,8 @@ internal suspend fun WhiteNoiseAppState.captureMediaReplyDraft(
     marmotIo {
         val selected = selectedDraftOrNull(account, group)
         val draft = selected?.draft
+        // Plain media must tolerate the composer's coalesced text writes during upload.
+        if (target == null && draft?.replyToMessageIdHex == null) return@marmotIo null
         val descriptorsMatch =
             draft != null &&
                 draft.mediaAttachments.size == attachments.size &&
@@ -61,7 +63,8 @@ internal suspend fun WhiteNoiseAppState.captureMediaReplyDraft(
             val revision =
                 saveDraftForSend(account, selected, draft.content, target)
                     ?: throw MediaReplyDraftUnavailableException()
-            SelectedMessageDraftFfi(revision, draft.copy(replyToMessageIdHex = target))
+            // Clearing a cancelled native reply does not lease a plain send's future draft content.
+            SelectedMessageDraftFfi(revision, draft.copy(replyToMessageIdHex = target)).takeIf { target != null }
         }
     }
 

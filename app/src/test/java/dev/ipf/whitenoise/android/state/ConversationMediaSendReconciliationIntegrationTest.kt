@@ -729,7 +729,15 @@ class ConversationMediaReplyAdmissionIntegrationTest {
     }
 
     @Test
-    fun selectingReplyImmediatelyBindsTargetBeforeAcceptance() = assertReplyAdmission(ReplyDraftMovement.SELECT_REPLY)
+    fun selectingReplyImmediatelyBindsTargetBeforeAcceptance() {
+        assertReplyAdmission(ReplyDraftMovement.SELECT_REPLY)
+    }
+
+    @Test
+    fun plainSendToleratesDraftTextWrittenDuringUpload() = assertReplyAdmission(ReplyDraftMovement.PLAIN_TEXT)
+
+    @Test
+    fun plainSendToleratesDraftContentClearedDuringUpload() = assertReplyAdmission(ReplyDraftMovement.PLAIN_CLEAR)
 
     @Test
     fun mixedDescriptorOrderMismatchIsRejectedBeforeAcceptance() = assertReplyAdmission(ReplyDraftMovement.ORDER)
@@ -763,7 +771,7 @@ class ConversationMediaReplyAdmissionIntegrationTest {
                     projectedMediaMessage(1u, references.first())
                         .let(TimelineProjector::toAppMessageRecord)
                         .copy(kind = 1068uL)
-                if (movement != ReplyDraftMovement.NO_UI_REPLY) controller.replyingTo = target
+                if (movement.replyTarget != null) controller.replyingTo = target
                 val attachments =
                     references.map {
                         PendingAttachment(byteArrayOf(1, 2, 3, 4), it.mediaType, it.fileName)
@@ -778,7 +786,7 @@ class ConversationMediaReplyAdmissionIntegrationTest {
                 }
                 requireNotNull(queued)
                 assertEquals(
-                    if (movement == ReplyDraftMovement.NO_UI_REPLY) null else CONFIRMED_MESSAGE_ID,
+                    movement.replyTarget,
                     dev.ipf.whitenoise.android.core.MessageProjector
                         .replyTargetMessageId(controller.timeline.single().record),
                 )
@@ -800,7 +808,7 @@ class ConversationMediaReplyAdmissionIntegrationTest {
                 assertEquals(1, boundary.admissions)
                 assertEquals(MessageStatus.Pending, controller.timeline.single().status)
                 assertEquals(
-                    if (movement == ReplyDraftMovement.NO_UI_REPLY) null else CONFIRMED_MESSAGE_ID,
+                    movement.replyTarget,
                     dev.ipf.whitenoise.android.core.MessageProjector
                         .replyTargetMessageId(controller.timeline.single().record),
                 )
@@ -836,7 +844,8 @@ private class ReplyAdmissionBoundary(
     var draft =
         when (movement) {
             ReplyDraftMovement.ORDER -> original.copy(mediaAttachments = descriptors.reversed())
-            ReplyDraftMovement.SELECT_REPLY -> original.copy(replyToMessageIdHex = null)
+            ReplyDraftMovement.SELECT_REPLY, ReplyDraftMovement.PLAIN_TEXT, ReplyDraftMovement.PLAIN_CLEAR ->
+                original.copy(replyToMessageIdHex = null)
             else -> original
         }
     private var revision = replyAdmissionRevision()
@@ -885,8 +894,9 @@ private class ReplyAdmissionBoundary(
 
     private fun save(args: Array<out Any?>): SelectedMessageDraftFfi {
         assertTrue(args[1] === revision)
-        assertEquals(draft.content, args[2])
-        draft = draft.copy(replyToMessageIdHex = args[3] as String?)
+        val content = args[2] as String
+        assertEquals(if (movement.replyTarget == null) "cap" else draft.content, content)
+        draft = draft.copy(content = content, replyToMessageIdHex = args[3] as String?)
         revision = replyAdmissionRevision()
         return SelectedMessageDraftFfi(revision, draft)
     }
@@ -904,7 +914,8 @@ private class ReplyAdmissionBoundary(
         draft =
             when (movement) {
                 ReplyDraftMovement.TARGET -> draft.copy(replyToMessageIdHex = "different")
-                ReplyDraftMovement.CONTENT -> draft.copy(content = "new unsent text")
+                ReplyDraftMovement.CONTENT, ReplyDraftMovement.PLAIN_TEXT -> draft.copy(content = "new unsent text")
+                ReplyDraftMovement.PLAIN_CLEAR -> draft.copy(content = "")
                 else -> draft
             }
         return MediaUploadSubmissionFfi(
@@ -916,7 +927,7 @@ private class ReplyAdmissionBoundary(
     private fun admit(args: Array<out Any?>): LocalSendAcceptanceFfi {
         assertTrue(args[1] === revision)
         assertEquals(
-            if (movement == ReplyDraftMovement.NO_UI_REPLY) null else CONFIRMED_MESSAGE_ID,
+            movement.replyTarget,
             draft.replyToMessageIdHex,
         )
         assertEquals("cap", draft.content)
@@ -933,8 +944,17 @@ private enum class ReplyDraftMovement {
     NEW_UI_CHOICE,
     NO_UI_REPLY,
     SELECT_REPLY,
+    PLAIN_TEXT,
+    PLAIN_CLEAR,
     ORDER,
 }
+
+private val ReplyDraftMovement.replyTarget: String?
+    get() =
+        when (this) {
+            ReplyDraftMovement.NO_UI_REPLY, ReplyDraftMovement.PLAIN_TEXT, ReplyDraftMovement.PLAIN_CLEAR -> null
+            else -> CONFIRMED_MESSAGE_ID
+        }
 
 /** Native revision identity only; no JNI constructor is invoked by the controlled boundary. */
 private fun replyAdmissionRevision(): MessageDraftRevisionFfi {
