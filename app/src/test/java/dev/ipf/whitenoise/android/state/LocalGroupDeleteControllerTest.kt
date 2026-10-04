@@ -10,10 +10,14 @@ import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -30,6 +34,7 @@ import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 /** Exercises the actual controller, platform journal and privacy-safe notice boundary. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
+@OptIn(ExperimentalCoroutinesApi::class)
 class LocalGroupDeleteControllerTest {
     private val controllers = mutableListOf<ChatsController>()
 
@@ -89,7 +94,9 @@ class LocalGroupDeleteControllerTest {
             assertEquals(1, fixture.calls.count { it == "catchUpAccounts" })
             assertTrue(fixture.controller.items.any { it.id == GROUP })
             assertTrue(requireNotNull(fixture.state.toast?.diagnosticReport).contains("phase=native_delete"))
-            // Automatic reconciliation may retire a confirmed-present intent, but never deletes again.
+            // A still-present group retains its intent; reconciliation never repeats the native delete.
+            fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+            assertNotNull(fixture.state.localGroupDeleteCleanupJournal.find(ACCOUNT, GROUP))
             assertEquals(3, fixture.calls.count { it == "deleteGroupLocal" })
         }
 
@@ -158,7 +165,7 @@ class LocalGroupDeleteControllerTest {
             assertEquals(null, fixture.state.toast)
         }
 
-    private fun fixture(
+    private fun TestScope.fixture(
         failing: String? = null,
         onRowRead: () -> Unit = {},
     ): Fixture {
@@ -174,6 +181,8 @@ class LocalGroupDeleteControllerTest {
                 accounts = listOf(AccountSummaryFfi(ACCOUNT, ACCOUNT_ID, true, false, false, true)),
                 activeAccountRef = ACCOUNT,
                 initialMarmotRuntime = AppMarmotRuntime("local-delete-test", native),
+                // Share the virtual readiness deadline's clock instead of racing real IO dispatch.
+                marmotIoDispatcher = StandardTestDispatcher(testScheduler),
             )
         val controller = ChatsController(state, ACCOUNT) { _, _ -> emptyList() }
         controllers += controller

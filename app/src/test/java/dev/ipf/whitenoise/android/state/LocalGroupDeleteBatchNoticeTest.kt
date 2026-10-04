@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -17,6 +18,29 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class LocalGroupDeleteBatchNoticeTest {
+    @Test
+    fun singleChatRetainsItsOriginalRetryNoticeAndDiagnostic() {
+        val state = emptyAppState()
+        val failure =
+            LocalGroupDeleteFailure(
+                LocalDeletePhase.NativeDelete,
+                3,
+                true,
+                true,
+                MarmotKitException.TransportClosed(),
+            )
+        state.presentFailure(
+            R.string.toast_couldnt_delete_chat,
+            "CHAT_LOCAL_DELETE",
+            failure,
+            detail = AppText.Resource(R.string.local_delete_retry_detail),
+        )
+        val original = requireNotNull(state.toast)
+        state.presentStoppedLocalChatDeleteBatch(LocalChatDeleteBatchResult(1, 1, 0), failure)
+        assertSame(original, state.toast)
+        assertEquals(null, state.transientNotice)
+    }
+
     @Test
     fun partialCountAndRetryGuidanceRetainTheExactFailingAttemptsDiagnostic() {
         val state = emptyAppState()
