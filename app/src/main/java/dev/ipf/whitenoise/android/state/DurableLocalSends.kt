@@ -116,6 +116,7 @@ internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
     group: String,
     request: MediaUploadRequestFfi,
     token: String,
+    replyTargetMessageIdHex: String? = null,
 ): DurableComposerMediaUpload {
     require(!request.send) { "controller request must begin as upload-only" }
     recoveredLocalSend(account, group, token)?.let { recovered ->
@@ -128,10 +129,9 @@ internal suspend fun MarmotInterface.uploadOrAdmitComposerMediaWithToken(
             recoveredWithoutUpload = true,
         )
     }
-    val draftBacked =
-        selectedDraftOrNull(account, group)
-            ?.draft
-            ?.let { draftDescribesUpload(it, request.attachments) } == true
+    val draft = selectedDraftOrNull(account, group)?.draft
+    val draftBacked = draft?.let { draftDescribesUpload(it, request.attachments) } == true
+    requireMediaReplyDraft(replyTargetMessageIdHex, draft?.replyToMessageIdHex, draftBacked)
     val submission = uploadMediaWithClientToken(account, group, request.copy(send = !draftBacked), token)
     val acceptance =
         submission.acceptance?.also {

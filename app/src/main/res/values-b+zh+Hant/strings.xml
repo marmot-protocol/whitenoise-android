@@ -2169,4 +2169,5 @@
     <string name="onboarding_details_expanded">已展開</string>
     <string name="onboarding_details_collapsed">已收合</string>
     <string name="group_svg_rejected_detail">無法處理此 SVG。請選擇簡單的 SVG、PNG 或 JPEG。</string>
+    <string name="toast_media_reply_unavailable">此附件回覆無法使用。請保留回覆選擇並重新附加檔案，或取消回覆後單獨傳送。</string>
 </resources>

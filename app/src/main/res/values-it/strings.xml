@@ -2201,4 +2201,5 @@
     <string name="onboarding_details_expanded">Espanso</string>
     <string name="onboarding_details_collapsed">Compresso</string>
     <string name="group_svg_rejected_detail">Impossibile preparare questo SVG. Scegli un SVG semplice, PNG o JPEG.</string>
+    <string name="toast_media_reply_unavailable">Questa risposta con allegato non è disponibile. Mantieni la risposta selezionata e allega di nuovo il file, oppure annulla la risposta per inviare separatamente.</string>
 </resources>

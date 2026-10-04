@@ -152,6 +152,39 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         }
     }
 
+    /** Pending and failed file replies retain the safe poll preview, without exposing poll JSON. */
+    @Test
+    fun fileRepliesKeepSafePollPreview() {
+        val pending =
+            fileTimelineMessage(
+                16,
+                "report.pdf",
+                mine = true,
+                hasReply = true,
+                status = MessageStatus.Pending,
+            )
+        val failed = fileTimelineMessage(17, "notes.txt", mine = true, hasReply = true, status = MessageStatus.Failed)
+
+        fun pollReply(item: TimelineMessage): TimelineMessage =
+            item.copy(
+                projected =
+                    checkNotNull(item.projected).copy(
+                        replyPreview = replyPreview().copy(kind = 1068uL, plaintext = "private poll JSON"),
+                    ),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp)) {
+                    Column {
+                        FileMessage(pollReply(pending))
+                        FileMessage(pollReply(failed))
+                    }
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/message_bubble_file_poll_reply_light.png")
+    }
+
     /** Captures real message bubbles across incoming, outgoing, captioned, pending, and selected layouts. */
     @Test
     fun realMessageBubblePathKeepsFileCardsReadableAcrossParentVariants() {

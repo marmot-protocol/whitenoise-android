@@ -6,6 +6,8 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
+import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
@@ -92,13 +94,125 @@ class DraftSendTest {
                             "group",
                             listOf(reference("a.jpg", "image/jpeg")),
                             "changed caption",
-                            clientToken = "stable-token",
+                            context = ComposerMediaSendContext(clientToken = "stable-token"),
                         )
                     }.exceptionOrNull()
 
                 assertTrue(failure is IllegalStateException)
                 assertFalse("sendMediaAttachments" in engine.calls)
             }
+        }
+
+    /** A matching native draft preserves the captured poll reply through media publication. */
+    @Test
+    fun mediaReplyUsesMatchingNativeDraft() =
+        runBlocking {
+            val engine = ScriptedEngine(draft = content("cap", listOf(jpeg("a.jpg")), replyTo = "poll"))
+            engine.marmot.sendComposerMedia(
+                "acct",
+                "group",
+                listOf(reference("a.jpg", "image/jpeg")),
+                "cap",
+                context = ComposerMediaSendContext(replyTargetMessageIdHex = "poll"),
+            )
+            assertEquals(listOf("selectedMessageDraft", "sendMessageDraft"), engine.calls)
+        }
+
+    /** Changed, missing and unrelated drafts cannot silently detach or retarget media replies. */
+    @Test
+    fun mediaReplyRejectsMissingOrChangedNativeDraft() =
+        runBlocking {
+            for (target in listOf(null, "other")) {
+                val engine = ScriptedEngine(draft = content("cap", listOf(jpeg("a.jpg")), replyTo = target))
+                val failure =
+                    runCatching {
+                        engine.marmot.sendComposerMedia(
+                            "acct",
+                            "group",
+                            listOf(reference("a.jpg", "image/jpeg")),
+                            "cap",
+                            context = ComposerMediaSendContext(replyTargetMessageIdHex = "poll"),
+                        )
+                    }.exceptionOrNull()
+                assertTrue(failure is MediaReplyDraftUnavailableException)
+                assertEquals(listOf("selectedMessageDraft"), engine.calls)
+            }
+            val missing = ScriptedEngine(draft = null)
+            val failure =
+                runCatching {
+                    missing.marmot.sendComposerMedia(
+                        "acct",
+                        "group",
+                        listOf(reference("a.jpg", "image/jpeg")),
+                        "cap",
+                        context = ComposerMediaSendContext(replyTargetMessageIdHex = "poll"),
+                    )
+                }.exceptionOrNull()
+            assertTrue(failure is MediaReplyDraftUnavailableException)
+        }
+
+    /** An absent or retargeted draft rejects admission before any blob upload can publish a plain message. */
+    @Test
+    fun uploadRejectsUnsupportedReplyBeforeNativeAdmission() =
+        runBlocking {
+            val request =
+                MediaUploadRequestFfi(
+                    listOf(MediaUploadAttachmentRequestFfi("a.jpg", "image/jpeg", byteArrayOf(1), null, null)),
+                    "cap",
+                    false,
+                    null,
+                )
+            for (draft in listOf(null, content("cap", listOf(jpeg("a.jpg")), replyTo = "other"))) {
+                val engine = ScriptedEngine(draft = draft)
+                val failure =
+                    runCatching {
+                        engine.marmot.uploadOrAdmitComposerMediaWithToken("acct", "group", request, "token", "poll")
+                    }.exceptionOrNull()
+                assertTrue(failure is MediaReplyDraftUnavailableException)
+                assertEquals(listOf("localSendStatus", "selectedMessageDraft"), engine.calls)
+            }
+        }
+
+    /** Publication uses the captured revision; a newer draft cannot be overwritten during upload. */
+    @Test
+    fun capturedReplyRevisionConflictFailsClosed() =
+        runBlocking {
+            val engine =
+                ScriptedEngine(
+                    draft = content("new caption", listOf(jpeg("a.jpg")), "other"),
+                    conflictOnSave = true,
+                )
+            val captured =
+                SelectedMessageDraftFfi(
+                    nativeStub(MessageDraftRevisionFfi::class.java),
+                    content("old caption", listOf(jpeg("a.jpg")), "poll"),
+                )
+            val failure =
+                runCatching {
+                    engine.marmot.sendComposerMedia(
+                        "acct",
+                        "group",
+                        listOf(reference("a.jpg", "image/jpeg")),
+                        "accepted caption",
+                        ComposerMediaSendContext(replyTargetMessageIdHex = "poll", replyDraft = captured),
+                    )
+                }.exceptionOrNull()
+            assertTrue(failure is MediaReplyDraftUnavailableException)
+            assertEquals(listOf("messageDraft", "saveMessageDraftIfRevision"), engine.calls)
+            assertFalse("sendMediaAttachments" in engine.calls)
+        }
+
+    /** A send accepted without a reply cannot acquire one from a newer selected draft. */
+    @Test
+    fun plainMediaDoesNotInheritLaterReply() =
+        runBlocking {
+            val engine = ScriptedEngine(draft = content("cap", listOf(jpeg("a.jpg")), replyTo = "later"))
+            val failure =
+                runCatching {
+                    engine.marmot.sendComposerMedia("acct", "group", listOf(reference("a.jpg", "image/jpeg")), "cap")
+                }.exceptionOrNull()
+            assertTrue(failure is MediaReplyDraftUnavailableException)
+            assertFalse("sendMessageDraft" in engine.calls)
         }
 
     /** The descriptor match is positional and covers name and media type. */

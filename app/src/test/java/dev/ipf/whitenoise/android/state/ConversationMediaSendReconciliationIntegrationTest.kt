@@ -41,6 +41,7 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
+import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollWriter
@@ -584,12 +585,20 @@ class ConversationMediaSendReconciliationIntegrationTest {
             dim = "1280x720",
         )
 
+    /** Unsupported voice/contact replies retain the reply selection and never accept or upload unrelated media. */
+    @Test
+    fun draftlessReplyKeepsComposerAndRejectsBeforeUpload() {
+        assertDraftlessMediaUsesTokenBoundNativeAdmission("audio/mp4", "voice.m4a", rejectReply = true)
+        assertDraftlessMediaUsesTokenBoundNativeAdmission("text/vcard", "contact.vcf", rejectReply = true)
+    }
+
     /** Exercises the default production path: no injected uploader or publisher test seam. */
     @Suppress("LongMethod") // The native proxy and both cancellation/admission outcomes share one fixture.
     private fun assertDraftlessMediaUsesTokenBoundNativeAdmission(
         mediaType: String,
         fileName: String,
         cancelBeforeUpload: Boolean = false,
+        rejectReply: Boolean = false,
     ) = runTest {
         val calls = mutableListOf<String>()
         var uploadedRequest: MediaUploadRequestFfi? = null
@@ -639,6 +648,27 @@ class ConversationMediaSendReconciliationIntegrationTest {
 
         controller.retryMembers()
         assertEquals(true, controller.canSendMessages)
+        if (rejectReply) {
+            val target =
+                projectedMediaMessage(1u, reference)
+                    .let(TimelineProjector::toAppMessageRecord)
+                    .copy(kind = 1068uL)
+            controller.replyingTo = target
+            val rejected =
+                controller.queueAttachments(
+                    listOf(PendingAttachment(byteArrayOf(1, 2, 3, 4), mediaType, fileName)),
+                    null,
+                )
+            assertNull(rejected)
+            assertEquals(target, controller.replyingTo)
+            assertEquals(emptyList<TimelineMessage>(), controller.timeline)
+            assertEquals(0, calls.count { it == "uploadMediaWithClientToken" })
+            assertEquals(
+                AppText.Resource(dev.ipf.whitenoise.android.R.string.toast_media_reply_unavailable),
+                appState.toast?.title,
+            )
+            return@runTest
+        }
         val seeded =
             requireNotNull(
                 controller.queueAttachments(

@@ -48,6 +48,7 @@ import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
+import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
@@ -1890,6 +1891,8 @@ private const val MARMOT_REACTION_EVENT_KIND = 7uL
 internal class RetainedMediaUpload(
     val attachments: List<PendingAttachment>,
     val caption: String?,
+    val replyTargetMessageIdHex: String? = null,
+    val replyDraft: SelectedMessageDraftFfi? = null,
     var uploadedReferences: List<MediaAttachmentReferenceFfi>? = null,
     var localAcceptance: SendSummaryFfi? = null,
     var recoveredWithoutUpload: Boolean = false,
@@ -8579,6 +8582,7 @@ class ConversationController(
         caption: String?,
         canQueue: () -> Boolean = { true },
         outboundVisibleStartedAtElapsedMs: Long = SystemClock.elapsedRealtime(),
+        replyTargetMessageIdHex: String? = replyingTo?.messageIdHex,
     ): QueuedAttachmentSend? {
         if (!canQueue()) return null
         val account =
@@ -8596,6 +8600,24 @@ class ConversationController(
         if (attachments.any { it.plaintextBytes.isEmpty() }) return null
         if (albumExceedsRetainedCap(attachments)) {
             appState.present(R.string.media_album_too_large)
+            return null
+        }
+        val replyDraft =
+            replyTargetMessageIdHex?.let {
+                appState.captureMediaReplyDraft(account, group.groupIdHex, attachments, it)
+            }
+        if (replyTargetMessageIdHex != null && replyDraft == null) {
+            appState.present(R.string.toast_media_reply_unavailable)
+            return null
+        }
+        if (!canQueue() ||
+            !shouldAcceptMediaUploadForAccount(
+                account,
+                mediaUploadSessionEpoch,
+                appState.activeAccountRef,
+                appState.mediaUploadSessionEpoch(),
+            )
+        ) {
             return null
         }
         val tempId = UUID.randomUUID().toString()
@@ -8623,6 +8645,7 @@ class ConversationController(
                         body = body,
                         attachments = attachments,
                         now = now,
+                        replyTargetMessageIdHex = replyTargetMessageIdHex,
                     )
                 }
             } catch (throwable: Throwable) {
@@ -8636,7 +8659,10 @@ class ConversationController(
         }
         val retentionAtSendSeconds = rememberRetentionAtSend(tempId, retentionSnapshot)
         val optimisticOrder = nextOptimisticTimelineOrder()
-        retainedMediaUploads.put(key, RetainedMediaUpload(attachments, trimmedCaption))
+        retainedMediaUploads.put(
+            key,
+            RetainedMediaUpload(attachments, trimmedCaption, replyTargetMessageIdHex, replyDraft),
+        )
         // Mark this slot as "still needed by a pending send" so the screen
         // dispose hook's `clearRetainedUploads` won't wipe bytes for slots
         // queued behind the one currently uploading.
@@ -8676,6 +8702,7 @@ class ConversationController(
         body: String,
         attachments: List<PendingAttachment>,
         now: ULong,
+        replyTargetMessageIdHex: String?,
     ): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = tempId,
@@ -8688,7 +8715,7 @@ class ConversationController(
             tags =
                 attachments.map {
                     MessageTagFfi(listOf("_media_pending", it.fileName, it.mediaType))
-                },
+                } + mediaReplyPresentationTags(replyTargetMessageIdHex),
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
@@ -8827,6 +8854,7 @@ class ConversationController(
                                                             group.groupIdHex,
                                                             request,
                                                             tempId,
+                                                            retained.replyTargetMessageIdHex,
                                                         )
                                                     }
                                                 outcome.acceptance?.let { recordOptimisticSendAcceptance(key, it) }
@@ -8880,7 +8908,11 @@ class ConversationController(
                                                     group.groupIdHex,
                                                     references,
                                                     retained.caption,
-                                                    tempId,
+                                                    ComposerMediaSendContext(
+                                                        tempId,
+                                                        retained.replyTargetMessageIdHex,
+                                                        retained.replyDraft,
+                                                    ),
                                                 )
                                             }
                                     recordOptimisticSendAcceptance(key, accepted)
@@ -8888,6 +8920,11 @@ class ConversationController(
                                 }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }
                         }
                 completeDurableAcceptance(key)
+                if (retained.replyTargetMessageIdHex != null &&
+                    replyingTo?.messageIdHex == retained.replyTargetMessageIdHex
+                ) {
+                    replyingTo = null
+                }
                 sendHostAttempt.success()
                 val canonicalId = summary.messageIds.firstOrNull()
                 diagnostics.alias(tempId, canonicalId)
@@ -8960,7 +8997,9 @@ class ConversationController(
                 // MarmotKit owns the encrypted-media wire format. Build the
                 // optimistic bridge tags through the same native API that
                 // validates and publishes the projected attachments.
-                val imetaTags = mediaImetaTagsBuilder(account, group.groupIdHex, references)
+                val imetaTags =
+                    mediaImetaTagsBuilder(account, group.groupIdHex, references) +
+                        mediaReplyPresentationTags(retained.replyTargetMessageIdHex)
                 val confirmedId = canonicalId ?: tempId
                 diagnostics.mediaTransportComplete(tempId)
                 transferRetentionAtSend(tempId, confirmedId)

@@ -460,6 +460,18 @@
         "test_ids": ["MSG-022", "MSG-023", "MSG-024"]
       },
       {
+        "surface": "Unsupported or changed native media reply feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SendFailureNotices.kt",
+        "anchor": "R.string.toast_media_reply_unavailable",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Media reply pre-acceptance feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_media_reply_unavailable",
+        "test_ids": ["MSG-021"]
+      },
+      {
         "surface": "Empty document send feedback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
         "anchor": "R.string.media_file_empty",

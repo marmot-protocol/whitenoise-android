@@ -62,25 +62,38 @@ internal suspend fun MarmotInterface.sendComposerMedia(
     groupIdHex: String,
     references: List<MediaAttachmentReferenceFfi>,
     caption: String?,
-    clientToken: String? = null,
+    context: ComposerMediaSendContext = ComposerMediaSendContext(),
 ): SendSummaryFfi {
+    val clientToken = context.clientToken
+    val replyTargetMessageIdHex = context.replyTargetMessageIdHex
     if (clientToken != null) recoveredLocalSend(accountRef, groupIdHex, clientToken)?.let { return it }
-    val selected = selectedDraftOrNull(accountRef, groupIdHex)
+    val selected = context.replyDraft ?: selectedDraftOrNull(accountRef, groupIdHex)
     val content = selected?.draft
+    requireMediaReplyDraft(
+        replyTargetMessageIdHex,
+        content?.replyToMessageIdHex,
+        content?.let { draftDescribes(it, references) } == true,
+    )
     if (selected != null && content != null && draftDescribes(content, references)) {
         val submitted =
-            saveDraftForSend(accountRef, selected, caption.orEmpty(), content.replyToMessageIdHex)
-                ?.let { revision ->
-                    if (clientToken == null) {
-                        sendDraftOrNull(accountRef, revision, references)
-                    } else {
-                        admitLocalSend(accountRef, groupIdHex, clientToken) {
-                            sendMessageDraftWithClientToken(accountRef, revision, references, clientToken)
+            try {
+                saveDraftForSend(accountRef, selected, caption.orEmpty(), content.replyToMessageIdHex)
+                    ?.let { revision ->
+                        if (clientToken == null) {
+                            sendDraftOrNull(accountRef, revision, references)
+                        } else {
+                            admitLocalSend(accountRef, groupIdHex, clientToken) {
+                                sendMessageDraftWithClientToken(accountRef, revision, references, clientToken)
+                            }
                         }
                     }
-                }
+            } catch (conflict: MarmotKitException.MessageDraftRevisionConflict) {
+                if (replyTargetMessageIdHex != null) throw MediaReplyDraftUnavailableException(conflict)
+                throw conflict
+            }
         if (submitted != null) return submitted
     }
+    if (replyTargetMessageIdHex != null) throw MediaReplyDraftUnavailableException()
     check(clientToken == null) { "client-token media send requires a matching draft revision" }
     return sendMediaAttachments(accountRef, groupIdHex, references, caption)
 }

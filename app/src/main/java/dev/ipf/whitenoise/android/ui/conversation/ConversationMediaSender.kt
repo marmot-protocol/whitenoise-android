@@ -370,6 +370,7 @@ internal class ConversationMediaSender(
 
     fun sendSharedContact(contact: SharedContact) {
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
+        val replyTargetMessageIdHex = controller.replyingTo?.messageIdHex
         appState.launchMutation {
             val vcardBytes =
                 withContext(Dispatchers.IO) {
@@ -391,6 +392,7 @@ internal class ConversationMediaSender(
                     attachments = listOf(attachment),
                     caption = caption,
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                    replyTargetMessageIdHex = replyTargetMessageIdHex,
                 ) ?: return@launchMutation
             onRevealSent()
             controller.uploadQueued(seeded)
@@ -405,6 +407,7 @@ internal class ConversationMediaSender(
         onQueued: (Boolean) -> Unit,
     ) {
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
+        val replyTargetMessageIdHex = controller.replyingTo?.messageIdHex
         appState.launchMutation {
             var accepted = false
             try {
@@ -427,6 +430,7 @@ internal class ConversationMediaSender(
                         null,
                         canQueue = { canSend() && controller.canSendMessages },
                         outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                        replyTargetMessageIdHex = replyTargetMessageIdHex,
                     ) ?: return@launchMutation
                 accepted = true
                 onQueued(true)
@@ -473,6 +477,7 @@ internal class ConversationMediaSender(
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
+        val replyTargetMessageIdHex = controller.replyingTo?.messageIdHex
         appState.launchMutation {
             var accepted = false
             try {
@@ -495,6 +500,7 @@ internal class ConversationMediaSender(
                         prepared.copy(documents = readyDocuments),
                         trimmedCaption,
                         outboundVisibleStartedAtElapsedMs,
+                        replyTargetMessageIdHex,
                     )
                 if (seeded.isEmpty()) {
                     return@launchMutation
@@ -667,7 +673,19 @@ internal class ConversationMediaSender(
         prepared: PreparedStagedAttachments,
         caption: String?,
         outboundVisibleStartedAtElapsedMs: Long,
+        replyTargetMessageIdHex: String?,
     ): List<ConversationController.QueuedAttachmentSend> {
+        // A reply consumes one exact native draft: do not split its descriptors into file siblings.
+        if (replyTargetMessageIdHex != null) {
+            return listOfNotNull(
+                controller.queueAttachments(
+                    attachments = prepared.images + prepared.documents.attachments,
+                    caption = caption,
+                    outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                    replyTargetMessageIdHex = replyTargetMessageIdHex,
+                ),
+            )
+        }
         val seeded = mutableListOf<ConversationController.QueuedAttachmentSend>()
         if (prepared.images.isNotEmpty()) {
             controller
@@ -675,6 +693,7 @@ internal class ConversationMediaSender(
                     attachments = prepared.images,
                     caption = caption,
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                    replyTargetMessageIdHex = replyTargetMessageIdHex,
                 )?.let(seeded::add)
         }
         val captionConsumedByImages = prepared.images.isNotEmpty()
@@ -685,6 +704,7 @@ internal class ConversationMediaSender(
                     attachments = listOf(attachment),
                     caption = itemCaption,
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
+                    replyTargetMessageIdHex = replyTargetMessageIdHex,
                 )?.let(seeded::add)
         }
         return seeded

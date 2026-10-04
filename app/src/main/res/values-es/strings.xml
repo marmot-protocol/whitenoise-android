@@ -2201,4 +2201,5 @@
     <string name="onboarding_details_expanded">Expandido</string>
     <string name="onboarding_details_collapsed">Contraído</string>
     <string name="group_svg_rejected_detail">No se pudo preparar este SVG. Elige un SVG sencillo, PNG o JPEG.</string>
+    <string name="toast_media_reply_unavailable">Esta respuesta con archivo adjunto no está disponible. Mantén la respuesta seleccionada y vuelve a adjuntar el archivo, o cancela la respuesta para enviarlo por separado.</string>
 </resources>
