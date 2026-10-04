@@ -103,10 +103,15 @@ class ChatMutePreferences(
 
     /** Erasing an identity removes only that account's host notification choices. */
     internal fun removeAccount(accountRef: String) {
+        val account = accountRef.trim().takeIf(String::isNotEmpty) ?: return
         synchronized(mutationLock) {
             val updated =
-                _state.value.notificationModes.filterKeys { !it.startsWith("$accountRef$COMPOSITE_SEPARATOR") }
-            persistModes(preferences.edit(), updated).apply()
+                _state.value.notificationModes.filterKeys { it.substringBeforeLast(COMPOSITE_SEPARATOR) != account }
+            // Finish the disk write before account cleanup returns. A disk failure must not
+            // interrupt the remaining native-wipe cleanup, but is visible in diagnostics.
+            if (!persistModes(preferences.edit(), updated).commit()) {
+                android.util.Log.w("ChatMutePreferences", "Could not persist erased account notification choices")
+            }
             _state.value = ChatNotificationState(updated)
         }
     }
@@ -211,6 +216,7 @@ class ChatMutePreferences(
 
         fun readMutedSet(preferences: SharedPreferences): Set<String> = preferences.getStringSet(KEY_MUTED_CONVERSATIONS, emptySet())?.toSet().orEmpty()
 
+        /** Restores both explicit choices; a legacy mentions entry wins if a corrupt store lists both. */
         fun readNotificationModes(preferences: SharedPreferences): Map<String, ChatNotifyMode> =
             preferences.getStringSet(KEY_ALL_CONVERSATIONS, emptySet()).orEmpty().associateWith { ChatNotifyMode.ALL } +
                 preferences
