@@ -18,6 +18,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -25,12 +26,41 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlinx.coroutines.CompletableDeferred
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class NostrEventCardTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun verifiedCardKeepsItsReaderActionWhilePreviewParsingIsPending() {
+        val pending = CompletableDeferred<MarkdownDocumentFfi>()
+        val original = noteCard().copy(readerBody = "Complete signed body")
+        var opened: NostrEventCardModel? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                val presentation =
+                    rememberNostrEventPreviewState(
+                        NostrEventCardState.Loaded(original),
+                        mentionDisplayName = { null },
+                        parseMarkdown = { pending.await() },
+                    )
+                NostrEventCard(
+                    state = presentation,
+                    authorDisplayName = { "Alex" },
+                    contentColor = Color.Black,
+                    onRetry = {},
+                    onCopy = {},
+                    onOpen = { opened = it },
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_expand)).performClick()
+        assertEquals(original.eventIdHex, opened?.eventIdHex)
+        assertEquals(original.readerBody, opened?.readerBody)
+    }
 
     @Test
     fun loadedCardExposesCopyAndOpenActions() {

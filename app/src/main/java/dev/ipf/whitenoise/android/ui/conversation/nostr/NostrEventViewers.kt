@@ -264,7 +264,7 @@ private fun NostrEventReaderBody(
     }
 }
 
-/** Normalizes a parser-authored event reference into the URI used by copy/open fallback actions. */
+/** Keeps the signed event context and explicit media actions above the complete body. */
 @Composable
 private fun NostrEventReaderContext(
     card: NostrEventCardModel,
@@ -297,6 +297,7 @@ private fun NostrEventReaderContext(
     }
 }
 
+/** Normalizes a parser-authored reference for copy and external-open actions. */
 private fun nostrEventUri(authoredReference: String): String =
     if (authoredReference.startsWith("nostr:", ignoreCase = true)) authoredReference else "nostr:$authoredReference"
 

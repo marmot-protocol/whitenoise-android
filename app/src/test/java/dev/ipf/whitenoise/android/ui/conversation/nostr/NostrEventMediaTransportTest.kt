@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
+import okhttp3.Dns
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -9,9 +10,14 @@ import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.io.IOException
+import java.net.InetAddress
+import java.net.Proxy
+import java.net.UnknownHostException
 
 class NostrEventMediaTransportTest {
     @Test
@@ -49,33 +55,75 @@ class NostrEventMediaTransportTest {
     }
 
     @Test
-    fun declaredAndStreamedResponseBudgetsAreBothEnforced() {
-        val request = Request.Builder().url("https://media.example/video").build()
+    fun playerClientUsesExplicitRedirectsPublicDnsAndNoProxy() {
+        assertEquals(Proxy.NO_PROXY, nostrMediaHttpClient.proxy)
+        assertFalse(nostrMediaHttpClient.followRedirects)
+        assertFalse(nostrMediaHttpClient.followSslRedirects)
+        assertTrue(nostrMediaHttpClient.dns is PublicMediaDns)
+        assertEquals(0, nostrMediaHttpClient.callTimeoutMillis)
+        assertEquals(30_000, nostrMediaHttpClient.readTimeoutMillis)
+    }
 
-        fun response(body: ResponseBody) =
-            Response
-                .Builder()
-                .request(request)
-                .protocol(Protocol.HTTP_1_1)
-                .code(200)
-                .message("OK")
-                .body(body)
-                .build()
-        assertThrows(IOException::class.java) {
-            boundedMediaResponse(response("12345".toResponseBody()), maximumBytes = 4)
+    @Test
+    fun dnsRejectsPrivateLoopbackAndMixedAnswers() {
+        val public = address(8, 8, 8, 8)
+        val private = address(10, 0, 0, 1)
+        val loopback = address(127, 0, 0, 1)
+        listOf(emptyList(), listOf(private), listOf(loopback), listOf(public, private)).forEach { answers ->
+            val dns = PublicMediaDns(Dns { answers })
+            assertThrows(UnknownHostException::class.java) { dns.lookup("media.example") }
         }
-        val streamed =
-            object : ResponseBody() {
+        assertEquals(listOf(public), PublicMediaDns(Dns { listOf(public) }).lookup("media.example"))
+    }
+
+    @Test
+    fun privateHostnameIsRejectedBeforeDnsLookup() {
+        var calls = 0
+        val dns = PublicMediaDns(Dns { calls++; listOf(address(8, 8, 8, 8)) })
+        assertThrows(UnknownHostException::class.java) { dns.lookup("localhost") }
+        assertEquals(0, calls)
+    }
+
+    @Test
+    fun largeProgressiveRangesRemainLazyAndKeepTheirRangeHeader() {
+        listOf(null, "bytes=0-", "bytes=700000000-").forEach { range ->
+            var sourceCalls = 0
+            val body = object : ResponseBody() {
                 override fun contentType(): MediaType? = null
 
-                override fun contentLength(): Long = -1
+                override fun contentLength(): Long = 4L * 1024 * 1024 * 1024
 
-                override fun source() = Buffer().writeUtf8("12345")
+                override fun source(): Buffer {
+                    sourceCalls++
+                    return Buffer().writeUtf8("sample")
+                }
             }
-        boundedMediaResponse(response(streamed), maximumBytes = 4).use { bounded ->
-            assertThrows(IOException::class.java) { bounded.body!!.string() }
+            val client =
+                OkHttpClient.Builder()
+                    .addInterceptor(::nostrMediaResponse)
+                    .addInterceptor { chain ->
+                        assertEquals(range, chain.request().header("Range"))
+                        Response.Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(if (range == null) 200 else 206)
+                            .message("stream fixture")
+                            .body(body)
+                            .build()
+                    }.build()
+            val request = Request.Builder().url("https://media.example/video")
+            range?.let { request.header("Range", it) }
+            client.newCall(request.build()).execute().use { response ->
+                assertEquals(0, sourceCalls)
+                assertEquals(4L * 1024 * 1024 * 1024, response.body!!.contentLength())
+                assertEquals("sample", response.body!!.source().readUtf8(6))
+            }
         }
     }
+
+    private fun address(vararg bytes: Int): InetAddress =
+        InetAddress.getByAddress(bytes.map(Int::toByte).toByteArray())
+
 }
 
 /** Exercises the real OkHttp application chain; the scripted final interceptor never dials. */

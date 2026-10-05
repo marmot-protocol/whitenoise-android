@@ -42,7 +42,12 @@ class NostrEventReaderBlocksTest {
             MarkdownInlineFfi.NostrMention(
                 MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, "npub1example"),
             )
-        val document = MarkdownDocumentFfi(listOf(MarkdownBlockFfi.Paragraph(listOf(link, mention))), false, byteArrayOf())
+        val document =
+            MarkdownDocumentFfi(
+                listOf(MarkdownBlockFfi.Paragraph(listOf(link, mention))),
+                false,
+                byteArrayOf(),
+            )
         val inlines = nostrReaderBlocks(document).flatMap { (it as MarkdownBlockFfi.Paragraph).inlines }
         val links = inlines.filterIsInstance<MarkdownInlineFfi.Link>()
         assertTrue(links.size > 1)

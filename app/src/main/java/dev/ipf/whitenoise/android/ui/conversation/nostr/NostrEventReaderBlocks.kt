@@ -102,7 +102,10 @@ private const val READER_INLINE_BUDGET = 128
 private const val READER_SPLIT_DEPTH_LIMIT = 64
 
 /** Fall back to complete plain text when a complex tree would exceed the shared renderer's safety windows. */
-internal fun nostrReaderCanFormat(document: MarkdownDocumentFfi): Boolean = !document.truncated && document.blocks.all { readerBlockFits(it, 0) }
+internal fun nostrReaderCanFormat(document: MarkdownDocumentFfi): Boolean {
+    val complete = !document.truncated
+    return complete && document.blocks.all { readerBlockFits(it, 0) }
+}
 
 private fun readerBlockFits(
     block: MarkdownBlockFfi,
@@ -116,7 +119,10 @@ private fun readerStructureFits(
     block: MarkdownBlockFfi,
     depth: Int,
 ): Boolean {
-    fun children(blocks: List<MarkdownBlockFfi>): Boolean = blocks.size <= MARKDOWN_MAX_CONTAINER_SIBLINGS && blocks.all { readerBlockFits(it, depth + 1) }
+    fun children(blocks: List<MarkdownBlockFfi>): Boolean {
+        val bounded = blocks.size <= MARKDOWN_MAX_CONTAINER_SIBLINGS
+        return bounded && blocks.all { readerBlockFits(it, depth + 1) }
+    }
 
     fun inlines(values: List<MarkdownInlineFfi>) = values.all { readerInlineFits(it, 0) }
     return when (block) {

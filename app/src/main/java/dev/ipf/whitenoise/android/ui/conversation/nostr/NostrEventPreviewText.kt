@@ -9,6 +9,9 @@ import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewText
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private data class NostrPreviewDocument(
     val document: MarkdownDocumentFfi?,
@@ -20,6 +23,7 @@ internal fun rememberNostrEventPreviewState(
     state: NostrEventCardState,
     mentionDisplayName: (String) -> String?,
     parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ): NostrEventCardState {
     val card = (state as? NostrEventCardState.Loaded)?.card
     var prepared by remember(card?.eventIdHex, card?.summary) { mutableStateOf<NostrPreviewDocument?>(null) }
@@ -28,7 +32,7 @@ internal fun rememberNostrEventPreviewState(
         val document =
             loaded.summary?.takeIf(String::isNotBlank)?.let { summary ->
                 try {
-                    parseMarkdown(summary)
+                    withContext(dispatcher) { parseMarkdown(summary) }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
@@ -39,7 +43,7 @@ internal fun rememberNostrEventPreviewState(
     }
     val document = prepared?.document
     return when {
-        card != null && prepared == null -> NostrEventCardState.Loading
+        card != null && prepared == null -> NostrEventCardState.Loaded(card.copy(summary = null))
         card != null && document != null && document.blocks.isNotEmpty() ->
             NostrEventCardState.Loaded(
                 card.copy(summary = markdownDocumentToPreviewText(document, PREVIEW_TEXT_BUDGET, mentionDisplayName)),
