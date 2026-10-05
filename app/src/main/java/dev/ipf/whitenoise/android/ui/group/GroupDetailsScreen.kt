@@ -293,7 +293,10 @@ internal fun GroupDetailsScreen(
         val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
         var membersExpanded by remember(controller) { mutableStateOf(false) }
         var memberSearchOpen by remember(controller) { mutableStateOf(false) }
-        var memberQuery by remember(controller) { mutableStateOf("") }
+        var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
+        var memberSearchRetry by remember(controller) { mutableStateOf(0) }
+        val memberResolution =
+            rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)
         // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
         // leave path and the Admins prompt so a trapped sole admin can hand the
         // role to another member (issue #417).
@@ -1112,8 +1115,10 @@ internal fun GroupDetailsScreen(
                                 value = memberQuery,
                                 onValueChange = { memberQuery = it },
                                 placeholder = stringResource(R.string.search_members),
+                                clipboardInput = GroupMemberIdentitySearch::clipboardInput,
                                 modifier =
                                     Modifier
+                                        .testTag("chat_info.member_search")
                                         .padding(horizontal = Dimens.spaceLg)
                                         .padding(bottom = Dimens.spaceSm),
                             )
@@ -1159,21 +1164,29 @@ internal fun GroupDetailsScreen(
                             when {
                                 memberNeedle.isNotEmpty() ->
                                     displayedMembers.filter {
-                                        memberTitlesByHex[it.memberIdHex]
-                                            .orEmpty()
-                                            .contains(memberNeedle, ignoreCase = true)
+                                        GroupMemberIdentitySearch.matches(
+                                            memberNeedle,
+                                            memberResolution.hex,
+                                            it.memberIdHex,
+                                            memberTitlesByHex[it.memberIdHex].orEmpty(),
+                                        )
                                     }
                                 membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT ->
                                     displayedMembers
                                 else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
                             }
-                        if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
+                        if (memberResolution.resolving) {
+                            CircularProgressIndicator(Modifier.padding(horizontal = Dimens.spaceLg))
+                        } else if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
                             Text(
                                 stringResource(R.string.no_matches),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
                             )
+                            if (memberResolution.canRetry) {
+                                TextButton(onClick = { memberSearchRetry++ }) { Text(stringResource(R.string.retry)) }
+                            }
                         }
                         // Row taps route into the profile sheet, which carries the same
                         // admin actions (grant/revoke admin, remove) the old per-row menu

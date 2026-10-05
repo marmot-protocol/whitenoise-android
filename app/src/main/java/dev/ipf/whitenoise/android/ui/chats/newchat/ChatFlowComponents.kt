@@ -68,6 +68,7 @@ internal fun FlowSearchField(
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
     onScanQr: (() -> Unit)? = null,
+    clipboardInput: ((String?) -> String?)? = null,
 ) {
     val shape = RoundedCornerShape(28.dp)
     TextField(
@@ -79,6 +80,7 @@ internal fun FlowSearchField(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PublicIdentifierFieldTrailingAction(
                     value = value,
+                    clipboardInput = clipboardInput,
                     onValueChange = onValueChange,
                 )
                 if (value.isEmpty() && onScanQr != null) {

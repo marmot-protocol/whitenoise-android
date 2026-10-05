@@ -11019,6 +11019,30 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHistoryBoundary.kt",
         "anchor": "R.string.conversation_history_retention_description",
         "test_ids": ["CON-023"]
+      },
+      {
+        "surface": "Existing member public identity search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)",
+        "test_ids": [
+          "GRP-027"
+        ]
+      },
+      {
+        "surface": "Existing member decoder retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-027"
+        ]
+      },
+      {
+        "surface": "Local member identity resolution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMemberIdentitySearch.kt",
+        "anchor": "internal fun rememberGroupMemberSearchResolution(",
+        "test_ids": [
+          "GRP-027"
+        ]
       }
     ],
     "settings_controls": [
