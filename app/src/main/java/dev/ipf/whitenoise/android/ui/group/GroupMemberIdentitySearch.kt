@@ -51,15 +51,7 @@ internal object GroupMemberIdentitySearch {
         if (!isIdentityQuery(raw)) return null
         val query = raw.trim()
         val uri = if (query.contains("://")) runCatching { URI(query) }.getOrNull() else null
-        val malformedUrl =
-            uri == null ||
-                uri.userInfo != null ||
-                uri.path
-                    .orEmpty()
-                    .trim('/')
-                    .split('/')
-                    .size > 2
-        val ambiguousUrl = query.contains("://") && malformedUrl
+        val ambiguousUrl = query.contains("://") && (uri == null || uri.userInfo != null)
         val bare = if (query.startsWith("nostr:", ignoreCase = true)) query.drop("nostr:".length) else query
         val publicBech32 =
             bare.startsWith("npub1", ignoreCase = true) ||

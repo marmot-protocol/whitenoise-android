@@ -20,6 +20,7 @@ class GroupMemberIdentitySearchTest {
             "whitenoise-dev://profile/$MEMBER_NPUB",
             "whitenoise-staging://profile/$MEMBER_NPUB",
             "https://whitenoise.chat/profile/$MEMBER_NPUB",
+            "https://whitenoise.chat/profile/$MEMBER_NPUB/extra",
             "http://marmot.app/$MEMBER_NPUB",
         ).forEach { reference ->
             val raw = "  $reference \n"
@@ -46,7 +47,7 @@ class GroupMemberIdentitySearchTest {
             "marmot://event/$MEMBER_NPUB",
             "ftp://profile/$MEMBER_NPUB",
             "https://user@whitenoise.chat/$MEMBER_NPUB",
-            "https://whitenoise.chat/profile/$MEMBER_NPUB/extra",
+            "https://whitenoise.chat/event/$MEMBER_NPUB",
         ).forEach { input ->
             val hex = validatedFixtureIdentity(GroupMemberIdentitySearch.decoderInput(input))
             assertNull(input, hex)
