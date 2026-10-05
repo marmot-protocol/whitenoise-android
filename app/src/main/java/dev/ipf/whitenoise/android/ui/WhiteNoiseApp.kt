@@ -250,6 +250,12 @@ internal fun WhiteNoiseApp(
     val toast = appState.toast
     val transientNotice = appState.transientNotice
     val context = LocalContext.current
+    val shareImport =
+        dev.ipf.whitenoise.android.share.rememberInboundShareImport(
+            context,
+            mainShellStateHolder,
+            inboundShareRequest,
+        )
     val dictationFocusManager = LocalFocusManager.current
     val dictationKeyboard = LocalSoftwareKeyboardController.current
     val activity = remember(context) { context.findActivity() }
@@ -660,6 +666,7 @@ internal fun WhiteNoiseApp(
                                                         onNotificationTargetHandled(target, requestId)
                                                     },
                                                     inboundShareRequest = inboundShareRequest,
+                                                    shareImport = shareImport,
                                                     onShareRequestHandled = { request ->
                                                         appState.recordProductObservation(
                                                             ProductObservation.SHARE_ENTRY,

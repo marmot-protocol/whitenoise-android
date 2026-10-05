@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media.editor
 
 import dev.ipf.marmotkit.MessageDraftFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -12,6 +13,7 @@ internal data class MessageDraftMergeCompletion(
     val result: MessageDraftMutationResult,
     val contentForHydration: String?,
     val draftedAtMs: Long?,
+    val generation: MessageDraftGeneration? = null,
 )
 
 /** Coalesces composer keystrokes while the repository serializes them with attachment edits. */
@@ -145,7 +147,7 @@ internal class CoalescingMessageDraftWriter(
     ): Boolean {
         val key = Key(accountRef, groupIdHex)
         return synchronized(lock) {
-            if (hydrationBlockedGenerations[key] == generation) return@synchronized false
+            if (isHydrationBlocked(key, generation)) return@synchronized false
             if (!drafts.coordinated.isCurrent(accountRef, groupIdHex, generation)) return@synchronized false
             block()
             true
@@ -158,6 +160,54 @@ internal class CoalescingMessageDraftWriter(
             if (jobs.isEmpty()) return
             jobs.forEach { it.join() }
         }
+    }
+
+    /** Flush accepted edits, retry each retained failure once, and report unsaved text before deactivation. */
+    suspend fun flushAccount(accountRef: String): Boolean {
+        val retried = mutableSetOf<Key>()
+        while (true) {
+            val jobs =
+                synchronized(lock) {
+                    pending
+                        .filterKeys { it.accountRef == accountRef }
+                        .mapNotNull { (key, state) ->
+                            if (
+                                state.job == null &&
+                                state.lastResult is MessageDraftMutationResult.Failure &&
+                                retried.add(key)
+                            ) {
+                                state.job = scope.launch { drain(key, state) }
+                            }
+                            state.job
+                        }
+                }
+            if (jobs.isEmpty()) {
+                return synchronized(lock) {
+                    pending.none { (key, state) ->
+                        key.accountRef == accountRef && state.lastResult is MessageDraftMutationResult.Failure
+                    }
+                }
+            }
+            jobs.forEach { it.join() }
+        }
+    }
+
+    /** Account removal retires unsaved private text and invalidates late saves/hydration without a native write. */
+    fun removeAccount(accountRef: String) {
+        val jobs =
+            synchronized(lock) {
+                val keys =
+                    (pending.keys + activeMerges.keys + hydrationBlockedGenerations.keys)
+                        .filter { it.accountRef == accountRef }
+                        .toSet()
+                keys.mapNotNull { key ->
+                    drafts.coordinated.acceptMutation(key.accountRef, key.groupIdHex)
+                    activeMerges.remove(key)
+                    hydrationBlockedGenerations.remove(key)
+                    pending.remove(key)?.job
+                }
+            }
+        jobs.forEach { it.cancel() }
     }
 
     suspend fun loadIfCurrent(
@@ -193,12 +243,18 @@ internal class CoalescingMessageDraftWriter(
         return deletion
     }
 
+    /**
+     * Flushes accepted edits before importing text; callers can preserve raw shared whitespace with trimIncoming=false.
+     * Retains receipt-based retry identity and a generation-fenced result for composer hydration.
+     */
     suspend fun mergeText(
         accountRef: String,
         groupIdHex: String,
         incoming: String,
+        trimIncoming: Boolean = true,
+        receipt: MessageDraftMergeReceipt? = null,
     ): MessageDraftMergeCompletion {
-        val trimmedIncoming = incoming.trim()
+        val trimmedIncoming = if (trimIncoming) incoming.trim() else incoming
         if (trimmedIncoming.isEmpty()) {
             return MessageDraftMergeCompletion(
                 result = MessageDraftMutationResult.Success(draft = null),
@@ -207,39 +263,55 @@ internal class CoalescingMessageDraftWriter(
             )
         }
         val key = Key(accountRef, groupIdHex)
-        synchronized(lock) {
-            drafts.coordinated.acceptMutation(accountRef, groupIdHex)
-            hydrationBlockedGenerations.remove(key)
-        }
         val mergeLock = synchronized(lock) { mergeLocks.getOrPut(key) { Mutex() } }
         return mergeLock.withLock {
-            val activeMerge = ActiveMerge(trimmedIncoming)
-            beginMerge(key, activeMerge)
-            try {
-                val mergeResult = drafts.coordinated.mergeAcceptedText(accountRef, groupIdHex, trimmedIncoming)
-                finishMerge(key, activeMerge, mergeResult)
-            } finally {
-                synchronized(lock) { activeMerges.remove(key, activeMerge) }
+            val activeMerge = ActiveMerge(trimmedIncoming, receipt)
+            val flushFailure = beginMerge(key, activeMerge)
+            if (flushFailure != null) {
+                MessageDraftMergeCompletion(flushFailure, null, null)
+            } else {
+                try {
+                    val mergeResult =
+                        drafts.coordinated.mergeAcceptedText(accountRef, groupIdHex, trimmedIncoming, receipt)
+                    finishMerge(key, activeMerge, mergeResult)
+                } finally {
+                    synchronized(lock) { activeMerges.remove(key, activeMerge) }
+                }
             }
         }
     }
 
+    /** Drain old keystrokes before advancing generation; a failed drain leaves their text available for retry. */
     private suspend fun beginMerge(
         key: Key,
         activeMerge: ActiveMerge,
-    ) {
+    ): MessageDraftMutationResult.Failure? {
         while (true) {
-            val pendingJob =
+            val (state, pendingJob) =
                 synchronized(lock) {
-                    pending[key]?.job.also { job ->
-                        if (job == null) activeMerges[key] = activeMerge
+                    val state = pending[key]
+                    if (state != null && state.job == null && state.lastResult is MessageDraftMutationResult.Failure) {
+                        state.job = scope.launch { drain(key, state) }
                     }
+                    val job = state?.job
+                    if (job == null) {
+                        activeMerges[key] = activeMerge
+                        drafts.coordinated.acceptMutation(key.accountRef, key.groupIdHex)
+                        hydrationBlockedGenerations.remove(key)
+                    }
+                    state to job
                 }
-            if (pendingJob == null) return
+            if (pendingJob == null) return null
             pendingJob.join()
+            val failure =
+                synchronized(lock) {
+                    if (pending[key] === state) state?.lastResult as? MessageDraftMutationResult.Failure else null
+                }
+            if (failure != null) return failure
         }
     }
 
+    /** Snapshot the last accepted content and generation together after edits concurrent with the import finish. */
     private suspend fun finishMerge(
         key: Key,
         activeMerge: ActiveMerge,
@@ -249,15 +321,17 @@ internal class CoalescingMessageDraftWriter(
             flush(key)
             val completed =
                 synchronized(lock) {
+                    if (activeMerges[key] !== activeMerge) {
+                        throw CancellationException("Draft merge retired with its account")
+                    }
                     if (pending[key]?.job == null) {
-                        true
+                        mergeCompletion(activeMerge.latestResult, activeMerge.latestContent, mergeResult)
+                            .copy(generation = drafts.coordinated.generation(key.accountRef, key.groupIdHex))
                     } else {
-                        false
+                        null
                     }
                 }
-            if (completed) {
-                return mergeCompletion(activeMerge.latestResult, activeMerge.latestContent, mergeResult)
-            }
+            if (completed != null) return completed
         }
     }
 
@@ -288,7 +362,11 @@ internal class CoalescingMessageDraftWriter(
     ) {
         delay(debounceMillis)
         while (true) {
-            val (content, generation) = synchronized(lock) { state.content to state.generation }
+            val (content, generation) =
+                synchronized(lock) {
+                    activeMerges[key]?.receipt?.proposedContent = state.content
+                    state.content to state.generation
+                }
             val saved =
                 drafts.coordinated.saveAcceptedTextIfCurrent(
                     accountRef = key.accountRef,
@@ -315,6 +393,7 @@ internal class CoalescingMessageDraftWriter(
                 synchronized(lock) {
                     activeMerges[key]?.latestResult = result
                     activeMerges[key]?.latestContent = content
+                    state.lastResult = result
                     drafts.coordinated.isCurrent(
                         key.accountRef,
                         key.groupIdHex,
@@ -326,7 +405,7 @@ internal class CoalescingMessageDraftWriter(
                 synchronized(lock) {
                     if (state.generation == generation) {
                         state.job = null
-                        pending.remove(key, state)
+                        if (result !is MessageDraftMutationResult.Failure) pending.remove(key, state)
                         true
                     } else {
                         false
@@ -336,13 +415,16 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Coalesce newer edits with an active import while preserving their accepted generation and retryable text. */
     private fun enqueueAccepted(
         key: Key,
         content: String,
         generation: MessageDraftGeneration,
     ) {
         val state = pending.getOrPut(key) { Pending() }
-        state.content = activeMerges[key]?.let { merge -> mergeDraftText(content, merge.incoming) } ?: content
+        state.lastResult = null
+        val merge = activeMerges[key]
+        state.content = merge?.let { mergeDraftText(content, it.incoming) } ?: content
         state.generation = generation.value
         if (state.job == null) state.job = scope.launch { drain(key, state) }
     }
@@ -350,7 +432,11 @@ internal class CoalescingMessageDraftWriter(
     private fun isHydrationBlocked(
         key: Key,
         generation: MessageDraftGeneration,
-    ): Boolean = synchronized(lock) { hydrationBlockedGenerations[key] == generation }
+    ): Boolean =
+        synchronized(lock) {
+            val failed = pending[key]?.takeIf { it.lastResult is MessageDraftMutationResult.Failure }
+            hydrationBlockedGenerations[key] == generation || failed?.generation == generation.value
+        }
 
     private data class Key(
         val accountRef: String,
@@ -362,10 +448,12 @@ internal class CoalescingMessageDraftWriter(
         // staleness-exempt: captured accepted draft-mutation token, not a counter owner.
         var generation: Long = 0L,
         var job: Job? = null,
+        var lastResult: MessageDraftMutationResult? = null,
     )
 
     private class ActiveMerge(
         val incoming: String,
+        val receipt: MessageDraftMergeReceipt?,
         var latestResult: MessageDraftMutationResult? = null,
         var latestContent: String? = null,
     )
