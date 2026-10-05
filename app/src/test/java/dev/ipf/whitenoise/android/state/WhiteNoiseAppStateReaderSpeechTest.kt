@@ -143,18 +143,19 @@ class WhiteNoiseAppStateReaderSpeechTest {
             val appState = testAppState()
             val engine = FakeSessionEngine()
             appState.ttsController.attachEngine(engine)
-            val result = runCatching {
-                appState.speakAloudPrepared(
-                    listOf(TtsSpeakableEntry("s", "Sender", "Cancelled request.")),
-                    Locale.US,
-                    isCurrent = {
-                        if (appState.ttsController.state.value is TtsState.Preparing) {
-                            throw CancellationException("fixture cancelled preparation")
-                        }
-                        true
-                    },
-                )
-            }
+            val result =
+                runCatching {
+                    appState.speakAloudPrepared(
+                        listOf(TtsSpeakableEntry("s", "Sender", "Cancelled request.")),
+                        Locale.US,
+                        isCurrent = {
+                            if (appState.ttsController.state.value is TtsState.Preparing) {
+                                throw CancellationException("fixture cancelled preparation")
+                            }
+                            true
+                        },
+                    )
+                }
             assertTrue(result.exceptionOrNull() is CancellationException)
             assertTrue(appState.ttsController.state.value is TtsState.Idle)
             assertFalse(appState.ownsCurrentAccountSpeech())

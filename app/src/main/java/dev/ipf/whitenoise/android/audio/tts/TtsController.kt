@@ -355,7 +355,11 @@ class TtsController internal constructor(
         }
     }
 
-    /** Text work runs outside the controller lock; only its current owner can commit. */
+    /**
+     * Text work runs outside the controller lock; only its current owner can commit.
+     * [isCurrent] runs under that monitor and must remain a quick, nonblocking ownership predicate,
+     * without IO or application locks ordered against this controller.
+     */
     internal suspend fun speakAsync(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
@@ -386,7 +390,11 @@ class TtsController internal constructor(
         }
     }
 
-    /** Resolves a prepared hit off-lock, then revalidates caller, ticket, engine and locale before commit. */
+    /**
+     * Resolves a prepared hit off-lock, then revalidates caller, ticket, engine and locale before commit.
+     * An explicit rendered hit cannot fall back to a guessed sentence. If an authorized replacement fails
+     * mapping, the caller may report a generic start refusal; the old queue is not resumed implicitly.
+     */
     private suspend fun completePreparation(
         ticket: Triple<Long, TtsSpeechEngine, Locale>,
         entries: List<TtsSpeakableEntry>,
