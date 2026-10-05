@@ -2284,13 +2284,22 @@ internal fun ConversationScreen(
                     return@launch
                 }
                 if (!navigationRequest.isCurrent()) return@launch
-                val centered =
-                    centerTimelineItemAt(
-                        targetMessageId,
-                        requireNotNull(currentTimelineListIndex(targetMessageId)),
-                        ConversationScrollReason.Mention,
+                val reached =
+                    scrollCoordinator.jumpToMentionReadingStart(
+                        targetMessageId = targetMessageId,
+                        resolveTargetIndex = { currentTimelineListIndex(targetMessageId) },
+                        readLayout = { index ->
+                            val layout = timelineViewport.readingLayoutInfo()
+                            ConversationMentionJumpLayout(
+                                viewportEndOffsetPx = layout.viewportEndOffset,
+                                itemHeightPx =
+                                    layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
+                                estimatedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
+                            )
+                        },
                     )
-                if (!centered) return@launch
+                if (!reached || !navigationRequest.isCurrent()) return@launch
+                scrollCoordinator.settleReadingAt(currentScrollAnchor())
                 // Mark read up to the visited mention so the count — and the
                 // chat-list @-badge — decrement in step; advance the local read
                 // anchor so the chip's derived count updates immediately.

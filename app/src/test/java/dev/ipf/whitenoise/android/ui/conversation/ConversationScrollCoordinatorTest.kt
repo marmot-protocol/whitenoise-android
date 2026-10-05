@@ -1777,8 +1777,15 @@ class ConversationScrollCoordinatorTest {
     fun conversationScreenHighlightsOnlyCompletedCenteringCommands() {
         val screen = sourceFile("ConversationScreen.kt").readText()
 
-        assertEquals(2, Regex("if \\(!centered\\)").findAll(screen).count())
+        assertEquals(1, Regex("if \\(!centered\\)").findAll(screen).count())
         assertEquals(1, Regex("if \\(centered && navigationRequest.isCurrent\\(\\)\\)").findAll(screen).count())
+        val mention = screen.substringAfter("fun jumpToNextUnreadMention()").substringBefore("LaunchedEffect(controller)")
+        val positioned = mention.indexOf("scrollCoordinator.jumpToMentionReadingStart(")
+        val guard = mention.indexOf("if (!reached || !navigationRequest.isCurrent()) return@launch")
+        val read = mention.indexOf("controller.markReadUpTo(targetMessageId)")
+        val highlight = mention.indexOf("showTransientMessageHighlight(targetMessageId)")
+        assertTrue(positioned >= 0 && guard > positioned && read > guard && highlight > read)
+        assertTrue(mention.contains("resolveTargetIndex = { currentTimelineListIndex(targetMessageId) }"))
     }
 
     @Test
