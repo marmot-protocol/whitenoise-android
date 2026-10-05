@@ -51,6 +51,7 @@ class ConversationSourceRetentionTest {
                 assertNotNull(files.metadata(uri))
                 activeKeys.remove("queued")
                 state.untrackInFlightMediaUpload("account", "queued-chat", "queued", job)
+                state.retainedMediaUploads("account", "settled-chat")
                 assertNull(cache.get("queued"))
                 assertNull(files.resolve(uri))
             } finally {
