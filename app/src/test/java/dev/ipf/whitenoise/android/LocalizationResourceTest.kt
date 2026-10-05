@@ -472,18 +472,7 @@ class LocalizationResourceTest {
         )
     }
 
-    // Guards the umbrella sweep from #381: user-visible string values must not
-    // expose raw NIP specification identifiers (e.g. "NIP-05", "NIP-65",
-    // "NIP-44") or the deprecated "NIP-EE" naming. NIP numbers are protocol
-    // implementation detail and mean nothing to a non-developer user; group
-    // encryption is the "Marmot Protocol", not "NIP-EE". Code identifiers,
-    // log lines and code comments are out of scope — this inspects the
-    // textContent of every user-visible resource (<string> plus the <item>
-    // children of <plurals> and <string-array>), not their keys (so the
-    // `nip_05` / `nip_65` resource *keys* are unaffected). If you need to
-    // reference a NIP for power users, keep it in a developer-facing log or
-    // comment, not in a user-visible string.
-    // Historical localization issue: no default locale should carry incomplete strings.
+    /** Keeps protocol jargon out of UI copy except the explicitly named NIP-05 profile address fields. */
     @Test
     fun userVisibleStringsDoNotExposeRawNipIdentifiers() {
         val resDir =
@@ -505,13 +494,16 @@ class LocalizationResourceTest {
         val offenders =
             resourceFiles.flatMap { file ->
                 userVisibleValues(file)
-                    .filter { (_, value) -> forbiddenNipPattern.containsMatchIn(value) }
-                    .map { (key, value) -> "${file.path}: $key=\"$value\"" }
+                    .filter { (key, value) ->
+                        forbiddenNipPattern.findAll(value).any { match ->
+                            key !in setOf("nip_05", "profile_readiness_address") || match.value != "NIP-05"
+                        }
+                    }.map { (key, value) -> "${file.path}: $key=\"$value\"" }
             }
 
         assertTrue(
             "User-visible string values must not expose raw NIP identifiers " +
-                "(NIP-<number> or the deprecated NIP-EE). Replace them with a " +
+                "(except NIP-05 in the two profile address labels). Replace other identifiers with a " +
                 "human-readable description (see #381). Offenders:\n" +
                 offenders.joinToString("\n"),
             offenders.isEmpty(),

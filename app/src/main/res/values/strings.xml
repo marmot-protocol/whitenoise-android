@@ -856,7 +856,7 @@
     <string name="preview">Preview</string>
     <string name="no_active_account_period">No active account.</string>
     <string name="about">About</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">NIP-05 address</string>
     <string name="profile_picture_hint">Public HTTPS image URL</string>
     <string name="profile_picture_invalid">Only public HTTPS image URLs are allowed.</string>
     <string name="profile_picture_edit">Edit profile picture</string>
@@ -2377,7 +2377,7 @@
     <string name="profile_readiness_picture">Profile picture</string>
     <string name="profile_readiness_bio">Bio</string>
     <string name="profile_readiness_banner">Banner</string>
-    <string name="profile_readiness_address">Verified address</string>
+    <string name="profile_readiness_address">NIP-05 address</string>
     <string name="profile_readiness_lightning">Lightning address</string>
     <string name="profile_readiness_added">Added</string>
     <string name="profile_readiness_recommended">Recommended</string>
