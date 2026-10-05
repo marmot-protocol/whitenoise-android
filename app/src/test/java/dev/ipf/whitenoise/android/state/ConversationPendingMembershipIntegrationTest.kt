@@ -2,18 +2,23 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
 import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import dev.ipf.whitenoise.android.ui.conversation.CONVERSATION_BOTTOM_BAR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -23,6 +28,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,7 +66,7 @@ class ConversationPendingMembershipIntegrationTest {
             try {
                 val context = ApplicationProvider.getApplicationContext<Context>()
                 rule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
-                rule.onNodeWithText(pendingLabel(app, peer.memberIdHex)).assertIsDisplayed()
+                assertPendingAboveComposer(pendingLabel(app, peer.memberIdHex))
                 val changes =
                     listOf(
                         TimelineMessageChangeFfi.Upsert(
@@ -85,6 +91,107 @@ class ConversationPendingMembershipIntegrationTest {
                 holder.await()
                 controller.onCleared()
             }
+        }
+
+    @Test
+    fun pendingRemovalIsFullyAboveComposerWhenInsertedIntoVisibleTranscript() = heldVisibleRemoval(rowCount = 100)
+
+    @Test
+    fun emptyReadyConversationShowsPendingRemovalAboveComposer() = heldVisibleRemoval(rowCount = 0)
+
+    private fun heldVisibleRemoval(rowCount: Int) =
+        runBlocking {
+            val controller = controller(rowCount)
+            val app = controller.appState
+            val peer = AppGroupMemberRecordFfi(ConversationTimelineTestIds.SENDER_ID, account = null, local = false)
+            val release = CompletableDeferred<Unit>()
+            val holder =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    app.withGroupCommitLock(ConversationTimelineTestIds.ACCOUNT_REF, controller.group.groupIdHex) {
+                        release.await()
+                    }
+                }
+            showConversation(controller)
+            rule.waitForIdle()
+            val removal = async(start = CoroutineStart.UNDISPATCHED) { controller.removeMember(peer) }
+            try {
+                assertPendingAboveComposer(pendingLabel(app, peer.memberIdHex))
+                removal.cancelAndJoin()
+                rule.onNodeWithText(pendingLabel(app, peer.memberIdHex)).assertDoesNotExist()
+            } finally {
+                removal.cancelAndJoin()
+                release.complete(Unit)
+                holder.await()
+                controller.onCleared()
+            }
+        }
+
+    private fun assertPendingAboveComposer(label: String) {
+        val pending = rule.onNodeWithText(label).assertIsDisplayed().getUnclippedBoundsInRoot()
+        val composer = rule.onNodeWithTag(CONVERSATION_BOTTOM_BAR_TAG).getUnclippedBoundsInRoot()
+        assertTrue("The full pending row must clear the composer: $pending vs $composer", pending.bottom <= composer.top)
+        assertTrue("The pending row must remain inside the screen", pending.top.value >= 0f)
+    }
+
+    @Test
+    fun historyAndRefreshDoNotEmitLiveMembershipLatency() =
+        runBlocking {
+            PerformanceDiagnostics.stop()
+            assertTrue(PerformanceDiagnostics.start().active)
+            val controller = controller(initialMembership = true)
+            try {
+                assertEquals(0, membershipArrivalCount())
+                controller.applyTimelinePage(timelinePage(remoteEvent()), replaceWindow = true, updatePagination = true)
+                assertEquals(0, membershipArrivalCount())
+                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                    listOf(
+                        TimelineMessageChangeFfi.Upsert(
+                            TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
+                            remoteEvent().copy(messageIdHex = "refresh-event"),
+                        ),
+                    ),
+                )
+                assertEquals(0, membershipArrivalCount())
+                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                    listOf(
+                        TimelineMessageChangeFfi.Upsert(
+                            TimelineUpdateTriggerFfi.GROUP_SYSTEM,
+                            remoteEvent().copy(
+                                messageIdHex = "new-live-event",
+                            ),
+                        ),
+                    ),
+                )
+                assertEquals(1, membershipArrivalCount())
+                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                    listOf(
+                        TimelineMessageChangeFfi.Upsert(
+                            TimelineUpdateTriggerFfi.GROUP_SYSTEM,
+                            remoteEvent().copy(
+                                messageIdHex = "new-live-event",
+                            ),
+                        ),
+                    ),
+                )
+                assertEquals(1, membershipArrivalCount())
+                controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                    listOf(
+                        TimelineMessageChangeFfi.Upsert(
+                            TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                            remoteEvent().copy(messageIdHex = "compat-live-event"),
+                        ),
+                    ),
+                )
+                assertEquals(2, membershipArrivalCount())
+            } finally {
+                controller.onCleared()
+                PerformanceDiagnostics.stop()
+            }
+        }
+
+    private fun membershipArrivalCount() =
+        PerformanceDiagnostics.exportLines().count {
+            "op=group_membership_projection" in it && "phase=timeline_subscription_received" in it
         }
 
     private fun showConversation(controller: ConversationController) {
@@ -115,11 +222,19 @@ class ConversationPendingMembershipIntegrationTest {
         }
     }
 
-    private fun controller(): ConversationController {
+    private fun controller(
+        rowCount: Int = 100,
+        initialMembership: Boolean = false,
+    ): ConversationController {
         val group = conversationTimelineTestGroup()
         val subscription =
             ScriptedConversationTimelineSubscription(
-                timelinePage(*(1..100).map { timelineRecord("row-$it", it.toULong()) }.toTypedArray()),
+                timelinePage(
+                    *(
+                        (1..rowCount).map { timelineRecord("row-$it", it.toULong()) } +
+                            if (initialMembership) listOf(remoteEvent()) else emptyList()
+                    ).toTypedArray(),
+                ),
             )
         val scripted = ScriptedConversationLiveSubscriptions(listOf(subscription), group)
         val roster =
@@ -145,11 +260,24 @@ class ConversationPendingMembershipIntegrationTest {
                 initialGroup = group,
                 initialMemberSnapshot = conversationTimelineMemberSnapshot(),
                 groupRosterReader = { _, _ -> roster },
+                groupRecoveryStatusReader = { _, groupIdHex ->
+                    GroupRecoveryStatusFfi(
+                        groupIdHex = groupIdHex,
+                        automaticRecoveryFailed = false,
+                        pendingReinvites = 0u,
+                        failedReinvites = 0u,
+                        rejoinInvitations = emptyList(),
+                    )
+                },
                 startOnConstruction = true,
             )
         awaitConversationCondition {
-            controller.memberRosterState == GroupRosterLoadState.READY && controller.timeline.size == 100
+            controller.memberRosterState == GroupRosterLoadState.READY &&
+                controller.timeline.size == rowCount + (if (initialMembership) 1 else 0) &&
+                controller.hasPublishedAuthoritativeTimeline &&
+                controller.groupRecoveryStatus != null
         }
+        assertTrue("The fixture must have a healthy recovery read", !controller.groupRecoveryReadFailed)
         return controller
     }
 
@@ -158,8 +286,7 @@ class ConversationPendingMembershipIntegrationTest {
         memberId: String,
     ): String {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        return context.getString(R.string.remove_member_named, app.networkDisplayName(memberId)) +
-            " · " + context.getString(R.string.message_status_pending)
+        return context.getString(R.string.member_removal_pending, app.networkDisplayName(memberId))
     }
 
     private fun remoteEvent() =

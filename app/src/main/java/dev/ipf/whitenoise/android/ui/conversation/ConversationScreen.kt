@@ -373,6 +373,8 @@ private fun presentVoiceRecordingFailure(
     }
 }
 
+private val MEMBERSHIP_FRAME_EVENT_TYPES = setOf("member_added", "member_removed")
+
 /** Renders the shared retryable conversation-load error surface. */
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 @Composable
@@ -1508,7 +1510,10 @@ internal fun ConversationScreen(
                     controller.errorEdge == ConversationLoadFailureEdge.TOP
             val newestVisibleTimelineIndex =
                 conversationTimelineIndexForListIndex(
-                    listIndex = listState.firstVisibleItemIndex,
+                    listIndex =
+                        listState.firstVisibleItemIndex.coerceAtLeast(
+                            controller.conversationTrailingRowCount(rendered.size),
+                        ),
                     timelineSize = rendered.size,
                     trailingRowCount = controller.conversationTrailingRowCount(rendered.size),
                 )
@@ -2931,6 +2936,17 @@ internal fun ConversationScreen(
             followingTail = scrollCoordinator.isFollowingTail,
             initialTimelineAnchored = initialTimelineAnchored,
         )
+    // Stable-key anchoring otherwise retains the old newest message and leaves
+    // the inserted row under the composer. The existing owner preserves history
+    // focus, navigation and foreground restoration while revealing this tail.
+    LaunchedEffect(controller, controller.pendingMembershipActivity?.id, transcriptReadyToReveal) {
+        if (controller.pendingMembershipActivity != null && transcriptReadyToReveal) {
+            scrollCoordinator.followTailIfAllowed(
+                resolveTailIndex = { currentTailIndex },
+                reason = ConversationScrollReason.NewMessage,
+            )
+        }
+    }
     LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
         if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
         val latestId = renderedTimeline.lastOrNull()?.id
@@ -2972,13 +2988,16 @@ internal fun ConversationScreen(
     // refuses this correction while the user is reading history.
     LaunchedEffect(
         controller,
+        controller.pendingMembershipActivity?.id,
         renderedTimeline
             .lastOrNull()
             ?.record
             ?.messageIdHex
             ?.let { controller.reactions[it] },
     ) {
-        if (initialTimelineAnchored && renderedTimeline.isNotEmpty()) {
+        // A pending action owns the physical tail, so message-height settling
+        // resumes only after it clears. Its own follow effect handles insertion.
+        if (initialTimelineAnchored && renderedTimeline.isNotEmpty() && controller.pendingMembershipActivity == null) {
             val lastMessageId = renderedTimeline.last().record.messageIdHex
             scrollCoordinator.settleTailAfterLayoutChange(
                 resolveTailIndex = { currentTailIndex },
@@ -3746,6 +3765,7 @@ internal fun ConversationScreen(
                             ConversationEmptyMessage(conversationEmptyState(controller.group.disappearingMessageSecs))
                         }
                     renderedTimeline.isEmpty() &&
+                        controller.pendingMembershipActivity == null &&
                         !controller.hasMoreBefore &&
                         !controller.hasMoreAfterTimeline &&
                         !controller.isLoadingPage &&
@@ -3882,7 +3902,7 @@ internal fun ConversationScreen(
                                 ) { index, item ->
                                     val messageId = item.record.messageIdHex
                                     val membershipFrameModifier =
-                                        if (item.projected?.groupSystem?.systemType in setOf("member_added", "member_removed")) {
+                                        if (item.projected?.groupSystem?.systemType in MEMBERSHIP_FRAME_EVENT_TYPES) {
                                             Modifier.membershipVisibleDraw(timelineViewport) {
                                                 controller.membershipTimings.projectionFrame(messageId)
                                             }

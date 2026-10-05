@@ -12031,7 +12031,6 @@ class ConversationController(
         val preparationGeneration = timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
         val applied = installed?.page ?: page
-        applied.messages.forEach(::recordMembershipProjectionArrival)
         val snapshot = currentWindowApplySnapshot()
         val preparation =
             prepareWindowApplyOn(
@@ -12187,7 +12186,11 @@ class ConversationController(
             when (change) {
                 is TimelineMessageChangeFfi.Upsert -> {
                     val record = change.message
-                    recordMembershipProjectionArrival(record)
+                    if (change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE ||
+                        change.trigger == TimelineUpdateTriggerFfi.GROUP_SYSTEM
+                    ) {
+                        recordMembershipProjectionArrival(record)
+                    }
                     val actionRecord =
                         upsertProjectedRecord(
                             record,
@@ -12496,10 +12499,11 @@ class ConversationController(
         ).forEach(optimisticReactionChanges::remove)
     }
 
-    /** Arrival is timed before window preparation; stable row IDs stay local to this controller. */
+    /** Only newly delivered live events are timed; initial, paging and refresh rows are excluded. */
     private fun recordMembershipProjectionArrival(record: TimelineMessageRecordFfi) {
+        val type = record.groupSystem?.systemType
         if (record.messageIdHex !in timelineRecords &&
-            record.groupSystem?.systemType in setOf("member_added", "member_removed") &&
+            (type == "member_added" || type == "member_removed") &&
             GroupSystemEvents.resolve(record)?.fromAuthenticatedStateProjection == true
         ) {
             membershipTimings.projectionArrived(record.messageIdHex)
@@ -12537,7 +12541,6 @@ class ConversationController(
             recoverPendingEditStatusForProjection(record)
             return preparedAction ?: TimelineProjector.toAppMessageRecord(record)
         }
-        recordMembershipProjectionArrival(record)
         var retentionAtSendSeconds =
             previousItemId?.let { itemId -> timelineItemsById[itemId]?.retentionAtSendSeconds }
         if (previousItemId != null) {

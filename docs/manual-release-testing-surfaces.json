@@ -10706,15 +10706,9 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:message_status_pending",
+        "surface": "string:member_removal_pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
-        "anchor": "R.string.message_status_pending",
-        "test_ids": ["GRP-026"]
-      },
-      {
-        "surface": "string:remove_member_named",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
-        "anchor": "R.string.remove_member_named",
+        "anchor": "R.string.member_removal_pending",
         "test_ids": ["GRP-026"]
       },
       {

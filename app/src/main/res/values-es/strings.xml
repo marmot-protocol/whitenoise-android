@@ -306,6 +306,7 @@
     <string name="large_group_invite_confirm_title">¿Invitar a un grupo grande?</string>
     <string name="large_group_invite_confirm_message">En grupos de 50 miembros o más, es posible que las invitaciones adicionales no se entreguen de forma fiable. Aun así, puedes continuar.</string>
     <string name="invite_pending">Invitación pendiente: %1$s</string>
+    <string name="member_removal_pending">Eliminación pendiente: %1$s</string>
     <string name="latest_group_error">Último error del grupo: %1$s</string>
     <string name="actions">Acciones</string>
     <string name="archive_chat">Archivar</string>

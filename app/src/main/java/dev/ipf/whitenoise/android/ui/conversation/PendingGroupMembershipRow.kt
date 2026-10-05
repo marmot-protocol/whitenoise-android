@@ -24,6 +24,7 @@ import dev.ipf.whitenoise.android.state.OptimisticGroupRosterMutation
 import dev.ipf.whitenoise.android.state.PendingGroupMembershipActivity
 
 /** Local request feedback, deliberately separate from MDK's authoritative group-system rows. */
+@Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 @Composable
 internal fun PendingGroupMembershipRow(
     activity: PendingGroupMembershipActivity,
@@ -35,8 +36,7 @@ internal fun PendingGroupMembershipRow(
             is OptimisticGroupRosterMutation.Invite ->
                 stringResource(R.string.invite_pending, mutation.memberRefs.joinToString(", ") { displayName(it) })
             is OptimisticGroupRosterMutation.Remove ->
-                stringResource(R.string.remove_member_named, displayName(mutation.memberIdHex)) +
-                    " · " + stringResource(R.string.message_status_pending)
+                stringResource(R.string.member_removal_pending, displayName(mutation.memberIdHex))
             is OptimisticGroupRosterMutation.SetAdmin -> return
         }
     Row(
