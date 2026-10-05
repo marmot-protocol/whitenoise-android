@@ -494,7 +494,14 @@ object NotificationNavigation {
         return if (intent.data?.getQueryParameter(NOTIFICATION_BOUND_ROUTE_QUERY) == "1") {
             target
                 .takeIf { isTrustedTargetSignature(notificationKey, token, it) }
-                ?.copy(replyDraft = if (importReplyDraft) notificationReplyDraftFrom(intent, target.kind) else null)
+                ?.copy(
+                    replyDraft =
+                        if (importReplyDraft) {
+                            notificationReplyDraftFrom(intent, target.kind, token.orEmpty())
+                        } else {
+                            null
+                        },
+                )
         } else {
             target.takeIf { isTrustedNotificationTap(notificationKey, token, isTrustedTapToken) }
         }

@@ -23,22 +23,22 @@ data class NotificationReplyDraft(
 internal fun notificationReplyDraftFrom(
     intent: Intent,
     kind: NotificationTargetKind,
+    signature: String,
 ): NotificationReplyDraft? =
     if (kind == NotificationTargetKind.MESSAGE && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) {
         intent
             .getStringExtra(Notification.EXTRA_REMOTE_INPUT_DRAFT)
             ?.takeIf { it.isNotBlank() && it.length <= MAX_REMOTE_DRAFT_CHARS }
-            ?.let { NotificationReplyDraft(notificationDraftReceiptId(intent, it), it) }
+            ?.let { NotificationReplyDraft(notificationDraftReceiptId(signature, it), it) }
     } else {
         null
     }
 
 /** Identical deliveries of one signed card share a receipt; a new card or changed text is a separate intake. */
 private fun notificationDraftReceiptId(
-    intent: Intent,
+    signature: String,
     text: String,
 ): String {
-    val signature = intent.getStringExtra(NotificationNavigation.EXTRA_TAP_TOKEN).orEmpty()
     val input = "${signature.length}:$signature${text.length}:$text".toByteArray(Charsets.UTF_8)
     val digest = MessageDigest.getInstance("SHA-256").digest(input)
     return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
