@@ -175,8 +175,13 @@ class AttachmentDownloadInterruptionBackoffTest {
         startAndStop(id, STOP_REASON_QUOTA)
         AttachmentDownloadWorker.cancelForRequest(application, testRequest())
 
-        val infos = WorkManager.getInstance(application).getWorkInfosForUniqueWork(workName()).get()
-        assertTrue(infos.all { it.state.isFinished })
+        eventually("cancelled work retired") {
+            WorkManager
+                .getInstance(application)
+                .getWorkInfosForUniqueWork(workName())
+                .get()
+                .all { it.state.isFinished }
+        }
     }
 
     /** Backed-off work completes once the delay has passed and the platform lets it run. */
@@ -420,8 +425,13 @@ class AttachmentDownloadInterruptionBackoffTest {
 
         AttachmentDownloadWorker.cancelForRequest(application, testRequest())
 
-        val infos = WorkManager.getInstance(application).getWorkInfosForUniqueWork(workName()).get()
-        assertTrue(infos.all { it.state.isFinished })
+        eventually("cancelled work retired") {
+            WorkManager
+                .getInstance(application)
+                .getWorkInfosForUniqueWork(workName())
+                .get()
+                .all { it.state.isFinished }
+        }
         assertFalse(intentStore().hasSpentTransientRetry(testRequest()))
     }
 
