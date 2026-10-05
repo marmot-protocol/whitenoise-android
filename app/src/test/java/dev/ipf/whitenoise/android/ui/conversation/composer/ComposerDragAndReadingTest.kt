@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -125,17 +126,21 @@ class ComposerDragAndReadingTest {
         drag(600f)
         assertTrue("compact chrome must leave unused space to the transcript", height() < before - 40f)
         assertOneEditorLine()
-        val resize = composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG).fetchSemanticsNode().boundsInRoot
-        val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
-        assertTrue("resize semantics must not cover the editor", resize.bottom <= editor.top)
+        composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.onNode(hasSetTextAction()).assertIsFocused()
     }
 
     @Test
-    fun resizeAccessibilityLeavesTheEmptyEditorReachable() {
+    fun accessibleResizeAndEditorFocusRemainIndependentlyAvailable() {
         render("")
-        val resize = composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG).fetchSemanticsNode().boundsInRoot
-        val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
-        assertTrue("resize semantics must not cover the editor", resize.bottom <= editor.top)
+        val resize = composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
+        val action = resize.fetchSemanticsNode().config[SemanticsProperties.CustomActions].single()
+        composeRule.runOnIdle { assertTrue(action.action()) }
+        composeRule.waitForIdle()
+        composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.onNode(hasSetTextAction()).assertIsFocused()
+        assertEquals("", observed.text)
+        assertEquals(0, sends)
     }
 
     @Test

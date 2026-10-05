@@ -946,12 +946,14 @@ internal fun ComposerPill(
                         // the editor, its spatial search otherwise reopens that editor immediately.
                         // Explicit touch/programmatic requests enter directly and keep their target.
                         if (requestedFocusDirection == FocusDirection.Down &&
-                            inputContentVisible && voiceReviewContent == null
+                            inputContentVisible &&
+                            voiceReviewContent == null
                         ) {
                             defaultActionFocus.requestFocus()
                         }
                     }
-                }.focusGroup().deferredPadding(
+                }.focusGroup()
+                .deferredPadding(
                     end = {
                         interpolateDp(
                             compactOuterEndInset,
@@ -1432,7 +1434,7 @@ internal fun ComposerPill(
                     Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .height(if (multilineControlsSuppressed) 12.dp else 24.dp)
+                        .height(48.dp)
                         .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
                         .semantics {
                             contentDescription = resizeComposerDescription
