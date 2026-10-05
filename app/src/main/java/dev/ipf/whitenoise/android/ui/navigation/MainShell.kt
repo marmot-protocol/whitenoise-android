@@ -760,6 +760,7 @@ internal fun MainShell(
     LaunchedEffect(
         inboundNotificationTarget,
         inboundNotificationRequestId,
+        inboundNotificationTarget?.replyDraft != null && appState.appInForeground,
         appState.activeAccountRef,
         appState.runtimeGeneration,
         appState.accounts,
@@ -790,6 +791,7 @@ internal fun MainShell(
                 }
                 return@LaunchedEffect
             }
+        if (target.replyDraft != null && !appState.appInForeground) return@LaunchedEffect
         if (routingRequestId != armedNotificationRequestId) {
             releaseNotificationFirstFrameGate(armedNotificationRequestId)
             notificationActiveRetryRequestId = null
@@ -843,7 +845,10 @@ internal fun MainShell(
         val step =
             resolveNotificationNav(
                 target = target,
-                knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
+                knownAccountRefs =
+                    appState.accounts
+                        .filter { target.replyDraft == null || !it.signedOut }
+                        .mapTo(mutableSetOf()) { it.label },
                 activeAccountRef = appState.activeAccountRef,
                 chatListReady = chatListReady,
                 availableGroupIds = availableGroupIds,
@@ -854,6 +859,8 @@ internal fun MainShell(
             )
 
         suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+            if (target.replyDraft != null) routingNotification = true
+            appState.notificationReplyDraftHandoff.stage(target)
             // Await cancellation before publishing any route state. A superseded
             // effect must not partially commit while its platform call is pending.
             appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)

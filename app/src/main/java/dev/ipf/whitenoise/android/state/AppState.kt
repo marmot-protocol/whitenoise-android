@@ -2254,15 +2254,9 @@ class WhiteNoiseAppState private constructor(
             stageText =
                 inboundShareTextStager ?: { accountRef, groupIdHex, text ->
                     mutationsScope.launch {
-                        val completion = draftWriter.mergeText(accountRef, groupIdHex, text)
-                        completion.contentForHydration?.let { content ->
-                            draftStore.hydrate(
-                                accountRef,
-                                groupIdHex,
-                                content,
-                                completion.draftedAtMs ?: System.currentTimeMillis(),
-                                replaceExisting = true,
-                            )
+                        val completion =
+                            draftWriter.mergeText(accountRef, groupIdHex, text, trimIncoming = false)
+                        draftWriter.hydrateMergedDraft(draftStore, accountRef, groupIdHex, completion) {
                             draftHydrationRevision += 1
                         }
                         when (val result = completion.result) {
@@ -2383,6 +2377,15 @@ class WhiteNoiseAppState private constructor(
             },
         )
     private val draftSummaryRefreshLifetime = StalenessGuard()
+    internal val notificationReplyDraftHandoff by lazy {
+        NotificationReplyDraftHandoff(
+            mutationsScope,
+            draftWriter,
+            draftStore,
+            available = { target -> accounts.any { it.label == target.accountRef && !it.signedOut } },
+            onFailed = { present(R.string.toast_reply_draft_restore_failed) },
+        ) { draftHydrationRevision += 1 }
+    }
     private val composerDraftExpansionBridge =
         ComposerDraftExpansionBridge(
             draftWriter = draftWriter,
@@ -2737,8 +2740,9 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ) {
         accountRef ?: return
-        val generation = draftWriter.generation(accountRef, groupIdHex)
         mutationsScope.launch {
+            notificationReplyDraftHandoff.retryPending(accountRef, groupIdHex)
+            val generation = draftWriter.generation(accountRef, groupIdHex)
             draftWriter
                 .loadIfCurrent(accountRef, groupIdHex, generation)
                 ?.onSuccess { draft ->
@@ -6181,6 +6185,7 @@ class WhiteNoiseAppState private constructor(
     @Suppress("ReturnCount") // No account, retained engine session, or completed local sign-out.
     suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
         val signedOutRef = activeAccountRef ?: return null
+        val draftsSaved = draftWriter.flushAccount(signedOutRef)
         // MDK 0.9.15 handles local and external signers through the same call.
         val engineResult =
             runCatchingCancellable {
@@ -6212,6 +6217,8 @@ class WhiteNoiseAppState private constructor(
         composerExpansionStateRetention.removeAccount(signedOutRef)
         composerDraftExpansionBridge.removeAccount(signedOutRef)
         pendingMessageEditHandoff.removeAccount(signedOutRef)
+        notificationReplyDraftHandoff.removeAccount(signedOutRef)
+        draftWriter.removeAccount(signedOutRef)
         conversationDictation.onAccountUnavailable(signedOutRef)
         stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
@@ -6240,6 +6247,7 @@ class WhiteNoiseAppState private constructor(
         // device — other identities still need it on multi-account switch.
         if (next == null) pushTokenStore.clear()
         refreshLocalNotificationSettings()
+        if (!draftsSaved) present(R.string.toast_draft_save_failed)
         return signOutCompletion(engineOutcome)
     }
 
@@ -6308,6 +6316,8 @@ class WhiteNoiseAppState private constructor(
             composerExpansionStateRetention.removeAccount(wipedRef)
             composerDraftExpansionBridge.removeAccount(wipedRef)
             pendingMessageEditHandoff.removeAccount(wipedRef)
+            notificationReplyDraftHandoff.removeAccount(wipedRef)
+            draftWriter.removeAccount(wipedRef)
             clearConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
