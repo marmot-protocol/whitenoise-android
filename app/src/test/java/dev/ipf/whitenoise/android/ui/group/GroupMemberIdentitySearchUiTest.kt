@@ -35,6 +35,7 @@ import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -79,7 +80,7 @@ class GroupMemberIdentitySearchUiTest {
     }
 
     @Test
-    fun trailingPasteAcceptsNprofileAndDoesNotFetchRelayHints() {
+    fun trailingPastePassesNprofileToDecoderOffMainThread() {
         val decoded = mutableListOf<String>()
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(ClipData.newPlainText("public", "nostr:$MEMBER_NPROFILE"))
@@ -145,6 +146,8 @@ class GroupMemberIdentitySearchUiTest {
     fun groupSwitchCancelsInFlightSearch() {
         val pending = CompletableDeferred<String?>()
         val started = CompletableDeferred<Unit>()
+        val secondPending = CompletableDeferred<String?>()
+        val secondStarted = CompletableDeferred<Unit>()
         val first = fixture {
             started.complete(Unit)
             pending.await()
@@ -154,11 +157,25 @@ class GroupMemberIdentitySearchUiTest {
         openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
         composeRule.waitUntil(5_000) { started.isCompleted }
-        composeRule.runOnIdle { current.value = fixture(groupId = "second") }
-        pending.complete(MEMBER_HEX)
+        composeRule.runOnIdle {
+            current.value = fixture(groupId = "second") {
+                secondStarted.complete(Unit)
+                secondPending.await()
+            }
+        }
         composeRule.onNodeWithTag("chat_info.members_screen").assertDoesNotExist()
         composeRule.onNodeWithTag(SEARCH).assertDoesNotExist()
         assertFalse(first.controller.group.groupIdHex == current.value.controller.group.groupIdHex)
+        openSearch()
+        composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
+        composeRule.waitUntil(5_000) { secondStarted.isCompleted }
+        pending.complete(MEMBER_HEX)
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.recipient_preview_resolving))
+            .assertExists()
+        composeRule.onNodeWithTag("chat_info.member.$MEMBER_HEX").assertDoesNotExist()
+        secondPending.complete(MEMBER_HEX)
+        awaitMatch()
     }
 
     @Test

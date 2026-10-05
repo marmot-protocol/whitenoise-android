@@ -64,6 +64,7 @@ class GroupMemberIdentitySearchTest {
         }
         assertFalse(GroupMemberIdentitySearch.matches("unknown", null, MEMBER_HEX, "Alice"))
         assertNull(GroupMemberIdentitySearch.clipboardInput("Alice"))
+        assertNull(GroupMemberIdentitySearch.decoderInput("bob@example.com"))
     }
 }
 

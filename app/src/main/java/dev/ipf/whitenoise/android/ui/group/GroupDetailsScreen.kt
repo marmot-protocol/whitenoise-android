@@ -60,6 +60,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,8 +83,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -294,7 +299,7 @@ internal fun GroupDetailsScreen(
         var membersExpanded by remember(controller) { mutableStateOf(false) }
         var memberSearchOpen by remember(controller) { mutableStateOf(false) }
         var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
-        var memberSearchRetry by remember(controller) { mutableStateOf(0) }
+        var memberSearchRetry by remember(controller) { mutableIntStateOf(0) }
         val memberResolution =
             rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)
         // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
@@ -1176,7 +1181,15 @@ internal fun GroupDetailsScreen(
                                 else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
                             }
                         if (memberResolution.resolving) {
-                            CircularProgressIndicator(Modifier.padding(horizontal = Dimens.spaceLg))
+                            val resolvingDescription = stringResource(R.string.recipient_preview_resolving)
+                            CircularProgressIndicator(
+                                Modifier
+                                    .padding(horizontal = Dimens.spaceLg)
+                                    .semantics {
+                                        contentDescription = resolvingDescription
+                                        liveRegion = LiveRegionMode.Polite
+                                    },
+                            )
                         } else if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
                             Text(
                                 stringResource(R.string.no_matches),

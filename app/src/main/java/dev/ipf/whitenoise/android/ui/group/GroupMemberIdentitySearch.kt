@@ -48,6 +48,7 @@ internal object GroupMemberIdentitySearch {
 
     /** Shape screening only. MDK must validate checksum and public identity before matching. */
     fun decoderInput(raw: String): String? {
+        if (!isIdentityQuery(raw)) return null
         val query = raw.trim()
         val uri = if (query.contains("://")) runCatching { URI(query) }.getOrNull() else null
         val malformedUrl =
@@ -101,7 +102,7 @@ internal fun rememberGroupMemberSearchResolution(
     owner: Any,
     retry: Int,
 ): GroupMemberSearchResolution {
-    val input = GroupMemberIdentitySearch.decoderInput(query)
+    val input = remember(query) { GroupMemberIdentitySearch.decoderInput(query) }
     val account = appState.activeAccountRef
     val generation = appState.runtimeGeneration
     val unavailable = appState.signOutInProgress || appState.wipeInProgress

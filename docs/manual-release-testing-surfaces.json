@@ -11139,6 +11139,12 @@
         ]
       },
       {
+        "surface": "Accessible local member resolution progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.recipient_preview_resolving",
+        "test_ids": ["GRP-027"]
+      },
+      {
         "surface": "Local member identity resolution",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMemberIdentitySearch.kt",
         "anchor": "internal fun rememberGroupMemberSearchResolution(",
