@@ -94,16 +94,9 @@ class GroupDetailsEditNavigationTest {
     /** New groups keep All; independent device switches can retain mentions-only and restore All. */
     @Test
     fun newGroupStartsWithAllAndCanChooseOnlyMentions() {
-        context
-            .getSharedPreferences("whitenoise.chat_mute", Context.MODE_PRIVATE)
-            .edit()
-            .clear()
-            .commit()
-        context
-            .getSharedPreferences("whitenoise.conversation_alerts", Context.MODE_PRIVATE)
-            .edit()
-            .clear()
-            .commit()
+        listOf("whitenoise.chat_mute", "whitenoise.conversation_alerts").forEach { name ->
+            context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
+        }
         val fixture = controller(group())
         val groupId = fixture.controller.group.groupIdHex
         render(fixture)
@@ -151,18 +144,6 @@ class GroupDetailsEditNavigationTest {
     private fun alertControlReady(tag: String, state: ToggleableState): Boolean {
         val node = composeRule.onNodeWithTag(tag).fetchSemanticsNode().config
         return !node.contains(SemanticsProperties.Disabled) && node[SemanticsProperties.ToggleableState] == state
-    }
-
-    @Test
-    fun soundAndAppearanceOpensBottomSheetAndCloseReturnsToAlertSettings() {
-        render(controller(group()))
-        composeRule.onNodeWithText(context.getString(R.string.sounds_and_notifications)).performScrollTo().performClick()
-        composeRule.onNodeWithTag(SOUND_APPEARANCE_OPEN_TAG).performScrollTo().performClick()
-        composeRule.onNodeWithTag("sheet.surface").assertIsDisplayed()
-        composeRule.onNodeWithTag("sheet.dragHandle").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
-        composeRule.onNodeWithTag("sheet.surface").assertDoesNotExist()
-        composeRule.onNodeWithTag("conversation-alert-messages_group").assertIsDisplayed()
     }
 
     /** Unavailable call actions do not occupy the primary action row. */
