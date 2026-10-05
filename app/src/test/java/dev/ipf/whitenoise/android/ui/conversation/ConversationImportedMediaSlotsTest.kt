@@ -157,5 +157,4 @@ class ConversationImportedMediaSlotsTest {
         assertEquals(listOf(fresh, imported), merged.mediaSlots)
         assertSame(imported, merged.mediaSlots.last())
     }
-
 }

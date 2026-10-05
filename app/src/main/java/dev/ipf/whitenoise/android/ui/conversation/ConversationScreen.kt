@@ -3157,15 +3157,27 @@ internal fun ConversationScreen(
             documentUris = pendingDocumentUris,
         )
 
+    val nativeComposerCleanupRevision =
+        appState.nativeComposerCleanupRevision(controller.boundAccountRef, controller.group.groupIdHex)
     LaunchedEffect(
         mediaDraftState,
         controller.boundAccountRef,
         chat.id,
-        appState.inboundShareRevision,
+        nativeComposerCleanupRevision,
         pendingMediaSlots,
         pendingDocumentUris,
     ) {
+        val capturedSlots = pendingMediaSlots
+        val capturedDocuments = pendingDocumentUris
+        val capturedAccount = controller.boundAccountRef
+        mediaDraftState.updateInputs(capturedSlots, capturedDocuments, capturedAccount)
         val restored = mediaDraftState.restorePersistedAttachments() ?: return@LaunchedEffect
+        if (
+            pendingMediaSlots != capturedSlots || pendingDocumentUris != capturedDocuments ||
+            controller.boundAccountRef != capturedAccount
+        ) {
+            return@LaunchedEffect
+        }
         val merged =
             // Native reconciliation already includes fresh local picks. Preserve only the
             // independently owned imported shelf here so consumed native slots stay removed.

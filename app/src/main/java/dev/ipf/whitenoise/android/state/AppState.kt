@@ -2246,6 +2246,15 @@ class WhiteNoiseAppState private constructor(
     // staleness-exempt: observable draft version combined into the composer revision.
     private var draftHydrationRevision by mutableIntStateOf(0)
 
+    // Transient view invalidation, bounded with the existing retained conversation state.
+    private val nativeComposerCleanupRevisions = mutableStateMapOf<String, Int>()
+
+    /** Only committed cleanup of this exact owner may refresh its native-restored media shelf. */
+    internal fun nativeComposerCleanupRevision(
+        accountRef: String?,
+        groupIdHex: String,
+    ): Int = nativeComposerCleanupRevisions[conversationKey(accountRef, groupIdHex)] ?: 0
+
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
         get() = shareStaging.revision + draftHydrationRevision
@@ -2393,7 +2402,15 @@ class WhiteNoiseAppState private constructor(
             draftRepository = messageDraftRepository,
             expansionRetention = composerExpansionStateRetention,
             scope = mutationsScope,
-            onDraftPresentationChanged = { draftHydrationRevision += 1 },
+            onDraftPresentationChanged = { accountRef, groupIdHex, nativeDraftConsumed ->
+                draftHydrationRevision += 1
+                if (nativeDraftConsumed) {
+                    synchronized(conversationStateLock) {
+                        val key = retainConversationState(accountRef, groupIdHex)
+                        nativeComposerCleanupRevisions[key] = (nativeComposerCleanupRevisions[key] ?: 0) + 1
+                    }
+                }
+            },
             onCleanupFailure = { groupIdHex, cause ->
                 appStateDebug(cause) { "sent draft cleanup failed group=${groupIdHex.take(8)}" }
             },
@@ -3106,6 +3123,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Drops all cached conversation overlays and clears the retained queue to release its source owners. */
     private fun removeConversationState(staleKey: String) {
+        nativeComposerCleanupRevisions.remove(staleKey)
         optimisticMessagesByConversation.remove(staleKey)
         durableAcceptanceCallbacksByConversation.remove(staleKey)?.clear()
         projectedMessageIdsByConversation.remove(staleKey)

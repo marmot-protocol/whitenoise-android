@@ -83,14 +83,7 @@ class ConversationDraftRestoreRemovalTest {
                 val gateway = RestoreGateway(MessageDraftFfi(group.groupIdHex, "caption", null, photos, 1L, 1L))
                 val repository = MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher)
                 val app =
-                    WhiteNoiseAppState(
-                        context = context,
-                        draftStore = DraftStore(EmptyDrafts),
-                        accountIdHexResolver = { null },
-                        accounts = emptyList(),
-                        activeAccountRef = "account",
-                        messageDraftRepository = repository,
-                    )
+                    appForRestore(context, repository)
                 val controller = ConversationController(appState = app, initialGroup = group)
                 val owner =
                     ConversationMediaDraftState(
@@ -100,7 +93,11 @@ class ConversationDraftRestoreRemovalTest {
                         backgroundScope,
                         PhotoEditorMessages("", "", "", ""),
                     )
-                owner.updateInputs(emptyList(), emptyList(), "account")
+                owner.updateInputs(
+                    savedNativeSlots(requireNotNull(gateway.current).mediaAttachments),
+                    emptyList(),
+                    "account",
+                )
                 val restored = requireNotNull(owner.restorePersistedAttachments())
                 assertEquals(2, restored.mediaSlots.size)
                 val newerPick =
@@ -109,9 +106,10 @@ class ConversationDraftRestoreRemovalTest {
                         newPhotoUri(context),
                     )
                 owner.updateInputs(restored.mediaSlots + newerPick, emptyList(), "account")
-                gateway.current = null // MDK durably accepted and consumed the original draft.
-                app.loadDraft("account", group.groupIdHex)
+                val pendingClear = requireNotNull(app.captureDraftForSend("account", group.groupIdHex))
+                app.clearDraftAfterSuccessfulSend(pendingClear)
                 advanceUntilIdle()
+                assertNull(gateway.current)
 
                 val reconciled = requireNotNull(owner.restorePersistedAttachments())
 
@@ -164,6 +162,63 @@ class ConversationDraftRestoreRemovalTest {
             .captureRoboImage("src/test/snapshots/composer_after_native_cleanup_dark_large_rtl.png")
     }
 
+    /** Generic hydration and another chat's cleanup cannot restore attachments queued by this send. */
+    @Test
+    fun pendingMediaDoesNotReappearOnUnrelatedOrSupersededDraftChanges() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            Dispatchers.setMain(dispatcher)
+            try {
+                val context = ApplicationProvider.getApplicationContext<Context>()
+                val group = conversationTimelineTestGroup()
+                val attachment =
+                    MessageDraftAttachmentFfi(
+                        "native-photo", "photo.jpg", "image/jpeg", byteArrayOf(1, 2),
+                        null, null, null, emptyList(),
+                    )
+                val gateway =
+                    RestoreGateway(
+                        MessageDraftFfi(group.groupIdHex, "caption", null, listOf(attachment), 1L, 1L),
+                    )
+                val app =
+                    appForRestore(
+                        context,
+                        MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher),
+                    )
+                val owner =
+                    ConversationMediaDraftState(
+                        app, ConversationController(appState = app, initialGroup = group), context,
+                        backgroundScope, PhotoEditorMessages("", "", "", ""),
+                    )
+                owner.updateInputs(
+                    savedNativeSlots(requireNotNull(gateway.current).mediaAttachments),
+                    emptyList(),
+                    "account",
+                )
+                val restored = requireNotNull(owner.restorePersistedAttachments())
+                val pendingClear = requireNotNull(app.captureDraftForSend("account", group.groupIdHex))
+                owner.forgetAcceptedAttachments(restored.mediaSlots.map { it.id }.toSet(), emptySet())
+                owner.updateInputs(emptyList(), emptyList(), "account")
+                app.loadDraft("account", group.groupIdHex)
+                val other = requireNotNull(app.captureDraftForSend("account", "bb".repeat(16)))
+                app.clearDraftAfterSuccessfulSend(other)
+                advanceUntilIdle()
+
+                assertEquals(0, app.nativeComposerCleanupRevision("account", group.groupIdHex))
+                assertNull(owner.restorePersistedAttachments())
+                assertTrue(owner.preparedAttachments().isEmpty())
+
+                app.setDraft("account", group.groupIdHex, androidx.compose.ui.text.input.TextFieldValue("next message"))
+                app.clearDraftAfterSuccessfulSend(pendingClear)
+                advanceUntilIdle()
+                assertEquals("next message", gateway.current?.content)
+                assertEquals(0, app.nativeComposerCleanupRevision("account", group.groupIdHex))
+                assertNull(owner.restorePersistedAttachments())
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
     /** A failed authoritative read cannot erase restored bytes or newer picker input. */
     @Test
     fun failedNativeRefreshPreservesTheCurrentShelf() =
@@ -184,15 +239,14 @@ class ConversationDraftRestoreRemovalTest {
                         null,
                         emptyList(),
                     )
-                val gateway = RestoreGateway(MessageDraftFfi(group.groupIdHex, "caption", null, listOf(attachment), 1L, 1L))
+                val gateway =
+                    RestoreGateway(
+                        MessageDraftFfi(group.groupIdHex, "caption", null, listOf(attachment), 1L, 1L),
+                    )
                 val app =
-                    WhiteNoiseAppState(
-                        context = context,
-                        draftStore = DraftStore(EmptyDrafts),
-                        accountIdHexResolver = { null },
-                        accounts = emptyList(),
-                        activeAccountRef = "account",
-                        messageDraftRepository = MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher),
+                    appForRestore(
+                        context,
+                        MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher),
                     )
                 val owner =
                     ConversationMediaDraftState(
@@ -202,7 +256,11 @@ class ConversationDraftRestoreRemovalTest {
                         backgroundScope,
                         PhotoEditorMessages("", "", "", ""),
                     )
-                owner.updateInputs(emptyList(), emptyList(), "account")
+                owner.updateInputs(
+                    savedNativeSlots(requireNotNull(gateway.current).mediaAttachments),
+                    emptyList(),
+                    "account",
+                )
                 val restored = requireNotNull(owner.restorePersistedAttachments())
                 val newerPick =
                     PendingMediaSlot(
@@ -210,7 +268,8 @@ class ConversationDraftRestoreRemovalTest {
                         Uri.parse("content://picker/new"),
                     )
                 owner.updateInputs(restored.mediaSlots + newerPick, emptyList(), "account")
-                app.loadDraft("account", group.groupIdHex)
+                val pendingClear = requireNotNull(app.captureDraftForSend("account", group.groupIdHex))
+                app.clearDraftAfterSuccessfulSend(pendingClear)
                 advanceUntilIdle()
                 gateway.readFailure = IllegalStateException("native read unavailable")
 
@@ -241,15 +300,14 @@ class ConversationDraftRestoreRemovalTest {
                         null,
                         emptyList(),
                     )
-                val gateway = RestoreGateway(MessageDraftFfi(group.groupIdHex, "caption", null, listOf(attachment), 1L, 1L))
+                val gateway =
+                    RestoreGateway(
+                        MessageDraftFfi(group.groupIdHex, "caption", null, listOf(attachment), 1L, 1L),
+                    )
                 val app =
-                    WhiteNoiseAppState(
-                        context = context,
-                        draftStore = DraftStore(EmptyDrafts),
-                        accountIdHexResolver = { null },
-                        accounts = emptyList(),
-                        activeAccountRef = "account",
-                        messageDraftRepository = MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher),
+                    appForRestore(
+                        context,
+                        MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher),
                     )
                 val owner =
                     ConversationMediaDraftState(
@@ -259,7 +317,11 @@ class ConversationDraftRestoreRemovalTest {
                         backgroundScope,
                         PhotoEditorMessages("", "", "", ""),
                     )
-                owner.updateInputs(emptyList(), emptyList(), "account")
+                owner.updateInputs(
+                    savedNativeSlots(requireNotNull(gateway.current).mediaAttachments),
+                    emptyList(),
+                    "account",
+                )
                 gateway.beforeReadReturns = { owner.updateInputs(emptyList(), emptyList(), "other-account") }
 
                 assertNull(owner.restorePersistedAttachments())
@@ -293,14 +355,7 @@ class ConversationDraftRestoreRemovalTest {
                 val gateway = RestoreGateway(MessageDraftFfi(group.groupIdHex, "", null, listOf(attachment), 1L, 1L))
                 val repository = MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher)
                 val app =
-                    WhiteNoiseAppState(
-                        context = context,
-                        draftStore = DraftStore(EmptyDrafts),
-                        accountIdHexResolver = { null },
-                        accounts = emptyList(),
-                        activeAccountRef = "account",
-                        messageDraftRepository = repository,
-                    )
+                    appForRestore(context, repository)
                 val controller = ConversationController(appState = app, initialGroup = group)
                 val owner =
                     ConversationMediaDraftState(
@@ -326,6 +381,23 @@ class ConversationDraftRestoreRemovalTest {
                 Dispatchers.resetMain()
             }
         }
+
+    private fun appForRestore(
+        context: Context,
+        repository: MessageDraftRepository,
+    ): WhiteNoiseAppState =
+        WhiteNoiseAppState(
+            context = context,
+            draftStore = DraftStore(EmptyDrafts),
+            accountIdHexResolver = { null },
+            accounts = emptyList(),
+            activeAccountRef = "account",
+            messageDraftRepository = repository,
+        )
+
+    /** Native-id slots model an already restored saveable shelf without relying on FileProvider shadows. */
+    private fun savedNativeSlots(attachments: List<MessageDraftAttachmentFfi>): List<PendingMediaSlot> =
+        attachments.map { PendingMediaSlot(it.id, Uri.parse("content://native.saved/${it.id}")) }
 
     /** Keeps editor bookkeeping isolated from the Android key store. */
     private object EmptyStrings : EditorStringStore {
@@ -360,7 +432,7 @@ private class RestoreGateway(
         groupIdHex: String,
     ): MessageDraftFfi? {
         readFailure?.let { throw it }
-        val snapshot = current
+        val snapshot = current?.takeIf { it.groupIdHex == groupIdHex }
         val action = beforeReadReturns
         beforeReadReturns = null
         action?.invoke()
@@ -383,7 +455,7 @@ private class RestoreGateway(
         accountRef: String,
         groupIdHex: String,
     ) {
-        current = null
+        if (current?.groupIdHex == groupIdHex) current = null
     }
 
     /** No chat-list background work is part of this restoration fixture. */

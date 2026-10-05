@@ -83,6 +83,13 @@ internal data class RestoredConversationAttachments(
     val documentUris: List<Uri>,
 )
 
+private data class DraftRestorationVersion(
+    val owner: DraftDocumentOwner,
+    val nativeRevision: Int,
+    val inputsRevision: Long,
+)
+
+
 /**
  * Owns the transient photo-draft workflow for one conversation.
  *
@@ -119,12 +126,6 @@ internal class ConversationMediaDraftState(
     private var currentSlots: List<PendingMediaSlot> = emptyList()
     private var currentDocumentUris: List<Uri> = emptyList()
     private var currentAccountRef: String? = null
-
-    private data class DraftRestorationVersion(
-        val owner: DraftDocumentOwner,
-        val nativeRevision: Int,
-        val inputsRevision: Long,
-    )
 
     private var restoredDraftRevision: DraftRestorationVersion? = null
     private var inputsRevision = 0L
@@ -317,33 +318,9 @@ internal class ConversationMediaDraftState(
         }
     }
 
-    fun preparedPreviews(): Map<String, PreparedPhotoPreview> =
-        backedPhotos.mapValues { (_, photo) ->
-            PreparedPhotoPreview(
-                revision = photo.attachmentDigest,
-                bytes = photo.attachment.plaintext,
-            )
-        } +
-            preparedPhotos.mapValues { (_, photo) ->
-                PreparedPhotoPreview(
-                    revision = photo.attachmentDigest,
-                    bytes = photo.attachment.plaintext,
-                )
-            }
+    fun preparedPreviews(): Map<String, PreparedPhotoPreview> = preparedPhotoPreviews(backedPhotos, preparedPhotos)
 
-    fun preparedQualities(): Map<String, PreparedPhotoQuality> =
-        backedPhotos.mapValues { (_, photo) ->
-            fun dimensions(quality: MediaQuality): String? =
-                renderer.outputPlan(photo.sourceInfo, photo.recipe, quality)?.geometry?.outputSize?.let {
-                    "${it.width} × ${it.height}"
-                }
-            PreparedPhotoQuality(
-                selectedQuality = photo.quality,
-                standardDimensions =
-                    dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.Standard)),
-                hdDimensions = dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.High)),
-            )
-        }
+    fun preparedQualities(): Map<String, PreparedPhotoQuality> = preparedPhotoQualities(backedPhotos, renderer)
 
     fun preparedAttachments() =
         backedPhotos.mapValues { (_, photo) -> photo.pendingAttachment() } +
@@ -413,7 +390,8 @@ internal class ConversationMediaDraftState(
     suspend fun restorePersistedAttachments(): RestoredConversationAttachments? =
         preparationMutex.withLock {
             val owner = documentOwnerFence.current() ?: return@withLock null
-            val requested = DraftRestorationVersion(owner, appState.inboundShareRevision, inputsRevision)
+            val cleanupRevision = appState.nativeComposerCleanupRevision(owner.accountRef, controller.group.groupIdHex)
+            val requested = DraftRestorationVersion(owner, cleanupRevision, inputsRevision)
             val restored = restoredDraftRevision
             if (restored?.owner == owner && restored.nativeRevision == requested.nativeRevision) {
                 return@withLock null
@@ -425,7 +403,10 @@ internal class ConversationMediaDraftState(
                     .getOrElse { return@withLock null }
                     ?.mediaAttachments
                     .orEmpty()
-            if (!documentOwnerFence.isCurrent(owner) || appState.inboundShareRevision != requested.nativeRevision) {
+            if (
+                !documentOwnerFence.isCurrent(owner) ||
+                appState.nativeComposerCleanupRevision(owner.accountRef, controller.group.groupIdHex) != cleanupRevision
+            ) {
                 return@withLock null
             }
             // Reconcile against picks/removals made while the native read was suspended.
@@ -434,8 +415,14 @@ internal class ConversationMediaDraftState(
             val nativeIds = attachments.mapTo(mutableSetOf()) { it.id }
             // A restored slot uses the native id itself. A fresh picker occurrence has
             // its own id and must survive an older send's native draft cleanup.
-            val removedPhotos = restoredPhotosMissingFrom(nativeIds)
-            val removedDocuments = restoredDocumentsMissingFrom(accountRef, nativeIds)
+            val removedPhotos = restoredPhotosMissingFrom(currentSlots, preparedPhotos, nativeIds)
+            val removedDocuments = restoredDocumentsMissingFrom(
+                    accountRef,
+                    controller.group.groupIdHex,
+                    currentDocumentUris,
+                    preparedDocuments,
+                    nativeIds,
+                )
             val retainedSlots = currentSlots.filterNot { it.id in removedPhotos }
             val retainedDocuments = currentDocumentUris.filterNot { it in removedDocuments }
             val reconciliation =
@@ -453,7 +440,14 @@ internal class ConversationMediaDraftState(
                         materializeDraftAttachment(context, attachment)?.let { attachment to it }
                     }
                 }
-            if (!restorationIsCurrent(version)) return@withLock null
+            if (
+                !restorationIsCurrent(
+                    version,
+                    documentOwnerFence,
+                    appState.nativeComposerCleanupRevision(version.owner.accountRef, controller.group.groupIdHex),
+                    inputsRevision,
+                )
+            ) return@withLock null
             restoredDraftRevision = version
             preparedPhotos = preparedPhotos.filterKeys { it !in removedPhotos } +
                 reconciliation.mediaBySlotId.mapValues { (_, attachment) ->
@@ -496,29 +490,6 @@ internal class ConversationMediaDraftState(
             }
         }
     }
-
-    private fun restoredPhotosMissingFrom(nativeIds: Set<String>): Set<String> =
-        currentSlots
-            .filter { slot ->
-                preparedPhotos[slot.id]?.attachment?.id == slot.id && slot.id !in nativeIds
-            }.mapTo(mutableSetOf()) { it.id }
-
-    private fun restoredDocumentsMissingFrom(
-        accountRef: String,
-        nativeIds: Set<String>,
-    ): Set<Uri> =
-        currentDocumentUris
-            .filter { uri ->
-                val prepared = preparedDocuments[uri]
-                prepared != null &&
-                    prepared.attachment.id !in nativeIds &&
-                    prepared.attachment.id != stagedDocumentAttachmentId(accountRef, controller.group.groupIdHex, uri.toString())
-            }.toSet()
-
-    private fun restorationIsCurrent(version: DraftRestorationVersion): Boolean =
-        documentOwnerFence.isCurrent(version.owner) &&
-            appState.inboundShareRevision == version.nativeRevision &&
-            inputsRevision == version.inputsRevision
 
     /** Combines this composer's fences with process-owned cleanup still running for the account. */
     private fun removedDraftAttachmentIds(accountRef: String): Set<String> =
@@ -821,6 +792,71 @@ private fun materializeDraftAttachment(
             MediaPipeline.safeDisplayName(attachment.fileName),
         )
     }.getOrNull()
+
+private fun restorationIsCurrent(
+    version: DraftRestorationVersion,
+    ownerFence: DraftDocumentOwnerFence,
+    cleanupRevision: Int,
+    inputsRevision: Long,
+): Boolean =
+    ownerFence.isCurrent(version.owner) &&
+        cleanupRevision == version.nativeRevision && inputsRevision == version.inputsRevision
+
+private fun preparedPhotoPreviews(
+    backedPhotos: Map<String, DraftBackedPhoto>,
+    preparedPhotos: Map<String, DraftPreparedPhoto>,
+): Map<String, PreparedPhotoPreview> =
+    backedPhotos.mapValues { (_, photo) ->
+        PreparedPhotoPreview(
+            revision = photo.attachmentDigest,
+            bytes = photo.attachment.plaintext,
+        )
+    } +
+        preparedPhotos.mapValues { (_, photo) ->
+            PreparedPhotoPreview(
+                revision = photo.attachmentDigest,
+                bytes = photo.attachment.plaintext,
+            )
+        }
+
+private fun preparedPhotoQualities(
+    backedPhotos: Map<String, DraftBackedPhoto>,
+    renderer: PhotoEditorRenderer,
+): Map<String, PreparedPhotoQuality> =
+    backedPhotos.mapValues { (_, photo) ->
+        fun dimensions(quality: MediaQuality): String? =
+            renderer.outputPlan(photo.sourceInfo, photo.recipe, quality)?.geometry?.outputSize?.let {
+                "${it.width} × ${it.height}"
+            }
+        PreparedPhotoQuality(
+            selectedQuality = photo.quality,
+            standardDimensions =
+                dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.Standard)),
+            hdDimensions = dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.High)),
+        )
+    }
+
+private fun restoredPhotosMissingFrom(
+    slots: List<PendingMediaSlot>,
+    prepared: Map<String, DraftPreparedPhoto>,
+    nativeIds: Set<String>,
+): Set<String> =
+    slots.filter { slot ->
+        prepared[slot.id]?.attachment?.id == slot.id && slot.id !in nativeIds
+    }.mapTo(mutableSetOf()) { it.id }
+
+private fun restoredDocumentsMissingFrom(
+    accountRef: String,
+    groupIdHex: String,
+    documents: List<Uri>,
+    prepared: Map<Uri, DraftPreparedPhoto>,
+    nativeIds: Set<String>,
+): Set<Uri> =
+    documents.filter { uri ->
+        val attachment = prepared[uri]?.attachment
+        attachment != null && attachment.id !in nativeIds &&
+            attachment.id != stagedDocumentAttachmentId(accountRef, groupIdHex, uri.toString())
+    }.toSet()
 
 /** Retains one caption acceptance generation across preview recompositions and staged-media edits. */
 @Composable

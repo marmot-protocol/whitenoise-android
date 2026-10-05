@@ -287,7 +287,7 @@ class MessageDraftDictationWriteTest {
         draftRepository = repository,
         expansionRetention = ComposerExpansionStateRetention(),
         scope = this,
-        onDraftPresentationChanged = onDraftPresentationChanged,
+        onDraftPresentationChanged = { _, _, _ -> onDraftPresentationChanged() },
         onCleanupFailure = { _, cause -> throw cause },
     )
 
