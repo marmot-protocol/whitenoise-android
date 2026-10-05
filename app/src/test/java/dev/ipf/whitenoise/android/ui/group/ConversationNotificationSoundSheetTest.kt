@@ -12,6 +12,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ConversationVibrationPattern
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
+import dev.ipf.whitenoise.android.state.DraftPersistence
+import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -37,8 +39,7 @@ class ConversationNotificationSoundSheetTest {
 
     private fun checkSheetFlow(isDm: Boolean) {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val appState = WhiteNoiseAppState(context, startPlatformServices = false)
-        appState.activeAccountRef = "sound-sheet-account"
+        val appState = testAppState(context)
         composeRule.setContent {
             WhiteNoiseTheme {
                 ConversationNotificationSettingsScreen(
@@ -67,5 +68,21 @@ class ConversationNotificationSoundSheetTest {
         composeRule.onNodeWithTag("sheet.surface").assertDoesNotExist()
         val primary = if (isDm) NotificationChannelSpec.DIRECT_MESSAGES else NotificationChannelSpec.GROUP_MESSAGES
         composeRule.onNodeWithTag("conversation-alert-${primary.id}").performScrollTo().assertIsDisplayed()
+    }
+
+    private fun testAppState(context: Context): WhiteNoiseAppState =
+        WhiteNoiseAppState(
+            context = context,
+            draftStore = DraftStore(InMemoryDraftPersistence()),
+            accountIdHexResolver = { "sound-sheet-self" },
+            accounts = emptyList(),
+            activeAccountRef = "sound-sheet-account",
+            profileReader = { null },
+        )
+
+    private class InMemoryDraftPersistence : DraftPersistence {
+        override fun read(): Map<String, String> = emptyMap()
+
+        override fun write(key: String, value: String?) = Unit
     }
 }
