@@ -9,8 +9,9 @@ internal class InFlightMediaUploads {
     private val jobs = mutableMapOf<String, Job>()
 
     /** Queued batch slots count as live ownership until their upload or owning job settles. */
-    fun hasUploads(conversationKey: String): Boolean = synchronized(lock) {
-        jobs.keys.any { it.startsWith("$conversationKey\u0000") }
+    fun hasUploads(conversationKey: String): Boolean {
+        val prefix = "$conversationKey\u0000"
+        return synchronized(lock) { jobs.keys.any { it.startsWith(prefix) } }
     }
 
     /** Tracks [job] for one conversation upload without letting stale completion remove its replacement. */
