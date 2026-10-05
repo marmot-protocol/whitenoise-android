@@ -60,6 +60,36 @@ class WhiteNoiseAppStateReaderSpeechTest {
             assertTrue(appState.ownsCurrentAccountSpeech())
         }
 
+    /** An A-B-A activation cannot restore the ownership of a request already preparing private speech. */
+    @Test
+    fun accountRoundTripDuringPreparationCannotCommitOldSpeech() =
+        runBlocking {
+            val appState = testAppState(twoAccounts = true)
+            val engine = FakeSessionEngine()
+            appState.ttsController.attachEngine(engine)
+            var switched = false
+            val started =
+                appState.speakAloudPrepared(
+                    listOf(TtsSpeakableEntry("s", "Sender", "Old account request.")),
+                    Locale.US,
+                    isCurrent = {
+                        if (!switched && appState.ttsController.state.value is TtsState.Preparing) {
+                            switched = true
+                            runBlocking {
+                                assertTrue(appState.setActiveAccount("account-b"))
+                                assertTrue(appState.setActiveAccount("account-a"))
+                            }
+                        }
+                        true
+                    },
+                )
+            assertTrue("The production account round trip must run during preparation", switched)
+            assertFalse("Returning to account A must not revive its old prepared request", started)
+            assertTrue(engine.spoken.isEmpty())
+            assertFalse(appState.ownsCurrentAccountSpeech())
+            assertTrue(appState.ttsController.state.value is TtsState.Idle)
+        }
+
     @Test
     fun conversationPreparedStartRejectsAnUnmappableHitWithoutReadingFromTheTop() =
         runBlocking {
