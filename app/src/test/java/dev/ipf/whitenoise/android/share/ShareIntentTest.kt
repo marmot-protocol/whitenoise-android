@@ -81,4 +81,17 @@ class ShareIntentTest {
     fun malformedNullIntent_returnsNull() {
         assertNull(parseShareIntent(null))
     }
+
+    /**
+     * Verifies raw EXTRA_TEXT parsing independently of stream contents; production draft merge is tested separately.
+     */
+    @Test
+    fun plainTextPreservesWhitespaceWithoutReadingFileContents() {
+        val intent =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, "  original text\n")
+            }
+        assertEquals("  original text\n", parseShareIntent(intent)?.text)
+    }
 }

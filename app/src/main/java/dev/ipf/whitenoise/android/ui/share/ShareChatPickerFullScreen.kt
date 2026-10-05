@@ -29,17 +29,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -78,7 +72,6 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import kotlinx.coroutines.launch
 
 internal const val SHARE_CHAT_PICKER_SCREEN_TEST_TAG = PerformanceTestTags.SHARE_PICKER
 internal const val SHARE_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG = "share_chat_picker_account_row"
@@ -91,7 +84,7 @@ internal fun ShareChatPickerFullScreenContent(
     requestId: String = "",
     payload: SharePayload,
     onDismiss: () -> Unit,
-    onStage: (String, List<String>) -> Boolean,
+    onStage: suspend (String, List<String>) -> Boolean,
     overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar? = null,
     controllerFactory: (WhiteNoiseAppState) -> ChatsController = { ChatsController(it) },
     controllerBinder: suspend (ChatsController, String) -> Unit = { controller, accountRef ->
@@ -107,37 +100,14 @@ internal fun ShareChatPickerFullScreenContent(
             controllerBinder = controllerBinder,
         )
     val presentedTargets = rememberShareChatPickerPresentations(appState, pickerState)
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
-    val stageRejectedMessage = stringResource(R.string.no_share_target_available)
-    var finishing by remember(requestId) { mutableStateOf(false) }
-    val dismissPicker: () -> Unit = {
-        if (!finishing) {
-            finishing = true
-            runShareChatPickerDismissal(
-                clearFocus = { focusManager.clearFocus(force = true) },
-                hideKeyboard = { keyboardController?.hide() },
-                dismiss = onDismiss,
-            )
-        }
-    }
     val scaffoldActions =
-        ShareChatPickerScaffoldActions(
-            dismiss = dismissPicker,
-            stage = {
-                if (!finishing) {
-                    if (pickerState.stage(onStage)) {
-                        dismissPicker()
-                    } else {
-                        coroutineScope.launch {
-                            snackbarHostState.currentSnackbarData?.dismiss()
-                            snackbarHostState.showSnackbar(stageRejectedMessage)
-                        }
-                    }
-                }
-            },
+        rememberShareChatPickerActions(
+            requestId = requestId,
+            snackbarHostState = snackbarHostState,
+            onDismiss = onDismiss,
+            stage = { pickerState.stage(onStage) },
+            bindCommitting = { pickerState.isCommitting = it },
         )
     ShareChatPickerScaffold(
         pickerState = pickerState,
@@ -157,11 +127,6 @@ internal fun ShareChatPickerFullScreenContent(
         )
     }
 }
-
-private data class ShareChatPickerScaffoldActions(
-    val dismiss: () -> Unit,
-    val stage: () -> Unit,
-)
 
 /** Builds the edge-to-edge modal surface and exports its first-frame benchmark selector. */
 @Composable
@@ -485,6 +450,7 @@ private class ShareChatPickerState(
     val canStage: Boolean
         get() = selected.isNotEmpty() && selected.all(targetGroupIds::contains)
 
+    /** Matches folded presentation values, restricting identity aliases to queries shaped like account identifiers. */
     fun filtered(presentedTargets: List<ShareChatPickerTargetPresentation>): List<ShareChatPickerTargetPresentation> {
         val needle = query.trim()
         return if (needle.isEmpty()) {
@@ -502,14 +468,20 @@ private class ShareChatPickerState(
         }
     }
 
+    var isCommitting: () -> Boolean = { false }
+
+    /** Ignores recipient changes while a destination commit owns the selected snapshot. */
     fun toggleSelection(groupId: String) {
+        if (isCommitting()) return
         selectedState.value =
             ArrayList(selected).apply {
                 if (contains(groupId)) remove(groupId) else add(groupId)
             }
     }
 
+    /** Rejects account changes during commit; an accepted switch clears recipients belonging to the prior account. */
     fun chooseAccount(accountRef: String) {
+        if (isCommitting()) return
         if (accountRef == selectedAccountRef || accounts.none { it.label == accountRef }) return
         selectedAccountRefState.value = accountRef
         selectedState.value = arrayListOf()
@@ -528,7 +500,10 @@ private class ShareChatPickerState(
         retryLoadAction()
     }
 
-    fun stage(onStage: (String, List<String>) -> Boolean): Boolean =
+    /**
+     * Rechecks the chosen signing account and current target membership before passing a stable destination snapshot.
+     */
+    suspend fun stage(onStage: suspend (String, List<String>) -> Boolean): Boolean =
         selectedAccountRef?.let { accountRef ->
             accounts.any { it.label == accountRef && it.isSignedInSigningAccount() } &&
                 canStage &&
@@ -536,6 +511,7 @@ private class ShareChatPickerState(
         } == true
 }
 
+/** Keeps the sending-account selector locked while the picker commits its destination snapshot. */
 @Composable
 private fun ShareChatPickerAccountRow(
     pickerState: ShareChatPickerState,
@@ -547,7 +523,7 @@ private fun ShareChatPickerAccountRow(
         appState = pickerState.appState,
         account = account,
         multipleAccounts = pickerState.accounts.size > 1,
-        onOpenSelector = { pickerState.accountSelectorOpen = true },
+        onOpenSelector = { if (!pickerState.isCommitting()) pickerState.accountSelectorOpen = true },
         modifier = modifier,
         compact = compact,
     )

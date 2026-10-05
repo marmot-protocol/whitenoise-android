@@ -23,6 +23,7 @@ data class NotificationTarget(
     val groupIdHex: String,
     val messageIdHex: String?,
     val kind: NotificationTargetKind,
+    val replyDraft: NotificationReplyDraft? = null,
 )
 
 /**
@@ -475,18 +476,35 @@ object NotificationNavigation {
     /** Parse a tapped content [intent] back into a target (untrusted). */
     fun parse(
         intent: Intent?,
+        importReplyDraft: Boolean = true,
+        isTrustedTargetSignature: (String, String?, NotificationTarget) -> Boolean = { _, _, _ -> false },
         isTrustedTapToken: (notificationKey: String, tapToken: String?) -> Boolean = { _, _ -> false },
     ): NotificationTarget? {
         intent ?: return null
         val notificationKey = notificationKeyFrom(intent) ?: return null
-        if (!isTrustedNotificationTap(notificationKey, intent.getStringExtra(EXTRA_TAP_TOKEN), isTrustedTapToken)) return null
-        return parseExtras(
-            action = intent.action,
-            accountRef = intent.getStringExtra(EXTRA_ACCOUNT_REF),
-            groupIdHex = intent.getStringExtra(EXTRA_GROUP_ID),
-            messageIdHex = intent.getStringExtra(EXTRA_MESSAGE_ID),
-            kindName = intent.getStringExtra(EXTRA_KIND),
-        )
+        val target =
+            parseExtras(
+                action = intent.action,
+                accountRef = intent.getStringExtra(EXTRA_ACCOUNT_REF),
+                groupIdHex = intent.getStringExtra(EXTRA_GROUP_ID),
+                messageIdHex = intent.getStringExtra(EXTRA_MESSAGE_ID),
+                kindName = intent.getStringExtra(EXTRA_KIND),
+            ) ?: return null
+        val token = intent.getStringExtra(EXTRA_TAP_TOKEN)
+        return if (intent.data?.getQueryParameter(NOTIFICATION_BOUND_ROUTE_QUERY) == "1") {
+            target
+                .takeIf { isTrustedTargetSignature(notificationKey, token, it) }
+                ?.copy(
+                    replyDraft =
+                        if (importReplyDraft) {
+                            notificationReplyDraftFrom(intent, target.kind, token.orEmpty())
+                        } else {
+                            null
+                        },
+                )
+        } else {
+            target.takeIf { isTrustedNotificationTap(notificationKey, token, isTrustedTapToken) }
+        }
     }
 
     internal fun isTrustedNotificationTap(

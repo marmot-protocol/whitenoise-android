@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">Alertes sur cet appareil</string>
+    <string name="notification_sound_appearance">Son et apparence</string>
+    <string name="notification_system_blocked">Bloqué dans les paramètres Android</string>
+    <string name="notification_alerts_detail">Choisissez les alertes sur cet appareil. La pause des alertes ordinaires laisse passer les mentions activées. Les avis de participation au groupe ont leurs propres paramètres.</string>
+    <string name="notification_scope_choose">Paramètres du son</string>
+    <string name="notification_pause_ordinary_alerts">Suspendre les alertes ordinaires</string>
+    <string name="notification_alert_paused">En pause tant que cette discussion est en sourdine</string>
+    <string name="notification_sound_scope_control">Paramètres du son pour %1$s</string>
+</resources>

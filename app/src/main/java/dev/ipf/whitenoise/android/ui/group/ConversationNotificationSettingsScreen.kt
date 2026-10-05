@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.NotificationConversationDescriptor
 import dev.ipf.whitenoise.android.notifications.OverridableConversationNotificationCategory
 import dev.ipf.whitenoise.android.notifications.PreparedConversationNotificationSettingsTarget
+import dev.ipf.whitenoise.android.notifications.androidBlockedConversationCategories
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettingsFallback
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
@@ -87,12 +88,15 @@ internal fun ConversationNotificationSettingsScreen(
     vibrationPattern: ConversationVibrationPattern,
     onBack: () -> Unit,
     onToggleMute: (Boolean) -> Unit,
-    onChooseNotifyFor: () -> Unit,
     onChooseVibrationPattern: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var resumeGeneration by remember { mutableIntStateOf(0) }
+    var showSoundSettings by remember(appState.activeAccountRef, groupIdHex) { mutableStateOf(false) }
+    val routingState by appState.conversationNotificationRouting.state.collectAsStateWithLifecycle()
+    val accountRef = appState.activeAccountRef
+    var blockedChannels by remember(accountRef, groupIdHex) { mutableStateOf<Set<NotificationChannelSpec>>(emptySet()) }
     DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
@@ -100,6 +104,22 @@ internal fun ConversationNotificationSettingsScreen(
             }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(accountRef, groupIdHex, isDm, vibrationPattern, resumeGeneration, routingState) {
+        val shortcut = accountRef?.let { conversationShortcutId(it, groupIdHex) }
+        if (shortcut != null) {
+            blockedChannels =
+                withContext(Dispatchers.IO) {
+                    val descriptor =
+                        NotificationConversationDescriptor(shortcut, isDm, conversationTitle, vibrationPattern)
+                    runCatching {
+                        androidBlockedConversationCategories(
+                            context,
+                            appState.conversationNotificationRouting.settings(descriptor),
+                        )
+                    }.getOrDefault(emptySet())
+                }
+        }
     }
     val effectiveVibration =
         remember(appState.activeAccountRef, groupIdHex, isDm, vibrationPattern, resumeGeneration) {
@@ -119,6 +139,17 @@ internal fun ConversationNotificationSettingsScreen(
         SettingsList {
             item { SettingsSection(stringResource(R.string.notifications)) }
             item {
+                ConversationAlertControls(
+                    appState = appState,
+                    groupIdHex = groupIdHex,
+                    isDm = isDm,
+                    legacyMode = notifyForMode,
+                    isMuted = isMuted,
+                    blockedChannels = blockedChannels,
+                )
+            }
+            item { SettingsExplainer(stringResource(R.string.notification_alerts_detail)) }
+            item {
                 SettingsGroup {
                     row("mute") { rowContext ->
                         ConversationMuteSettingsSwitch(
@@ -127,14 +158,6 @@ internal fun ConversationNotificationSettingsScreen(
                             muteExpiryMillis = muteExpiryMillis,
                             muteCommandPending = muteCommandPending,
                             onToggleMute = onToggleMute,
-                        )
-                    }
-                    row("notify_for") { rowContext ->
-                        SettingsLink(
-                            context = rowContext,
-                            title = stringResource(R.string.notify_for),
-                            onClick = onChooseNotifyFor,
-                            value = notificationModeLabel(notifyForMode),
                         )
                     }
                     row("vibration") { rowContext ->
@@ -147,19 +170,31 @@ internal fun ConversationNotificationSettingsScreen(
                     }
                 }
             }
-            item { SettingsExplainer(stringResource(R.string.notification_notify_restore)) }
-            item { SettingsSection(stringResource(R.string.notification_categories)) }
+            item { SettingsSection(stringResource(R.string.notification_sound_appearance)) }
             item {
-                NotificationCategoriesSection(
-                    appState = appState,
-                    groupIdHex = groupIdHex,
-                    conversationTitle = conversationTitle,
-                    conversationAvatarUrl = conversationAvatarUrl,
-                    isDm = isDm,
-                    primaryVibrationPattern = vibrationPattern,
-                )
+                SettingsGroup {
+                    row("sound_settings") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.notification_sound_appearance),
+                            onClick = { showSoundSettings = true },
+                            modifier = Modifier.testTag(SOUND_APPEARANCE_OPEN_TAG),
+                        )
+                    }
+                }
             }
-            item { SettingsExplainer(stringResource(R.string.notification_chat_categories_detail)) }
+        }
+    }
+    if (showSoundSettings) {
+        ConversationSoundAppearanceSheet(onDismiss = { showSoundSettings = false }) {
+            NotificationCategoriesSection(
+                appState = appState,
+                groupIdHex = groupIdHex,
+                conversationTitle = conversationTitle,
+                conversationAvatarUrl = conversationAvatarUrl,
+                isDm = isDm,
+                primaryVibrationPattern = vibrationPattern,
+            )
         }
     }
 }
@@ -390,7 +425,7 @@ internal fun ConversationMuteSettingsSwitch(
 ) {
     SettingsSwitch(
         context = rowContext,
-        title = stringResource(R.string.mute),
+        title = stringResource(R.string.notification_pause_ordinary_alerts),
         checked = isMuted,
         onCheckedChange = onToggleMute,
         modifier = Modifier.testTag(MUTE_SWITCH_ROW_TAG),

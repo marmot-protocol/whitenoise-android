@@ -148,6 +148,7 @@ import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
@@ -1623,7 +1624,7 @@ internal fun ConversationScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val exitConversation =
+    val exitConversationRoute =
         rememberConversationExitHandler(
             identity = chat.id,
             imeIsOpen = imeIsOpen,
@@ -1734,11 +1735,60 @@ internal fun ConversationScreen(
     // shelf — ConversationScreen is reused when `selectedChat` changes in
     // place, and an unkeyed state would otherwise carry URIs from chat A into
     // chat B (where a Send would attach them to the wrong recipient).
-    var pendingMediaSlots by rememberSaveable(chat.id, stateSaver = PendingMediaSlotListSaver) {
+    val importedShareAccount =
+        appState.accounts
+            .firstOrNull { it.label == conversationAccountRef }
+            ?.accountIdHex
+            .orEmpty()
+    var pendingMediaSlots by rememberSaveable(conversationAccountRef, chat.id, stateSaver = PendingMediaSlotListSaver) {
         mutableStateOf<List<PendingMediaSlot>>(emptyList())
     }
-    var pendingDocumentUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
+    var pendingDocumentUris by rememberSaveable(conversationAccountRef, chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
+    val importedShareFiles =
+        remember(context) {
+            dev.ipf.whitenoise.android.share
+                .PrivateShareFiles(context)
+        }
+    val exitConversation = {
+        val exitingUris = (pendingMediaSlots.map { it.uri } + pendingDocumentUris).filter(importedShareFiles::owns)
+        pendingMediaSlots = pendingMediaSlots.filterNot { importedShareFiles.owns(it.uri) }
+        pendingDocumentUris = pendingDocumentUris.filterNot(importedShareFiles::owns)
+        appState.launchMutation {
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) {
+                    importedShareFiles.leases.changeShelf(
+                        importedShareAccount,
+                        chat.group.groupIdHex,
+                        exitingUris,
+                        emptyList(),
+                    )
+                }
+            }.onFailure { appState.present(R.string.share_import_storage) }
+        }
+        exitConversationRoute()
+    }
+    dev.ipf.whitenoise.android.share.ImportedShareShelf(
+        importedShareAccount,
+        chat.group.groupIdHex,
+        pendingMediaSlots.map { it.uri } + pendingDocumentUris,
+        appState.inboundShareRevision,
+    ) { restored ->
+        val staging =
+            restored.getOrElse {
+                appState.present(R.string.share_import_storage)
+                return@ImportedShareShelf
+            }
+        val recovered =
+            restoreImportedComposerAttachments(
+                pendingMediaSlots,
+                pendingDocumentUris,
+                staging,
+                importedShareFiles::owns,
+            )
+        pendingMediaSlots = recovered.mediaSlots
+        pendingDocumentUris = recovered.documentUris
     }
     LaunchedEffect(chat.id, appState.inboundShareRevision, pendingMediaSlots.size, pendingDocumentUris.size) {
         val capped =
@@ -2067,7 +2117,7 @@ internal fun ConversationScreen(
             // Append into the document side of the staging shelf rather than
             // sending immediately. The preview sheet renders both lists and
             // a single Send dispatches both decoders into one kind-9 album.
-            val merged = (pendingDocumentUris + uris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+            val merged = appendRecoveredDocuments(pendingDocumentUris, uris, MEDIA_PICKER_MAX_ITEMS)
             pendingDocumentUris = merged
         }
 
@@ -3116,8 +3166,15 @@ internal fun ConversationScreen(
         pendingDocumentUris,
     ) {
         val restored = mediaDraftState.restorePersistedAttachments() ?: return@LaunchedEffect
-        pendingMediaSlots = restored.mediaSlots
-        pendingDocumentUris = restored.documentUris
+        val merged =
+            mergeRestoredComposerAttachments(
+                pendingMediaSlots,
+                pendingDocumentUris,
+                restored,
+                importedShareFiles::owns,
+            )
+        pendingMediaSlots = merged.mediaSlots
+        pendingDocumentUris = merged.documentUris
     }
 
     val pollVotesHost = remember(controller) { PollVotesHostState() }
@@ -3554,7 +3611,19 @@ internal fun ConversationScreen(
                     } else {
                         null
                     },
-                onSendAttachments = { caption, onResult ->
+                onSendAttachments = sendAttachments@{ caption, onResult ->
+                    if (
+                        importedComposerExceedsLimit(
+                            pendingMediaSlots,
+                            pendingDocumentUris,
+                            MEDIA_PICKER_MAX_ITEMS,
+                            importedShareFiles::owns,
+                        )
+                    ) {
+                        appState.present(R.string.share_import_recovered_limit)
+                        onResult(false)
+                        return@sendAttachments
+                    }
                     attachmentSendPending = true
                     var dispatched = false
                     try {

@@ -278,7 +278,6 @@ internal fun GroupDetailsScreen(
         var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showNotificationSettings by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showMuteDurationDialog by remember(controller) { mutableStateOf(false) }
-        var showNotifyForDialog by remember { mutableStateOf(false) }
         var showVibrationPatternDialog by remember { mutableStateOf(false) }
         var showDmAddToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var addingDmPeerToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -732,19 +731,8 @@ internal fun GroupDetailsScreen(
                         appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
                     }
                 },
-                onChooseNotifyFor = { showNotifyForDialog = true },
                 onChooseVibrationPattern = { showVibrationPatternDialog = true },
             )
-            if (showNotifyForDialog) {
-                NotifyForDialog(
-                    currentMode = conversationRestoreMode,
-                    onDismiss = { showNotifyForDialog = false },
-                    onSelect = { mode ->
-                        showNotifyForDialog = false
-                        appState.setConversationNotifyForMode(controller.group.groupIdHex, mode)
-                    },
-                )
-            }
             if (showVibrationPatternDialog) {
                 VibrationPatternDialog(
                     currentPattern = conversationVibrationPattern,
@@ -1626,7 +1614,12 @@ internal fun GroupDetailsScreen(
                             title = stringResource(R.string.sounds_and_notifications),
                             onClick = { showNotificationSettings = true },
                             modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
-                            value = notificationModeLabel(conversationNotifyMode),
+                            value =
+                                conversationNotificationSummary(
+                                    appState,
+                                    controller.group.groupIdHex,
+                                    conversationNotifyMode,
+                                ),
                             leading = { SettingsLeadingIcon(Icons.Filled.Notifications) },
                         )
                     }
