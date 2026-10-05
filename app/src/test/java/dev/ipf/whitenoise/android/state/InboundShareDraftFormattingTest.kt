@@ -102,8 +102,11 @@ private class FormattingDraftGateway : MessageDraftGateway {
         content: String,
         replyToMessageIdHex: String?,
         mediaAttachments: List<MessageDraftAttachmentFfi>,
-    ): MessageDraftFfi =
-        MessageDraftFfi(groupIdHex, content, replyToMessageIdHex, mediaAttachments, 1L, 2L).also { current = it }
+    ): MessageDraftFfi {
+        val saved = MessageDraftFfi(groupIdHex, content, replyToMessageIdHex, mediaAttachments, 1L, 2L)
+        current = saved
+        return saved
+    }
 
     /** Removes the captured draft when the production repository asks to clear it. */
     override fun delete(
