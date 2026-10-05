@@ -158,7 +158,12 @@ class NotificationReplyDraftHandoffTest {
             val savesBeforeRetry = fixture.gateway.saves
             fixture.handoff.retryPending("account-b", "group-b")
             assertEquals(savesBeforeRetry, fixture.gateway.saves)
-            assertEquals("newer edit", fixture.gateway.drafts.getValue("account-b" to "group-b").content)
+            assertEquals(
+                "newer edit",
+                fixture.gateway.drafts
+                    .getValue("account-b" to "group-b")
+                    .content,
+            )
         }
 
     @Test
