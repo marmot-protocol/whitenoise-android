@@ -62,6 +62,7 @@ class ShareInboundStagerTest {
         assertEquals("existing\nincoming", draftStore.get("acct", "g1"))
     }
 
+    /** Stages a mixed visual/document payload into the account/group shelf without invoking a send. */
     @Test
     fun stagesStreamsIntoShareStagingStore() {
         val context = RuntimeEnvironment.getApplication()
@@ -78,6 +79,17 @@ class ShareInboundStagerTest {
         assertEquals(listOf(image), staged?.mediaUris)
         assertEquals(listOf(doc), staged?.documentUris)
         assertNull(draftStore.get("acct", "g1"))
+    }
+
+    /** Preserves import order through document staging rather than regrouping provider MIME families. */
+    @Test
+    fun importedMixedFilesKeepTheirSuppliedOrderThroughTheOrdinaryDocumentShelf() {
+        val context = RuntimeEnvironment.getApplication()
+        val doc = Uri.parse("content://private/doc.pdf")
+        val image = Uri.parse("content://private/photo.jpg")
+        val prepared = stager.prepare(context, SharePayload(null, listOf(doc, image), "*/*", importReady = true))
+        assertEquals(emptyList<Uri>(), prepared.streamStaging?.mediaUris)
+        assertEquals(listOf(doc, image), prepared.streamStaging?.documentUris)
     }
 
     /** Provider preparation is side-effect free until the Main-thread apply boundary. */
