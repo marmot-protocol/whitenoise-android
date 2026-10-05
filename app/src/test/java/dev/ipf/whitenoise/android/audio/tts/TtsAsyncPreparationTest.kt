@@ -16,7 +16,8 @@ class TtsAsyncPreparationTest {
     fun invalidRenderedHitNeverFallsBackToTheDocumentTop() =
         runTest {
             val harness = SessionHarness(this)
-            harness.controller.lastStartFailure = TtsStartFailure.AudioFocusDenied
+            assertFalse(harness.controller.speak(emptyList(), Locale.US))
+            assertEquals(TtsStartFailure.EmptyContent, harness.controller.lastStartFailure)
             val result =
                 harness.controller.speakAsync(
                     listOf(harness.entry("m1")),
