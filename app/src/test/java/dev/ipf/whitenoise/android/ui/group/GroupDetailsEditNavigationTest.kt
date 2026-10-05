@@ -6,6 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
@@ -121,13 +122,13 @@ class GroupDetailsEditNavigationTest {
         composeRule.waitUntil(5_000) {
             ConversationAlertPreferences(context)
                 .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == false &&
-                alertControlEnabled(reactionsTag)
+                alertControlReady(messagesTag, ToggleableState.Off)
         }
         composeRule.onNodeWithTag(reactionsTag).performClick()
         composeRule.waitUntil(5_000) {
             ConversationAlertPreferences(context)
                 .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS) == false &&
-                alertControlEnabled(messagesTag)
+                alertControlReady(reactionsTag, ToggleableState.Off)
         }
         composeRule.onNodeWithTag(messagesTag).assertIsOff()
         composeRule.onNodeWithTag(reactionsTag).assertIsOff()
@@ -141,14 +142,15 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag(messagesTag).performClick()
         composeRule.waitUntil(5_000) {
             ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == true
+                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == true &&
+                alertControlReady(messagesTag, ToggleableState.On)
         }
         composeRule.onNodeWithTag(messagesTag).assertIsOn()
     }
 
-    private fun alertControlEnabled(tag: String): Boolean {
-        val node = composeRule.onNodeWithTag(tag).fetchSemanticsNode()
-        return !node.config.contains(SemanticsProperties.Disabled)
+    private fun alertControlReady(tag: String, state: ToggleableState): Boolean {
+        val node = composeRule.onNodeWithTag(tag).fetchSemanticsNode().config
+        return !node.contains(SemanticsProperties.Disabled) && node[SemanticsProperties.ToggleableState] == state
     }
 
     @Test

@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
@@ -92,6 +95,7 @@ class ConversationSoundAppearanceSheetScreenshotTest {
                 LocalDensity provides Density(LocalDensity.current.density, fontScale),
             ) {
                 WhiteNoiseTheme(darkTheme = dark) {
+                    Surface(Modifier.fillMaxSize()) {}
                     if (visible.value) {
                         ConversationSoundAppearanceSheet(onDismiss = { visible.value = false }) {
                             ConversationNotificationCategoriesList(
@@ -104,6 +108,8 @@ class ConversationSoundAppearanceSheetScreenshotTest {
                 }
             }
         }
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
     }
 
     private fun settings(isDm: Boolean): List<ConversationNotificationCategorySetting> {
