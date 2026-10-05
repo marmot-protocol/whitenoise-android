@@ -185,6 +185,24 @@ class NotificationReplyDraftHandoffTest {
         }
 
     @Test
+    fun accountWipeCancelsQueuedPrivateTextWithoutDiscardingAnotherAccountsEdit() =
+        runTest {
+            val fixture = fixture()
+            fixture.writer.submit("account-b", "group-b", "wiped private text")
+            fixture.writer.submit("account-a", "group-b", "other account edit")
+            fixture.writer.removeAccount("account-b")
+            advanceUntilIdle()
+            assertNull(fixture.gateway.drafts["account-b" to "group-b"])
+            assertEquals(
+                "other account edit",
+                fixture.gateway.drafts
+                    .getValue("account-a" to "group-b")
+                    .content,
+            )
+            assertEquals(1, fixture.gateway.saves)
+        }
+
+    @Test
     fun accountRemovalRejectsTheCompletionOfAnAlreadyStartedMerge() =
         runTest {
             val fixture = fixture()
