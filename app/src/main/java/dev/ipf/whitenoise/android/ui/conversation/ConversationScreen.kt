@@ -3167,9 +3167,11 @@ internal fun ConversationScreen(
     ) {
         val restored = mediaDraftState.restorePersistedAttachments() ?: return@LaunchedEffect
         val merged =
+            // Native reconciliation already includes fresh local picks. Preserve only the
+            // independently owned imported shelf here so consumed native slots stay removed.
             mergeRestoredComposerAttachments(
-                pendingMediaSlots,
-                pendingDocumentUris,
+                pendingMediaSlots.filter { importedShareFiles.owns(it.uri) },
+                pendingDocumentUris.filter(importedShareFiles::owns),
                 restored,
                 importedShareFiles::owns,
             )

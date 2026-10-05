@@ -138,4 +138,24 @@ class ConversationImportedMediaSlotsTest {
         assertSame(imported, merged.mediaSlots.last())
         assertEquals(listOf(ordinaryDocument, importedDocument), merged.documentUris)
     }
+
+    /** Authoritative native cleanup removes old slots while the independent imported shelf survives. */
+    @Test
+    fun consumedNativeSlotsDoNotReturnWhenMergingTheIndependentImportedShelf() {
+        val sent = PendingMediaSlot("sent-native", Uri.parse("content://native/sent"))
+        val fresh = PendingMediaSlot("new-picker", Uri.parse("content://picker/new"))
+        val imported = PendingMediaSlot("shared", Uri.parse("content://private-share/current"))
+        val owns: (Uri) -> Boolean = { it.authority == "private-share" }
+        val reconciled = RestoredConversationAttachments(listOf(fresh), emptyList())
+        val merged =
+            mergeRestoredComposerAttachments(
+                listOf(sent, fresh, imported).filter { owns(it.uri) },
+                emptyList(),
+                reconciled,
+                owns,
+            )
+        assertEquals(listOf(fresh, imported), merged.mediaSlots)
+        assertSame(imported, merged.mediaSlots.last())
+    }
+
 }
