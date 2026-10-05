@@ -16,7 +16,9 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
+import androidx.work.impl.utils.futures.SettableFuture
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.google.common.util.concurrent.ListenableFuture
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
@@ -219,6 +221,53 @@ class AttachmentDownloadInterruptionBackoffTest {
         assertFalse(attachmentAutomaticAccountTag(testRequest().accountRef) in workInfo(explicitId).tags)
     }
 
+    /** A failed lookup is retried once, and the retry still replaces the waiting automatic work. */
+    @Test
+    fun failedLookupIsRetriedOnceBeforeChoosingAPolicy() {
+        AttachmentDownloadWorker.enqueue(application, testRequest())
+        val automaticId = uniqueWorkId()
+        intentStore().setInteractive(testRequest(), interactive = true)
+        val lookups = AtomicInteger(0)
+
+        AttachmentDownloadWorker.enqueueExplicit(
+            application,
+            testRequest(),
+            AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive),
+            intentStore(),
+            lookup = { manager, name ->
+                if (lookups.incrementAndGet() == 1) failedLookup() else manager.getWorkInfosForUniqueWork(name)
+            },
+        )
+
+        assertEquals(2, lookups.get())
+        assertNotEquals(automaticId, uniqueWorkId())
+    }
+
+    /** Two failed lookups enqueue nothing, leave the waiting work alone and keep the explicit intent. */
+    @Test
+    fun repeatedLookupFailureEnqueuesNothingAndKeepsTheIntent() {
+        AttachmentDownloadWorker.enqueue(application, testRequest())
+        val automaticId = uniqueWorkId()
+        intentStore().setInteractive(testRequest(), interactive = true)
+        val lookups = AtomicInteger(0)
+
+        AttachmentDownloadWorker.enqueueExplicit(
+            application,
+            testRequest(),
+            AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive),
+            intentStore(),
+            lookup = { _, _ ->
+                lookups.incrementAndGet()
+                failedLookup()
+            },
+        )
+
+        assertEquals(2, lookups.get())
+        assertEquals(automaticId, uniqueWorkId())
+        assertEquals(WorkInfo.State.ENQUEUED, workInfo(automaticId).state)
+        assertTrue(intentStore().isInteractive(testRequest()))
+    }
+
     /** Repeated explicit requests and later automatic enqueues coalesce onto the one unique work. */
     @Test
     fun explicitAndAutomaticEnqueuesCoalesceOnTheUniqueWork() {
@@ -353,6 +402,13 @@ class AttachmentDownloadInterruptionBackoffTest {
                 .addTag(attachmentAutomaticAccountTag(testRequest().accountRef))
                 .build()
         WorkManager.getInstance(application).enqueueUniqueWork(workName(), ExistingWorkPolicy.KEEP, work)
+    }
+
+    /** A lookup future that has already failed, as a closed or busy work database would produce. */
+    private fun failedLookup(): ListenableFuture<List<WorkInfo>> {
+        val future = SettableFuture.create<List<WorkInfo>>()
+        future.setException(IllegalStateException("work database unavailable"))
+        return future
     }
 
     /** Reads the current public WorkManager info for one work id. */

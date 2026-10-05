@@ -26688,7 +26688,7 @@
       {
         "surface": "Explicit attachment request replaces waiting automatic work",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
-        "anchor": "private fun enqueueExplicit(",
+        "anchor": "internal fun enqueueExplicit(",
         "test_ids": ["MED-022"]
       },
       {

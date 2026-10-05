@@ -15,6 +15,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.google.common.util.concurrent.ListenableFuture
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -344,6 +345,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
     companion object {
         private const val TAG = "DMAttachmentWorker"
         internal const val BACKOFF_SECONDS = 30L
+        private const val EXPLICIT_LOOKUP_RETRIES = 1
 
         /**
          * Builds the durable request for one transfer. Ordinary (automatic) work opts into WorkManager's
@@ -429,38 +431,64 @@ class AttachmentDownloadWorker : CoroutineWorker {
          * hours or still running unpromoted, and `KEEP` would strand the request behind it, so live
          * automatic work is replaced by a fresh explicit spec. Explicit work already queued or
          * running stays, preserving coalescing. The probe is asynchronous, and the intent is
-         * re-checked afterwards so a cancel that raced it is not undone.
+         * re-checked afterwards so a cancel that raced it is not undone. A failed lookup is retried
+         * once. If it fails again nothing is enqueued and the interactive intent stays set, because
+         * choosing a policy without knowing what exists could strand the request behind backed-off work.
          */
-        private fun enqueueExplicit(
+        internal fun enqueueExplicit(
             context: Context,
             request: AttachmentTransferRequest,
             work: OneTimeWorkRequest,
             intentStore: AttachmentDownloadIntentStore,
+            lookup: (WorkManager, String) -> ListenableFuture<List<WorkInfo>> = { manager, name ->
+                manager.getWorkInfosForUniqueWork(name)
+            },
+            attempt: Int = 0,
         ) {
             runCatching {
                 val manager = WorkManager.getInstance(context)
                 val name = attachmentDownloadWorkName(request)
-                val probe = manager.getWorkInfosForUniqueWork(name)
+                val probe = lookup(manager, name)
                 probe.addListener(
                     {
-                        val supersedesAutomatic =
-                            runCatching { probe.get() }.getOrNull().orEmpty().any { info ->
-                                !info.state.isFinished && attachmentAutomaticAccountTag(request.accountRef) in info.tags
+                        val outcome = runCatching { probe.get() }
+                        val infos = outcome.getOrNull()
+                        when {
+                            infos != null -> settleExplicit(manager, name, request, work, intentStore, infos)
+                            attempt < EXPLICIT_LOOKUP_RETRIES ->
+                                enqueueExplicit(context, request, work, intentStore, lookup, attempt + 1)
+                            else -> {
+                                val type = outcome.exceptionOrNull()?.javaClass?.simpleName
+                                Log.w(TAG, "attachment_download_lookup_failed type=$type")
                             }
-                        if (intentStore.isInteractive(request)) {
-                            val policy =
-                                if (supersedesAutomatic) {
-                                    ExistingWorkPolicy.REPLACE
-                                } else {
-                                    ExistingWorkPolicy.KEEP
-                                }
-                            runCatching { manager.enqueueUniqueWork(name, policy, work) }
-                                .onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
                         }
                     },
                     Executor { task -> task.run() },
                 )
             }.onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
+        }
+
+        /** Replaces live automatic work with the explicit spec, or keeps what exists, unless the tap was cancelled. */
+        private fun settleExplicit(
+            manager: WorkManager,
+            name: String,
+            request: AttachmentTransferRequest,
+            work: OneTimeWorkRequest,
+            intentStore: AttachmentDownloadIntentStore,
+            infos: List<WorkInfo>,
+        ) {
+            val automaticTag = attachmentAutomaticAccountTag(request.accountRef)
+            val supersedesAutomatic = infos.any { info -> !info.state.isFinished && automaticTag in info.tags }
+            if (intentStore.isInteractive(request)) {
+                val policy =
+                    if (supersedesAutomatic) {
+                        ExistingWorkPolicy.REPLACE
+                    } else {
+                        ExistingWorkPolicy.KEEP
+                    }
+                runCatching { manager.enqueueUniqueWork(name, policy, work) }
+                    .onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
+            }
         }
 
         /**
