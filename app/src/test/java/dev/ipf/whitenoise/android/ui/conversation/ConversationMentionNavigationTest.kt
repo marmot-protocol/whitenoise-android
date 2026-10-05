@@ -84,7 +84,7 @@ class ConversationMentionNavigationTest {
                     awaitLayout = { layoutPass++ },
                 )
             assertTrue(reached)
-            assertEquals(2, layoutPass)
+            assertEquals(3, layoutPass)
             assertEquals(
                 listOf(Write(true, 5, 1500), Write(false, 5, 0), Write(false, 5, -420)),
                 writer.writes,

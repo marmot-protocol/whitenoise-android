@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 
+private const val MAX_MENTION_LAYOUT_CORRECTIONS = 3
+
 /** Measured reverse-list coordinates, not a second timeline or protocol-state cache. */
 internal data class ConversationMentionJumpLayout(
     val viewportEndOffsetPx: Int,
@@ -47,12 +49,39 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
                 measuredLayout = readLayout(measuredIndex)
             }
             if (!measuredLayout.isMeasured) return@programmaticJump
-            if (measuredIndex != placedIndex || measuredLayout.readingStartOffset != placedOffset) {
-                scrollToItem(measuredIndex, measuredLayout.readingStartOffset)
-            }
-            if (resolveTargetIndex() != measuredIndex) return@programmaticJump
-            reached = true
+            reached =
+                settleMentionStart(
+                    resolveTargetIndex = resolveTargetIndex,
+                    readLayout = readLayout,
+                    awaitLayout = awaitLayout,
+                    initialPlacedIndex = placedIndex,
+                    initialPlacedOffset = placedOffset,
+                )
         }
     if (completed) onCompleted()
     return completed && reached
+}
+
+/** A corrective write can remeasure an animating row; validate its fresh geometry before success. */
+private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope.settleMentionStart(
+    resolveTargetIndex: () -> Int?,
+    readLayout: (Int) -> ConversationMentionJumpLayout,
+    awaitLayout: suspend () -> Unit,
+    initialPlacedIndex: Int,
+    initialPlacedOffset: Int,
+): Boolean {
+    var placedIndex = initialPlacedIndex
+    var placedOffset = initialPlacedOffset
+    repeat(MAX_MENTION_LAYOUT_CORRECTIONS + 1) { attempt ->
+        val index = resolveTargetIndex() ?: return false
+        val layout = readLayout(index)
+        if (!layout.isMeasured) return false
+        if (index == placedIndex && layout.readingStartOffset == placedOffset) return true
+        if (attempt == MAX_MENTION_LAYOUT_CORRECTIONS) return false
+        scrollToItem(index, layout.readingStartOffset)
+        placedIndex = index
+        placedOffset = layout.readingStartOffset
+        awaitLayout()
+    }
+    return false
 }
