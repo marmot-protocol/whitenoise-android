@@ -12499,7 +12499,9 @@ class ConversationController(
     private fun recordMembershipProjectionArrival(change: TimelineMessageChangeFfi.Upsert) {
         if (change.trigger != TimelineUpdateTriggerFfi.NEW_MESSAGE &&
             change.trigger != TimelineUpdateTriggerFfi.GROUP_SYSTEM
-        ) return
+        ) {
+            return
+        }
         val record = change.message
         val type = record.groupSystem?.systemType
         val isMembershipEvent = type == "member_added" || type == "member_removed"
