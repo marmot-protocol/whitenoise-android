@@ -25862,6 +25862,12 @@
         "test_ids": ["SYS-004", "SYS-005"]
       },
       {
+        "surface": "Queued share source retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun untrackInFlightMediaUpload(",
+        "test_ids": ["SYS-005"]
+      },
+      {
         "surface": "Private share account wipe",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": ".leases.releaseAccount(account)",

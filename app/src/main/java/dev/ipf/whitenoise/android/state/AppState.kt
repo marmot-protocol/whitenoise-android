@@ -825,9 +825,12 @@ private fun String.relayHostCandidate(): String? {
  * the chat currently on screen. The protected key is promoted before overflow
  * pruning so an active controller's optimistic/retry state cannot be aged out
  * by other conversations touching their own state maps.
+ * Queued and running uploads also protect their conversation until settlement;
+ * pruning then restores the ordinary window and releases inactive private sources.
  */
 internal class ConversationStateRetention(
     private val maxEntries: Int,
+    private val isProtected: (String) -> Boolean = { false },
 ) {
     private val recentKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
 
@@ -857,6 +860,9 @@ internal class ConversationStateRetention(
 
     fun keysSnapshot(): List<String> = recentKeys.keys.toList()
 
+    /** Settled uploads return to the ordinary retention window without promoting stale state. */
+    fun prune(protectedKey: String? = null): List<String> = evictOverflow(protectedKey)
+
     private fun promoteProtected(protectedKey: String?) {
         if (protectedKey != null && recentKeys.containsKey(protectedKey)) {
             recentKeys[protectedKey] = Unit
@@ -866,7 +872,7 @@ internal class ConversationStateRetention(
     private fun evictOverflow(protectedKey: String?): List<String> {
         val evicted = mutableListOf<String>()
         while (recentKeys.size > maxEntries) {
-            val staleKey = recentKeys.keys.firstOrNull { it != protectedKey } ?: break
+            val staleKey = recentKeys.keys.firstOrNull { it != protectedKey && !isProtected(it) } ?: break
             recentKeys.remove(staleKey)
             evicted += staleKey
         }
@@ -2231,7 +2237,8 @@ class WhiteNoiseAppState private constructor(
 
     // staleness-exempt: observable preference version consumed as a Compose key.
     private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
-    private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
+    private val conversationStateRetention =
+        ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES, isProtected = inFlightMediaUploads::hasUploads)
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
 
@@ -3054,6 +3061,9 @@ class WhiteNoiseAppState private constructor(
     ) {
         if (job != null) {
             inFlightMediaUploads.untrack(conversationKey(accountRef, groupIdHex), uploadKey, job)
+            synchronized(conversationStateLock) {
+                conversationStateRetention.prune(activeConversationStateKey()).forEach(::removeConversationState)
+            }
         }
     }
 

@@ -52,12 +52,13 @@ class ImportedShareShelfBehaviorTest {
         importedCount: Int = 1,
     ) {
         val files = PrivateShareFiles(RuntimeEnvironment.getApplication())
-        val imported = List(importedCount) { index ->
-            val (uri, file) = files.newFile()
-            file.writeBytes(byteArrayOf(1))
-            files.finish(uri, "shared-$index.png", "image/png", 1)
-            uri
-        }
+        val imported =
+            List(importedCount) { index ->
+                val (uri, file) = files.newFile()
+                file.writeBytes(byteArrayOf(1))
+                files.finish(uri, "shared-$index.png", "image/png", 1)
+                uri
+            }
         files.leases.saveShelf("restore-account", "restore-chat", imported)
         val media = mutableStateOf<List<PendingMediaSlot>>(emptyList())
         val documents = mutableStateOf<List<Uri>>(emptyList())

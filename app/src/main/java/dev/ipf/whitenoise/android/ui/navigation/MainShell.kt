@@ -671,7 +671,7 @@ internal fun MainShell(
     val visiblePickerRequest = visibleShareRequest.takeUnless { inboundDirectGroupId != null }
     var pendingStagedShareOpen by remember { mutableStateOf<PendingStagedShareOpen?>(null) }
     val clearSharePickerRequest: () -> Unit = {
-        val request = shareRequestToCancel(inboundShareRequest, visibleShareRequest)
+        val request = visibleShareRequest ?: inboundShareRequest
         val requestId = request?.requestId ?: shellStateHolder.pendingShareRequestId
         shellStateHolder.clearPendingShareRequest(requestId)
         if (request != null && inboundShareRequest?.requestId == request.requestId) {

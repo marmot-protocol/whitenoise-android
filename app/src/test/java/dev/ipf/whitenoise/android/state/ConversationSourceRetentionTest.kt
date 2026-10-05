@@ -3,10 +3,14 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.whitenoise.android.share.PrivateShareFiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -37,20 +41,20 @@ class ConversationSourceRetentionTest {
                 retained.retainSource { files.leases.releaseSend("queued") }
                 val cache = state.retainedMediaUploads("account", "queued-chat")
                 cache.put("queued", retained)
-                state.activeUploadKeys("account", "queued-chat").add("queued")
+                val activeKeys = state.activeUploadKeys("account", "queued-chat")
+                activeKeys.add("queued")
                 val job = state.trackInFlightMediaUpload("account", "queued-chat", "queued")
 
                 repeat(40) { state.retainedMediaUploads("account", "other-$it") }
 
                 assertSame(retained, cache.get("queued"))
                 assertNotNull(files.metadata(uri))
-                state.activeUploadKeys("account", "queued-chat").remove("queued")
+                activeKeys.remove("queued")
                 state.untrackInFlightMediaUpload("account", "queued-chat", "queued", job)
-                repeat(40) { state.retainedMediaUploads("account", "settled-$it") }
                 assertNull(cache.get("queued"))
                 assertNull(files.resolve(uri))
             } finally {
-                state.mutationsScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+                withContext(NonCancellable) { state.mutationsScope.coroutineContext.job.cancelAndJoin() }
                 root.deleteRecursively()
                 Dispatchers.resetMain()
             }
