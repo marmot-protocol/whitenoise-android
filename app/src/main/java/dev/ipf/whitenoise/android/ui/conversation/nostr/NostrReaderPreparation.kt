@@ -16,6 +16,7 @@ import kotlinx.coroutines.withContext
 internal data class NostrReaderPreparation(
     val document: MarkdownDocumentFfi? = null,
     val blocks: List<MarkdownBlockFfi> = emptyList(),
+    val textChunks: List<String> = emptyList(),
     val parsing: Boolean = true,
 )
 
@@ -28,19 +29,20 @@ internal fun rememberNostrReaderPreparation(
 ): NostrReaderPreparation {
     var prepared by remember(card.eventIdHex, card.readerBody) { mutableStateOf(NostrReaderPreparation()) }
     LaunchedEffect(card.eventIdHex, card.readerBody) {
-        val document =
-            try {
-                withContext(dispatcher) { parseMarkdown(card.readerBody.orEmpty()) }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                null
-            }
-        val blocks =
+        prepared =
             withContext(dispatcher) {
-                document?.takeIf(::nostrReaderCanFormat)?.let(::nostrReaderBlocks).orEmpty()
+                val body = card.readerBody ?: card.summary.orEmpty()
+                val textChunks = nostrReaderTextChunks(body)
+                try {
+                    val document = parseMarkdown(body)
+                    val blocks = document.takeIf(::nostrReaderCanFormat)?.let(::nostrReaderBlocks).orEmpty()
+                    NostrReaderPreparation(document, blocks, textChunks, parsing = false)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    NostrReaderPreparation(textChunks = textChunks, parsing = false)
+                }
             }
-        prepared = NostrReaderPreparation(document, blocks, parsing = false)
     }
     return prepared
 }

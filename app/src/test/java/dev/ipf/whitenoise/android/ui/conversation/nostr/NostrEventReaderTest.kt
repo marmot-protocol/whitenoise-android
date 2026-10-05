@@ -36,6 +36,29 @@ class NostrEventReaderTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    @Test
+    fun parserFailureKeepsTheCompleteBodyInTheReader() {
+        val tail = "The complete fallback tail remains available."
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventReaderDialog(
+                    card = noteCard().copy(readerBody = "Long fallback text ".repeat(600) + tail),
+                    authoredReference = AUTHORED_REFERENCE,
+                    authorDisplayName = { "Alex" },
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                    parseMarkdown = { throw IllegalStateException("Parser unavailable") },
+                    onDismiss = {},
+                )
+            }
+        }
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag(NOSTR_EVENT_READER_LOADING_TAG).fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG).performScrollToNode(hasText(tail, substring = true))
+        composeRule.onNodeWithText(tail, substring = true).assertIsDisplayed()
+    }
+
     /** Verifies the note reader keeps full safe content, event context, and independent controls. */
     @Test
     fun noteReaderShowsCompleteMarkdownAndContextWithoutRecursiveCards() {

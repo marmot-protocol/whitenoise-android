@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -52,6 +55,44 @@ class NostrEventImageTest {
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(1, downloads) }
     }
+
+    @Test
+    fun failedImageCanRetryAndOpenFullscreenWithoutAnotherDownload() {
+        var downloads = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventImagePane(url = "https://images.example/retry", loadImage = { _, _ ->
+                    downloads++
+                    if (downloads == 1) null else ImageBitmap(20, 10)
+                })
+            }
+        }
+        composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).performClick()
+        composeRule.onNodeWithText(string(R.string.nostr_event_image_failed)).assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.retry)).performClick()
+        composeRule.onNodeWithText(string(R.string.nostr_event_image_failed)).assertDoesNotExist()
+        composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.close)).assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(2, downloads) }
+    }
+
+    @Test
+    fun unsafeImageNeverReachesTheLoader() {
+        var downloads = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventImagePane(url = "https://127.0.0.1/private", loadImage = { _, _ ->
+                    downloads++
+                    ImageBitmap(10, 10)
+                })
+            }
+        }
+        composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).performClick()
+        composeRule.onNodeWithText(string(R.string.nostr_event_image_failed)).assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(0, downloads) }
+    }
+
+    private fun string(id: Int): String = ApplicationProvider.getApplicationContext<Context>().getString(id)
 
     private fun event(tags: List<List<String>>) =
         NostrEvent(

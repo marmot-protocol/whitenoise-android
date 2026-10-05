@@ -119,7 +119,7 @@ internal fun NostrEventReaderDialog(
                 },
             onDismiss = onDismiss,
             onPlayVideo = { playing = true },
-            preparedBlocks = prepared.blocks,
+            preparation = prepared,
         )
     }
     if (playing) {
@@ -144,7 +144,7 @@ internal fun NostrEventReaderScreen(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     onPlayVideo: (() -> Unit)? = null,
-    preparedBlocks: List<MarkdownBlockFfi>? = null,
+    preparation: NostrReaderPreparation? = null,
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -168,7 +168,7 @@ internal fun NostrEventReaderScreen(
                 mentionDisplayName = mentionDisplayName,
                 onNostrProfileTap = onNostrProfileTap,
                 onPlayVideo = onPlayVideo,
-                preparedBlocks = preparedBlocks,
+                preparation = preparation,
             )
         }
     }
@@ -221,11 +221,15 @@ private fun NostrEventReaderBody(
     mentionDisplayName: (String) -> String?,
     onNostrProfileTap: (String) -> Unit,
     onPlayVideo: (() -> Unit)?,
-    preparedBlocks: List<MarkdownBlockFfi>?,
+    preparation: NostrReaderPreparation?,
 ) {
     val blocks =
-        preparedBlocks ?: remember(document) {
+        preparation?.blocks ?: remember(document) {
             document?.takeIf(::nostrReaderCanFormat)?.let(::nostrReaderBlocks).orEmpty()
+        }
+    val textChunks =
+        preparation?.textChunks ?: remember(card.readerBody, card.summary) {
+            nostrReaderTextChunks(card.readerBody ?: card.summary.orEmpty())
         }
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag(NOSTR_EVENT_READER_BODY_TAG),
@@ -257,7 +261,7 @@ private fun NostrEventReaderBody(
                 )
             }
         } else {
-            itemsIndexed(nostrReaderTextChunks(card.readerBody ?: card.summary.orEmpty())) { _, chunk ->
+            itemsIndexed(textChunks) { _, chunk ->
                 Text(chunk, style = MaterialTheme.typography.bodyLarge)
             }
         }

@@ -16,4 +16,3 @@ internal class PublicMediaDns(private val resolver: Dns = Dns.SYSTEM) : Dns {
         return addresses
     }
 }
-
