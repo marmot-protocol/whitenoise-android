@@ -302,7 +302,7 @@ class ImportedShareDocumentBoundaryTest {
             org.junit.Assert.assertNotNull(files.metadata(incoming))
             files.leases.releaseRequest(request.requestId)
             files.leases.saveShelf("account", "chat", emptyList())
-            assertTrue(files.availableBytes() == PRIVATE_SHARE_BATCH_MAX_BYTES)
+            request.payload.streamUris.forEach { org.junit.Assert.assertNull(files.resolve(it)) }
         }
 
     /** Rejects a multi-destination commit and verifies prior shelves plus pending request ownership are retained. */

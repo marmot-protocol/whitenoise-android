@@ -17,6 +17,43 @@ import org.robolectric.annotation.Config
 class ConversationImportedMediaSlotsTest {
     private val owns: (Uri) -> Boolean = { it.authority == "private-share" }
 
+    /** A partial current shelf must retain its edited occurrence while the imported URI order is restored. */
+    @Test
+    fun partialImportedRestorePreservesStagingOrderAndEditedOccurrence() {
+        val camera = PendingMediaSlot("camera", Uri.parse("content://camera/photo"))
+        val first = Uri.parse("content://private-share/first")
+        val second = PendingMediaSlot("edited-second", Uri.parse("content://private-share/second"))
+        val restored = restoreImportedMediaSlots(listOf(camera, second), listOf(first, second.uri), 10, owns)
+        assertEquals(listOf(camera.uri, first, second.uri), restored.map { it.uri })
+        assertSame(camera, restored.first())
+        assertSame(second, restored.last())
+    }
+
+    /** A stale native projection cannot discard newly picked occurrences or replace their current source URI. */
+    @Test
+    fun lateNativeRestorePreservesNewOrdinaryPicksAndCurrentOccurrences() {
+        val old = PendingMediaSlot("saved", Uri.parse("content://native/old"))
+        val current = PendingMediaSlot(old.id, Uri.parse("content://camera/current"))
+        val picked = PendingMediaSlot("picked", Uri.parse("content://picker/photo"))
+        val duplicate = PendingMediaSlot("picked-again", picked.uri)
+        val private = PendingMediaSlot("private", Uri.parse("content://private-share/photo"))
+        val oldDocument = Uri.parse("content://native/document")
+        val newDocument = Uri.parse("content://picker/document")
+        val privateDocument = Uri.parse("content://private-share/document")
+        val merged =
+            mergeRestoredComposerAttachments(
+                listOf(current, picked, duplicate, private),
+                listOf(newDocument, privateDocument),
+                RestoredConversationAttachments(listOf(old), listOf(oldDocument)),
+                owns,
+            )
+        assertEquals(listOf(current, picked, duplicate, private), merged.mediaSlots)
+        assertSame(current, merged.mediaSlots.first())
+        assertSame(picked, merged.mediaSlots[1])
+        assertSame(duplicate, merged.mediaSlots[2])
+        assertEquals(listOf(oldDocument, newDocument, privateDocument), merged.documentUris)
+    }
+
     /** Restores mixed content with a media URI on the document shelf and preserves its existing edited slot. */
     @Test
     fun mixedShelfRefreshPreservesAnExistingEditedMediaOccurrence() {
