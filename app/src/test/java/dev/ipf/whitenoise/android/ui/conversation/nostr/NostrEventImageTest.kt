@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -58,6 +59,7 @@ class NostrEventImageTest {
     @Test
     fun failedImageCanRetryAndOpenFullscreenWithoutAnotherDownload() {
         var downloads = 0
+        val failureLabel = string(R.string.nostr_event_image_failed)
         composeRule.setContent {
             WhiteNoiseTheme {
                 NostrEventImagePane(url = "https://images.example/retry", loadImage = { _, _ ->
@@ -67,9 +69,13 @@ class NostrEventImageTest {
             }
         }
         composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).performClick()
-        composeRule.onNodeWithText(string(R.string.nostr_event_image_failed)).assertIsDisplayed()
+        composeRule.onNodeWithText(failureLabel).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.retry)).performClick()
-        composeRule.onNodeWithText(string(R.string.nostr_event_image_failed)).assertDoesNotExist()
+        composeRule.waitUntil(10_000) {
+            downloads == 2 &&
+                composeRule.onAllNodesWithText(failureLabel).fetchSemanticsNodes().isEmpty()
+        }
+        composeRule.onNodeWithText(failureLabel).assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.close)).assertIsDisplayed().performClick()
         composeRule.runOnIdle { assertEquals(2, downloads) }

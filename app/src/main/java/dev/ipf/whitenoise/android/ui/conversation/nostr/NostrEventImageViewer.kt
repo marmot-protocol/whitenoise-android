@@ -42,7 +42,7 @@ import kotlinx.coroutines.CancellationException
 @Composable
 internal fun NostrEventImagePane(
     url: String,
-    loadImage: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
+    loadImage: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::retryBanner,
 ) {
     var attempt by remember(url) { mutableIntStateOf(0) }
     var image by remember(url) { mutableStateOf(AvatarImageLoader.peekBanner(url, IMAGE_WIDTH_PX)) }
