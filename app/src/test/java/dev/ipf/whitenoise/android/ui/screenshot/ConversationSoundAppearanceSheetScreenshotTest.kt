@@ -81,9 +81,7 @@ class ConversationSoundAppearanceSheetScreenshotTest {
 
     private fun capture(name: String) {
         val surface = composeRule.onNodeWithTag("sheet.surface")
-        val handle = composeRule.onNodeWithTag("sheet.dragHandle")
-        println("sound sheet bounds surface=${surface.fetchSemanticsNode().boundsInRoot}")
-        println("sound sheet bounds handle=${handle.fetchSemanticsNode().boundsInRoot}")
+        val handle = composeRule.onNodeWithTag("sheet.dragHandle", useUnmergedTree = true)
         visualErrors.checkSucceeds { surface.captureRoboImage("src/test/snapshots/$name.png") }
         handle.assertIsDisplayed()
     }

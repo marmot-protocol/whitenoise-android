@@ -63,7 +63,7 @@ class ConversationNotificationSoundSheetTest {
         composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("sheet.surface").assertIsDisplayed()
-        composeRule.onNodeWithTag("sheet.dragHandle").assertIsDisplayed()
+        composeRule.onNodeWithTag("sheet.dragHandle", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
         composeRule.onNodeWithTag("sheet.surface").assertDoesNotExist()
         val primary = if (isDm) NotificationChannelSpec.DIRECT_MESSAGES else NotificationChannelSpec.GROUP_MESSAGES
