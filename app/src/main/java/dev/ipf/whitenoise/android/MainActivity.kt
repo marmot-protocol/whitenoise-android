@@ -20,7 +20,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,6 +34,7 @@ import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
 import dev.ipf.whitenoise.android.diagnostics.AndroidFramePerformanceReporter
 import dev.ipf.whitenoise.android.diagnostics.FramePerformanceCallbackGuard
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
+import dev.ipf.whitenoise.android.notifications.NotificationInboundState
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
@@ -68,8 +68,17 @@ import javax.crypto.Cipher
 class MainActivity : AppCompatActivity() {
     private val activityCreatedAtElapsedMs = SystemClock.elapsedRealtime()
     private var inboundProfilePayload by mutableStateOf<String?>(null)
-    private var inboundNotificationTarget by mutableStateOf<NotificationTarget?>(null)
-    private var inboundNotificationRequestId by mutableLongStateOf(0L)
+    private val notificationInboundState: NotificationInboundState by viewModels()
+    private var inboundNotificationTarget: NotificationTarget?
+        get() = notificationInboundState.target
+        set(value) {
+            notificationInboundState.target = value
+        }
+    private var inboundNotificationRequestId: Long
+        get() = notificationInboundState.requestId
+        set(value) {
+            notificationInboundState.requestId = value
+        }
     private var inboundAppUpdateTap by mutableIntStateOf(0)
     private lateinit var appUnlockPrompt: BiometricPrompt
     private val appUnlockCryptoGate by lazy(::AppUnlockCryptoGate)
@@ -375,9 +384,18 @@ class MainActivity : AppCompatActivity() {
             setIntent(Intent(this, MainActivity::class.java))
             return
         }
+        val retainNotification = retainPendingShareOnRecreation && inboundNotificationTarget != null
         val parsedTarget =
-            NotificationNavigation.parse(intent) { notificationKey, tapToken ->
-                notificationTapTokens.isValid(notificationKey, tapToken)
+            if (retainNotification) {
+                null
+            } else {
+                NotificationNavigation.parse(
+                    intent,
+                    importReplyDraft = !retainPendingShareOnRecreation,
+                    isTrustedTargetSignature = notificationTapTokens::isValidTarget,
+                ) { notificationKey, tapToken ->
+                    notificationTapTokens.isValid(notificationKey, tapToken)
+                }
             }
         val parsedShare =
             if (retainPendingShareOnRecreation && inboundShareRequest != null) {
@@ -389,7 +407,7 @@ class MainActivity : AppCompatActivity() {
             routeInboundIntent(
                 parsedTarget = parsedTarget,
                 shareRequest = parsedShare,
-                dataString = intent?.dataString,
+                dataString = intent?.dataString.takeUnless { retainNotification },
                 current =
                     InboundIntentRouting(
                         notificationTarget = inboundNotificationTarget,
@@ -497,6 +515,7 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         if (
             BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS &&
+            intent.action != NotificationNavigation.ACTION_OPEN &&
             intent.getBooleanExtra(BENCHMARK_RECREATE_ACTIVITY_EXTRA, false)
         ) {
             setIntent(Intent(this, MainActivity::class.java))
