@@ -6,9 +6,11 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AttachmentLocalAssetFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
+import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -20,6 +22,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Exercises controller-backed observation, including updates after the kept card's first frame. */
 @RunWith(RobolectricTestRunner::class)
@@ -123,6 +128,80 @@ class KeptMediaLiveStateTest {
         }
         composeRule.onNodeWithText("Video · Download failed. Open the original to retry").assertIsDisplayed()
         assertNoAcquisition(native)
+    }
+
+    /** A completed cached observer must reopen when eviction reveals native failure behind the kept card. */
+    @Test
+    fun cacheEvictionRestartsReadOnlyNativeObservation() {
+        val surface = surface("video/mp4")
+        val native = KeptMediaNativeFixture(surface.appState, AttachmentTransferStateFfi.FAILED)
+        val cacheKey = mediaCacheKey(SWIPE_TEST_ACCOUNT_REF, SWIPE_TEST_GROUP_ID, SWIPE_TEST_MESSAGE_ID, 0)
+        surface.appState.cacheMediaPlaintext(cacheKey, byteArrayOf(1, 2, 3))
+        var presentation: KeptMessagePresentation? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                KeptMediaTestHost(
+                    surface.item,
+                    conversation = surface.controller,
+                    onPresentation = { presentation = it },
+                )
+            }
+        }
+        composeRule.runOnIdle {
+            val status = presentation!!.attachments.single().statusLabel
+            assertEquals("Available on this device", status)
+        }
+        composeRule.runOnIdle { surface.appState.removeMediaMemoryCacheEntry(cacheKey) }
+        composeRule.waitUntil(5_000) {
+            // Native observation probes Android's main-thread cache again after the disk miss.
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
+            presentation?.attachments?.singleOrNull()?.statusLabel == "Download failed. Open the original to retry"
+        }
+        assertNoAcquisition(native)
+    }
+
+    /** A native failure cannot replace verified own-file availability while competing probes are unresolved. */
+    @Test
+    fun firstOwnFileProbeCommitsBeforeNativeFailureCanAppear() {
+        val surface = surface("video/mp4", mine = true)
+        val firstProbe = CountDownLatch(1)
+        val laterProbe = CountDownLatch(1)
+        val probes = AtomicInteger()
+        val native =
+            KeptMediaNativeFixture(surface.appState, AttachmentTransferStateFfi.FAILED) {
+                val gate = if (probes.incrementAndGet() == 1) firstProbe else laterProbe
+                check(gate.await(10, TimeUnit.SECONDS))
+                AttachmentLocalAssetFfi("retained-fixture", 3u)
+            }
+        var presentation: KeptMessagePresentation? = null
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    KeptMediaTestHost(
+                        surface.item,
+                        conversation = surface.controller,
+                        onPresentation = { presentation = it },
+                    )
+                }
+            }
+            composeRule.waitUntil(5_000) { "subscribeAttachmentTransfers" in native.calls && probes.get() > 0 }
+            composeRule.runOnIdle {
+                assertEquals("Checking availability", presentation!!.attachments.single().statusLabel)
+            }
+            firstProbe.countDown()
+            composeRule.waitUntil(5_000) {
+                presentation?.attachments?.singleOrNull()?.statusLabel != "Checking availability"
+            }
+            composeRule.runOnIdle {
+                assertEquals("Available on this device", presentation!!.attachments.single().statusLabel)
+            }
+            assertEquals(1, probes.get())
+        } finally {
+            firstProbe.countDown()
+            laterProbe.countDown()
+        }
     }
 
     /** Loads the accepted reference into the actual controller, not just the presentation input. */

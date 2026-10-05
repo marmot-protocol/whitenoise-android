@@ -22,8 +22,10 @@ import javax.crypto.spec.SecretKeySpec
 internal class KeptMediaNativeFixture(
     state: WhiteNoiseAppState,
     initial: AttachmentTransferStateFfi,
+    localAsset: () -> AttachmentLocalAssetFfi = { AttachmentLocalAssetFfi(null, 0u) },
 ) {
-    private val snapshots = Channel<AttachmentTransferSnapshotFfi>(Channel.UNLIMITED)
+    private val feeds = CopyOnWriteArrayList<Channel<AttachmentTransferSnapshotFfi>>()
+    private lateinit var latest: AttachmentTransferSnapshotFfi
     val calls = CopyOnWriteArrayList<String>()
 
     init {
@@ -48,7 +50,7 @@ internal class KeptMediaNativeFixture(
                 when (name) {
                     "displayName" -> "Fixture"
                     "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
-                    "attachmentLocalAssets" -> listOf(AttachmentLocalAssetFfi(null, 0u))
+                    "attachmentLocalAssets" -> listOf(localAsset())
                     "subscribeAttachmentTransfers" -> subscription()
                     else -> error("Unexpected native call: $name")
                 }
@@ -61,20 +63,23 @@ internal class KeptMediaNativeFixture(
 
     /** Publishes state owned by native work without starting any host transfer. */
     fun publish(phase: AttachmentTransferStateFfi) {
-        check(
-            snapshots
-                .trySend(
-                    AttachmentTransferSnapshotFfi(listOf(AttachmentTransferStatusFfi(null, phase, 1u, 0u, null, null))),
-                ).isSuccess,
-        )
+        synchronized(feeds) {
+            latest = AttachmentTransferSnapshotFfi(listOf(AttachmentTransferStatusFfi(null, phase, 1u, 0u, null, null)))
+            feeds.forEach { it.trySend(latest) }
+        }
     }
 
     /** Allocates a generated-handle fake without loading the native library in Robolectric. */
     private fun subscription(): AttachmentTransferSubscription {
         val unsafeClass = Class.forName("sun.misc.Unsafe")
         val unsafe = unsafeClass.getDeclaredField("theUnsafe").apply { isAccessible = true }.get(null)
+        val channel = Channel<AttachmentTransferSnapshotFfi>(Channel.UNLIMITED)
+        synchronized(feeds) {
+            feeds += channel
+            channel.trySend(latest)
+        }
         return (unsafeClass.getMethod("allocateInstance", Class::class.java).invoke(unsafe, Feed::class.java) as Feed)
-            .also { it.snapshots = snapshots }
+            .also { it.snapshots = channel }
     }
 
     /** Cancelling the card observer releases only its subscription, never acquisition. */

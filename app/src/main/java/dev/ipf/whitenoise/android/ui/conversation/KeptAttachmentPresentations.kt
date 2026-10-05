@@ -6,7 +6,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
@@ -126,7 +128,7 @@ private fun rememberKeptAttachmentTransfer(
     DisposableEffect(controller, id, index) {
         onDispose { controller.releaseAttachmentTransferState(id, index) }
     }
-    val native by remember(controller, id, index, reference.ciphertextSha256, reference.sourceEpoch) {
+    val native by remember(controller, id, index, reference.ciphertextSha256, reference.sourceEpoch, cacheRevision) {
         controller.attachmentNativeProgress(id, index)
     }.collectAsStateWithLifecycle(initialValue = null)
     val cancellation by remember(controller, id, index) {
@@ -136,8 +138,11 @@ private fun rememberKeptAttachmentTransfer(
         rememberAttachmentFirstFrameCacheResolution(controller, "$id#$index", initiallyAvailable) {
             controller.refreshAttachmentTransferState(id, index)
         }
-    LaunchedEffect(controller, id, index, cacheRevision) {
+    var reconciledRevision by remember(controller, id, index) { mutableStateOf(cacheRevision) }
+    LaunchedEffect(controller, id, index, cacheRevision, cacheResolved) {
+        if (!cacheResolved || cacheRevision == reconciledRevision) return@LaunchedEffect
         controller.refreshAttachmentTransferState(id, index)
+        reconciledRevision = cacheRevision
     }
     val progress = if (controller.isMessageMine(message.record) && !cacheResolved) null else native
     return TileTransfer(
