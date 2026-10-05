@@ -1612,13 +1612,16 @@ class WhiteNoiseAppState private constructor(
             }
             return started
         } finally {
-            val state = ttsController.state.value
-            if (state is TtsState.Idle &&
-                state.sessionId == preparingSessionId && ttsSpeechAccountRef == ownerAccount
-            ) {
-                ttsSpeechAccountRef = null
-                ttsAutoReadSessionKey = null
-                ttsHistorySession.onSessionCleared()
+            // Check and clear under the same monitor as queue starts, not against a stale Idle snapshot.
+            synchronized(ttsController) {
+                val state = ttsController.state.value
+                if (state is TtsState.Idle &&
+                    state.sessionId == preparingSessionId && ttsSpeechAccountRef == ownerAccount
+                ) {
+                    ttsSpeechAccountRef = null
+                    ttsAutoReadSessionKey = null
+                    ttsHistorySession.onSessionCleared()
+                }
             }
         }
     }
