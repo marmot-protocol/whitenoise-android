@@ -6,4 +6,4 @@ import dev.ipf.whitenoise.android.share.ShareRequest
 internal fun shareRequestToCancel(
     inbound: ShareRequest?,
     visible: ShareRequest?,
-): ShareRequest? = visible ?: inbound
+): ShareRequest? = inbound?.takeUnless { it.payload.importReady } ?: visible ?: inbound

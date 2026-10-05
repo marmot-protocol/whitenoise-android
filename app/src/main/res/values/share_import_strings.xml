@@ -14,5 +14,5 @@
     <string name="share_import_interrupted">The import was interrupted. Share the files again.</string>
     <string name="share_import_progress">File %1$d of %2$d: %3$d bytes</string>
     <string name="share_import_rejected_count">Files not imported: %1$d</string>
-    <string name="share_import_recovered_limit">Recovered files exceed the 10-attachment limit. Remove extras before sending.</string>
+    <string name="share_import_recovered_limit">More than 10 attachments are selected. Remove extras before sending.</string>
 </resources>

@@ -14,5 +14,5 @@
     <string name="share_import_interrupted">匯入已中斷。請重新分享檔案。</string>
     <string name="share_import_progress">檔案 %1$d/%2$d：%3$d 位元組</string>
     <string name="share_import_rejected_count">未匯入的檔案：%1$d</string>
-    <string name="share_import_recovered_limit">恢復的檔案超過了 10 個附件的上限。請移除多餘的附件後再傳送。</string>
+    <string name="share_import_recovered_limit">選取的附件超過了 10 個。傳送前請移除多餘的附件。</string>
 </resources>

@@ -41,8 +41,10 @@ internal fun importedComposerExceedsLimit(
     documents: List<Uri>,
     maxItems: Int,
     owns: (Uri) -> Boolean,
-): Boolean =
-    media.size + documents.size > maxItems && (media.any { owns(it.uri) } || documents.any(owns))
+): Boolean {
+    if (media.size + documents.size <= maxItems) return false
+    return media.any { owns(it.uri) } || documents.any(owns)
+}
 
 internal fun appendRecoveredDocuments(
     current: List<Uri>,

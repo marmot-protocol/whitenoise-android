@@ -14,5 +14,5 @@
     <string name="share_import_interrupted">L’importation a été interrompue. Partagez à nouveau les fichiers.</string>
     <string name="share_import_progress">Fichier %1$d sur %2$d : %3$d octets</string>
     <string name="share_import_rejected_count">Fichiers non importés : %1$d</string>
-    <string name="share_import_recovered_limit">Les fichiers récupérés dépassent la limite de 10 pièces jointes. Retirez les fichiers en trop avant d’envoyer.</string>
+    <string name="share_import_recovered_limit">Plus de 10 pièces jointes sont sélectionnées. Retirez celles en trop avant d’envoyer.</string>
 </resources>

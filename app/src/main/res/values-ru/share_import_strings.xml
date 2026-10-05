@@ -14,5 +14,5 @@
     <string name="share_import_interrupted">Импорт прерван. Поделитесь файлами снова.</string>
     <string name="share_import_progress">Файл %1$d из %2$d: %3$d байт</string>
     <string name="share_import_rejected_count">Не импортировано файлов: %1$d</string>
-    <string name="share_import_recovered_limit">Восстановленные файлы превышают лимит в 10 вложений. Удалите лишние вложения перед отправкой.</string>
+    <string name="share_import_recovered_limit">Выбрано более 10 вложений. Удалите лишние вложения перед отправкой.</string>
 </resources>

@@ -14,5 +14,5 @@
     <string name="share_import_interrupted">İçe aktarma kesildi. Dosyaları yeniden paylaşın.</string>
     <string name="share_import_progress">%2$d dosyadan %1$d: %3$d bayt</string>
     <string name="share_import_rejected_count">İçe aktarılmayan dosyalar: %1$d</string>
-    <string name="share_import_recovered_limit">Kurtarılan dosyalar 10 ek sınırını aşıyor. Göndermeden önce fazla ekleri kaldırın.</string>
+    <string name="share_import_recovered_limit">Seçilen ek sayısı 10 sınırını aşıyor. Göndermeden önce fazla ekleri kaldırın.</string>
 </resources>
