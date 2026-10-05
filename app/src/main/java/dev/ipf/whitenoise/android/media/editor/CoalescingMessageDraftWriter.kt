@@ -243,7 +243,10 @@ internal class CoalescingMessageDraftWriter(
         return deletion
     }
 
-    /** Flush accepted edits before importing text, retaining exact retry identity and a generation-fenced UI result. */
+    /**
+     * Flushes accepted edits before importing text; callers can preserve raw shared whitespace with trimIncoming=false.
+     * Retains receipt-based retry identity and a generation-fenced result for composer hydration.
+     */
     suspend fun mergeText(
         accountRef: String,
         groupIdHex: String,
