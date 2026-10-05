@@ -601,7 +601,7 @@
     <string name="preview">Vorschau</string>
     <string name="no_active_account_period">Kein aktives Konto.</string>
     <string name="about">Über</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">NIP-05-Adresse</string>
     <string name="nsec_or_npub">Privaten Schlüssel eingeben</string>
     <string name="white_noise_logo">White-Noise-Logo</string>
     <string name="identity_entry_error_invalid_key">Das sieht nicht wie ein gültiger nsec- oder npub-Schlüssel aus.</string>
@@ -2238,7 +2238,7 @@
     <string name="profile_readiness_picture">Profilbild</string>
     <string name="profile_readiness_bio">Über mich</string>
     <string name="profile_readiness_banner">Titelbild</string>
-    <string name="profile_readiness_address">Verifizierte Adresse</string>
+    <string name="profile_readiness_address">NIP-05-Adresse</string>
     <string name="profile_readiness_lightning">Lightning-Adresse</string>
     <string name="profile_readiness_added">Hinzugefügt</string>
     <string name="profile_readiness_recommended">Empfohlen</string>
