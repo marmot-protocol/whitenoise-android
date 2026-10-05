@@ -2201,4 +2201,9 @@
     <string name="profile_readiness_added">已新增</string>
     <string name="profile_readiness_recommended">建議填寫</string>
     <string name="profile_readiness_field_optional">選填</string>
+    <string name="folder_sort_title">聊天排序方式</string>
+    <string name="folder_sort_recent">最近活動</string>
+    <string name="folder_sort_name">名稱 A–Z</string>
+    <string name="folder_sort_unread">未讀優先</string>
+    <string name="folder_sort_precedence">待確認的聊天始終在最前面，其後為依手動順序排列的置頂聊天。</string>
 </resources>

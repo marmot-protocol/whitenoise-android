@@ -2230,4 +2230,9 @@
     <string name="profile_readiness_added">Eklendi</string>
     <string name="profile_readiness_recommended">Önerilen</string>
     <string name="profile_readiness_field_optional">İsteğe bağlı</string>
+    <string name="folder_sort_title">Sohbetleri sıralama ölçütü</string>
+    <string name="folder_sort_recent">En son etkinlik</string>
+    <string name="folder_sort_name">Ad A–Z</string>
+    <string name="folder_sort_unread">Önce okunmamışlar</string>
+    <string name="folder_sort_precedence">Bekleyen sohbetler başta kalır, ardından sabitlenen sohbetler elle belirlenen sırayla gösterilir.</string>
 </resources>

@@ -21,6 +21,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatFolderPreferences
 import dev.ipf.whitenoise.android.state.ChatFolderRule
+import dev.ipf.whitenoise.android.state.ChatFolderSortOrder
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.FolderField
@@ -55,6 +56,48 @@ class ChatFolderEditScreenTest {
             .edit()
             .clear()
             .commit()
+    }
+
+    /** Choosing an order is draft-only until Save, including a seeded folder. */
+    @Test
+    fun sortChoicePersistsOnlyWithTheCompleteFolderDraft() {
+        val appState = appState()
+        val id = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        renderEditor(appState, {})
+        composeRule.onNodeWithTag("folder.sort").performScrollTo().performClick()
+        composeRule.onNodeWithTag("folder.sort.NAME").performClick()
+        assertEquals(
+            ChatFolderSortOrder.RECENT,
+            appState.chatFolderPreferences
+                .foldersFor(ACCOUNT_REF)
+                .first { it.id == id }
+                .sortOrder,
+        )
+        composeRule.onNodeWithText("Name A–Z").assertExists()
+        composeRule.onNodeWithTag("folder.save").performClick()
+        assertEquals(
+            ChatFolderSortOrder.NAME,
+            appState.chatFolderPreferences
+                .foldersFor(ACCOUNT_REF)
+                .first { it.id == id }
+                .sortOrder,
+        )
+    }
+
+    /** Back treats a changed sort option as a dirty draft and discard leaves storage unchanged. */
+    @Test
+    fun discardedSortChoiceDoesNotChangeTheFolder() {
+        val appState = appState()
+        renderEditor(appState, {})
+        composeRule.onNodeWithTag("folder.sort").performScrollTo().performClick()
+        composeRule.onNodeWithTag("folder.sort.UNREAD").performClick()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_discard)).performClick()
+        assertTrue(
+            appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).all {
+                it.sortOrder == ChatFolderSortOrder.RECENT
+            },
+        )
     }
 
     @Test

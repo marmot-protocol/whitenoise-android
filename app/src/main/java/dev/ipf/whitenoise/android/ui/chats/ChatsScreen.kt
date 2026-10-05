@@ -91,6 +91,7 @@ import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
+import dev.ipf.whitenoise.android.state.ChatFolderSortOrder
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
@@ -106,6 +107,7 @@ import dev.ipf.whitenoise.android.state.presentStoppedLocalChatDeleteBatch
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
+import dev.ipf.whitenoise.android.state.sortFolderChatItems
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
@@ -669,7 +671,20 @@ internal fun ChatsScreen(
                 throw throwable
             }
         }
-    val visibleItems = remember(searchSections) { searchSections.orderedItems() }
+    val visibleItems =
+        remember(searchSections, searchActive, selectedFolder, profileRev, groupTitleCopy) {
+            val rows = searchSections.orderedItems()
+            if (searchActive) {
+                rows
+            } else {
+                sortFolderChatItems(
+                    items = rows,
+                    order = selectedFolder?.sortOrder ?: ChatFolderSortOrder.RECENT,
+                    activeAccountIdHex = appState.activeAccount?.accountIdHex,
+                    displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+                )
+            }
+        }
 
     fun visibleRowId(item: ChatListItem): String =
         if (searchActive) {

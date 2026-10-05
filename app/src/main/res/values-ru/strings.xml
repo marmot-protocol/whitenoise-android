@@ -2300,4 +2300,9 @@
     <string name="profile_readiness_added">Добавлено</string>
     <string name="profile_readiness_recommended">Рекомендуется</string>
     <string name="profile_readiness_field_optional">Необязательно</string>
+    <string name="folder_sort_title">Сортировка чатов</string>
+    <string name="folder_sort_recent">Последняя активность</string>
+    <string name="folder_sort_name">По имени А–Я</string>
+    <string name="folder_sort_unread">Сначала непрочитанные</string>
+    <string name="folder_sort_precedence">Ожидающие чаты остаются в начале, за ними идут закреплённые чаты в заданном вручную порядке.</string>
 </resources>

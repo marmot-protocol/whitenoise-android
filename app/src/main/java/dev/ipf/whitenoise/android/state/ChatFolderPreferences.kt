@@ -25,6 +25,7 @@ data class ChatFolder(
     val order: Int,
     val systemKind: SystemFolderKind?,
     val showWhenEmpty: Boolean = false,
+    val sortOrder: ChatFolderSortOrder = ChatFolderSortOrder.RECENT,
 )
 
 /**
@@ -125,6 +126,7 @@ class ChatFolderPreferences(
         manualChatIds: Set<String>,
         rule: ChatFolderRule?,
         showWhenEmpty: Boolean? = null,
+        sortOrder: ChatFolderSortOrder? = null,
     ): ChatFolder? {
         val account = normalizedAccount(accountRef)
         val trimmedName = name?.trim()
@@ -136,11 +138,13 @@ class ChatFolderPreferences(
             val existing = folderId?.let { id -> current.folders.firstOrNull { it.id == id } }
             if (folderId != null && existing == null) return@synchronized null
             val visibleWhenEmpty = folderDraftVisibility(showWhenEmpty, existing)
+            val sorting = folderDraftSortOrder(sortOrder, existing)
             val folder =
                 existing?.copy(
                     name = trimmedName ?: existing.name,
                     description = description.trim(),
                     showWhenEmpty = visibleWhenEmpty,
+                    sortOrder = sorting,
                 ) ?: ChatFolder(
                     id = UUID.randomUUID().toString(),
                     name = requireNotNull(trimmedName),
@@ -148,11 +152,18 @@ class ChatFolderPreferences(
                     order = (current.folders.maxOfOrNull { it.order } ?: -1) + 1,
                     systemKind = null,
                     showWhenEmpty = visibleWhenEmpty,
+                    sortOrder = sorting,
                 )
             persistFolderDraft(account, current, folder, existing == null, manualChatIds, rule)
             folder
         }
     }
+
+    /** Metadata-only saves preserve a folder's selected order; creation keeps the legacy default. */
+    private fun folderDraftSortOrder(
+        requested: ChatFolderSortOrder?,
+        existing: ChatFolder?,
+    ): ChatFolderSortOrder = requested ?: existing?.sortOrder ?: ChatFolderSortOrder.RECENT
 
     private fun folderDraftVisibility(
         requested: Boolean?,
@@ -517,6 +528,7 @@ class ChatFolderPreferences(
                             .put(FIELD_NAME, folder.name)
                             .put(FIELD_DESCRIPTION, folder.description)
                             .put(FIELD_SHOW_WHEN_EMPTY, folder.showWhenEmpty)
+                            .put(FIELD_SORT_ORDER, folder.sortOrder.name)
                             .put(FIELD_ORDER, folder.order)
                             .put(FIELD_SYSTEM_KIND, folder.systemKind?.name),
                     )
@@ -544,6 +556,7 @@ class ChatFolderPreferences(
                     order = json.optInt(FIELD_ORDER, 0),
                     systemKind = kind,
                     showWhenEmpty = json.optBoolean(FIELD_SHOW_WHEN_EMPTY, false),
+                    sortOrder = ChatFolderSortOrder.fromStored(json.optString(FIELD_SORT_ORDER)),
                 )
             }
         }.getOrNull()
@@ -556,6 +569,7 @@ class ChatFolderPreferences(
         private const val FIELD_ID = "id"
         private const val FIELD_NAME = "name"
         private const val FIELD_SHOW_WHEN_EMPTY = "showWhenEmpty"
+        private const val FIELD_SORT_ORDER = "sortOrder"
         private const val FIELD_DESCRIPTION = "description"
         private const val FIELD_ORDER = "order"
         private const val FIELD_SYSTEM_KIND = "systemKind"

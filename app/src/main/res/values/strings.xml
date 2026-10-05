@@ -2390,4 +2390,9 @@
     <string name="profile_readiness_recommended">Recommended</string>
     <string name="profile_readiness_field_optional">Optional</string>
     <string name="profile_readiness_field" translatable="false">%1$s · %2$s</string>
+    <string name="folder_sort_title">Sort chats by</string>
+    <string name="folder_sort_recent">Most recent activity</string>
+    <string name="folder_sort_name">Name A–Z</string>
+    <string name="folder_sort_unread">Unread first</string>
+    <string name="folder_sort_precedence">Pending chats stay first, followed by pinned chats in their manual order.</string>
 </resources>

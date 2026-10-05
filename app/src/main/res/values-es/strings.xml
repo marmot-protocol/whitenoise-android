@@ -2232,4 +2232,9 @@
     <string name="profile_readiness_added">Añadido</string>
     <string name="profile_readiness_recommended">Recomendado</string>
     <string name="profile_readiness_field_optional">Opcional</string>
+    <string name="folder_sort_title">Ordenar chats por</string>
+    <string name="folder_sort_recent">Actividad más reciente</string>
+    <string name="folder_sort_name">Nombre A–Z</string>
+    <string name="folder_sort_unread">No leídos primero</string>
+    <string name="folder_sort_precedence">Los chats pendientes aparecen primero, seguidos de los chats fijados en su orden manual.</string>
 </resources>

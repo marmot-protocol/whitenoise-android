@@ -39,10 +39,12 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.chatFolderChatIds
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatFolderRule
+import dev.ipf.whitenoise.android.state.ChatFolderSortOrder
 import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.allLoadedFolderChats
 import dev.ipf.whitenoise.android.state.chatFolderSource
+import dev.ipf.whitenoise.android.state.sortFolderChatItems
 import dev.ipf.whitenoise.android.ui.chats.newchat.deriveRecipientCandidates
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
@@ -118,6 +120,8 @@ private fun ChatFolderEditSession(
     val prefillName = existing?.let { chatFolderDisplayName(it) }.orEmpty()
     val name = rememberTextFieldState(prefillName)
     val description = rememberTextFieldState(existing?.description.orEmpty())
+    val initialSortOrder = remember { existing?.sortOrder ?: ChatFolderSortOrder.RECENT }
+    var sortOrder by rememberSaveable { mutableStateOf(initialSortOrder) }
     val initialShowWhenEmpty = remember { existing?.showWhenEmpty ?: false }
     var showWhenEmpty by rememberSaveable { mutableStateOf(initialShowWhenEmpty) }
     val keyword = rememberTextFieldState(existingRule?.keyword.orEmpty())
@@ -177,7 +181,8 @@ private fun ChatFolderEditSession(
             description.text.toString() != existing?.description.orEmpty() ||
             rule != initialRule ||
             manualChatIds != initialManual ||
-            showWhenEmpty != initialShowWhenEmpty
+            showWhenEmpty != initialShowWhenEmpty ||
+            sortOrder != initialSortOrder
 
     /** Back confirms discarding a dirty draft. */
     fun back() {
@@ -219,6 +224,7 @@ private fun ChatFolderEditSession(
                     manualChatIds = manualChatIds,
                     rule = rule.takeIf { it != ChatFolderRule() },
                     showWhenEmpty = showWhenEmpty,
+                    sortOrder = sortOrder,
                 )
             } catch (_: Exception) {
                 null
@@ -280,7 +286,7 @@ private fun ChatFolderEditSession(
             }
         }
     val previewRows =
-        remember(source, manualChatIds, rule, activeHex, profileRevision, groupTitleCopy) {
+        remember(source, manualChatIds, rule, activeHex, profileRevision, groupTitleCopy, sortOrder) {
             val ids =
                 chatFolderChatIds(
                     items = source,
@@ -290,15 +296,18 @@ private fun ChatFolderEditSession(
                     isMuted = { groupIdHex -> source.any { it.group.groupIdHex == groupIdHex && it.engineMuted() } },
                     displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
                 )
-            source
-                .filter { it.group.groupIdHex.lowercase(Locale.ROOT) in ids }
-                .map { item ->
-                    WhiteNoisePickerItem(
-                        id = item.id.lowercase(Locale.ROOT),
-                        title = chatListItemDisplayTitle(item, appState, groupTitleCopy),
-                        avatarSeed = item.id,
-                    )
-                }
+            sortFolderChatItems(
+                items = source.filter { it.group.groupIdHex.lowercase(Locale.ROOT) in ids },
+                order = sortOrder,
+                activeAccountIdHex = activeHex,
+                displayTitle = { chatListItemDisplayTitle(it, appState, groupTitleCopy) },
+            ).map { item ->
+                WhiteNoisePickerItem(
+                    id = item.id.lowercase(Locale.ROOT),
+                    title = chatListItemDisplayTitle(item, appState, groupTitleCopy),
+                    avatarSeed = item.id,
+                )
+            }
         }
 
     ChatFolderEditContent(
@@ -306,6 +315,7 @@ private fun ChatFolderEditSession(
             ChatFolderEditFormState(
                 isNew = folderId == null,
                 showWhenEmpty = showWhenEmpty,
+                sortOrder = sortOrder,
                 name = name,
                 description = description,
                 keyword = keyword,
@@ -336,6 +346,7 @@ private fun ChatFolderEditSession(
                     },
             ),
         onShowWhenEmptyChange = { showWhenEmpty = it },
+        onSortOrderChange = { sortOrder = it },
         onUnreadOnlyChange = { unreadOnly = it },
         onIncludeMutedChange = { includeMuted = it },
         onGroupsOnlyChange = {
@@ -473,6 +484,7 @@ internal data class ChatFolderEditFormState(
     val pinnedOnly: Boolean = false,
     val advancedRules: Boolean = false,
     val showWhenEmpty: Boolean = false,
+    val sortOrder: ChatFolderSortOrder = ChatFolderSortOrder.RECENT,
 )
 
 /** The form without any store access, so tests can render every draft. */
@@ -495,6 +507,7 @@ internal fun ChatFolderEditContent(
     onPinnedOnlyChange: (Boolean) -> Unit,
     rulesContent: (@Composable () -> Unit)? = null,
     onShowWhenEmptyChange: (Boolean) -> Unit = {},
+    onSortOrderChange: (ChatFolderSortOrder) -> Unit = {},
 ) {
     SettingsScaffold(
         title = stringResource(if (state.isNew) R.string.folder_new_title else R.string.folder_edit),
@@ -546,6 +559,7 @@ internal fun ChatFolderEditContent(
                     }
                 }
             }
+            item { FolderSortSetting(state.sortOrder, onSortOrderChange) }
             if (rulesContent == null) {
                 item {
                     SettingsGroup {

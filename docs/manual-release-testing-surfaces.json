@@ -9128,6 +9128,18 @@
         ]
       },
       {
+        "surface": "FolderSortSetting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderSortSetting.kt",
+        "anchor": "fun FolderSortSetting(",
+        "test_ids": ["FLD-001"]
+      },
+      {
+        "surface": "FolderSortDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderSortSetting.kt",
+        "anchor": "fun FolderSortDialog(",
+        "test_ids": ["FLD-001"]
+      },
+      {
         "surface": "ChatFolderEditScreen",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
         "anchor": "fun ChatFolderEditScreen(",

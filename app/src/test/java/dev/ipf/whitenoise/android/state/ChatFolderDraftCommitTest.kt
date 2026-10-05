@@ -36,6 +36,62 @@ class ChatFolderDraftCommitTest {
         preferences.writes = 0
     }
 
+    /** Sorting is saved atomically for custom and seeded folders, without leaking to another account. */
+    @Test
+    fun folderSortIsAtomicIsolatedAndSurvivesMetadataEdits() {
+        val custom = store.createFolder(A, "Work")!!
+        val seeded = ChatFolderPreferences.SYSTEM_FOLDER_ARCHIVED_ID
+        store.foldersFor("other")
+        for (id in listOf(custom.id, seeded)) {
+            preferences.writes = 0
+            store.commitFolderDraft(
+                A,
+                id,
+                null,
+                "Sorted",
+                setOf("chat"),
+                ChatFolderRule(archivedOnly = true),
+                sortOrder = ChatFolderSortOrder.NAME,
+            )
+            assertEquals(1, preferences.writes)
+            store.commitFolderDraft(
+                A,
+                id,
+                null,
+                "Renamed description",
+                setOf("chat"),
+                ChatFolderRule(archivedOnly = true),
+            )
+        }
+        store.reorderFolders(A, listOf(custom.id, seeded))
+        val reloaded = ChatFolderPreferences(context, preferences)
+        for (id in listOf(custom.id, seeded)) {
+            assertEquals(ChatFolderSortOrder.NAME, reloaded.foldersFor(A).first { it.id == id }.sortOrder)
+            assertEquals(setOf("chat"), reloaded.membershipFor(A, id))
+            assertEquals(ChatFolderRule(archivedOnly = true), reloaded.folderRule(A, id))
+        }
+        assertEquals(ChatFolderSortOrder.RECENT, reloaded.foldersFor("other").first { it.id == seeded }.sortOrder)
+    }
+
+    /** Missing and unknown sort values preserve all legacy folder metadata and default ordering. */
+    @Test
+    fun oldFoldersDefaultWithoutResettingTheirDefinition() {
+        val raw = context.getSharedPreferences("folder-sort-legacy", Context.MODE_PRIVATE)
+        raw
+            .edit()
+            .putString(
+                "cf:legacy:folders",
+                """[{"id":"old","name":"Legacy","description":"Keep","order":8,"showWhenEmpty":true},""" +
+                    """{"id":"future","name":"Future","order":9,"sortOrder":"FUTURE"}]""",
+            ).commit()
+        val folders = ChatFolderPreferences(context, raw).foldersFor("legacy")
+        assertEquals(listOf("old", "future"), folders.map { it.id })
+        assertEquals(listOf(8, 9), folders.map { it.order })
+        assertEquals("Keep", folders.first().description)
+        assertEquals(true, folders.first().showWhenEmpty)
+        assertEquals(listOf(ChatFolderSortOrder.RECENT, ChatFolderSortOrder.RECENT), folders.map { it.sortOrder })
+    }
+
     /** The per-account visibility setting shares the draft write and survives other folder edits. */
     @Test
     fun emptyVisibilityIsAtomicAccountScopedAndPreservedByMetadataAndReorder() {

@@ -2249,4 +2249,9 @@
     <string name="profile_readiness_added">Hinzugefügt</string>
     <string name="profile_readiness_recommended">Empfohlen</string>
     <string name="profile_readiness_field_optional">Freiwillig</string>
+    <string name="folder_sort_title">Chats sortieren nach</string>
+    <string name="folder_sort_recent">Neueste Aktivität</string>
+    <string name="folder_sort_name">Alphabetisch (A–Z)</string>
+    <string name="folder_sort_unread">Ungelesene zuerst</string>
+    <string name="folder_sort_precedence">Ausstehende Chats bleiben zuerst, gefolgt von angehefteten Chats in ihrer manuellen Reihenfolge.</string>
 </resources>

@@ -2232,4 +2232,9 @@
     <string name="profile_readiness_added">Ajout effectué</string>
     <string name="profile_readiness_recommended">Recommandé</string>
     <string name="profile_readiness_field_optional">Facultatif</string>
+    <string name="folder_sort_title">Trier les discussions par</string>
+    <string name="folder_sort_recent">Activité la plus récente</string>
+    <string name="folder_sort_name">Nom A–Z</string>
+    <string name="folder_sort_unread">Non lues en premier</string>
+    <string name="folder_sort_precedence">Les discussions en attente restent en tête, suivies des discussions épinglées dans leur ordre manuel.</string>
 </resources>

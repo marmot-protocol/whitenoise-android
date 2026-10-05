@@ -2232,4 +2232,9 @@
     <string name="profile_readiness_added">Adicionado</string>
     <string name="profile_readiness_recommended">Recomendado</string>
     <string name="profile_readiness_field_optional">Opcional</string>
+    <string name="folder_sort_title">Ordenar conversas por</string>
+    <string name="folder_sort_recent">Atividade mais recente</string>
+    <string name="folder_sort_name">Nome A–Z</string>
+    <string name="folder_sort_unread">Não lidas primeiro</string>
+    <string name="folder_sort_precedence">As conversas pendentes ficam primeiro, seguidas das conversas fixadas na sua ordem manual.</string>
 </resources>
