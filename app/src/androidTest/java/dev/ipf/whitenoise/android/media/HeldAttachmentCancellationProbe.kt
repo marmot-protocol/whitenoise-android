@@ -31,7 +31,9 @@ import java.net.URL
 
 /** Proves native acknowledgement, socket closure and a quiet interval independently of host waiter disposal. */
 internal object HeldAttachmentCancellationProbe {
-    /** Cancels a real held ciphertext body, rejects ordinary retries, then admits one deliberate Retry. */
+    private const val CIPHERTEXT_TAG_BYTES = 16
+
+    /** Cancels a real held ciphertext body of any declared size, rejects ordinary retries, then admits one Retry. */
     suspend fun run(
         state: WhiteNoiseAppState,
         request: AttachmentTransferRequest,
@@ -42,14 +44,15 @@ internal object HeldAttachmentCancellationProbe {
         assertNoWorkCancellation(state, request)
         control(port, "/__hold-acquisition")
         val cold = async { runCatching { read(state, request, reference).close() } }
+        val ciphertextBytes = (bytes.size + CIPHERTEXT_TAG_BYTES).toULong()
         val progress =
             withTimeout(5_000L) {
-                // DOWNLOADING may precede response headers; this fixture declares a known 1040-byte body.
+                // DOWNLOADING may precede response headers; the fixture declares the plaintext plus one AEAD tag.
                 state.nativeProgress(request).first {
-                    it?.phase == AttachmentTransferStateFfi.DOWNLOADING && it.total == 1040uL
+                    it?.phase == AttachmentTransferStateFfi.DOWNLOADING && it.total == ciphertextBytes
                 }
             }
-        assertEquals(1040uL, requireNotNull(progress).total)
+        assertEquals(ciphertextBytes, requireNotNull(progress).total)
         awaitLedger(port) { events -> events.any { it.getString("kind") == "held" } }
         assertActiveJoins(state, request)
         control(port, "/__cancel-marker")

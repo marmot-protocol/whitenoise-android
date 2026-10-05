@@ -108,6 +108,14 @@ internal fun NotificationsScreen(
             if (!capability.isAvailable) {
                 item { SettingsExplainer(stringResource(capability.subtitleResource())) }
             }
+            item {
+                val previews = appState.notificationPreviewSettings
+                NotificationPreviewControl(
+                    state = NotificationPreviewControlState(previews.enabled, previews.busy, previews.failed),
+                    onChange = { value -> appState.launchMutation { previews.setEnabled(value) } },
+                    onRetry = { appState.launchMutation { previews.retry() } },
+                )
+            }
             item { SettingsSection(stringResource(R.string.notification_device_policy)) }
             item {
                 NotificationDevicePolicyGroup(

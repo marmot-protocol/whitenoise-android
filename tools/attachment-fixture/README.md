@@ -157,6 +157,25 @@ median (with an optional target), a ceiling breach, a missing measurement or a b
 and an unmet target is reported only. The command refuses (status 2) a report whose run did not qualify, whose raw matrix
 fails the correctness check, or whose cohort mixes environments or link shapes, before it evaluates any ceiling.
 
+The `controller-apk-recreation` mode qualifies **process death during a download** of a received APK. One generated
+package is sent through the shipping controller, then the fixture holds its ciphertext body at 2 MiB and the probe
+starts the real receiver download. Once the native feed shows at least 1 MiB received and the server records the held
+body, the probe records the identity the next process needs and ends its own process with `Process.killProcess`, with
+no cancel, pause or cleanup, as the system does when it reclaims memory. The host then releases the hold, waits for the
+server's own `disconnect` of that acquisition so the two can never overlap, sets the install permission for a
+self-update build, and launches a new process that reopens the restored runtime, records the native state it finds,
+retries through the same `downloadAttachmentPlaintextSource` path a reader's tap uses, proves the published file by
+size and SHA-256 against the sender's copy, and only then calls the real `openAttachmentExternally`.
+`apk_recreation_checker.py` requires exactly one upload and exactly two acquisitions of it, the first held at the
+prefix and ended by the disconnect with no completion, the second started after that disconnect and delivering exactly
+the bytes it still needed (it records whether the replacement resumed from the committed prefix or restarted), and the
+expected platform outcome per distribution. Nothing is ever installed, cancelled or force-stopped by the host.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Zapstore reference-api30-arm64 controller-apk-recreation
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-apk-recreation
+```
+
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
 the report, but representative 4 MiB performance is explicitly unqualified;
@@ -186,6 +205,33 @@ The Pixel profile applies the existing 1500 ms cold / 150 ms retained-read /
 controller, held-cancellation and process-restart modes work with this explicit
 opt-in. A passing physical fixture does not qualify manual UI flows, real platform
 job lifetime or representative large-file performance.
+
+#### Physical received-APK gate
+
+`apk_physical_runner.py` drives the same `controller-apk` probe on one explicitly authorized physical device. It has
+three commands and none of them ever uninstalls, clears, downgrades or grants anything:
+
+- `preflight` is read-only: it verifies the serial, the non-emulator check and the `pixel-api37-arm64` API/ABI,
+  lists which isolated packages are installed, lists existing reverses and the current install app-op mode.
+- `install` updates only `dev.ipf.whitenoise.android.medialatency` and its `.test` package in place with
+  `adb install -r -t --user 0`, after `aapt2` package-name checks, `apksigner` signer parity between both candidates
+  and the installed APKs (pulled read-only as the retained restore copies). It needs `--confirm-in-place-update`, and a
+  package absent from the device additionally needs `--allow-fresh-install-of-isolated-identity`. It proves the
+  device's `sha256sum` of each installed APK and writes an install receipt into the private backup directory.
+- `run` refuses without `--owner-present-device-idle`, `--allow-installer-on-screen` and, for a self-update build,
+  `--allow-install-app-op-toggle` (refused for Play, which has no app-op). It records the isolated package's original
+  app-op mode and restores it, uses `adb reverse --no-rebind` and removes only its own mappings, and keeps failed and
+  partial stages in the redacted report. Optional selectors close named gaps: `--cancel-retry` runs the shared
+  held-body cancellation probe on the valid package before publication, `--large-apk PATH` registers a host-built
+  30 to 31 MiB signed package, which `apksigner` from `--build-tools` must verify before the device is contacted, on the server's `/__payload/` endpoint (outside the counted acquisition ledger) and
+  sends it through the shipping controller, `--no-installer-branch` dispatches the valid package through a context
+  whose launch raises `ActivityNotFoundException`, which the checker reports as simulated, never as a platform state.
+
+`apk_payload.py` builds that payload on the host from the built isolated test APK: one stored pad entry, `zipalign`,
+then `apksigner sign` with the debug key, so the package is genuinely signed and within the 32 MiB Android sender cap.
+Nothing installs it. The exact preconditions, owner authorizations, command order, evidence and restore steps are in
+the [physical gate plan](../../docs/performance-data/attachment-apk-physical-gate-plan.md), which also states that
+the Pixel results recorded so far and which criteria the gate still does not cover.
 
 ### Unknown-length native control
 

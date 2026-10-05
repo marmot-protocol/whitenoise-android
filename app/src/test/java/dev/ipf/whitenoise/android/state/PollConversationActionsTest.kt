@@ -12,11 +12,13 @@ import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -125,6 +127,53 @@ class PollConversationActionsTest {
                 controller.castPollVote(MESSAGE_ID, listOf("native-option")),
             )
             assertEquals(2, attempt)
+        }
+
+    @Test
+    fun nativeVoteRejectionHasSafeSupportAttributionWithoutAnAutomaticRetry() =
+        runTest {
+            var attempts = 0
+            val state =
+                appState(
+                    native { name, _ ->
+                        assertEquals("castPollVote", name)
+                        attempts++
+                        throw MarmotKitException.Runtime(
+                            "invalid app message payload: poll is closed at the response event timestamp",
+                        )
+                    },
+                )
+
+            assertNull(controller(state).castPollVote(MESSAGE_ID, listOf("native-option")))
+            assertEquals(1, attempts)
+            val report = requireNotNull(state.toast?.diagnosticReport)
+            assertTrue(report.contains("marmot=Runtime"))
+            assertTrue(report.contains("detail=poll_vote_reason=POLL_RESPONSE_TIME_REJECTED"))
+            assertFalse(report.contains("poll is closed at the response event timestamp"))
+            val logs = ShadowLog.getLogsForTag("WNPolls").joinToString { it.msg }
+            listOf(TARGET_REF, GROUP_ID, MESSAGE_ID, "native-option").forEach {
+                assertFalse(report.contains(it))
+                assertFalse(logs.contains(it))
+            }
+        }
+
+    @Test
+    fun cancelledVoteDoesNotProduceAFailureReportOrRetry() =
+        runTest {
+            val cancellation = CancellationException("vote cancelled")
+            var attempts = 0
+            val state =
+                appState(
+                    native { name, _ ->
+                        if (name == "castPollVote") attempts++
+                        throw cancellation
+                    },
+                )
+            val failure = runCatching { controller(state).castPollVote(MESSAGE_ID, listOf("native-option")) }
+            assertTrue(failure.exceptionOrNull() is CancellationException)
+            assertEquals(cancellation.message, failure.exceptionOrNull()?.message)
+            assertNull(state.toast)
+            assertEquals(1, attempts)
         }
 
     @Test

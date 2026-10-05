@@ -22,12 +22,17 @@ def evidence():
         prepare += [measure(f"media-sender-retained-{message}-{index}", size),
                     measure(f"media-receiver-cold-{message}-{index}", size)]
         for role in ROLES:
+            hit = role == "sent" and message != "video-24mib"
             read += [measure(f"media-native-read-{role}-{message}-{index}", size),
                      measure(f"media-resolver-read-{role}-{message}-{index}", size),
                      {"phase": "media-readback", "message": message, "index": index, "role": role,
                       "kind": "album" if message == "album-3" else media, "bytes": size, "exact": True,
-                      "memory_hit": False, "host_disk_hit": role == "sent" and message != "video-24mib",
+                      "memory_hit": False, "host_disk_hit": hit, "memory_eligible": size <= 8 * MIB,
                       "preview_ok": True, "preview_ms": 3.5}]
+            if hit:
+                read.append(measure(f"media-host-disk-read-{role}-{message}-{index}", size))
+            if size <= 8 * MIB:
+                read.append(measure(f"media-memory-hit-{role}-{message}-{index}", size))
     prepare += [{"phase": "media-message-sent", "message": m, "attachments": 3 if m == "album-3" else 1}
                 for m in ("single-image", "video-small", "video-9mib", "video-24mib", "album-3")]
     prepare += [{"phase": "media-own-host-publication", "message": m, "index": i, "published": True}
@@ -120,10 +125,26 @@ class MediaEvidenceTest(unittest.TestCase):
         """Received media is served from native retention, so its host cache state is informational only."""
         prepare, read, events, boundary = evidence()
         altered = deepcopy(read)
-        for row in altered:
-            if row.get("phase") == "media-readback" and row["role"] == "received":
+        for row in list(altered):
+            if row.get("phase") == "media-readback" and row["role"] == "received" and row["bytes"] <= 8 * MIB:
                 row["host_disk_hit"] = True
+                altered.append(measure(f"media-host-disk-read-received-{row['message']}-{row['index']}", row["bytes"]))
         self.assertTrue(check_media(prepare, altered, events, boundary)["passed"])
+
+    def test_every_local_layer_that_can_serve_an_attachment_is_timed_separately(self):
+        """A host-disk hit and a memory-eligible size each need their own exact measurement, and no other does."""
+        prepare, read, events, boundary = evidence()
+        for stage in ("media-host-disk-read", "media-memory-hit"):
+            dropped = [m for m in read if not str(m.get("phase")).startswith(stage)]
+            self.assertFalse(check_media(prepare, dropped, events, boundary)["passed"], stage)
+        extra = read + [measure("media-memory-hit-sent-video-9mib-0", 9 * MIB)]
+        self.assertFalse(check_media(prepare, extra, events, boundary)["passed"])
+        extra = read + [measure("media-host-disk-read-received-single-image-0", SIZES[("single-image", 0)])]
+        self.assertFalse(check_media(prepare, extra, events, boundary)["passed"])
+        wrong = deepcopy(read)
+        next(m for m in wrong if m.get("phase") == "media-readback" and m["message"] == "video-9mib")[
+            "memory_eligible"] = True
+        self.assertFalse(check_media(prepare, wrong, events, boundary)["passed"])
 
     def test_invalid_measurements_fail(self):
         """Latency and Java/native peaks must be finite measurements for the declared payload."""
