@@ -33,6 +33,21 @@ never persisted, so a process restart also disables ordinary device collection.
 The benchmark-selector build is the one exception: choosing that purpose-built
 local variant is the runner's explicit opt-in before its cold-start measurement.
 
+### Member activity presentation
+
+`op=group_membership_pending` measures one local add/remove request's `accepted`
+phase to its first uncovered transcript draw (`first_local_frame`).
+`op=group_membership_projection` separately measures arrival of a new live native
+member event (`timeline_subscription_received`, before projection application) to
+its first uncovered draw. The latter is not correlated with a local request:
+native group events have their own canonical identities and ordering.
+Initial pages, older-history loads and snapshot refreshes are excluded. These
+are presentation timings, not proof of relay acknowledgement or Welcome delivery.
+Hidden reveal frames, prefetched measurements and fully covered rows do not
+complete either timing. Request/row keys remain in controller-local memory;
+only closed categories, opaque diagnostic counters and timing values are emitted
+through the existing opt-in bounded session. Projection traces are capped at 32.
+
 ### Conversation history pages
 
 `op=chat_history_page` covers one page of history in either direction: older,
