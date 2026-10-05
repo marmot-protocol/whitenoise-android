@@ -121,21 +121,13 @@ class GroupDetailsEditNavigationTest {
         composeRule.waitUntil(5_000) {
             ConversationAlertPreferences(context)
                 .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == false &&
-                !composeRule
-                    .onNodeWithTag(reactionsTag)
-                    .fetchSemanticsNode()
-                    .config
-                    .contains(SemanticsProperties.Disabled)
+                alertControlEnabled(reactionsTag)
         }
         composeRule.onNodeWithTag(reactionsTag).performClick()
         composeRule.waitUntil(5_000) {
             ConversationAlertPreferences(context)
                 .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS) == false &&
-                !composeRule
-                    .onNodeWithTag(messagesTag)
-                    .fetchSemanticsNode()
-                    .config
-                    .contains(SemanticsProperties.Disabled)
+                alertControlEnabled(messagesTag)
         }
         composeRule.onNodeWithTag(messagesTag).assertIsOff()
         composeRule.onNodeWithTag(reactionsTag).assertIsOff()
@@ -153,6 +145,9 @@ class GroupDetailsEditNavigationTest {
         }
         composeRule.onNodeWithTag(messagesTag).assertIsOn()
     }
+
+    private fun alertControlEnabled(tag: String): Boolean =
+        !composeRule.onNodeWithTag(tag).fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)
 
     /** Unavailable call actions do not occupy the primary action row. */
     @Test
