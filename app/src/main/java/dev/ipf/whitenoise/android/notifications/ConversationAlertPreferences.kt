@@ -16,12 +16,17 @@ internal class ConversationAlertPreferences(
     private val _state = MutableStateFlow(read())
     val state: StateFlow<Map<String, Boolean>> = _state.asStateFlow()
 
+    /** Returns the saved device-local choice, or null to retain legacy behavior for this category. */
     fun choice(
         accountRef: String,
         groupIdHex: String,
         channel: NotificationChannelSpec,
     ): Boolean? = key(accountRef, groupIdHex, channel)?.let { _state.value[it] }
 
+    /**
+     * Saves a supported account/chat/category choice durably; call off the main thread.
+     * Returns false for invalid scope or failed persistence, without publishing the rejected choice.
+     */
     fun setEnabled(
         accountRef: String,
         groupIdHex: String,
@@ -48,11 +53,16 @@ internal class ConversationAlertPreferences(
             .mapNotNull { (key, value) -> (value as? Boolean)?.let { key to it } }
             .toMap()
 
+    /** Prunes choices for absent accounts immediately in memory, with best-effort asynchronous persistence. */
     fun retainAccounts(accountRefs: Collection<String>): Boolean {
         val retained = accountRefs.map { sha256Hex(it) }.toSet()
         return removeChoices(durable = false) { key -> key.substringBefore(':') !in retained }
     }
 
+    /**
+     * Durably removes only this account's choices; call off the main thread.
+     * Returns false on a failed commit and keeps the accepted state; account erasure must still proceed.
+     */
     fun clearAccount(accountRef: String): Boolean {
         val prefix = sha256Hex(accountRef)
         return removeChoices { key -> key.substringBefore(':') == prefix }
