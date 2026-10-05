@@ -52,6 +52,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -208,6 +209,31 @@ class GroupMemberIdentitySearchUiTest {
         composeRule.onNodeWithText("No matches").assertDoesNotExist()
     }
 
+    @Test
+    fun interruptedRuntimeDiscardsTheOldResultAndRestartsWhenAvailable() {
+        val pending = CompletableDeferred<String?>()
+        val started = CompletableDeferred<Unit>()
+        val attempts = AtomicInteger()
+        val current = fixture { input ->
+            if (attempts.incrementAndGet() == 1) {
+                started.complete(Unit)
+                pending.await()
+            } else {
+                validatedFixtureIdentity(input)
+            }
+        }
+        render(current)
+        openSearch()
+        composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
+        composeRule.waitUntil(5_000) { started.isCompleted }
+        composeRule.runOnIdle { current.state.wipeInProgress = true }
+        pending.complete(MEMBER_HEX)
+        composeRule.onNodeWithTag("chat_info.member.$MEMBER_HEX").assertDoesNotExist()
+        composeRule.runOnIdle { current.state.wipeInProgress = false }
+        awaitMatch()
+        assertTrue(attempts.get() >= 2)
+    }
+
     private fun openSearch() {
         composeRule.onNodeWithTag("chat_info.all_members").performScrollTo().performClick()
         composeRule.onNodeWithContentDescription("Search members").performClick()
@@ -274,6 +300,7 @@ class GroupMemberIdentitySearchUiTest {
                         UserProfileMetadataFfi("Bob: work", null, null, null, null, null, null)
                     }
                 },
+                profileDisplayNameReader = { null },
             )
         val members = (listOf(MEMBER_HEX, OTHER_HEX) + (1..4).map { "%064x".format(it) }).toMutableList()
         val group = group(groupId)

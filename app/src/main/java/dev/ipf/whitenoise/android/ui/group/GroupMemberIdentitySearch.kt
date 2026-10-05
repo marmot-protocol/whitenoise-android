@@ -51,7 +51,8 @@ internal object GroupMemberIdentitySearch {
         val query = raw.trim()
         val uri = if (query.contains("://")) runCatching { URI(query) }.getOrNull() else null
         val malformedUrl =
-            uri == null || uri.userInfo != null ||
+            uri == null ||
+                uri.userInfo != null ||
                 uri.path
                     .orEmpty()
                     .trim('/')
@@ -103,16 +104,17 @@ internal fun rememberGroupMemberSearchResolution(
     val input = GroupMemberIdentitySearch.decoderInput(query)
     val account = appState.activeAccountRef
     val generation = appState.runtimeGeneration
-    var resolution by remember(query, owner, account, generation, retry) {
-        mutableStateOf(GroupMemberSearchResolution(resolving = input != null))
+    val unavailable = appState.signOutInProgress || appState.wipeInProgress
+    var resolution by remember(query, owner, account, generation, retry, unavailable) {
+        mutableStateOf(GroupMemberSearchResolution(resolving = input != null && !unavailable))
     }
-    LaunchedEffect(query, owner, account, generation, retry) {
-        if (input != null) {
+    LaunchedEffect(query, owner, account, generation, retry, unavailable) {
+        if (input != null && !unavailable) {
             val hex = resolveMemberPublicIdentity(appState, input)
             currentCoroutineContext().ensureActive()
             val sameOwner = appState.activeAccountRef == account && appState.runtimeGeneration == generation
-            val unavailable = appState.signOutInProgress || appState.wipeInProgress
-            if (sameOwner && !unavailable) {
+            val stillAvailable = !appState.signOutInProgress && !appState.wipeInProgress
+            if (sameOwner && stillAvailable) {
                 resolution = GroupMemberSearchResolution(hex = hex, canRetry = hex == null)
             }
         }
