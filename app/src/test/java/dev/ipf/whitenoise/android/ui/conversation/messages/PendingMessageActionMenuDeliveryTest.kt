@@ -1,9 +1,16 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -11,10 +18,16 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.reconcileSuccessfulTextSend
+import dev.ipf.whitenoise.android.ui.conversation.TimelineRow
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -22,6 +35,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.Locale
 
 /** Exercises the actual bubble menu across outgoing-send reconciliation and row disposal. */
 @RunWith(RobolectricTestRunner::class)
@@ -137,29 +151,67 @@ class PendingMessageActionMenuDeliveryTest {
         robot.assertClosed()
     }
 
+    /** Changing conversations clears selection even when the destination reuses the same row key. */
+    @Test
+    fun conversationNavigationDoesNotReopenTheDeliveredMenu() = assertNavigationDismisses(changeAccount = false)
+
+    /** Account navigation clears selection before the old account's late confirmation arrives. */
+    @Test
+    fun accountNavigationDoesNotReopenTheDeliveredMenu() = assertNavigationDismisses(changeAccount = true)
+
+    /** Keeps the row identity deliberately identical to exercise route ownership rather than row removal. */
+    private fun assertNavigationDismisses(changeAccount: Boolean) {
+        val robot = MenuRobot()
+        robot.render()
+        robot.open()
+        robot.confirm()
+        robot.assertOpen()
+        composeRule.runOnIdle {
+            val group = robot.surface.controller.group
+            robot.surface =
+                robot.surface.copy(
+                    controller =
+                        ConversationController(
+                            appState = robot.surface.appState,
+                            initialGroup = if (changeAccount) group else group.copy(groupIdHex = "other-group"),
+                            accountRefOverride = if (changeAccount) "other-account" else SWIPE_TEST_ACCOUNT_REF,
+                        ),
+                )
+        }
+        robot.assertClosed()
+        robot.confirm()
+        robot.assertClosed()
+        robot.open()
+        robot.assertOpen()
+    }
+
     /** Uses production reconciliation and real bubble interactions without duplicating menu logic. */
     private inner class MenuRobot {
-        val surface =
-            swipeTestSurface(ApplicationProvider.getApplicationContext(), reacted = false, mine = true, media = false)
+        var surface by mutableStateOf(
+            swipeTestSurface(ApplicationProvider.getApplicationContext(), reacted = false, mine = true, media = false),
+        )
         private val pending = surface.item.copy(status = MessageStatus.Pending, projected = null)
         var item by mutableStateOf(pending)
         var visible by mutableStateOf(true)
-        private var openId by mutableStateOf<String?>(null)
+        private var openState = mutableStateOf<String?>(null)
+        private val openId get() = openState.value
 
         /** The host owns selection in the same way as the conversation's lazy row. */
         fun render() {
             composeRule.setContent {
+                val owner = remember(surface.controller) { mutableStateOf<String?>(null) }
+                SideEffect { openState = owner }
                 if (visible) {
                     key(item.presentationId) {
                         val messageId = item.presentationId
-                        SwipeTestBubbleHost(
+                        PendingMenuTimelineRowHost(
                             surface = surface.copy(item = item),
-                            actionMenuOpen = openId == messageId,
+                            actionMenuOpen = owner.value == messageId,
                             onActionMenuOpenChange = { open ->
                                 if (open) {
-                                    openId = messageId
-                                } else if (openId == messageId) {
-                                    openId = null
+                                    owner.value = messageId
+                                } else if (owner.value == messageId) {
+                                    owner.value = null
                                 }
                             },
                         )
@@ -208,5 +260,57 @@ class PendingMessageActionMenuDeliveryTest {
 
     private companion object {
         const val CONFIRMED_ID = "confirmed-message"
+    }
+}
+
+/** Renders the production timeline wrapper, including its independent disposal and account boundaries. */
+@Composable
+@Suppress("FunctionNaming", "LongMethod") // Mirrors the real timeline row's complete interaction contract.
+private fun PendingMenuTimelineRowHost(
+    surface: SwipeTestSurface,
+    actionMenuOpen: Boolean,
+    onActionMenuOpenChange: (Boolean) -> Unit,
+) {
+    WhiteNoiseTheme {
+        Box(Modifier.fillMaxWidth().testTag(SWIPE_TEST_HOST_TAG)) {
+            TimelineRow(
+                item = surface.item,
+                older = surface.item,
+                newer = null,
+                transcriptLocale = Locale.US,
+                entryUnreadCount = 0,
+                entryUnreadDividerRetired = true,
+                entryFirstUnreadMessageId = null,
+                onMeasured = { _, _ -> },
+                appState = surface.appState,
+                controller = surface.controller,
+                composerTextState = ComposerTextState(TextFieldValue("")),
+                highlighted = false,
+                selectionMode = false,
+                textSelectionMode = false,
+                onTextSelectionModeChange = {},
+                onTextSelectionBoundsChange = {},
+                batchSelectable = true,
+                selected = false,
+                onToggleSelection = {},
+                rangeDragActive = false,
+                onDragSelectionStart = {},
+                onDragSelection = { false },
+                onDragSelectionEnd = {},
+                onDragSelectionCancel = {},
+                quickReactionEmojis = emptyList(),
+                recentEmojis = emptyList(),
+                onEmojiUsed = {},
+                isActionMenuOpen = actionMenuOpen,
+                onActionMenuOpenChange = onActionMenuOpenChange,
+                onQuickReactionsSave = {},
+                onReplyPreviewClick = {},
+                composerGate = ComposerGate.COMPOSER,
+                onBack = {},
+                mentionCandidates = emptyList(),
+                mentionPickerEnabled = false,
+                collapseLongMessages = false,
+            )
+        }
     }
 }

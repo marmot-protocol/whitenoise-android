@@ -5943,6 +5943,8 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher? = null,
+    private val mediaThumbnailDecoder: suspend (PendingAttachment) -> android.graphics.Bitmap? =
+        ::decodeMediaThumbnailOffMain,
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
         { account, groupIdHex, archived ->
@@ -8907,11 +8909,11 @@ class ConversationController(
                     optimisticMessageIdHex = tempId,
                     confirmedMessageIdHex = confirmedId,
                 )
-                optimisticMessages.remove(key)
-                messageById.remove(tempId)
                 // INVARIANT: the discard re-check must run BEFORE any cache mutation
                 // below, so a mid-flight discard never seeds the just-sent bytes.
                 if (discardedDuringRetry.remove(key)) {
+                    optimisticMessages.remove(key)
+                    messageById.remove(tempId)
                     // User discarded after publish committed; drop the local
                     // optimistic + bytes. The published event may still echo back
                     // via projection (publish already succeeded — not retractable).
@@ -8956,13 +8958,17 @@ class ConversationController(
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
-                        val decoded = decodeMediaThumbnailOffMain(attachment)
+                        val decoded = mediaThumbnailDecoder(attachment)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)
                         }
                     }
                 }
+                // Keep the pending row available to exact native reconciliation across thumbnail suspension.
+                // Removing it earlier lets a concurrent echo publish a new presentation identity.
+                optimisticMessages.remove(key)
+                messageById.remove(tempId)
                 retainedMediaUploads.remove(key)
                 activeUploadKeys.remove(key)
                 // Bridge the gap until the published event echoes back via the

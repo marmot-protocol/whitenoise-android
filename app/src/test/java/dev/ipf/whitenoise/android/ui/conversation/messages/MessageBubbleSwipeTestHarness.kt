@@ -82,8 +82,6 @@ internal fun SwipeTestBubbleHost(
     surface: SwipeTestSurface,
     rtl: Boolean = false,
     amoled: Boolean = false,
-    actionMenuOpen: Boolean = false,
-    onActionMenuOpenChange: (Boolean) -> Unit = {},
 ) {
     val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLayoutDirection provides direction) {
@@ -111,8 +109,8 @@ internal fun SwipeTestBubbleHost(
                     quickReactionEmojis = emptyList(),
                     recentEmojis = emptyList(),
                     onEmojiUsed = {},
-                    isActionMenuOpen = actionMenuOpen,
-                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    isActionMenuOpen = false,
+                    onActionMenuOpenChange = {},
                     onQuickReactionsSave = {},
                     onReplyPreviewClick = {},
                     composerGate = ComposerGate.COMPOSER,
