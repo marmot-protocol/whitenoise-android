@@ -162,6 +162,48 @@ class ProfileEditSaveButtonTest {
         assertEquals(1, submitted.size)
     }
 
+    /** Publication alone never completes readiness; only the subsequent native read can add or clear the name. */
+    @Test
+    fun readinessFollowsActualSaveReadbackAndSurvivesFailure() {
+        val empty = profileEditMetadata("", "", "", "", "", "")
+        var accepted = false
+        var published = false
+        var readback = CompletableDeferred<UserProfileMetadataFfi?>()
+        show(cached = empty, load = { if (published) readback.await() else empty }, publish = {
+            if (accepted) published = true
+            accepted
+        })
+        editName("Alice")
+        composeRule.onNodeWithText(app.getString(R.string.profile_readiness_setup)).assertExists()
+        composeRule.onNodeWithTag("profile.save").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("profile.save").assertIsEnabled()
+        composeRule.onNodeWithText(app.getString(R.string.profile_readiness_setup)).assertExists()
+        accepted = true
+        composeRule.onNodeWithTag("profile.save").performClick()
+        composeRule.waitUntil { composeRule.onAllNodesWithTag("profile.save").fetchSemanticsNodes().isEmpty() }
+        composeRule.onNodeWithTag("profile.edit").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.profile_readiness_setup)).assertExists()
+        readback.complete(null)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app.getString(R.string.profile_readiness_setup)).assertExists()
+        readback = CompletableDeferred()
+        composeRule.onNodeWithTag("profile.name_field").performScrollTo().performTextReplacement("Bob")
+        composeRule.onNodeWithTag("profile.save").performClick()
+        composeRule.waitUntil { composeRule.onAllNodesWithTag("profile.save").fetchSemanticsNodes().isEmpty() }
+        readback.complete(empty.copy(name = "Bob"))
+        composeRule.onNodeWithTag("profile.edit").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app.getString(R.string.profile_readiness_optional)).assertExists()
+        readback = CompletableDeferred()
+        composeRule.onNodeWithTag("profile.name_field").performScrollTo().performTextReplacement("")
+        composeRule.onNodeWithTag("profile.save").performClick()
+        composeRule.waitUntil { composeRule.onAllNodesWithTag("profile.save").fetchSemanticsNodes().isEmpty() }
+        readback.complete(empty)
+        composeRule.onNodeWithTag("profile.edit").performClick()
+        composeRule.onNodeWithText(app.getString(R.string.profile_readiness_setup)).assertExists()
+    }
+
     /** Failed publication leaves the complete draft available for retry instead of accepting it as a baseline. */
     @Test
     fun failedSaveRetainsTheDraftForRetry() {

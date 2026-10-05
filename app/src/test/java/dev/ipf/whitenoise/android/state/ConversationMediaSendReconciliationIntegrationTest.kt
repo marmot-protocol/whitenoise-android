@@ -49,13 +49,18 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -71,6 +76,48 @@ import java.time.Duration
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
 class ConversationMediaSendReconciliationIntegrationTest {
+    /** A timed-out test still drains asynchronous mutation cleanup before releasing the Main dispatcher. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun cancelledFixtureOwnerWaitsForMutationCleanup() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val controller = ConversationController(state, group(), initialMemberSnapshot = memberSnapshot())
+            var mutationFinished = false
+            var ownerObservedCompletion = false
+            state.mutationsScope.launch {
+                try {
+                    awaitCancellation()
+                } finally {
+                    withContext(NonCancellable) {
+                        yield()
+                        mutationFinished = true
+                    }
+                }
+            }
+            val owner =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        finishMediaFixture(controller, state)
+                        ownerObservedCompletion = mutationFinished
+                    }
+                }
+            try {
+                owner.cancelAndJoin()
+                assertTrue(ownerObservedCompletion)
+                assertTrue(state.mutationsScope.coroutineContext.job.isCompleted)
+            } finally {
+                try {
+                    finishMediaFixture(controller, state)
+                } finally {
+                    Dispatchers.resetMain()
+                }
+            }
+        }
+
     /** Group-details viewers can retry terminal native work without a platform-open destination. */
     @Test
     fun mediaLibraryRetryWithNoOpenDestinationAdmitsNativeWork() = assertLibraryRetry(accepted = true)
@@ -162,9 +209,11 @@ class ConversationMediaSendReconciliationIntegrationTest {
                 controller.onCleared()
                 assertFalse(controller.retryAttachmentTransfer(CONFIRMED_MESSAGE_ID, 0, {}, {}))
             } finally {
-                controller.onCleared()
-                state.mutationsScope.cancel()
-                Dispatchers.resetMain()
+                try {
+                    finishMediaFixture(controller, state)
+                } finally {
+                    Dispatchers.resetMain()
+                }
             }
         }
 
@@ -246,14 +295,23 @@ class ConversationMediaSendReconciliationIntegrationTest {
                             overrides.containsKey(CONFIRMED_MESSAGE_ID),
                         )
                     } finally {
-                        controller.onCleared()
-                        state.mutationsScope.cancel()
+                        finishMediaFixture(controller, state)
                     }
                 }
             } finally {
                 Dispatchers.resetMain()
             }
         }
+
+    /** Drains cancelled cache IO even after a test timeout, before its process-global Main dispatcher is reset. */
+    private suspend fun finishMediaFixture(
+        controller: ConversationController,
+        state: WhiteNoiseAppState,
+    ) = withContext(NonCancellable) {
+        controller.onCleared()
+        state.mutationsScope.coroutineContext.job
+            .cancelAndJoin()
+    }
 
     /** Both a file and a multi-image album reveal after durable acceptance, including a canonical echo. */
     @Test

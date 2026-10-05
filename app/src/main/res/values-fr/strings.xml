@@ -306,6 +306,7 @@
     <string name="large_group_invite_confirm_title">Inviter dans un grand groupe ?</string>
     <string name="large_group_invite_confirm_message">Dans les groupes de 50 membres ou plus, les invitations supplémentaires risquent de ne pas être distribuées de manière fiable. Vous pouvez tout de même continuer.</string>
     <string name="invite_pending">Invitation en attente : %1$s</string>
+    <string name="member_removal_pending">Retrait en attente : %1$s</string>
     <string name="latest_group_error">Dernière erreur du groupe : %1$s</string>
     <string name="actions">Actions</string>
     <string name="archive_chat">Archiver</string>
@@ -600,7 +601,7 @@
     <string name="preview">Aperçu</string>
     <string name="no_active_account_period">Aucun compte actif.</string>
     <string name="about">À propos</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">Adresse NIP-05</string>
     <string name="nsec_or_npub">Entrez votre clé privée</string>
     <string name="white_noise_logo">Logo White Noise</string>
     <string name="identity_entry_error_invalid_key">Cela ne ressemble pas à une clé nsec ou npub valide.</string>
@@ -2202,6 +2203,10 @@
     <string name="onboarding_details_accessibility">%1$s : %2$s</string>
     <string name="onboarding_details_expanded">Développé</string>
     <string name="onboarding_details_collapsed">Réduit</string>
+    <string name="local_delete_retry_detail">\u2068La suppression est arrêtée. Choisissez à nouveau Supprimer de cet appareil ; le résultat précédent sera vérifié d\'abord. Si le problème persiste, redémarrez l\'application.\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068La discussion a été supprimée. Le nettoyage des données locales sera réessayé automatiquement.\u2069</string>
+    <string name="chat_list_delete_stopped">Suppression arrêtée</string>
+    <string name="chat_list_delete_stopped_detail">\u2068%1$d suppressions confirmées sur %2$d. Réessayez Supprimer de cet appareil pour vérifier le résultat. Si l\'échec persiste, redémarrez l\'application.\u2069</string>
     <string name="group_svg_rejected_detail">Impossible de préparer ce SVG. Choisissez un SVG simple, un PNG ou un JPEG.</string>
     <string name="error_invalid_key_package">La clé de discussion publiée pour cette personne n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>
     <string name="error_invalid_key_package_for">La clé de discussion publiée pour %1$s n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>
@@ -2210,4 +2215,19 @@
     <string name="notification_show_previews">Afficher les aperçus des notifications</string>
     <string name="notification_show_previews_detail">Désactivé : masque les noms et le contenu des messages pour tous les comptes.</string>
     <string name="notification_preview_update_failed">Les modifications peuvent être perdues après un redémarrage.</string>
+    <string name="profile_readiness_loading">Chargement du profil…</string>
+    <string name="profile_readiness_unavailable">Statut du profil indisponible · Appuyez pour modifier</string>
+    <string name="profile_readiness_editor_unavailable">Statut du profil indisponible</string>
+    <string name="profile_readiness_setup">Configurez votre profil</string>
+    <string name="profile_readiness_ready">Profil prêt</string>
+    <string name="profile_readiness_optional">Profil prêt · Des informations facultatives peuvent être ajoutées</string>
+    <string name="profile_readiness_name">Nom affiché</string>
+    <string name="profile_readiness_picture">Photo de profil</string>
+    <string name="profile_readiness_bio">Biographie</string>
+    <string name="profile_readiness_banner">Bannière</string>
+    <string name="profile_readiness_address">Adresse NIP-05</string>
+    <string name="profile_readiness_lightning">Adresse Lightning</string>
+    <string name="profile_readiness_added">Ajout effectué</string>
+    <string name="profile_readiness_recommended">Recommandé</string>
+    <string name="profile_readiness_field_optional">Facultatif</string>
 </resources>

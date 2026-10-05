@@ -43,6 +43,14 @@ class SettingsHomeBehaviorTest {
     private var appUpdateCount = 0
     private var backCount = 0
 
+    /** Signed-out Settings retains its Profile action without claiming a profile read is running. */
+    @Test fun signedOutHasNoReadinessSpinnerCopy() {
+        mount(profileCount = 0, hasActiveAccount = false)
+        composeRule.onNodeWithText("Loading profile…").assertDoesNotExist()
+        scrollToAndClick("Profile")
+        composeRule.runOnIdle { assertEquals(listOf(SettingsDetail.Profile), opened) }
+    }
+
     /** Every hub and support row with a destination opens exactly that detail, in the prototype's order. */
     @Test
     fun rowsOpenTheirDetailsInPrototypeOrder() {

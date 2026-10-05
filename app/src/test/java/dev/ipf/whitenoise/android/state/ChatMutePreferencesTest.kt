@@ -97,6 +97,59 @@ class ChatMutePreferencesTest {
         assertEquals(ChatNotifyMode.ALL, legacy.restoreMode)
     }
 
+    /** New and previously implicit groups keep All without scanning accounts or migrating startup state. */
+    @Test
+    fun implicitAllAndExplicitMentionsSurviveRestart() {
+        val context = RuntimeEnvironment.getApplication()
+        clear(context)
+        val preferences = ChatMutePreferences(context)
+        preferences.setNotifyForMode("alice", "mentions", ChatNotifyMode.MENTIONS_ONLY)
+        val restored = ChatMutePreferences(context)
+        assertEquals(ChatNotifyMode.ALL, restored.mode("alice", "old"))
+        assertEquals(ChatNotifyMode.ALL, restored.mode("alice", "new"))
+        assertEquals(ChatNotifyMode.ALL, restored.mode("bob", "mentions"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("alice", "mentions"))
+    }
+
+    /** Both explicit choices survive restart/rejoin and removal erases only the intended identity. */
+    @Test
+    fun explicitChoicesSurviveRestartAndAccountRemovalIsIsolated() {
+        val context = RuntimeEnvironment.getApplication()
+        clear(context)
+        val preferences = ChatMutePreferences(context)
+        preferences.setNotifyForMode("alice", "group", ChatNotifyMode.MENTIONS_ONLY)
+        preferences.setNotifyForMode("bob", "group", ChatNotifyMode.MENTIONS_ONLY)
+        val restored = ChatMutePreferences(context)
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("alice", "group"))
+        restored.setNotifyForMode("alice", "group", ChatNotifyMode.ALL)
+        assertEquals(ChatNotifyMode.ALL, ChatMutePreferences(context).mode("alice", "group"))
+        assertEquals(ChatNotifyMode.ALL, ChatMutePreferences(context).state.value.notificationModes["alice|group"])
+        restored.removeAccount("alice")
+        val afterRemoval = ChatMutePreferences(context)
+        assertFalse(
+            afterRemoval.state.value.notificationModes
+                .containsKey("alice|group"),
+        )
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, afterRemoval.mode("bob", "group"))
+    }
+
+    /** Normalization and the final group separator protect similarly prefixed account labels. */
+    @Test
+    fun accountWipeMatchesTheEntireNormalizedLabel() {
+        val context = RuntimeEnvironment.getApplication()
+        clear(context)
+        val preferences = ChatMutePreferences(context)
+        preferences.setNotifyForMode("alice", "group", ChatNotifyMode.MENTIONS_ONLY)
+        preferences.setNotifyForMode("alice|other", "group", ChatNotifyMode.MENTIONS_ONLY)
+        preferences.removeAccount("   ")
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, preferences.mode("alice", "group"))
+        preferences.removeAccount(" alice ")
+        val restored = ChatMutePreferences(context)
+        assertEquals(ChatNotifyMode.ALL, restored.mode("alice", "group"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("alice|other", "group"))
+    }
+
+    /** Isolates persisted preference scenarios from earlier test instances. */
     private fun clear(context: Context) {
         context
             .getSharedPreferences("whitenoise.chat_mute", Context.MODE_PRIVATE)

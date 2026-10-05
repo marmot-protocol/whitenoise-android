@@ -93,13 +93,16 @@ import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
 import dev.ipf.whitenoise.android.state.collectGlobalAttachments
+import dev.ipf.whitenoise.android.state.deleteLocalChatsBatch
 import dev.ipf.whitenoise.android.state.hasEarlierChats
 import dev.ipf.whitenoise.android.state.loadEarlierChats
 import dev.ipf.whitenoise.android.state.loadMoreChats
+import dev.ipf.whitenoise.android.state.presentStoppedLocalChatDeleteBatch
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reportVisibleChat
 import dev.ipf.whitenoise.android.state.returnChatListToTop
@@ -303,7 +306,7 @@ internal fun ChatsScreen(
     // into the next one, where those rows are not even addressable.
     var pendingBulkDelete by
         remember(appState.activeAccountRef, appState.runtimeGeneration, showArchived) {
-            mutableStateOf<List<ChatListItem>?>(null)
+            mutableStateOf<PendingLocalChatDelete?>(null)
         }
     val searchFocusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
@@ -1419,7 +1422,9 @@ internal fun ChatsScreen(
                                 selectedChatIds.clear()
                                 selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
                             },
-                            onDelete = { pendingBulkDelete = listOf(item) },
+                            onDelete = {
+                                pendingBulkDelete = PendingLocalChatDelete.capture(listOf(item), controller, appState)
+                            },
                             onLeaveAndDelete =
                                 if (!item.isDm() &&
                                     !item.group.leaveRequestPending &&
@@ -1560,7 +1565,10 @@ internal fun ChatsScreen(
                             if (selectedVisibleItems.any { it.group.groupIdHex in leavingAndDeleting }) {
                                 return@ChatListSelectionControls
                             }
-                            pendingBulkDelete = selectedVisibleItems.takeIf { it.isNotEmpty() }
+                            pendingBulkDelete =
+                                selectedVisibleItems
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.let { PendingLocalChatDelete.capture(it, controller, appState) }
                         },
                         onAddToFolder = {
                             openFolderPicker(selectedVisibleItems)
@@ -1949,31 +1957,41 @@ internal fun ChatsScreen(
         )
     }
 
-    pendingBulkDelete?.let { items ->
+    pendingBulkDelete?.let { request ->
+        val isCurrent = { request.isCurrent(appState, controller) }
         ChatDeleteConfirmationDialog(
-            count = items.size,
+            count = request.groupIds.size,
             onConfirm = {
                 pendingBulkDelete = null
-                if (items.any {
-                        it.group.groupIdHex in leavingAndDeleting
-                    }
-                ) {
+                if (!isCurrent()) return@ChatDeleteConfirmationDialog
+                if (request.groupIds.any { it in leavingAndDeleting }) {
                     return@ChatDeleteConfirmationDialog
                 }
                 clearSelection()
                 appState.launchMutation {
-                    var succeeded = 0
-                    items.forEach { item ->
-                        if (controller.deleteGroupLocalFromChatList(item.group.groupIdHex, notify = false)) {
-                            succeeded++
+                    var failure: Throwable? = null
+                    var cleanupDeferred = false
+                    val observer =
+                        LocalChatDeleteObserver(
+                            onFailure = { failure = it },
+                            onCleanupDeferred = { cleanupDeferred = true },
+                        )
+                    val result =
+                        deleteLocalChatsBatch(request.groupIds, isCurrent) { groupId ->
+                            controller.deleteGroupLocalFromChatList(
+                                groupId,
+                                notify = false,
+                                observer = observer,
+                            )
                         }
-                    }
-                    if (succeeded > 0) {
+                    if (isCurrent() && result.deleted < result.total) {
+                        appState.presentStoppedLocalChatDeleteBatch(result, failure)
+                    } else if (isCurrent() && result.deleted > 0 && !cleanupDeferred) {
                         appState.presentTransient(
                             context.resources.getQuantityString(
                                 R.plurals.toast_chat_list_chats_deleted,
-                                succeeded,
-                                succeeded,
+                                result.deleted,
+                                result.deleted,
                             ),
                         )
                     }

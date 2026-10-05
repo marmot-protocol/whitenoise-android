@@ -3,12 +3,291 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Present-row reconciliation retains cleanup intent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupDeleteCleanupJournal.kt",
+        "anchor": "internal suspend fun reconcilePendingLocalGroupDeleteCleanup(",
+        "test_ids": ["CHL-024"]
+      },
+      {
+        "surface": "German local-delete retry action wording",
+        "source": "app/src/main/res/values-de/strings.xml",
+        "anchor": "name=\"local_delete_retry_detail\"",
+        "test_ids": ["CHL-024"]
+      },
+      {
+        "surface": "Italian count-neutral stopped-delete guidance",
+        "source": "app/src/main/res/values-it/strings.xml",
+        "anchor": "name=\"chat_list_delete_stopped_detail\"",
+        "test_ids": ["CHL-024"]
+      },
+      {
+        "surface": "Original local-delete confirmation owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/PendingLocalChatDelete.kt",
+        "anchor": "internal class PendingLocalChatDelete private constructor(",
+        "test_ids": [
+          "CHL-010",
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "Local-delete retry guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.local_delete_retry_detail",
+        "test_ids": [
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "Local-delete deferred cleanup notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "R.string.local_delete_cleanup_pending",
+        "test_ids": [
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "Stopped local-delete batch notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
+        "anchor": "R.string.chat_list_delete_stopped",
+        "test_ids": [
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "Confirmed local-delete batch count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
+        "anchor": "R.string.chat_list_delete_stopped_detail",
+        "test_ids": [
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "Local-delete batch owner and uncertainty fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
+        "anchor": "internal suspend fun deleteLocalChatsBatch(",
+        "test_ids": [
+          "CHL-010",
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "Recoverable explicit local-delete gesture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(",
+        "test_ids": [
+          "CHL-010",
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "Bounded local-delete phase diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupDeleteAttempt.kt",
+        "anchor": "internal class LocalGroupDeleteFailure(",
+        "test_ids": [
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "R.string.toast_chat_deleted_local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "R.string.toast_chat_deleted_local",
+        "test_ids": [
+          "CHL-024"
+        ]
+      },
+      {
+        "surface": "PendingGroupMembershipRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "fun PendingGroupMembershipRow(",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "Modifier.membershipVisibleDraw",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/MembershipVisibleDraw.kt",
+        "anchor": "fun Modifier.membershipVisibleDraw(",
+        "test_ids": ["GRP-026"]
+      },
+      {
         "surface": "NotificationPreviewControl",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "fun NotificationPreviewControl(",
         "test_ids": [
           "NTF-030"
         ]
+      },
+      {
+        "surface": "R.string.profile_readiness_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_loading",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_optional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_optional",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_ready",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_ready",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_setup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_setup",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_added",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_address",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_address",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_banner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_banner",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_bio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_bio",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_field",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_field",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_field_optional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_field_optional",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_lightning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_lightning",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_name",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_picture",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_recommended",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_recommended",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ProfileReadinessFields",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "fun ProfileReadinessFields(",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.setup_hide_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.setup_hide_details",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.setup_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.setup_details",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_expanded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.onboarding_details_expanded",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_collapsed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.onboarding_details_collapsed",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_editor_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_editor_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ProfileReadinessChecklist",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "fun ProfileReadinessChecklist(",
+        "test_ids": ["ACC-002"]
       },
       {
         "surface": "ConversationViewportRestorationEffects",
@@ -4765,8 +5044,21 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
         "anchor": "fun MediaImageBubble(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-003"
         ]
+      },
+      {
+        "surface": "Retained image preparation accessibility state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "R.string.media_opening",
+        "test_ids": ["MED-023"]
+      },
+      {
+        "surface": "Retained image accessible open action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": ["MED-023"]
       },
       {
         "surface": "RemoteGiphyMediaBubble",
@@ -6544,7 +6836,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "fun ConversationNotificationSettingsScreen(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "NTF-012"
         ]
       },
       {
@@ -10693,6 +10986,18 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "string:member_removal_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "R.string.member_removal_pending",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "string:invite_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "R.string.invite_pending",
+        "test_ids": ["GRP-026"]
+      },
       {
         "surface": "string:retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
@@ -18179,6 +18484,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
         "anchor": "R.string.nip_05",
         "test_ids": [
+          "ACC-002",
           "PRO-001",
           "PRO-002"
         ]
@@ -30967,6 +31273,18 @@
         "test_ids": [
           "FLD-004"
         ]
+      },
+      {
+        "surface": "Forward source read from MarmotKit's retained copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt",
+        "anchor": "internal suspend fun readRetainedForwardPlaintext(",
+        "test_ids": ["MSG-010", "MED-020"]
+      },
+      {
+        "surface": "Forward phase diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ForwardDiagnostics.kt",
+        "anchor": "internal class ForwardDiagnostics private constructor(",
+        "test_ids": ["MSG-010"]
       }
     ],
     "notification_content_contracts": [

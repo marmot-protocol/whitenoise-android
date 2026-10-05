@@ -306,6 +306,7 @@
     <string name="large_group_invite_confirm_title">In eine große Gruppe einladen?</string>
     <string name="large_group_invite_confirm_message">In Gruppen mit mindestens 50 Mitgliedern werden weitere Einladungen möglicherweise nicht zuverlässig zugestellt. Sie können trotzdem fortfahren.</string>
     <string name="invite_pending">Einladung ausstehend: %1$s</string>
+    <string name="member_removal_pending">Entfernung ausstehend: %1$s</string>
     <string name="latest_group_error">Letzter Gruppenfehler: %1$s</string>
     <string name="actions">Aktionen</string>
     <string name="archive_chat">Archivieren</string>
@@ -600,7 +601,7 @@
     <string name="preview">Vorschau</string>
     <string name="no_active_account_period">Kein aktives Konto.</string>
     <string name="about">Über</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">NIP-05-Adresse</string>
     <string name="nsec_or_npub">Privaten Schlüssel eingeben</string>
     <string name="white_noise_logo">White-Noise-Logo</string>
     <string name="identity_entry_error_invalid_key">Das sieht nicht wie ein gültiger nsec- oder npub-Schlüssel aus.</string>
@@ -2219,6 +2220,10 @@
     <string name="onboarding_details_accessibility">%1$s: %2$s</string>
     <string name="onboarding_details_expanded">Ausgeklappt</string>
     <string name="onboarding_details_collapsed">Eingeklappt</string>
+    <string name="local_delete_retry_detail">\u2068Löschen gestoppt. Versuche „Auf diesem Gerät löschen“ erneut; zuerst wird das vorherige Ergebnis geprüft. Wenn es weiter fehlschlägt, starte die App neu.\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068Der Chat wurde gelöscht. Die Bereinigung lokaler Daten wird automatisch erneut versucht.\u2069</string>
+    <string name="chat_list_delete_stopped">Löschen gestoppt</string>
+    <string name="chat_list_delete_stopped_detail">\u2068%1$d von %2$d Löschungen bestätigt. Versuche erneut „Auf diesem Gerät löschen“, um das Ergebnis zu prüfen. Bei weiteren Fehlern starte die App neu.\u2069</string>
     <string name="group_svg_rejected_detail">Diese SVG konnte nicht verarbeitet werden. Wähle eine einfache SVG, PNG oder JPEG.</string>
     <string name="error_invalid_key_package">Der veröffentlichte Chat-Schlüssel für diese Person konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
     <string name="error_invalid_key_package_for">Der veröffentlichte Chat-Schlüssel für %1$s konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
@@ -2227,4 +2232,19 @@
     <string name="notification_show_previews">Benachrichtigungsvorschau anzeigen</string>
     <string name="notification_show_previews_detail">Wenn ausgeschaltet, werden Namen und Nachrichteninhalte verborgen. Gilt für alle Konten.</string>
     <string name="notification_preview_update_failed">Änderungen können nach einem Neustart verloren gehen.</string>
+    <string name="profile_readiness_loading">Profil wird geladen…</string>
+    <string name="profile_readiness_unavailable">Profilstatus nicht verfügbar · Zum Bearbeiten tippen</string>
+    <string name="profile_readiness_editor_unavailable">Profilstatus nicht verfügbar</string>
+    <string name="profile_readiness_setup">Richte dein Profil ein</string>
+    <string name="profile_readiness_ready">Profil bereit</string>
+    <string name="profile_readiness_optional">Profil bereit · Optionale Angaben verfügbar</string>
+    <string name="profile_readiness_name">Anzeigename</string>
+    <string name="profile_readiness_picture">Profilbild</string>
+    <string name="profile_readiness_bio">Über mich</string>
+    <string name="profile_readiness_banner">Titelbild</string>
+    <string name="profile_readiness_address">NIP-05-Adresse</string>
+    <string name="profile_readiness_lightning">Lightning-Adresse</string>
+    <string name="profile_readiness_added">Hinzugefügt</string>
+    <string name="profile_readiness_recommended">Empfohlen</string>
+    <string name="profile_readiness_field_optional">Freiwillig</string>
 </resources>
