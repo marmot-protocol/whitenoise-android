@@ -9,6 +9,7 @@ data class ShareStreamStaging(
     val mediaUris: List<Uri>,
     val documentUris: List<Uri>,
 ) {
+    /** Reports whether the one-shot UI handoff contains any stream; durable file ownership is separate. */
     fun isEmpty(): Boolean = mediaUris.isEmpty() && documentUris.isEmpty()
 }
 
@@ -22,7 +23,7 @@ data class CappedShareStreamStaging(
 
 /**
  * Apply the composer attachment cap before consuming a one-shot staged share.
- * Media and documents each respect [maxItems] minus any already-queued shelf
+ * Media and documents share [maxItems] minus all already-queued shelf
  * items so inbound shares never silently discard overflow.
  */
 fun capShareStreamStaging(
@@ -37,10 +38,9 @@ fun capShareStreamStaging(
             droppedCount = if (maxItems <= 0) staging.mediaUris.size + staging.documentUris.size else 0,
         )
     }
-    val mediaRoom = (maxItems - existingMediaCount).coerceAtLeast(0)
-    val documentRoom = (maxItems - existingDocumentCount).coerceAtLeast(0)
-    val acceptedMedia = staging.mediaUris.take(mediaRoom)
-    val acceptedDocuments = staging.documentUris.take(documentRoom)
+    val room = (maxItems - existingMediaCount - existingDocumentCount).coerceAtLeast(0)
+    val acceptedMedia = staging.mediaUris.take(room)
+    val acceptedDocuments = staging.documentUris.take((room - acceptedMedia.size).coerceAtLeast(0))
     val incomingCount = staging.mediaUris.size + staging.documentUris.size
     val acceptedCount = acceptedMedia.size + acceptedDocuments.size
     return CappedShareStreamStaging(
@@ -51,7 +51,8 @@ fun capShareStreamStaging(
 
 /**
  * In-memory share stream staging keyed by `"<accountIdHex> <groupIdHex>"`.
- * Not persisted — URI grants are session-scoped. Text shares use [DraftStore] instead.
+ * Private intake files have separate durable account/chat leases; this is their one-shot UI handoff.
+ * Text shares use [DraftStore] instead.
  */
 class ShareStagingStore {
     private val pending = ConcurrentHashMap<String, ShareStreamStaging>()
@@ -61,6 +62,7 @@ class ShareStagingStore {
     val revision: Int
         get() = revisionState.intValue
 
+    /** Merges distinct URI occurrences into one account/chat handoff and wakes its mounted composer without sending. */
     fun stage(
         accountIdHex: String,
         groupIdHex: String,
@@ -82,11 +84,16 @@ class ShareStagingStore {
         revisionState.intValue += 1
     }
 
+    /** Takes one account/chat handoff once; consuming transient URIs never releases its durable private shelf. */
     fun consume(
         accountIdHex: String,
         groupIdHex: String,
     ): ShareStreamStaging? = pending.remove(draftKey(accountIdHex, groupIdHex))
 
+    /**
+     * Takes the handoff with explicit overflow accounting against current picker slots, not accepted recovered
+     * sources.
+     */
     fun consumeCapped(
         accountIdHex: String,
         groupIdHex: String,
@@ -107,6 +114,7 @@ class ShareStagingStore {
         return capped
     }
 
+    /** Matches the existing account/group namespace so another account cannot consume this handoff. */
     private fun draftKey(
         accountIdHex: String,
         groupIdHex: String,
@@ -134,4 +142,21 @@ fun classifyShareStreams(
         }
     }
     return ShareStreamStaging(mediaUris = media.distinct(), documentUris = documents.distinct())
+}
+
+/** Actual private-file sizes share the 10-item/256 MiB raw-source shelf budget. */
+internal fun capPrivateShareShelf(
+    uris: List<Uri>,
+    metadata: (Uri) -> org.json.JSONObject?,
+): List<Uri> {
+    var bytes = 0L
+    val accepted = mutableListOf<Uri>()
+    uris.distinct().forEach { uri ->
+        val size = metadata(uri)?.optLong("size", -1) ?: -1
+        if (size > 0 && bytes + size <= PRIVATE_SHARE_BATCH_MAX_BYTES && accepted.size < SHARE_STREAM_MAX_ITEMS) {
+            accepted += uri
+            bytes += size
+        }
+    }
+    return accepted
 }

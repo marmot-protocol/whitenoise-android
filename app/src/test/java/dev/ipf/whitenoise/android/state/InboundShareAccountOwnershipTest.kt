@@ -86,6 +86,47 @@ class InboundShareAccountOwnershipTest {
         assertEquals(1, appState.shareStaging.revision)
     }
 
+    /** Changes request ownership between validation points and verifies no draft is staged from the stale picker. */
+    @Test
+    fun supersededPickerCannotCommitAfterProviderPreparation() =
+        kotlinx.coroutines.runBlocking {
+            val personal = account("personal", "a0".repeat(32))
+            val state = appState(listOf(personal), personal.label)
+            var validations = 0
+            assertFalse(
+                state.stageInboundShareForFirstFrame(
+                    personal.label,
+                    listOf("chat"),
+                    SharePayload("private draft", emptyList(), "text/plain"),
+                ) { ++validations == 1 },
+            )
+            assertNull(state.draftStore.get(personal.label, "chat"))
+            assertNull(state.shareStaging.consume(personal.accountIdHex, "chat"))
+        }
+
+    /** Signs out the chosen account at final validation; the prepared request must not enter its draft. */
+    @Test
+    fun signOutAtCommitKeepsTheShareRecoverableWithoutStaging() =
+        kotlinx.coroutines.runBlocking {
+            val personal = account("personal", "a0".repeat(32))
+            val accounts = mutableListOf(personal)
+            val state = appState(accounts, personal.label)
+            var validations = 0
+            assertFalse(
+                state.stageInboundShareForFirstFrame(
+                    personal.label,
+                    listOf("chat"),
+                    SharePayload("private draft", emptyList(), "text/plain"),
+                ) {
+                    if (++validations > 1) {
+                        accounts[0] = account(personal.label, personal.accountIdHex, signedOut = true)
+                    }
+                    true
+                },
+            )
+            assertNull(state.draftStore.get(personal.label, "chat"))
+        }
+
     private fun appState(
         accounts: List<AccountSummaryFfi>,
         activeAccountRef: String,

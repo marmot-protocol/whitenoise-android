@@ -825,9 +825,12 @@ private fun String.relayHostCandidate(): String? {
  * the chat currently on screen. The protected key is promoted before overflow
  * pruning so an active controller's optimistic/retry state cannot be aged out
  * by other conversations touching their own state maps.
+ * Queued and running uploads also protect their conversation until settlement;
+ * pruning then restores the ordinary window and releases inactive private sources.
  */
 internal class ConversationStateRetention(
     private val maxEntries: Int,
+    private val isProtected: (String) -> Boolean = { false },
 ) {
     private val recentKeys = LinkedHashMap<String, Unit>(16, 0.75f, true)
 
@@ -857,16 +860,20 @@ internal class ConversationStateRetention(
 
     fun keysSnapshot(): List<String> = recentKeys.keys.toList()
 
+    /** Settled uploads return to the ordinary retention window without promoting stale state. */
+    fun prune(protectedKey: String? = null): List<String> = evictOverflow(protectedKey)
+
     private fun promoteProtected(protectedKey: String?) {
         if (protectedKey != null && recentKeys.containsKey(protectedKey)) {
             recentKeys[protectedKey] = Unit
         }
     }
 
+    /** Evicts idle conversations only; active uploads may temporarily exceed the ordinary retention window. */
     private fun evictOverflow(protectedKey: String?): List<String> {
         val evicted = mutableListOf<String>()
         while (recentKeys.size > maxEntries) {
-            val staleKey = recentKeys.keys.firstOrNull { it != protectedKey } ?: break
+            val staleKey = recentKeys.keys.firstOrNull { it != protectedKey && !isProtected(it) } ?: break
             recentKeys.remove(staleKey)
             evicted += staleKey
         }
@@ -2231,7 +2238,8 @@ class WhiteNoiseAppState private constructor(
 
     // staleness-exempt: observable preference version consumed as a Compose key.
     private var attachmentDownloadPolicyRevision by mutableIntStateOf(0)
-    private val conversationStateRetention = ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES)
+    private val conversationStateRetention =
+        ConversationStateRetention(MAX_RETAINED_CONVERSATION_STATES, isProtected = inFlightMediaUploads::hasUploads)
 
     val shareStaging: ShareStagingStore = ShareStagingStore()
 
@@ -2246,7 +2254,8 @@ class WhiteNoiseAppState private constructor(
             stageText =
                 inboundShareTextStager ?: { accountRef, groupIdHex, text ->
                     mutationsScope.launch {
-                        val completion = draftWriter.mergeText(accountRef, groupIdHex, text)
+                        val completion =
+                            draftWriter.mergeText(accountRef, groupIdHex, text, trimIncoming = false)
                         draftWriter.hydrateMergedDraft(draftStore, accountRef, groupIdHex, completion) {
                             draftHydrationRevision += 1
                         }
@@ -3010,6 +3019,7 @@ class WhiteNoiseAppState private constructor(
                 ?.get(confirmedMessageIdHex)
         }
 
+    /** Returns the account/group retained queue whose removal callback releases private source ownership. */
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,
@@ -3020,6 +3030,7 @@ class WhiteNoiseAppState private constructor(
                 dev.ipf.whitenoise.android.media.ByteSizeLruCache(
                     maxBytes = ConversationController.MEDIA_RETAINED_MAX_BYTES,
                     sizeOf = { upload -> upload.attachments.sumOf { it.plaintextBytes.size } },
+                    onEntryRemoved = RetainedMediaUpload::releaseSource,
                 )
             }
         }
@@ -3048,6 +3059,7 @@ class WhiteNoiseAppState private constructor(
         return job
     }
 
+    /** Removes only the matching upload job, then prunes conversations whose active-source protection has ended. */
     internal fun untrackInFlightMediaUpload(
         accountRef: String?,
         groupIdHex: String,
@@ -3056,6 +3068,9 @@ class WhiteNoiseAppState private constructor(
     ) {
         if (job != null) {
             inFlightMediaUploads.untrack(conversationKey(accountRef, groupIdHex), uploadKey, job)
+            synchronized(conversationStateLock) {
+                conversationStateRetention.prune(activeConversationStateKey()).forEach(::removeConversationState)
+            }
         }
     }
 
@@ -3089,6 +3104,7 @@ class WhiteNoiseAppState private constructor(
             .forEach(::removeConversationState)
     }
 
+    /** Drops all cached conversation overlays and clears the retained queue to release its source owners. */
     private fun removeConversationState(staleKey: String) {
         optimisticMessagesByConversation.remove(staleKey)
         durableAcceptanceCallbacksByConversation.remove(staleKey)?.clear()
@@ -3100,7 +3116,7 @@ class WhiteNoiseAppState private constructor(
         acceptedPendingTextOptimisticIdsByConversation.remove(staleKey)
         optimisticSendPhasesByConversation.remove(staleKey)
         optimisticCancellationGenerationByConversation.remove(staleKey)
-        retainedMediaUploadsByConversation.remove(staleKey)
+        retainedMediaUploadsByConversation.remove(staleKey)?.clear()
         activeUploadKeysByConversation.remove(staleKey)
         pendingProjectionsAwaitingBridgeByConversation.remove(staleKey)
     }
@@ -3493,21 +3509,40 @@ class WhiteNoiseAppState private constructor(
         accountRef: String,
         targetGroupIds: List<String>,
         payload: SharePayload,
+        shouldCommit: () -> Boolean = { true },
     ): Boolean {
         val initialTarget = validatedInboundShareTarget(accountRef, targetGroupIds)
-        if (initialTarget == null) return false
+        if (initialTarget == null || !shouldCommit()) return false
         val prepared = withContext(Dispatchers.IO) { shareInboundStager.prepare(appContext, payload) }
-        val target = validatedInboundShareTarget(accountRef, targetGroupIds)
-        return if (target == initialTarget) {
-            shareInboundStager.stagePreparedToChats(
-                accountIdHex = target.accountIdHex,
-                groupIds = target.groupIds,
-                prepared = prepared,
-                draftAccountRef = accountRef,
-            )
-            true
-        } else {
-            false
+        return dev.ipf.whitenoise.android.share.retainShareAtDestination(
+            appContext,
+            initialTarget.accountIdHex,
+            initialTarget.groupIds,
+            payload,
+        ) { droppedCount ->
+            if (!shouldCommit() || validatedInboundShareTarget(accountRef, targetGroupIds) != initialTarget) {
+                false
+            } else {
+                shareInboundStager.stagePreparedToChats(
+                    initialTarget.accountIdHex,
+                    initialTarget.groupIds,
+                    if (payload.importReady) prepared.copy(streamStaging = null) else prepared,
+                    accountRef,
+                )
+                if (payload.importReady && payload.streamUris.isNotEmpty()) shareStaging.notifyTextStaged()
+                if (droppedCount > 0) {
+                    presentText(
+                        AppText.Plain(
+                            appContext.resources.getQuantityString(
+                                R.plurals.toast_share_attachments_dropped,
+                                droppedCount,
+                                droppedCount,
+                            ),
+                        ),
+                    )
+                }
+                true
+            }
         }
     }
 
@@ -6237,6 +6272,7 @@ class WhiteNoiseAppState private constructor(
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
+        val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
         try {
@@ -6305,6 +6341,16 @@ class WhiteNoiseAppState private constructor(
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
             }
             withContext(NonCancellable + Dispatchers.IO) {
+                wipedShareAccount?.takeIf(String::isNotBlank)?.let { account ->
+                    runCatching {
+                        val files =
+                            dev.ipf.whitenoise.android.share
+                                .PrivateShareFiles(appContext)
+                        files.leases.releaseAccount(account)
+                    }.onFailure {
+                        appStateDebug(it) { "private share purge failed after wipe: ${it.readableMessage()}" }
+                    }
+                }
                 runCatching {
                     if (editorSessionStore.removeAccount(wipedRef)) {
                         editorSessionStore.sourceLeaseReferenceCounts()?.let(editorSourceStore::reconcile)

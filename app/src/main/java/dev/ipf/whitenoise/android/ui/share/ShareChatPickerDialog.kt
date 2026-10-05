@@ -26,7 +26,7 @@ internal fun ShareChatPickerFullScreen(
     requestId: String = "",
     payload: SharePayload,
     onDismiss: () -> Unit,
-    onStage: (String, List<String>) -> Boolean,
+    onStage: suspend (String, List<String>) -> Boolean,
     overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar? = null,
     controllerFactory: (WhiteNoiseAppState) -> ChatsController = { ChatsController(it) },
     controllerBinder: suspend (ChatsController, String) -> Unit = { controller, accountRef ->
