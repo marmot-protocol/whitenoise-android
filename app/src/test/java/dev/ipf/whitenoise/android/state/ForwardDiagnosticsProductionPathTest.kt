@@ -210,7 +210,8 @@ class ForwardDiagnosticsProductionPathTest {
         }
         val snapshot = appState.activeForwardOperation.value
         val phases =
-            PerformanceDiagnostics.exportLines()
+            PerformanceDiagnostics
+                .exportLines()
                 .filter { " op=message_forward " in it }
                 .map { it.substringAfter(" phase=").substringBefore(' ') }
         error(
