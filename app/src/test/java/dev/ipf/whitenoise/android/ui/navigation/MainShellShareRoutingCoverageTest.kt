@@ -11,15 +11,28 @@ class MainShellShareRoutingCoverageTest {
         val source = mainShellSource().readText()
         val routing =
             source
-                .substringAfter("val request =\n            inboundShareRequest", missingDelimiterValue = "")
+                .substringAfter("val request =\n            preparedShareRequest", missingDelimiterValue = "")
                 .substringBefore("\n    // Upgrade a provisional open", missingDelimiterValue = "")
 
-        val saveIndex = routing.indexOf("persisted = store.save(request)")
         val presentationGateIndex = routing.indexOf("shouldPresentInboundShare(")
         val ordinaryBranchIndex = routing.indexOf("request.shortcutId.isNullOrBlank()")
         val chatReadinessIndex = routing.indexOf("val chatListReady =")
-        assertTrue("the external payload must be encrypted before route readiness checks", saveIndex >= 0)
-        assertTrue(saveIndex < presentationGateIndex)
+        assertTrue(
+            "routing must require imported private content",
+            "inboundShareRequest?.takeIf { it.payload.importReady }" in source,
+        )
+        val importer =
+            mainShellSource()
+                .parentFile.parentFile.parentFile
+                .resolve("share/InboundShareImport.kt")
+                .readText()
+        val saveIndex = importer.indexOf("store.save(request)")
+        val readyIndex = importer.indexOf("holder.acceptInboundShareRequest(ready")
+        assertTrue(
+            "private intake must finish before the shell receives a ready request",
+            saveIndex >= 0 && readyIndex > saveIndex,
+        )
+        assertTrue(presentationGateIndex >= 0)
         assertTrue(presentationGateIndex < ordinaryBranchIndex)
         assertTrue("ordinary shares must not wait for chat-list readiness", ordinaryBranchIndex < chatReadinessIndex)
     }
@@ -40,6 +53,11 @@ class MainShellShareRoutingCoverageTest {
         assertTrue("direct shares must prepare without Main-thread provider I/O", stageIndex >= 0)
         assertTrue("direct shares must clear an existing picker", clearIndex >= 0)
         assertTrue("durable local staging must precede acknowledgement", stageIndex < clearIndex)
+        val successGuardIndex = directShareBranch.indexOf("if (stagingResult.getOrDefault(false))")
+        assertTrue(
+            "failed Direct Share staging must remain recoverable",
+            successGuardIndex in (stageIndex + 1) until clearIndex,
+        )
         assertTrue("the destination opens only after staging and acknowledgement", clearIndex < openIndex)
         assertTrue(
             "direct routing must not acknowledge the same request a second time",
@@ -88,7 +106,7 @@ class MainShellShareRoutingCoverageTest {
         )
         assertTrue(
             "staging must not fall back to the globally active account",
-            "appState.stageInboundShare(accountRef, groupIds, request.payload)" in shareStageSection,
+            "appState.stageInboundShareForFirstFrame(accountRef, groupIds, request.payload)" in shareStageSection,
         )
         val pendingIndex = nonActiveAccountBranch.indexOf("pendingStagedShareOpen = pending")
         val switchIndex = nonActiveAccountBranch.indexOf("appState.setActiveAccount(accountRef)")

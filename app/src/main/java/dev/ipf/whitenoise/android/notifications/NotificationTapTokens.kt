@@ -11,6 +11,24 @@ class NotificationTapTokens(
     private val randomBytes: (ByteArray) -> Unit = secureRandom::nextBytes,
     private val nowMillis: () -> Long = System::currentTimeMillis,
 ) {
+    private val boundTap = NotificationBoundTap(preferences)
+
+    /** A signing/storage failure disables mutable draft handoff without preventing the ordinary notification tap. */
+    internal fun signatureFor(
+        notificationKey: String,
+        target: NotificationTarget,
+    ): String? = runCatching { boundTap.sign(notificationKey, tokenFor(notificationKey), target) }.getOrNull()
+
+    /** Require both this card's live token and its authenticated account/chat/message/kind destination. */
+    internal fun isValidTarget(
+        notificationKey: String,
+        signature: String?,
+        target: NotificationTarget,
+    ): Boolean {
+        val token = preferences.getString(storageKey(notificationKey), null)?.takeIf(::isPlausibleToken) ?: return false
+        return boundTap.matches(notificationKey, token, target, signature)
+    }
+
     fun tokenFor(notificationKey: String): String =
         synchronized(tokenMutationLock) {
             val key = storageKey(notificationKey)

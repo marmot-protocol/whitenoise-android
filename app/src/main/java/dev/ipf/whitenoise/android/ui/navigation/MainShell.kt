@@ -57,9 +57,7 @@ import dev.ipf.whitenoise.android.notifications.runInactiveNotificationRouteStag
 import dev.ipf.whitenoise.android.notifications.shouldDeferNotificationChatListBind
 import dev.ipf.whitenoise.android.notifications.shouldRetryNotificationMessageLoadAfterActivation
 import dev.ipf.whitenoise.android.notifications.stateFor
-import dev.ipf.whitenoise.android.share.SerializedPendingShareRequestStore
 import dev.ipf.whitenoise.android.share.ShareRequest
-import dev.ipf.whitenoise.android.share.createPendingShareRequestStore
 import dev.ipf.whitenoise.android.share.shouldPresentInboundShare
 import dev.ipf.whitenoise.android.state.AccountSwitchPreloadPolicy
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -349,6 +347,7 @@ internal fun MainShell(
     onNotificationTargetHandled: (NotificationTarget, Long) -> Unit = { _, _ -> },
     inboundShareRequest: ShareRequest? = null,
     onShareRequestHandled: (ShareRequest) -> Unit = {},
+    shareImport: dev.ipf.whitenoise.android.share.InboundShareImportState? = null,
     inboundAppUpdateTap: Int = 0,
     onAppUpdateTapHandled: (Int) -> Unit = {},
     diagnosticsPrompt: @Composable () -> Unit = {},
@@ -651,10 +650,15 @@ internal fun MainShell(
     val currentInboundNotificationTarget by rememberUpdatedState(inboundNotificationTarget)
     val currentInboundNotificationRequestId by rememberUpdatedState(inboundNotificationRequestId)
     val currentRuntimeGeneration by rememberUpdatedState(appState.runtimeGeneration)
-    var pendingShareRequestStore by remember(context) { mutableStateOf<SerializedPendingShareRequestStore?>(null) }
-    LaunchedEffect(context) {
-        pendingShareRequestStore = SerializedPendingShareRequestStore(createPendingShareRequestStore(context))
-    }
+    val importState =
+        shareImport ?: dev.ipf.whitenoise.android.share.rememberInboundShareImport(
+            context,
+            shellStateHolder,
+            inboundShareRequest,
+        )
+    val pendingShareRequestStore = importState.store
+    val preparedShareRequest = inboundShareRequest?.takeIf { it.payload.importReady }
+    val shareImportProgress = importState.progress
     val inboundDirectGroupId =
         inboundShareRequest?.let {
             shellStateHolder.visibleShareDirectGroupId(
@@ -662,11 +666,12 @@ internal fun MainShell(
                 runtimeGeneration = appState.runtimeGeneration,
             )
         }
-    val visibleShareRequest = inboundShareRequest ?: shellStateHolder.pendingShareRequest.value
+    val visibleShareRequest = preparedShareRequest ?: shellStateHolder.pendingShareRequest.value
+    val currentShareRequestId by rememberUpdatedState(visibleShareRequest?.requestId ?: inboundShareRequest?.requestId)
     val visiblePickerRequest = visibleShareRequest.takeUnless { inboundDirectGroupId != null }
     var pendingStagedShareOpen by remember { mutableStateOf<PendingStagedShareOpen?>(null) }
     val clearSharePickerRequest: () -> Unit = {
-        val request = visibleShareRequest
+        val request = visibleShareRequest ?: inboundShareRequest
         val requestId = request?.requestId ?: shellStateHolder.pendingShareRequestId
         shellStateHolder.clearPendingShareRequest(requestId)
         if (request != null && inboundShareRequest?.requestId == request.requestId) {
@@ -705,19 +710,6 @@ internal fun MainShell(
             accountRef = chatListBindAccountRef,
             preserveLoadedContent = chatsController.retryGeneration > 0L || chatsController.hasLoadedLocalSnapshot,
         )
-    }
-
-    LaunchedEffect(
-        pendingShareRequestStore,
-        shellStateHolder.pendingShareRequestId,
-        inboundShareRequest?.requestId,
-    ) {
-        val store = pendingShareRequestStore ?: return@LaunchedEffect
-        if (inboundShareRequest != null) return@LaunchedEffect
-        val requestId = shellStateHolder.pendingShareRequestId ?: return@LaunchedEffect
-        if (shellStateHolder.pendingShareRequest.value?.requestId == requestId) return@LaunchedEffect
-        val restored = store.load(requestId)
-        shellStateHolder.restorePendingShareRequest(requestId, restored)
     }
 
     LaunchedEffect(
@@ -768,6 +760,7 @@ internal fun MainShell(
     LaunchedEffect(
         inboundNotificationTarget,
         inboundNotificationRequestId,
+        inboundNotificationTarget?.replyDraft != null && appState.appInForeground,
         appState.activeAccountRef,
         appState.runtimeGeneration,
         appState.accounts,
@@ -798,6 +791,7 @@ internal fun MainShell(
                 }
                 return@LaunchedEffect
             }
+        if (target.replyDraft != null && !appState.appInForeground) return@LaunchedEffect
         if (routingRequestId != armedNotificationRequestId) {
             releaseNotificationFirstFrameGate(armedNotificationRequestId)
             notificationActiveRetryRequestId = null
@@ -851,7 +845,10 @@ internal fun MainShell(
         val step =
             resolveNotificationNav(
                 target = target,
-                knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
+                knownAccountRefs =
+                    appState.accounts
+                        .filter { target.replyDraft == null || !it.signedOut }
+                        .mapTo(mutableSetOf()) { it.label },
                 activeAccountRef = appState.activeAccountRef,
                 chatListReady = chatListReady,
                 availableGroupIds = availableGroupIds,
@@ -862,6 +859,8 @@ internal fun MainShell(
             )
 
         suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+            if (target.replyDraft != null) routingNotification = true
+            appState.notificationReplyDraftHandoff.stage(target)
             // Await cancellation before publishing any route state. A superseded
             // effect must not partially commit while its platform call is pending.
             appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)
@@ -1351,10 +1350,19 @@ internal fun MainShell(
         }
     }
     val stageShareToChats:
-        (ShareRequest, String, List<String>) -> Boolean =
+        suspend (ShareRequest, String, List<String>) -> Boolean =
         stageShare@{ request, accountRef, groupIds ->
-            if (groupIds.isEmpty()) return@stageShare false
-            if (!appState.stageInboundShare(accountRef, groupIds, request.payload)) {
+            if (groupIds.isEmpty() || currentShareRequestId != request.requestId) return@stageShare false
+            val staged =
+                runCatchingCancellable {
+                    appState.stageInboundShareForFirstFrame(accountRef, groupIds, request.payload) {
+                        currentShareRequestId == request.requestId
+                    }
+                }.getOrElse {
+                    appState.present(R.string.share_import_storage)
+                    return@stageShare false
+                }
+            if (!staged) {
                 appState.present(R.string.toast_notification_account_unavailable)
                 return@stageShare false
             }
@@ -1422,7 +1430,7 @@ internal fun MainShell(
 
     LaunchedEffect(
         pendingShareRequestStore,
-        inboundShareRequest,
+        preparedShareRequest,
         appState.phase,
         appState.appLockScreenVisible,
         appState.activeAccountRef,
@@ -1437,23 +1445,16 @@ internal fun MainShell(
         shellStateHolder.pendingShareRequestId,
     ) {
         val request =
-            inboundShareRequest ?: run {
-                routingShare = false
+            preparedShareRequest ?: run {
+                routingShare = inboundShareRequest != null
                 return@LaunchedEffect
             }
         routingShare = true
         supersedePendingTtsDestinationNavigation()
         val store = pendingShareRequestStore ?: return@LaunchedEffect
-        var persisted = shellStateHolder.pendingShareRequestId == request.requestId
-        if (!persisted) {
-            persisted = store.save(request)
-            if (persisted && !shellStateHolder.markInboundSharePersisted(request.requestId)) {
-                store.remove(request.requestId)
-                return@LaunchedEffect
-            }
-        }
+        val persisted = shellStateHolder.pendingShareRequestId == request.requestId
         if (!shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) return@LaunchedEffect
-        if (request.shortcutId.isNullOrBlank()) {
+        if (request.shortcutId.isNullOrBlank() || request.payload.importErrors.isNotEmpty()) {
             val promoted = shellStateHolder.promoteInboundShareRequest(request, persisted)
             if (promoted) {
                 routingShare = false
@@ -1469,17 +1470,27 @@ internal fun MainShell(
         if (!chatListReady) return@LaunchedEffect
         val directGroupId = inboundDirectGroupId
         if (directGroupId != null) {
-            val staged =
-                appState.stageInboundShareForFirstFrame(
-                    accountRef = accountRef,
-                    targetGroupIds = listOf(directGroupId),
-                    payload = request.payload,
-                )
-            clearSharePickerRequest()
-            if (staged) {
+            val stagingResult =
+                runCatchingCancellable {
+                    appState.stageInboundShareForFirstFrame(
+                        accountRef = accountRef,
+                        targetGroupIds = listOf(directGroupId),
+                        payload = request.payload,
+                        shouldCommit = { currentShareRequestId == request.requestId },
+                    )
+                }
+            if (stagingResult.getOrDefault(false)) {
+                clearSharePickerRequest()
                 openAfterStagedShare(accountRef, listOf(directGroupId))
             } else {
-                appState.present(R.string.toast_notification_account_unavailable)
+                if (shellStateHolder.promoteInboundShareRequest(request, persisted)) onShareRequestHandled(request)
+                val message =
+                    if (stagingResult.isFailure) {
+                        R.string.share_import_storage
+                    } else {
+                        R.string.toast_notification_account_unavailable
+                    }
+                appState.present(message)
             }
             routingShare = false
         } else {
@@ -2526,16 +2537,23 @@ internal fun MainShell(
             // Dialog owns pointer and accessibility focus while preserving the route
             // underneath for an exact return after cancellation (issue #1721).
             if (shouldPresentInboundShare(appState.phase, appState.appLockScreenVisible)) {
-                visiblePickerRequest?.let { request ->
-                    ShareChatPickerFullScreen(
-                        appState = appState,
-                        requestId = request.requestId,
-                        payload = request.payload,
-                        onDismiss = clearSharePickerRequest,
-                        onStage = { accountRef, groupIds ->
-                            stageShareToChats(request, accountRef, groupIds)
-                        },
-                    )
+                dev.ipf.whitenoise.android.ui.share.ShareImportStatus(
+                    importing = inboundShareRequest != null && preparedShareRequest == null,
+                    progress = shareImportProgress,
+                    request = visibleShareRequest,
+                    onCancel = clearSharePickerRequest,
+                ) { importAccepted ->
+                    visiblePickerRequest?.takeIf { importAccepted && it.payload.isSupported() }?.let { request ->
+                        ShareChatPickerFullScreen(
+                            appState = appState,
+                            requestId = request.requestId,
+                            payload = request.payload,
+                            onDismiss = clearSharePickerRequest,
+                            onStage = { accountRef, groupIds ->
+                                stageShareToChats(request, accountRef, groupIds)
+                            },
+                        )
+                    }
                 }
             }
         }

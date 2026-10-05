@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.Thumbhash
+import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -472,10 +473,17 @@ internal class ConversationMediaSender(
         val pendingDraftClear =
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
+        val sourceAccount = appState.accounts.firstOrNull { it.label == controller.boundAccountRef }?.accountIdHex
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
             var accepted = false
+            var sourceLease: PrivateShareSendLease? = null
             try {
+                sourceLease =
+                    acquireStagedSources(context, imageSlots.map { it.uri } + documentUris, sourceAccount).getOrElse {
+                        appState.present(R.string.share_import_storage)
+                        return@launchMutation
+                    }
                 val prepared =
                     prepareStagedAttachments(
                         imageSlots,
@@ -499,6 +507,7 @@ internal class ConversationMediaSender(
                 if (seeded.isEmpty()) {
                     return@launchMutation
                 }
+                val sourceReleases = retainStagedSources(appState, controller, sourceLease, seeded)
                 accepted = true
                 onAccepted()
                 onAfterSend()
@@ -506,15 +515,30 @@ internal class ConversationMediaSender(
                     pendingDraftClear?.let { pendingClear ->
                         { appState.clearDraftAfterSuccessfulSend(pendingClear) }
                     }
-                seeded.forEachIndexed { index, queued ->
-                    controller.uploadQueued(
-                        seeded = queued,
-                        onDurablyAccepted = if (index == 0) clearDraftAfterDurableAcceptance else null,
-                    )
-                }
+                uploadStagedAttachments(seeded, sourceReleases, clearDraftAfterDurableAcceptance)
             } finally {
-                if (!accepted) onRejected()
+                if (!accepted) {
+                    withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) { sourceLease?.release() }
+                    onRejected()
+                }
             }
+        }
+    }
+
+    /** Uploads seeded sends in order; durable acceptance releases each source owner and clears the draft only once. */
+    private suspend fun uploadStagedAttachments(
+        seeded: List<ConversationController.QueuedAttachmentSend>,
+        releases: List<() -> Unit>?,
+        clearDraft: (() -> Unit)?,
+    ) {
+        seeded.forEachIndexed { index, queued ->
+            controller.uploadQueued(
+                seeded = queued,
+                onDurablyAccepted = {
+                    if (index == 0) clearDraft?.invoke()
+                    releases?.get(index)?.invoke()
+                },
+            )
         }
     }
 

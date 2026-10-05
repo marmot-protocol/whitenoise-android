@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_import_title">正在导入共享文件</string>
+    <string name="share_import_error_title">部分文件无法导入</string>
+    <string name="share_import_recovery">取消并从来源应用重新分享，或继续使用可用项目。</string>
+    <string name="share_import_unreadable">文件无法读取或访问权限已过期。</string>
+    <string name="share_import_scheme">仅支持内容提供程序的文件。</string>
+    <string name="share_import_empty">共享文件为空。</string>
+    <string name="share_import_file_limit">文件超过导入限制（图片为 64 MiB，其他文件为 32 MiB）。</string>
+    <string name="share_import_batch_limit">文件总大小超过 256 MiB 限制。</string>
+    <string name="share_import_count_limit">只能导入前 10 个文件。</string>
+    <string name="share_import_metadata">文件元数据无效或大小发生变化。</string>
+    <string name="share_import_storage">私有存储不可用或已满。</string>
+    <string name="share_import_interrupted">导入已中断。请重新分享文件。</string>
+    <string name="share_import_progress">文件 %1$d/%2$d：%3$d 字节</string>
+    <string name="share_import_rejected_count">未导入的文件：%1$d</string>
+    <string name="share_import_recovered_limit">选择的附件超过了 10 个。发送前请移除多余的附件。</string>
+</resources>
