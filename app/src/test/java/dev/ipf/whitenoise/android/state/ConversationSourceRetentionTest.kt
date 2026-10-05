@@ -55,7 +55,10 @@ class ConversationSourceRetentionTest {
                 assertNull(cache.get("queued"))
                 assertNull(files.resolve(uri))
             } finally {
-                withContext(NonCancellable) { state.mutationsScope.coroutineContext.job.cancelAndJoin() }
+                withContext(NonCancellable) {
+                    state.mutationsScope.coroutineContext.job
+                        .cancelAndJoin()
+                }
                 root.deleteRecursively()
                 Dispatchers.resetMain()
             }
