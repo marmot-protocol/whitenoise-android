@@ -137,6 +137,54 @@ class ConversationMentionNavigationTest {
             assertEquals(listOf(Write(true, 5, 0)), writer.writes)
         }
 
+    @Test
+    fun replacementNavigationCancelsThePendingMeasurementCorrection() =
+        runTest {
+            val writer = RecordingWriter()
+            val coordinator = ConversationScrollCoordinator(writer)
+            val waiting = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var reached = true
+            val jump =
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    reached =
+                        coordinator.jumpToMentionReadingStart(
+                            targetMessageId = "mention",
+                            resolveTargetIndex = { 5 },
+                            readLayout = { ConversationMentionJumpLayout(500, null) },
+                            awaitLayout = {
+                                waiting.complete(Unit)
+                                release.await()
+                            },
+                        )
+                }
+            waiting.await()
+            assertTrue(
+                coordinator.programmaticJump("search", ConversationScrollReason.Search) {
+                    scrollToItem(3, -20)
+                },
+            )
+            release.complete(Unit)
+            jump.join()
+            assertFalse(reached)
+            assertEquals(listOf(Write(true, 5, 0), Write(false, 3, -20)), writer.writes)
+        }
+
+    @Test
+    fun invalidViewportAfterApproachDoesNotReportSuccess() =
+        runTest {
+            val writer = RecordingWriter()
+            assertFalse(
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "mention",
+                    resolveTargetIndex = { 5 },
+                    readLayout = { ConversationMentionJumpLayout(0, 800) },
+                    awaitLayout = {},
+                ),
+            )
+            assertEquals(listOf(Write(true, 5, 0)), writer.writes)
+        }
+
     private data class Write(
         val animated: Boolean,
         val index: Int,

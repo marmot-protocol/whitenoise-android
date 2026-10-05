@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -68,7 +69,7 @@ class ConversationMentionNavigationUiTest {
         assertMentionTop(rowHeight = 720, viewportHeight = 420, padding = 12, targetIndex = 150)
     }
 
-    @Suppress("LongMethod") // One real-list fixture keeps measurement and the production command in the same composition.
+    @Suppress("LongMethod") // One real-list fixture shares measurement and the production command.
     private fun assertMentionTop(
         rowHeight: Int,
         viewportHeight: Int,
@@ -80,7 +81,9 @@ class ConversationMentionNavigationUiTest {
         var completed = false
         composeRule.setContent {
             WhiteNoiseTheme {
-                CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
                     val listState = rememberLazyListState()
                     val scope = rememberCoroutineScope()
                     val coordinator =
@@ -113,7 +116,8 @@ class ConversationMentionNavigationUiTest {
                                             targetMessageId = "message-$targetIndex",
                                             resolveTargetIndex = { targetIndex },
                                             readLayout = { index ->
-                                                val layout = conversationReadingLayoutInfo(listState.layoutInfo, overlap)
+                                                val layout =
+                                                    conversationReadingLayoutInfo(listState.layoutInfo, overlap)
                                                 ConversationMentionJumpLayout(
                                                     viewportEndOffsetPx = layout.viewportEndOffset,
                                                     itemHeightPx =
@@ -133,8 +137,8 @@ class ConversationMentionNavigationUiTest {
         }
         composeRule.onNodeWithTag("mention-jump").performClick()
         composeRule.waitForIdle()
-        val listTop = composeRule.onNodeWithTag("mention-list").fetchSemanticsNode().boundsInRoot.top
-        val messageTop = composeRule.onNodeWithTag("message-$targetIndex").fetchSemanticsNode().boundsInRoot.top
+        val listTop = composeRule.onNodeWithTag("mention-list").getUnclippedBoundsInRoot().top.value
+        val messageTop = composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
         assertEquals(listTop, messageTop, 1f)
         composeRule.runOnIdle { assertTrue(completed) }
     }
