@@ -84,11 +84,12 @@ class GroupMemberIdentitySearchUiTest {
         val decoded = mutableListOf<String>()
         val clipboard = context.getSystemService(ClipboardManager::class.java)
         clipboard.setPrimaryClip(ClipData.newPlainText("public", "nostr:$MEMBER_NPROFILE"))
-        val current = fixture { input ->
-            check(android.os.Looper.myLooper() != android.os.Looper.getMainLooper())
-            synchronized(decoded) { decoded.add(input) }
-            validatedFixtureIdentity(input)
-        }
+        val current =
+            fixture { input ->
+                check(android.os.Looper.myLooper() != android.os.Looper.getMainLooper())
+                synchronized(decoded) { decoded.add(input) }
+                validatedFixtureIdentity(input)
+            }
         render(current)
         openSearch()
         composeRule.onNodeWithContentDescription("Paste").performClick()
@@ -148,20 +149,22 @@ class GroupMemberIdentitySearchUiTest {
         val started = CompletableDeferred<Unit>()
         val secondPending = CompletableDeferred<String?>()
         val secondStarted = CompletableDeferred<Unit>()
-        val first = fixture {
-            started.complete(Unit)
-            pending.await()
-        }
+        val first =
+            fixture {
+                started.complete(Unit)
+                pending.await()
+            }
         val current = mutableStateOf(first)
         render(current)
         openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
         composeRule.waitUntil(5_000) { started.isCompleted }
         composeRule.runOnIdle {
-            current.value = fixture(groupId = "second") {
-                secondStarted.complete(Unit)
-                secondPending.await()
-            }
+            current.value =
+                fixture(groupId = "second") {
+                    secondStarted.complete(Unit)
+                    secondPending.await()
+                }
         }
         composeRule.onNodeWithTag("chat_info.members_screen").assertDoesNotExist()
         composeRule.onNodeWithTag(SEARCH).assertDoesNotExist()
@@ -197,14 +200,15 @@ class GroupMemberIdentitySearchUiTest {
     fun accountSwitchDiscardsTheOldResultAndKeepsTheNewQuery() {
         val pending = CompletableDeferred<String?>()
         val started = CompletableDeferred<Unit>()
-        val current = fixture { input ->
-            if (input == MEMBER_NPUB) {
-                started.complete(Unit)
-                pending.await()
-            } else {
-                validatedFixtureIdentity(input)
+        val current =
+            fixture { input ->
+                if (input == MEMBER_NPUB) {
+                    started.complete(Unit)
+                    pending.await()
+                } else {
+                    validatedFixtureIdentity(input)
+                }
             }
-        }
         render(current)
         openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
@@ -231,14 +235,15 @@ class GroupMemberIdentitySearchUiTest {
         val pending = CompletableDeferred<String?>()
         val started = CompletableDeferred<Unit>()
         val attempts = AtomicInteger()
-        val current = fixture { input ->
-            if (attempts.incrementAndGet() == 1) {
-                started.complete(Unit)
-                pending.await()
-            } else {
-                validatedFixtureIdentity(input)
+        val current =
+            fixture { input ->
+                if (attempts.incrementAndGet() == 1) {
+                    started.complete(Unit)
+                    pending.await()
+                } else {
+                    validatedFixtureIdentity(input)
+                }
             }
-        }
         render(current)
         openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
@@ -386,9 +391,7 @@ class GroupMemberIdentitySearchUiTest {
         val members: MutableList<String>,
     )
 
-    private fun group(
-        groupId: String,
-    ): AppGroupRecordFfi =
+    private fun group(groupId: String): AppGroupRecordFfi =
         AppGroupRecordFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
             groupIdHex = groupId,
