@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">Alerts on this device</string>
+    <string name="notification_sound_appearance">Sound and appearance</string>
+    <string name="notification_system_blocked">Blocked in Android settings</string>
+    <string name="notification_alerts_detail">Choose alerts for this device. Pausing ordinary alerts still allows enabled mentions. Group membership notices use separate settings.</string>
+    <string name="notification_scope_choose">Sound settings</string>
+    <string name="notification_pause_ordinary_alerts">Pause ordinary alerts</string>
+    <string name="notification_alert_paused">Paused while this chat is muted</string>
+    <string name="notification_sound_scope_control">Sound settings for %1$s</string>
+</resources>

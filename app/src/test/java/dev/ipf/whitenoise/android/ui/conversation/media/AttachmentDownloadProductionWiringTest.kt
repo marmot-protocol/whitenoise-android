@@ -76,13 +76,14 @@ class AttachmentDownloadProductionWiringTest {
         assertEquals(1, occurrences(voice, "afterProducerCancellation("))
     }
 
+    /** Local image preparation announces opening and preserves its accessible viewer action. */
     @Test
     fun clickableImageLoadingProgressHasAnAccessibleName() {
         val image = source("MediaImageBubbles.kt").normalized()
 
         assertTrue(
-            ".semantics { contentDescription = downloadLabel } .clickable( " +
-                "onClickLabel = downloadLabel," in image,
+            ".semantics { contentDescription = openingLabel } .clickable( " +
+                "onClickLabel = openLabel," in image,
         )
     }
 

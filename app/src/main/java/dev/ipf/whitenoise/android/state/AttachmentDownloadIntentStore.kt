@@ -71,6 +71,28 @@ internal class AttachmentDownloadIntentStore(
 
     fun isAutomaticSuppressed(request: AttachmentTransferRequest): Boolean = requestToken(request) in readSet(CANCELLED)
 
+    /**
+     * True once this transfer has used its one follow-up after a completed transient failure.
+     * It is kept here rather than derived from WorkManager's run-attempt count, which also counts
+     * every restart after a platform interruption.
+     */
+    fun hasSpentTransientRetry(request: AttachmentTransferRequest): Boolean {
+        val token = requestToken(request)
+        return token in readSet(TRANSIENT_RETRY_SPENT)
+    }
+
+    /** Records that the transient-failure follow-up was granted. */
+    fun spendTransientRetry(request: AttachmentTransferRequest) {
+        val token = requestToken(request)
+        updateSet(TRANSIENT_RETRY_SPENT) { it + token }
+    }
+
+    /** Restores the follow-up once the transfer reaches a terminal result or is cancelled. */
+    fun resetTransientRetry(request: AttachmentTransferRequest) {
+        val token = requestToken(request)
+        updateSet(TRANSIENT_RETRY_SPENT) { it - token }
+    }
+
     /** Restarting the whole automatic backlog is a resume-everything signal. */
     fun clearSuppressedAutomatic() {
         updateSet(CANCELLED) { emptySet() }
@@ -450,6 +472,7 @@ internal class AttachmentDownloadIntentStore(
         const val PAUSED_ACCOUNTS = "attachment_download_paused_accounts"
         const val INTERACTIVE_IDENTITIES = "attachment_download_interactive_identities"
         const val CANCELLED = "attachment_download_cancelled_identities"
+        const val TRANSIENT_RETRY_SPENT = "attachment_download_transient_retry_spent_identities"
         const val OPEN_IDENTITIES = "attachment_download_open_identities"
         const val INSTALL_PERMISSION_IDENTITIES = "attachment_install_permission_identities"
         val ACTIVE_INSTALL_PERMISSION_IDENTITIES = mutableSetOf<String>()

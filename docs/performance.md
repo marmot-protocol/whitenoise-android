@@ -33,6 +33,21 @@ never persisted, so a process restart also disables ordinary device collection.
 The benchmark-selector build is the one exception: choosing that purpose-built
 local variant is the runner's explicit opt-in before its cold-start measurement.
 
+### Member activity presentation
+
+`op=group_membership_pending` measures one local add/remove request's `accepted`
+phase to its first uncovered transcript draw (`first_local_frame`).
+`op=group_membership_projection` separately measures arrival of a new live native
+member event (`timeline_subscription_received`, before projection application) to
+its first uncovered draw. The latter is not correlated with a local request:
+native group events have their own canonical identities and ordering.
+Initial pages, older-history loads and snapshot refreshes are excluded. These
+are presentation timings, not proof of relay acknowledgement or Welcome delivery.
+Hidden reveal frames, prefetched measurements and fully covered rows do not
+complete either timing. Request/row keys remain in controller-local memory;
+only closed categories, opaque diagnostic counters and timing values are emitted
+through the existing opt-in bounded session. Projection traces are capped at 32.
+
 ### Conversation history pages
 
 `op=chat_history_page` covers one page of history in either direction: older,
@@ -86,6 +101,24 @@ Accepted-pending responses are
 reported as durable ownership rather than success, with
 `engine_phase_unavailable` making clear that Android cannot see the deeper MDK
 queue, MLS, storage, transport, or acknowledgement phases.
+
+`op=message_forward` follows one forwarding operation from acceptance to its
+terminal state. For each source attachment it emits `forward_source_lookup`
+(`result=success layer=storage` when the plaintext was already in the Android
+memory or disk cache, `result=success layer=mdk` when MarmotKit's retained copy
+served it, `pending` on a miss), the `forward_source_download_start`/`_return` pair
+around the native source download, and `forward_source_ready` for the whole
+materialization; `forward_source_reference_resolved` appears only when an
+optimistic reference had to be resolved through native history. Each destination
+then emits `media_upload_start`/`_return`, `commit_lock_acquired` (how long the
+batch waited for the shared group commit lock, omitted below 5 ms),
+`media_publish_start`/`_return` per message and, on an uncertain-publish retry,
+`convergence_start`/`_return`. `forward_complete` closes the operation with
+`result=success`, `failure` or `dropped` (cancelled) and `count` set to the
+completed destinations. A retry that reuses destination references shows
+`media_publish_start` with no preceding `media_upload_start`. As with media
+sends, a start phase without its return names the phase that stopped
+answering, and no line carries a group, account, message, file, hash or URL.
 
 `op=attachment_fetch` distinguishes explicit taps from automatic fetches and
 records memory and disk probes, acquisition start, native snapshot and demand,

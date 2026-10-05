@@ -69,7 +69,10 @@ internal fun ConversationController.conversationLeadingStructuralRowCount(render
  * so the bottom-edge load failure is emitted before the timeline and every
  * message row sits that many indices further from the bottom.
  */
-internal fun conversationTimelineTrailingRowCount(hasBottomError: Boolean): Int = if (hasBottomError) 1 else 0
+internal fun conversationTimelineTrailingRowCount(
+    hasBottomError: Boolean,
+    hasPendingMembership: Boolean = false,
+): Int = (if (hasBottomError) 1 else 0) + (if (hasPendingMembership) 1 else 0)
 
 /** Counts the controller's rows currently rendered below its newest message. */
 internal fun ConversationController.conversationTrailingRowCount(renderedTimelineSize: Int): Int =
@@ -78,19 +81,23 @@ internal fun ConversationController.conversationTrailingRowCount(renderedTimelin
             renderedTimelineSize > 0 &&
                 error != null &&
                 errorEdge == ConversationLoadFailureEdge.BOTTOM,
+        hasPendingMembership = pendingMembershipActivity != null,
     )
 
 /**
- * Resolves the newest message row, which the reversed transcript anchors on.
+ * Resolves the pending membership row, or otherwise the newest message row.
  *
- * The newest message is the list's own origin, so following the tail costs one
+ * Both rows sit at a fixed offset from the list's origin, so following the tail costs one
  * scroll to a fixed index instead of arithmetic over the timeline's length.
  */
 internal fun conversationTimelineTailListIndex(
     timelineSize: Int,
     trailingRowCount: Int,
+    hasPendingMembership: Boolean = false,
 ): Int? =
-    if (timelineSize > 0) {
+    if (hasPendingMembership) {
+        (trailingRowCount - 1).coerceAtLeast(0)
+    } else if (timelineSize > 0) {
         trailingRowCount
     } else {
         null

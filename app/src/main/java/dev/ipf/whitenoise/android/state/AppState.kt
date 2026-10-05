@@ -378,65 +378,6 @@ internal fun notificationReactionSendFailureOutcome(throwable: Throwable): Notif
         NotificationReactionSendOutcome.NonRetryableFailure
     }
 
-private fun missingKeyPackageFailureDetail(
-    account: String,
-    displayName: (String) -> String,
-): AppText {
-    val normalizedAccount = account.trim()
-    return if (normalizedAccount.isEmpty()) {
-        AppText.Resource(R.string.error_missing_key_package)
-    } else {
-        AppText.Resource(R.string.error_missing_key_package_for, listOf(displayName(normalizedAccount)))
-    }
-}
-
-internal fun groupCreateFailureDetail(
-    throwable: Throwable,
-    displayName: (String) -> String,
-): AppText =
-    when (throwable) {
-        is StartProfileChatNoActiveAccountException -> AppText.Resource(R.string.toast_no_active_account)
-        is MarmotKitException.MissingKeyPackage -> missingKeyPackageFailureDetail(throwable.account, displayName)
-        is MarmotKitException.InvalidKeyPackageEvent -> AppText.Resource(R.string.error_missing_key_package)
-        is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
-        is MarmotKitException.Publish -> AppText.Resource(R.string.error_group_create_failed_retry)
-        is MarmotKitException.GroupHydrationPending -> AppText.Resource(R.string.toast_chat_still_loading)
-        is MarmotKitException -> AppText.Resource(R.string.error_group_create_failed_retry)
-        else -> AppText.Resource(R.string.error_group_create_failed_retry)
-    }
-
-/**
- * Missing or unusable KeyPackages mean the recipient is not ready for secure
- * chat. Malformed recipient references remain `InvalidIdentity`, even after a
- * direct-chat lookup, so this classification never relies on call-site guesses
- * or error-detail strings.
- */
-internal fun startProfileChatFailureIsMissingSetup(throwable: Throwable): Boolean =
-    throwable is MarmotKitException.MissingKeyPackage || throwable is MarmotKitException.InvalidKeyPackageEvent
-
-internal fun startProfileChatInviteDetail(recipientName: String?): AppText =
-    recipientName?.trim()?.takeIf { it.isNotEmpty() }?.let {
-        AppText.Resource(R.string.invite_to_white_noise_description, listOf(it))
-    } ?: AppText.Resource(R.string.unknown_invite_to_white_noise_description)
-
-internal fun startProfileChatFailureDetail(
-    throwable: Throwable,
-    displayName: (String) -> String,
-): AppText = groupCreateFailureDetail(throwable, displayName)
-
-internal fun groupCreateFailureCopyable(throwable: Throwable): Boolean =
-    when (throwable) {
-        is StartProfileChatNoActiveAccountException -> false
-        is MarmotKitException.MissingKeyPackage -> false
-        is MarmotKitException.InvalidKeyPackageEvent -> false
-        is MarmotKitException.InvalidIdentity -> false
-        is MarmotKitException.Publish -> true
-        is MarmotKitException -> false
-        else -> true
-    }
-
-internal fun startProfileChatFailureCopyable(throwable: Throwable): Boolean = groupCreateFailureCopyable(throwable)
-
 internal data class ConversationNotificationTarget(
     val accountRef: String,
     val groupIdHex: String,
@@ -2398,9 +2339,15 @@ class WhiteNoiseAppState private constructor(
             scope = mutationsScope,
             automaticRetryAttempts = FORWARD_BACKGROUND_RETRY_ATTEMPTS,
             retryDelayMillis = { attempt -> FORWARD_BACKGROUND_RETRY_DELAY_MS shl attempt },
-            onTerminal = { snapshot -> forwardTerminalDismiss.onTerminal(snapshot) },
+            onTerminal = { snapshot ->
+                activeForwardDiagnostics?.terminal(snapshot)
+                forwardTerminalDismiss.onTerminal(snapshot)
+            },
         )
     internal val activeForwardOperation: StateFlow<ForwardOperationSnapshot?> = forwardOperationOwner.state
+
+    /** Phase timings of the visible forward operation, present only while local diagnostics are active. */
+    private var activeForwardDiagnostics: ForwardDiagnostics? = null
 
     /** Destination owner of the visible forward operation, for account-scoped progress UI. */
     internal var activeForwardDestinationAccountRef by mutableStateOf<String?>(null)
@@ -3638,7 +3585,8 @@ class WhiteNoiseAppState private constructor(
         val startable =
             sourceAccount != null && account != null && messages.isNotEmpty() && targets.isNotEmpty()
         if (!startable || sourceAccount == null || account == null) return false
-        val transport = forwardTransport(sourceAccount, account, messages.size)
+        val diagnostics = ForwardDiagnostics.begin()
+        val transport = forwardTransport(sourceAccount, account, messages.size, diagnostics)
         val session =
             ForwardSession(
                 scope = mutationsScope,
@@ -3657,6 +3605,7 @@ class WhiteNoiseAppState private constructor(
         if (!started) {
             session.release()
         } else {
+            activeForwardDiagnostics = diagnostics
             activeForwardDestinationAccountRef = account
             activeForwardTargetTitles = targetTitles
         }
@@ -3877,7 +3826,11 @@ class WhiteNoiseAppState private constructor(
                                 listOf(displayName(ref)),
                             )
                         } else {
-                            AppText.Resource(R.string.error_try_again)
+                            inviteFailureDetail(
+                                error,
+                                ::displayName,
+                                if (error is MarmotKitException.InvalidKeyPackageEvent) displayName(ref) else null,
+                            )
                         }
                 }
             }
@@ -6315,6 +6268,7 @@ class WhiteNoiseAppState private constructor(
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return outcome
             }
+            chatMutePreferences.removeAccount(wipedRef)
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
             composerDraftExpansionBridge.removeAccount(wipedRef)
@@ -6328,6 +6282,15 @@ class WhiteNoiseAppState private constructor(
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
+            withContext(NonCancellable + Dispatchers.IO) {
+                val alertsCleared =
+                    runCatching {
+                        conversationAlertPreferences.clearAccount(wipedRef)
+                    }.getOrDefault(false)
+                if (!alertsCleared) {
+                    appStateDebug { "local alert preference cleanup will retry during account retention" }
+                }
+            }
             wipeDecryptedMediaFromDisk()
             if (!clearHiddenMessagesForAccount(wipedRef)) {
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
@@ -11543,6 +11506,7 @@ class WhiteNoiseAppState private constructor(
             // Load the persisted per-chat channel scopes before the settings UI
             // can request them, without blocking the main-thread constructor.
             mutationsScope.launch(Dispatchers.IO) { conversationNotificationRouting }
+            mutationsScope.launch(Dispatchers.IO) { conversationAlertPreferences }
             if (requireAppUnlock) {
                 // Pre-warm the Keystore-backed unlock timestamp off-main so the
                 // first foreground lock evaluation is a cache hit. Assigned on
