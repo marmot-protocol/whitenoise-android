@@ -2339,9 +2339,15 @@ class WhiteNoiseAppState private constructor(
             scope = mutationsScope,
             automaticRetryAttempts = FORWARD_BACKGROUND_RETRY_ATTEMPTS,
             retryDelayMillis = { attempt -> FORWARD_BACKGROUND_RETRY_DELAY_MS shl attempt },
-            onTerminal = { snapshot -> forwardTerminalDismiss.onTerminal(snapshot) },
+            onTerminal = { snapshot ->
+                activeForwardDiagnostics?.terminal(snapshot)
+                forwardTerminalDismiss.onTerminal(snapshot)
+            },
         )
     internal val activeForwardOperation: StateFlow<ForwardOperationSnapshot?> = forwardOperationOwner.state
+
+    /** Phase timings of the visible forward operation, present only while local diagnostics are active. */
+    private var activeForwardDiagnostics: ForwardDiagnostics? = null
 
     /** Destination owner of the visible forward operation, for account-scoped progress UI. */
     internal var activeForwardDestinationAccountRef by mutableStateOf<String?>(null)
@@ -3579,7 +3585,8 @@ class WhiteNoiseAppState private constructor(
         val startable =
             sourceAccount != null && account != null && messages.isNotEmpty() && targets.isNotEmpty()
         if (!startable || sourceAccount == null || account == null) return false
-        val transport = forwardTransport(sourceAccount, account, messages.size)
+        val diagnostics = ForwardDiagnostics.begin()
+        val transport = forwardTransport(sourceAccount, account, messages.size, diagnostics)
         val session =
             ForwardSession(
                 scope = mutationsScope,
@@ -3598,6 +3605,7 @@ class WhiteNoiseAppState private constructor(
         if (!started) {
             session.release()
         } else {
+            activeForwardDiagnostics = diagnostics
             activeForwardDestinationAccountRef = account
             activeForwardTargetTitles = targetTitles
         }
@@ -6260,6 +6268,7 @@ class WhiteNoiseAppState private constructor(
                 restoreAfterFailedDestructiveAccountWipe(wipedRef, restartNotifications)
                 return outcome
             }
+            chatMutePreferences.removeAccount(wipedRef)
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
             composerDraftExpansionBridge.removeAccount(wipedRef)

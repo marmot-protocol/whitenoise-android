@@ -23,6 +23,180 @@
         ]
       },
       {
+        "surface": "R.string.profile_readiness_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_loading",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_optional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_optional",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_ready",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_ready",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_setup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_setup",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_added",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_address",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_address",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_banner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_banner",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_bio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_bio",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_field",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_field",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_field_optional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_field_optional",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_lightning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_lightning",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_name",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_picture",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_recommended",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_recommended",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ProfileReadinessFields",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "fun ProfileReadinessFields(",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.setup_hide_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.setup_hide_details",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.setup_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.setup_details",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_expanded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.onboarding_details_expanded",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_collapsed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.onboarding_details_collapsed",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_editor_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_editor_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ProfileReadinessChecklist",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "fun ProfileReadinessChecklist(",
+        "test_ids": ["ACC-002"]
+      },
+      {
         "surface": "ConversationViewportRestorationEffects",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
         "anchor": "fun ConversationViewportRestorationEffects(",
@@ -4777,8 +4951,21 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
         "anchor": "fun MediaImageBubble(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-003"
         ]
+      },
+      {
+        "surface": "Retained image preparation accessibility state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "R.string.media_opening",
+        "test_ids": ["MED-023"]
+      },
+      {
+        "surface": "Retained image accessible open action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": ["MED-023"]
       },
       {
         "surface": "RemoteGiphyMediaBubble",
@@ -6556,7 +6743,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "fun ConversationNotificationSettingsScreen(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "NTF-012"
         ]
       },
       {
@@ -30979,6 +31167,18 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
         "anchor": "internal class ConversationDictationDraftRecovery(",
         "test_ids": ["DIC-002"]
+      },
+      {
+        "surface": "Forward source read from MarmotKit's retained copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt",
+        "anchor": "internal suspend fun readRetainedForwardPlaintext(",
+        "test_ids": ["MSG-010", "MED-020"]
+      },
+      {
+        "surface": "Forward phase diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ForwardDiagnostics.kt",
+        "anchor": "internal class ForwardDiagnostics private constructor(",
+        "test_ids": ["MSG-010"]
       }
     ],
     "notification_content_contracts": [

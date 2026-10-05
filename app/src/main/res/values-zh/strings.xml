@@ -2179,4 +2179,19 @@
     <string name="notification_show_previews">显示通知预览</string>
     <string name="notification_show_previews_detail">关闭时隐藏姓名和消息内容。适用于所有账户。</string>
     <string name="notification_preview_update_failed">重新启动后更改可能会丢失。</string>
+    <string name="profile_readiness_loading">正在加载个人资料…</string>
+    <string name="profile_readiness_unavailable">个人资料状态不可用 · 点按编辑</string>
+    <string name="profile_readiness_editor_unavailable">个人资料状态不可用</string>
+    <string name="profile_readiness_setup">设置个人资料</string>
+    <string name="profile_readiness_ready">个人资料已就绪</string>
+    <string name="profile_readiness_optional">个人资料已就绪 · 可添加选填信息</string>
+    <string name="profile_readiness_name">显示名称</string>
+    <string name="profile_readiness_picture">头像</string>
+    <string name="profile_readiness_bio">简介</string>
+    <string name="profile_readiness_banner">横幅</string>
+    <string name="profile_readiness_address">已验证地址</string>
+    <string name="profile_readiness_lightning">闪电网络地址</string>
+    <string name="profile_readiness_added">已添加</string>
+    <string name="profile_readiness_recommended">建议填写</string>
+    <string name="profile_readiness_field_optional">选填</string>
 </resources>

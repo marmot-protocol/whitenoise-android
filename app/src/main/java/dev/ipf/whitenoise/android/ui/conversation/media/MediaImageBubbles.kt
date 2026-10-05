@@ -342,6 +342,8 @@ internal fun MediaImageBubble(
     ) {
         Box(contentAlignment = Alignment.Center) {
             val downloadLabel = stringResource(R.string.media_tap_to_download)
+            val openingLabel = stringResource(R.string.media_opening)
+            val openLabel = stringResource(R.string.media_open)
             val current = presentation
             val placeholder = rememberThumbhashImage(reference.thumbhash)
             // Paint the blurred placeholder behind whatever loading-state is
@@ -430,9 +432,9 @@ internal fun MediaImageBubble(
                                 modifier =
                                     Modifier
                                         .size(48.dp)
-                                        .semantics { contentDescription = downloadLabel }
+                                        .semantics { contentDescription = openingLabel }
                                         .clickable(
-                                            onClickLabel = downloadLabel,
+                                            onClickLabel = openLabel,
                                             onClick = {
                                                 controller.requestAttachmentOpen(key, attachmentIndex)
                                             },
