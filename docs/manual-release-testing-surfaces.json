@@ -1930,7 +1930,7 @@
           "CHL-016",
           "CHL-019",
           "FIND-003"
-        ]
+        , "MSG-007"]
       },
       {
         "surface": "ChatRowPreviewLine",
@@ -26618,9 +26618,9 @@
         ]
       },
       {
-        "surface": "Pages without edit events skip aggregation without changing edit presentation",
+        "surface": "Native accepted edit summaries own bubble presentation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MessageEdits.kt",
-        "anchor": "fun aggregateEdits(",
+        "anchor": "fun withAuthoritativeEdits(",
         "test_ids": [
           "MSG-007"
         ]

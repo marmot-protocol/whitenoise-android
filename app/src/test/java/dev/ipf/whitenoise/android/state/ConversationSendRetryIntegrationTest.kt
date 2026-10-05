@@ -69,6 +69,33 @@ import java.util.concurrent.TimeUnit
 @Config(sdk = [36], qualifiers = "en")
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
+    /** Wire edit payloads, including another author's forged target, never override the native target row. */
+    @Test
+    fun mismatchedAuthorEditInTimelineCannotAlterBubble() =
+        runTest {
+            val controller = ConversationController(appState(), group(), initialMemberSnapshot = memberSnapshot())
+            try {
+                val original = projectedMessage(5uL, null, null)
+                applyProjection(controller, original)
+                applyProjection(
+                    controller,
+                    original.copy(
+                        messageIdHex = "forged-edit",
+                        kind = 1009uL,
+                        sender = "other-author",
+                        plaintext = "forged revision",
+                        tags = listOf(MessageTagFfi(listOf("e", CONFIRMED_MESSAGE_ID))),
+                        timelineAt = 6uL,
+                    ),
+                )
+                val target = controller.timeline.first { it.record.messageIdHex == CONFIRMED_MESSAGE_ID }
+                assertEquals("hello", controller.displayedText(target.record))
+                assertNull(controller.editsByTarget[CONFIRMED_MESSAGE_ID])
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun confirmedProjectionUsesNativeEditsOnlyWhenItsLedgerTokenIsRetained() =

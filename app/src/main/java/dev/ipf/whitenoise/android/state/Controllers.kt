@@ -81,7 +81,6 @@ import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.StreamDebugEventFormatter
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
-import dev.ipf.whitenoise.android.core.aggregateEdits
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
@@ -6267,7 +6266,7 @@ class ConversationController(
      * Local optimistic edits keyed by target message id, applied immediately on
      * confirm so the bubble flips to the edited text without waiting for the
      * kind-1009 to round-trip through the engine (the echo can lag ~1s). Merged
-     * over [aggregateEdits]' output on every publish, then dropped once the real
+     * over MDK's accepted-edit summaries on every publish, then dropped once the real
      * edit lands in the timeline. A [MessageStatus.Pending] entry drives a
      * brief sending indicator on the target bubble; [MessageStatus.Failed]
      * reverts the displayed text to the pre-edit body and lights the same
@@ -9618,7 +9617,7 @@ class ConversationController(
      * Publish a kind-1009 edit replacing the body of [targetMessageId] with
      * [content]. The runtime enforces the wire-level constraint that the
      * edit's signer matches the original; recipients re-enforce
-     * client-side via [aggregateEdits]. Trim is applied before send so a
+     * through MDK’s accepted-edit projection. Trim is applied before send so a
      * trailing newline from the composer doesn't change the visible body.
      */
     suspend fun editMessage(
@@ -9646,7 +9645,7 @@ class ConversationController(
             // Publish accepted: drop the Pending indicator but keep the text
             // overlay so the bubble doesn't flicker back to the old body in the
             // gap before the kind-1009 lands in the timeline. The overlay is
-            // pruned once `aggregateEdits` reflects the same latest text.
+            // pruned once MDK reflects the same latest text.
             // Only act if this attempt still owns the overlay: if the user
             // re-edited the same target while this publish was in flight, a
             // newer Pending overlay (different text) has superseded us, and
@@ -13274,8 +13273,7 @@ class ConversationController(
                     isTimelineMessageVisible(message.record.messageIdHex, hiddenIds)
                 }
             }
-        val localEdits = aggregateEdits(visible.map { it.record })
-        val aggregated = withAuthoritativeEdits(localEdits, authoritativeEditsOf(timelineRecords.values))
+        val aggregated = withAuthoritativeEdits(emptyMap(), authoritativeEditsOf(timelineRecords.values))
         // Admission projects the revised body before publication. The original row's
         // delivery state cannot confirm its edit; retain the overlay until the edit's
         // own native publication and exact revision agree.
