@@ -601,7 +601,7 @@
     <string name="preview">Anteprima</string>
     <string name="no_active_account_period">Nessun account attivo.</string>
     <string name="about">Informazioni</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">Indirizzo NIP-05</string>
     <string name="nsec_or_npub">Inserisci la tua chiave privata</string>
     <string name="white_noise_logo">Logo di White Noise</string>
     <string name="identity_entry_error_invalid_key">Non sembra una chiave nsec o npub valida.</string>
@@ -2203,6 +2203,10 @@
     <string name="onboarding_details_accessibility">%1$s: %2$s</string>
     <string name="onboarding_details_expanded">Espanso</string>
     <string name="onboarding_details_collapsed">Compresso</string>
+    <string name="local_delete_retry_detail">\u2068Eliminazione interrotta. Scegli di nuovo Elimina da questo dispositivo; prima verrà verificato il risultato precedente. Se continua a non riuscire, riavvia l\'app.\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068La chat è stata eliminata. La pulizia dei dati locali verrà ritentata automaticamente.\u2069</string>
+    <string name="chat_list_delete_stopped">Eliminazione interrotta</string>
+    <string name="chat_list_delete_stopped_detail">\u2068Eliminazioni confermate: %1$d su %2$d. Riprova Elimina da questo dispositivo per verificare il risultato. Se continua a non funzionare, riavvia l\'app.\u2069</string>
     <string name="group_svg_rejected_detail">Impossibile preparare questo SVG. Scegli un SVG semplice, PNG o JPEG.</string>
     <string name="error_invalid_key_package">Non è stato possibile convalidare la chiave di chat pubblicata per questa persona. Chiedi di aggiornare White Noise e pubblicare una nuova chiave di chat, poi riprova.</string>
     <string name="error_invalid_key_package_for">Non è stato possibile convalidare la chiave di chat pubblicata per %1$s. Chiedi di aggiornare White Noise e pubblicare una nuova chiave di chat, poi riprova.</string>
@@ -2221,7 +2225,7 @@
     <string name="profile_readiness_picture">Immagine del profilo</string>
     <string name="profile_readiness_bio">Biografia</string>
     <string name="profile_readiness_banner">Immagine di copertina</string>
-    <string name="profile_readiness_address">Indirizzo verificato</string>
+    <string name="profile_readiness_address">Indirizzo NIP-05</string>
     <string name="profile_readiness_lightning">Indirizzo Lightning</string>
     <string name="profile_readiness_added">Aggiunto</string>
     <string name="profile_readiness_recommended">Consigliato</string>

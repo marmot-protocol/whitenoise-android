@@ -856,7 +856,7 @@
     <string name="preview">Preview</string>
     <string name="no_active_account_period">No active account.</string>
     <string name="about">About</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">NIP-05 address</string>
     <string name="profile_picture_hint">Public HTTPS image URL</string>
     <string name="profile_picture_invalid">Only public HTTPS image URLs are allowed.</string>
     <string name="profile_picture_edit">Edit profile picture</string>
@@ -2359,6 +2359,11 @@
     <string name="onboarding_details_accessibility">%1$s, %2$s</string>
     <string name="onboarding_details_expanded">Expanded</string>
     <string name="onboarding_details_collapsed">Collapsed</string>
+    <!-- Keep first-strong isolation balanced so counts and punctuation stay readable in RTL layouts. -->
+    <string name="local_delete_retry_detail">\u2068Deletion stopped. Try Delete from this device again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068The chat was deleted. Cleanup of local data will retry automatically.\u2069</string>
+    <string name="chat_list_delete_stopped">Deletion stopped</string>
+    <string name="chat_list_delete_stopped_detail">\u2068%1$d of %2$d deletions confirmed. Retry Delete from this device to check the result. If it keeps failing, restart the app.\u2069</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
     <string name="error_invalid_key_package">The published chat key for this person couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
     <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
@@ -2377,7 +2382,7 @@
     <string name="profile_readiness_picture">Profile picture</string>
     <string name="profile_readiness_bio">Bio</string>
     <string name="profile_readiness_banner">Banner</string>
-    <string name="profile_readiness_address">Verified address</string>
+    <string name="profile_readiness_address">NIP-05 address</string>
     <string name="profile_readiness_lightning">Lightning address</string>
     <string name="profile_readiness_added">Added</string>
     <string name="profile_readiness_recommended">Recommended</string>

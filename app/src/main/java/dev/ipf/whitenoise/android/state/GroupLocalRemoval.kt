@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -55,51 +55,95 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
     account: String,
     groupIdHex: String,
     isCurrent: () -> Boolean,
+    readinessBudget: LocalGroupDeleteReadinessBudget,
     onNativeCommitted: () -> Unit,
-) {
-    // Capture encrypted media identifiers while the native group is still present. Unlike the
-    // legacy leave/reset paths, a failed preflight aborts without touching the group or caches.
-    val media =
-        retryIdempotentRuntimeMutation {
-            if (!isCurrent()) throw CancellationException("chat binding changed during local deletion preflight")
-            marmotIo { listMedia(account, groupIdHex, null) }
+): Boolean =
+    localGroupDeleteCleanupMutex.withLock {
+        val attempt =
+            LocalGroupDeleteAttempt(
+                isCurrent = isCurrent,
+                // MDK reconciles finished workers and waits for their replacements to be ready.
+                recoverTransport = { marmotIo { catchUpAccounts() } },
+                readinessBudget = readinessBudget,
+            )
+        val pending =
+            stageAndDeleteLocalGroup(
+                attempt,
+                LocalGroupDeleteOperations(
+                    previous = {
+                        withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.find(account, groupIdHex) }
+                    },
+                    present = { nativeGroupPresent(account, groupIdHex) },
+                    prepare = { prepareLocalGroupDeleteCleanup(account, groupIdHex) },
+                    stage = { withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.stage(it) } },
+                    delete = { marmotIo { deleteGroupLocal(account, groupIdHex) } },
+                ),
+            )
+        onNativeCommitted()
+        if (pending != null) {
+            completeLocalGroupDeleteCleanup(pending, attempt, isCurrent)
+        } else {
+            true
         }
+    }
+
+private suspend fun WhiteNoiseAppState.completeLocalGroupDeleteCleanup(
+    pending: PendingLocalGroupDeleteCleanup,
+    attempt: LocalGroupDeleteAttempt,
+    isCurrent: () -> Boolean,
+) = withContext(NonCancellable) {
+    var cleanupFailure: Throwable? = null
+    val result =
+        runCatching {
+            attempt.phase(LocalDeletePhase.PostCommitCleanup) {
+                val complete =
+                    finishLocalGroupDeleteCleanup(pending) { failure ->
+                        if (cleanupFailure == null) cleanupFailure = failure
+                    }
+                if (!complete) throw requireNotNull(cleanupFailure)
+                withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.finish(pending) }
+            }
+        }.onFailure { failure ->
+            // Report deferred client cleanup, not a failed native delete.
+            if (isCurrent()) {
+                presentFailure(
+                    R.string.toast_chat_deleted_local,
+                    "CHAT_LOCAL_DELETE",
+                    failure,
+                    detail = AppText.Resource(R.string.local_delete_cleanup_pending),
+                )
+            }
+            schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
+        }
+    result.isSuccess
+}
+
+private suspend fun WhiteNoiseAppState.prepareLocalGroupDeleteCleanup(
+    account: String,
+    groupIdHex: String,
+): PendingLocalGroupDeleteCleanup {
+    val media = marmotIo { listMedia(account, groupIdHex, null) }
     val cacheKeys =
         media.map { rec ->
             mediaCacheKey(account, groupIdHex, rec.messageIdHex, rec.attachmentIndex.toInt())
         }
     val tags = media.mapNotNull { it.reference.ciphertextSha256 }.toSet()
-
-    val pending = PendingLocalGroupDeleteCleanup(account, groupIdHex, cacheKeys, tags)
-    localGroupDeleteCleanupMutex.withLock {
-        // A synchronous, atomic journal write must precede the destructive native call. If a
-        // closed worker loses both its response and the reconciliation reads, restart can replay
-        // Android cleanup without ever repeating the native wipe.
-        withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.stage(pending) }
-        deleteLocalGroupWithRecovery(
-            isCurrent = isCurrent,
-            delete = { marmotIo { deleteGroupLocal(account, groupIdHex) } },
-            isGroupPresent = { nativeGroupPresent(account, groupIdHex) },
-        )
-        onNativeCommitted()
-        withContext(NonCancellable) {
-            if (finishLocalGroupDeleteCleanup(pending)) {
-                runCatching { withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.finish(pending) } }
-                    .onFailure { appStateDebug(it) { "local delete cleanup journal finish failed" } }
-            }
-        }
-    }
+    return PendingLocalGroupDeleteCleanup(account, groupIdHex, cacheKeys, tags)
 }
 
 /** Replayed on startup and live refresh; a present group or failed read never clears client data. */
 internal suspend fun WhiteNoiseAppState.reconcilePendingLocalGroupDeleteCleanups() {
     localGroupDeleteCleanupMutex.withLock {
+        val runtime = runtimeGeneration
         localGroupDeleteCleanupJournal.pending().forEach { pending ->
             runCatchingCancellable {
                 reconcilePendingLocalGroupDeleteCleanup(
                     pending = pending,
                     accountReady = {
-                        accounts.any { it.label == pending.account && it.isSignedInSigningAccount() }
+                        val tearingDown = signOutInProgress || wipeInProgress
+                        runtimeGeneration == runtime &&
+                            !tearingDown &&
+                            accounts.any { it.label == pending.account && it.isSignedInSigningAccount() }
                     },
                     isGroupPresent = { nativeGroupPresent(pending.account, pending.groupIdHex) },
                     cleanup = { withContext(NonCancellable) { finishLocalGroupDeleteCleanup(it) } },
@@ -114,13 +158,14 @@ private suspend fun WhiteNoiseAppState.nativeGroupPresent(
     account: String,
     groupIdHex: String,
 ): Boolean =
-    // The durable chat-list projection is the same native source that supplied the row being
-    // removed. Unlike groupDetails, it does not depend on a live MLS roster.
-    marmotIo { chatList(account, true) }
-        .any { it.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+    // The targeted durable row does not depend on a live roster or the loaded chat window.
+    marmotIo { chatListRow(account, groupIdHex) } != null
 
 /** Returns false if any cleanup step failed so the durable intent can be retried later. */
-private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(pending: PendingLocalGroupDeleteCleanup): Boolean {
+private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(
+    pending: PendingLocalGroupDeleteCleanup,
+    onFailure: (Throwable) -> Unit = {},
+): Boolean {
     val account = pending.account
     val groupIdHex = pending.groupIdHex
     var complete = true
@@ -132,6 +177,7 @@ private suspend fun WhiteNoiseAppState.finishLocalGroupDeleteCleanup(pending: Pe
         runCatching { block() }
             .onFailure { failure ->
                 complete = false
+                onFailure(failure)
                 appStateDebug(failure) { "local delete $name cleanup failed" }
             }
     }

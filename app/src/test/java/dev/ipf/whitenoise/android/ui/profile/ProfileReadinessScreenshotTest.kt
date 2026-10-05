@@ -112,6 +112,7 @@ class ProfileReadinessScreenshotTest {
             toggleChecklist()
             val lightningStatus = if (name == "full") "Added" else "Optional"
             composeRule.onNodeWithText("Lightning address · $lightningStatus").assertExists()
+            composeRule.onNodeWithText("NIP-05 address · $lightningStatus").assertExists()
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/profile_readiness_${name}_$style.png")
         if (readiness.fields.isNotEmpty()) {
