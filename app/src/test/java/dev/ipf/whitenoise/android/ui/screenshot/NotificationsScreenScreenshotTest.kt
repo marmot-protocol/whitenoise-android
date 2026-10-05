@@ -12,7 +12,11 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.settings.NotificationPreviewControl
+import dev.ipf.whitenoise.android.ui.settings.NotificationPreviewControlState
 import dev.ipf.whitenoise.android.ui.settings.NotificationsScreen
+import dev.ipf.whitenoise.android.ui.settings.SettingsList
+import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -29,6 +33,7 @@ class NotificationsScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    private var previews = true
     private val app = ApplicationProvider.getApplicationContext<Context>()
 
     /** Light theme. */
@@ -54,6 +59,34 @@ class NotificationsScreenScreenshotTest {
         )
     }
 
+    /** Opted-out previews remain a clear independent choice without an account. */
+    @Test
+    fun notificationsPreviewsHidden() {
+        previews = false
+        capture("notifications_previews_hidden", darkTheme = false)
+    }
+
+    /** A failed save exposes one retry row next to the same privacy choice. */
+    @Test
+    fun notificationPreviewsRetry() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                SettingsScaffold(title = "Notifications", onBack = {}) {
+                    SettingsList {
+                        item {
+                            NotificationPreviewControl(
+                                state = NotificationPreviewControlState(enabled = false, failed = true),
+                                onChange = {},
+                                onRetry = {},
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/notification_previews_retry.png")
+    }
+
     /** Renders the fixture and records its screenshot baseline. */
     private fun capture(
         name: String,
@@ -62,6 +95,11 @@ class NotificationsScreenScreenshotTest {
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
     ) {
+        app
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("show_notification_previews", previews)
+            .commit()
         val appState =
             WhiteNoiseAppState(
                 context = app,

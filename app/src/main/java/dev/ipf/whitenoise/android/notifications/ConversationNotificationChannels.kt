@@ -164,18 +164,23 @@ object ConversationNotificationChannels {
             } else {
                 null
             }
-        return ensureConversationChannel(
-            manager = manager,
-            parentChannelId = parentChannelId,
-            conversationShortcutId = conversationShortcutId,
-            conversationTitle = conversationTitle,
-            vibrationPattern = vibrationPattern,
-            sourceVibrationPattern = sourceVibrationPattern,
-            baseName = baseName,
-            usesCustomScope = usesCustomScope,
-            customDisplayName = customDisplayName,
-            customDescription = customDescription,
-        )
+        return synchronized(UserEventNotificationGroup.mutationLock) {
+            val previews = NotificationPreviewPreferences.enabled(context)
+            val genericName = context.getString(dev.ipf.whitenoise.android.R.string.app_name)
+            val genericDescription = context.getString(dev.ipf.whitenoise.android.R.string.notification_hidden_content)
+            ensureConversationChannel(
+                manager = manager,
+                parentChannelId = parentChannelId,
+                conversationShortcutId = conversationShortcutId,
+                conversationTitle = if (previews) conversationTitle else genericName,
+                vibrationPattern = vibrationPattern,
+                sourceVibrationPattern = sourceVibrationPattern,
+                baseName = baseName,
+                usesCustomScope = usesCustomScope,
+                customDisplayName = if (previews) customDisplayName else baseName,
+                customDescription = if (previews) customDescription else genericDescription,
+            )
+        }
     }
 
     private fun ensureConversationChannel(

@@ -79,14 +79,20 @@ internal object AndroidConversationNotificationSettingsPlatform : ConversationNo
         shortcut: ShortcutInfoCompat,
         existing: Boolean,
     ) {
-        val accepted =
-            if (existing) {
-                ShortcutManagerCompat.updateShortcuts(context, listOf(shortcut))
-            } else {
-                ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
-            }
-        check(accepted) {
-            "Android rejected the conversation shortcut"
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            val payload =
+                if (shortcutPreviewAllowed(context, shortcut)) {
+                    shortcut
+                } else {
+                    genericNotificationShortcut(context, shortcut)
+                }
+            val accepted =
+                if (existing) {
+                    ShortcutManagerCompat.updateShortcuts(context, listOf(payload))
+                } else {
+                    ShortcutManagerCompat.pushDynamicShortcut(context, payload)
+                }
+            check(accepted) { "Android rejected the conversation shortcut" }
         }
     }
 
