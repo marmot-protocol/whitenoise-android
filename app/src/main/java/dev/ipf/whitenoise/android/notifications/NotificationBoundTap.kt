@@ -11,6 +11,7 @@ import javax.crypto.spec.SecretKeySpec
 internal class NotificationBoundTap(
     private val preferences: SharedPreferences,
 ) {
+    /** Persist the routing secret before issuing a signature; callers fall back to an immutable tap on failure. */
     fun sign(
         notificationKey: String,
         tapToken: String,
@@ -28,6 +29,7 @@ internal class NotificationBoundTap(
             signature(secret, notificationKey, tapToken, target)
         }
 
+    /** Validate the complete destination against the current card token using a constant-time signature comparison. */
     fun matches(
         notificationKey: String,
         tapToken: String,
@@ -44,12 +46,14 @@ internal class NotificationBoundTap(
             )
     }
 
+    /** Malformed or missing secrets cannot authenticate a tap and are never replaced during validation. */
     private fun readSecret(): ByteArray? =
         preferences.getString(SECRET_KEY, null)?.let {
             val decoded = runCatching { Base64.getUrlDecoder().decode(it) }.getOrNull()
             decoded?.takeIf { bytes -> bytes.size == SECRET_BYTES }
         }
 
+    /** Length prefixes prevent ambiguous field boundaries; reply plaintext is deliberately excluded. */
     private fun signature(
         secret: ByteArray,
         notificationKey: String,

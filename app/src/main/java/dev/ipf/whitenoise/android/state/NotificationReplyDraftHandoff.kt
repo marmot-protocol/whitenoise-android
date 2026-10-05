@@ -55,6 +55,7 @@ internal class NotificationReplyDraftHandoff(
             }.forEach { stage(it) }
     }
 
+    /** Sign-out/wipe retires unsaved private input and cancels only that account's outstanding deliveries. */
     fun removeAccount(accountRef: String) {
         val ids = pending.filterValues { it.target.accountRef == accountRef }.keys.toList()
         ids.forEach { id ->
@@ -90,6 +91,7 @@ internal class NotificationReplyDraftHandoff(
         return false
     }
 
+    /** Bound completed delivery receipts without evicting active saves or the separate failed-save buffer. */
     private fun pruneReceipts() {
         while (deliveries.size > MAX_RECEIPTS) {
             val completed = deliveries.entries.firstOrNull { entry -> entry.value.isCompleted } ?: break
@@ -97,6 +99,7 @@ internal class NotificationReplyDraftHandoff(
         }
     }
 
+    /** A cancelled save is a failed handoff; cancellation of this navigation caller must still propagate. */
     private suspend fun awaitDelivery(delivery: Deferred<Boolean>): Boolean =
         try {
             delivery.await()

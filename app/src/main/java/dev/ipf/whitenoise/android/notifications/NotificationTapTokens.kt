@@ -13,11 +13,13 @@ class NotificationTapTokens(
 ) {
     private val boundTap = NotificationBoundTap(preferences)
 
+    /** A signing/storage failure disables mutable draft handoff without preventing the ordinary notification tap. */
     internal fun signatureFor(
         notificationKey: String,
         target: NotificationTarget,
     ): String? = runCatching { boundTap.sign(notificationKey, tokenFor(notificationKey), target) }.getOrNull()
 
+    /** Require both this card's live token and its authenticated account/chat/message/kind destination. */
     internal fun isValidTarget(
         notificationKey: String,
         signature: String?,

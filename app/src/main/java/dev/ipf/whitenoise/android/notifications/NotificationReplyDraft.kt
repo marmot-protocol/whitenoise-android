@@ -14,9 +14,11 @@ data class NotificationReplyDraft(
     val id: String,
     val text: String,
 ) {
+    /** Diagnostic interpolation must never expose unsent message text. */
     override fun toString(): String = "NotificationReplyDraft(redacted)"
 }
 
+/** Accept bounded message-only input once; Android's task-history replay is not a new delivery. */
 internal fun notificationReplyDraftFrom(
     intent: Intent,
     kind: NotificationTargetKind,

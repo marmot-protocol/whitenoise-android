@@ -31280,13 +31280,13 @@
         "surface": "Automatic unsent reply handoff",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationReplyDraftHandoff.kt",
         "anchor": "internal class NotificationReplyDraftHandoff(",
-        "test_ids": ["NTF-031"]
+        "test_ids": ["NTF-032"]
       },
       {
         "surface": "Reply draft restore failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
         "anchor": "R.string.toast_reply_draft_restore_failed",
-        "test_ids": ["NTF-031"]
+        "test_ids": ["NTF-032"]
       },
       {
         "surface": "Direct Share preview privacy fence",

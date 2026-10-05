@@ -194,6 +194,7 @@ internal class CoalescingMessageDraftWriter(
         return deletion
     }
 
+    /** Flush accepted edits before importing text, retaining exact retry identity and a generation-fenced UI result. */
     suspend fun mergeText(
         accountRef: String,
         groupIdHex: String,
@@ -228,6 +229,7 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Drain old keystrokes before advancing generation; a failed drain leaves their text available for retry. */
     private suspend fun beginMerge(
         key: Key,
         activeMerge: ActiveMerge,
@@ -257,6 +259,7 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Snapshot the last accepted content and generation together after edits concurrent with the import finish. */
     private suspend fun finishMerge(
         key: Key,
         activeMerge: ActiveMerge,
@@ -357,6 +360,7 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Coalesce newer edits with an active import while preserving their accepted generation and retryable text. */
     private fun enqueueAccepted(
         key: Key,
         content: String,
