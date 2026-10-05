@@ -49,6 +49,31 @@ class PendingShareRequestStoreTest {
         dir.deleteRecursively()
     }
 
+    /** Decodes a future outcome as interruption while preserving the request caption and sources. */
+    @Test
+    fun futureErrorNamesPreserveTheRecoverableRequest() {
+        val original = request("future", text = "retained caption")
+        val json = org.json.JSONObject(String(encodePendingShareRequest(original), Charsets.UTF_8))
+        json.put("import_errors", org.json.JSONArray(listOf("FutureProviderFailure")))
+        val recovered = decodePendingShareRequest(json.toString().toByteArray(), "future")!!
+        assertEquals(original.payload.streamUris, recovered.payload.streamUris)
+        assertEquals(original.payload.text, recovered.payload.text)
+        assertEquals(listOf(ShareImportError.Interrupted), recovered.payload.importErrors)
+    }
+
+    /** Round-trips the maximum meaningful rejection list through encrypted persistence. */
+    @Test
+    fun allBoundedImportOutcomesSurviveEncryptedRecovery() {
+        val errors =
+            List(SHARE_STREAM_MAX_ITEMS) { ShareImportError.Unreadable } +
+                listOf(ShareImportError.TooMany, ShareImportError.Interrupted, ShareImportError.Interrupted)
+        val original = request("all-outcomes", text = "retained caption")
+        val interrupted = original.copy(payload = original.payload.copy(importReady = true, importErrors = errors))
+        assertTrue(store().save(interrupted))
+        assertEquals(interrupted, store().load(interrupted.requestId))
+    }
+
+    /** Inspects persisted bytes for the fixture caption and reloads using a fresh store instance. */
     @Test
     fun requestRoundTripsAcrossStoreRecreationWithoutPlaintextOnDisk() {
         val request = request("request-1", text = "private shared text")
@@ -65,6 +90,47 @@ class PendingShareRequestStoreTest {
         assertFalse(String(encryptedBytes, Charsets.ISO_8859_1).contains("private shared text"))
         assertEquals(request, store().load(request.requestId))
     }
+
+    /** Checks the durable interruption marker inside the import callback, then cancels before completion. */
+    @Test
+    fun importBridgePersistsAnInterruptedOutcomeBeforeTouchingSources() =
+        runTest {
+            val request = request("interrupted", text = "private")
+            val delegate = store()
+            val serialized =
+                SerializedPendingShareRequestStore(delegate, importRequest = {
+                    val restored = delegate.load(it.requestId)!!
+                    assertTrue(restored.payload.streamUris.isEmpty())
+                    assertEquals(listOf(ShareImportError.Interrupted), restored.payload.importErrors)
+                    throw kotlinx.coroutines.CancellationException()
+                })
+            try {
+                serialized.save(request)
+                org.junit.Assert.fail("cancelled")
+            } catch (_: kotlinx.coroutines.CancellationException) {
+            }
+            val restored = store().load(request.requestId)!!
+            assertEquals(listOf(ShareImportError.Interrupted), restored.payload.importErrors)
+            assertTrue(restored.payload.importReady)
+        }
+
+    /** Rejects marker persistence and verifies that provider import is never started. */
+    @Test
+    fun failedInterruptionMarkerDoesNotOpenAnyExternalSource() =
+        kotlinx.coroutines.runBlocking {
+            val delegate =
+                object : PendingShareRequestStore by store() {
+                    override fun save(request: ShareRequest): Boolean = false
+                }
+            var imported = false
+            val serialized =
+                SerializedPendingShareRequestStore(delegate, importRequest = {
+                    imported = true
+                    it
+                })
+            assertFalse(serialized.save(request("failed-marker", text = "caption")))
+            assertFalse(imported)
+        }
 
     @Test
     fun newRequestReplacesThePreviousPendingShare() {

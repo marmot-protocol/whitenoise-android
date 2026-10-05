@@ -59,6 +59,8 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
+import dev.ipf.whitenoise.android.ui.profile.ProfileReadiness
+import dev.ipf.whitenoise.android.ui.profile.rememberProfileReadiness
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateEmblem
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -548,6 +550,14 @@ private fun SettingsHomeScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val activeAccount = appState.activeAccount
+    val readiness =
+        rememberProfileReadiness(
+            appState,
+            activeAccount?.accountIdHex,
+            appState.profileRevisionForCompose,
+            appState::userProfileCached,
+            appState::loadUserProfile,
+        )
 
     // Read the live flag on invocation as teardown can begin before the next recomposition.
 
@@ -576,6 +586,7 @@ private fun SettingsHomeScreen(
                     pictureUrl = appState.avatarUrl(account.accountIdHex),
                 )
             },
+        profileReadiness = readiness,
         profileCount = appState.accounts.size,
         appUpdateInfo = appState.appUpdateInfo,
         versionName = BuildConfig.VERSION_NAME,
@@ -641,6 +652,7 @@ private fun SettingsHomeScreen(
 internal fun SettingsHomeContent(
     state: SettingsHomeState,
     account: SettingsHomeAccount?,
+    profileReadiness: ProfileReadiness = ProfileReadiness.Loading,
     profileCount: Int,
     appUpdateInfo: AppUpdateInfo,
     versionName: String,
@@ -708,7 +720,12 @@ internal fun SettingsHomeContent(
                         SettingsHomeSection.Support,
                         ->
                             state.groups.firstOrNull { it.section == section }?.let { group ->
-                                SettingsHubSection(group, onOpenDetail, onChatWithSupport)
+                                SettingsHubSection(
+                                    group,
+                                    onOpenDetail,
+                                    onChatWithSupport,
+                                    profileReadiness.takeIf { account != null },
+                                )
                             }
                         SettingsHomeSection.SignOut -> SignOutGroup(onSignOut)
                         SettingsHomeSection.Version -> SettingsVersionFooter(versionName)
@@ -858,17 +875,23 @@ private fun SettingsProfileTrailing() {
 /** A labelled hub section: the heading at the 32 dp content line, then one connected group of its rows. */
 @Composable
 @Suppress("FunctionNaming")
-private fun SettingsHubSection(
+internal fun SettingsHubSection(
     group: SettingsHomeGroup,
     onOpenDetail: (SettingsDetail) -> Unit,
     onChatWithSupport: () -> Unit,
+    profileReadiness: ProfileReadiness?,
 ) {
     Column(
         modifier = Modifier.testTag("settings.section.${group.section.name}"),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
         SettingsSection(stringResource(group.titleRes))
-        SettingsHubGroup(rows = group.rows, onOpenDetail = onOpenDetail, onChatWithSupport = onChatWithSupport)
+        SettingsHubGroup(
+            rows = group.rows,
+            onOpenDetail = onOpenDetail,
+            onChatWithSupport = onChatWithSupport,
+            profileReadiness = profileReadiness,
+        )
     }
 }
 
@@ -879,6 +902,7 @@ private fun SettingsHubGroup(
     rows: List<SettingsHomeRow>,
     onOpenDetail: (SettingsDetail) -> Unit,
     onChatWithSupport: () -> Unit,
+    profileReadiness: ProfileReadiness?,
 ) {
     SettingsGroup {
         rows.forEach { entry ->
@@ -886,6 +910,12 @@ private fun SettingsHubGroup(
                 SettingsHubLink(
                     context = context,
                     row = entry,
+                    subtitle =
+                        if (entry == SettingsHomeRow.Profile && profileReadiness != null) {
+                            stringResource(profileReadiness.summary)
+                        } else {
+                            null
+                        },
                     onClick = {
                         val detail = entry.detail
                         if (detail != null) onOpenDetail(detail) else onChatWithSupport()
@@ -903,10 +933,12 @@ private fun SettingsHubLink(
     context: SettingsRowContext,
     row: SettingsHomeRow,
     onClick: () -> Unit,
+    subtitle: String?,
 ) {
     SettingsLink(
         context = context,
         title = stringResource(row.titleRes),
+        subtitle = subtitle,
         onClick = onClick,
         leading = { SettingsHubIcon(row.iconRes, row.iconTag, MaterialTheme.colorScheme.onSurfaceVariant) },
     )

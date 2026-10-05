@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.state.AppText
@@ -16,6 +17,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePerson
 import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientUserSearchState
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientDirectoryMatches
+import dev.ipf.whitenoise.android.ui.chats.newchat.startChatErrorUiState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -112,6 +114,43 @@ class NewMessageScreenshotTest {
             people = addressPeople(),
             identifier = true,
             lookupFailed = true,
+        )
+
+    @Test fun missingKeyLight() =
+        capture(
+            "new_message_missing_key_light.png",
+            error = inviteError(MarmotKitException.MissingKeyPackage("ada")),
+        )
+
+    @Test fun invalidKeyDark() =
+        capture(
+            "new_message_invalid_key_dark.png",
+            dark = true,
+            error = inviteError(MarmotKitException.InvalidKeyPackageEvent("private native details")),
+        )
+
+    @Test fun missingInboxAmoled() =
+        capture(
+            "new_message_missing_inbox_amoled.png",
+            dark = true,
+            amoled = true,
+            error = inviteError(MarmotKitException.MissingMemberInboxRoute("ada")),
+        )
+
+    @Test fun invalidKeyLargeRtl() =
+        capture(
+            "new_message_invalid_key_large_rtl.png",
+            largeRtl = true,
+            error = inviteError(MarmotKitException.InvalidKeyPackageEvent("private native details")),
+        )
+
+    private fun inviteError(error: Throwable): StartChatErrorUiState =
+        startChatErrorUiState(
+            "npub1ada",
+            "ada",
+            error,
+            "Ada Lovelace",
+            { "Ada Lovelace" },
         )
 
     /** Canonical creation recovery exposes Open chat and safe diagnostic copying. */

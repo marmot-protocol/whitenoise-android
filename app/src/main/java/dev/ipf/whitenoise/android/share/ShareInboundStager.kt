@@ -46,7 +46,18 @@ class ShareInboundStager(
                             uris = uris,
                             resolveMime = { uri -> resolveMime(context, uri) },
                             intentMimeType = payload.intentMimeType,
-                        )
+                        ).let { staging ->
+                            // Mixed file shares follow Files' ordered document path; media-only shares remain albums.
+                            if (
+                                payload.importReady &&
+                                staging.mediaUris.isNotEmpty() &&
+                                staging.documentUris.isNotEmpty()
+                            ) {
+                                ShareStreamStaging(emptyList(), uris)
+                            } else {
+                                staging
+                            }
+                        }
                     },
         )
 
@@ -91,6 +102,7 @@ class ShareInboundStager(
     }
 }
 
+/** Resolves provider type through the existing guarded MIME adapter; caller preparation chooses the I/O dispatcher. */
 internal fun shareResolveMime(
     context: Context,
     uri: Uri,

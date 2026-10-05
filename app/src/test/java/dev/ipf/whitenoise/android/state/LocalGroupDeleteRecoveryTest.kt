@@ -17,6 +17,34 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class LocalGroupDeleteRecoveryTest {
     @Test
+    fun terminalClosedReconciliationDoesNotRecoverOrRepeatDeletion() =
+        runTest {
+            var reads = 0
+            var deletes = 0
+            var recoveries = 0
+            val closed = MarmotKitException.TransportClosed()
+            val failure =
+                runCatching {
+                    deleteLocalGroupWithRecovery(
+                        isCurrent = { true },
+                        delete = {
+                            deletes++
+                            throw MarmotKitException.StorageBusy("private mutation details")
+                        },
+                        isGroupPresent = {
+                            if (++reads == IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS) throw closed
+                            throw MarmotKitException.StorageBusy("private read details")
+                        },
+                        observer = LocalDeleteRecoveryObserver(recoverTransport = { recoveries++ }),
+                    )
+                }.exceptionOrNull()
+            assertSame(closed, failure)
+            assertEquals(1, deletes)
+            assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, reads)
+            assertEquals(0, recoveries)
+        }
+
+    @Test
     fun transientClosedTransportRetriesOnlyAfterGroupIsConfirmedPresent() =
         runTest {
             val events = mutableListOf<String>()
@@ -92,6 +120,50 @@ class LocalGroupDeleteRecoveryTest {
             assertTrue(result.isFailure)
             assertEquals(1, deletes)
             assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, reads)
+        }
+
+    @Test
+    fun exhaustedReconciliationPreservesTheReadFailureInsteadOfTheMutationFailure() =
+        runTest {
+            val readFailure = MarmotKitException.StorageBusy("private storage details")
+            var deletes = 0
+            val result =
+                runCatching {
+                    deleteLocalGroupWithRecovery(
+                        isCurrent = { true },
+                        delete = {
+                            deletes++
+                            throw MarmotKitException.TransportClosed()
+                        },
+                        isGroupPresent = { throw readFailure },
+                    )
+                }
+            assertSame(readFailure, result.exceptionOrNull())
+            assertEquals(1, deletes)
+        }
+
+    @Test
+    fun recoveredReconciliationDoesNotReplaceAnExhaustedMutationFailure() =
+        runTest {
+            val mutationFailure = MarmotKitException.TransportClosed()
+            var reads = 0
+            var deletes = 0
+            val result =
+                runCatching {
+                    deleteLocalGroupWithRecovery(
+                        isCurrent = { true },
+                        delete = {
+                            deletes++
+                            throw mutationFailure
+                        },
+                        isGroupPresent = {
+                            if (++reads == 1) throw MarmotKitException.StorageBusy("private storage details")
+                            true
+                        },
+                    )
+                }
+            assertSame(mutationFailure, result.exceptionOrNull())
+            assertEquals(IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS, deletes)
         }
 
     @Test

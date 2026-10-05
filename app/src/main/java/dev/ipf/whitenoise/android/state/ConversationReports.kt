@@ -98,7 +98,7 @@ internal suspend fun ConversationController.dismissReports(
 
 /**
  * MarmotKit's complete accepted-edit history for one message, oldest first, or null when the engine could
- * not answer. The history view then falls back to whatever edits the loaded window contains.
+ * not answer. Raw timeline edit events are never reinterpreted as accepted history.
  */
 internal suspend fun ConversationController.authoritativeEditHistory(messageIdHex: String): List<EditVersion>? {
     val account = boundAccountRef ?: return null

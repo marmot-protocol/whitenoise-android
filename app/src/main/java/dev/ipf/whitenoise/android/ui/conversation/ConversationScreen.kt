@@ -148,6 +148,7 @@ import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
@@ -372,6 +373,8 @@ private fun presentVoiceRecordingFailure(
             )
     }
 }
+
+private val MEMBERSHIP_FRAME_EVENT_TYPES = setOf("member_added", "member_removed")
 
 /** Renders the shared retryable conversation-load error surface. */
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
@@ -1508,7 +1511,10 @@ internal fun ConversationScreen(
                     controller.errorEdge == ConversationLoadFailureEdge.TOP
             val newestVisibleTimelineIndex =
                 conversationTimelineIndexForListIndex(
-                    listIndex = listState.firstVisibleItemIndex,
+                    listIndex =
+                        listState.firstVisibleItemIndex.coerceAtLeast(
+                            controller.conversationTrailingRowCount(rendered.size),
+                        ),
                     timelineSize = rendered.size,
                     trailingRowCount = controller.conversationTrailingRowCount(rendered.size),
                 )
@@ -1618,7 +1624,7 @@ internal fun ConversationScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
-    val exitConversation =
+    val exitConversationRoute =
         rememberConversationExitHandler(
             identity = chat.id,
             imeIsOpen = imeIsOpen,
@@ -1729,11 +1735,60 @@ internal fun ConversationScreen(
     // shelf — ConversationScreen is reused when `selectedChat` changes in
     // place, and an unkeyed state would otherwise carry URIs from chat A into
     // chat B (where a Send would attach them to the wrong recipient).
-    var pendingMediaSlots by rememberSaveable(chat.id, stateSaver = PendingMediaSlotListSaver) {
+    val importedShareAccount =
+        appState.accounts
+            .firstOrNull { it.label == conversationAccountRef }
+            ?.accountIdHex
+            .orEmpty()
+    var pendingMediaSlots by rememberSaveable(conversationAccountRef, chat.id, stateSaver = PendingMediaSlotListSaver) {
         mutableStateOf<List<PendingMediaSlot>>(emptyList())
     }
-    var pendingDocumentUris by rememberSaveable(chat.id, stateSaver = UriListSaver) {
+    var pendingDocumentUris by rememberSaveable(conversationAccountRef, chat.id, stateSaver = UriListSaver) {
         mutableStateOf<List<android.net.Uri>>(emptyList())
+    }
+    val importedShareFiles =
+        remember(context) {
+            dev.ipf.whitenoise.android.share
+                .PrivateShareFiles(context)
+        }
+    val exitConversation = {
+        val exitingUris = (pendingMediaSlots.map { it.uri } + pendingDocumentUris).filter(importedShareFiles::owns)
+        pendingMediaSlots = pendingMediaSlots.filterNot { importedShareFiles.owns(it.uri) }
+        pendingDocumentUris = pendingDocumentUris.filterNot(importedShareFiles::owns)
+        appState.launchMutation {
+            runCatchingCancellable {
+                withContext(Dispatchers.IO) {
+                    importedShareFiles.leases.changeShelf(
+                        importedShareAccount,
+                        chat.group.groupIdHex,
+                        exitingUris,
+                        emptyList(),
+                    )
+                }
+            }.onFailure { appState.present(R.string.share_import_storage) }
+        }
+        exitConversationRoute()
+    }
+    dev.ipf.whitenoise.android.share.ImportedShareShelf(
+        importedShareAccount,
+        chat.group.groupIdHex,
+        pendingMediaSlots.map { it.uri } + pendingDocumentUris,
+        appState.inboundShareRevision,
+    ) { restored ->
+        val staging =
+            restored.getOrElse {
+                appState.present(R.string.share_import_storage)
+                return@ImportedShareShelf
+            }
+        val recovered =
+            restoreImportedComposerAttachments(
+                pendingMediaSlots,
+                pendingDocumentUris,
+                staging,
+                importedShareFiles::owns,
+            )
+        pendingMediaSlots = recovered.mediaSlots
+        pendingDocumentUris = recovered.documentUris
     }
     LaunchedEffect(chat.id, appState.inboundShareRevision, pendingMediaSlots.size, pendingDocumentUris.size) {
         val capped =
@@ -2062,7 +2117,7 @@ internal fun ConversationScreen(
             // Append into the document side of the staging shelf rather than
             // sending immediately. The preview sheet renders both lists and
             // a single Send dispatches both decoders into one kind-9 album.
-            val merged = (pendingDocumentUris + uris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+            val merged = appendRecoveredDocuments(pendingDocumentUris, uris, MEDIA_PICKER_MAX_ITEMS)
             pendingDocumentUris = merged
         }
 
@@ -2310,6 +2365,7 @@ internal fun ConversationScreen(
         conversationTimelineTailListIndex(
             timelineSize = renderedTimeline.size,
             trailingRowCount = trailingRowCount,
+            hasPendingMembership = controller.pendingMembershipActivity != null,
         ) ?: 0
     val currentTailIndex by rememberUpdatedState(newValue = tailTimelineIndex)
     val seededTailAlignmentReady =
@@ -2930,6 +2986,17 @@ internal fun ConversationScreen(
             followingTail = scrollCoordinator.isFollowingTail,
             initialTimelineAnchored = initialTimelineAnchored,
         )
+    // Stable-key anchoring otherwise retains the old newest message and leaves
+    // the inserted row under the composer. The existing owner preserves history
+    // focus, navigation and foreground restoration while revealing this tail.
+    LaunchedEffect(controller, controller.pendingMembershipActivity?.id, transcriptReadyToReveal) {
+        if (controller.pendingMembershipActivity != null && transcriptReadyToReveal) {
+            scrollCoordinator.followTailIfAllowed(
+                resolveTailIndex = { currentTailIndex },
+                reason = ConversationScrollReason.NewMessage,
+            )
+        }
+    }
     LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
         if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
         val latestId = renderedTimeline.lastOrNull()?.id
@@ -2971,13 +3038,16 @@ internal fun ConversationScreen(
     // refuses this correction while the user is reading history.
     LaunchedEffect(
         controller,
+        controller.pendingMembershipActivity?.id,
         renderedTimeline
             .lastOrNull()
             ?.record
             ?.messageIdHex
             ?.let { controller.reactions[it] },
     ) {
-        if (initialTimelineAnchored && renderedTimeline.isNotEmpty()) {
+        // A pending action owns the physical tail, so message-height settling
+        // resumes only after it clears. Its own follow effect handles insertion.
+        if (initialTimelineAnchored && renderedTimeline.isNotEmpty() && controller.pendingMembershipActivity == null) {
             val lastMessageId = renderedTimeline.last().record.messageIdHex
             scrollCoordinator.settleTailAfterLayoutChange(
                 resolveTailIndex = { currentTailIndex },
@@ -3089,8 +3159,15 @@ internal fun ConversationScreen(
 
     LaunchedEffect(mediaDraftState, controller.boundAccountRef, chat.id) {
         val restored = mediaDraftState.restorePersistedAttachments() ?: return@LaunchedEffect
-        pendingMediaSlots = restored.mediaSlots
-        pendingDocumentUris = restored.documentUris
+        val merged =
+            mergeRestoredComposerAttachments(
+                pendingMediaSlots,
+                pendingDocumentUris,
+                restored,
+                importedShareFiles::owns,
+            )
+        pendingMediaSlots = merged.mediaSlots
+        pendingDocumentUris = merged.documentUris
     }
 
     val pollVotesHost = remember(controller) { PollVotesHostState() }
@@ -3527,7 +3604,19 @@ internal fun ConversationScreen(
                     } else {
                         null
                     },
-                onSendAttachments = { caption, onResult ->
+                onSendAttachments = sendAttachments@{ caption, onResult ->
+                    if (
+                        importedComposerExceedsLimit(
+                            pendingMediaSlots,
+                            pendingDocumentUris,
+                            MEDIA_PICKER_MAX_ITEMS,
+                            importedShareFiles::owns,
+                        )
+                    ) {
+                        appState.present(R.string.share_import_recovered_limit)
+                        onResult(false)
+                        return@sendAttachments
+                    }
                     attachmentSendPending = true
                     var dispatched = false
                     try {
@@ -3745,6 +3834,7 @@ internal fun ConversationScreen(
                             ConversationEmptyMessage(conversationEmptyState(controller.group.disappearingMessageSecs))
                         }
                     renderedTimeline.isEmpty() &&
+                        controller.pendingMembershipActivity == null &&
                         !controller.hasMoreBefore &&
                         !controller.hasMoreAfterTimeline &&
                         !controller.isLoadingPage &&
@@ -3849,6 +3939,23 @@ internal fun ConversationScreen(
                                     targetEdge = ConversationLoadFailureEdge.BOTTOM,
                                     onRetry = { scope.launch { controller.retryLoadFailure() } },
                                 )
+                                controller.pendingMembershipActivity?.let { activity ->
+                                    item(key = "pending-membership:${activity.id}", contentType = "pendingMembership") {
+                                        PendingGroupMembershipRow(
+                                            activity = activity,
+                                            displayName = { ref ->
+                                                appState.contactNicknameFor(controller.boundAccountRef, ref)
+                                                    ?: appState.networkDisplayName(ref)
+                                            },
+                                            modifier =
+                                                Modifier
+                                                    .timelineReadingExposure(timelineViewport)
+                                                    .membershipVisibleDraw(timelineViewport) {
+                                                        controller.membershipTimings.pendingFrame(activity.id)
+                                                    },
+                                        )
+                                    }
+                                }
                                 itemsIndexed(
                                     renderedTimelineNewestFirst,
                                     key = { _, item -> item.id },
@@ -3863,11 +3970,20 @@ internal fun ConversationScreen(
                                     },
                                 ) { index, item ->
                                     val messageId = item.record.messageIdHex
+                                    val membershipFrameModifier =
+                                        if (item.projected?.groupSystem?.systemType in MEMBERSHIP_FRAME_EVENT_TYPES) {
+                                            Modifier.membershipVisibleDraw(timelineViewport) {
+                                                controller.membershipTimings.projectionFrame(messageId)
+                                            }
+                                        } else {
+                                            Modifier
+                                        }
                                     TimelineRow(
                                         modifier =
                                             Modifier
                                                 .timelineReadingExposure(timelineViewport)
-                                                .conversationTailEntranceMotion(tailEntrance, item.id),
+                                                .conversationTailEntranceMotion(tailEntrance, item.id)
+                                                .then(membershipFrameModifier),
                                         item = item,
                                         // Newest-first rows: the chronologically
                                         // older neighbour is the next row emitted.
