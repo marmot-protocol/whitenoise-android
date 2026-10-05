@@ -7,6 +7,7 @@ import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.MainActivity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -32,6 +33,18 @@ class NotificationReplyDraftNavigationTest {
         assertEquals(target.copy(replyDraft = parsed?.replyDraft), parsed)
         assertEquals(" unfinished\nreply ", parsed?.replyDraft?.text)
         assertTrue(parsed?.replyDraft.toString().contains("redacted"))
+    }
+
+    @Test
+    fun duplicateFillInsShareAReceiptButNewMessagesAndEditedTextRemainDistinct() {
+        val intent = boundIntent().putExtra(Notification.EXTRA_REMOTE_INPUT_DRAFT, "partial")
+        val first = checkNotNull(parse(intent)?.replyDraft)
+        assertEquals(first, parse(Intent(intent))?.replyDraft)
+        val nextMessage = boundIntent(target.copy(messageIdHex = "new-message"))
+        nextMessage.putExtra(Notification.EXTRA_REMOTE_INPUT_DRAFT, "partial")
+        assertNotEquals(first.id, parse(nextMessage)?.replyDraft?.id)
+        intent.putExtra(Notification.EXTRA_REMOTE_INPUT_DRAFT, "edited partial")
+        assertNotEquals(first.id, parse(intent)?.replyDraft?.id)
     }
 
     @Test

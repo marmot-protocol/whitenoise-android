@@ -7,7 +7,8 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import java.util.UUID
+import java.security.MessageDigest
+import java.util.Base64
 
 /** Transient SystemUI handoff; never place its plaintext in saved-instance state or diagnostics. */
 data class NotificationReplyDraft(
@@ -27,10 +28,21 @@ internal fun notificationReplyDraftFrom(
         intent
             .getStringExtra(Notification.EXTRA_REMOTE_INPUT_DRAFT)
             ?.takeIf { it.isNotBlank() && it.length <= MAX_REMOTE_DRAFT_CHARS }
-            ?.let { NotificationReplyDraft(UUID.randomUUID().toString(), it) }
+            ?.let { NotificationReplyDraft(notificationDraftReceiptId(intent, it), it) }
     } else {
         null
     }
+
+/** Identical deliveries of one signed card share a receipt; a new card or changed text is a separate intake. */
+private fun notificationDraftReceiptId(
+    intent: Intent,
+    text: String,
+): String {
+    val signature = intent.getStringExtra(NotificationNavigation.EXTRA_TAP_TOKEN).orEmpty()
+    val input = "${signature.length}:$signature${text.length}:$text".toByteArray(Charsets.UTF_8)
+    val digest = MessageDigest.getInstance("SHA-256").digest(input)
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
+}
 
 /** Retains an accepted tap through unlock and Activity recreation without serializing its text. */
 class NotificationInboundState : ViewModel() {
