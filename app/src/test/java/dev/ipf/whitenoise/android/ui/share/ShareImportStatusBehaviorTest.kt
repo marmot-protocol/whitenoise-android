@@ -13,8 +13,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.ui.navigation.shareRequestToCancel
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
