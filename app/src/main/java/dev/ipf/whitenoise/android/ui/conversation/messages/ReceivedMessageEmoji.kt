@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -30,6 +31,43 @@ private val ShortcodeInText = Regex(":[A-Za-z0-9_-]{1,64}:")
  */
 @Composable
 internal fun rememberReceivedEmoji(
+    item: TimelineMessage,
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+): ReceivedEmoji =
+    key(
+        controller,
+        controller.boundAccountRef,
+        item.record.messageIdHex,
+        item.record.groupIdHex,
+        item.record.tags,
+        item.record.sourceEpoch,
+        item.record.plaintext,
+        item.projected?.media,
+    ) {
+        rememberReceivedEmojiInScope(item, controller, appState)
+    }
+
+/** A quote uses only its available target in the native visible window; never the replying row's art. */
+@Composable
+internal fun rememberReplyReceivedEmoji(
+    targetMessageIdHex: String?,
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+): ReceivedEmoji {
+    if (targetMessageIdHex == null) return ReceivedEmoji.None
+    val window = controller.timeline
+    val target =
+        window.firstOrNull {
+            it.record.messageIdHex == targetMessageIdHex &&
+                it.record.messageIdHex !in controller.deletedMessageIds && it.projected?.deleted != true
+        }
+    return target?.takeUnless { controller.isRetainedRowGone(targetMessageIdHex) }
+        ?.let { rememberReceivedEmoji(it, controller, appState) } ?: ReceivedEmoji.None
+}
+
+@Composable
+private fun rememberReceivedEmojiInScope(
     item: TimelineMessage,
     controller: ConversationController,
     appState: WhiteNoiseAppState,

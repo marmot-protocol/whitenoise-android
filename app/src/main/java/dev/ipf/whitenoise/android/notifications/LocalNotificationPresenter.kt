@@ -140,6 +140,10 @@ class LocalNotificationPresenter(
     private val alertBudget: NotificationAlertBudget = NotificationAlertBudget(),
     private val dismissalRetryDelay: suspend () -> Unit = { delay(CONVERSATION_DISMISSAL_RETRY_DELAY_MS) },
     private val groupReconciliation: () -> Unit = { NotificationGroupReconciler.shared(context).request() },
+    private val emojiArtworkPreparer: suspend (String, String?) -> NotificationEmojiArtifact? = { text, source ->
+        notificationEmojiArtwork(context, text, source)
+    },
+    private val emojiArtworkTimeoutMs: Long = NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS,
     // Kept last so callers may still pass it as a trailing lambda.
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
@@ -632,6 +636,8 @@ class LocalNotificationPresenter(
             }
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
+        var emojiArtifact: NotificationEmojiArtifact? = null
+        var emojiPreparationAttempted = false
         try {
             written =
                 ConversationCardPostSynchronizer.withRegisteredShow(
@@ -639,6 +645,17 @@ class LocalNotificationPresenter(
                     notificationContent.notificationId,
                     ConversationCardScope(update.accountRef, update.groupIdHex),
                 ) { showToken ->
+                    // Capture dismissal ownership before optional image I/O can suspend.
+                    if (!redactContent && decision.style == NotificationStyleChoice.Messaging) {
+                        emojiPreparationAttempted = true
+                        emojiArtifact =
+                            prepareNotificationEmojiArtwork(
+                                emojiArtworkPreparer,
+                                notificationContent.body,
+                                update.previewText,
+                                emojiArtworkTimeoutMs,
+                            )
+                    }
                     val showGenerationAllowsPost = {
                         if (replaceCurrentMessage) {
                             ConversationCardPostSynchronizer.isShowCurrent(showToken)
@@ -933,7 +950,8 @@ class LocalNotificationPresenter(
                                             body = notificationContent.body,
                                             carriedMessageCount = carried.orEmpty().size,
                                             redactContent = redactContent,
-                                        )
+                                        ) &&
+                                        emojiArtifact == null
                                     ) {
                                         builder
                                             .setContentTitle(notificationContent.title)
@@ -970,6 +988,7 @@ class LocalNotificationPresenter(
                                                 carried,
                                                 messaging.sender,
                                                 presentationTimestampMs,
+                                                emojiArtifact?.uri,
                                             ),
                                         )
                                     }
@@ -1040,6 +1059,7 @@ class LocalNotificationPresenter(
                                                     carriedHistory = null,
                                                     sender = messaging.sender,
                                                     newMessageTimestampMs = presentationTimestampMs,
+                                                    emojiArtwork = emojiArtifact?.uri,
                                                 ),
                                             )
                                             val cleanNotification =
@@ -1188,6 +1208,8 @@ class LocalNotificationPresenter(
                     true
                 }
         } finally {
+            emojiArtifact?.close()
+            if (emojiPreparationAttempted) groupReconciliation()
             rewriteLease?.let(NotificationCardGenerations::release)
             if (!written) heldAlert?.release()
         }
@@ -1975,6 +1997,7 @@ class LocalNotificationPresenter(
         carriedHistory: List<NotificationCompat.MessagingStyle.Message>?,
         sender: Person,
         newMessageTimestampMs: Long,
+        emojiArtwork: android.net.Uri? = null,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -1984,8 +2007,16 @@ class LocalNotificationPresenter(
                 .build()
         // Cap carried-forward history; the extracted style is otherwise re-serialized unbounded across Binder on every post.
         val style = NotificationCompat.MessagingStyle(self)
+        val newMessages =
+            notificationEmojiMessages(
+                content.body,
+                newMessageTimestampMs,
+                sender,
+                emojiArtwork,
+                context.getString(R.string.custom_emoji),
+            )
         carriedHistory
-            ?.let { capNotificationHistory(it, historyCap) }
+            ?.let { capNotificationLogicalHistory(it, historyCap, MAX_NOTIFICATION_MESSAGE_HISTORY - newMessages.size) }
             ?.forEach { message ->
                 style.addMessage(
                     copiedMessage(
@@ -1999,7 +2030,7 @@ class LocalNotificationPresenter(
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.
         (conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let { style.conversationTitle = it }
-        style.addMessage(content.body, newMessageTimestampMs, sender)
+        newMessages.forEach(style::addMessage)
         return style
     }
 
@@ -2034,7 +2065,7 @@ class LocalNotificationPresenter(
             replacingMessageIdHex != null &&
             conversationCardMessageIdHex(existing) == replacingMessageIdHex
         ) {
-            messages?.dropLast(1)
+            messages?.let(::dropLastNotificationLogicalMessage)
         } else {
             messages
         }

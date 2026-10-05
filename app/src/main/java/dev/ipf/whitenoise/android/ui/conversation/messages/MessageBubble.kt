@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -121,6 +120,7 @@ import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
@@ -1769,6 +1769,12 @@ internal fun MessageBubble(
                     } else {
                         controller.replyPreview(item, messageTextCopy)
                     }
+                val replyReceivedEmoji =
+                    rememberReplyReceivedEmoji(
+                        controller.replyTargetMessageId(item).takeUnless { replyPreview?.originalUnavailable != false },
+                        controller,
+                        appState,
+                    )
                 val imageAttachments = bubbleMedia.images
                 val videoAttachments = bubbleMedia.videos
                 val fileAttachments = bubbleMedia.files
@@ -2058,7 +2064,7 @@ internal fun MessageBubble(
                 // of the text-only bubble otherwise.
                 val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     if (showSenderName) {
-                        Text(
+                        EmojiLabel(
                             appState.displayName(record.sender),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
@@ -2098,6 +2104,7 @@ internal fun MessageBubble(
                                 presentation = bubblePresentation,
                             )
                         ReplyPreviewCard(
+                            receivedEmoji = replyReceivedEmoji,
                             senderTitle =
                                 if (preview.originalUnavailable) {
                                     ""
@@ -2673,6 +2680,7 @@ internal fun MessageBubble(
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 replyPreview?.let { preview ->
                                     ReplyPreviewCard(
+                                        receivedEmoji = replyReceivedEmoji,
                                         senderTitle =
                                             if (preview.originalUnavailable) {
                                                 ""
@@ -2739,6 +2747,7 @@ internal fun MessageBubble(
                                     replyPreview?.let { preview ->
                                         {
                                             ReplyPreviewCard(
+                                                receivedEmoji = replyReceivedEmoji,
                                                 senderTitle =
                                                     if (preview.originalUnavailable) {
                                                         ""
@@ -2875,6 +2884,12 @@ internal fun MessageBubble(
                                 ComposerGate.COMPOSER ->
                                     if (!actionsReadOnly) {
                                         ComposerBar(
+                                            replyingToEmoji =
+                                                rememberReplyReceivedEmoji(
+                                                    controller.replyingTo?.messageIdHex,
+                                                    controller,
+                                                    appState,
+                                                ),
                                             replyingTo = controller.replyingTo,
                                             replyingToMedia =
                                                 controller.replyingTo

@@ -9,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.OptimisticGroupRosterMutation
 import dev.ipf.whitenoise.android.state.PendingGroupMembershipActivity
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 
 /** Local request feedback, deliberately separate from MDK's authoritative group-system rows. */
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
@@ -54,7 +54,7 @@ internal fun PendingGroupMembershipRow(
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Text(
+        EmojiLabel(
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

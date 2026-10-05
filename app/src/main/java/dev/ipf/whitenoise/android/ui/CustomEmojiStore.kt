@@ -174,11 +174,7 @@ internal class CustomEmojiStore(
      */
     private fun scan(): CustomEmojiSet {
         val entries =
-            directory
-                .listFiles()
-                .orEmpty()
-                .filter { it.isFile && !it.name.startsWith('.') }
-                .sortedWith(compareBy({ !hasSendableExtension(it) }, { it.name }))
+            filesForPresentation(directory)
                 .mapNotNull { file ->
                     val code = file.name.substringBeforeLast('.')
                     if (code.isEmpty() || sanitizeEmojiCode(code) != code || file.length() > MAX_BYTES) {
@@ -200,6 +196,12 @@ internal class CustomEmojiStore(
 
         /** File extensions of emoji images that can be sent, so every listed emoji is sendable. */
         val SENDABLE_EXTENSIONS = setOf("png", "gif", "webp", "jpg")
+
+        /** Shared display precedence: modern artwork first, then decodable legacy files in name order. */
+        internal fun filesForPresentation(directory: File): List<File> =
+            directory.listFiles().orEmpty()
+                .filter { it.isFile && !it.name.startsWith('.') }
+                .sortedWith(compareBy({ !hasSendableExtension(it) }, { it.name }))
     }
 }
 

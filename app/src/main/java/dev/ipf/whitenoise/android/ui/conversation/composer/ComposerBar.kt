@@ -364,6 +364,7 @@ internal fun ComposerBar(
     replyingTo: AppMessageRecordFfi?,
     replyingToMedia: List<MediaAttachmentReferenceFfi> = emptyList(),
     replyingToDisplay: TimelineReplyDisplay? = null,
+    replyingToEmoji: dev.ipf.whitenoise.android.ui.ReceivedEmoji = dev.ipf.whitenoise.android.ui.ReceivedEmoji.None,
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
     onSend: (text: String, onAccepted: () -> Unit) -> Unit,
@@ -1153,6 +1154,7 @@ internal fun ComposerBar(
                                                 },
                                             isOwn = replyingTo.direction == "sent",
                                             body = replyBody,
+                                            receivedEmoji = replyingToEmoji,
                                             mediaKind = mediaKind,
                                             mediaFileName =
                                                 replyingToDisplay?.mediaFileName ?: mediaFallback?.filename,

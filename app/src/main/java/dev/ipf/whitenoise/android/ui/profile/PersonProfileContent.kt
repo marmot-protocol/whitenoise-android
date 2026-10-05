@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -312,7 +313,7 @@ private fun PersonProfileIdentity(
             ) {
                 Avatar(person.title, person.seed, avatarSize, pictureUrl = person.pictureUrl)
             }
-            Text(
+            EmojiLabel(
                 person.title,
                 Modifier
                     .padding(start = 16.dp, end = 16.dp, top = WhiteNoiseSpacing.FormField)
@@ -322,7 +323,7 @@ private fun PersonProfileIdentity(
                 textAlign = TextAlign.Center,
             )
             if (person.title != person.publishedName) {
-                Text(
+                EmojiLabel(
                     person.publishedName,
                     Modifier.padding(horizontal = 16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -339,7 +340,7 @@ private fun PersonProfileIdentity(
                     shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ) {
-                    Text(
+                    EmojiLabel(
                         about,
                         Modifier.fillMaxWidth().padding(16.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

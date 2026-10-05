@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -36,6 +37,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.labelFor
 import dev.ipf.whitenoise.android.state.reportReasonLabel
 import dev.ipf.whitenoise.android.state.shouldShowOriginalTimestamp
+import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -188,7 +192,11 @@ private fun MessageDetailsContentCard(
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         ) {
             if (text.isNotBlank()) {
-                Text(text, style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    remember(text) { EmojiShortcodes.annotate(AnnotatedString(text)) },
+                    inlineContent = EmojiShortcodes.content(),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
             attachmentLabels.forEach { label ->
                 Row(
@@ -346,7 +354,9 @@ private fun MessageReactionsSection(reactions: List<ReactionTally>) {
                     headlineContent = {
                         Text(pluralStringResource(R.plurals.people_reacted, tally.count, tally.count))
                     },
-                    leadingContent = { Text(tally.emoji, fontSize = ReactionGlyphSize) },
+                    leadingContent = {
+                        EmojiLabel(tally.emoji, style = LocalTextStyle.current.copy(fontSize = ReactionGlyphSize))
+                    },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
             }
@@ -417,8 +427,8 @@ private fun MessageReportRow(
         headlineContent = { Text(stringResource(reportReasonLabel(report.reason))) },
         supportingContent = {
             Column {
-                if (report.explanation.isNotBlank()) Text(report.explanation)
-                Text(stringResource(R.string.report_reported_by, reporter))
+                if (report.explanation.isNotBlank()) EmojiLabel(report.explanation)
+                EmojiLabel(stringResource(R.string.report_reported_by, reporter))
                 Text(filedAt, style = MaterialTheme.typography.labelSmall)
             }
         },
@@ -459,7 +469,7 @@ private fun MessageDeliverySection(
             if (!mine) {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.sent_from)) },
-                    supportingContent = { Text(senderDisplayName) },
+                    supportingContent = { EmojiLabel(senderDisplayName) },
                     leadingContent = {
                         Avatar(
                             title = senderDisplayName,
@@ -473,7 +483,7 @@ private fun MessageDeliverySection(
             } else {
                 recipients.forEach { recipient ->
                     ListItem(
-                        headlineContent = { Text(recipient.title) },
+                        headlineContent = { EmojiLabel(recipient.title) },
                         supportingContent = { Text(statusText) },
                         leadingContent = {
                             Avatar(

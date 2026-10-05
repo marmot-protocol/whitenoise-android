@@ -68,6 +68,7 @@ import dev.ipf.whitenoise.android.state.ForwardTargetProgress
 import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -534,7 +535,7 @@ private fun ForwardTargetProgressRow(
                 stateDescription = supportingText
             },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { EmojiLabel(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(supportingText, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         leadingContent = {
             when (progress.phase) {
