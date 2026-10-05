@@ -1596,7 +1596,9 @@ class WhiteNoiseAppState private constructor(
                     startSentenceIndex,
                     startRenderedHit,
                     isCurrent = {
-                        isCurrent() && activeAccountRef == ownerAccount && accountSwitchHandoff.isCurrent(ownerGeneration)
+                        isCurrent() &&
+                            activeAccountRef == ownerAccount &&
+                            accountSwitchHandoff.isCurrent(ownerGeneration)
                     },
                 ) {
                     preparingSessionId = ttsController.state.value.sessionId

@@ -386,7 +386,7 @@ class TtsController internal constructor(
         }
     }
 
-    /** Resolves an exact prepared hit off-lock, then revalidates the caller, ticket, engine and locale before commit. */
+    /** Resolves a prepared hit off-lock, then revalidates caller, ticket, engine and locale before commit. */
     private suspend fun completePreparation(
         ticket: Triple<Long, TtsSpeechEngine, Locale>,
         entries: List<TtsSpeakableEntry>,

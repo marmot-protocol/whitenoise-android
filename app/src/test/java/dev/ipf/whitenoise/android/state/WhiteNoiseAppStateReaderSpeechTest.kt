@@ -116,7 +116,12 @@ class WhiteNoiseAppStateReaderSpeechTest {
                     Locale.US,
                     isCurrent = {
                         if (appState.ttsController.state.value is TtsState.Preparing) {
-                            assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("s", "Sender", "Replacement.")), Locale.US))
+                            assertTrue(
+                                appState.speakAloud(
+                                    listOf(TtsSpeakableEntry("s", "Sender", "Replacement.")),
+                                    Locale.US,
+                                ),
+                            )
                             replacementSession = appState.ttsController.state.value.sessionId
                             false
                         } else {
