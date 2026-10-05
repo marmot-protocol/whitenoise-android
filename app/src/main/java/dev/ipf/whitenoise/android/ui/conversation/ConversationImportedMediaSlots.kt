@@ -5,7 +5,7 @@ import dev.ipf.whitenoise.android.share.ShareStreamStaging
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
 
-/** A shelf refresh preserves occurrence identities, prepared previews and ordinary picker selections. */
+/** Restores imported ordering while preserving edited occurrence identities and ordinary picker positions. */
 internal fun restoreImportedMediaSlots(
     current: List<PendingMediaSlot>,
     restored: List<Uri>,
@@ -14,7 +14,10 @@ internal fun restoreImportedMediaSlots(
 ): List<PendingMediaSlot> {
     val retained = current.filter { !owns(it.uri) || it.uri in restored }
     val added = restored.filterNot { uri -> retained.any { it.uri == uri } }
-    return appendPendingMediaSlots(retained, added, maxItems)
+    val appended = appendPendingMediaSlots(retained, added, maxItems)
+    val importedInOrder =
+        appended.filter { owns(it.uri) }.sortedBy { restored.indexOf(it.uri) }.iterator()
+    return appended.map { slot -> if (owns(slot.uri)) importedInOrder.next() else slot }
 }
 
 /** Recover accepted sources without discarding bytes or changing an existing edited occurrence. */
@@ -53,14 +56,17 @@ internal fun appendRecoveredDocuments(
     maxItems: Int,
 ): List<Uri> = current + added.filterNot { it in current }.distinct().take((maxItems - current.size).coerceAtLeast(0))
 
-/** The native restore cannot discard platform sources published since its last input projection. */
+/** Adds missing native items without discarding later picks, current occurrence URIs or private ownership. */
 internal fun mergeRestoredComposerAttachments(
     currentMedia: List<PendingMediaSlot>,
     currentDocuments: List<Uri>,
     restored: RestoredConversationAttachments,
     owns: (Uri) -> Boolean,
-): RestoredConversationAttachments =
-    RestoredConversationAttachments(
-        mediaSlots = restored.mediaSlots.filterNot { owns(it.uri) } + currentMedia.filter { owns(it.uri) },
-        documentUris = (restored.documentUris.filterNot(owns) + currentDocuments.filter(owns)).distinct(),
+): RestoredConversationAttachments {
+    val currentIds = currentMedia.map(PendingMediaSlot::id).toSet()
+    val missingNative = restored.mediaSlots.filter { !owns(it.uri) && it.id !in currentIds }
+    return RestoredConversationAttachments(
+        mediaSlots = missingNative + currentMedia,
+        documentUris = (restored.documentUris.filterNot(owns) + currentDocuments).distinct(),
     )
+}

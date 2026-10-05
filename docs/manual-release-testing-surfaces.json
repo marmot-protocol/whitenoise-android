@@ -9,6 +9,18 @@
         "test_ids": ["SYS-004", "SYS-005"]
       },
       {
+        "surface": "restoreImportedMediaSlots",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun restoreImportedMediaSlots(",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "mergeRestoredComposerAttachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun mergeRestoredComposerAttachments(",
+        "test_ids": ["SYS-005"]
+      },
+      {
         "surface": "restoreImportedComposerAttachments",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
         "anchor": "fun restoreImportedComposerAttachments(",
