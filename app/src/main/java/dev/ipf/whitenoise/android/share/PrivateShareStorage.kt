@@ -35,11 +35,11 @@ internal fun writePrivateShareJson(
         if (
             !file.isFile ||
             Files.isSymbolicLink(file.toPath()) ||
-            file.length() != encoded.size.toLong() ||
-            !file.readBytes().contentEquals(encoded)
+            file.length() != encoded.size.toLong()
         ) {
             throw IOException("Private share record was not committed")
         }
+        if (!file.readBytes().contentEquals(encoded)) throw IOException("Private share record was not committed")
         committed = true
     } finally {
         if (!committed) runCatching { atomic.failWrite(out) }
