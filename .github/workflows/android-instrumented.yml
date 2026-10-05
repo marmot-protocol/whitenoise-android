@@ -66,11 +66,14 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/NativePhaseAttachmentProbe.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AndroidAttachmentFixtureSender.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaLifecycleAttachmentProbe.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/ForwardAttachmentProbe.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/FixtureMediaAssets.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/ApkInstallerAttachmentProbe.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/FixtureSession.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MatrixAttachmentProbe.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/state/MessageForwarding.kt'
       # Stored direct-peer title and membership separation (#2149) against the real native runtime.
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/state/ChatListColdStartDirectPeerPresentationFfiIntegrationTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/state/LoopbackNostrRelay.kt'
@@ -128,6 +131,7 @@ jobs:
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-matrix unshaped,quick
             bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk-recreation
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-forward
       - name: Preserve redacted ledger and measurements on success or failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

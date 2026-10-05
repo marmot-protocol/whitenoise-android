@@ -72,6 +72,10 @@ class MediaAttachmentLatencyProbe {
     @Test
     fun measureControlledMediaLifecycle() = runBlocking { MediaLifecycleAttachmentProbe.run() }
 
+    /** Opt-in forward probe: shipping forwards of a small text attachment, phase timings and genuine receipt. */
+    @Test
+    fun measureControlledForward() = runBlocking { ForwardAttachmentProbe.run() }
+
     /** Compares generated file preparation, upload, and verified cold downloads by payload size. */
     @Test
     fun measureSyntheticSizeMatrix() =

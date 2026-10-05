@@ -5,6 +5,9 @@ import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
+import dev.ipf.whitenoise.android.media.readWithin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -19,13 +22,15 @@ import kotlinx.coroutines.withContext
  * [account]. Neither boundary ever re-reads the live active account: each
  * revalidates that its own bound owner is still a signed-in signing account,
  * so removal or sign-out of either owner stops the operation without falling
- * back to another account.
+ * back to another account. [diagnostics] times each phase while a local
+ * diagnostics session is active and receives no identifiers or content.
  */
 @Suppress("LongMethod")
 internal fun WhiteNoiseAppState.forwardTransport(
     sourceAccount: String,
     account: String,
     batchMessageCount: Int,
+    diagnostics: ForwardDiagnostics? = null,
 ): ForwardTransport {
     /** Rejects source reads after their explicitly bound signing account leaves the runtime. */
     fun requireSourceAccount() {
@@ -52,18 +57,22 @@ internal fun WhiteNoiseAppState.forwardTransport(
                     messageIdHex = sourceMessageIdHex,
                     attachmentIndex = source.attachmentIndex,
                 )
-            return materializeForwardAttachment(
-                source = source,
-                resolveAuthoritativeReference = {
-                    requireSourceAccount()
-                    resolveAttachmentReference(request).also { requireSourceAccount() }
-                },
-                downloadPlaintext = { reference ->
-                    requireSourceAccount()
-                    materializeAttachmentPlaintextIsolated(request, reference)
-                        .also { requireSourceAccount() }
-                },
-            )
+            return diagnostics.span({}, ForwardDiagnostics::sourceReady) {
+                materializeForwardAttachment(
+                    source = source,
+                    resolveAuthoritativeReference = {
+                        requireSourceAccount()
+                        diagnostics.span({}, ForwardDiagnostics::sourceReferenceResolved) {
+                            resolveAttachmentReference(request).also { requireSourceAccount() }
+                        }
+                    },
+                    downloadPlaintext = { reference ->
+                        requireSourceAccount()
+                        materializeAttachmentPlaintextIsolated(request, reference, diagnostics)
+                            .also { requireSourceAccount() }
+                    },
+                )
+            }
         }
 
         /** Uploads already-materialized bytes strictly through the destination account. */
@@ -73,26 +82,28 @@ internal fun WhiteNoiseAppState.forwardTransport(
         ): List<MediaAttachmentReferenceFfi> {
             requireDestinationAccount()
             val uploaded =
-                marmotIo {
-                    uploadMedia(
-                        account,
-                        targetGroupIdHex,
-                        MediaUploadRequestFfi(
-                            attachments =
-                                message.attachments.map { attachment ->
-                                    MediaUploadAttachmentRequestFfi(
-                                        fileName = attachment.fileName,
-                                        mediaType = attachment.mediaType,
-                                        plaintext = attachment.plaintextBytes,
-                                        dim = attachment.dim,
-                                        thumbhash = attachment.thumbhash,
-                                    )
-                                },
-                            caption = message.caption,
-                            send = false,
-                            blossomServer = null,
-                        ),
-                    ).attachments.map { it.reference }
+                diagnostics.span(ForwardDiagnostics::uploadStart, ForwardDiagnostics::uploadReturn) {
+                    marmotIo {
+                        uploadMedia(
+                            account,
+                            targetGroupIdHex,
+                            MediaUploadRequestFfi(
+                                attachments =
+                                    message.attachments.map { attachment ->
+                                        MediaUploadAttachmentRequestFfi(
+                                            fileName = attachment.fileName,
+                                            mediaType = attachment.mediaType,
+                                            plaintext = attachment.plaintextBytes,
+                                            dim = attachment.dim,
+                                            thumbhash = attachment.thumbhash,
+                                        )
+                                    },
+                                caption = message.caption,
+                                send = false,
+                                blossomServer = null,
+                            ),
+                        ).attachments.map { it.reference }
+                    }
                 }
             requireDestinationAccount()
             return uploaded
@@ -132,7 +143,9 @@ internal fun WhiteNoiseAppState.forwardTransport(
             onMessagePublished: (messageIndex: Int) -> Unit,
         ) {
             requireDestinationAccount()
+            val lockRequestedAtMs = diagnostics?.startSpan()
             withGroupCommitLock(account, targetGroupIdHex) {
+                if (lockRequestedAtMs != null) diagnostics?.commitLockAcquired(lockRequestedAtMs)
                 val knownMessageIds =
                     recentForwardTimeline(targetGroupIdHex, messages.size)
                         .mapTo(mutableSetOf(), TimelineMessageRecordFfi::messageIdHex)
@@ -145,19 +158,21 @@ internal fun WhiteNoiseAppState.forwardTransport(
                     val evidenceBefore = knownMessageIds.toSet()
                     try {
                         val publishedMessageIds =
-                            when (message) {
-                                is PreparedForwardMessage.Text ->
-                                    marmotIo { sendText(account, targetGroupIdHex, message.text) }.messageIds
-                                is PreparedForwardMessage.Media -> {
-                                    check(references.isNotEmpty()) { "missing destination media references" }
-                                    marmotIo {
-                                        sendMediaAttachments(
-                                            account,
-                                            targetGroupIdHex,
-                                            references,
-                                            message.caption,
-                                        )
-                                    }.messageIds
+                            diagnostics.span(ForwardDiagnostics::publishStart, ForwardDiagnostics::publishReturn) {
+                                when (message) {
+                                    is PreparedForwardMessage.Text ->
+                                        marmotIo { sendText(account, targetGroupIdHex, message.text) }.messageIds
+                                    is PreparedForwardMessage.Media -> {
+                                        check(references.isNotEmpty()) { "missing destination media references" }
+                                        marmotIo {
+                                            sendMediaAttachments(
+                                                account,
+                                                targetGroupIdHex,
+                                                references,
+                                                message.caption,
+                                            )
+                                        }.messageIds
+                                    }
                                 }
                             }
                         knownMessageIds += publishedMessageIds
@@ -247,7 +262,9 @@ internal fun WhiteNoiseAppState.forwardTransport(
                     if (candidate.sourceMessageIdHex != null) {
                         return@withGroupCommitLock ForwardPublishRecoveryResult.Published
                     }
-                    marmotIo { retryGroupConvergence(account, targetGroupIdHex) }
+                    diagnostics.span(ForwardDiagnostics::convergenceStart, ForwardDiagnostics::convergenceReturn) {
+                        marmotIo { retryGroupConvergence(account, targetGroupIdHex) }
+                    }
                     val delivered =
                         try {
                             recentForwardTimeline(targetGroupIdHex, batchMessageCount)
@@ -272,18 +289,27 @@ internal fun WhiteNoiseAppState.forwardTransport(
 }
 
 /**
- * Downloads one attachment's plaintext for forwarding without joining the
+ * Materializes one attachment's plaintext for forwarding without joining the
  * shared memoized download pool and without writing any cache. An unrelated
  * active-account switch cancels and clears that shared pool for UI hygiene;
  * a forwarding operation binds its accounts explicitly and must survive such
- * invalidation, so it reads the existing caches opportunistically and
- * otherwise downloads within its own session scope. The forwarding session
+ * invalidation, so it reads the existing local layers opportunistically and
+ * otherwise downloads within its own session scope. The local layers are the
+ * Android memory and disk caches and then MarmotKit's own retained copy of the
+ * attachment, the canonical local store that holds every received attachment
+ * the user has already opened and every own send, so an attachment the device
+ * already holds never crosses the network again. The forwarding session
  * retains and later zeroes its own private copy of the bytes, so skipping
  * cache writes leaks nothing and keeps switch-time cache policy intact.
+ * [diagnostics] records the local probe and the native download span only, and
+ * [readRetained] is the retained read, injectable so JVM tests can stand in for
+ * the native asset.
  */
 internal suspend fun WhiteNoiseAppState.materializeAttachmentPlaintextIsolated(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,
+    diagnostics: ForwardDiagnostics? = null,
+    readRetained: suspend (AttachmentTransferRequest) -> ByteArray? = { retainedForwardPlaintext(it) },
 ): ByteArray {
     val cacheKey =
         mediaCacheKey(
@@ -292,8 +318,54 @@ internal suspend fun WhiteNoiseAppState.materializeAttachmentPlaintextIsolated(
             request.messageIdHex,
             request.attachmentIndex,
         )
+    val lookupStartedAtMs = diagnostics?.startSpan()
     val cached =
         withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
             ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
-    return cached ?: marmotIo { downloadMedia(request.accountRef, request.groupIdHex, reference) }.plaintext
+    // A retained read that fails only means the network path is used, as before. A source over the forward's own cap
+    // is the exception: downloading it cannot succeed, so the typed rejection ends the forward without a download.
+    val retained =
+        if (cached == null) {
+            runCatchingCancellable { readRetained(request) }
+                .onFailure { failure -> if (failure is ForwardPayloadTooLargeException) throw failure }
+                .getOrNull()
+        } else {
+            null
+        }
+    if (lookupStartedAtMs != null) {
+        diagnostics?.sourceLookup(
+            hit = cached != null || retained != null,
+            startedAtMs = lookupStartedAtMs,
+            native = retained != null,
+        )
+    }
+    return cached
+        ?: retained
+        ?: diagnostics
+            .span(ForwardDiagnostics::sourceDownloadStart, ForwardDiagnostics::sourceDownloadReturn) {
+                marmotIo { downloadMedia(request.accountRef, request.groupIdHex, reference) }
+            }.plaintext
 }
+
+/** Copies MarmotKit's verified retained plaintext for one attachment into a private buffer, or null when absent. */
+private suspend fun WhiteNoiseAppState.retainedForwardPlaintext(request: AttachmentTransferRequest): ByteArray? =
+    readRetainedForwardPlaintext { openNativeAttachment(request) }
+
+/**
+ * Copies an opened retained lease into a private buffer of at most [maxBytes] on the IO dispatcher and closes it on
+ * every path.
+ *
+ * A forward session runs on the main dispatcher, and opening a lease returns to that context, so the read runs on IO.
+ * The read is bounded by the forward's own retained-bytes cap, so a larger attachment is rejected before it is
+ * allocated as [ForwardPayloadTooLargeException], the same failure the session raises for an oversized source, and a
+ * forward cancelled mid-copy stops at the next chunk.
+ */
+internal suspend fun readRetainedForwardPlaintext(
+    maxBytes: Long = ConversationController.MEDIA_RETAINED_MAX_BYTES,
+    open: suspend () -> AttachmentPlaintext?,
+): ByteArray? =
+    try {
+        open()?.use { lease -> lease.readWithin(maxBytes) }
+    } catch (_: AttachmentTooLargeToPresentException) {
+        throw ForwardPayloadTooLargeException()
+    }
