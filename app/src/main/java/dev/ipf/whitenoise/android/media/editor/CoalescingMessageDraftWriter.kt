@@ -193,13 +193,16 @@ internal class CoalescingMessageDraftWriter(
         return deletion
     }
 
+    /**
+     * Merges nonblank shared text without normalizing indentation or trailing line breaks before native persistence.
+     * Serialized merges retain concurrently accepted composer edits and expose the saved content for hydration.
+     */
     suspend fun mergeText(
         accountRef: String,
         groupIdHex: String,
         incoming: String,
     ): MessageDraftMergeCompletion {
-        val trimmedIncoming = incoming.trim()
-        if (trimmedIncoming.isEmpty()) {
+        if (incoming.isBlank()) {
             return MessageDraftMergeCompletion(
                 result = MessageDraftMutationResult.Success(draft = null),
                 contentForHydration = null,
@@ -213,10 +216,10 @@ internal class CoalescingMessageDraftWriter(
         }
         val mergeLock = synchronized(lock) { mergeLocks.getOrPut(key) { Mutex() } }
         return mergeLock.withLock {
-            val activeMerge = ActiveMerge(trimmedIncoming)
+            val activeMerge = ActiveMerge(incoming)
             beginMerge(key, activeMerge)
             try {
-                val mergeResult = drafts.coordinated.mergeAcceptedText(accountRef, groupIdHex, trimmedIncoming)
+                val mergeResult = drafts.coordinated.mergeAcceptedText(accountRef, groupIdHex, incoming)
                 finishMerge(key, activeMerge, mergeResult)
             } finally {
                 synchronized(lock) { activeMerges.remove(key, activeMerge) }
