@@ -3,6 +3,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "ConversationSoundAppearanceSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
+        "anchor": "fun ConversationSoundAppearanceSheet(",
+        "test_ids": ["NTF-031"]
+      },
+      {
         "surface": "ConversationAlertControls",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
         "anchor": "fun ConversationAlertControls(",
@@ -11091,9 +11097,9 @@
         ]
       },
       {
-        "surface": "Chat alerts ConversationNotificationSettingsScreen.kt done",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.done",
+        "surface": "Chat sound drawer notification_sound_appearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
+        "anchor": "R.string.notification_sound_appearance",
         "test_ids": [
           "NTF-031"
         ]

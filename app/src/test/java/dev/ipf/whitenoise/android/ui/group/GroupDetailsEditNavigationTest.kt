@@ -151,6 +151,18 @@ class GroupDetailsEditNavigationTest {
         return !node.config.contains(SemanticsProperties.Disabled)
     }
 
+    @Test
+    fun soundAndAppearanceOpensBottomSheetAndCloseReturnsToAlertSettings() {
+        render(controller(group()))
+        composeRule.onNodeWithText(context.getString(R.string.sounds_and_notifications)).performScrollTo().performClick()
+        composeRule.onNodeWithTag(SOUND_APPEARANCE_OPEN_TAG).performScrollTo().performClick()
+        composeRule.onNodeWithTag("sheet.surface").assertIsDisplayed()
+        composeRule.onNodeWithTag("sheet.dragHandle").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
+        composeRule.onNodeWithTag("sheet.surface").assertDoesNotExist()
+        composeRule.onNodeWithTag("conversation-alert-messages_group").assertIsDisplayed()
+    }
+
     /** Unavailable call actions do not occupy the primary action row. */
     @Test
     fun unavailableCallActionsDoNotOccupyThePrimaryActionRow() {
