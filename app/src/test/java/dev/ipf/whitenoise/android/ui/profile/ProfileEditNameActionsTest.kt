@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -86,6 +87,7 @@ class ProfileEditNameActionsTest {
             }
         }
         composeRule.onNodeWithTag("profile.edit").performClick()
+        composeRule.onNodeWithTag("profile.restore_name").performScrollTo()
     }
 
     private companion object {
