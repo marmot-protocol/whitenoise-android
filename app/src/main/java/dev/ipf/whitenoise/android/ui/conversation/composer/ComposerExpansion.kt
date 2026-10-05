@@ -108,6 +108,7 @@ internal fun dragComposerHeight(
 ): ComposerExpansionState {
     val maximum = normalizedMaximumHeight(maximumHeightPx)
     val minimum = normalizedMinimumHeight(minimumManualHeightPx, maximum)
+    val dragMinimum = minOf(minimum, normalizedMinimumHeight(automaticHeightPx, maximum))
     // An already compact automatic row cannot shrink further; do not grow it just to enter Manual.
     if (state.mode == ComposerExpansionMode.Automatic && automaticHeightPx <= minimum && dragDeltaYPx >= 0f) {
         return state
@@ -117,10 +118,10 @@ internal fun dragComposerHeight(
             composerHeightPx(
                 state = state,
                 automaticHeightPx = automaticHeightPx,
-                minimumManualHeightPx = minimum,
+                minimumManualHeightPx = dragMinimum,
                 maximumHeightPx = maximum,
             ) - dragDeltaYPx
-        ).coerceIn(minimum, maximum)
+        ).coerceIn(dragMinimum, maximum)
     return ComposerExpansionState(
         mode = ComposerExpansionMode.Manual,
         manualHeightPx = nextHeight,
@@ -145,12 +146,14 @@ internal fun settleComposerHeight(
         composerHeightPx(
             state = state,
             automaticHeightPx = automatic,
-            minimumManualHeightPx = minimum,
+            minimumManualHeightPx = minOf(minimum, automatic),
             maximumHeightPx = maximum,
         )
     return when {
         state.mode == ComposerExpansionMode.Automatic -> ComposerExpansionState()
-        automatic <= minimum && abs(height - minimum) <= deadbandPx -> ComposerExpansionState()
+        height < minimum -> ComposerExpansionState()
+        abs(height - automatic) <= deadbandPx && abs(height - automatic) < abs(height - minimum) ->
+            ComposerExpansionState()
         abs(height - minimum) <= deadbandPx -> ComposerExpansionState(ComposerExpansionMode.Manual, minimum)
         abs(height - automatic) <= deadbandPx -> ComposerExpansionState()
         abs(maximum - height) <= deadbandPx ->

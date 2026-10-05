@@ -152,6 +152,24 @@ class ComposerExpansionTest {
         assertEquals(automatic, settleComposerHeight(automatic, 84f, 108f, 600f, 24f))
     }
 
+    @Test
+    fun overlappingLandingZonesChooseTheCloserDestination() {
+        val settle = { height: Float ->
+            settleComposerHeight(ComposerExpansionState(ComposerExpansionMode.Manual, height), 132f, 108f, 600f, 24f)
+        }
+        assertEquals(ComposerExpansionMode.Automatic, settle(132f).mode)
+        assertEquals(ComposerExpansionMode.Automatic, settle(121f).mode)
+        assertEquals(ComposerExpansionMode.Manual, settle(119f).mode)
+        assertEquals(108f, settle(108f).manualHeightPx)
+    }
+
+    @Test
+    fun compactGrowthStartsAtTheCurrentHeightWithoutJumpingToTheManualFloor() {
+        val grown = dragComposerHeight(ComposerExpansionState(), -1f, 84f, 108f, 600f)
+        assertEquals(85f, grown.manualHeightPx)
+        assertEquals(ComposerExpansionMode.Automatic, settleComposerHeight(grown, 84f, 108f, 600f, 24f).mode)
+    }
+
     /** The resize handle remains the only gesture that explicitly leaves full-screen mode. */
     @Test
     fun resizeHandleTapIsTheExplicitFullScreenCollapsePath() {

@@ -23,6 +23,7 @@ import androidx.compose.foundation.content.TransferableContent
 import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -74,6 +75,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -446,6 +448,7 @@ internal fun ComposerPill(
     val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
     val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
     var composerFocused by remember { mutableStateOf(false) }
+    val defaultActionFocus = remember { FocusRequester() }
     var showKeyboardAfterTouchTap by remember { mutableStateOf(false) }
     LaunchedEffect(composerFocused, showKeyboardAfterTouchTap) {
         if (composerFocused && showKeyboardAfterTouchTap) {
@@ -936,15 +939,27 @@ internal fun ComposerPill(
 
     Box(
         modifier =
-            modifier.deferredPadding(
-                end = {
-                    interpolateDp(
-                        compactOuterEndInset,
-                        0.dp,
-                        expansionProgress.value,
-                    )
-                },
-            ),
+            modifier
+                .focusProperties {
+                    onEnter = {
+                        // Android can restore default focus after clearFocus. With the tools below
+                        // the editor, its spatial search otherwise reopens that editor immediately.
+                        // Explicit touch/programmatic requests enter directly and keep their target.
+                        if (requestedFocusDirection == FocusDirection.Down &&
+                            inputContentVisible && voiceReviewContent == null
+                        ) {
+                            defaultActionFocus.requestFocus()
+                        }
+                    }
+                }.focusGroup().deferredPadding(
+                    end = {
+                        interpolateDp(
+                            compactOuterEndInset,
+                            0.dp,
+                            expansionProgress.value,
+                        )
+                    },
+                ),
     ) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -963,7 +978,7 @@ internal fun ComposerPill(
                         Modifier
                             .boundedComposerAccessory()
                             .onSizeChanged { size ->
-                                // The grip spacer adds 12dp beyond the editor's ordinary top inset.
+                                // Accessories insert 12dp beyond the ordinary editor padding in either layout.
                                 onAccessoryHeightChanged(with(density) { size.height.toDp() } + 12.dp)
                             }.verticalScroll(rememberScrollState()),
                     ) {
@@ -1320,7 +1335,7 @@ internal fun ComposerPill(
                                 enabled = inputContentVisible,
                                 onClick = onEmojiPickerToggle,
                                 togglesKeyboard = true,
-                                modifier = Modifier.width(32.dp).height(48.dp),
+                                modifier = Modifier.width(32.dp).height(48.dp).focusRequester(defaultActionFocus),
                                 iconSize = 24.dp,
                                 emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
                             )
@@ -1417,7 +1432,7 @@ internal fun ComposerPill(
                     Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(if (multilineControlsSuppressed) 12.dp else 24.dp)
                         .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
                         .semantics {
                             contentDescription = resizeComposerDescription

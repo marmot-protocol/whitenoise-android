@@ -98,6 +98,7 @@ import kotlin.math.roundToInt
 
 // One measured editor line, dedicated grip, bottom tools, and outer padding.
 private val ComposerManualChromeHeight = 84.dp
+private val ComposerManualCompactChromeHeight = 36.dp
 
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
 private val ComposerSettleDeadband = 24.dp
@@ -988,20 +989,32 @@ internal fun ComposerBar(
                 measuredEditorLineHeight = editorLineHeight,
             )
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
+        val compactControlLayout = composerMultilineControlsSuppressed(automaticComposerCeiling)
+        val manualChromeHeight =
+            if (compactControlLayout) {
+                ComposerManualCompactChromeHeight
+            } else {
+                ComposerManualChromeHeight
+            }
         val minimumManualComposerHeightPx =
             with(density) {
                 (
-                    editorLineHeight + ComposerManualChromeHeight +
+                    editorLineHeight + manualChromeHeight +
                         extraComposerControlsHeight + measuredComposerAccessoryHeight
-                )
-                    .coerceAtMost(maximumComposerHeight)
+                ).coerceAtMost(maximumComposerHeight)
                     .toPx()
             }
         val automaticComposerCeilingPx = with(density) { automaticComposerCeiling.toPx() }
         val resolvedAutomaticHeightPx =
             (automaticComposerHeightPx.takeIf { it > 0f } ?: with(density) { 44.dp.toPx() })
                 .coerceAtMost(automaticComposerCeilingPx)
-        val minimumRenderedComposerHeightPx = minimumManualComposerHeightPx
+        // A live drag can cross the gap between the compact row and the manual tool layout continuously.
+        val minimumRenderedComposerHeightPx =
+            if (composerHeightDragActive) {
+                minOf(minimumManualComposerHeightPx, resolvedAutomaticHeightPx)
+            } else {
+                minimumManualComposerHeightPx
+            }
         val resolvedComposerHeight =
             with(density) {
                 composerHeightPx(
@@ -1390,7 +1403,14 @@ internal fun ComposerBar(
                         },
                         onHeightDragStarted = {
                             composerHeightDragActive = true
-                            composerHeightDragState = currentComposerExpansion()
+                            composerHeightDragState =
+                                currentComposerExpansion().let { state ->
+                                    if (state.mode == ComposerExpansionMode.Manual) {
+                                        state.copy(manualHeightPx = visibleComposerHeightPx)
+                                    } else {
+                                        state
+                                    }
+                                }
                         },
                         onHeightDrag = { dragAmount ->
                             composerHeightDragState =
@@ -1444,7 +1464,7 @@ internal fun ComposerBar(
                         onExtraControlsHeightChanged = { extraComposerControlsHeight = it },
                         onAccessoryHeightChanged = { measuredComposerAccessoryHeight = it },
                         scrollOwnerKey = Triple(draftKey, draftAccountRef, draftGroupIdHex),
-                        multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
+                        multilineControlsSuppressed = compactControlLayout,
                         dismissInProgress = composerDismissInProgress,
                         collapsedBySend = textState.collapsedBySend,
                         onSendCollapseApplied = textState::consumeSendCollapse,

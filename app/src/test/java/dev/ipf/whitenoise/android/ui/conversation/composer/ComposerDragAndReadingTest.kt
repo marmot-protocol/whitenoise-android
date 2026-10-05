@@ -88,6 +88,57 @@ class ComposerDragAndReadingTest {
     }
 
     @Test
+    fun firstUpwardDragFrameDoesNotJumpToTheManualMinimum() {
+        render("")
+        val before = height()
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
+            val start = center
+            down(start)
+            moveTo(start - Offset(0f, 30f), delayMillis = 16)
+        }
+        composeRule.waitForIdle()
+        assertTrue("the first drag must actually move", height() > before)
+        assertTrue("the small movement must stay below the extra manual chrome", height() < before + 24f)
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput { up() }
+    }
+
+    @Test
+    fun twoLineDraftReturnsToAutomaticEvenWhenLandingZonesOverlap() {
+        render("First line\nSecond line")
+        composeRule.onNode(hasSetTextAction()).performClick()
+        composeRule.waitForIdle()
+        val automaticHeight = height()
+        val original = observed
+        drag(-250f)
+        drag(height() - automaticHeight)
+        assertEquals(automaticHeight, height(), 1f)
+        assertEquals(original, observed)
+        composeRule.onNode(hasSetTextAction()).performTextReplacement(longDraft)
+        composeRule.waitForIdle()
+        assertTrue("returning to Automatic must restore content growth", height() > automaticHeight + 100f)
+    }
+
+    @Test
+    fun compactHeightCanReachOneEditorLineWithoutReservingAnExpandedToolbar() {
+        render(longDraft, surfaceHeight = 150)
+        val before = height()
+        drag(600f)
+        assertTrue("compact chrome must leave unused space to the transcript", height() < before - 40f)
+        assertOneEditorLine()
+        val resize = composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG).fetchSemanticsNode().boundsInRoot
+        val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
+        assertTrue("resize semantics must not cover the editor", resize.bottom <= editor.top)
+    }
+
+    @Test
+    fun resizeAccessibilityLeavesTheEmptyEditorReachable() {
+        render("")
+        val resize = composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG).fetchSemanticsNode().boundsInRoot
+        val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
+        assertTrue("resize semantics must not cover the editor", resize.bottom <= editor.top)
+    }
+
+    @Test
     fun returningToTheContentHeightRestoresMentionSuggestions() {
         val candidate =
             MentionComposer.Candidate(
@@ -456,6 +507,7 @@ class ComposerDragAndReadingTest {
         fontScale: Float = 1f,
         editing: Boolean = false,
         mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
+        surfaceHeight: Int = 600,
     ) {
         observed = TextFieldValue(draft, TextRange(draft.length))
         sends = 0
@@ -468,7 +520,7 @@ class ComposerDragAndReadingTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark) {
-                    Surface(Modifier.width(width.dp).height(600.dp)) {
+                    Surface(Modifier.width(width.dp).height(surfaceHeight.dp)) {
                         Box(contentAlignment = Alignment.BottomCenter) {
                             ComposerBar(
                                 replyingTo = null,
