@@ -15,7 +15,6 @@ import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
-import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -91,7 +90,7 @@ class ForwardRetainedSourceTest {
         assertTrue("the lease was not released", lease.closed)
     }
 
-    /** A retained lease above the forward's cap is rejected before any copy and still released. */
+    /** A retained lease above the forward's cap fails as a too-large forward before any copy and is still released. */
     @Test
     fun retainedLeaseAboveTheCapIsRejectedBeforeAnyCopyAndReleased() {
         val lease = RecordingLease(DOWNLOADED)
@@ -100,7 +99,7 @@ class ForwardRetainedSourceTest {
             runCatching { runBlocking { readRetainedForwardPlaintext(maxBytes = DOWNLOADED.size - 1L) { lease } } }
                 .exceptionOrNull()
 
-        assertTrue("the over-cap lease was not rejected: $failure", failure is AttachmentTooLargeToPresentException)
+        assertTrue("the over-cap lease was not rejected: $failure", failure is ForwardPayloadTooLargeException)
         assertNull("an over-cap lease was copied", lease.copiedOn)
         assertTrue("the rejected lease was not released", lease.closed)
     }
@@ -213,6 +212,29 @@ class ForwardRetainedSourceTest {
 
         assertArrayEquals(DOWNLOADED, plaintext)
         assertEquals(1, downloads.get())
+    }
+
+    /** An over-cap retained source ends the forward as too large without ever downloading the same attachment. */
+    @Test
+    fun overCapRetainedSourceFailsTheForwardWithoutDownloading() {
+        val appState = appState()
+        val lease = RecordingLease(DOWNLOADED)
+
+        val failure =
+            runCatching {
+                await(
+                    appState.mutationsScope.async {
+                        appState.materializeAttachmentPlaintextIsolated(request(), reference()) {
+                            readRetainedForwardPlaintext(maxBytes = DOWNLOADED.size - 1L) { lease }
+                        }
+                    },
+                )
+            }.exceptionOrNull()
+
+        assertTrue("not rejected as too large: $failure", failure is ForwardPayloadTooLargeException)
+        assertEquals("an over-cap retained source was downloaded", 0, downloads.get())
+        assertNull("an over-cap lease was copied", lease.copiedOn)
+        assertTrue("the rejected lease was not released", lease.closed)
     }
 
     /** Builds a diagnostics owner whose recorder appends only phase, result and layer. */

@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.readWithin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -321,8 +322,16 @@ internal suspend fun WhiteNoiseAppState.materializeAttachmentPlaintextIsolated(
     val cached =
         withContext(Dispatchers.Main.immediate) { cachedMediaPlaintext(cacheKey) }
             ?: withContext(Dispatchers.IO) { diskMediaCache.get(cacheKey) }
-    // A retained read that fails for any reason only means the network path is used, as before.
-    val retained = if (cached == null) runCatchingCancellable { readRetained(request) }.getOrNull() else null
+    // A retained read that fails only means the network path is used, as before. A source over the forward's own cap
+    // is the exception: downloading it cannot succeed, so the typed rejection ends the forward without a download.
+    val retained =
+        if (cached == null) {
+            runCatchingCancellable { readRetained(request) }
+                .onFailure { failure -> if (failure is ForwardPayloadTooLargeException) throw failure }
+                .getOrNull()
+        } else {
+            null
+        }
     if (lookupStartedAtMs != null) {
         diagnostics?.sourceLookup(
             hit = cached != null || retained != null,
@@ -348,9 +357,15 @@ private suspend fun WhiteNoiseAppState.retainedForwardPlaintext(request: Attachm
  *
  * A forward session runs on the main dispatcher, and opening a lease returns to that context, so the read runs on IO.
  * The read is bounded by the forward's own retained-bytes cap, so a larger attachment is rejected before it is
- * allocated and the caller falls back to the download, and a forward cancelled mid-copy stops at the next chunk.
+ * allocated as [ForwardPayloadTooLargeException], the same failure the session raises for an oversized source, and a
+ * forward cancelled mid-copy stops at the next chunk.
  */
 internal suspend fun readRetainedForwardPlaintext(
     maxBytes: Long = ConversationController.MEDIA_RETAINED_MAX_BYTES,
     open: suspend () -> AttachmentPlaintext?,
-): ByteArray? = open()?.use { lease -> lease.readWithin(maxBytes) }
+): ByteArray? =
+    try {
+        open()?.use { lease -> lease.readWithin(maxBytes) }
+    } catch (_: AttachmentTooLargeToPresentException) {
+        throw ForwardPayloadTooLargeException()
+    }
