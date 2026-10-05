@@ -129,7 +129,10 @@ class ConversationPendingMembershipIntegrationTest {
     private fun assertPendingAboveComposer(label: String) {
         val pending = rule.onNodeWithText(label).assertIsDisplayed().getUnclippedBoundsInRoot()
         val composer = rule.onNodeWithTag(CONVERSATION_BOTTOM_BAR_TAG).getUnclippedBoundsInRoot()
-        assertTrue("The full pending row must clear the composer: $pending vs $composer", pending.bottom <= composer.top)
+        assertTrue(
+            "The full pending row must clear the composer: $pending vs $composer",
+            pending.bottom <= composer.top,
+        )
         assertTrue("The pending row must remain inside the screen", pending.top.value >= 0f)
     }
 

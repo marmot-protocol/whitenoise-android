@@ -12186,11 +12186,7 @@ class ConversationController(
             when (change) {
                 is TimelineMessageChangeFfi.Upsert -> {
                     val record = change.message
-                    if (change.trigger == TimelineUpdateTriggerFfi.NEW_MESSAGE ||
-                        change.trigger == TimelineUpdateTriggerFfi.GROUP_SYSTEM
-                    ) {
-                        recordMembershipProjectionArrival(record)
-                    }
+                    recordMembershipProjectionArrival(change)
                     val actionRecord =
                         upsertProjectedRecord(
                             record,
@@ -12500,10 +12496,15 @@ class ConversationController(
     }
 
     /** Only newly delivered live events are timed; initial, paging and refresh rows are excluded. */
-    private fun recordMembershipProjectionArrival(record: TimelineMessageRecordFfi) {
+    private fun recordMembershipProjectionArrival(change: TimelineMessageChangeFfi.Upsert) {
+        if (change.trigger != TimelineUpdateTriggerFfi.NEW_MESSAGE &&
+            change.trigger != TimelineUpdateTriggerFfi.GROUP_SYSTEM
+        ) return
+        val record = change.message
         val type = record.groupSystem?.systemType
+        val isMembershipEvent = type == "member_added" || type == "member_removed"
         if (record.messageIdHex !in timelineRecords &&
-            (type == "member_added" || type == "member_removed") &&
+            isMembershipEvent &&
             GroupSystemEvents.resolve(record)?.fromAuthenticatedStateProjection == true
         ) {
             membershipTimings.projectionArrived(record.messageIdHex)
