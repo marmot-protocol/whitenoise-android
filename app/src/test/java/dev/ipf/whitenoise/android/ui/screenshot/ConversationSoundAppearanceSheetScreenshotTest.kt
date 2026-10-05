@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ErrorCollector
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -41,6 +42,9 @@ import org.robolectric.annotation.GraphicsMode
 class ConversationSoundAppearanceSheetScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @get:Rule
+    val visualErrors = ErrorCollector()
 
     @Test
     fun groupSoundSheetLight() {
@@ -76,8 +80,12 @@ class ConversationSoundAppearanceSheetScreenshotTest {
     }
 
     private fun capture(name: String) {
-        composeRule.onNodeWithTag("sheet.dragHandle").assertIsDisplayed()
-        composeRule.onNodeWithTag("sheet.surface").captureRoboImage("src/test/snapshots/$name.png")
+        val surface = composeRule.onNodeWithTag("sheet.surface")
+        val handle = composeRule.onNodeWithTag("sheet.dragHandle")
+        println("sound sheet bounds surface=${surface.fetchSemanticsNode().boundsInRoot}")
+        println("sound sheet bounds handle=${handle.fetchSemanticsNode().boundsInRoot}")
+        visualErrors.checkSucceeds { surface.captureRoboImage("src/test/snapshots/$name.png") }
+        handle.assertIsDisplayed()
     }
 
     private fun render(

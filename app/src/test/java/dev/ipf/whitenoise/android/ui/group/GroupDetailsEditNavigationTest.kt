@@ -95,7 +95,11 @@ class GroupDetailsEditNavigationTest {
     @Test
     fun newGroupStartsWithAllAndCanChooseOnlyMentions() {
         listOf("whitenoise.chat_mute", "whitenoise.conversation_alerts").forEach { name ->
-            context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
+            context
+                .getSharedPreferences(name, Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .commit()
         }
         val fixture = controller(group())
         val groupId = fixture.controller.group.groupIdHex
@@ -141,7 +145,10 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag(messagesTag).assertIsOn()
     }
 
-    private fun alertControlReady(tag: String, state: ToggleableState): Boolean {
+    private fun alertControlReady(
+        tag: String,
+        state: ToggleableState,
+    ): Boolean {
         val node = composeRule.onNodeWithTag(tag).fetchSemanticsNode().config
         return !node.contains(SemanticsProperties.Disabled) && node[SemanticsProperties.ToggleableState] == state
     }

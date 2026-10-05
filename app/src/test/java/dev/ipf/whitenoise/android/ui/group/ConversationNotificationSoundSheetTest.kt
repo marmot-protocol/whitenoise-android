@@ -83,6 +83,9 @@ class ConversationNotificationSoundSheetTest {
     private class InMemoryDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
 
-        override fun write(key: String, value: String?) = Unit
+        override fun write(
+            key: String,
+            value: String?,
+        ) = Unit
     }
 }
