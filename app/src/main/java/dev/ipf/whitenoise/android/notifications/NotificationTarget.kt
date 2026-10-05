@@ -23,6 +23,7 @@ data class NotificationTarget(
     val groupIdHex: String,
     val messageIdHex: String?,
     val kind: NotificationTargetKind,
+    val replyDraft: NotificationReplyDraft? = null,
 )
 
 /**
@@ -368,6 +369,7 @@ object NotificationNavigation {
     private const val EXTRA_TAP_TOKEN = "dev.ipf.whitenoise.android.extra.TAP_TOKEN"
     private const val URI_SCHEME = "whitenoise-notify"
     private const val URI_HOST_OPEN = "open"
+    private const val BOUND_ROUTE_QUERY = "bound"
 
     /**
      * Per-notification data URI. Android compares a PendingIntent's *data*
@@ -472,21 +474,39 @@ object NotificationNavigation {
         applyTargetExtras(intent, target)
     }
 
+    /** Keeps the card's PendingIntent identity stable and its destination authenticated. */
+    internal fun applyBoundToIntent(
+        intent: Intent,
+        target: NotificationTarget,
+        notificationKey: String,
+        signature: String,
+    ) {
+        applyToIntent(intent, target, notificationKey, signature)
+        intent.data = intent.data?.buildUpon()?.appendQueryParameter(BOUND_ROUTE_QUERY, "1")?.build()
+    }
+
     /** Parse a tapped content [intent] back into a target (untrusted). */
     fun parse(
         intent: Intent?,
+        isTrustedTargetSignature: (String, String?, NotificationTarget) -> Boolean = { _, _, _ -> false },
         isTrustedTapToken: (notificationKey: String, tapToken: String?) -> Boolean = { _, _ -> false },
     ): NotificationTarget? {
         intent ?: return null
         val notificationKey = notificationKeyFrom(intent) ?: return null
-        if (!isTrustedNotificationTap(notificationKey, intent.getStringExtra(EXTRA_TAP_TOKEN), isTrustedTapToken)) return null
-        return parseExtras(
+        val target = parseExtras(
             action = intent.action,
             accountRef = intent.getStringExtra(EXTRA_ACCOUNT_REF),
             groupIdHex = intent.getStringExtra(EXTRA_GROUP_ID),
             messageIdHex = intent.getStringExtra(EXTRA_MESSAGE_ID),
             kindName = intent.getStringExtra(EXTRA_KIND),
-        )
+        ) ?: return null
+        val token = intent.getStringExtra(EXTRA_TAP_TOKEN)
+        return if (intent.data?.getQueryParameter(BOUND_ROUTE_QUERY) == "1") {
+            target.takeIf { isTrustedTargetSignature(notificationKey, token, it) }
+                ?.copy(replyDraft = notificationReplyDraftFrom(intent, target.kind))
+        } else {
+            target.takeIf { isTrustedNotificationTap(notificationKey, token, isTrustedTapToken) }
+        }
     }
 
     internal fun isTrustedNotificationTap(

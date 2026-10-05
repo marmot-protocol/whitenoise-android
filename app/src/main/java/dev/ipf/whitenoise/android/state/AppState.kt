@@ -2247,14 +2247,7 @@ class WhiteNoiseAppState private constructor(
                 inboundShareTextStager ?: { accountRef, groupIdHex, text ->
                     mutationsScope.launch {
                         val completion = draftWriter.mergeText(accountRef, groupIdHex, text)
-                        completion.contentForHydration?.let { content ->
-                            draftStore.hydrate(
-                                accountRef,
-                                groupIdHex,
-                                content,
-                                completion.draftedAtMs ?: System.currentTimeMillis(),
-                                replaceExisting = true,
-                            )
+                        draftWriter.hydrateMergedDraft(draftStore, accountRef, groupIdHex, completion) {
                             draftHydrationRevision += 1
                         }
                         when (val result = completion.result) {
@@ -2369,6 +2362,14 @@ class WhiteNoiseAppState private constructor(
             },
         )
     private val draftSummaryRefreshLifetime = StalenessGuard()
+    internal val notificationReplyDraftHandoff by lazy {
+        NotificationReplyDraftHandoff(
+            mutationsScope,
+            draftWriter,
+            draftStore,
+            available = { target -> accounts.any { it.label == target.accountRef && !it.signedOut } },
+        ) { draftHydrationRevision += 1 }
+    }
     private val composerDraftExpansionBridge =
         ComposerDraftExpansionBridge(
             draftWriter = draftWriter,

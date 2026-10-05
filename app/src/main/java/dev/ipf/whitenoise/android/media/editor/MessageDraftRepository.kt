@@ -509,13 +509,18 @@ internal class MessageDraftCoordinatedOperations(
         accountRef: String,
         groupIdHex: String,
         incoming: String,
+        deduplicateSuffix: Boolean = false,
     ): MessageDraftMutationResult =
         withContext(ioDispatcher) {
             draftLocks.withLock(DraftKey(accountRef, groupIdHex)) {
                 runDraftMutation {
                     val current = gateway.read(accountRef, groupIdHex)
-                    val merged = mergeDraftText(current?.content.orEmpty(), incoming)
-                    saveDraftText(gateway, accountRef, groupIdHex, merged, current)
+                    val merged = mergeDraftText(current?.content.orEmpty(), incoming, deduplicateSuffix)
+                    if (current != null && current.content == merged) {
+                        MessageDraftMutationResult.Success(current)
+                    } else {
+                        saveDraftText(gateway, accountRef, groupIdHex, merged, current)
+                    }
                 }
             }
         }

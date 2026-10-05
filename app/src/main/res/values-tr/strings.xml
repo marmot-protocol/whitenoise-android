@@ -1016,6 +1016,7 @@
     <string name="message_status_failed">Başarısız</string>
     <string name="message_status_streaming">Aktarılıyor</string>
     <string name="toast_notification_account_unavailable">Bu hesap artık kullanılamıyor</string>
+    <string name="toast_reply_draft_restore_failed">Yanıt geri yüklenemedi.</string>
     <string name="toast_notification_conversation_unavailable">Bu sohbet artık kullanılamıyor</string>
     <string name="toast_couldnt_decode_image">Resim çözülemedi</string>
     <string name="toast_couldnt_prepare_image">Görsel indirilemedi veya hazırlanamadı.</string>

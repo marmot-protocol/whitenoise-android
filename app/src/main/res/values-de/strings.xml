@@ -1016,6 +1016,7 @@
     <string name="message_status_failed">Fehlgeschlagen</string>
     <string name="message_status_streaming">Wird gestreamt</string>
     <string name="toast_notification_account_unavailable">Dieses Konto ist nicht mehr verfügbar</string>
+    <string name="toast_reply_draft_restore_failed">Antwort konnte nicht wiederhergestellt werden.</string>
     <string name="toast_notification_conversation_unavailable">Diese Unterhaltung ist nicht mehr verfügbar</string>
     <string name="toast_couldnt_decode_image">Bild konnte nicht decodiert werden</string>
     <string name="toast_couldnt_prepare_image">Das Bild konnte nicht heruntergeladen oder vorbereitet werden.</string>

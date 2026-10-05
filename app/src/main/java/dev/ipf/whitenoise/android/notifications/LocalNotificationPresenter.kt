@@ -2265,21 +2265,29 @@ class LocalNotificationPresenter(
         update: NotificationUpdateFfi,
         tag: String,
     ): PendingIntent {
+        val acceptsDraft = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && update.reactionEmoji.isNullOrBlank()
+        val target = NotificationNavigation.fromUpdate(update)
+        val signature = target?.takeIf { acceptsDraft }?.let { tapTokens.signatureFor(tag, it) }
         val tapIntent =
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 // Key the tap target on the notification tag (per-conversation
                 // for messages) so the accumulating card always reopens the
                 // same conversation. PendingIntents compare by URI, not extras.
-                NotificationNavigation.fromUpdate(update)?.let { target ->
-                    NotificationNavigation.applyToIntent(this, target, tag, tapTokens.tokenFor(tag))
+                target?.let { destination ->
+                    if (signature != null) {
+                        NotificationNavigation.applyBoundToIntent(this, destination, tag, signature)
+                    } else {
+                        NotificationNavigation.applyToIntent(this, destination, tag, tapTokens.tokenFor(tag))
+                    }
                 }
             }
         return PendingIntent.getActivity(
             context,
             NotificationNavigation.requestCode(tag),
             tapIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            PendingIntent.FLAG_UPDATE_CURRENT or
+                if (signature != null) PendingIntent.FLAG_MUTABLE else PendingIntent.FLAG_IMMUTABLE,
         )
     }
 }

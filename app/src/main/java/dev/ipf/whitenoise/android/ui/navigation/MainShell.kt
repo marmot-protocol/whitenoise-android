@@ -768,6 +768,7 @@ internal fun MainShell(
     LaunchedEffect(
         inboundNotificationTarget,
         inboundNotificationRequestId,
+        appState.appInForeground,
         appState.activeAccountRef,
         appState.runtimeGeneration,
         appState.accounts,
@@ -798,6 +799,7 @@ internal fun MainShell(
                 }
                 return@LaunchedEffect
             }
+        if (target.replyDraft != null && !appState.appInForeground) return@LaunchedEffect
         if (routingRequestId != armedNotificationRequestId) {
             releaseNotificationFirstFrameGate(armedNotificationRequestId)
             notificationActiveRetryRequestId = null
@@ -862,6 +864,12 @@ internal fun MainShell(
             )
 
         suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+            if (!appState.notificationReplyDraftHandoff.stage(target)) {
+                routingNotification = false
+                releaseNotificationFirstFrameGate(routingRequestId)
+                appState.present(R.string.toast_reply_draft_restore_failed)
+                return
+            }
             // Await cancellation before publishing any route state. A superseded
             // effect must not partially commit while its platform call is pending.
             appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)
