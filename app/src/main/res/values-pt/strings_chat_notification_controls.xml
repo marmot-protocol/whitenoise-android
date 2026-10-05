@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">Alertas neste dispositivo</string>
+    <string name="notification_sound_appearance">Som e aparência</string>
+    <string name="notification_system_blocked">Bloqueado nas definições do Android</string>
+    <string name="notification_alerts_detail">Escolha os alertas para este dispositivo. Ao pausar alertas comuns, as menções ativadas continuam permitidas. Os avisos de participação no grupo têm definições próprias.</string>
+    <string name="notification_scope_choose">Definições de som</string>
+</resources>

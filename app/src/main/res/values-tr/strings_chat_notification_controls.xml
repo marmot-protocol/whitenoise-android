@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">Bu cihazdaki bildirimler</string>
+    <string name="notification_sound_appearance">Ses ve görünüm</string>
+    <string name="notification_system_blocked">Android ayarlarında engellendi</string>
+    <string name="notification_alerts_detail">Bu cihaz için bildirimleri seçin. Normal bildirimleri duraklatmak, açık olan bahsetmeleri engellemez. Grup üyeliği bildirimlerinin ayrı ayarları vardır.</string>
+    <string name="notification_scope_choose">Ses ayarları</string>
+</resources>

@@ -7,7 +7,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -78,9 +77,6 @@ class NotificationScopeSettingsScreenshotTest {
             onScopeChange = { setting, custom -> toggled = setting.channel to custom },
         )
 
-        composeRule.onNodeWithContentDescription("Custom Mentions for this chat").assertIsOn()
-        composeRule.onNodeWithContentDescription("Custom Reactions for this chat").assertIsOff()
-
         composeRule
             .onNodeWithTag("open-conversation-notification-${NotificationChannelSpec.REACTIONS.id}")
             .performClick()
@@ -90,7 +86,8 @@ class NotificationScopeSettingsScreenshotTest {
             opened = null
         }
 
-        composeRule.onNodeWithContentDescription("Custom Reactions for this chat").performClick()
+        composeRule.onNodeWithTag("conversation-sound-scope-${NotificationChannelSpec.REACTIONS.id}").performClick()
+        composeRule.onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.REACTIONS.id}-true").performClick()
         composeRule.runOnIdle {
             assertEquals(NotificationChannelSpec.REACTIONS to true, toggled)
             assertTrue(opened == null)

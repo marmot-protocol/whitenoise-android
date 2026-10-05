@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">Avisos en este dispositivo</string>
+    <string name="notification_sound_appearance">Sonido y apariencia</string>
+    <string name="notification_system_blocked">Bloqueado en los ajustes de Android</string>
+    <string name="notification_alerts_detail">Elige los avisos para este dispositivo. Al pausar los avisos normales, las menciones activadas siguen permitidas. Los avisos de pertenencia al grupo tienen ajustes propios.</string>
+    <string name="notification_scope_choose">Ajustes de sonido</string>
+</resources>

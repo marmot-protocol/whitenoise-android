@@ -3,6 +3,24 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "conversationNotificationSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun conversationNotificationSummary(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "ConversationAlertSettingsRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun ConversationAlertSettingsRows(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "notificationChannelTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "fun notificationChannelTitle(",
+        "test_ids": ["NTF-031"]
+      },
+      {
         "surface": "NotificationPreviewControl",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "fun NotificationPreviewControl(",
@@ -10694,6 +10712,60 @@
     ],
     "settings_controls": [
       {
+        "surface": "Chat alert save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.toast_notification_scope_update_failed",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Chat alerts ConversationAlertSettingsRows.kt notification_system_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_system_blocked",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationAlertSettingsRows.kt notification_alerts_on_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_alerts_on_device",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationSettingsScreen.kt notification_alerts_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_alerts_detail",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationSettingsScreen.kt notification_sound_appearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_sound_appearance",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationSettingsScreen.kt done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationCategoryRows.kt notification_scope_choose",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_scope_choose",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
         "surface": "string:retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "R.string.retry",
@@ -15241,14 +15313,6 @@
         ]
       },
       {
-        "surface": "string:notification_scope_switch_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
-        "anchor": "R.string.notification_scope_switch_detail",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:mute",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.mute",
@@ -15273,14 +15337,6 @@
         ]
       },
       {
-        "surface": "string:notification_chat_categories_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.notification_chat_categories_detail",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:notification_mute_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.notification_mute_detail",
@@ -15300,14 +15356,6 @@
         "surface": "string:notifications",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.notifications",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:notify_for",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.notify_for",
         "test_ids": [
           "GRP-001"
         ]

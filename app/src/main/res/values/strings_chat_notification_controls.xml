@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">Alerts on this device</string>
+    <string name="notification_sound_appearance">Sound and appearance</string>
+    <string name="notification_system_blocked">Blocked in Android settings</string>
+    <string name="notification_alerts_detail">Choose alerts for this device. Pausing ordinary alerts still allows enabled mentions. Group membership notices use separate settings.</string>
+    <string name="notification_scope_choose">Sound settings</string>
+</resources>

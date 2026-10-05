@@ -11,6 +11,63 @@ import org.junit.Test
 
 class LocalNotificationPolicyTest {
     @Test
+    fun explicitCategoryChoicesOverrideLegacyModeForGroupsAndDirectMessages() {
+        listOf(false, true).forEach { isDm ->
+            fun permitted(mention: Boolean, choice: Boolean?, muted: Boolean = false) =
+                LocalNotificationPolicy.shouldPost(
+                    update = update("group", isMention = mention, isDm = isDm),
+                    appInForeground = false,
+                    activeConversationGroupIdHex = null,
+                    activeConversationAccountRef = null,
+                    appLockScreenVisible = false,
+                    conversationNotifyMode = { _, _ -> ChatNotifyMode.MENTIONS_ONLY },
+                    engineMuted = muted,
+                    categoryEnabled = { _, _, _ -> choice },
+                )
+            assertFalse(permitted(mention = false, choice = null))
+            assertTrue(permitted(mention = true, choice = null))
+            assertTrue(permitted(mention = false, choice = true))
+            assertFalse(permitted(mention = true, choice = false))
+            assertFalse(permitted(mention = false, choice = true, muted = true))
+            assertFalse(permitted(mention = true, choice = false, muted = true))
+            assertTrue(permitted(mention = true, choice = true, muted = true))
+        }
+    }
+
+    @Test
+    fun categoryFilterReceivesTheClassifiedReactionAndCannotHideMembershipRemoval() {
+        var classified: NotificationChannelSpec? = null
+        fun permitted(trigger: NotificationTriggerFfi, reaction: String?) =
+            LocalNotificationPolicy.shouldPost(
+                update = update("group", trigger = trigger, reactionEmoji = reaction),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                categoryEnabled = { _, _, channel -> classified = channel; false },
+            )
+        assertFalse(permitted(NotificationTriggerFfi.NEW_MESSAGE, "👍"))
+        assertTrue(classified == NotificationChannelSpec.REACTIONS)
+        assertTrue(permitted(NotificationTriggerFfi.REMOVED_FROM_GROUP, null))
+    }
+
+    @Test
+    fun enablingACategoryNeverBypassesAppLockOrTheActiveConversation() {
+        listOf(true, false).forEach { locked ->
+            assertFalse(
+                LocalNotificationPolicy.shouldPost(
+                    update = update("group", accountRef = "account", isMention = true),
+                    appInForeground = !locked,
+                    activeConversationGroupIdHex = "group",
+                    activeConversationAccountRef = "account",
+                    appLockScreenVisible = locked,
+                    categoryEnabled = { _, _, _ -> true },
+                ),
+            )
+        }
+    }
+
+    @Test
     fun foregroundActiveConversationNotificationIsSuppressed() {
         assertFalse(
             LocalNotificationPolicy.shouldPost(

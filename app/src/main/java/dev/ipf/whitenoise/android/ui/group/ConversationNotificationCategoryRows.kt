@@ -5,12 +5,17 @@ package dev.ipf.whitenoise.android.ui.group
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategorySetting
@@ -18,7 +23,6 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationScope
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
-import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -56,7 +60,7 @@ private fun ConversationNotificationCategoryGroup(
 ) {
     val usesCustom = setting.scope == ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT
     val title = notificationChannelTitle(setting.channel)
-    val toggleDescription = stringResource(R.string.notification_custom_for_chat_control, title)
+    var choosingScope by remember(setting.channel) { mutableStateOf(false) }
     val openTag =
         if (
             BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS &&
@@ -86,22 +90,49 @@ private fun ConversationNotificationCategoryGroup(
         }
         if (setting.canChangeScope) {
             row("scope") { context ->
-                SettingsSwitch(
+                SettingsLink(
                     context = context,
-                    title = stringResource(R.string.notification_scope_custom_chat),
-                    checked = usesCustom,
-                    onCheckedChange = { useCustom -> onScopeChange(setting, useCustom) },
-                    modifier = Modifier.semantics { contentDescription = toggleDescription },
-                    subtitle = stringResource(R.string.notification_scope_switch_detail),
+                    title = stringResource(R.string.notification_scope_choose),
+                    value = stringResource(
+                        if (usesCustom) R.string.notification_scope_custom_chat else R.string.notification_scope_default_all_chats,
+                    ),
+                    onClick = { choosingScope = true },
+                    modifier = Modifier.testTag("conversation-sound-scope-${setting.channel.id}"),
                     enabled = scopeChangesEnabled,
                 )
             }
         }
     }
+    if (choosingScope) {
+        AlertDialog(
+            onDismissRequest = { choosingScope = false },
+            title = { Text(title) },
+            text = {
+                Column {
+                    listOf(false, true).forEach { custom ->
+                        TextButton(
+                            modifier = Modifier.testTag("sound-scope-choice-${setting.channel.id}-$custom"),
+                            onClick = {
+                                choosingScope = false
+                                onScopeChange(setting, custom)
+                            },
+                        ) {
+                            Text(
+                                stringResource(
+                                    if (custom) R.string.notification_scope_custom_chat else R.string.notification_scope_default_all_chats,
+                                ),
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+        )
+    }
 }
 
 @Composable
-private fun notificationChannelTitle(parent: NotificationChannelSpec): String =
+internal fun notificationChannelTitle(parent: NotificationChannelSpec): String =
     stringResource(
         when (parent) {
             NotificationChannelSpec.DIRECT_MESSAGES -> R.string.notification_channel_direct_messages

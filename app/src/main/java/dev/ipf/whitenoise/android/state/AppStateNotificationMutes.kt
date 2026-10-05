@@ -3,10 +3,21 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
+import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
 
 private val memberMuteLock = Any()
 
 private var memberMuteHolder: Pair<Context, MemberMutePreferences>? = null
+
+private var alertPreferenceHolder: Pair<Context, ConversationAlertPreferences>? = null
+
+/** One process-wide adapter for this device's chat/category alert choices. */
+internal val WhiteNoiseAppState.conversationAlertPreferences: ConversationAlertPreferences
+    get() =
+        synchronized(memberMuteLock) {
+            alertPreferenceHolder?.takeIf { it.first === appContext }?.second
+                ?: ConversationAlertPreferences(appContext).also { alertPreferenceHolder = appContext to it }
+        }
 
 /**
  * The process-wide per-member group mute store (#2782).
@@ -42,6 +53,7 @@ internal fun WhiteNoiseAppState.shouldPostNotification(
         conversationNotifyMode = chatMutePreferences::mode,
         engineMuted = engineMuted,
         senderMutedInGroup = memberMutePreferences::isMuted,
+        categoryEnabled = conversationAlertPreferences::choice,
     )
 
 /** Whether [memberIdHex] is silenced for [accountRef] inside [groupIdHex]. */

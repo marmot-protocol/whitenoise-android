@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">Hinweise auf diesem Gerät</string>
+    <string name="notification_sound_appearance">Ton und Darstellung</string>
+    <string name="notification_system_blocked">In den Android-Einstellungen blockiert</string>
+    <string name="notification_alerts_detail">Wähle Hinweise für dieses Gerät. Beim Pausieren gewöhnlicher Hinweise bleiben aktivierte Erwähnungen möglich. Gruppenmitgliedschaftshinweise haben eigene Einstellungen.</string>
+    <string name="notification_scope_choose">Toneinstellungen</string>
+</resources>

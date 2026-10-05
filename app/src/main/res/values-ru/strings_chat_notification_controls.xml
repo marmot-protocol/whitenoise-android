@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">Уведомления на этом устройстве</string>
+    <string name="notification_sound_appearance">Звук и оформление</string>
+    <string name="notification_system_blocked">Заблокировано в настройках Android</string>
+    <string name="notification_alerts_detail">Выберите уведомления для этого устройства. При паузе обычных уведомлений включённые упоминания остаются разрешены. Уведомления об участии в группе имеют отдельные настройки.</string>
+    <string name="notification_scope_choose">Настройки звука</string>
+</resources>
