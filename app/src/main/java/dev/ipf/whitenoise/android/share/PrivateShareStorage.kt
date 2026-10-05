@@ -32,18 +32,26 @@ internal fun writePrivateShareJson(
         out.fd.sync()
         atomic.finishWrite(out)
         privateShareFile(file)
-        if (
-            !file.isFile ||
-            Files.isSymbolicLink(file.toPath()) ||
-            file.length() != encoded.size.toLong()
-        ) {
-            throw IOException("Private share record was not committed")
-        }
-        if (!file.readBytes().contentEquals(encoded)) throw IOException("Private share record was not committed")
+        verifyPrivateShareCommit(file, encoded)
         committed = true
     } finally {
         if (!committed) runCatching { atomic.failWrite(out) }
     }
+}
+
+/** Rejects missing, unsafe or stale replacement bytes before the caller acknowledges new ownership. Runs on I/O. */
+private fun verifyPrivateShareCommit(
+    file: File,
+    encoded: ByteArray,
+) {
+    if (
+        !file.isFile ||
+        Files.isSymbolicLink(file.toPath()) ||
+        file.length() != encoded.size.toLong()
+    ) {
+        throw IOException("Private share record was not committed")
+    }
+    if (!file.readBytes().contentEquals(encoded)) throw IOException("Private share record was not committed")
 }
 
 /**
