@@ -29,6 +29,9 @@ internal enum class PerformanceOperation(
     ATTACHMENT_FETCH("attachment_fetch"),
     SYNC_CATCH_UP("sync_catch_up"),
     CHAT_HISTORY_PAGE("chat_history_page"),
+    GROUP_MEMBERSHIP_PENDING("group_membership_pending"),
+    GROUP_MEMBERSHIP_PROJECTION("group_membership_projection"),
+    MESSAGE_FORWARD("message_forward"),
 }
 
 /** Source-confirmed triggers accepted by recovery diagnostics. */
@@ -149,6 +152,12 @@ internal enum class PerformancePhase(
     PAGE_WINDOW("page_window"),
     PAGE_APPLY("page_apply"),
     PAGE_COMPLETE("page_complete"),
+    FORWARD_SOURCE_REFERENCE_RESOLVED("forward_source_reference_resolved"),
+    FORWARD_SOURCE_LOOKUP("forward_source_lookup"),
+    FORWARD_SOURCE_DOWNLOAD_START("forward_source_download_start"),
+    FORWARD_SOURCE_DOWNLOAD_RETURN("forward_source_download_return"),
+    FORWARD_SOURCE_READY("forward_source_ready"),
+    FORWARD_COMPLETE("forward_complete"),
 }
 
 internal enum class PerformanceResult(

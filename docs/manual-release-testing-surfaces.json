@@ -21,6 +21,18 @@
         "test_ids": ["NTF-031"]
       },
       {
+        "surface": "PendingGroupMembershipRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "fun PendingGroupMembershipRow(",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "Modifier.membershipVisibleDraw",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/MembershipVisibleDraw.kt",
+        "anchor": "fun Modifier.membershipVisibleDraw(",
+        "test_ids": ["GRP-026"]
+      },
+      {
         "surface": "NotificationPreviewControl",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
         "anchor": "fun NotificationPreviewControl(",
@@ -10788,6 +10800,18 @@
         "test_ids": [
           "NTF-031"
         ]
+      },
+      {
+        "surface": "string:member_removal_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "R.string.member_removal_pending",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "string:invite_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "R.string.invite_pending",
+        "test_ids": ["GRP-026"]
       },
       {
         "surface": "string:retry",
@@ -31019,6 +31043,18 @@
         "test_ids": [
           "FLD-004"
         ]
+      },
+      {
+        "surface": "Forward source read from MarmotKit's retained copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt",
+        "anchor": "internal suspend fun readRetainedForwardPlaintext(",
+        "test_ids": ["MSG-010", "MED-020"]
+      },
+      {
+        "surface": "Forward phase diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ForwardDiagnostics.kt",
+        "anchor": "internal class ForwardDiagnostics private constructor(",
+        "test_ids": ["MSG-010"]
       }
     ],
     "notification_content_contracts": [
