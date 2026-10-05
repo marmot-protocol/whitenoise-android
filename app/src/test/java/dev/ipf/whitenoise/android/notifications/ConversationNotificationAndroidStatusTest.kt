@@ -17,7 +17,9 @@ class ConversationNotificationAndroidStatusTest {
     fun readsTheActualCustomTargetWithoutConfusingItWithGlobalDefaults() {
         val context = RuntimeEnvironment.getApplication().applicationContext
         val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel("mentions", "Mentions", NotificationManager.IMPORTANCE_HIGH))
+        manager.createNotificationChannel(
+            NotificationChannel("mentions", "Mentions", NotificationManager.IMPORTANCE_HIGH),
+        )
         manager.createNotificationChannel(NotificationChannel("custom", "Custom", NotificationManager.IMPORTANCE_NONE))
         val setting = ConversationNotificationCategorySetting(
             NotificationChannelSpec.MENTIONS,
@@ -25,8 +27,13 @@ class ConversationNotificationAndroidStatusTest {
             true,
             AndroidNotificationSettingsTarget.Conversation("custom", "conversation"),
         )
-        assertEquals(setOf(NotificationChannelSpec.MENTIONS), androidBlockedConversationCategories(context, listOf(setting)))
-        val global = setting.copy(settingsTarget = AndroidNotificationSettingsTarget.Global(NotificationChannelSpec.MENTIONS))
+        assertEquals(
+            setOf(NotificationChannelSpec.MENTIONS),
+            androidBlockedConversationCategories(context, listOf(setting)),
+        )
+        val global = setting.copy(
+            settingsTarget = AndroidNotificationSettingsTarget.Global(NotificationChannelSpec.MENTIONS),
+        )
         assertTrue(androidBlockedConversationCategories(context, listOf(global)).isEmpty())
     }
 
@@ -42,6 +49,9 @@ class ConversationNotificationAndroidStatusTest {
             false,
             AndroidNotificationSettingsTarget.Conversation("uncreated", "conversation"),
         )
-        assertEquals(setOf(NotificationChannelSpec.DIRECT_MESSAGES), androidBlockedConversationCategories(context, listOf(setting)))
+        assertEquals(
+            setOf(NotificationChannelSpec.DIRECT_MESSAGES),
+            androidBlockedConversationCategories(context, listOf(setting)),
+        )
     }
 }

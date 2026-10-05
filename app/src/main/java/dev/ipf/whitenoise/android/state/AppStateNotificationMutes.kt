@@ -2,8 +2,8 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
+import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
 
 private val memberMuteLock = Any()
 

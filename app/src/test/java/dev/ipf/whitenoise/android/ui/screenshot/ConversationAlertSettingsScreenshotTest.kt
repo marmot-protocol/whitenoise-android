@@ -50,7 +50,9 @@ class ConversationAlertSettingsScreenshotTest {
     @Test
     fun blockedAlertsLargeRtl() {
         render(isDm = false, blocked = true, rtl = true, fontScale = 2f)
-        composeRule.onNodeWithTag("alerts").captureRoboImage("src/test/snapshots/conversation_alerts_blocked_large_rtl.png")
+        composeRule.onNodeWithTag("alerts").captureRoboImage(
+            "src/test/snapshots/conversation_alerts_blocked_large_rtl.png",
+        )
     }
 
     @Test

@@ -3,6 +3,18 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "ConversationAlertControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun ConversationAlertControls(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "NotificationSoundScopeDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "fun NotificationSoundScopeDialog(",
+        "test_ids": ["NTF-031"]
+      },
+      {
         "surface": "conversationNotificationSummary",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
         "anchor": "fun conversationNotificationSummary(",
@@ -10723,6 +10735,12 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "Chat category preference save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.toast_notification_scope_update_failed",
+        "test_ids": ["NTF-031"]
+      },
       {
         "surface": "Ordinary chat alert pause action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",

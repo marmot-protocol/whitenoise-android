@@ -4,28 +4,79 @@ package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
-import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
-import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
+import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
+import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationAlertPreferences
+import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-internal data class ConversationAlertSetting(
-    val channel: NotificationChannelSpec,
-    val enabled: Boolean,
-    val blockedByAndroid: Boolean = false,
-    val pausedByMute: Boolean = false,
-)
 
 /** Binary alert choices, with the same controls for direct and group conversations. */
+@Composable
+internal fun ConversationAlertControls(
+    appState: WhiteNoiseAppState,
+    groupIdHex: String,
+    isDm: Boolean,
+    legacyMode: ChatNotifyMode,
+    isMuted: Boolean,
+    blockedChannels: Set<NotificationChannelSpec>,
+) {
+    val preferences = appState.conversationAlertPreferences
+    val state by preferences.state.collectAsStateWithLifecycle()
+    val accountRef = appState.activeAccountRef
+    var saving by remember(accountRef, groupIdHex) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val channels = listOf(
+        ConversationNotificationChannels.primaryMessageParent(isDm),
+        NotificationChannelSpec.MENTIONS,
+        NotificationChannelSpec.REACTIONS,
+    )
+    ConversationAlertSettingsRows(
+        settings = channels.map { channel ->
+            val choice = remember(state, accountRef, groupIdHex, channel) {
+                accountRef?.let { preferences.choice(it, groupIdHex, channel) }
+            }
+            ConversationAlertSetting(
+                channel,
+                choice ?: (channel == NotificationChannelSpec.MENTIONS || legacyMode == ChatNotifyMode.ALL),
+                channel in blockedChannels,
+                isMuted && channel != NotificationChannelSpec.MENTIONS,
+            )
+        },
+        busy = saving || accountRef == null,
+        onChange = { channel, enabled ->
+            if (accountRef != null && !saving) {
+                saving = true
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) {
+                        preferences.setEnabled(accountRef, groupIdHex, channel, enabled)
+                    }
+                    saving = false
+                    if (!saved && appState.activeAccountRef == accountRef) {
+                        appState.present(R.string.toast_notification_scope_update_failed)
+                    }
+                }
+            }
+        },
+    )
+}
+
+/** Binary rows contain presentation only; their caller owns persistence. */
 @Composable
 internal fun ConversationAlertSettingsRows(
     settings: List<ConversationAlertSetting>,
@@ -74,7 +125,7 @@ internal fun conversationNotificationSummary(
     }
     return when {
         legacyMode == ChatNotifyMode.NONE -> stringResource(
-            if (accountRef != null && preferences.choice(accountRef, groupIdHex, NotificationChannelSpec.MENTIONS) == false) {
+            if (accountRef?.let { preferences.choice(it, groupIdHex, NotificationChannelSpec.MENTIONS) } == false) {
                 R.string.notify_nothing
             } else {
                 R.string.notify_nothing_while_muted

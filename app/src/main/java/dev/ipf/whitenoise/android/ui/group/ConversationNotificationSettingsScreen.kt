@@ -3,15 +3,14 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import android.content.Context
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Text
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -32,7 +32,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.notifications.AndroidNotificationSettingsTarget
-import dev.ipf.whitenoise.android.notifications.androidBlockedConversationCategories
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategorySetting
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationChannels
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationRouting
@@ -48,6 +47,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.NotificationConversationDescriptor
 import dev.ipf.whitenoise.android.notifications.OverridableConversationNotificationCategory
 import dev.ipf.whitenoise.android.notifications.PreparedConversationNotificationSettingsTarget
+import dev.ipf.whitenoise.android.notifications.androidBlockedConversationCategories
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.notifications.openConversationNotificationSettingsFallback
 import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
@@ -103,13 +103,9 @@ internal fun ConversationNotificationSettingsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var resumeGeneration by remember { mutableIntStateOf(0) }
     var showSoundSettings by remember(appState.activeAccountRef, groupIdHex) { mutableStateOf(false) }
-    val alerts = appState.conversationAlertPreferences
-    val alertState by alerts.state.collectAsStateWithLifecycle()
     val routingState by appState.conversationNotificationRouting.state.collectAsStateWithLifecycle()
     val accountRef = appState.activeAccountRef
     var blockedChannels by remember(accountRef, groupIdHex) { mutableStateOf<Set<NotificationChannelSpec>>(emptySet()) }
-    var alertSavePending by remember(appState.activeAccountRef, groupIdHex) { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
     DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
@@ -150,40 +146,13 @@ internal fun ConversationNotificationSettingsScreen(
         SettingsList {
             item { SettingsSection(stringResource(R.string.notifications)) }
             item {
-                val channels = listOf(
-                    ConversationNotificationChannels.primaryMessageParent(isDm),
-                    NotificationChannelSpec.MENTIONS,
-                    NotificationChannelSpec.REACTIONS,
-                )
-                ConversationAlertSettingsRows(
-                    settings = channels.map { channel ->
-                        val explicit = remember(alertState, accountRef, groupIdHex, channel) {
-                            accountRef?.let { alerts.choice(it, groupIdHex, channel) }
-                        }
-                        ConversationAlertSetting(
-                            channel,
-                            explicit ?: (
-                                channel == NotificationChannelSpec.MENTIONS || notifyForMode == ChatNotifyMode.ALL
-                            ),
-                            channel in blockedChannels,
-                            isMuted && channel != NotificationChannelSpec.MENTIONS,
-                        )
-                    },
-                    busy = alertSavePending || accountRef == null,
-                    onChange = { channel, enabled ->
-                        if (accountRef != null && !alertSavePending) {
-                            alertSavePending = true
-                            coroutineScope.launch {
-                                val saved = withContext(Dispatchers.IO) {
-                                    alerts.setEnabled(accountRef, groupIdHex, channel, enabled)
-                                }
-                                alertSavePending = false
-                                if (!saved && appState.activeAccountRef == accountRef) {
-                                    appState.present(R.string.toast_notification_scope_update_failed)
-                                }
-                            }
-                        }
-                    },
+                ConversationAlertControls(
+                    appState = appState,
+                    groupIdHex = groupIdHex,
+                    isDm = isDm,
+                    legacyMode = notifyForMode,
+                    isMuted = isMuted,
+                    blockedChannels = blockedChannels,
                 )
             }
             item { SettingsExplainer(stringResource(R.string.notification_alerts_detail)) }

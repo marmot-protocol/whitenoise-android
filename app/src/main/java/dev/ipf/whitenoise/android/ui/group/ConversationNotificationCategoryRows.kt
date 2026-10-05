@@ -4,15 +4,15 @@ package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.runtime.Composable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -94,7 +94,11 @@ private fun ConversationNotificationCategoryGroup(
                     context = context,
                     title = stringResource(R.string.notification_scope_choose),
                     value = stringResource(
-                        if (usesCustom) R.string.notification_scope_custom_chat else R.string.notification_scope_default_all_chats,
+                        if (usesCustom) {
+                            R.string.notification_scope_custom_chat
+                        } else {
+                            R.string.notification_scope_default_all_chats
+                        },
                     ),
                     onClick = { choosingScope = true },
                     modifier = Modifier.testTag("conversation-sound-scope-${setting.channel.id}"),
@@ -104,31 +108,45 @@ private fun ConversationNotificationCategoryGroup(
         }
     }
     if (choosingScope) {
-        AlertDialog(
-            onDismissRequest = { choosingScope = false },
-            title = { Text(title) },
-            text = {
-                Column {
-                    listOf(false, true).forEach { custom ->
-                        TextButton(
-                            modifier = Modifier.testTag("sound-scope-choice-${setting.channel.id}-$custom"),
-                            onClick = {
-                                choosingScope = false
-                                onScopeChange(setting, custom)
-                            },
-                        ) {
-                            Text(
-                                stringResource(
-                                    if (custom) R.string.notification_scope_custom_chat else R.string.notification_scope_default_all_chats,
-                                ),
-                            )
-                        }
+        NotificationSoundScopeDialog(setting, onDismiss = { choosingScope = false }, onScopeChange = onScopeChange)
+    }
+}
+
+/** Explicit inheritance choices stay inside sound customization, away from alert switches. */
+@Composable
+private fun NotificationSoundScopeDialog(
+    setting: ConversationNotificationCategorySetting,
+    onDismiss: () -> Unit,
+    onScopeChange: (ConversationNotificationCategorySetting, Boolean) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(notificationChannelTitle(setting.channel)) },
+        text = {
+            Column {
+                listOf(false, true).forEach { custom ->
+                    TextButton(
+                        modifier = Modifier.testTag("sound-scope-choice-${setting.channel.id}-$custom"),
+                        onClick = {
+                            onDismiss()
+                            onScopeChange(setting, custom)
+                        },
+                    ) {
+                        Text(
+                            stringResource(
+                                if (custom) {
+                                    R.string.notification_scope_custom_chat
+                                } else {
+                                    R.string.notification_scope_default_all_chats
+                                },
+                            ),
+                        )
                     }
                 }
-            },
-            confirmButton = {},
-        )
-    }
+            }
+        },
+        confirmButton = {},
+    )
 }
 
 @Composable

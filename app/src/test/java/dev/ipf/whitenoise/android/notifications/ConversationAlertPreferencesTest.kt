@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
+import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -58,6 +59,33 @@ class ConversationAlertPreferencesTest {
         assertEquals(false, restarted.choice("kept", "group", NotificationChannelSpec.MENTIONS))
         assertTrue(restarted.retainAccounts(emptyList()))
         assertTrue(store().state.value.isEmpty())
+    }
+
+    @Test
+    fun failedSavingRestoresThePreviousInMemoryPreference() {
+        val context = RuntimeEnvironment.getApplication().applicationContext
+        val delegate = context.getSharedPreferences("alert-failure-test", Context.MODE_PRIVATE)
+        val failing = object : SharedPreferences by delegate {
+            override fun edit(): SharedPreferences.Editor {
+                val editor = delegate.edit()
+                return object : SharedPreferences.Editor by editor {
+                    override fun putBoolean(key: String?, value: Boolean): SharedPreferences.Editor {
+                        editor.putBoolean(key, value)
+                        return this
+                    }
+
+                    override fun commit(): Boolean {
+                        editor.commit()
+                        return false
+                    }
+                }
+            }
+        }
+        val store = ConversationAlertPreferences(context, failing)
+        assertFalse(store.setEnabled("account", "group", NotificationChannelSpec.MENTIONS, false))
+        assertNull(store.choice("account", "group", NotificationChannelSpec.MENTIONS))
+        val restarted = ConversationAlertPreferences(context, delegate)
+        assertNull(restarted.choice("account", "group", NotificationChannelSpec.MENTIONS))
     }
 
     private fun store(): ConversationAlertPreferences {
