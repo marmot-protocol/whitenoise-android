@@ -31,8 +31,10 @@ internal class PrivateShareFiles private constructor(
     private val root by lazy(rootForIo)
     val leases by lazy { PrivateShareLeases(root, ::owns, ::metadata, ::delete) }
 
+    /** Checks only the app-private provider identity, without touching storage or granting external access. */
     fun owns(uri: Uri): Boolean = uri.scheme == "content" && uri.authority == authority
 
+    /** Allocates an owner-only original within the global quota; allocation/permission failures reject intake. */
     fun newFile(): Pair<Uri, File> =
         synchronized(privateShareLock) {
             privateShareDirectory(root)
@@ -58,6 +60,10 @@ internal class PrivateShareFiles private constructor(
             (PRIVATE_SHARE_STORAGE_BUDGET - used).coerceAtLeast(0)
         }
 
+    /**
+     * Resolves only a regular, non-symlink UUID original directly under the private root; missing sources return
+     * null.
+     */
     fun resolve(uri: Uri): File? {
         val id = uri.pathSegments.singleOrNull()
         val file = if (owns(uri) && id != null && UUID_PATTERN.matches(id)) File(root, "$id.bin") else null
@@ -66,6 +72,7 @@ internal class PrivateShareFiles private constructor(
         }
     }
 
+    /** Commits bounded metadata after copying completes; failed storage does not make an original ready for staging. */
     fun finish(
         uri: Uri,
         name: String,
@@ -82,6 +89,7 @@ internal class PrivateShareFiles private constructor(
         )
     }
 
+    /** Accepts metadata only while the original exists and its actual length matches the committed size budget. */
     fun metadata(uri: Uri): JSONObject? =
         resolve(uri)?.let { file ->
             readPrivateShareJson(File(root, "${file.nameWithoutExtension}.json"))?.takeIf {
@@ -89,6 +97,10 @@ internal class PrivateShareFiles private constructor(
             }
         }
 
+    /**
+     * Removes an original and its metadata after the caller has reconciled ownership; foreign/missing URIs are
+     * ignored.
+     */
     fun delete(uri: Uri) {
         val file = resolve(uri) ?: return
         File(root, "${file.nameWithoutExtension}.json").delete()
@@ -128,6 +140,10 @@ private fun privateShareRootForIo(context: Context): () -> File {
     return { File(app.noBackupFilesDir, PRIVATE_SHARE_DIRECTORY) }
 }
 
+/**
+ * Revalidates recovered private originals on I/O, reporting expired/missing entries as interruption without
+ * reopening grants.
+ */
 internal fun validateImportedShare(
     context: Context,
     request: ShareRequest,

@@ -13,10 +13,13 @@ import java.io.FileNotFoundException
 class PrivateShareProvider : ContentProvider() {
     private val files: PrivateShareFiles get() = PrivateShareFiles(requireNotNull(context))
 
+    /** Initializes no storage on provider creation; the private directory is resolved only when I/O is needed. */
     override fun onCreate(): Boolean = true
 
+    /** Returns only validated private metadata; a missing original never advertises a stale type. */
     override fun getType(uri: Uri): String? = files.metadata(uri)?.optString("mime")
 
+    /** Exposes bounded display-name/actual-size columns for an app-private original, without external URI grants. */
     override fun query(
         uri: Uri,
         projection: Array<out String>?,
@@ -39,6 +42,7 @@ class PrivateShareProvider : ContentProvider() {
         }
     }
 
+    /** Opens only read mode on a still-existing owned source; disappearance races surface as FileNotFoundException. */
     override fun openFile(
         uri: Uri,
         mode: String,
@@ -48,11 +52,13 @@ class PrivateShareProvider : ContentProvider() {
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
+    /** This provider never accepts writes or creates source ownership through ContentResolver. */
     override fun insert(
         uri: Uri,
         values: ContentValues?,
     ): Uri? = throw UnsupportedOperationException()
 
+    /** Metadata mutation belongs to serialized private intake, not provider callers. */
     override fun update(
         uri: Uri,
         values: ContentValues?,
@@ -60,6 +66,7 @@ class PrivateShareProvider : ContentProvider() {
         selectionArgs: Array<out String>?,
     ): Int = throw UnsupportedOperationException()
 
+    /** Lease reconciliation owns deletion; provider callers cannot remove another shelf/send's original. */
     override fun delete(
         uri: Uri,
         selection: String?,

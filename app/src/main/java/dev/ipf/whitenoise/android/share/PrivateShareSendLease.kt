@@ -11,6 +11,10 @@ internal class PrivateShareSendLease private constructor(
     private val files: PrivateShareFiles,
     private val id: String,
 ) {
+    /**
+     * Returns one idempotent release per queued slot; final ownership ends only after every slot accepts or is
+     * removed.
+     */
     fun ownerReleases(
         count: Int,
         onFinalRelease: (PrivateShareSendLease) -> Unit,

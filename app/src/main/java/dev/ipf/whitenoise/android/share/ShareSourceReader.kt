@@ -45,6 +45,7 @@ internal class ShareSourceReader(
     private val open: (Uri, CancellationSignal) -> InputStream?,
     private val sourceLimit: (ShareSourceMetadata, ByteArray) -> Long = { _, _ -> PRIVATE_SHARE_MAX_BYTES },
 ) {
+    /** Copies and syncs one bounded provider stream; cancellation closes it and never returns a partial success. */
     suspend fun copy(
         source: Uri,
         file: File,
@@ -84,6 +85,10 @@ internal class ShareSourceReader(
             }
         }
 
+    /**
+     * Sniffs only the bounded prefix then pushes it back so byte limits and the output include the same source
+     * bytes.
+     */
     private suspend fun readHeader(
         stream: PushbackInputStream,
         remaining: Long,
@@ -100,6 +105,10 @@ internal class ShareSourceReader(
         return header.copyOf(size)
     }
 
+    /**
+     * Counts actual bytes, rejects overflow before writing it, syncs successful output and reports bounded
+     * progress.
+     */
     private suspend fun copyStream(
         stream: InputStream,
         file: File,
@@ -133,6 +142,7 @@ internal class ShareSourceReader(
             size
         }
 
+    /** Maps provider I/O errors to unreadable-source feedback while leaving cancellation visible to the importer. */
     private fun <T> providerRead(block: () -> T): T =
         try {
             block()

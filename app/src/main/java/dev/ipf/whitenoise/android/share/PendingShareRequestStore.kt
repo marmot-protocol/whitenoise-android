@@ -21,12 +21,16 @@ import java.io.File
  * until the picker is dismissed or the request is staged.
  */
 internal interface PendingShareRequestStore {
+    /** Replaces the one encrypted recovery entry; false means the caller cannot acknowledge durable recovery. */
     fun save(request: ShareRequest): Boolean
 
+    /** Reads only the matching bounded recovery token; absent or malformed entries return null. */
     fun load(requestId: String): ShareRequest?
 
+    /** Removes only this request's encrypted entry, preserving a newer request with a different token. */
     fun remove(requestId: String)
 
+    /** Clears the sole unresolved recovery entry when its route is explicitly abandoned. */
     fun clear()
 }
 
@@ -123,6 +127,7 @@ internal class EncryptedPendingShareRequestStore(
             }
         }
 
+    /** Decodes only the requested encrypted snapshot and rejects malformed or token-mismatched contents. */
     override fun load(requestId: String): ShareRequest? =
         if (requestId.isBlank()) {
             null
@@ -132,16 +137,19 @@ internal class EncryptedPendingShareRequestStore(
             }
         }
 
+    /** Removes one encrypted token without acknowledging or sending any staged content. */
     override fun remove(requestId: String) {
         if (requestId.isNotBlank()) cache.remove(requestId)
     }
 
+    /** Clears recoverable plaintext from the encrypted store; private-original ownership is handled separately. */
     override fun clear() = cache.clear()
 
     companion object {
         private const val STORE_DIRECTORY = "pending-share-requests"
         private const val STORE_KEY_ALIAS = "whitenoise.pending_share_requests.aes_gcm.v1"
 
+        /** Opens the bounded no-backup AES-GCM store using the app's Android Keystore key, away from Main. */
         fun create(context: Context): EncryptedPendingShareRequestStore {
             val app = context.applicationContext
             return EncryptedPendingShareRequestStore(
@@ -177,6 +185,7 @@ private const val KEY_STREAM_URIS = "stream_uris"
 private const val KEY_MIME_TYPE = "mime_type"
 private const val KEY_SHORTCUT_ID = "shortcut_id"
 
+/** Encodes only recovery inputs/status; live objects and external-grant ownership never enter the snapshot. */
 internal fun encodePendingShareRequest(request: ShareRequest): ByteArray {
     val streamUris = JSONArray()
     request.payload.streamUris.forEach { streamUris.put(it.toString()) }
@@ -194,6 +203,7 @@ internal fun encodePendingShareRequest(request: ShareRequest): ByteArray {
         .toByteArray(Charsets.UTF_8)
 }
 
+/** Rejects unsupported versions, oversized snapshots and mismatched tokens before exposing recovered status or URIs. */
 internal fun decodePendingShareRequest(
     encoded: ByteArray,
     expectedRequestId: String,
@@ -233,9 +243,11 @@ internal fun decodePendingShareRequest(
     }.getOrNull()
 }
 
+/** Preserves absent optional fields without conflating them with the literal string "null". */
 private fun JSONObject.putNullable(
     key: String,
     value: String?,
 ): JSONObject = put(key, value ?: JSONObject.NULL)
 
+/** Restores optional snapshot text without changing its whitespace. */
 private fun JSONObject.nullableString(key: String): String? = if (isNull(key)) null else getString(key)

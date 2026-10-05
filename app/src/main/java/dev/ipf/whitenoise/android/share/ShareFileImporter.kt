@@ -59,6 +59,10 @@ internal class ShareFileImporter(
         },
     )
 
+    /**
+     * Imports one request on I/O within item/byte/deadline limits, retaining completed sources under request
+     * ownership.
+     */
     suspend fun import(
         request: ShareRequest,
         progress: (ShareImportProgress) -> Unit = {},
@@ -105,6 +109,10 @@ internal class ShareFileImporter(
             }
         }
 
+    /**
+     * Copies distinct admitted inputs in pick order and records each partial original before reading untrusted
+     * bytes.
+     */
     private suspend fun importSources(
         sources: List<Uri>,
         intentMime: String?,
@@ -139,6 +147,10 @@ internal class ShareFileImporter(
         }
     }
 
+    /**
+     * Rejects non-content or app-owned providers before any metadata/read call, including user-prefixed
+     * authorities.
+     */
     private fun isRejectedSource(uri: Uri): Boolean {
         if (uri.scheme != "content" || uri.authority.isNullOrBlank()) return true
         // ContentResolver strips Android's user-id prefix before choosing a provider.
@@ -152,6 +164,10 @@ internal class ShareFileImporter(
         val errors = mutableListOf<ShareImportError>()
         var used = 0L
 
+        /**
+         * Accounts only completed copies; rejected inputs contribute errors without consuming another owner's
+         * bytes.
+         */
         fun add(result: ImportedFile) {
             val uri = result.uri
             if (uri == null) {
@@ -163,6 +179,7 @@ internal class ShareFileImporter(
         }
     }
 
+    /** Copies one bounded stream; cancellation propagates and every incomplete original is removed in finally. */
     private suspend fun importOne(
         source: Uri,
         intentMime: String?,
@@ -209,11 +226,16 @@ internal class ShareFileImporter(
         }
     }
 
+    /**
+     * Returns a typed rejection while preserving a caller's cancellation rather than disguising it as storage
+     * failure.
+     */
     private suspend fun importFailure(error: ShareImportError): ImportedFile {
         currentCoroutineContext().ensureActive()
         return ImportedFile(error = error)
     }
 
+    /** Applies the image or document budget to metadata/signature-confirmed content before accepting streamed bytes. */
     private fun sourceLimit(
         info: ShareSourceMetadata,
         header: ByteArray,
@@ -233,6 +255,10 @@ internal class ShareFileImporter(
     )
 }
 
+/**
+ * Preserves safe extensions while bounding names and neutralizing path/control characters; unusable names return
+ * null.
+ */
 internal fun sanitizeShareFilename(name: String?): String? {
     val safe =
         (name ?: "file")
@@ -252,6 +278,7 @@ internal fun sanitizeShareFilename(name: String?): String? {
     return stem.take(MAX_SHARE_FILENAME_CHARS - extension.length) + extension
 }
 
+/** Reads optional provider name/type/length under the same cancellation signal as the subsequent copy. */
 private fun readShareSourceMetadata(
     context: Context,
     uri: Uri,
@@ -278,6 +305,7 @@ private fun readShareSourceMetadata(
     return ShareSourceMetadata(name, context.contentResolver.getType(uri), size)
 }
 
+/** Chooses a concrete normalized provider type, falling back to the existing document MIME policy for wildcards. */
 internal fun resolveShareMime(
     providerMime: String?,
     intentMime: String?,

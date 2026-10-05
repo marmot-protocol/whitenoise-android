@@ -45,6 +45,10 @@ internal class PrivateShareLeases(
         saveShelf(account, group, loadShelf(account, group).filterNot(removed::contains) + added)
     }
 
+    /**
+     * Reads this account/chat's bounded committed ownership, omitting missing or invalid private sources. Runs on
+     * I/O.
+     */
     fun loadShelf(
         account: String,
         group: String,
@@ -58,6 +62,10 @@ internal class PrivateShareLeases(
                 .filter { metadata(it) != null }
         }
 
+    /**
+     * Commits independent queued-send ownership before preparation or optimistic admission; storage failures
+     * propagate.
+     */
     fun holdSend(
         id: String,
         uris: List<Uri>,
@@ -69,6 +77,7 @@ internal class PrivateShareLeases(
         )
     }
 
+    /** Releases this send's reference once; only sources with no remaining request, shelf or send owner are deleted. */
     fun releaseSend(id: String) =
         synchronized(privateShareLock) {
             val file = File(root, "send-$id.lease")
@@ -93,6 +102,7 @@ internal class PrivateShareLeases(
         }
     }
 
+    /** Drops one picker/import reference without deleting another destination's or queued send's sources. */
     fun releaseRequest(requestId: String) =
         synchronized(privateShareLock) {
             val file = privateShareLeaseFile(root, "request", requestId)
@@ -101,6 +111,10 @@ internal class PrivateShareLeases(
             if (uris != null) repeat(uris.length()) { deleteIfUnreferenced(Uri.parse(uris.optString(it))) }
         }
 
+    /**
+     * Removes superseded unresolved-request leases at serialized intake, preserving independent shelf/send
+     * ownership.
+     */
     fun releasePendingRequests() =
         synchronized(privateShareLock) {
             val uris =
@@ -130,6 +144,7 @@ internal class PrivateShareLeases(
             }
         }
 
+    /** Deletes a private original only after the locked lease scan proves no durable owner still names it. */
     private fun deleteIfUnreferenced(uri: Uri) {
         val referenced =
             root.listFiles().orEmpty().filter { it.extension == "lease" }.any { file ->
