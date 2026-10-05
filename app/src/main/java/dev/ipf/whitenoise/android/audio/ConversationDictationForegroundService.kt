@@ -362,10 +362,13 @@ internal class ConversationDictationForegroundService(
         /** Releases only dictation; connection work keeps the shared host alive. */
         @Suppress("UNUSED_PARAMETER") // Existing controller API accepts its application context.
         fun stop(context: Context) {
-            activeService
-                ?.takeIf { it.promotedController?.hasDurableSession != true }
-                ?.removeForegroundNotification()
-            conversationDictationDiagnostic("event=foreground_service_stop accepted=true")
+            val current = activeService
+            val accepted = current != null && current.promotedController?.hasDurableSession != true
+            if (accepted) current?.removeForegroundNotification()
+            conversationDictationDiagnostic(
+                "event=foreground_service_stop accepted=$accepted active=${current != null} " +
+                    "durable=${current?.promotedController?.hasDurableSession == true}",
+            )
         }
 
         internal const val ACTION_START = "dev.ipf.whitenoise.android.dictation.START"

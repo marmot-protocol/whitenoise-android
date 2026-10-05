@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">Срок восстановления диктовки истёк</string>
     <string name="dictation_recovery_expired_text">Незавершённая диктовка удалена с этого устройства.</string>
     <string name="dictation_incomplete_title">Неполная диктовка</string>
-    <string name="dictation_incomplete_text">Расшифровка остановилась до завершения. Можно отправить распознанный текст или вставить его для проверки.</string>
+    <string name="dictation_incomplete_text">Расшифровка остановилась до завершения. Проверьте распознанный текст в черновике перед отправкой.</string>
     <string name="dictation_send_recognized_text">Отправить распознанный текст</string>
 </resources>

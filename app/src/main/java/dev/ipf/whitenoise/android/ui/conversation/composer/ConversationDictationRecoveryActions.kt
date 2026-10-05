@@ -40,7 +40,9 @@ internal fun ConversationDictationFailureAction(
     val recovery = dictationFailureRecovery(state.cause ?: state.reason)
     val retrySend = state.reason == ConversationDictationFailure.SendBlocked
     var confirmPartialSend by remember(state) { mutableStateOf(false) }
+    val recoveredSendAvailable = !state.draftRecovered || controller.canRetryRetainedAudio || controller.canRetryRecoveredSend
     IconButton(
+        enabled = !retrySend || recoveredSendAvailable,
         onClick =
             when {
                 retrySend && state.recognitionIncomplete -> ({ confirmPartialSend = true })
@@ -94,10 +96,6 @@ private fun ConversationDictationSendConfirmation(
             onDismiss()
             if (controller.state === state) controller.sendRecognizedText()
         },
-        onPaste = {
-            onDismiss()
-            if (controller.state === state) controller.paste()
-        },
         onOpenSettings = confirmationRecoveryAction(state, controller, recovery, context, onDismiss),
         settingsLabel =
             stringResource(
@@ -139,7 +137,6 @@ private fun confirmationRecoveryAction(
 internal fun ConversationDictationPartialSendDialog(
     onDismiss: () -> Unit,
     onSend: () -> Unit,
-    onPaste: () -> Unit,
     onOpenSettings: (() -> Unit)? = null,
     settingsLabel: String = "",
 ) {
@@ -160,9 +157,6 @@ internal fun ConversationDictationPartialSendDialog(
         },
         confirmButton = {
             TextButton(onClick = onSend) { Text(stringResource(R.string.dictation_send_recognized_text)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onPaste) { Text(stringResource(R.string.paste)) }
         },
     )
 }

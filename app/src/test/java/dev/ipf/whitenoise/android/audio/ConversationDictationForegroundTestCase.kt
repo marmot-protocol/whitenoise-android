@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.app.Notification
+import android.app.NotificationManager
 import android.app.Service
 import android.content.ComponentName
 import android.content.Context
@@ -12,6 +13,7 @@ import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,6 +22,10 @@ import org.robolectric.shadows.ShadowLog
 
 /** Shared deterministic foreground seams; each case restores them after execution. */
 internal abstract class ConversationDictationForegroundTestCase {
+    @Before
+    fun modelAndroidForegroundIdentityReplacement() {
+        NotificationStreamForegroundService.foregroundPublisher = modelForegroundIdReplacement(defaultPublisher)
+    }
     protected class RejectingForegroundStartContext(
         base: Context,
     ) : ContextWrapper(base) {
@@ -32,6 +38,7 @@ internal abstract class ConversationDictationForegroundTestCase {
     fun restoreResolver() {
         ConversationDictationForegroundService.hostResolver = defaultResolver
         ConversationDictationForegroundService.foregroundPromoter = defaultForegroundPromoter
+        NotificationStreamForegroundService.foregroundPublisher = defaultPublisher
     }
 
     protected fun assertCorrelatedServiceTrace() {
@@ -114,5 +121,16 @@ internal abstract class ConversationDictationForegroundTestCase {
             )
         val defaultResolver = ConversationDictationForegroundService.hostResolver
         val defaultForegroundPromoter = ConversationDictationForegroundService.foregroundPromoter
+        val defaultPublisher = NotificationStreamForegroundService.foregroundPublisher
     }
+}
+
+/** Robolectric 4.17 omits Android's cancellation of the previous foreground ID when it changes. */
+internal fun modelForegroundIdReplacement(
+    publish: (NotificationStreamForegroundService, Notification, Int) -> Unit,
+): (NotificationStreamForegroundService, Notification, Int) -> Unit = { service, notification, type ->
+    val previous = shadowOf(service as Service).lastForegroundNotificationId
+    publish(service, notification, type)
+    val current = NotificationStreamForegroundService.foregroundNotificationId(notification)
+    if (previous != 0 && previous != current) service.getSystemService(NotificationManager::class.java).cancel(previous)
 }

@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">Dikte kurtarma süresi doldu</string>
     <string name="dictation_recovery_expired_text">Tamamlanmamış dikte bu cihazdan temizlendi.</string>
     <string name="dictation_incomplete_title">Eksik dikte</string>
-    <string name="dictation_incomplete_text">Yazıya dönüştürme tamamlanmadan durdu. Tanınan metni gönderebilir veya incelemek için yapıştırabilirsiniz.</string>
+    <string name="dictation_incomplete_text">Metne dönüştürme tamamlanmadan durdu. Göndermeden önce taslaktaki tanınan metni gözden geçirin.</string>
     <string name="dictation_send_recognized_text">Tanınan metni gönder</string>
 </resources>

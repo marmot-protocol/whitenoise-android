@@ -8,6 +8,6 @@
     <string name="dictation_recovery_expired_title">Diktatwiederherstellung abgelaufen</string>
     <string name="dictation_recovery_expired_text">Das unfertige Diktat wurde von diesem Gerät gelöscht.</string>
     <string name="dictation_incomplete_title">Unvollständiges Diktat</string>
-    <string name="dictation_incomplete_text">Die Transkription wurde vorzeitig beendet. Du kannst den erkannten Text senden oder zur Prüfung einfügen.</string>
+    <string name="dictation_incomplete_text">Die Transkription wurde vorzeitig beendet. Prüfe den erkannten Text im Entwurf, bevor du ihn sendest.</string>
     <string name="dictation_send_recognized_text">Erkannten Text senden</string>
 </resources>

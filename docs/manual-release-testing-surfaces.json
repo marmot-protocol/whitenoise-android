@@ -10951,12 +10951,6 @@
         "test_ids": ["DIC-002"]
       },
       {
-        "surface": "string:paste",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
-        "anchor": "R.string.paste",
-        "test_ids": ["DIC-002"]
-      },
-      {
         "surface": "string:dictation_recovery_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
         "anchor": "R.string.dictation_recovery_title",
@@ -30979,6 +30973,12 @@
         "test_ids": [
           "FLD-004"
         ]
+      },
+      {
+        "surface": "Automatic dictation draft recovery and retry fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+        "anchor": "internal class ConversationDictationDraftRecovery(",
+        "test_ids": ["DIC-002"]
       }
     ],
     "notification_content_contracts": [

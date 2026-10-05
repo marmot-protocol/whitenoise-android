@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">Recupero della dettatura scaduto</string>
     <string name="dictation_recovery_expired_text">La dettatura incompleta è stata eliminata da questo dispositivo.</string>
     <string name="dictation_incomplete_title">Dettatura incompleta</string>
-    <string name="dictation_incomplete_text">La trascrizione si è interrotta prima di finire. Puoi inviare il testo riconosciuto o incollarlo per controllarlo.</string>
+    <string name="dictation_incomplete_text">La trascrizione si è interrotta prima di terminare. Controlla il testo riconosciuto nella bozza prima di inviarlo.</string>
     <string name="dictation_send_recognized_text">Invia il testo riconosciuto</string>
 </resources>

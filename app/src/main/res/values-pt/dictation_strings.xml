@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">A recuperação do ditado expirou</string>
     <string name="dictation_recovery_expired_text">O ditado inacabado foi apagado deste dispositivo.</string>
     <string name="dictation_incomplete_title">Ditado incompleto</string>
-    <string name="dictation_incomplete_text">A transcrição parou antes de terminar. Você pode enviar o texto reconhecido ou colá-lo para revisar.</string>
+    <string name="dictation_incomplete_text">A transcrição parou antes de terminar. Revise o texto reconhecido no rascunho antes de enviar.</string>
     <string name="dictation_send_recognized_text">Enviar texto reconhecido</string>
 </resources>

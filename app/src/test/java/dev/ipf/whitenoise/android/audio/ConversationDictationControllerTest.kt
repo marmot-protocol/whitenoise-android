@@ -6149,6 +6149,71 @@ class ConversationDictationControllerTest {
         assertTrue(controller.state is ConversationDictationState.ProviderActivityRequired)
     }
 
+    /** A rejected Send stores recognized text without a Paste gesture and keeps a single retry payload. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun automaticDraftRecoveryPreservesRejectedSendAndRetriesOnce() = runTest {
+        var accept = false
+        var sends = 0
+        val payloads = mutableListOf<String>()
+        val f = fixture(
+            draft = TextFieldValue("Draft", TextRange(5)),
+            targetValidationScope = this,
+            sendTranscriptIfOriginUnchanged = { request ->
+                sends++
+                if (accept && request.beginDispatch()) {
+                    payloads += request.payload
+                    true
+                } else {
+                    false
+                }
+            },
+        )
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.send()
+        f.platform.listener.onResult("recognized")
+        advanceUntilIdle()
+        assertEquals("Draft recognized", f.drafts.getValue(key()).text)
+        assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
+        assertFalse(f.controller.hasDurableSession)
+        accept = true
+        f.controller.retry()
+        advanceUntilIdle()
+        f.controller.retry()
+        assertEquals(2, sends)
+        assertEquals(listOf("Draft recognized"), payloads)
+        assertEquals("", f.drafts.getValue(key()).text)
+        assertTrue(f.controller.state is ConversationDictationState.Idle)
+    }
+
+    /** Unknown delivery preserves the full text but cannot automatically or manually retry transport. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun automaticDraftRecoveryKeepsUnknownDeliveryNonRetryable() = runTest {
+        var sends = 0
+        val f = fixture(
+            draft = TextFieldValue("Draft", TextRange(5)),
+            targetValidationScope = this,
+            sendTranscriptIfOriginUnchanged = { request ->
+                sends++
+                assertTrue(request.beginDispatch())
+                false
+            },
+        )
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.send()
+        f.platform.listener.onResult("recognized")
+        advanceUntilIdle()
+        assertEquals("Draft recognized", f.drafts.getValue(key()).text)
+        val failed = f.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.DeliveryUnknown, failed.reason)
+        assertTrue(failed.draftRecovered)
+        f.controller.retry()
+        advanceUntilIdle()
+        assertEquals(1, sends)
+        assertFalse(f.controller.hasDurableSession)
+    }
+
     /** Builds a deterministic controller harness with injectable ownership, validation, and delivery seams. */
     private fun fixture(
         draft: TextFieldValue,

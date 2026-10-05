@@ -208,7 +208,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertTrue(
             service.getSystemService(NotificationManager::class.java).activeNotifications.any {
-                it.id == BackgroundConnectionNotification.NOTIFICATION_ID
+                it.id == NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID
             },
         )
 
@@ -217,9 +217,27 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
 
         assertFalse(
             service.getSystemService(NotificationManager::class.java).activeNotifications.any {
-                it.id == BackgroundConnectionNotification.NOTIFICATION_ID
+                it.id == NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID
             },
         )
+    }
+
+    /** Keep connected off must retire completed controls without relying on asynchronous destruction. */
+    @Test
+    fun pasteCompletionWithoutConnectionRemovesControlsImmediately() {
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        harness.conversationDictation.paste()
+        harness.platform.listener.onResult("completed transcript")
+        assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        assertNull(ConversationDictationForegroundService.activeNotificationOrNull())
+        assertFalse(service.getSystemService(NotificationManager::class.java).activeNotifications.any {
+            it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+        })
+        lifecycle.destroy()
     }
 
     /** A completed result removes controls without waiting for a service-destruction callback. */
@@ -603,7 +621,7 @@ internal class ConversationDictationForegroundServiceStartTest : ConversationDic
             newService
                 .getSystemService(NotificationManager::class.java)
                 .activeNotifications
-                .single { it.id == BackgroundConnectionNotification.NOTIFICATION_ID }
+                .single { it.id == NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID }
                 .notification
         assertEquals(
             "Dictation active",

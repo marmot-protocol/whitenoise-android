@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">La récupération de la dictée a expiré</string>
     <string name="dictation_recovery_expired_text">La dictée inachevée a été effacée de cet appareil.</string>
     <string name="dictation_incomplete_title">Dictée incomplète</string>
-    <string name="dictation_incomplete_text">La transcription s’est arrêtée avant la fin. Vous pouvez envoyer le texte reconnu ou le coller pour le vérifier.</string>
+    <string name="dictation_incomplete_text">La transcription s’est arrêtée avant la fin. Vérifiez le texte reconnu dans le brouillon avant de l’envoyer.</string>
     <string name="dictation_send_recognized_text">Envoyer le texte reconnu</string>
 </resources>

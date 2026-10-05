@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">語音輸入復原已過期</string>
     <string name="dictation_recovery_expired_text">未完成的語音輸入已從此裝置清除。</string>
     <string name="dictation_incomplete_title">聽寫未完成</string>
-    <string name="dictation_incomplete_text">轉寫在完成前停止。你可以傳送已辨識的文字，或貼上後檢查。</string>
+    <string name="dictation_incomplete_text">轉錄在完成前停止了。傳送前請檢查草稿中的已辨識文字。</string>
     <string name="dictation_send_recognized_text">傳送已辨識的文字</string>
 </resources>

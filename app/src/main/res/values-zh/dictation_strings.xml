@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">语音输入恢复已过期</string>
     <string name="dictation_recovery_expired_text">未完成的语音输入已从此设备清除。</string>
     <string name="dictation_incomplete_title">听写未完成</string>
-    <string name="dictation_incomplete_text">转写在完成前停止。你可以发送已识别的文字，或粘贴后检查。</string>
+    <string name="dictation_incomplete_text">转录在完成前停止了。发送前请检查草稿中的已识别文本。</string>
     <string name="dictation_send_recognized_text">发送已识别的文字</string>
 </resources>
