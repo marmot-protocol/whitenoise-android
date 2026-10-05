@@ -4756,42 +4756,67 @@ class ChatsController private constructor(
      * + [deleteGroupLocal], and never touch MLS membership. Used by bulk Delete
      * local (#1169) so still-member groups stay joined.
      */
-    suspend fun deleteGroupLocalFromChatList(
+    internal suspend fun deleteGroupLocalFromChatList(
         groupIdHex: String,
         notify: Boolean = true,
         failureMessage: Int = R.string.toast_couldnt_delete_chat,
-    ): Boolean {
-        val account = accountRef ?: return false
-        val epoch = bindEpoch
-        val isCurrent = { accountRef == account && isActiveBindEpoch(epoch) }
-        val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
-        removeChatRow(groupIdHex, optimistic = true)
-        var nativeCommitted = false
-        val wipe =
-            runCatching {
-                appState.deleteChatGroupLocalWithRecovery(account, groupIdHex, isCurrent) {
-                    nativeCommitted = true
-                }
+        observer: LocalChatDeleteObserver = LocalChatDeleteObserver(),
+    ): Boolean =
+        accountRef?.let { account ->
+            val epoch = bindEpoch
+            val runtime = appState.runtimeGeneration
+            val isCurrent = {
+                chatListDepartureIsCurrent(account, epoch, runtime) && appState.retainedAccountReactivationRef == null
             }
-        wipe.exceptionOrNull()?.let {
-            appState.schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
-            if (isCurrent() && !nativeCommitted) removedSnapshot?.let(::restoreRemovedChatRow)
-            if (isCurrent() && nativeCommitted) {
+            if (!isCurrent()) return@let false
+            val removedSnapshot = snapshotChatRowForRemoval(groupIdHex)
+            removeChatRow(groupIdHex, optimistic = true)
+            var nativeCommitted = false
+            val wipe =
+                runCatching {
+                    appState.deleteChatGroupLocalWithRecovery(
+                        account,
+                        groupIdHex,
+                        isCurrent,
+                        observer.readinessBudget,
+                    ) {
+                        nativeCommitted = true
+                    }
+                }
+            val failure = wipe.exceptionOrNull()
+            if (failure != null) {
+                appState.schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
+                if (isCurrent()) {
+                    if (nativeCommitted) {
+                        removeChatRow(groupIdHex)
+                        finishRemovedChatRowClientState(groupIdHex)
+                    } else {
+                        removedSnapshot?.let(::restoreRemovedChatRow)
+                    }
+                }
+                if (failure is CancellationException) throw failure
+                if (isCurrent()) {
+                    appState.presentFailure(
+                        failureMessage,
+                        "CHAT_LOCAL_DELETE",
+                        failure,
+                        detail = AppText.Resource(R.string.local_delete_retry_detail),
+                    )
+                    observer.onFailure(failure)
+                }
+                false
+            } else if (isCurrent()) {
                 removeChatRow(groupIdHex)
                 finishRemovedChatRowClientState(groupIdHex)
+                if (!wipe.getOrDefault(false)) observer.onCleanupDeferred()
+                if (notify && wipe.getOrDefault(false)) {
+                    appState.presentTransient(R.string.toast_chat_deleted_local)
+                }
+                true
+            } else {
+                false
             }
-            if (it is CancellationException) throw it
-            if (isCurrent()) appState.presentFailure(failureMessage, "CHAT_LOCAL_DELETE", it)
-            return false
-        }
-        if (!isCurrent()) return false
-        removeChatRow(groupIdHex)
-        finishRemovedChatRowClientState(groupIdHex)
-        if (notify) {
-            appState.presentTransient(R.string.toast_chat_deleted_local)
-        }
-        return true
-    }
+        } ?: false
 
     /**
      * When [leaveFirst] (the user is still a member), leave the group first and
