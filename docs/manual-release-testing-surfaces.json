@@ -9,6 +9,24 @@
         "test_ids": ["SYS-004", "SYS-005"]
       },
       {
+        "surface": "restoreImportedComposerAttachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun restoreImportedComposerAttachments(",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "importedComposerExceedsLimit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun importedComposerExceedsLimit(",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "share_import_recovered_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.share_import_recovered_limit",
+        "test_ids": ["SYS-005"]
+      },
+      {
         "surface": "restorePendingShareImport",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImport.kt",
         "anchor": "fun restorePendingShareImport(",
@@ -67,6 +85,18 @@
           "SYS-004",
           "SYS-005"
         ]
+      },
+      {
+        "surface": "PendingGroupMembershipRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "fun PendingGroupMembershipRow(",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "Modifier.membershipVisibleDraw",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/MembershipVisibleDraw.kt",
+        "anchor": "fun Modifier.membershipVisibleDraw(",
+        "test_ids": ["GRP-026"]
       },
       {
         "surface": "NotificationPreviewControl",
@@ -10765,6 +10795,18 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "string:member_removal_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "R.string.member_removal_pending",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "string:invite_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "R.string.invite_pending",
+        "test_ids": ["GRP-026"]
+      },
       {
         "surface": "string:retry",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",

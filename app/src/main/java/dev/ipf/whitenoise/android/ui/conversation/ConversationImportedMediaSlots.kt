@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.net.Uri
+import dev.ipf.whitenoise.android.share.ShareStreamStaging
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
 
@@ -11,10 +12,43 @@ internal fun restoreImportedMediaSlots(
     maxItems: Int,
     owns: (Uri) -> Boolean,
 ): List<PendingMediaSlot> {
-    val retained = current.filter { !owns(it.uri) || it.uri in restored }.take(maxItems)
+    val retained = current.filter { !owns(it.uri) || it.uri in restored }
     val added = restored.filterNot { uri -> retained.any { it.uri == uri } }
     return appendPendingMediaSlots(retained, added, maxItems)
 }
+
+/** Recover accepted sources without discarding bytes or changing an existing edited occurrence. */
+internal fun restoreImportedComposerAttachments(
+    currentMedia: List<PendingMediaSlot>,
+    currentDocuments: List<Uri>,
+    staging: ShareStreamStaging,
+    owns: (Uri) -> Boolean,
+): RestoredConversationAttachments {
+    val allRestored = (staging.mediaUris + staging.documentUris).toSet()
+    val existingMedia = currentMedia.filter { owns(it.uri) && it.uri in allRestored }.map { it.uri }
+    val existingDocuments = currentDocuments.filter { owns(it) && it in allRestored }
+    val media = (staging.mediaUris.filterNot { it in existingDocuments } + existingMedia).distinct()
+    val documents = (staging.documentUris.filterNot { it in existingMedia } + existingDocuments).distinct()
+    return RestoredConversationAttachments(
+        restoreImportedMediaSlots(currentMedia, media, Int.MAX_VALUE, owns),
+        (currentDocuments.filterNot(owns) + documents).distinct(),
+    )
+}
+
+/** An over-limit recovery requires explicit removal; it must never silently drop a saved source. */
+internal fun importedComposerExceedsLimit(
+    media: List<PendingMediaSlot>,
+    documents: List<Uri>,
+    maxItems: Int,
+    owns: (Uri) -> Boolean,
+): Boolean =
+    media.size + documents.size > maxItems && (media.any { owns(it.uri) } || documents.any(owns))
+
+internal fun appendRecoveredDocuments(
+    current: List<Uri>,
+    added: List<Uri>,
+    maxItems: Int,
+): List<Uri> = current + added.filterNot { it in current }.distinct().take((maxItems - current.size).coerceAtLeast(0))
 
 /** The native restore cannot discard platform sources published since its last input projection. */
 internal fun mergeRestoredComposerAttachments(

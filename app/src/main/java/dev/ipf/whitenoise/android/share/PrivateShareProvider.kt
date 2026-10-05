@@ -44,7 +44,8 @@ class PrivateShareProvider : ContentProvider() {
         mode: String,
     ): ParcelFileDescriptor {
         if (mode != "r" || files.metadata(uri) == null) throw FileNotFoundException("Unavailable share file")
-        return ParcelFileDescriptor.open(requireNotNull(files.resolve(uri)), ParcelFileDescriptor.MODE_READ_ONLY)
+        val file = files.resolve(uri) ?: throw FileNotFoundException("Unavailable share file")
+        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
     override fun insert(

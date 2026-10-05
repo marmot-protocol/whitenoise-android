@@ -14,4 +14,5 @@
     <string name="share_import_interrupted">导入已中断。请重新分享文件。</string>
     <string name="share_import_progress">文件 %1$d/%2$d：%3$d 字节</string>
     <string name="share_import_rejected_count">未导入的文件：%1$d</string>
+    <string name="share_import_recovered_limit">恢复的文件超过了 10 个附件的上限。请移除多余的附件后再发送。</string>
 </resources>

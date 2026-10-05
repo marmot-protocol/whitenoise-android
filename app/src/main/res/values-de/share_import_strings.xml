@@ -14,4 +14,5 @@
     <string name="share_import_interrupted">Der Import wurde unterbrochen. Teile die Dateien erneut.</string>
     <string name="share_import_progress">Datei %1$d von %2$d: %3$d Bytes</string>
     <string name="share_import_rejected_count">Nicht importierte Dateien: %1$d</string>
+    <string name="share_import_recovered_limit">Die wiederhergestellten Dateien überschreiten das Limit von 10 Anhängen. Entferne zusätzliche Dateien vor dem Senden.</string>
 </resources>

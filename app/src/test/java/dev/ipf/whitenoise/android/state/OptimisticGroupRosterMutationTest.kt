@@ -66,6 +66,7 @@ class OptimisticGroupRosterMutationTest {
                 }
 
             assertTrue(projectedGroupAdmin(authoritativeAdmin, "BOB", tracker.current))
+            assertNull(tracker.pendingMembershipActivity)
 
             releaseCommit.complete(Unit)
             result.await()
@@ -128,6 +129,89 @@ class OptimisticGroupRosterMutationTest {
                     mutation = OptimisticGroupRosterMutation.Invite(canonicalRefs),
                 ),
             )
+        }
+
+    @Test
+    fun transcriptPendingInviteBelongsToTheSuspendedNativeAttempt() =
+        runBlocking {
+            val tracker = OptimisticGroupRosterMutationTracker()
+            val release = CompletableDeferred<Unit>()
+            val mutation = OptimisticGroupRosterMutation.Invite(listOf("bob", "carol"))
+            val result =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    tracker.track(mutation) { release.await() }
+                }
+            val activity = requireNotNull(tracker.pendingMembershipActivity)
+            assertEquals(mutation, activity.mutation)
+            assertTrue(activity.id.isNotBlank())
+            assertEquals(activity.id, tracker.pendingMembershipActivity?.id)
+            release.complete(Unit)
+            result.await()
+            assertNull(tracker.pendingMembershipActivity)
+        }
+
+    @Test
+    fun anEarlierResultCannotClearOrSettleANewerMembershipAction() =
+        runBlocking {
+            val tracker = OptimisticGroupRosterMutationTracker()
+            val firstRelease = CompletableDeferred<Unit>()
+            val nextRelease = CompletableDeferred<Unit>()
+            val first =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    tracker.track(OptimisticGroupRosterMutation.Remove("bob")) { firstRelease.await() }
+                }
+            val oldId = requireNotNull(tracker.pendingMembershipActivity).id
+            val next =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    tracker.track(OptimisticGroupRosterMutation.Remove("bob")) { nextRelease.await() }
+                }
+            val newId = requireNotNull(tracker.pendingMembershipActivity).id
+            assertFalse(oldId == newId)
+            tracker.settleMembershipActivity(oldId)
+            firstRelease.complete(Unit)
+            first.await()
+            assertEquals(newId, tracker.pendingMembershipActivity?.id)
+            nextRelease.complete(Unit)
+            next.await()
+            assertNull(tracker.pendingMembershipActivity)
+        }
+
+    @Test
+    fun acceptedInviteStopsShowingPendingWhileOptionalPromotionIsStillSuspended() =
+        runBlocking {
+            val tracker = OptimisticGroupRosterMutationTracker()
+            val promotion = CompletableDeferred<Unit>()
+            val result =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    tracker.track(OptimisticGroupRosterMutation.Invite(listOf("bob"))) {
+                        tracker.settleMembershipActivity(tracker.pendingMembershipActivity?.id)
+                        promotion.await()
+                    }
+                }
+            assertNull(tracker.pendingMembershipActivity)
+            assertEquals(OptimisticGroupRosterMutation.Invite(listOf("bob")), tracker.current)
+            promotion.complete(Unit)
+            result.await()
+            assertNull(tracker.current)
+        }
+
+    @Test
+    fun cancelledMembershipActionClearsFeedbackWithoutRunningTheCallAgain() =
+        runBlocking {
+            val tracker = OptimisticGroupRosterMutationTracker()
+            var calls = 0
+            val result =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    tracker.track(OptimisticGroupRosterMutation.Remove("bob")) {
+                        calls++
+                        CompletableDeferred<Unit>().await()
+                    }
+                }
+            result.cancel()
+            result.join()
+            assertEquals(1, calls)
+            assertNull(tracker.pendingMembershipActivity)
+            assertNull(tracker.current)
         }
 
     private fun member(id: String) =

@@ -374,6 +374,8 @@ private fun presentVoiceRecordingFailure(
     }
 }
 
+private val MEMBERSHIP_FRAME_EVENT_TYPES = setOf("member_added", "member_removed")
+
 /** Renders the shared retryable conversation-load error surface. */
 @Suppress("FunctionNaming") // Jetpack Compose functions use UpperCamelCase.
 @Composable
@@ -1509,7 +1511,10 @@ internal fun ConversationScreen(
                     controller.errorEdge == ConversationLoadFailureEdge.TOP
             val newestVisibleTimelineIndex =
                 conversationTimelineIndexForListIndex(
-                    listIndex = listState.firstVisibleItemIndex,
+                    listIndex =
+                        listState.firstVisibleItemIndex.coerceAtLeast(
+                            controller.conversationTrailingRowCount(rendered.size),
+                        ),
                     timelineSize = rendered.size,
                     trailingRowCount = controller.conversationTrailingRowCount(rendered.size),
                 )
@@ -1775,34 +1780,15 @@ internal fun ConversationScreen(
                 appState.present(R.string.share_import_storage)
                 return@ImportedShareShelf
             }
-        val retainedMedia = pendingMediaSlots.filterNot { importedShareFiles.owns(it.uri) }
-        val retainedDocuments = pendingDocumentUris.filterNot(importedShareFiles::owns)
-        val capped =
-            dev.ipf.whitenoise.android.share.capShareStreamStaging(
-                staging,
-                retainedMedia.size,
-                retainedDocuments.size,
-                MEDIA_PICKER_MAX_ITEMS,
-            )
-        pendingMediaSlots =
-            restoreImportedMediaSlots(
+        val recovered =
+            restoreImportedComposerAttachments(
                 pendingMediaSlots,
-                capped.accepted.mediaUris,
-                MEDIA_PICKER_MAX_ITEMS,
+                pendingDocumentUris,
+                staging,
                 importedShareFiles::owns,
             )
-        pendingDocumentUris = (retainedDocuments + capped.accepted.documentUris).distinct()
-        if (capped.droppedCount > 0) {
-            appState.presentText(
-                AppText.Plain(
-                    context.resources.getQuantityString(
-                        R.plurals.toast_share_attachments_dropped,
-                        capped.droppedCount,
-                        capped.droppedCount,
-                    ),
-                ),
-            )
-        }
+        pendingMediaSlots = recovered.mediaSlots
+        pendingDocumentUris = recovered.documentUris
     }
     LaunchedEffect(chat.id, appState.inboundShareRevision, pendingMediaSlots.size, pendingDocumentUris.size) {
         val capped =
@@ -2131,7 +2117,7 @@ internal fun ConversationScreen(
             // Append into the document side of the staging shelf rather than
             // sending immediately. The preview sheet renders both lists and
             // a single Send dispatches both decoders into one kind-9 album.
-            val merged = (pendingDocumentUris + uris).distinct().take(MEDIA_PICKER_MAX_ITEMS)
+            val merged = appendRecoveredDocuments(pendingDocumentUris, uris, MEDIA_PICKER_MAX_ITEMS)
             pendingDocumentUris = merged
         }
 
@@ -2379,6 +2365,7 @@ internal fun ConversationScreen(
         conversationTimelineTailListIndex(
             timelineSize = renderedTimeline.size,
             trailingRowCount = trailingRowCount,
+            hasPendingMembership = controller.pendingMembershipActivity != null,
         ) ?: 0
     val currentTailIndex by rememberUpdatedState(newValue = tailTimelineIndex)
     val seededTailAlignmentReady =
@@ -2999,6 +2986,17 @@ internal fun ConversationScreen(
             followingTail = scrollCoordinator.isFollowingTail,
             initialTimelineAnchored = initialTimelineAnchored,
         )
+    // Stable-key anchoring otherwise retains the old newest message and leaves
+    // the inserted row under the composer. The existing owner preserves history
+    // focus, navigation and foreground restoration while revealing this tail.
+    LaunchedEffect(controller, controller.pendingMembershipActivity?.id, transcriptReadyToReveal) {
+        if (controller.pendingMembershipActivity != null && transcriptReadyToReveal) {
+            scrollCoordinator.followTailIfAllowed(
+                resolveTailIndex = { currentTailIndex },
+                reason = ConversationScrollReason.NewMessage,
+            )
+        }
+    }
     LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
         if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
         val latestId = renderedTimeline.lastOrNull()?.id
@@ -3040,13 +3038,16 @@ internal fun ConversationScreen(
     // refuses this correction while the user is reading history.
     LaunchedEffect(
         controller,
+        controller.pendingMembershipActivity?.id,
         renderedTimeline
             .lastOrNull()
             ?.record
             ?.messageIdHex
             ?.let { controller.reactions[it] },
     ) {
-        if (initialTimelineAnchored && renderedTimeline.isNotEmpty()) {
+        // A pending action owns the physical tail, so message-height settling
+        // resumes only after it clears. Its own follow effect handles insertion.
+        if (initialTimelineAnchored && renderedTimeline.isNotEmpty() && controller.pendingMembershipActivity == null) {
             val lastMessageId = renderedTimeline.last().record.messageIdHex
             scrollCoordinator.settleTailAfterLayoutChange(
                 resolveTailIndex = { currentTailIndex },
@@ -3603,7 +3604,19 @@ internal fun ConversationScreen(
                     } else {
                         null
                     },
-                onSendAttachments = { caption, onResult ->
+                onSendAttachments = sendAttachments@{ caption, onResult ->
+                    if (
+                        importedComposerExceedsLimit(
+                            pendingMediaSlots,
+                            pendingDocumentUris,
+                            MEDIA_PICKER_MAX_ITEMS,
+                            importedShareFiles::owns,
+                        )
+                    ) {
+                        appState.present(R.string.share_import_recovered_limit)
+                        onResult(false)
+                        return@sendAttachments
+                    }
                     attachmentSendPending = true
                     var dispatched = false
                     try {
@@ -3821,6 +3834,7 @@ internal fun ConversationScreen(
                             ConversationEmptyMessage(conversationEmptyState(controller.group.disappearingMessageSecs))
                         }
                     renderedTimeline.isEmpty() &&
+                        controller.pendingMembershipActivity == null &&
                         !controller.hasMoreBefore &&
                         !controller.hasMoreAfterTimeline &&
                         !controller.isLoadingPage &&
@@ -3925,6 +3939,23 @@ internal fun ConversationScreen(
                                     targetEdge = ConversationLoadFailureEdge.BOTTOM,
                                     onRetry = { scope.launch { controller.retryLoadFailure() } },
                                 )
+                                controller.pendingMembershipActivity?.let { activity ->
+                                    item(key = "pending-membership:${activity.id}", contentType = "pendingMembership") {
+                                        PendingGroupMembershipRow(
+                                            activity = activity,
+                                            displayName = { ref ->
+                                                appState.contactNicknameFor(controller.boundAccountRef, ref)
+                                                    ?: appState.networkDisplayName(ref)
+                                            },
+                                            modifier =
+                                                Modifier
+                                                    .timelineReadingExposure(timelineViewport)
+                                                    .membershipVisibleDraw(timelineViewport) {
+                                                        controller.membershipTimings.pendingFrame(activity.id)
+                                                    },
+                                        )
+                                    }
+                                }
                                 itemsIndexed(
                                     renderedTimelineNewestFirst,
                                     key = { _, item -> item.id },
@@ -3939,11 +3970,20 @@ internal fun ConversationScreen(
                                     },
                                 ) { index, item ->
                                     val messageId = item.record.messageIdHex
+                                    val membershipFrameModifier =
+                                        if (item.projected?.groupSystem?.systemType in MEMBERSHIP_FRAME_EVENT_TYPES) {
+                                            Modifier.membershipVisibleDraw(timelineViewport) {
+                                                controller.membershipTimings.projectionFrame(messageId)
+                                            }
+                                        } else {
+                                            Modifier
+                                        }
                                     TimelineRow(
                                         modifier =
                                             Modifier
                                                 .timelineReadingExposure(timelineViewport)
-                                                .conversationTailEntranceMotion(tailEntrance, item.id),
+                                                .conversationTailEntranceMotion(tailEntrance, item.id)
+                                                .then(membershipFrameModifier),
                                         item = item,
                                         // Newest-first rows: the chronologically
                                         // older neighbour is the next row emitted.

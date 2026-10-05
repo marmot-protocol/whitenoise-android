@@ -8,7 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import dev.ipf.whitenoise.android.ui.conversation.RestoredConversationAttachments
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.mergeRestoredComposerAttachments
-import dev.ipf.whitenoise.android.ui.conversation.restoreImportedMediaSlots
+import dev.ipf.whitenoise.android.ui.conversation.restoreImportedComposerAttachments
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
@@ -36,18 +36,35 @@ class ImportedShareShelfBehaviorTest {
         assertBothRestoresKeepPrivateFiles(draftFirst = true)
     }
 
-    private fun assertBothRestoresKeepPrivateFiles(draftFirst: Boolean) {
+    @Test
+    fun nativeFirstOverflowDoesNotDeleteAcceptedPrivateOriginals() {
+        assertBothRestoresKeepPrivateFiles(draftFirst = true, ordinaryCount = 8, importedCount = 3)
+    }
+
+    @Test
+    fun shelfFirstOverflowDoesNotDeleteAcceptedPrivateOriginals() {
+        assertBothRestoresKeepPrivateFiles(draftFirst = false, ordinaryCount = 8, importedCount = 3)
+    }
+
+    private fun assertBothRestoresKeepPrivateFiles(
+        draftFirst: Boolean,
+        ordinaryCount: Int = 1,
+        importedCount: Int = 1,
+    ) {
         val files = PrivateShareFiles(RuntimeEnvironment.getApplication())
-        val (uri, file) = files.newFile()
-        file.writeBytes(byteArrayOf(1))
-        files.finish(uri, "shared.png", "image/png", 1)
-        files.leases.saveShelf("restore-account", "restore-chat", listOf(uri))
+        val imported = List(importedCount) { index ->
+            val (uri, file) = files.newFile()
+            file.writeBytes(byteArrayOf(1))
+            files.finish(uri, "shared-$index.png", "image/png", 1)
+            uri
+        }
+        files.leases.saveShelf("restore-account", "restore-chat", imported)
         val media = mutableStateOf<List<PendingMediaSlot>>(emptyList())
         val documents = mutableStateOf<List<Uri>>(emptyList())
         val ordinary =
             RestoredConversationAttachments(
-                listOf(PendingMediaSlot("native", Uri.parse("content://native/photo"))),
-                listOf(Uri.parse("content://native/document")),
+                List(ordinaryCount) { PendingMediaSlot("native-$it", Uri.parse("content://native/photo-$it")) },
+                if (ordinaryCount == 1) listOf(Uri.parse("content://native/document")) else emptyList(),
             )
         val restoreOrdinary = {
             val merged = mergeRestoredComposerAttachments(media.value, documents.value, ordinary, files::owns)
@@ -65,8 +82,10 @@ class ImportedShareShelfBehaviorTest {
                     revision = 0,
                 ) {
                     val staging = it.getOrThrow()
-                    media.value = restoreImportedMediaSlots(media.value, staging.mediaUris, 10, files::owns)
-                    documents.value = (documents.value.filterNot(files::owns) + staging.documentUris).distinct()
+                    val recovered =
+                        restoreImportedComposerAttachments(media.value, documents.value, staging, files::owns)
+                    media.value = recovered.mediaSlots
+                    documents.value = recovered.documentUris
                     restored = true
                 }
                 Text("Items: ${media.value.size + documents.value.size}")
@@ -74,9 +93,10 @@ class ImportedShareShelfBehaviorTest {
             composeRule.waitUntil(10_000) { restored }
             composeRule.waitForIdle()
             if (!draftFirst) composeRule.runOnIdle { restoreOrdinary() }
-            composeRule.onNodeWithText("Items: 3").assertExists()
-            assertNotNull(files.metadata(uri))
-            assertEquals(listOf(uri), files.leases.loadShelf("restore-account", "restore-chat"))
+            val expectedCount = importedCount + ordinaryCount + ordinary.documentUris.size
+            composeRule.onNodeWithText("Items: $expectedCount").assertExists()
+            imported.forEach { assertNotNull(files.metadata(it)) }
+            assertEquals(imported, files.leases.loadShelf("restore-account", "restore-chat"))
         } finally {
             files.leases.saveShelf("restore-account", "restore-chat", emptyList())
         }

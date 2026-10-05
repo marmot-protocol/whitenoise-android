@@ -14,4 +14,5 @@
     <string name="share_import_interrupted">Importazione interrotta. Condividi di nuovo i file.</string>
     <string name="share_import_progress">File %1$d di %2$d: %3$d byte</string>
     <string name="share_import_rejected_count">File non importati: %1$d</string>
+    <string name="share_import_recovered_limit">I file recuperati superano il limite di 10 allegati. Rimuovi quelli in eccesso prima di inviare.</string>
 </resources>

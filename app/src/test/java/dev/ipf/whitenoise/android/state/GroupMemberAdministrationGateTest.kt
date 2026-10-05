@@ -104,11 +104,16 @@ class GroupMemberAdministrationGateTest {
             // UNDISPATCHED runs through all synchronous preconditions. Remaining
             // active here proves the operation reached the held commit lock.
             assertTrue(invite.isActive)
+            assertEquals(
+                OptimisticGroupRosterMutation.Invite(listOf("carol")),
+                controller.pendingMembershipActivity?.mutation,
+            )
 
             tracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
             releaseLock.complete(Unit)
 
             assertFalse(invite.await())
+            assertNull(controller.pendingMembershipActivity)
             holder.await()
             assertEquals(0, runtimeAccess.callCount)
             assertRosterChangedFailure(appState, controller, R.string.toast_couldnt_add_members)
@@ -131,10 +136,12 @@ class GroupMemberAdministrationGateTest {
                     controller.removeMember(member("bob"))
                 }
             assertTrue(remove.isActive)
+            assertEquals(OptimisticGroupRosterMutation.Remove("bob"), controller.pendingMembershipActivity?.mutation)
             tracker.transition(GroupRosterRefreshEvent.INCONSISTENT)
             releaseLock.complete(Unit)
 
             assertFalse(remove.await())
+            assertNull(controller.pendingMembershipActivity)
             holder.await()
             assertEquals(0, runtimeAccess.callCount)
             assertRosterChangedFailure(appState, controller, R.string.toast_couldnt_remove_member)

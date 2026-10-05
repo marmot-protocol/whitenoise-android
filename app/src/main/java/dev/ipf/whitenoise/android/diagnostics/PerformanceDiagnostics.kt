@@ -29,6 +29,8 @@ internal enum class PerformanceOperation(
     ATTACHMENT_FETCH("attachment_fetch"),
     SYNC_CATCH_UP("sync_catch_up"),
     CHAT_HISTORY_PAGE("chat_history_page"),
+    GROUP_MEMBERSHIP_PENDING("group_membership_pending"),
+    GROUP_MEMBERSHIP_PROJECTION("group_membership_projection"),
 }
 
 /** Source-confirmed triggers accepted by recovery diagnostics. */
