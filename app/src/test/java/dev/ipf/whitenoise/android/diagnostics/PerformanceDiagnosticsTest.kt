@@ -157,6 +157,7 @@ class PerformanceDiagnosticSchemaTest {
                 "chat_history_page",
                 "group_membership_pending",
                 "group_membership_projection",
+                "message_forward",
             ),
             PerformanceOperation.entries.mapTo(mutableSetOf()) { it.wireName },
         )
