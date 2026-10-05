@@ -162,6 +162,18 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Non-destructive sign-out saves accepted keystrokes before MDK deactivates the account. */
+    suspend fun flushAccount(accountRef: String) {
+        while (true) {
+            val jobs =
+                synchronized(lock) {
+                    pending.filterKeys { it.accountRef == accountRef }.values.mapNotNull(Pending::job)
+                }
+            if (jobs.isEmpty()) return
+            jobs.forEach { it.join() }
+        }
+    }
+
     /** Account removal retires unsaved private text and invalidates late saves/hydration without a native write. */
     fun removeAccount(accountRef: String) {
         val jobs =

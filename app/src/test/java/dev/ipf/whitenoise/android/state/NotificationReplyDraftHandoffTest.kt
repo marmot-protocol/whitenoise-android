@@ -169,6 +169,22 @@ class NotificationReplyDraftHandoffTest {
         }
 
     @Test
+    fun plainSignOutSavesAcceptedKeystrokesBeforeRetiringEditorMemory() =
+        runTest {
+            val fixture = fixture()
+            fixture.writer.submit("account-b", "group-b", "last queued edit")
+            fixture.writer.flushAccount("account-b")
+            fixture.writer.removeAccount("account-b")
+            assertEquals(
+                "last queued edit",
+                fixture.gateway.drafts
+                    .getValue("account-b" to "group-b")
+                    .content,
+            )
+            assertEquals(1, fixture.gateway.saves)
+        }
+
+    @Test
     fun accountRemovalRejectsTheCompletionOfAnAlreadyStartedMerge() =
         runTest {
             val fixture = fixture()
