@@ -447,6 +447,7 @@ class LocalizationResourceTest {
         assertEquals("Where I receive", englishValues["inbox"])
     }
 
+    /** Names read-aloud following explicitly in every locale so TalkBack does not announce a generic back action. */
     @Test
     fun ttsResumeFollowAccessibilityLabelNamesReadAloudAcrossAllLocales() {
         val resDir =
