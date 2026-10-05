@@ -208,7 +208,15 @@ class ForwardDiagnosticsProductionPathTest {
             if (snapshot != null && !snapshot.isActive && diagnosticComplete) return snapshot
             Thread.sleep(5)
         }
-        error("forward operation did not reach terminal state and emit its terminal diagnostic")
+        val snapshot = appState.activeForwardOperation.value
+        val phases =
+            PerformanceDiagnostics.exportLines()
+                .filter { " op=message_forward " in it }
+                .map { it.substringAfter(" phase=").substringBefore(' ') }
+        error(
+            "forward diagnostic timeout: phase=${snapshot?.phase}, " +
+                "active=${snapshot?.isActive}, diagnostics=${PerformanceDiagnostics.status()}, phases=$phases",
+        )
     }
 
     /** Builds one complete authoritative media reference. */
