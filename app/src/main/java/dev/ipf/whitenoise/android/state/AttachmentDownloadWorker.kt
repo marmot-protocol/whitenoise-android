@@ -354,6 +354,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
         private const val TAG = "DMAttachmentWorker"
         internal const val BACKOFF_SECONDS = 30L
         private const val EXPLICIT_LOOKUP_RETRIES = 1
+        internal const val RETIRED_TAG = "attachment_download_retired"
         private val explicitFence = ExplicitEnqueueFence()
 
         /**
@@ -400,16 +401,30 @@ class AttachmentDownloadWorker : CoroutineWorker {
             request: AttachmentTransferRequest,
         ) {
             runCatching {
-                val inert =
-                    OneTimeWorkRequestBuilder<AttachmentDownloadWorker>()
-                        .setInputData(AttachmentDownloadWorkData.encode(request, retired = true))
-                        .addTag(attachmentIdentityTag(request))
-                        .build()
                 WorkManager
                     .getInstance(context)
-                    .enqueueUniqueWork(attachmentDownloadWorkName(request), ExistingWorkPolicy.REPLACE, inert)
+                    .enqueueUniqueWork(
+                        attachmentDownloadWorkName(request),
+                        ExistingWorkPolicy.REPLACE,
+                        buildRetirementRequest(request),
+                    )
             }.onFailure { Log.w(TAG, "attachment_download_retire_failed") }
         }
+
+        /**
+         * Builds the inert spec that replaces retired work. It carries [RETIRED_TAG] so a fresh explicit request
+         * recognizes it as replaceable, and [constraints] exist only so tests can hold it pending.
+         */
+        internal fun buildRetirementRequest(
+            request: AttachmentTransferRequest,
+            constraints: Constraints = Constraints.NONE,
+        ): OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<AttachmentDownloadWorker>()
+                .setInputData(AttachmentDownloadWorkData.encode(request, retired = true))
+                .setConstraints(constraints)
+                .addTag(attachmentIdentityTag(request))
+                .addTag(RETIRED_TAG)
+                .build()
 
         /**
          * Persists one transfer as unique WorkManager work. Automatic work coalesces onto any existing
@@ -475,9 +490,10 @@ class AttachmentDownloadWorker : CoroutineWorker {
             },
             attempt: Int = 0,
             fence: ExplicitEnqueueFence = explicitFence,
+            lease: ExplicitEnqueueFence.Lease? = null,
         ) {
             val name = attachmentDownloadWorkName(request)
-            if (attempt == 0 && !fence.tryAcquire(name)) return
+            val held = (if (attempt == 0) fence.tryAcquire(name) else lease) ?: return
             runCatching {
                 val manager = WorkManager.getInstance(context)
                 val probe = lookup(manager, name)
@@ -486,16 +502,21 @@ class AttachmentDownloadWorker : CoroutineWorker {
                         val outcome = runCatching { probe.get() }
                         val infos = outcome.getOrNull()
                         when {
-                            infos != null -> {
-                                settleExplicit(manager, name, request, work, intentStore, infos)
-                                fence.release(name)
-                            }
+                            infos != null ->
+                                fence.runIfCurrent(held) {
+                                    settleExplicit(manager, name, request, work, intentStore, infos) {
+                                        fence.release(held)
+                                    }
+                                }
                             attempt < EXPLICIT_LOOKUP_RETRIES ->
-                                enqueueExplicit(context, request, work, intentStore, lookup, attempt + 1, fence)
+                                if (fence.isCurrent(held)) {
+                                    val next = attempt + 1
+                                    enqueueExplicit(context, request, work, intentStore, lookup, next, fence, held)
+                                }
                             else -> {
                                 val type = outcome.exceptionOrNull()?.javaClass?.simpleName
                                 Log.w(TAG, "attachment_download_lookup_failed type=$type")
-                                fence.release(name)
+                                fence.release(held)
                             }
                         }
                     },
@@ -503,11 +524,15 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 )
             }.onFailure {
                 Log.w(TAG, "attachment_download_enqueue_failed")
-                fence.release(name)
+                fence.release(held)
             }
         }
 
-        /** Replaces live automatic work with the explicit spec, or keeps what exists, unless the tap was cancelled. */
+        /**
+         * Replaces live automatic work, or the inert spec a retirement leaves, with the explicit spec, or keeps
+         * what exists, unless the tap was cancelled. [onSettled] runs once the enqueue has completed or was skipped,
+         * so the fence covers the whole decision.
+         */
         private fun settleExplicit(
             manager: WorkManager,
             name: String,
@@ -515,18 +540,24 @@ class AttachmentDownloadWorker : CoroutineWorker {
             work: OneTimeWorkRequest,
             intentStore: AttachmentDownloadIntentStore,
             infos: List<WorkInfo>,
+            onSettled: () -> Unit,
         ) {
             val automaticTag = attachmentAutomaticAccountTag(request.accountRef)
-            val supersedesAutomatic = infos.any { info -> !info.state.isFinished && automaticTag in info.tags }
-            if (intentStore.isInteractive(request)) {
-                val policy =
-                    if (supersedesAutomatic) {
-                        ExistingWorkPolicy.REPLACE
-                    } else {
-                        ExistingWorkPolicy.KEEP
-                    }
-                runCatching { manager.enqueueUniqueWork(name, policy, work) }
-                    .onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
+            val replaceable =
+                infos.any { info -> !info.state.isFinished && (automaticTag in info.tags || RETIRED_TAG in info.tags) }
+            val operation =
+                if (intentStore.isInteractive(request)) {
+                    val policy = if (replaceable) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
+                    runCatching { manager.enqueueUniqueWork(name, policy, work) }
+                        .onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
+                        .getOrNull()
+                } else {
+                    null
+                }
+            if (operation == null) {
+                onSettled()
+            } else {
+                operation.result.addListener({ onSettled() }, Executor { task -> task.run() })
             }
         }
 

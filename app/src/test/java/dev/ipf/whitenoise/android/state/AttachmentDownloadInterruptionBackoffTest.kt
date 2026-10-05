@@ -325,6 +325,73 @@ class AttachmentDownloadInterruptionBackoffTest {
         assertFalse(workInfo(explicitId).state.isFinished)
     }
 
+    /** A fresh explicit request replaces a retirement spec that is still pending instead of being discarded. */
+    @Test
+    fun freshExplicitRequestReplacesAPendingRetirementSpec() {
+        val held = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+        WorkManager.getInstance(application).enqueueUniqueWork(
+            workName(),
+            ExistingWorkPolicy.REPLACE,
+            AttachmentDownloadWorker.buildRetirementRequest(testRequest(), held),
+        )
+        val retiredId = uniqueWorkId()
+        assertTrue(AttachmentDownloadWorker.RETIRED_TAG in workInfo(retiredId).tags)
+        intentStore().setInteractive(testRequest(), interactive = true)
+
+        AttachmentDownloadWorker.enqueueExplicit(
+            application,
+            testRequest(),
+            AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive),
+            intentStore(),
+            fence = ExplicitEnqueueFence(),
+        )
+
+        val installedId = uniqueWorkId()
+        assertNotEquals("the fresh request was discarded behind the retirement spec", retiredId, installedId)
+        assertFalse(AttachmentDownloadWorker.RETIRED_TAG in workInfo(installedId).tags)
+        assertEquals(WorkInfo.State.ENQUEUED, workInfo(installedId).state)
+    }
+
+    /** An expired lookup that completes after its successor installed explicit work must not replace it. */
+    @Test
+    fun expiredLookupCannotReplaceTheSuccessorsExplicitWork() {
+        AttachmentDownloadWorker.enqueue(application, testRequest())
+        val automaticId = uniqueWorkId()
+        intentStore().setInteractive(testRequest(), interactive = true)
+        val staleSnapshot = WorkManager.getInstance(application).getWorkInfosForUniqueWork(workName()).get()
+        var fenceNow = 0L
+        val fence = ExplicitEnqueueFence(nowMillis = { fenceNow }, staleAfterMillis = FENCE_STALE_MS)
+        // Distinct requests, so a stale replacement would install a different work id and be visible.
+        val staleWork = AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive)
+        val successorWork =
+            AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive)
+        val stalled = SettableFuture.create<List<WorkInfo>>()
+
+        AttachmentDownloadWorker.enqueueExplicit(
+            application,
+            testRequest(),
+            staleWork,
+            intentStore(),
+            { _, _ -> stalled },
+            fence = fence,
+        )
+        fenceNow = FENCE_STALE_MS
+        AttachmentDownloadWorker.enqueueExplicit(
+            application,
+            testRequest(),
+            successorWork,
+            intentStore(),
+            fence = fence,
+        )
+        val explicitId = uniqueWorkId()
+        assertEquals(successorWork.id, explicitId)
+
+        stalled.set(staleSnapshot)
+
+        assertEquals("the expired lookup replaced the successor's work", explicitId, uniqueWorkId())
+        assertFalse(workInfo(explicitId).state.isFinished)
+    }
+
     /** Repeated explicit requests and later automatic enqueues coalesce onto the one unique work. */
     @Test
     fun explicitAndAutomaticEnqueuesCoalesceOnTheUniqueWork() {
@@ -540,6 +607,7 @@ class AttachmentDownloadInterruptionBackoffTest {
         const val INTERRUPTION_ROUNDS = 13
         const val RUN_SECONDS = 10L
         const val SETTLE_MS = 800L
+        const val FENCE_STALE_MS = 1_000L
         const val AGED_MS = 6L * 60L * 60L * 1000L
         const val BLOCKING_NAME = "blocking"
         const val EVENTUAL_TIMEOUT_MS = 15_000L
