@@ -702,7 +702,7 @@ class ComposerExpansionBehaviorTest {
                 .onNodeWithTag(TAG)
                 .fetchSemanticsNode()
                 .boundsInRoot.height
-        assertTrue("upward fling should grow the composer", draggedHeight > initialHeight + 64f)
+        assertTrue("upward drag should grow the composer", draggedHeight > initialHeight + 64f)
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
         assertComposerBottom(initialBounds.bottom)
         composeRule.onNodeWithText(longDraft()).assertExists()
@@ -710,7 +710,7 @@ class ComposerExpansionBehaviorTest {
 
     /** A downward drag can shrink beneath a long draft's content-driven height. */
     @Test
-    fun downwardDragKeepsTheCurrentDraftsCompactEndpoint() {
+    fun downwardDragCanReachOneEditorLineBelowTheContentHeight() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
         render(draft)
         val automaticBounds = composerBounds()

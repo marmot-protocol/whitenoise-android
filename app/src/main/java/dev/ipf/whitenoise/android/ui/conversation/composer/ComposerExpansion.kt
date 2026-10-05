@@ -108,6 +108,10 @@ internal fun dragComposerHeight(
 ): ComposerExpansionState {
     val maximum = normalizedMaximumHeight(maximumHeightPx)
     val minimum = normalizedMinimumHeight(minimumManualHeightPx, maximum)
+    // An already compact automatic row cannot shrink further; do not grow it just to enter Manual.
+    if (state.mode == ComposerExpansionMode.Automatic && automaticHeightPx <= minimum && dragDeltaYPx >= 0f) {
+        return state
+    }
     val nextHeight =
         (
             composerHeightPx(
@@ -125,7 +129,7 @@ internal fun dragComposerHeight(
 
 /**
  * Preserve the exact release height except near either endpoint, where a small
- * deadband makes the one-line manual and full-screen destinations easy to land on.
+ * deadband makes the minimum, automatic content height and full-screen destinations easy to land on.
  */
 internal fun settleComposerHeight(
     state: ComposerExpansionState,
@@ -145,7 +149,10 @@ internal fun settleComposerHeight(
             maximumHeightPx = maximum,
         )
     return when {
+        state.mode == ComposerExpansionMode.Automatic -> ComposerExpansionState()
+        automatic <= minimum && abs(height - minimum) <= deadbandPx -> ComposerExpansionState()
         abs(height - minimum) <= deadbandPx -> ComposerExpansionState(ComposerExpansionMode.Manual, minimum)
+        abs(height - automatic) <= deadbandPx -> ComposerExpansionState()
         abs(maximum - height) <= deadbandPx ->
             ComposerExpansionState(mode = ComposerExpansionMode.FullScreen)
         else -> ComposerExpansionState(ComposerExpansionMode.Manual, height)

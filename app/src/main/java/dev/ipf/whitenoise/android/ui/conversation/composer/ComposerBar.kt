@@ -519,6 +519,7 @@ internal fun ComposerBar(
             mutableStateOf(false)
         }
     var extraComposerControlsHeight by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(0.dp) }
+    var measuredComposerAccessoryHeight by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(0.dp) }
     var automaticComposerHeightPx by
         remember(
             draftKey,
@@ -987,10 +988,12 @@ internal fun ComposerBar(
                 measuredEditorLineHeight = editorLineHeight,
             )
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
-        val manualAccessoryFactor = if (replyingTo != null || hasPendingAttachments) 2 else 1
         val minimumManualComposerHeightPx =
             with(density) {
-                ((editorLineHeight + ComposerManualChromeHeight + extraComposerControlsHeight) * manualAccessoryFactor)
+                (
+                    editorLineHeight + ComposerManualChromeHeight +
+                        extraComposerControlsHeight + measuredComposerAccessoryHeight
+                )
                     .coerceAtMost(maximumComposerHeight)
                     .toPx()
             }
@@ -1401,7 +1404,7 @@ internal fun ComposerBar(
                         },
                         onHeightDragSettled = {
                             // A release keeps the height it was let go at. The endpoints keep a deadband
-                            // so the one-line editor and full screen stay easy to land on deliberately,
+                            // for the minimum, automatic content height and full screen,
                             // but everything between them is the reader's own choice and is retained.
                             val settledExpansion =
                                 settleComposerHeight(
@@ -1439,6 +1442,7 @@ internal fun ComposerBar(
                             },
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
                         onExtraControlsHeightChanged = { extraComposerControlsHeight = it },
+                        onAccessoryHeightChanged = { measuredComposerAccessoryHeight = it },
                         scrollOwnerKey = Triple(draftKey, draftAccountRef, draftGroupIdHex),
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         dismissInProgress = composerDismissInProgress,

@@ -27,8 +27,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextLayoutResult
@@ -38,6 +40,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -66,9 +69,42 @@ class ComposerDragAndReadingTest {
         render("")
         composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertIsDisplayed()
         val before = height()
+        drag(320f)
+        assertEquals("an empty row is already at its smallest automatic height", before, height(), 1f)
         drag(-320f)
         assertTrue(height() > before + 200f)
         assertEquals("", observed.text)
+    }
+
+    @Test
+    fun downwardShortDraftDragKeepsAutomaticGrowthAvailable() {
+        render("Short")
+        val before = height()
+        drag(400f)
+        assertEquals(before, height(), 1f)
+        composeRule.onNode(hasSetTextAction()).performTextReplacement(longDraft)
+        composeRule.waitForIdle()
+        assertTrue("the unchanged automatic mode must still grow with the draft", height() > before + 100f)
+    }
+
+    @Test
+    fun returningToTheContentHeightRestoresMentionSuggestions() {
+        val candidate =
+            MentionComposer.Candidate(
+                accountIdHex = "aa".repeat(32),
+                npub = "npub1" + "q".repeat(58),
+                displayName = "Ada",
+                nip05 = null,
+            )
+        render("@Ad", mentionCandidates = listOf(candidate))
+        composeRule.onNodeWithText("Ada").assertIsDisplayed()
+        val automaticHeight = height()
+        val original = observed
+        drag(-250f)
+        composeRule.onNodeWithText("Ada").assertDoesNotExist()
+        drag(height() - automaticHeight)
+        composeRule.onNodeWithText("Ada").assertIsDisplayed()
+        assertEquals(original, observed)
     }
 
     @Test
@@ -419,6 +455,7 @@ class ComposerDragAndReadingTest {
         rtl: Boolean = false,
         fontScale: Float = 1f,
         editing: Boolean = false,
+        mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
     ) {
         observed = TextFieldValue(draft, TextRange(draft.length))
         sends = 0
@@ -440,6 +477,8 @@ class ComposerDragAndReadingTest {
                                 onSend = { _, _ -> sends++ },
                                 onPickFromGallery = {},
                                 onPickDocument = {},
+                                mentionCandidates = mentionCandidates,
+                                mentionPickerEnabled = mentionCandidates.isNotEmpty(),
                                 editingMessageId = if (editing) "synthetic-message" else null,
                                 editingInitialText = draft.takeIf { editing },
                                 onCancelEdit = { cancels++ },

@@ -95,6 +95,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -410,6 +411,7 @@ internal fun ComposerPill(
     inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
     onExtraControlsHeightChanged: (Dp) -> Unit = {},
+    onAccessoryHeightChanged: (Dp) -> Unit = {},
     scrollOwnerKey: Any? = null,
     // Compact-height viewports cannot afford the expanded control layout, whose
     // fixed header and action-row overhead consumes the whole compact composer
@@ -648,7 +650,7 @@ internal fun ComposerPill(
             hasUserShare ||
             hasContactShare
     var multilineControls by remember { mutableStateOf(false) }
-    val showDraftTop by remember(composerScrollState) { derivedStateOf { composerScrollState.value > 0 } }
+    val draftStartOffscreen by remember(composerScrollState) { derivedStateOf { composerScrollState.value > 0 } }
     val leadingControlsWidth = if (hasAttachmentAction) 80.dp else 40.dp
     val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
@@ -666,6 +668,8 @@ internal fun ComposerPill(
     val navigationRoom =
         navigationSurfaceWidth - leadingControlsWidth - primaryTrailingWidth -
             minimumDictationWidth - (if (sendAccessoryContent != null) 66.dp else 0.dp)
+    // A compact-height row cannot afford another toolbar above it; preserve its editor and core tools.
+    val showDraftTop = draftStartOffscreen && (!multilineControlsSuppressed || navigationRoom >= 48.dp)
     val textMeasurer = rememberTextMeasurer()
     val draftTopLabel = stringResource(R.string.scroll_to_top)
     val draftTopLabelStyle = MaterialTheme.typography.labelMedium
@@ -690,6 +694,7 @@ internal fun ComposerPill(
         }
     val extraControlsHeight = if (topOnSeparateRow) 48.dp else 0.dp
     SideEffect { onExtraControlsHeightChanged(extraControlsHeight) }
+    SideEffect { if (accessoryContent == null) onAccessoryHeightChanged(0.dp) }
     val reservedTrailingWidth = primaryTrailingWidth + if (topOnSeparateRow) 0.dp else draftTopWidth
     val availableDictationWidth =
         compactMeasurementWidth?.let {
@@ -715,6 +720,7 @@ internal fun ComposerPill(
     val compactFreeTrailingGutter = if (expandedTrailingActionInset > 0.dp) 0.dp else 4.dp
     val compactMeasurementTrailingReserve =
         4.dp +
+            (if (topOnSeparateRow) 0.dp else draftTopWidth) +
             dictationControlWidth +
             expandedTrailingActionInset +
             (if (compactMeasurementReservesTrailingAction) 40.dp else 0.dp)
@@ -954,7 +960,12 @@ internal fun ComposerPill(
                 if (accessoryContent != null) {
                     Spacer(Modifier.height(if (multilineControlsSuppressed) 12.dp else CompactEditorTopInset))
                     Box(
-                        Modifier.boundedComposerAccessory().verticalScroll(rememberScrollState()),
+                        Modifier
+                            .boundedComposerAccessory()
+                            .onSizeChanged { size ->
+                                // The grip spacer adds 12dp beyond the editor's ordinary top inset.
+                                onAccessoryHeightChanged(with(density) { size.height.toDp() } + 12.dp)
+                            }.verticalScroll(rememberScrollState()),
                     ) {
                         accessoryContent()
                     }
