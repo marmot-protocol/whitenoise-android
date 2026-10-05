@@ -46,7 +46,6 @@ import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
-import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ConversationTimelineTestDraftPersistence
@@ -807,12 +806,6 @@ abstract class NotificationRouteTimelinePresentationFixture {
             activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
             profileDisplayNameReader = { id -> SENDER_NAME.takeIf { id == ConversationTimelineTestIds.SENDER_ID } },
         ).also { state ->
-            // Isolate foreground routing from the new-group notification default.
-            state.chatMutePreferences.setNotifyForMode(
-                TARGET_ACCOUNT,
-                ConversationTimelineTestIds.GROUP_ID,
-                ChatNotifyMode.ALL,
-            )
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
                 .apply { isAccessible = true }

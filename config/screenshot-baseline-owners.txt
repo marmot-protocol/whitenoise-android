@@ -100,4 +100,4 @@
 
 *.ReceivedFileCachedFirstFrameTest.ownFileRemainsVisibleDuringLocalPreparation
 
-*.GroupDetailsEditNavigationTest.newGroupNotifyModeCanOptInAndReturnToMentions
+*.GroupDetailsEditNavigationTest.newGroupStartsWithAllAndCanChooseOnlyMentions

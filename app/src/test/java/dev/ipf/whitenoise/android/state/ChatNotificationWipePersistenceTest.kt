@@ -22,8 +22,8 @@ class ChatNotificationWipePersistenceTest {
 
         assertEquals(3, fixture.disk.attempts)
         val restored = ChatMutePreferences(RuntimeEnvironment.getApplication(), fixture.disk.underlying)
-        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("alice", "group", false))
-        assertEquals(ChatNotifyMode.ALL, restored.mode("bob", "group", false))
+        assertEquals(ChatNotifyMode.ALL, restored.mode("alice", "group"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("bob", "group"))
     }
 
     /** Permanent disk failure is bounded; in-memory cleanup still permits remaining account-wipe work. */
@@ -34,8 +34,8 @@ class ChatNotificationWipePersistenceTest {
         fixture.preferences.removeAccount("alice")
 
         assertEquals(3, fixture.disk.attempts)
-        assertEquals(ChatNotifyMode.MENTIONS_ONLY, fixture.preferences.mode("alice", "group", false))
-        assertEquals(ChatNotifyMode.ALL, fixture.preferences.mode("bob", "group", false))
+        assertEquals(ChatNotifyMode.ALL, fixture.preferences.mode("alice", "group"))
+        assertEquals(ChatNotifyMode.MENTIONS_ONLY, fixture.preferences.mode("bob", "group"))
     }
 
     /** Seeds existing choices before installing a failure injector that delays actual persistence. */
@@ -45,7 +45,7 @@ class ChatNotificationWipePersistenceTest {
         shared
             .edit()
             .clear()
-            .putStringSet("allConversations", setOf("alice|group", "bob|group"))
+            .putStringSet("mentionOnlyConversations", setOf("alice|group", "bob|group"))
             .commit()
         val disk = FailingRemovalPreferences(shared, failures)
         return RemovalFixture(ChatMutePreferences(context, disk), disk)

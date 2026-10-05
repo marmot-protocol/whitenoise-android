@@ -16,6 +16,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -81,9 +82,9 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
     }
 
-    /** Real details/settings show the new default and retain an explicit All choice after store recreation. */
+    /** New groups show All; the existing picker retains an explicit mentions choice and can restore All. */
     @Test
-    fun newGroupNotifyModeCanOptInAndReturnToMentions() {
+    fun newGroupStartsWithAllAndCanChooseOnlyMentions() {
         context
             .getSharedPreferences("whitenoise.chat_mute", Context.MODE_PRIVATE)
             .edit()
@@ -95,21 +96,28 @@ class GroupDetailsEditNavigationTest {
             .onNodeWithText(context.getString(R.string.sounds_and_notifications))
             .performScrollTo()
             .performClick()
-        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).assertIsDisplayed()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_mentions.png")
-        composeRule.onNodeWithText(context.getString(R.string.notify_for)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.notify_all_messages)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.notify_all_messages)).assertIsDisplayed()
+        composeRule.waitUntil(5_000) {
+            composeRule
+                .onAllNodesWithText(context.getString(R.string.notification_channel_group_messages))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_all.png")
+        composeRule.onNodeWithText(context.getString(R.string.notify_for)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions.png")
         val restored =
             dev.ipf.whitenoise.android.state
                 .ChatMutePreferences(context)
         assertEquals(
-            dev.ipf.whitenoise.android.state.ChatNotifyMode.ALL,
-            restored.mode(ACCOUNT_REF, fixture.controller.group.groupIdHex, false),
+            dev.ipf.whitenoise.android.state.ChatNotifyMode.MENTIONS_ONLY,
+            restored.mode(ACCOUNT_REF, fixture.controller.group.groupIdHex),
         )
         composeRule.onNodeWithText(context.getString(R.string.notify_for)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.notify_all_messages)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.notify_all_messages)).assertIsDisplayed()
     }
 
     /** Unavailable call actions do not occupy the primary action row. */

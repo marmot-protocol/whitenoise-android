@@ -505,14 +505,6 @@ abstract class NotificationDelayedRosterFixture {
             notificationDispatcher = Dispatchers.IO,
             profileDisplayNameReader = { id -> "Peer".takeIf { id == PEER_ID } },
         ).also { state ->
-            // Visibility ownership is tested with both identities explicitly opted in.
-            listOf(SOURCE_ACCOUNT, TARGET_ACCOUNT).forEach { label ->
-                state.chatMutePreferences.setNotifyForMode(
-                    label,
-                    SHARED_GROUP,
-                    dev.ipf.whitenoise.android.state.ChatNotifyMode.ALL,
-                )
-            }
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
                 .apply { isAccessible = true }

@@ -543,13 +543,7 @@ internal class NotificationBootstrapTestFixture(
             pushServerConfigProvider = pushServerConfigProvider,
             nativePushCapabilityResolver = nativePushCapabilityResolver,
             notificationFirstPostTimingObserver = notificationFirstPostTimingObserver,
-        ).also { state ->
-            // These delivery/startup fixtures model an existing installation. Keep the one-time
-            // migration out of controlled row-read races and retain their opted-in group card.
-            state.chatMutePreferences.preserveExistingModes(
-                (accounts.map { it.label } + "account-a").associateWith { listOf("group-a") },
-            )
-        }
+        )
 
     /** Creates the inert chat-list window used by bootstrap tests; only the active view carries rows. */
     private fun emptyChatListWindow(view: ChatListViewFfi): ChatListWindowSubscription =

@@ -4441,10 +4441,6 @@ class WhiteNoiseAppState private constructor(
         bootstrap()
     }
 
-    /**
-     * Initializes the process-owned runtime under the bootstrap barrier. Existing notification
-     * choices are preserved before native workers start; migration failure keeps startup retryable.
-     */
     private suspend fun bootstrapLocked() {
         try {
             if (resumeCompletedBootstrap()) return
@@ -4564,7 +4560,6 @@ class WhiteNoiseAppState private constructor(
                             withContext(Dispatchers.IO) {
                                 runtime.marmot.configurePrivacyRuntime()
                                 runtime.marmot.enforceAppOwnedAttachmentAcquisitionForKnownAccounts()
-                                runtime.marmot.preserveExistingNotificationModes(chatMutePreferences)
                             }
                         }
                     },
@@ -7013,13 +7008,9 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
-    /** Resolves the typed conversation default beneath the independent native mute. */
-    fun conversationNotifyMode(
-        groupIdHex: String,
-        isDm: Boolean = true,
-    ): ChatNotifyMode {
+    fun conversationNotifyMode(groupIdHex: String): ChatNotifyMode {
         val accountRef = activeAccountRef ?: return ChatNotifyMode.ALL
-        return chatMutePreferences.mode(accountRef, groupIdHex, isDm)
+        return chatMutePreferences.mode(accountRef, groupIdHex)
     }
 
     fun conversationVibrationPattern(groupIdHex: String): ConversationVibrationPattern {
@@ -7071,12 +7062,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** The All/Only-mentions preference to show when the chat isn't muted. */
-    fun conversationRestoreNotifyMode(
-        groupIdHex: String,
-        isDm: Boolean = true,
-    ): ChatNotifyMode {
+    fun conversationRestoreNotifyMode(groupIdHex: String): ChatNotifyMode {
         val accountRef = activeAccountRef ?: return ChatNotifyMode.ALL
-        return chatMutePreferences.restoreNotifyMode(accountRef, groupIdHex, isDm)
+        return chatMutePreferences.restoreNotifyMode(accountRef, groupIdHex)
     }
 
     fun setConversationNotifyMode(

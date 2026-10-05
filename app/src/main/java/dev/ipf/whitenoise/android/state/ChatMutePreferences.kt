@@ -41,21 +41,19 @@ class ChatMutePreferences(
     private val _state = MutableStateFlow(ChatNotificationState(readNotificationModes(preferences)))
     val state: StateFlow<ChatNotificationState> = _state.asStateFlow()
 
-    /** Explicit choices win; only newly discovered non-DM groups default to mentions. */
+    /** Explicit account/group choices win; every new conversation starts with all messages. */
     fun mode(
         accountRef: String,
         groupIdHex: String,
-        isDm: Boolean = true,
     ): ChatNotifyMode =
         compositeKeyOrNull(accountRef, groupIdHex)?.let(_state.value.notificationModes::get)
-            ?: if (isDm) ChatNotifyMode.ALL else ChatNotifyMode.MENTIONS_ONLY
+            ?: ChatNotifyMode.ALL
 
     /** Returns the delivery preference retained beneath the independent native mute. */
     fun restoreNotifyMode(
         accountRef: String,
         groupIdHex: String,
-        isDm: Boolean = true,
-    ): ChatNotifyMode = mode(accountRef, groupIdHex, isDm)
+    ): ChatNotifyMode = mode(accountRef, groupIdHex)
 
     /** Persists explicit opt-in or mentions-only without modifying native mute state. */
     fun setNotifyForMode(
@@ -76,31 +74,6 @@ class ChatMutePreferences(
         }
     }
 
-    /** One installation-wide barrier, completed before native workers can discover new groups. */
-    internal val needsDefaultsMigration: Boolean
-        get() = !preferences.getBoolean(KEY_DEFAULTS_MIGRATED, false)
-
-    /** Atomically preserves every old implicit All choice; a failed write leaves migration retryable. */
-    internal fun preserveExistingModes(existingGroups: Map<String, List<String>>) {
-        synchronized(mutationLock) {
-            if (!needsDefaultsMigration) return
-            val updated = _state.value.notificationModes.toMutableMap()
-            existingGroups.forEach { (account, groups) ->
-                groups.forEach { group ->
-                    compositeKeyOrNull(account, group)?.let { updated.putIfAbsent(it, ChatNotifyMode.ALL) }
-                }
-            }
-            val persisted = persistModes(preferences.edit(), updated).putBoolean(KEY_DEFAULTS_MIGRATED, true).commit()
-            if (!persisted) {
-                // commit() mutates SharedPreferences memory even on disk failure. Do not let a
-                // same-process bootstrap retry mistake that unpersisted marker for success.
-                preferences.edit().remove(KEY_DEFAULTS_MIGRATED).apply()
-                error("Could not preserve existing notification preferences")
-            }
-            _state.value = ChatNotificationState(updated.toMap())
-        }
-    }
-
     /** Erases only this identity's choices, retrying transient disk failures before wipe cleanup continues. */
     internal fun removeAccount(accountRef: String) {
         val account = accountRef.trim().takeIf(String::isNotEmpty) ?: return
@@ -117,7 +90,7 @@ class ChatMutePreferences(
         }
     }
 
-    /** Writes both explicit modes together; All must no longer collapse into an absent override. */
+    /** Persists both explicit delivery choices independently of native mute state. */
     private fun persistModes(
         editor: SharedPreferences.Editor,
         modes: Map<String, ChatNotifyMode>,
@@ -127,6 +100,7 @@ class ChatMutePreferences(
         return editor.putStringSet(KEY_MENTION_ONLY_CONVERSATIONS, mentions).putStringSet(KEY_ALL_CONVERSATIONS, all)
     }
 
+    /** Compatibility command entry point; NONE never overwrites the saved delivery choice. */
     fun setMode(
         accountRef: String,
         groupIdHex: String,
@@ -164,7 +138,6 @@ class ChatMutePreferences(
 
     internal companion object {
         private const val PREFERENCES_NAME = "whitenoise.chat_mute"
-        private const val KEY_DEFAULTS_MIGRATED = "groupDefaultsMigrated"
         private const val KEY_ALL_CONVERSATIONS = "allConversations"
         private const val KEY_MUTED_CONVERSATIONS = "mutedConversations"
         private const val KEY_MENTION_ONLY_CONVERSATIONS = "mentionOnlyConversations"
@@ -174,6 +147,7 @@ class ChatMutePreferences(
         private const val COMPOSITE_SEPARATOR = '|'
         private const val ACCOUNT_REMOVAL_ATTEMPTS = 3
 
+        /** Preserves the legacy expiry format, including an empty field for indefinite mute. */
         fun encodeMuteExpiry(entry: Map.Entry<String, MuteExpiry>): String {
             val expiryField = entry.value.expiryMillis?.toString() ?: ""
             return listOf(expiryField, entry.value.restoreMode.name, entry.key).joinToString(EXPIRY_FIELD_SEPARATOR)
@@ -218,7 +192,12 @@ class ChatMutePreferences(
             return compositeKey(label, group)
         }
 
-        fun readMutedSet(preferences: SharedPreferences): Set<String> = preferences.getStringSet(KEY_MUTED_CONVERSATIONS, emptySet())?.toSet().orEmpty()
+        /** Returns a defensive snapshot of legacy mutes awaiting authoritative native confirmation. */
+        fun readMutedSet(preferences: SharedPreferences): Set<String> =
+            preferences
+                .getStringSet(KEY_MUTED_CONVERSATIONS, emptySet())
+                ?.toSet()
+                .orEmpty()
 
         /** Restores both explicit choices; a legacy mentions entry wins if a corrupt store lists both. */
         fun readNotificationModes(preferences: SharedPreferences): Map<String, ChatNotifyMode> =
