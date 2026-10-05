@@ -72,16 +72,21 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
 ): Boolean {
     var placedIndex = initialPlacedIndex
     var placedOffset = initialPlacedOffset
-    repeat(MAX_MENTION_LAYOUT_CORRECTIONS + 1) { attempt ->
-        val index = resolveTargetIndex() ?: return false
-        val layout = readLayout(index)
-        if (!layout.isMeasured) return false
-        if (index == placedIndex && layout.readingStartOffset == placedOffset) return true
-        if (attempt == MAX_MENTION_LAYOUT_CORRECTIONS) return false
-        scrollToItem(index, layout.readingStartOffset)
-        placedIndex = index
-        placedOffset = layout.readingStartOffset
-        awaitLayout()
+    var attempt = 0
+    var reached = false
+    while (attempt <= MAX_MENTION_LAYOUT_CORRECTIONS && !reached) {
+        val index = resolveTargetIndex()
+        val layout = index?.let(readLayout)
+        if (index == null || layout == null || !layout.isMeasured) break
+        if (index == placedIndex && layout.readingStartOffset == placedOffset) {
+            reached = true
+        } else if (attempt < MAX_MENTION_LAYOUT_CORRECTIONS) {
+            scrollToItem(index, layout.readingStartOffset)
+            placedIndex = index
+            placedOffset = layout.readingStartOffset
+            awaitLayout()
+        }
+        attempt++
     }
-    return false
+    return reached
 }
