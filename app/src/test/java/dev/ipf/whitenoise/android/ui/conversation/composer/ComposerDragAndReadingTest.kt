@@ -134,7 +134,7 @@ class ComposerDragAndReadingTest {
     fun accessibleResizeAndEditorFocusRemainIndependentlyAvailable() {
         render("")
         val resize = composeRule.onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
-        val action = resize.fetchSemanticsNode().config[SemanticsProperties.CustomActions].single()
+        val action = resize.fetchSemanticsNode().config[SemanticsActions.CustomActions].single()
         composeRule.runOnIdle { assertTrue(action.action()) }
         composeRule.waitForIdle()
         composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
@@ -175,6 +175,22 @@ class ComposerDragAndReadingTest {
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_manual_minimum_light.png")
         drag(-600f)
         assertTrue("the same grip reaches full height", height() > 450f)
+        assertEquals(original, observed)
+    }
+
+    @Test
+    fun aLongDraftEnteredAfterExpandingAnEmptyComposerCanStillStayAtOneLine() {
+        render("")
+        drag(-250f)
+        composeRule.onNode(hasSetTextAction()).performTextReplacement(longDraft)
+        composeRule.waitForIdle()
+        val original = observed
+        drag(600f)
+        assertOneEditorLine()
+        val minimum = height()
+        composeRule.mainClock.advanceTimeBy(500)
+        composeRule.waitForIdle()
+        assertEquals("the stale empty height must not restore automatic growth", minimum, height(), 1f)
         assertEquals(original, observed)
     }
 

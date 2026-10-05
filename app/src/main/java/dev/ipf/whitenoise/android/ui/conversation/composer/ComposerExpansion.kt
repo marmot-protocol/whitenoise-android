@@ -151,14 +151,14 @@ internal fun settleComposerHeight(
         )
     return when {
         state.mode == ComposerExpansionMode.Automatic -> ComposerExpansionState()
-        height < minimum -> ComposerExpansionState()
+        automatic == minimum && abs(height - automatic) <= deadbandPx -> ComposerExpansionState()
         abs(height - automatic) <= deadbandPx && abs(height - automatic) < abs(height - minimum) ->
             ComposerExpansionState()
         abs(height - minimum) <= deadbandPx -> ComposerExpansionState(ComposerExpansionMode.Manual, minimum)
         abs(height - automatic) <= deadbandPx -> ComposerExpansionState()
         abs(maximum - height) <= deadbandPx ->
             ComposerExpansionState(mode = ComposerExpansionMode.FullScreen)
-        else -> ComposerExpansionState(ComposerExpansionMode.Manual, height)
+        else -> ComposerExpansionState(ComposerExpansionMode.Manual, height.coerceAtLeast(minimum))
     }
 }
 

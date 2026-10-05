@@ -170,6 +170,16 @@ class ComposerExpansionTest {
         assertEquals(ComposerExpansionMode.Automatic, settleComposerHeight(grown, 84f, 108f, 600f, 24f).mode)
     }
 
+    @Test
+    fun compactGapSettlesAtItsCloserDestinationAndAnEquivalentSingleLineRestoresAutomatic() {
+        val nearManual = ComposerExpansionState(ComposerExpansionMode.Manual, 105f)
+        assertEquals(108f, settleComposerHeight(nearManual, 84f, 108f, 600f, 24f).manualHeightPx)
+        assertEquals(
+            ComposerExpansionMode.Automatic,
+            settleComposerHeight(nearManual.copy(manualHeightPx = 108f), 108f, 108f, 600f, 24f).mode,
+        )
+    }
+
     /** The resize handle remains the only gesture that explicitly leaves full-screen mode. */
     @Test
     fun resizeHandleTapIsTheExplicitFullScreenCollapsePath() {

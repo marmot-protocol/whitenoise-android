@@ -414,6 +414,7 @@ internal fun ComposerPill(
     onMultilineControlsChanged: (Boolean) -> Unit = {},
     onExtraControlsHeightChanged: (Dp) -> Unit = {},
     onAccessoryHeightChanged: (Dp) -> Unit = {},
+    onAutomaticTextMeasured: (Int, Boolean) -> Unit = { _, _ -> },
     scrollOwnerKey: Any? = null,
     // Compact-height viewports cannot afford the expanded control layout, whose
     // fixed header and action-row overhead consumes the whole compact composer
@@ -776,6 +777,22 @@ internal fun ComposerPill(
             }
         }
     val compactTextLayout = compactDraftMeasurement?.layout
+    // Keep the natural destination measurable while a manual viewport clips the same editor.
+    SideEffect {
+        compactTextLayout?.let { layout ->
+            onAutomaticTextMeasured(
+                layout.size.height,
+                !multilineControlsSuppressed &&
+                    composerEditingRequested(
+                        focused = composerFocused,
+                        hasText = textFieldValue.text.isNotEmpty(),
+                        forceEditingLayout = forceEditingLayout,
+                        mode = ComposerExpansionMode.Automatic,
+                        dismissInProgress = dismissInProgress,
+                    ),
+            )
+        }
+    }
     // The crossover is decided by the width the draft is leaving, even when the height targets the
     // width it is arriving at: the destination's own count can be lower and would suppress the change.
     val compactLineCount = compactDraftMeasurement?.crossoverLineCount
