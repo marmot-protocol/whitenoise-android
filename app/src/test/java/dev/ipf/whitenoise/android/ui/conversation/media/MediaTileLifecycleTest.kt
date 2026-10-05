@@ -35,6 +35,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -44,6 +45,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Media that is already local must stay on screen across the ordinary ways a person leaves and returns to a chat:
@@ -111,6 +115,36 @@ class MediaTileLifecycleTest {
         awaitTilesShown()
 
         assertEquals("returning to the foreground started a transfer", 0, fixture.calls.size)
+    }
+
+    /** A slow local read must announce opening, never offer to download bytes already in the encrypted cache. */
+    @Test
+    fun retainedImageDoesNotAnnounceDownloadWhileReadingCachedBytes() {
+        val reading = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val hold = AtomicBoolean(false)
+        fixture.reopenDisk {
+            if (hold.get()) {
+                reading.countDown()
+                check(release.await(10, TimeUnit.SECONDS)) { "Synthetic cache read was not released" }
+            }
+        }
+        runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+            assertTrue(fixture.state.diskMediaCache.containsAfterHydration(request(0).cacheKey()))
+        }
+        hold.set(true)
+        try {
+            show()
+            composeRule.waitUntil(10_000) { reading.count == 0L }
+            assertNoDownloadAction()
+            composeRule.onNodeWithContentDescription(text(R.string.media_opening)).assertIsDisplayed()
+            assertEquals(0, fixture.calls.size)
+        } finally {
+            hold.set(false)
+            release.countDown()
+        }
+        awaitTilesShown()
+        assertEquals(0, fixture.calls.size)
     }
 
     /** Pixels decoded before recreation are on the first committed frame of the new Activity, not reloaded later. */

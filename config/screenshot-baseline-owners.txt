@@ -99,3 +99,5 @@
 *.VoiceReviewRecoveryTest.finalizedReviewRecreationShowsUnavailableNoticeAndExplicitRecordAgain
 
 *.ReceivedFileCachedFirstFrameTest.ownFileRemainsVisibleDuringLocalPreparation
+
+*.GroupDetailsEditNavigationTest.newGroupStartsWithAllAndCanChooseOnlyMentions

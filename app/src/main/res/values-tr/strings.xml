@@ -601,7 +601,7 @@
     <string name="preview">Önizleme</string>
     <string name="no_active_account_period">Etkin hesap yok.</string>
     <string name="about">Hakkında</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">NIP-05 adresi</string>
     <string name="nsec_or_npub">Özel anahtarınızı girin</string>
     <string name="white_noise_logo">White Noise logosu</string>
     <string name="identity_entry_error_invalid_key">Bu geçerli bir nsec veya npub anahtarına benzemiyor.</string>
@@ -2210,4 +2210,19 @@
     <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
     <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplar için geçerlidir.</string>
     <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>
+    <string name="profile_readiness_loading">Profil yükleniyor…</string>
+    <string name="profile_readiness_unavailable">Profil durumu kullanılamıyor · Düzenlemek için dokunun</string>
+    <string name="profile_readiness_editor_unavailable">Profil durumu kullanılamıyor</string>
+    <string name="profile_readiness_setup">Profilinizi oluşturun</string>
+    <string name="profile_readiness_ready">Profil hazır</string>
+    <string name="profile_readiness_optional">Profil hazır · İsteğe bağlı bilgiler eklenebilir</string>
+    <string name="profile_readiness_name">Görünen ad</string>
+    <string name="profile_readiness_picture">Profil fotoğrafı</string>
+    <string name="profile_readiness_bio">Biyografi</string>
+    <string name="profile_readiness_banner">Kapak görseli</string>
+    <string name="profile_readiness_address">NIP-05 adresi</string>
+    <string name="profile_readiness_lightning">Lightning adresi</string>
+    <string name="profile_readiness_added">Eklendi</string>
+    <string name="profile_readiness_recommended">Önerilen</string>
+    <string name="profile_readiness_field_optional">İsteğe bağlı</string>
 </resources>

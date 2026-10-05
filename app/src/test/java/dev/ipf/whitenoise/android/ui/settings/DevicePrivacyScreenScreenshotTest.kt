@@ -82,6 +82,11 @@ class DevicePrivacyScreenScreenshotTest {
         val shell = presentBootstrappedApp(state, AppPhase.Ready)
         composeRule.onNodeWithText("Help Improve White Noise").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Close").assertIsDisplayed()
+        // The privacy-only fake rejects chat reads; wait for the golden's settled error
+        // backdrop instead of racing the seeded empty list behind the consent sheet.
+        val chats = composeRule.runOnIdle { shell.chatsController(state.activeAccountRef, state.runtimeGeneration) }
+        composeRule.waitUntil(5_000L) { !chats.isLoading && chats.error != null }
+        composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/usage_diagnostics_chats_prompt.png")
         composeRule.runOnIdle { shell.release() }
     }
