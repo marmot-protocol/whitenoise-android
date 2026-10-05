@@ -141,6 +141,33 @@ class AttachmentDownloadWorkerClassTest {
             assertEquals(Result.retry(), buildWorkerWithDownloadOverride(download, runAttemptCount = 0).doWork())
         }
 
+    /** The inert spec left by retireWork succeeds without a download and without touching intent. */
+    @Test
+    fun retiredSpecSucceedsWithoutDownloadingOrClearingIntent() =
+        runTest {
+            val intents =
+                AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+            intents.setInteractive(testRequest(), interactive = true)
+            intents.spendTransientRetry(testRequest())
+            var downloads = 0
+            val worker =
+                TestListenableWorkerBuilder
+                    .from<AttachmentDownloadWorker>(appContext, AttachmentDownloadWorker::class.java)
+                    .setWorkerFactory(
+                        downloadWorkerFactory { _, _, _ ->
+                            downloads += 1
+                            true
+                        },
+                    ).setInputData(AttachmentDownloadWorkData.encode(testRequest(), retired = true))
+                    .build()
+
+            assertEquals(Result.success(), worker.doWork())
+
+            assertEquals(0, downloads)
+            assertTrue(intents.isInteractive(testRequest()))
+            assertTrue(intents.hasSpentTransientRetry(testRequest()))
+        }
+
     /** A completed download restores the follow-up even when an earlier failure spent it. */
     @Test
     fun successRestoresTheTransientRetryFollowUp() =

@@ -21,6 +21,20 @@ Refs #3081 and #2779.
   WorkManager's run-attempt count, because every restart after a stop also
   increments that count. A terminal result, success or cancel restores it.
 
+## Retiring work safely
+
+WorkManager 2.12.0 has a defect that the opt-in exposes (upstream issue 552283281): when a
+running worker that opted into interruption backoff is cancelled, the stop path reschedules
+the row back to ENQUEUED instead of leaving it cancelled. A test drives this against the real
+scheduler: cancelling a running opted-in job leaves it ENQUEUED with the cancelled-by-app stop
+reason. A download handed to a user-initiated job, or cancelled, would therefore come back and
+run beside its replacement.
+
+Work is retired by replacing it with an inert spec instead. Replacing deletes the old row, so
+there is nothing to reschedule, and the inert spec succeeds without downloading. Concurrent
+explicit requests share one replacement decision per attachment, so a second tap cannot replace
+the explicit work the first one just created.
+
 ## Why the field loop happened
 
 Without the opt-in, WorkManager measures the retry delay from the spec's original

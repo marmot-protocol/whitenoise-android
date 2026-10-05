@@ -71,6 +71,7 @@ internal object AttachmentDownloadWorkData {
     private const val KEY_ATTACHMENT_INDEX = "attachment_index"
     private const val KEY_SOURCE_MESSAGE_ID_HEX = "source_message_id_hex"
     private const val KEY_INTERRUPTION_BACKOFF = "interruption_backoff"
+    private const val KEY_RETIRED = "retired"
 
     /**
      * Encodes only the minimal identity needed for MDK to resolve the attachment again.
@@ -80,6 +81,7 @@ internal object AttachmentDownloadWorkData {
     fun encode(
         request: AttachmentTransferRequest,
         interruptionBackoff: Boolean = false,
+        retired: Boolean = false,
     ): Data {
         val entries =
             mutableListOf<Pair<String, Any?>>(
@@ -90,8 +92,12 @@ internal object AttachmentDownloadWorkData {
                 KEY_SOURCE_MESSAGE_ID_HEX to request.sourceMessageIdHex,
             )
         if (interruptionBackoff) entries += KEY_INTERRUPTION_BACKOFF to true
+        if (retired) entries += KEY_RETIRED to true
         return workDataOf(*entries.toTypedArray())
     }
+
+    /** True for the inert spec that [AttachmentDownloadWorker.retireWork] leaves in place of cancelled work. */
+    fun isRetired(data: Data): Boolean = data.getBoolean(KEY_RETIRED, false)
 
     /** True when the persisted spec was built with the system-interruption backoff opt-in. */
     fun hasInterruptionBackoff(data: Data): Boolean = data.getBoolean(KEY_INTERRUPTION_BACKOFF, false)
@@ -227,6 +233,8 @@ class AttachmentDownloadWorker : CoroutineWorker {
         val application = applicationContext as? WhiteNoiseApplication
         return if (request == null || application == null) {
             Result.failure()
+        } else if (AttachmentDownloadWorkData.isRetired(inputData)) {
+            Result.success()
         } else {
             val intentStore = attachmentIntentStore(applicationContext)
             val priority = intentStore.priorityFor(request)
@@ -346,6 +354,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
         private const val TAG = "DMAttachmentWorker"
         internal const val BACKOFF_SECONDS = 30L
         private const val EXPLICIT_LOOKUP_RETRIES = 1
+        private val explicitFence = ExplicitEnqueueFence()
 
         /**
          * Builds the durable request for one transfer. Ordinary (automatic) work opts into WorkManager's
@@ -380,6 +389,29 @@ class AttachmentDownloadWorker : CoroutineWorker {
         }
 
         /**
+         * Retires the transfer's WorkManager work by replacing it with an inert spec rather than
+         * cancelling it. WorkManager 2.12.0 reschedules a cancelled worker that opted into interruption
+         * backoff back to ENQUEUED (upstream issue 552283281), which would resurrect a download that was
+         * just handed to a user-initiated job or cancelled. Replacing deletes the old row, so there is
+         * nothing to resurrect, and the inert spec succeeds without doing any work.
+         */
+        internal fun retireWork(
+            context: Context,
+            request: AttachmentTransferRequest,
+        ) {
+            runCatching {
+                val inert =
+                    OneTimeWorkRequestBuilder<AttachmentDownloadWorker>()
+                        .setInputData(AttachmentDownloadWorkData.encode(request, retired = true))
+                        .addTag(attachmentIdentityTag(request))
+                        .build()
+                WorkManager
+                    .getInstance(context)
+                    .enqueueUniqueWork(attachmentDownloadWorkName(request), ExistingWorkPolicy.REPLACE, inert)
+            }.onFailure { Log.w(TAG, "attachment_download_retire_failed") }
+        }
+
+        /**
          * Persists one transfer as unique WorkManager work. Automatic work coalesces onto any existing
          * work and backs off after platform interruptions. An explicit request replaces waiting
          * automatic work instead, and on Android 14 or later a visible one runs as a user-initiated job.
@@ -406,9 +438,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
                     Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
                     AttachmentUserInitiatedDownloads.schedule(context.applicationContext, request)
                 ) {
-                    WorkManager
-                        .getInstance(context.applicationContext)
-                        .cancelUniqueWork(attachmentDownloadWorkName(request))
+                    retireWork(context.applicationContext, request)
                     return
                 }
             }
@@ -444,28 +474,37 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 manager.getWorkInfosForUniqueWork(name)
             },
             attempt: Int = 0,
+            fence: ExplicitEnqueueFence = explicitFence,
         ) {
+            val name = attachmentDownloadWorkName(request)
+            if (attempt == 0 && !fence.tryAcquire(name)) return
             runCatching {
                 val manager = WorkManager.getInstance(context)
-                val name = attachmentDownloadWorkName(request)
                 val probe = lookup(manager, name)
                 probe.addListener(
                     {
                         val outcome = runCatching { probe.get() }
                         val infos = outcome.getOrNull()
                         when {
-                            infos != null -> settleExplicit(manager, name, request, work, intentStore, infos)
+                            infos != null -> {
+                                settleExplicit(manager, name, request, work, intentStore, infos)
+                                fence.release(name)
+                            }
                             attempt < EXPLICIT_LOOKUP_RETRIES ->
-                                enqueueExplicit(context, request, work, intentStore, lookup, attempt + 1)
+                                enqueueExplicit(context, request, work, intentStore, lookup, attempt + 1, fence)
                             else -> {
                                 val type = outcome.exceptionOrNull()?.javaClass?.simpleName
                                 Log.w(TAG, "attachment_download_lookup_failed type=$type")
+                                fence.release(name)
                             }
                         }
                     },
                     Executor { task -> task.run() },
                 )
-            }.onFailure { Log.w(TAG, "attachment_download_enqueue_failed") }
+            }.onFailure {
+                Log.w(TAG, "attachment_download_enqueue_failed")
+                fence.release(name)
+            }
         }
 
         /** Replaces live automatic work with the explicit spec, or keeps what exists, unless the tap was cancelled. */
@@ -508,9 +547,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
                 setInteractive(request, interactive = false)
                 resetTransientRetry(request)
             }
-            runCatching {
-                WorkManager.getInstance(appContext).cancelUniqueWork(attachmentDownloadWorkName(request))
-            }.onFailure { Log.w(TAG, "attachment_download_cancel_failed") }
+            retireWork(appContext, request)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 AttachmentUserInitiatedDownloads.cancel(appContext, request)
             }

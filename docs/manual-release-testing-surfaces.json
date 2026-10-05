@@ -26692,6 +26692,18 @@
         "test_ids": ["MED-022"]
       },
       {
+        "surface": "Retired attachment work cannot be resurrected by interruption backoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "internal fun retireWork(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Concurrent explicit attachment requests share one replacement decision",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ExplicitEnqueueFence.kt",
+        "anchor": "internal class ExplicitEnqueueFence(",
+        "test_ids": ["MED-022"]
+      },
+      {
         "surface": "Transient attachment failure follow-up survives platform interruptions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadIntentStore.kt",
         "anchor": "fun hasSpentTransientRetry(",

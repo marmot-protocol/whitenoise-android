@@ -268,6 +268,63 @@ class AttachmentDownloadInterruptionBackoffTest {
         assertTrue(intentStore().isInteractive(testRequest()))
     }
 
+    /**
+     * WorkManager 2.12.0 reschedules a cancelled worker that opted into interruption backoff, so retiring
+     * running automatic work must not rely on cancellation. Neither the old spec nor its download may return.
+     */
+    @Test
+    fun retiringRunningOptedInWorkLeavesNothingToResurrect() {
+        AttachmentDownloadWorker.enqueue(application, testRequest())
+        val automaticId = uniqueWorkId()
+        val driver = WorkManagerTestInitHelper.getTestDriver(application)!!
+        val before = entered.get()
+        driver.setAllConstraintsMet(automaticId)
+        eventually("download entered") { entered.get() > before }
+
+        AttachmentDownloadWorker.retireWork(application, testRequest())
+        Thread.sleep(SETTLE_MS)
+        shadowOf(Looper.getMainLooper()).idle()
+        clock.now += AGED_MS
+        // The old spec was deleted, so the scheduler no longer knows it and cannot start it again.
+        val unknown = runCatching { driver.setAllConstraintsMet(automaticId) }.exceptionOrNull()
+        assertTrue("the retired spec is still schedulable: $unknown", unknown is IllegalArgumentException)
+        Thread.sleep(SETTLE_MS)
+
+        val old = WorkManager.getInstance(application).getWorkInfoById(automaticId).get()
+        assertTrue("old spec returned as ${old?.state}", old == null || old.state.isFinished)
+        val live = WorkManager.getInstance(application).getWorkInfosForUniqueWork(workName()).get()
+        val automaticTag = attachmentAutomaticAccountTag(testRequest().accountRef)
+        assertTrue(live.none { !it.state.isFinished && automaticTag in it.tags })
+        assertEquals("a retired download restarted", before + 1, entered.get())
+    }
+
+    /** Two explicit requests that read the same automatic work enqueue once, and a later one coalesces. */
+    @Test
+    fun concurrentExplicitRequestsDoNotReplaceEachOthersWork() {
+        AttachmentDownloadWorker.enqueue(application, testRequest())
+        val automaticId = uniqueWorkId()
+        intentStore().setInteractive(testRequest(), interactive = true)
+        val pending = SettableFuture.create<List<WorkInfo>>()
+        val lookups = AtomicInteger(0)
+        val lookup: (WorkManager, String) -> ListenableFuture<List<WorkInfo>> = { _, _ ->
+            lookups.incrementAndGet()
+            pending
+        }
+        val fence = ExplicitEnqueueFence()
+        val work = AttachmentDownloadWorker.buildRequest(testRequest(), AttachmentDownloadPriority.Interactive)
+
+        AttachmentDownloadWorker.enqueueExplicit(application, testRequest(), work, intentStore(), lookup, fence = fence)
+        AttachmentDownloadWorker.enqueueExplicit(application, testRequest(), work, intentStore(), lookup, fence = fence)
+        assertEquals("the second request was not fenced", 1, lookups.get())
+        pending.set(WorkManager.getInstance(application).getWorkInfosForUniqueWork(workName()).get())
+
+        val explicitId = uniqueWorkId()
+        assertNotEquals(automaticId, explicitId)
+        AttachmentDownloadWorker.enqueueExplicit(application, testRequest(), work, intentStore(), fence = fence)
+        assertEquals("a later request replaced the explicit work", explicitId, uniqueWorkId())
+        assertFalse(workInfo(explicitId).state.isFinished)
+    }
+
     /** Repeated explicit requests and later automatic enqueues coalesce onto the one unique work. */
     @Test
     fun explicitAndAutomaticEnqueuesCoalesceOnTheUniqueWork() {
@@ -482,6 +539,7 @@ class AttachmentDownloadInterruptionBackoffTest {
         const val STOP_REASON_CONSTRAINT = 4
         const val INTERRUPTION_ROUNDS = 13
         const val RUN_SECONDS = 10L
+        const val SETTLE_MS = 800L
         const val AGED_MS = 6L * 60L * 60L * 1000L
         const val BLOCKING_NAME = "blocking"
         const val EVENTUAL_TIMEOUT_MS = 15_000L
