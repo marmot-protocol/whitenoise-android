@@ -23,6 +23,7 @@ internal fun rememberInboundShareImport(
     return state
 }
 
+/** Creates encrypted recovery and private-source adapters off Main; creation failure remains explicit user feedback. */
 @Composable
 private fun createInboundShareImportStore(
     context: Context,
@@ -56,6 +57,7 @@ private fun createInboundShareImportStore(
     }
 }
 
+/** Persists the interruption marker before reads and rejects completion for a superseded inbound request. */
 @Composable
 private fun persistInboundShareImport(
     holder: MainShellStateHolder,
@@ -85,6 +87,7 @@ private fun persistInboundShareImport(
     }
 }
 
+/** Restores only the retained route token when no newer inbound request owns it, without reopening external grants. */
 @Composable
 private fun restorePendingShareImport(
     holder: MainShellStateHolder,
@@ -109,6 +112,7 @@ private fun restorePendingShareImport(
     }
 }
 
+/** Converts an intake failure into bounded recoverable status, never a send or an empty accepted source list. */
 private fun failedShareImport(
     request: ShareRequest,
     error: ShareImportError,

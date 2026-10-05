@@ -9,6 +9,7 @@ data class ShareStreamStaging(
     val mediaUris: List<Uri>,
     val documentUris: List<Uri>,
 ) {
+    /** Reports whether the one-shot UI handoff contains any stream; durable file ownership is separate. */
     fun isEmpty(): Boolean = mediaUris.isEmpty() && documentUris.isEmpty()
 }
 
@@ -61,6 +62,7 @@ class ShareStagingStore {
     val revision: Int
         get() = revisionState.intValue
 
+    /** Merges distinct URI occurrences into one account/chat handoff and wakes its mounted composer without sending. */
     fun stage(
         accountIdHex: String,
         groupIdHex: String,
@@ -82,11 +84,16 @@ class ShareStagingStore {
         revisionState.intValue += 1
     }
 
+    /** Takes one account/chat handoff once; consuming transient URIs never releases its durable private shelf. */
     fun consume(
         accountIdHex: String,
         groupIdHex: String,
     ): ShareStreamStaging? = pending.remove(draftKey(accountIdHex, groupIdHex))
 
+    /**
+     * Takes the handoff with explicit overflow accounting against current picker slots, not accepted recovered
+     * sources.
+     */
     fun consumeCapped(
         accountIdHex: String,
         groupIdHex: String,
@@ -107,6 +114,7 @@ class ShareStagingStore {
         return capped
     }
 
+    /** Matches the existing account/group namespace so another account cannot consume this handoff. */
     private fun draftKey(
         accountIdHex: String,
         groupIdHex: String,

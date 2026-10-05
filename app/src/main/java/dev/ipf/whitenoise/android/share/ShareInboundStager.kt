@@ -102,6 +102,7 @@ class ShareInboundStager(
     }
 }
 
+/** Resolves provider type through the existing guarded MIME adapter; caller preparation chooses the I/O dispatcher. */
 internal fun shareResolveMime(
     context: Context,
     uri: Uri,
