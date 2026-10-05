@@ -13,10 +13,10 @@ import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import org.junit.After
-import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowLog
 
@@ -26,6 +26,7 @@ internal abstract class ConversationDictationForegroundTestCase {
     fun modelAndroidForegroundIdentityReplacement() {
         NotificationStreamForegroundService.foregroundPublisher = modelForegroundIdReplacement(defaultPublisher)
     }
+
     protected class RejectingForegroundStartContext(
         base: Context,
     ) : ContextWrapper(base) {
@@ -128,9 +129,10 @@ internal abstract class ConversationDictationForegroundTestCase {
 /** Robolectric 4.17 omits Android's cancellation of the previous foreground ID when it changes. */
 internal fun modelForegroundIdReplacement(
     publish: (NotificationStreamForegroundService, Notification, Int) -> Unit,
-): (NotificationStreamForegroundService, Notification, Int) -> Unit = { service, notification, type ->
-    val previous = shadowOf(service as Service).lastForegroundNotificationId
-    publish(service, notification, type)
-    val current = NotificationStreamForegroundService.foregroundNotificationId(notification)
-    if (previous != 0 && previous != current) service.getSystemService(NotificationManager::class.java).cancel(previous)
-}
+): (NotificationStreamForegroundService, Notification, Int) -> Unit =
+    { service, notification, type ->
+        val previous = shadowOf(service as Service).lastForegroundNotificationId
+        publish(service, notification, type)
+        val current = NotificationStreamForegroundService.foregroundNotificationId(notification)
+        if (previous != 0 && previous != current) service.getSystemService(NotificationManager::class.java).cancel(previous)
+    }

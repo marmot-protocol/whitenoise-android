@@ -4,8 +4,8 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.pm.ServiceInfo
 import dev.ipf.whitenoise.android.audio.ConversationDictationForegroundService
-import dev.ipf.whitenoise.android.audio.isForegroundServiceStartRejection
 import dev.ipf.whitenoise.android.audio.conversationDictationDiagnostic
+import dev.ipf.whitenoise.android.audio.isForegroundServiceStartRejection
 
 /** Main-owned leases and presentation for one concrete Android foreground-service record. */
 internal class ConversationForegroundRecord(

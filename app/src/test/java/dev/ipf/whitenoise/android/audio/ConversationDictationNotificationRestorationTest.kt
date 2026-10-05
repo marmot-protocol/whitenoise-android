@@ -22,11 +22,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -43,48 +43,50 @@ class ConversationDictationNotificationRestorationTest {
     fun modelAndroidForegroundIdentityReplacement() {
         NotificationStreamForegroundService.foregroundPublisher = modelForegroundIdReplacement(defaultPublisher)
     }
+
     /** Android cancels the previous foreground ID even if the replacement card is suppressed. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun aRejectedOrdinaryCardCannotKeepCompletedDictationControls() = runTest {
-        notificationActions.forEach { action ->
-            val harness = Harness(this)
-            ConversationDictationForegroundService.hostResolver = { harness }
-            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
-            val service = lifecycle.get()
-            val manager = service.getSystemService(NotificationManager::class.java)
-            var associatedId = 0
-            NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
-                val before = manager.activeNotifications.associate { it.id to it.notification }
-                val nextId = NotificationStreamForegroundService.foregroundNotificationId(notification)
-                defaultPublisher(owner, notification, type)
-                if (notification.channelId == BackgroundConnectionNotification.CHANNEL_ID) {
-                    // A disabled channel/rate rejection leaves an existing key untouched.
-                    manager.cancel(nextId)
-                    before[nextId]?.let { manager.notify(nextId, it) }
+    fun aRejectedOrdinaryCardCannotKeepCompletedDictationControls() =
+        runTest {
+            notificationActions.forEach { action ->
+                val harness = Harness(this)
+                ConversationDictationForegroundService.hostResolver = { harness }
+                val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+                val service = lifecycle.get()
+                val manager = service.getSystemService(NotificationManager::class.java)
+                var associatedId = 0
+                NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
+                    val before = manager.activeNotifications.associate { it.id to it.notification }
+                    val nextId = NotificationStreamForegroundService.foregroundNotificationId(notification)
+                    defaultPublisher(owner, notification, type)
+                    if (notification.channelId == BackgroundConnectionNotification.CHANNEL_ID) {
+                        // A disabled channel/rate rejection leaves an existing key untouched.
+                        manager.cancel(nextId)
+                        before[nextId]?.let { manager.notify(nextId, it) }
+                    }
+                    // This is ActiveServices' system cancellation, not an app cancelling a live FGS.
+                    if (associatedId != 0 && associatedId != nextId) manager.cancel(associatedId)
+                    associatedId = nextId
                 }
-                // This is ActiveServices' system cancellation, not an app cancelling a live FGS.
-                if (associatedId != 0 && associatedId != nextId) manager.cancel(associatedId)
-                associatedId = nextId
-            }
-            try {
-                service.onStartCommand(startIntent(service, harness), 0, 1)
-                service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
-                assertTrue(manager.activeNotifications.any { it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID })
-                service.onStartCommand(actionCommand(service, harness, action), 0, 2)
-                if (action != ConversationDictationForegroundService.ACTION_CANCEL) harness.platform.listener.onResult("recognized")
-                runCurrent()
-                Snapshot.sendApplyNotifications()
-                shadowOf(Looper.getMainLooper()).idle()
-                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-                assertFalse(manager.activeNotifications.any { it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID })
-                assertTrue(service.foreground.connectionServiceType != 0)
-                assertFalse(shadowOf(service as Service).isForegroundStopped)
-            } finally {
-                lifecycle.destroy()
+                try {
+                    service.onStartCommand(startIntent(service, harness), 0, 1)
+                    service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+                    assertTrue(manager.activeNotifications.any { it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID })
+                    service.onStartCommand(actionCommand(service, harness, action), 0, 2)
+                    if (action != ConversationDictationForegroundService.ACTION_CANCEL) harness.platform.listener.onResult("recognized")
+                    runCurrent()
+                    Snapshot.sendApplyNotifications()
+                    shadowOf(Looper.getMainLooper()).idle()
+                    assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+                    assertFalse(manager.activeNotifications.any { it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID })
+                    assertTrue(service.foreground.connectionServiceType != 0)
+                    assertFalse(shadowOf(service as Service).isForegroundStopped)
+                } finally {
+                    lifecycle.destroy()
+                }
             }
         }
-    }
 
     private class Harness(
         scope: CoroutineScope? = null,

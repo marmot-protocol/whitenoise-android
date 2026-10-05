@@ -1450,7 +1450,8 @@ internal class ConversationDictationController internal constructor(
         pendingForegroundRecoverySessionId = null
         if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed
-        if (failed != null && !failed.draftRecovered &&
+        if (failed != null &&
+            !failed.draftRecovered &&
             recoverRecognizedDraft(failed.sessionId, failed.target, failed.retainedTranscript)
         ) {
             if (state !== failed) return
@@ -3321,10 +3322,11 @@ internal class ConversationDictationController internal constructor(
                 sessionId,
                 failedTarget,
                 transcript,
-                options = ConversationDictationDraftRecovery.Options(
-                    restoreCapturedPrefix = claim.emptiedRevision != null && claim.restoredRevision == null,
-                    ownedEmptyRevision = claim.emptiedRevision,
-                ),
+                options =
+                    ConversationDictationDraftRecovery.Options(
+                        restoreCapturedPrefix = claim.emptiedRevision != null && claim.restoredRevision == null,
+                        ownedEmptyRevision = claim.emptiedRevision,
+                    ),
             )
         }
         retainUndeliveredTranscript(sessionId, failedTarget, transcript)
@@ -3543,9 +3545,17 @@ internal class ConversationDictationController internal constructor(
         acknowledgedPrefix: String? = null,
     ): Boolean {
         if (transcript.isNullOrBlank() || draftTargetRemoved || state.sessionId != sessionId) return false
-        val available = completedTargetValidation(target.copy(replyToMessageIdHex = null)) !=
-            ConversationDictationTargetValidation.DefinitelyRemoved
-        val recovered = available && draftRecovery.recover(sessionId, target, transcript, options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = acknowledgedPrefix))
+        val available =
+            completedTargetValidation(target.copy(replyToMessageIdHex = null)) !=
+                ConversationDictationTargetValidation.DefinitelyRemoved
+        val recovered =
+            available &&
+                draftRecovery.recover(
+                    sessionId,
+                    target,
+                    transcript,
+                    options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = acknowledgedPrefix),
+                )
         conversationDictationDiagnostic("event=paste_write outcome=${if (recovered) "accepted" else "retained"} source=latest_draft")
         return recovered
     }

@@ -448,6 +448,7 @@ class NotificationStreamForegroundService : Service() {
             } else {
                 NOTIFICATION_ID
             }
+
         internal var foregroundRemover: (NotificationStreamForegroundService) -> Unit =
             { service -> service.stopForeground(STOP_FOREGROUND_REMOVE) }
 

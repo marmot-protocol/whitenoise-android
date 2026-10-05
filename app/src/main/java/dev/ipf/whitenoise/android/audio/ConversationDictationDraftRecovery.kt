@@ -31,8 +31,10 @@ internal class ConversationDictationDraftRecovery(
         receipt = null
     }
 
-    fun owns(session: Long, target: ConversationDictationTarget): Boolean =
-        receipt?.let { it.session == session && it.target == target } == true
+    fun owns(
+        session: Long,
+        target: ConversationDictationTarget,
+    ): Boolean = receipt?.let { it.session == session && it.target == target } == true
 
     /** Tracks only the clear or restoration actually performed by this session's dispatch. */
     fun updateDispatch(
@@ -78,22 +80,24 @@ internal class ConversationDictationDraftRecovery(
             val unchanged = previous?.draft?.let { sameDraft(it, current) } == true
             val insertion = planInsertion(previous, current, text, options)
             val value = insertionValue(target, text, insertion)
-            val revision = runCatching { write(target.accountRef, target.groupIdHex, current.revision, value) }
-                .getOrNull() ?: return@repeat
+            val revision =
+                runCatching { write(target.accountRef, target.groupIdHex, current.revision, value) }
+                    .getOrNull() ?: return@repeat
             val originalUnchanged = sameDraft(ConversationDictationDraftSnapshot(target.capturedDraft, target.capturedDraftRevision), current)
             val ownsEmpty = (previous?.emptiedRevision ?: options.ownedEmptyRevision) == current.revision && current.value.text.isEmpty()
-            receipt = Receipt(
-                session,
-                target,
-                text,
-                options.acknowledgedPrefix ?: previous?.acknowledgedPrefix ?: text,
-                ConversationDictationDraftSnapshot(value, revision),
-                if (previous == null) originalUnchanged || ownsEmpty else (unchanged || ownsEmpty) && previous.sendEligible,
-                insertion.base,
-                insertion.prefix,
-                insertion.appendOnly,
-                insertion.appendPayload,
-            )
+            receipt =
+                Receipt(
+                    session,
+                    target,
+                    text,
+                    options.acknowledgedPrefix ?: previous?.acknowledgedPrefix ?: text,
+                    ConversationDictationDraftSnapshot(value, revision),
+                    if (previous == null) originalUnchanged || ownsEmpty else (unchanged || ownsEmpty) && previous.sendEligible,
+                    insertion.base,
+                    insertion.prefix,
+                    insertion.appendOnly,
+                    insertion.appendPayload,
+                )
             return true
         }
         return false
@@ -113,7 +117,10 @@ internal class ConversationDictationDraftRecovery(
         return Insertion(current.value, prefix, previous != null, restoringPayload)
     }
 
-    private fun recognizedPrefix(previous: Receipt, text: String): String {
+    private fun recognizedPrefix(
+        previous: Receipt,
+        text: String,
+    ): String {
         if (text.startsWith(previous.transcript)) return previous.transcript
         val acknowledged = previous.acknowledgedPrefix.takeIf { text.startsWith(it) }.orEmpty()
         val length = maxOf(acknowledged.length, commonWordPrefixLength(previous.transcript, text))
@@ -122,25 +129,36 @@ internal class ConversationDictationDraftRecovery(
         return text.take(length)
     }
 
-    private fun insertionValue(target: ConversationDictationTarget, text: String, insertion: Insertion): TextFieldValue {
+    private fun insertionValue(
+        target: ConversationDictationTarget,
+        text: String,
+        insertion: Insertion,
+    ): TextFieldValue {
         val delta = text.removePrefix(insertion.prefix).trim()
         return when {
             insertion.appendPayload -> {
-                val originalPayload = (mergeConversationDictationTranscript(target.capturedDraft, target.capturedDraft, text)
-                    as? ConversationDictationMerge.Applied)?.value
-                    ?: appendConversationDictationTranscript(target.capturedDraft, text)
+                val originalPayload =
+                    (
+                        mergeConversationDictationTranscript(target.capturedDraft, target.capturedDraft, text)
+                            as? ConversationDictationMerge.Applied
+                    )?.value
+                        ?: appendConversationDictationTranscript(target.capturedDraft, text)
                 appendConversationDictationTranscript(insertion.base, originalPayload.text)
             }
             insertion.appendOnly -> appendConversationDictationTranscript(insertion.base, delta)
-            else -> when (val merged = mergeConversationDictationTranscript(target.capturedDraft, insertion.base, delta)) {
-                is ConversationDictationMerge.Applied -> merged.value
-                ConversationDictationMerge.NeedsAppendFallback -> appendConversationDictationTranscript(insertion.base, delta)
-            }
+            else ->
+                when (val merged = mergeConversationDictationTranscript(target.capturedDraft, insertion.base, delta)) {
+                    is ConversationDictationMerge.Applied -> merged.value
+                    ConversationDictationMerge.NeedsAppendFallback -> appendConversationDictationTranscript(insertion.base, delta)
+                }
         }
     }
 
     /** A recovered draft is an admission fence, not a replacement for the immutable outgoing payload. */
-    fun sendTarget(session: Long, target: ConversationDictationTarget): ConversationDictationTarget? {
+    fun sendTarget(
+        session: Long,
+        target: ConversationDictationTarget,
+    ): ConversationDictationTarget? {
         val saved = receipt?.takeIf { it.session == session && it.target == target }
         return if (saved == null) {
             target
@@ -154,11 +172,16 @@ internal class ConversationDictationDraftRecovery(
         }
     }
 
-    private fun sameDraft(a: ConversationDictationDraftSnapshot, b: ConversationDictationDraftSnapshot): Boolean =
-        a.revision == b.revision && a.value.text == b.value.text
+    private fun sameDraft(
+        a: ConversationDictationDraftSnapshot,
+        b: ConversationDictationDraftSnapshot,
+    ): Boolean = a.revision == b.revision && a.value.text == b.value.text
 
     /** Provider punctuation/case changes cannot repeat a shared spoken prefix after an editor change. */
-    private fun commonWordPrefixLength(previous: String, current: String): Int {
+    private fun commonWordPrefixLength(
+        previous: String,
+        current: String,
+    ): Int {
         fun words(text: String): List<Pair<String, Int>> {
             val boundaries = BreakIterator.getWordInstance(Locale.ROOT)
             boundaries.setText(text)

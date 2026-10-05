@@ -234,10 +234,47 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
         assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
         assertTrue(shadowOf(service as Service).isForegroundStopped)
         assertNull(ConversationDictationForegroundService.activeNotificationOrNull())
-        assertFalse(service.getSystemService(NotificationManager::class.java).activeNotifications.any {
-            it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
-        })
+        assertFalse(
+            service.getSystemService(NotificationManager::class.java).activeNotifications.any {
+                it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+            },
+        )
         lifecycle.destroy()
+    }
+
+    /** Losing a presentation cache cannot strand the foreground record Android still owns. */
+    @Test
+    fun completionUsesCurrentHostWhenThePresentationOwnerIsMissing() {
+        listOf(false, true).forEach { connected ->
+            val harness = installHost()
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            try {
+                if (connected) service.foreground.promoteConnection(ForegroundStartTrigger.PushWake)
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                // A stale completion must preserve a controller that is still recording.
+                ConversationDictationForegroundService.stop(service)
+                assertTrue(harness.conversationDictation.hasDurableSession)
+                assertFalse(shadowOf(service as Service).isForegroundStopped)
+
+                ConversationDictationForegroundService::class.java.getDeclaredField("activeService").apply {
+                    isAccessible = true
+                    set(null, null)
+                }
+                harness.conversationDictation.paste()
+                harness.platform.listener.onResult("completed transcript")
+
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+                assertEquals(!connected, shadowOf(service as Service).isForegroundStopped)
+                assertFalse(
+                    service.getSystemService(NotificationManager::class.java).activeNotifications.any {
+                        it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+                    },
+                )
+            } finally {
+                lifecycle.destroy()
+            }
+        }
     }
 
     /** A completed result removes controls without waiting for a service-destruction callback. */

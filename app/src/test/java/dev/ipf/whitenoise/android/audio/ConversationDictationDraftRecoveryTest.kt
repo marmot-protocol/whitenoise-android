@@ -77,7 +77,14 @@ internal class ConversationDictationDraftRecoveryTest {
         val f = Fixture()
         f.edit("")
         val empty = f.draft.revision
-        assertTrue(f.recovery.recover(1, f.target, "first", options = ConversationDictationDraftRecovery.Options(restoreCapturedPrefix = true, ownedEmptyRevision = empty)))
+        assertTrue(
+            f.recovery.recover(
+                1,
+                f.target,
+                "first",
+                options = ConversationDictationDraftRecovery.Options(restoreCapturedPrefix = true, ownedEmptyRevision = empty),
+            ),
+        )
         assertEquals("Draft first", f.draft.value.text)
         assertNotNull(f.recovery.sendTarget(1, f.target))
     }
@@ -98,7 +105,14 @@ internal class ConversationDictationDraftRecoveryTest {
         val f = Fixture()
         f.recovery.recover(1, f.target, "first second", options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first"))
         f.edit("Draft first second edited")
-        assertTrue(f.recovery.recover(1, f.target, "First, SECOND third", options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "First, SECOND third")))
+        assertTrue(
+            f.recovery.recover(
+                1,
+                f.target,
+                "First, SECOND third",
+                options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "First, SECOND third"),
+            ),
+        )
         assertEquals("Draft first second edited third", f.draft.value.text)
         assertNull(f.recovery.sendTarget(1, f.target))
     }
@@ -108,7 +122,14 @@ internal class ConversationDictationDraftRecoveryTest {
         val f = Fixture()
         f.recovery.recover(1, f.target, "first preview", options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first"))
         f.edit("Draft first preview edited")
-        assertTrue(f.recovery.recover(1, f.target, "first corrected result", options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first corrected result")))
+        assertTrue(
+            f.recovery.recover(
+                1,
+                f.target,
+                "first corrected result",
+                options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first corrected result"),
+            ),
+        )
         assertEquals("Draft first preview edited corrected result", f.draft.value.text)
         assertNull(f.recovery.sendTarget(1, f.target))
     }
@@ -128,22 +149,23 @@ internal class ConversationDictationDraftRecoveryTest {
         val target = ConversationDictationTarget("account", "group", draft.value, 0, ConversationDictationMode.InApp)
         var writes = 0
         var reject = false
-        val recovery = ConversationDictationDraftRecovery(
-            read = { account, group ->
-                assertEquals("account", account)
-                assertEquals("group", group)
-                draft
-            },
-            write = { _, _, expected, value ->
-                if (reject || expected != draft.revision) {
-                    null
-                } else {
-                    writes++
-                    draft = ConversationDictationDraftSnapshot(value, expected + 1)
-                    draft.revision
-                }
-            },
-        )
+        val recovery =
+            ConversationDictationDraftRecovery(
+                read = { account, group ->
+                    assertEquals("account", account)
+                    assertEquals("group", group)
+                    draft
+                },
+                write = { _, _, expected, value ->
+                    if (reject || expected != draft.revision) {
+                        null
+                    } else {
+                        writes++
+                        draft = ConversationDictationDraftSnapshot(value, expected + 1)
+                        draft.revision
+                    }
+                },
+            )
 
         fun edit(text: String) {
             draft = ConversationDictationDraftSnapshot(TextFieldValue(text, TextRange(text.length)), draft.revision + 1)
