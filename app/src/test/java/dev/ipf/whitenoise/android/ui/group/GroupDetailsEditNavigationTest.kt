@@ -146,8 +146,10 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag(messagesTag).assertIsOn()
     }
 
-    private fun alertControlEnabled(tag: String): Boolean =
-        !composeRule.onNodeWithTag(tag).fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)
+    private fun alertControlEnabled(tag: String): Boolean {
+        val node = composeRule.onNodeWithTag(tag).fetchSemanticsNode()
+        return !node.config.contains(SemanticsProperties.Disabled)
+    }
 
     /** Unavailable call actions do not occupy the primary action row. */
     @Test
