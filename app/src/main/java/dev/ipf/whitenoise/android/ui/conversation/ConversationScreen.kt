@@ -3107,7 +3107,14 @@ internal fun ConversationScreen(
             documentUris = pendingDocumentUris,
         )
 
-    LaunchedEffect(mediaDraftState, controller.boundAccountRef, chat.id) {
+    LaunchedEffect(
+        mediaDraftState,
+        controller.boundAccountRef,
+        chat.id,
+        appState.inboundShareRevision,
+        pendingMediaSlots,
+        pendingDocumentUris,
+    ) {
         val restored = mediaDraftState.restorePersistedAttachments() ?: return@LaunchedEffect
         pendingMediaSlots = restored.mediaSlots
         pendingDocumentUris = restored.documentUris

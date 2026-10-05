@@ -21,7 +21,7 @@ internal class ComposerDraftExpansionBridge(
     private val draftRepository: MessageDraftRepository,
     private val expansionRetention: ComposerExpansionStateRetention,
     private val scope: CoroutineScope,
-    private val onDraftPresentationRestored: () -> Unit,
+    private val onDraftPresentationChanged: () -> Unit,
     private val onCleanupFailure: (groupIdHex: String, cause: Throwable) -> Unit,
 ) {
     private val sentPresentation = SentComposerDraftPresentation()
@@ -126,7 +126,7 @@ internal class ComposerDraftExpansionBridge(
                 token.generation.value,
                 token.composerExpansionRevision,
             )
-            onDraftPresentationRestored()
+            onDraftPresentationChanged()
         }
     }
 
@@ -157,6 +157,9 @@ internal class ComposerDraftExpansionBridge(
                             draftWriter.runIfCurrent(accountRef, groupIdHex, cleanupGeneration) {
                                 draftStore.replaceFromAuthoritative(accountRef, groupIdHex, null, null)
                             }
+                            // The native draft is now authoritative for any composer that
+                            // reopened while this send's cleanup was still running.
+                            onDraftPresentationChanged()
                         }
                         is MessageDraftMutationResult.Failure -> onCleanupFailure(groupIdHex, result.cause)
                         else -> Unit

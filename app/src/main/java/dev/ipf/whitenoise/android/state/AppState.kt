@@ -2382,7 +2382,7 @@ class WhiteNoiseAppState private constructor(
             draftRepository = messageDraftRepository,
             expansionRetention = composerExpansionStateRetention,
             scope = mutationsScope,
-            onDraftPresentationRestored = { draftHydrationRevision += 1 },
+            onDraftPresentationChanged = { draftHydrationRevision += 1 },
             onCleanupFailure = { groupIdHex, cause ->
                 appStateDebug(cause) { "sent draft cleanup failed group=${groupIdHex.take(8)}" }
             },

@@ -246,6 +246,27 @@ class MessageDraftDictationWriteTest {
             )
         }
 
+    /** Mounted and reopened shelves get an authoritative refresh after successful draft deletion. */
+    @Test
+    fun durableCleanupPublishesADraftPresentationChange() =
+        runTest {
+            val gateway = KeyedDraftGateway(mutableMapOf((ACCOUNT to GROUP) to draft(GROUP, "caption")))
+            val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
+            val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
+            val store = DraftStore(NoOpDraftPersistence)
+            var changes = 0
+            val bridge = draftBridge(writer, store, repository) { changes++ }
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("caption"))
+            writer.flush()
+            val token = requireNotNull(bridge.captureForSend(ACCOUNT, GROUP))
+
+            bridge.clearAfterDurableAcceptance(token)
+            advanceUntilIdle()
+
+            assertEquals(1, changes)
+            assertEquals(null, repository.draft(ACCOUNT, GROUP).getOrThrow())
+        }
+
     private fun repository(
         gateway: MessageDraftGateway,
         ioDispatcher: CoroutineDispatcher,
@@ -259,13 +280,14 @@ class MessageDraftDictationWriteTest {
         writer: CoalescingMessageDraftWriter,
         store: DraftStore,
         repository: MessageDraftRepository,
+        onDraftPresentationChanged: () -> Unit = {},
     ) = ComposerDraftExpansionBridge(
         draftWriter = writer,
         draftStore = store,
         draftRepository = repository,
         expansionRetention = ComposerExpansionStateRetention(),
         scope = this,
-        onDraftPresentationRestored = {},
+        onDraftPresentationChanged = onDraftPresentationChanged,
         onCleanupFailure = { _, cause -> throw cause },
     )
 
