@@ -7,7 +7,7 @@ import dev.ipf.whitenoise.android.R
 data class LocalDeleteNotice(
     val accountRef: String,
     val groupIds: Set<String>,
-    val retry: (() -> Unit)? = null,
+    val retry: ((Set<String>) -> Unit)? = null,
 )
 
 internal fun WhiteNoiseAppState.presentLocalDeleteFailure(

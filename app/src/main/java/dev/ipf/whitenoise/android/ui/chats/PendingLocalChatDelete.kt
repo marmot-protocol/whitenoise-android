@@ -35,6 +35,14 @@ internal class PendingLocalChatDelete private constructor(
         groupIds.drop(deleted), controller, ownerState, account, runtime, bindEpoch,
     )
 
+    /** Recovery may retire targets while a warning is visible; never reconfirm those or expand its scope. */
+    fun retaining(groupIds: Set<String>): PendingLocalChatDelete {
+        val wanted = groupIds.map { it.lowercase() }.toSet()
+        return PendingLocalChatDelete(
+            this.groupIds.filter { it.lowercase() in wanted }, controller, ownerState, account, runtime, bindEpoch,
+        )
+    }
+
     companion object {
         fun capture(
             items: List<ChatListItem>,

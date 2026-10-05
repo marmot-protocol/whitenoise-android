@@ -410,8 +410,11 @@ internal fun WhiteNoiseApp(
                     actionLabel = deletion?.retry?.let { context.getString(R.string.retry) },
                 ),
             )
+            val noticeIsCurrent = appState.toast === toast
             appState.clearToast(toast)
-            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) deletion?.retry?.invoke()
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed && noticeIsCurrent) {
+                deletion?.let { it.retry?.invoke(it.groupIds) }
+            }
         }
     }
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)

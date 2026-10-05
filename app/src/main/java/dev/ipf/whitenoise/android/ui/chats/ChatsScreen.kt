@@ -1990,8 +1990,11 @@ internal fun ChatsScreen(
                         appState.presentStoppedLocalChatDeleteBatch(
                             result,
                             failure,
-                            notice = LocalDeleteNotice(requireNotNull(controller.accountRef), remaining.groupIds.toSet()) {
-                                if (isCurrent()) pendingBulkDelete = remaining
+                            notice = LocalDeleteNotice(
+                                requireNotNull(controller.accountRef),
+                                remaining.groupIds.toSet(),
+                            ) { targets ->
+                                if (isCurrent()) pendingBulkDelete = remaining.retaining(targets)
                             },
                         )
                     } else if (isCurrent() && result.deleted > 0 && !cleanupDeferred) {
