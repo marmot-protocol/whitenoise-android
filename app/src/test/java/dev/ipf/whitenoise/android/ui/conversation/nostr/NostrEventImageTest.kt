@@ -1,10 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -18,6 +20,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -58,27 +61,28 @@ class NostrEventImageTest {
 
     @Test
     fun failedImageCanRetryAndOpenFullscreenWithoutAnotherDownload() {
-        var downloads = 0
+        val downloads = AtomicInteger()
+        val recoveredImage = Bitmap.createBitmap(20, 10, Bitmap.Config.ARGB_8888).asImageBitmap()
         val failureLabel = string(R.string.nostr_event_image_failed)
+        val viewLabel = string(R.string.nostr_event_view_image)
         composeRule.setContent {
             WhiteNoiseTheme {
                 NostrEventImagePane(url = "https://images.example/retry", loadImage = { _, _ ->
-                    downloads++
-                    if (downloads == 1) null else ImageBitmap(20, 10)
+                    if (downloads.incrementAndGet() == 1) null else recoveredImage
                 })
             }
         }
-        composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).performClick()
+        composeRule.onNodeWithText(viewLabel).performClick()
         composeRule.onNodeWithText(failureLabel).assertIsDisplayed()
         composeRule.onNodeWithText(string(R.string.retry)).performClick()
         composeRule.waitUntil(10_000) {
-            downloads == 2 &&
-                composeRule.onAllNodesWithText(failureLabel).fetchSemanticsNodes().isEmpty()
+            composeRule.onAllNodesWithContentDescription(viewLabel).fetchSemanticsNodes().isNotEmpty()
         }
+        composeRule.runOnIdle { assertEquals(2, downloads.get()) }
         composeRule.onNodeWithText(failureLabel).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).performClick()
+        composeRule.onNodeWithText(viewLabel).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.close)).assertIsDisplayed().performClick()
-        composeRule.runOnIdle { assertEquals(2, downloads) }
+        composeRule.runOnIdle { assertEquals(2, downloads.get()) }
     }
 
     @Test
