@@ -26078,6 +26078,18 @@
     ],
     "source_coverage": [
       {
+        "surface": "Prepared attachment speech account-switch ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun speakAloudPrepared(",
+        "test_ids": ["MED-010", "NAV-006"]
+      },
+      {
+        "surface": "Reader speech geometry disposal after text replacement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReaderTextSelection.kt",
+        "anchor": "DisposableEffect(key, rendered.text, sentenceLayoutReporter)",
+        "test_ids": ["MED-010"]
+      },
+      {
         "surface": "Share picker staging rejection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "R.string.no_share_target_available",

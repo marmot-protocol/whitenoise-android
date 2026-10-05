@@ -119,6 +119,7 @@ class TtsPlaybackForegroundServiceTest {
         controller.destroy()
     }
 
+    /** Notification controls retain an attachment's queue and cursor while exposing no document text or filename. */
     @Test
     fun attachmentSessionRetainsItsCursorThroughBackgroundNotificationControls() {
         val harness = installHost()

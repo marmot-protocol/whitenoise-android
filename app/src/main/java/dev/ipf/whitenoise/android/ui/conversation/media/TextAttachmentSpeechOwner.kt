@@ -12,6 +12,7 @@ internal class TextAttachmentSpeechOwner(
     private val sourceIsCurrent: () -> Boolean,
     private val accountOwnsSpeech: () -> Boolean,
 ) {
+    /** Grants controls only to this attachment while its source and owning local account remain current. */
     fun ownsAttachment(
         state: TtsState,
         messageIdHex: String,
@@ -25,6 +26,10 @@ internal class TextAttachmentSpeechOwner(
                 attachmentIndex,
             )
 
+    /**
+     * Captures callbacks for the observed session. Revoked accounts expose no passage; stale source/session
+     * callbacks cannot seek a replacement queue or start another reader's speech.
+     */
     fun playback(
         entry: TtsSpeakableEntry,
         state: TtsState,
@@ -45,6 +50,7 @@ internal class TextAttachmentSpeechOwner(
         )
     }
 
+    /** Seeks only an exact live account/source/session/projection match, otherwise returning no new state. */
     private fun seek(
         entry: TtsSpeakableEntry,
         sessionId: Long,

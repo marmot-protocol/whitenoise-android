@@ -208,6 +208,7 @@ private class ReaderSpeechInteractions(
     private val policy: ConversationTtsFollowPolicy,
     private val links: TtsLinkTapCoordinator,
 ) {
+    /** Maps a current unselected hit to the live queue, or delegates an inactive reader's explicit start. */
     fun seek(hit: RenderedTextHit) {
         val live = playback.value?.takeIf { it.isCurrent() && !selection.active } ?: return
         if (textAttachmentPlaybackPassage(live) != null) {
@@ -219,6 +220,7 @@ private class ReaderSpeechInteractions(
         }
     }
 
+    /** Accessibility choices must name the current projection and cannot act during text selection. */
     fun choose(choice: TtsSentenceChoice): Boolean {
         val live = playback.value ?: return false
         return if (!selection.active && live.isCurrent() && choice.revision == live.entry.projectionId) {
@@ -228,6 +230,7 @@ private class ReaderSpeechInteractions(
         }
     }
 
+    /** A successful explicit seek cancels link activation and suppresses only its next automatic reveal. */
     private fun suppressFollow(state: TtsState?): Boolean =
         state?.conversationFollowTargetOrNull()?.let {
             links.cancelPendingActivation()
@@ -236,6 +239,7 @@ private class ReaderSpeechInteractions(
         } ?: false
 }
 
+/** Uses the selection registry's current window geometry without stealing ordinary inactive link taps. */
 @Composable
 private fun rememberReaderSeekModifier(
     selection: TextAttachmentSelectionController,
@@ -263,6 +267,7 @@ private fun rememberReaderSeekModifier(
     )
 }
 
+/** Registers complete rendered coverage for one sentence; incomplete or selected leaves clear their contribution. */
 @Composable
 private fun rememberReaderSentenceLayoutReporter(
     target: ConversationTtsFollowTarget?,

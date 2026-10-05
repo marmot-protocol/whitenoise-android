@@ -160,6 +160,7 @@ internal fun TextAttachmentReaderDialog(
         if (actions.isCurrent()) entry = prepared
     }
 
+    /** Starts one source-scoped preparation and always releases its busy UI flag, including on cancellation. */
     fun start(
         preview: TextAttachmentPreview,
         hit: RenderedTextHit? = null,

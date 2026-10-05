@@ -50,6 +50,7 @@ class TextAttachmentReaderSessionTest {
     private var visible by mutableStateOf(true)
     private var service: ServiceController<TtsPlaybackForegroundService>? = null
 
+    /** Stops fixture speech and restores the process-wide foreground host resolver. */
     @After
     fun releaseSession() {
         appState.stopSpeaking()
@@ -57,6 +58,7 @@ class TextAttachmentReaderSessionTest {
         TtsPlaybackForegroundService.hostResolver = resolver
     }
 
+    /** Closing and reopening the real reader preserves its queue, cursor and notification controls. */
     @Test
     fun readerStartsOneOwnedSessionAndBackgroundControlsRestoreItsPausedCursor() {
         startReaderSession()
@@ -93,6 +95,7 @@ class TextAttachmentReaderSessionTest {
         assertTrue(appState.ttsController.state.value is TtsState.Idle)
     }
 
+    /** Opens the production dialog and starts its toolbar action against the fixture foreground host. */
     private fun startReaderSession() {
         appState.ttsController.attachEngine(engine)
         installForegroundHost()
@@ -121,24 +124,29 @@ class TextAttachmentReaderSessionTest {
         assertTrue(appState.ownsCurrentAccountSpeech())
     }
 
+    /** Waits for actual reader text instead of assuming asynchronous loading has finished. */
     private fun waitForBody() {
         composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText(source).fetchSemanticsNodes().isNotEmpty() }
         composeRule.waitForIdle()
     }
 
+    /** Routes notification transport to the fixture's controller without creating another queue. */
     private fun installForegroundHost() {
         TtsPlaybackForegroundService.hostResolver = {
             object : TtsPlaybackSessionHost {
                 override val controller get() = appState.ttsController
 
+                /** Advances the fixture's currently owned queue. */
                 override fun nextSentence() {
                     controller.skipNextSentence()
                 }
 
+                /** Rewinds the fixture's currently owned queue. */
                 override fun previousSentence() {
                     controller.skipPreviousSentence()
                 }
 
+                /** Clears AppState ownership together with the stopped queue. */
                 override fun stopSession() {
                     appState.stopSpeaking()
                 }
@@ -147,6 +155,7 @@ class TextAttachmentReaderSessionTest {
         service = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
     }
 
+    /** Delivers a real service intent and drains callbacks before inspecting the reader state. */
     private fun notificationAction(action: String) {
         val live = requireNotNull(service).get()
         live.onStartCommand(Intent(context, live::class.java).setAction(action), 0, 1)
@@ -154,14 +163,17 @@ class TextAttachmentReaderSessionTest {
         composeRule.waitForIdle()
     }
 
+    /** Provides one local account and inert draft persistence, with no network or second protocol store. */
     private fun createAppState() =
         WhiteNoiseAppState(
             context = context,
             draftStore =
                 DraftStore(
                     object : DraftPersistence {
+                        /** Returns no persisted drafts to the reader fixture. */
                         override fun read(): Map<String, String> = emptyMap()
 
+                        /** Never retains reader text or protocol data in a second store. */
                         override fun write(
                             key: String,
                             value: String?,

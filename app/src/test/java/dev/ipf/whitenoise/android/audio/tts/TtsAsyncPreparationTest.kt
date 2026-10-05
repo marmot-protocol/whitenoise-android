@@ -11,10 +11,12 @@ import org.junit.Test
 import java.util.Locale
 
 class TtsAsyncPreparationTest {
+    /** Rejects invalid rendered coordinates rather than speaking a guessed fallback sentence. */
     @Test
     fun invalidRenderedHitNeverFallsBackToTheDocumentTop() =
         runTest {
             val harness = SessionHarness(this)
+            harness.controller.lastStartFailure = TtsStartFailure.AudioFocusDenied
             val result =
                 harness.controller.speakAsync(
                     listOf(harness.entry("m1")),
@@ -23,8 +25,10 @@ class TtsAsyncPreparationTest {
                 ) { true }
             assertFalse(result)
             assertTrue(harness.spokenTexts().isEmpty())
+            assertEquals(TtsStartFailure.None, harness.controller.lastStartFailure)
         }
 
+    /** Revocation before ticket creation preserves the already-playing queue. */
     @Test
     fun alreadyRevokedSourcePreservesTheExistingSession() =
         runTest {
@@ -38,6 +42,7 @@ class TtsAsyncPreparationTest {
             assertEquals(1, harness.spokenTexts().size)
         }
 
+    /** Revocation after ticket creation prevents commitment and releases Preparing state. */
     @Test
     fun revokedSourceDuringPreparationCannotStartSpeech() =
         runTest {
@@ -57,6 +62,7 @@ class TtsAsyncPreparationTest {
             assertTrue(harness.spokenTexts().isEmpty())
         }
 
+    /** Foreground ownership precedes preparation; commitment preserves the preparation session ID. */
     @Test
     fun preparingOwnsTheServiceBeforeTextWorkAndCommitsTheSameSession() =
         runTest {
@@ -75,6 +81,7 @@ class TtsAsyncPreparationTest {
             assertTrue(harness.controller.state.value is TtsState.Speaking)
         }
 
+    /** Explicit stop invalidates a pending ticket even after its foreground callback succeeds. */
     @Test
     fun stopDuringPreparationCannotPublishAfterwards() =
         runTest {
@@ -89,6 +96,7 @@ class TtsAsyncPreparationTest {
             assertTrue(harness.spokenTexts().isEmpty())
         }
 
+    /** Refusing foreground ownership leaves no private speech or lingering preparation. */
     @Test
     fun rejectedForegroundOwnerCancelsPreparation() =
         runTest {
@@ -99,6 +107,7 @@ class TtsAsyncPreparationTest {
             assertTrue(harness.spokenTexts().isEmpty())
         }
 
+    /** Inline-code expansion does not move a prose hit into the wrong prepared sentence. */
     @Test
     fun renderedHitStartsAtPreparedSentenceAfterInlineCodeExpansion() =
         runTest {

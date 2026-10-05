@@ -76,6 +76,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
 import dev.ipf.whitenoise.android.audio.tts.TtsPlaybackForegroundService
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
@@ -1572,6 +1573,11 @@ class WhiteNoiseAppState private constructor(
         return started
     }
 
+    /**
+     * Prepares reader text off the controller lock, preserving caller/account ownership through playback commit.
+     * Account-switch generation prevents an A-B-A return from reviving old work. Cleanup is session-scoped so
+     * a revoked or cancelled request cannot clear a replacement queue's ownership.
+     */
     suspend fun speakAloudPrepared(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
@@ -1580,23 +1586,39 @@ class WhiteNoiseAppState private constructor(
         isCurrent: () -> Boolean = { true },
     ): Boolean {
         val ownerAccount = activeAccountRef
-        return ttsController
-            .speakAsync(
-                entries,
-                locale,
-                startSentenceIndex,
-                startRenderedHit,
-                isCurrent = { activeAccountRef == ownerAccount && isCurrent() },
-            ) {
-                ttsSpeechAccountRef = ownerAccount
-                TtsPlaybackForegroundService.start(appContext)
-            }.also { started ->
-                if (started) {
+        val ownerGeneration = accountSwitchHandoff.capture()
+        var preparingSessionId: Long? = null
+        try {
+            val started =
+                ttsController.speakAsync(
+                    entries,
+                    locale,
+                    startSentenceIndex,
+                    startRenderedHit,
+                    isCurrent = {
+                        isCurrent() && activeAccountRef == ownerAccount && accountSwitchHandoff.isCurrent(ownerGeneration)
+                    },
+                ) {
+                    preparingSessionId = ttsController.state.value.sessionId
                     ttsSpeechAccountRef = ownerAccount
-                    ttsAutoReadSessionKey = null
-                    ttsHistorySession.onSessionCleared()
+                    TtsPlaybackForegroundService.start(appContext)
                 }
+            if (started) {
+                ttsSpeechAccountRef = ownerAccount
+                ttsAutoReadSessionKey = null
+                ttsHistorySession.onSessionCleared()
             }
+            return started
+        } finally {
+            val state = ttsController.state.value
+            if (state is TtsState.Idle &&
+                state.sessionId == preparingSessionId && ttsSpeechAccountRef == ownerAccount
+            ) {
+                ttsSpeechAccountRef = null
+                ttsAutoReadSessionKey = null
+                ttsHistorySession.onSessionCleared()
+            }
+        }
     }
 
     suspend fun speakAloudAutoRead(

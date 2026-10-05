@@ -8,6 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class TextAttachmentSpeechOwnerTest {
+    /** Every captured ownership dimension must still match before a seek can move a shared queue. */
     @Test
     fun staleSessionAccountSourceAndRevisionCannotSeekAnotherQueue() =
         runTest {
@@ -38,6 +39,7 @@ class TextAttachmentSpeechOwnerTest {
             assertEquals(replacement, harness.controller.state.value)
         }
 
+    /** An attachment index is part of ownership, even when the parent message is the same. */
     @Test
     fun otherAttachmentNeverOwnsTheStopOrSeekAction() =
         runTest {
@@ -48,6 +50,7 @@ class TextAttachmentSpeechOwnerTest {
             org.junit.Assert.assertFalse(owner.ownsAttachment(harness.controller.state.value, "message", 0))
         }
 
+    /** An inactive reader's captured callback cannot replace a session started after capture. */
     @Test
     fun staleInactiveCallbackCannotReplaceANewlyStartedSession() =
         runTest {

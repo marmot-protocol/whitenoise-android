@@ -214,7 +214,7 @@ internal fun ReaderSelectablePlainText(
     DisposableEffect(key, onSelectableTextLayoutChanged) {
         onDispose { onSelectableTextLayoutChanged(key, null, null) }
     }
-    DisposableEffect(key, sentenceLayoutReporter) {
+    DisposableEffect(key, rendered.text, sentenceLayoutReporter) {
         onDispose {
             leafId?.let { sentenceLayoutReporter?.invoke(it, rendered.text, null, null) }
         }

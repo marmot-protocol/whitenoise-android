@@ -24,6 +24,43 @@ import org.robolectric.annotation.Config
 class ReaderPlainTextLayoutLifetimeTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** A stable leaf ID still retires the old text's speech geometry and the final text on disposal. */
+    @Test
+    fun changingTextWithStableLeafClearsBothLayoutLifetimes() {
+        val text = mutableStateOf("Original sentence.")
+        val mounted = mutableStateOf(true)
+        val reported = mutableSetOf<String>()
+        val cleared = mutableListOf<String>()
+        val reporter: TtsSentenceLayoutReporter = { _, rendered, layout, _ ->
+            if (layout == null) cleared += rendered else reported += rendered
+        }
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (mounted.value) {
+                    ReaderSelectablePlainText(
+                        text = text.value,
+                        onSelectableTextLayoutChanged = { _, _, _ -> },
+                        leafId = "plain",
+                        sentenceLayoutReporter = reporter,
+                    )
+                }
+            }
+        }
+        composeRule.runOnIdle {
+            assertTrue("Original sentence." in reported)
+            text.value = "Replacement sentence."
+        }
+        composeRule.runOnIdle {
+            assertEquals(listOf("Original sentence."), cleared)
+            assertTrue("Replacement sentence." in reported)
+            mounted.value = false
+        }
+        composeRule.runOnIdle {
+            assertEquals(listOf("Original sentence.", "Replacement sentence."), cleared)
+        }
+    }
+
+    /** Sentence progression preserves the independent native-selection registration. */
     @Test
     fun changingSentenceReporterDoesNotRemoveTheSelectionLayout() {
         val sentence = mutableStateOf(0)
@@ -56,6 +93,7 @@ class ReaderPlainTextLayoutLifetimeTest {
         }
     }
 
+    /** Markdown re-reports speech geometry without unregistering hit testing. */
     @Test
     fun markdownSentenceReporterChangesKeepSelectionHitTestingRegistered() {
         val sentence = mutableStateOf(0)

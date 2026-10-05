@@ -366,7 +366,12 @@ class TtsController internal constructor(
     ): Boolean {
         val ticket =
             synchronized(this) {
-                if (isCurrent()) preparationTicket(entries, locale) else null
+                if (isCurrent()) {
+                    lastStartFailure = TtsStartFailure.None
+                    preparationTicket(entries, locale)
+                } else {
+                    null
+                }
             } ?: return false
         try {
             return if (!onPreparing()) {
@@ -381,6 +386,7 @@ class TtsController internal constructor(
         }
     }
 
+    /** Resolves an exact prepared hit off-lock, then revalidates the caller, ticket, engine and locale before commit. */
     private suspend fun completePreparation(
         ticket: Triple<Long, TtsSpeechEngine, Locale>,
         entries: List<TtsSpeakableEntry>,

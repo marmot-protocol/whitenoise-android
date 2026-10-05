@@ -72,6 +72,7 @@ class TextAttachmentReadAloudScreenshotTest {
     private var sourceCurrent by mutableStateOf(true)
     private val speechOwner = TextAttachmentSpeechOwner(harness.controller, { sourceCurrent }, { true })
 
+    /** Pins active Markdown sentence and word highlighting in the light theme. */
     @Test
     fun markdownActiveSentenceAndWordLight() {
         render(markdownPreview)
@@ -79,6 +80,7 @@ class TextAttachmentReadAloudScreenshotTest {
         capture("text_attachment_read_aloud_markdown_light.png")
     }
 
+    /** Pins active Markdown highlighting against AMOLED surfaces. */
     @Test
     fun markdownActiveSentenceAndWordAmoled() {
         render(markdownPreview, amoled = true)
@@ -86,6 +88,7 @@ class TextAttachmentReadAloudScreenshotTest {
         capture("text_attachment_read_aloud_markdown_amoled.png")
     }
 
+    /** Pins active plain-text highlighting at large font scale with RTL chrome. */
     @Test
     fun plainTextActiveSentenceLargeRtl() {
         render(plainPreview, rtl = true, fontScale = 1.6f)
@@ -93,6 +96,7 @@ class TextAttachmentReadAloudScreenshotTest {
         capture("text_attachment_read_aloud_plain_large_rtl.png")
     }
 
+    /** Body seeking preserves the queue; the toolbar explicitly starts at the document top. */
     @Test
     fun plainDoubleTapSeeksTheExistingSessionAndToolbarStartsAtTop() {
         render(plainPreview)
@@ -105,6 +109,7 @@ class TextAttachmentReadAloudScreenshotTest {
         assertTrue(harness.controller.state.value.sessionId != session)
     }
 
+    /** Markdown hits use rendered leaf coordinates rather than raw markup offsets. */
     @Test
     fun markdownDoubleTapUsesRenderedSentenceCoordinates() {
         render(markdownPreview)
@@ -114,6 +119,7 @@ class TextAttachmentReadAloudScreenshotTest {
         assertEquals(session, harness.controller.state.value.sessionId)
     }
 
+    /** An explicit inactive-reader tap starts at its mapped sentence, never a guessed top fallback. */
     @Test
     fun inactiveDoubleTapStartsAtTheTappedSentenceInsteadOfTheTop() {
         render(plainPreview)
@@ -122,6 +128,7 @@ class TextAttachmentReadAloudScreenshotTest {
         assertEquals(1, harness.controller.state.value.sentenceIndexWithinMessage)
     }
 
+    /** Returning to a paused reader restores highlighting without another speech submission. */
     @Test
     fun closeAndReturnRestoresPausedHighlightWithoutRestartingSpeech() {
         render(markdownPreview)
@@ -138,6 +145,7 @@ class TextAttachmentReadAloudScreenshotTest {
         capture("text_attachment_read_aloud_paused_return.png")
     }
 
+    /** A revoked source cannot control speech through stale gestures. */
     @Test
     fun revokedSourceDoubleTapCannotSeekOrRestart() {
         render(plainPreview)
@@ -147,6 +155,7 @@ class TextAttachmentReadAloudScreenshotTest {
         assertEquals(spoken, harness.spokenTexts().size)
     }
 
+    /** Text selection removes competing highlights but leaves intentional shared playback running. */
     @Test
     fun selectionSuppressesHighlightWithoutStoppingSharedSpeech() {
         render(plainPreview)
@@ -158,6 +167,7 @@ class TextAttachmentReadAloudScreenshotTest {
         assertEquals(session, harness.controller.state.value.sessionId)
     }
 
+    /** Direct dragging suspends follow for the current passage; later progression reveals the next sentence. */
     @Test
     fun manualDragYieldsThenNextSentenceResumesFollow() {
         val longPreview = plainPreview.copy(text = (1..60).joinToString("\n\n") { "Sentence number $it continues." })
@@ -170,6 +180,7 @@ class TextAttachmentReadAloudScreenshotTest {
         composeRule.onNodeWithContentDescription(string(R.string.tts_resume_follow)).assertDoesNotExist()
     }
 
+    /** Starts fixture speech and mounts the reader with theme, direction and font-scale overrides. */
     private fun render(
         preview: TextAttachmentPreview,
         amoled: Boolean = false,
@@ -199,6 +210,7 @@ class TextAttachmentReadAloudScreenshotTest {
         composeRule.waitForIdle()
     }
 
+    /** Mounts the production screen against the fixture's live projection and source ownership. */
     @Composable
     private fun readerSurface(
         preview: TextAttachmentPreview,
@@ -231,6 +243,7 @@ class TextAttachmentReadAloudScreenshotTest {
         }
     }
 
+    /** Requires a sentence highlight and, while speaking, the fixture's current word highlight. */
     private fun assertHighlights(text: String) {
         composeRule
             .onNodeWithText(text, useUnmergedTree = true)
@@ -243,6 +256,7 @@ class TextAttachmentReadAloudScreenshotTest {
         }
     }
 
+    /** Sends two pointer taps to measured rendered word bounds. */
     private fun doubleTap(word: String) {
         val layouts = mutableListOf<TextLayoutResult>()
         val node = composeRule.onNodeWithText(word, substring = true, useUnmergedTree = true)
@@ -264,10 +278,12 @@ class TextAttachmentReadAloudScreenshotTest {
         composeRule.waitForIdle()
     }
 
+    /** Captures the reader root into its owned golden. */
     private fun capture(name: String) {
         composeRule.onNodeWithTag(TEXT_ATTACHMENT_READER_TAG).captureRoboImage("src/test/snapshots/$name")
     }
 
+    /** Resolves production accessible labels in the fixture locale. */
     private fun string(id: Int) = ApplicationProvider.getApplicationContext<android.content.Context>().getString(id)
 
     private companion object {

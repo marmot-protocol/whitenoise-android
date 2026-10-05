@@ -20,6 +20,7 @@ import org.junit.Test
 import java.util.Locale
 
 class TextAttachmentTtsFollowTest {
+    /** Window-space sentence bounds become inset-aware offsets clamped to the reader's actual scroll range. */
     @Test
     fun windowCoordinatesIncludeInsetsAndClampToAvailableScroll() {
         assertEquals(300, textAttachmentFollowOffset(100, 1_000, viewport, Rect(0f, 300f, 300f, 325f), request))
@@ -27,6 +28,7 @@ class TextAttachmentTtsFollowTest {
         assertEquals(400, textAttachmentFollowOffset(350, 400, viewport, Rect(0f, 800f, 300f, 830f), request))
     }
 
+    /** Ordinary progression preserves visible content; an explicit reveal may top-anchor the same sentence. */
     @Test
     fun alreadyVisibleSentenceStaysUnlessExplicitlyRevealed() {
         val sentence = Rect(0f, 120f, 300f, 150f)
@@ -34,6 +36,7 @@ class TextAttachmentTtsFollowTest {
         assertEquals(120, textAttachmentFollowOffset(100, 1_000, viewport, sentence, request))
     }
 
+    /** Only the exact whole-document projection exposes live or paused coordinates to the reader. */
     @Test
     fun currentProjectionOwnsSpeakingAndPausedPassagesButNeverASelectedTextQueue() =
         runTest {
@@ -60,6 +63,7 @@ class TextAttachmentTtsFollowTest {
             assertNull(textAttachmentPlaybackPassage(playback.copy(state = harness.controller.state.value)))
         }
 
+    /** Rendered plain-text offsets resolve through prepared speech and preserve the existing session on seek. */
     @Test
     fun realPreparedPlainAttachmentSeeksExactSentenceWithoutReplacingSession() =
         runTest {
@@ -83,6 +87,7 @@ class TextAttachmentTtsFollowTest {
             assertNull(resolver.sentenceIndexAtRenderedOffset(hit.copy(renderedText = "changed")))
         }
 
+    /** Reopening or resuming follow reveals the paused cursor without synthesizing another utterance. */
     @Test
     fun pausedReaderReopenAndExplicitResumeRevealDoNotStartNewSpeech() =
         runTest {
@@ -100,6 +105,7 @@ class TextAttachmentTtsFollowTest {
             assertTrue(harness.controller.state.value is TtsState.Paused)
         }
 
+    /** A visible tail beyond the bounded speech projection is unmappable rather than clamped to the last sentence. */
     @Test
     fun visibleTextBeyondTheSpeechBoundNeverGuessesTheLastSentence() =
         runTest {
@@ -114,6 +120,7 @@ class TextAttachmentTtsFollowTest {
             assertNull(resolver.sentenceIndexAtRenderedOffset(tail))
         }
 
+    /** Builds a read-only projection with inert callbacks for passage-eligibility assertions. */
     private fun playback(
         entry: dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry,
         state: TtsState,
