@@ -18,7 +18,6 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -99,7 +98,11 @@ class GroupDetailsEditNavigationTest {
             .edit()
             .clear()
             .commit()
-        context.getSharedPreferences("whitenoise.conversation_alerts", Context.MODE_PRIVATE).edit().clear().commit()
+        context
+            .getSharedPreferences("whitenoise.conversation_alerts", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         val fixture = controller(group())
         val groupId = fixture.controller.group.groupIdHex
         render(fixture)
