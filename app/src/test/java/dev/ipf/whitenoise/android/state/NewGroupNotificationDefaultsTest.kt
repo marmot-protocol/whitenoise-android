@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
@@ -27,6 +28,28 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class NewGroupNotificationDefaultsTest {
+    /** The production adapter reads independent device choices for groups, DMs and reactions. */
+    @Test
+    fun independentDeviceChoicesReachTheProductionDeliveryAdapter() {
+        val state = freshState()
+        try {
+            val preferences = state.conversationAlertPreferences
+            assertTrue(preferences.setEnabled("alice", "group", NotificationChannelSpec.GROUP_MESSAGES, false))
+            assertFalse(state.shouldPostNotification(update(), false))
+            assertTrue(state.shouldPostNotification(update().copy(isMention = true), false))
+            assertTrue(preferences.setEnabled("alice", "group", NotificationChannelSpec.MENTIONS, false))
+            assertFalse(state.shouldPostNotification(update().copy(isMention = true), false))
+            assertFalse(state.shouldPostNotification(update().copy(isMention = true), true))
+            assertTrue(state.shouldPostNotification(update().copy(isDm = true), false))
+            assertTrue(preferences.setEnabled("alice", "group", NotificationChannelSpec.REACTIONS, false))
+            assertFalse(state.shouldPostNotification(update().copy(reactionEmoji = "👍"), false))
+            assertTrue(preferences.clearAccount("alice"))
+            assertTrue(state.shouldPostNotification(update(), false))
+        } finally {
+            state.mutationsScope.cancel()
+        }
+    }
+
     /** New groups and DMs deliver ordinary messages; explicit mentions-only remains scoped to one account/group. */
     @Test
     fun allMessagesDefaultAndExplicitMentionsReachDeliveryPolicy() {
