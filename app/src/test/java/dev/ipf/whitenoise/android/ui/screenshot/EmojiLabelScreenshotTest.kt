@@ -80,11 +80,12 @@ class EmojiLabelScreenshotTest {
                 CompositionLocalProvider(LocalCustomEmoji provides local, LocalReceivedEmoji provides enclosing) {
                     Surface(Modifier.width(360.dp).testTag("reactions")) {
                         ReactionPillRow(
-                            tallies = listOf(
-                                ReactionTally(":remote:", 1, mine = false),
-                                ReactionTally(":party:", 2, mine = true),
-                                ReactionTally(":wn:", 1, mine = false),
-                            ),
+                            tallies =
+                                listOf(
+                                    ReactionTally(":remote:", 1, mine = false),
+                                    ReactionTally(":party:", 2, mine = true),
+                                    ReactionTally(":wn:", 1, mine = false),
+                                ),
                             enabled = true,
                             onOpenDetails = {},
                         )
@@ -188,7 +189,10 @@ class EmojiLabelScreenshotTest {
         return CustomEmojiSet(listOf(CustomEmoji(":party:", File("party.png"), image.asImageBitmap())))
     }
 
-    private fun capturePoll(rtl: Boolean, name: String) {
+    private fun capturePoll(
+        rtl: Boolean,
+        name: String,
+    ) {
         val local = localEmoji()
         rule.setContent {
             WhiteNoiseTheme(darkTheme = rtl, fontScale = if (rtl) 1.6f else 1f) {
@@ -198,19 +202,20 @@ class EmojiLabelScreenshotTest {
                 ) {
                     Surface(Modifier.width(360.dp).testTag("poll")) {
                         PollCard(
-                            poll = PollProjectionFfi(
-                                question = "Choose :party: :wn:",
-                                options = listOf(
-                                    PollOptionResultFfi("a", "Local :party:", 2uL),
-                                    PollOptionResultFfi("b", "Builtin :marmot: :unknown:", 1uL),
+                            poll =
+                                PollProjectionFfi(
+                                    question = "Choose :party: :wn:",
+                                    options = listOf(
+                                        PollOptionResultFfi("a", "Local :party:", 2uL),
+                                        PollOptionResultFfi("b", "Builtin :marmot: :unknown:", 1uL),
+                                    ),
+                                    pollType = PollTypeFfi.SINGLE_CHOICE,
+                                    participants = 3uL,
+                                    localSelection = listOf("a"),
+                                    creator = "fixture",
+                                    endsAt = null,
+                                    open = true,
                                 ),
-                                pollType = PollTypeFfi.SINGLE_CHOICE,
-                                participants = 3uL,
-                                localSelection = listOf("a"),
-                                creator = "fixture",
-                                endsAt = null,
-                                open = true,
-                            ),
                             canVote = false,
                             onVote = {},
                         )

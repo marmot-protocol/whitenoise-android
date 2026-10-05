@@ -126,7 +126,8 @@ internal class NotificationGroupReconciler(
         children: List<NotificationGroupChild>,
         old: StatusBarNotification?,
     ): Boolean {
-        return if (children.isEmpty()) old == null else matches(old, UserEventNotificationGroup.summaryState(children))
+        val expected = if (children.isEmpty()) null else UserEventNotificationGroup.summaryState(children)
+        return if (expected == null) old == null else matches(old, expected)
     }
 
     /** Cleanup is not complete while a write is settling or an empty snapshot still needs confirmation. */

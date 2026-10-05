@@ -70,5 +70,6 @@ internal fun capNotificationLogicalHistory(
 
 /** A silent replacement removes both image and text, not just the last platform row. */
 internal fun dropLastNotificationLogicalMessage(messages: List<Message>): List<Message> {
-    return notificationLogicalMessageGroups(messages).dropLast(1).flatten()
+    val groups = notificationLogicalMessageGroups(messages)
+    return groups.dropLast(1).flatten()
 }

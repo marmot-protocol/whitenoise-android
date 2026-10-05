@@ -100,7 +100,10 @@ class NotificationEmojiScreenshotTest {
         }
 
     @Suppress("DEPRECATION") // Inflate actual platform RemoteViews only for deterministic visual evidence.
-    private fun capture(notification: Notification, name: String) {
+    private fun capture(
+        notification: Notification,
+        name: String,
+    ) {
         Robolectric.buildActivity(Activity::class.java).setup().use { controller ->
             val activity = controller.get()
             val parent = FrameLayout(activity)
