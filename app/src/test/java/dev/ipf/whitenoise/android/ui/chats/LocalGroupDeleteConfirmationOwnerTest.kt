@@ -68,27 +68,14 @@ class LocalGroupDeleteConfirmationOwnerTest {
     fun remainingBatchRetryKeepsTheOriginalOwnerFence() {
         val state = emptyAppState()
         val controller = ChatsController(state, ACCOUNT_REF) { _, _ -> emptyList() }
-        val request = PendingLocalChatDelete.capture(
-            listOf("first", "failed", "unattempted").map { chatListItemFromProjection(chatRow(it)) },
-            controller, state,
-        )
+        val request =
+            PendingLocalChatDelete.capture(
+                listOf("first", "failed", "unattempted").map { chatListItemFromProjection(chatRow(it)) },
+                controller,
+                state,
+            )
         val retry = request.remaining(1)
         assertEquals(listOf("failed", "unattempted"), retry.groupIds)
-        assertTrue(retry.isCurrent(state, controller))
-        state.advanceLocalDeleteTestRuntime()
-        assertFalse(retry.isCurrent(state, controller))
-    }
-
-    @Test
-    fun recoveredTargetsAreExcludedAndRetryCannotAddAnUnconfirmedTarget() {
-        val state = emptyAppState()
-        val controller = ChatsController(state, ACCOUNT_REF) { _, _ -> emptyList() }
-        val request = PendingLocalChatDelete.capture(
-            listOf("recovered", "pending").map { chatListItemFromProjection(chatRow(it)) },
-            controller, state,
-        )
-        val retry = request.retaining(setOf("PENDING", "another-chat"))
-        assertEquals(listOf("pending"), retry.groupIds)
         assertTrue(retry.isCurrent(state, controller))
         state.advanceLocalDeleteTestRuntime()
         assertFalse(retry.isCurrent(state, controller))

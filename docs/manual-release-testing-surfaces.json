@@ -3,6 +3,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Scoped local-delete batch retry after navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
+        "anchor": "internal fun WhiteNoiseAppState.localDeleteBatchRetryNotice(",
+        "test_ids": ["CHL-024", "CHL-025"]
+      },
+      {
         "surface": "Local-delete diagnostic Copy action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
         "anchor": "R.string.copy",

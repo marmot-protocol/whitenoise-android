@@ -10,10 +10,14 @@ import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -135,49 +139,49 @@ class LocalGroupDeleteControllerTest {
         }
 
     @Test
-    fun successfulRetryRetiresItsWarningAndKeepsTheSafePresenceCheck() = runTest {
-        val fixture = fixture("deleteGroupLocal")
-        assertFalse(fixture.controller.deleteGroupLocalFromChatList(GROUP))
-        assertNotNull(fixture.state.toast?.localDeleteNotice?.retry)
-        fixture.failureMethod.set(null)
-        val readsBefore = fixture.calls.count { it == "chatListRow" }
-        assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
-        assertTrue(fixture.calls.count { it == "chatListRow" } > readsBefore)
-        assertEquals(null, fixture.state.toast)
-        assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
-    }
-
+    fun successfulRetryRetiresItsWarningAndKeepsTheSafePresenceCheck() =
+        runTest {
+            val fixture = fixture("deleteGroupLocal")
+            assertFalse(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+            assertNotNull(fixture.state.toast?.localDeleteNotice?.retry)
+            fixture.failureMethod.set(null)
+            val readsBefore = fixture.calls.count { it == "chatListRow" }
+            assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+            assertTrue(fixture.calls.count { it == "chatListRow" } > readsBefore)
+            assertEquals(null, fixture.state.toast)
+            assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+        }
     @Test
-    fun backgroundRecoveryRetiresTheWarningWithoutAnotherNativeDelete() = runTest {
-        val fixture = fixture("selectedMessageDraft")
-        assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
-        fixture.state.presentLocalDeleteFailure(
-            R.string.toast_couldnt_delete_chat, MarmotKitException.TransportClosed(),
-            notice = LocalDeleteNotice(ACCOUNT, setOf(GROUP)),
-        )
-        fixture.failureMethod.set(null)
-        fixture.state.reconcilePendingLocalGroupDeleteCleanups()
-        assertEquals(null, fixture.state.toast)
-        assertEquals(null, fixture.state.transientNotice)
-        assertEquals(1, fixture.calls.count { it == "deleteGroupLocal" })
-        assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
-    }
-
+    fun backgroundRecoveryRetiresTheWarningWithoutAnotherNativeDelete() =
+        runTest {
+            val fixture = fixture("selectedMessageDraft")
+            assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+            fixture.state.presentLocalDeleteFailure(
+                R.string.toast_couldnt_delete_chat, MarmotKitException.TransportClosed(),
+                notice = LocalDeleteNotice(ACCOUNT, setOf(GROUP)),
+            )
+            fixture.failureMethod.set(null)
+            fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+            assertEquals(null, fixture.state.toast)
+            assertEquals(null, fixture.state.transientNotice)
+            assertEquals(1, fixture.calls.count { it == "deleteGroupLocal" })
+            assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+        }
     @Test
-    fun deferredCleanupRetainsAnUnrelatedWarningAndRecoversSilently() = runTest {
-        val fixture = fixture("selectedMessageDraft")
-        fixture.state.present(R.string.toast_couldnt_delete_chat)
-        val other = fixture.state.toast
-        assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
-        assertEquals(other, fixture.state.toast)
-        assertEquals(null, fixture.state.transientNotice)
-        fixture.failureMethod.set(null)
-        fixture.state.reconcilePendingLocalGroupDeleteCleanups()
-        assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
-        assertEquals(other, fixture.state.toast)
-        assertEquals(null, fixture.state.transientNotice)
-    }
-
+    fun deferredCleanupRetainsAnUnrelatedWarningAndRecoversSilently() =
+        runTest {
+            val fixture = fixture("selectedMessageDraft")
+            fixture.state.present(R.string.toast_couldnt_delete_chat)
+            val other = fixture.state.toast
+            assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+            assertEquals(other, fixture.state.toast)
+            assertEquals(null, fixture.state.transientNotice)
+            fixture.failureMethod.set(null)
+            fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+            assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+            assertEquals(other, fixture.state.toast)
+            assertEquals(null, fixture.state.transientNotice)
+        }
     @Test
     fun retainedAccountReactivationRejectsGestureBeforeOptimisticRowRemoval() =
         runTest {
@@ -206,6 +210,46 @@ class LocalGroupDeleteControllerTest {
             assertTrue(failure is CancellationException)
             assertEquals(0, fixture.calls.count { it == "deleteGroupLocal" })
             assertEquals(null, fixture.state.toast)
+        }
+
+    @Test
+    fun batchRetrySurvivesItsScreenAndCannotExpandTheConfirmedTargets() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture()
+                val notice = fixture.state.localDeleteBatchRetryNotice(fixture.controller, listOf(GROUP)) { true }
+                fixture.state.presentLocalDeleteFailure(R.string.toast_couldnt_delete_chat, null, notice = notice)
+                requireNotNull(notice.retry).invoke(setOf(GROUP.uppercase(), "unconfirmed-group"))
+                fixture.state.mutationsScope.coroutineContext[Job]?.children?.toList()?.forEach { it.join() }
+                assertEquals(1, fixture.calls.count { it == "deleteGroupLocal" })
+                assertEquals(null, fixture.state.toast)
+                assertEquals(null, fixture.state.transientNotice)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    fun singleAndBatchRetryCallbacksRejectAReplacedRuntimeBeforeNativeReads() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture()
+                val runtime = fixture.state.runtimeGeneration
+                val isCurrent = { fixture.state.runtimeGeneration == runtime }
+                val single = fixture.state.localDeleteRetryNotice(ACCOUNT, GROUP, isCurrent) {
+                    fixture.controller.deleteGroupLocalFromChatList(GROUP)
+                }
+                val batch = fixture.state.localDeleteBatchRetryNotice(fixture.controller, listOf(GROUP), isCurrent)
+                fixture.state.advanceLocalDeleteTestRuntime()
+                requireNotNull(single.retry).invoke(single.groupIds)
+                requireNotNull(batch.retry).invoke(batch.groupIds)
+                fixture.state.mutationsScope.coroutineContext[Job]?.children?.toList()?.forEach { it.join() }
+                assertEquals(0, fixture.calls.count { it == "chatListRow" || it == "deleteGroupLocal" })
+            } finally {
+                Dispatchers.resetMain()
+            }
         }
 
     private fun TestScope.fixture(

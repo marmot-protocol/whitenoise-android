@@ -14,6 +14,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDefaults
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,6 +28,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ToastMessage
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
 /** A short actionable message; guidance and the privacy-safe report stay behind Details. */
 @Suppress("FunctionNaming") // Composable component follows framework naming convention.
@@ -92,4 +95,17 @@ private fun LocalDeleteDetails(
             }
         },
     )
+}
+
+/** Dismissal or a superseded message never authorizes a deletion retry. */
+internal fun finishLocalDeleteSnackbar(
+    appState: WhiteNoiseAppState,
+    toast: ToastMessage,
+    result: SnackbarResult,
+) {
+    val noticeIsCurrent = appState.toast === toast
+    appState.clearToast(toast)
+    if (result == SnackbarResult.ActionPerformed && noticeIsCurrent) {
+        toast.localDeleteNotice?.let { it.retry?.invoke(it.groupIds) }
+    }
 }

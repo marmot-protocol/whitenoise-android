@@ -31,17 +31,15 @@ internal class PendingLocalChatDelete private constructor(
     private fun accountIsSuspended(appState: WhiteNoiseAppState): Boolean =
         appState.signOutInProgress || appState.wipeInProgress || appState.retainedAccountReactivationRef != null
 
-    fun remaining(deleted: Int) = PendingLocalChatDelete(
-        groupIds.drop(deleted), controller, ownerState, account, runtime, bindEpoch,
-    )
-
-    /** Recovery may retire targets while a warning is visible; never reconfirm those or expand its scope. */
-    fun retaining(groupIds: Set<String>): PendingLocalChatDelete {
-        val wanted = groupIds.map { it.lowercase() }.toSet()
-        return PendingLocalChatDelete(
-            this.groupIds.filter { it.lowercase() in wanted }, controller, ownerState, account, runtime, bindEpoch,
+    fun remaining(deleted: Int) =
+        PendingLocalChatDelete(
+            groupIds.drop(deleted),
+            controller,
+            ownerState,
+            account,
+            runtime,
+            bindEpoch,
         )
-    }
 
     companion object {
         fun capture(

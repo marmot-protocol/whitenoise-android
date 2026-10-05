@@ -10503,10 +10503,11 @@ class WhiteNoiseAppState private constructor(
     /** Publishes a scoped UI notice through the same privacy-safe copy gate as ordinary errors. */
     internal fun presentText(notice: ToastMessage) {
         val safeReport = notice.diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
-        toast = notice.copy(
-            copyable = notice.copyable && safeReport != null,
-            diagnosticReport = safeReport,
-        )
+        toast =
+            notice.copy(
+                copyable = notice.copyable && safeReport != null,
+                diagnosticReport = safeReport,
+            )
     }
 
     fun presentTransient(
