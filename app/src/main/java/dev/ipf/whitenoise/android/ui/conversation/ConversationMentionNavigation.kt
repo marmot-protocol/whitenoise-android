@@ -31,12 +31,25 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
             if (!animateScrollToItem(initialIndex, initialOffset, resolveTargetIndex)) return@programmaticJump
 
             awaitLayout()
-            val measuredIndex = resolveTargetIndex() ?: return@programmaticJump
-            val measuredLayout = readLayout(measuredIndex)
+            var placedIndex = initialIndex
+            var placedOffset = initialOffset
+            var measuredIndex = resolveTargetIndex() ?: return@programmaticJump
+            var measuredLayout = readLayout(measuredIndex)
+            // An expanded-row estimate can overshoot a now-collapsed row entirely.
+            // Reach its newest edge once without the estimate, then measure afresh.
+            if (!measuredLayout.isMeasured && measuredLayout.viewportEndOffsetPx > 0 && initialOffset != 0) {
+                scrollToItem(measuredIndex, 0)
+                placedIndex = measuredIndex
+                placedOffset = 0
+                awaitLayout()
+                measuredIndex = resolveTargetIndex() ?: return@programmaticJump
+                measuredLayout = readLayout(measuredIndex)
+            }
             if (!measuredLayout.isMeasured) return@programmaticJump
-            if (measuredIndex != initialIndex || measuredLayout.readingStartOffset != initialOffset) {
+            if (measuredIndex != placedIndex || measuredLayout.readingStartOffset != placedOffset) {
                 scrollToItem(measuredIndex, measuredLayout.readingStartOffset)
             }
+            if (resolveTargetIndex() != measuredIndex) return@programmaticJump
             reached = true
         }
     return completed && reached

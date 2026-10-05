@@ -59,7 +59,33 @@ class ConversationMentionNavigationTest {
                     awaitLayout = {},
                 )
             assertFalse(reached)
-            assertEquals(listOf(Write(true, 5, 300)), writer.writes)
+            assertEquals(listOf(Write(true, 5, 300), Write(false, 5, 0)), writer.writes)
+        }
+
+    @Test
+    fun oversizedStaleEstimateRecoversTheCollapsedRowOnce() =
+        runTest {
+            val writer = RecordingWriter()
+            var layoutPass = 0
+            val reached =
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "mention",
+                    resolveTargetIndex = { 5 },
+                    readLayout = {
+                        ConversationMentionJumpLayout(
+                            viewportEndOffsetPx = 500,
+                            itemHeightPx = if (layoutPass >= 2) 80 else null,
+                            estimatedItemHeightPx = if (layoutPass == 0) 2000 else null,
+                        )
+                    },
+                    awaitLayout = { layoutPass++ },
+                )
+            assertTrue(reached)
+            assertEquals(2, layoutPass)
+            assertEquals(
+                listOf(Write(true, 5, 1500), Write(false, 5, 0), Write(false, 5, -420)),
+                writer.writes,
+            )
         }
 
     @Test
