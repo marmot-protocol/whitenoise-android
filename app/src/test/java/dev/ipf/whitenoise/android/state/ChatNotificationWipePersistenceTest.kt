@@ -24,6 +24,32 @@ class ChatNotificationWipePersistenceTest {
         val restored = ChatMutePreferences(RuntimeEnvironment.getApplication(), fixture.disk.underlying)
         assertEquals(ChatNotifyMode.ALL, restored.mode("alice", "group"))
         assertEquals(ChatNotifyMode.MENTIONS_ONLY, restored.mode("bob", "group"))
+        assertLegacyCleanup(restored, fixture.disk.underlying)
+    }
+
+    /** Reimport cannot replay an erased identity's legacy mute or orphan expiry; other identities remain intact. */
+    @Test
+    fun removesPendingLegacyPreferencesForOnlyTheErasedIdentity() {
+        val fixture = removalFixture(failures = 0)
+
+        fixture.preferences.removeAccount(" alice ")
+
+        val restored = ChatMutePreferences(RuntimeEnvironment.getApplication(), fixture.disk.underlying)
+        assertLegacyCleanup(restored, fixture.disk.underlying)
+        assertEquals(1, fixture.disk.attempts)
+    }
+
+    /** Checks raw legacy storage too, so orphan or malformed entries belonging to other accounts are preserved. */
+    private fun assertLegacyCleanup(
+        restored: ChatMutePreferences,
+        shared: SharedPreferences,
+    ) {
+        assertEquals(setOf("bob", "alice|other"), restored.legacyMuteEntries().map { it.accountRef }.toSet())
+        assertEquals(setOf("bob|group", "alice|other|group"), ChatMutePreferences.readMutedSet(shared))
+        assertEquals(
+            setOf("5000\u0000ALL\u0000bob|group", "broken\u0000mode\u0000bob|orphan"),
+            shared.getStringSet("muteExpiries", emptySet()),
+        )
     }
 
     /** Permanent disk failure is bounded; in-memory cleanup still permits remaining account-wipe work. */
@@ -46,7 +72,16 @@ class ChatNotificationWipePersistenceTest {
             .edit()
             .clear()
             .putStringSet("mentionOnlyConversations", setOf("alice|group", "bob|group"))
-            .commit()
+            .putStringSet("mutedConversations", setOf("alice|group", "bob|group", "alice|other|group"))
+            .putStringSet(
+                "muteExpiries",
+                setOf(
+                    "5000\u0000ALL\u0000alice|group",
+                    "5000\u0000ALL\u0000alice|orphan",
+                    "5000\u0000ALL\u0000bob|group",
+                    "broken\u0000mode\u0000bob|orphan",
+                ),
+            ).commit()
         val disk = FailingRemovalPreferences(shared, failures)
         return RemovalFixture(ChatMutePreferences(context, disk), disk)
     }
@@ -64,11 +99,11 @@ class ChatNotificationWipePersistenceTest {
         var attempts = 0
             private set
 
-        /** A fresh editor per attempt ensures a retry actually carries both sets to storage. */
+        /** A fresh editor per attempt carries current choices and pending legacy entries together. */
         override fun edit(): SharedPreferences.Editor {
             val editor = underlying.edit()
             return object : SharedPreferences.Editor by editor {
-                /** Preserve interception when the production writer chains the two preference sets. */
+                /** Preserves interception when the production writer chains preference sets. */
                 override fun putStringSet(
                     key: String?,
                     values: Set<String>?,

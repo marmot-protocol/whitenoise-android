@@ -74,15 +74,30 @@ class ChatMutePreferences(
         }
     }
 
-    /** Erases only this identity's choices, retrying transient disk failures before wipe cleanup continues. */
+    /** Erases this identity's current and pending legacy choices together, retrying transient disk failures. */
     internal fun removeAccount(accountRef: String) {
         val account = accountRef.trim().takeIf(String::isNotEmpty) ?: return
         synchronized(mutationLock) {
             val updated =
                 _state.value.notificationModes.filterKeys { it.substringBeforeLast(COMPOSITE_SEPARATOR) != account }
+            val legacyMuted =
+                readMutedSet(preferences).filterNot { it.substringBeforeLast(COMPOSITE_SEPARATOR) == account }
+            val legacyExpiries =
+                preferences.getStringSet(KEY_MUTE_EXPIRIES, emptySet()).orEmpty().filterNot { encoded ->
+                    encoded
+                        .split(EXPIRY_FIELD_SEPARATOR, limit = EXPIRY_FIELD_COUNT)
+                        .getOrNull(EXPIRY_FIELD_COUNT - 1)
+                        ?.substringBeforeLast(COMPOSITE_SEPARATOR) == account
+                }
             // Recreate each transaction even when a failed commit already changed preference
             // memory. Bound retries so persistent disk failure cannot stall native-wipe cleanup.
-            val persisted = (1..ACCOUNT_REMOVAL_ATTEMPTS).any { persistModes(preferences.edit(), updated).commit() }
+            val persisted =
+                (1..ACCOUNT_REMOVAL_ATTEMPTS).any {
+                    persistModes(preferences.edit(), updated)
+                        .putStringSet(KEY_MUTED_CONVERSATIONS, legacyMuted.toSet())
+                        .putStringSet(KEY_MUTE_EXPIRIES, legacyExpiries.toSet())
+                        .commit()
+                }
             if (!persisted) {
                 android.util.Log.w("ChatMutePreferences", "Could not persist erased account notification choices")
             }
