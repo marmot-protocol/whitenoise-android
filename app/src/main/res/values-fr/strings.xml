@@ -2203,6 +2203,10 @@
     <string name="onboarding_details_accessibility">%1$s : %2$s</string>
     <string name="onboarding_details_expanded">Développé</string>
     <string name="onboarding_details_collapsed">Réduit</string>
+    <string name="local_delete_retry_detail">\u2068La suppression est arrêtée. Choisissez à nouveau Supprimer de cet appareil ; le résultat précédent sera vérifié d\'abord. Si le problème persiste, redémarrez l\'application.\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068La discussion a été supprimée. Le nettoyage des données locales sera réessayé automatiquement.\u2069</string>
+    <string name="chat_list_delete_stopped">Suppression arrêtée</string>
+    <string name="chat_list_delete_stopped_detail">\u2068%1$d suppressions confirmées sur %2$d. Réessayez Supprimer de cet appareil pour vérifier le résultat. Si l\'échec persiste, redémarrez l\'application.\u2069</string>
     <string name="group_svg_rejected_detail">Impossible de préparer ce SVG. Choisissez un SVG simple, un PNG ou un JPEG.</string>
     <string name="error_invalid_key_package">La clé de discussion publiée pour cette personne n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>
     <string name="error_invalid_key_package_for">La clé de discussion publiée pour %1$s n’a pas pu être validée. Demandez-lui de mettre à jour White Noise et de publier une nouvelle clé de discussion, puis réessayez.</string>

@@ -514,7 +514,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
                 assertEquals(2, fixture.calls.delete.get())
-                assertEquals(1, fixture.calls.chatList.get())
+                assertEquals(2, fixture.calls.chatListRow.get())
                 assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
                 assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
                 assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
@@ -532,7 +532,7 @@ class ComposerExpansionDestructiveLifecycleTest {
                 assertTrue(controller.deleteGroupLocalFromChatList(GROUP_ID, notify = false))
                 shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20))
                 assertEquals(1, fixture.calls.delete.get())
-                assertEquals(1, fixture.calls.chatList.get())
+                assertEquals(2, fixture.calls.chatListRow.get())
                 assertTrue(controller.items.none { it.group.groupIdHex == GROUP_ID })
             } finally {
                 controller.onCleared()
@@ -788,6 +788,11 @@ class ComposerExpansionDestructiveLifecycleTest {
                 "sendText" -> countedSendResult(calls, sendResult)
                 "groupMembers" -> if (soleMember) members().take(1) else members()
                 "listMedia" -> emptyList<Any>()
+                "catchUpAccounts" -> Unit
+                "chatListRow" -> {
+                    calls.chatListRow.incrementAndGet()
+                    lifecycleChatRows(localGroupPresent, left).firstOrNull { it.groupIdHex == arguments?.get(1) }
+                }
                 "chatList" -> {
                     calls.chatList.incrementAndGet()
                     lifecycleChatRows(localGroupPresent, left)
@@ -942,6 +947,7 @@ class ComposerExpansionDestructiveLifecycleTest {
         val leave = AtomicInteger()
         val delete = AtomicInteger()
         val chatList = AtomicInteger()
+        val chatListRow = AtomicInteger()
     }
 
     private companion object {
