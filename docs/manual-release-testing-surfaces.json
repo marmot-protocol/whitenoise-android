@@ -3,6 +3,138 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "rememberShareChatPickerActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
+        "anchor": "fun rememberShareChatPickerActions(",
+        "test_ids": ["SYS-004", "SYS-005"]
+      },
+      {
+        "surface": "restoreImportedMediaSlots",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun restoreImportedMediaSlots(",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "mergeRestoredComposerAttachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun mergeRestoredComposerAttachments(",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "restoreImportedComposerAttachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun restoreImportedComposerAttachments(",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "importedComposerExceedsLimit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun importedComposerExceedsLimit(",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "share_import_recovered_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.share_import_recovered_limit",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "restorePendingShareImport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImport.kt",
+        "anchor": "fun restorePendingShareImport(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "persistInboundShareImport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImport.kt",
+        "anchor": "fun persistInboundShareImport(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "createInboundShareImportStore",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImport.kt",
+        "anchor": "fun createInboundShareImportStore(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "rememberInboundShareImport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/InboundShareImport.kt",
+        "anchor": "fun rememberInboundShareImport(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "ImportedShareShelf",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ImportedShareShelf.kt",
+        "anchor": "fun ImportedShareShelf(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "ShareImportErrorDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "fun ShareImportErrorDialog(",
+        "test_ids": ["SYS-004", "SYS-005"]
+      },
+      {
+        "surface": "ShareImportStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "fun ShareImportStatus(",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "ConversationSoundAppearanceSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
+        "anchor": "fun ConversationSoundAppearanceSheet(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "ConversationAlertControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun ConversationAlertControls(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "NotificationSoundScopeDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "fun NotificationSoundScopeDialog(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "conversationNotificationSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun conversationNotificationSummary(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "ConversationAlertSettingsRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun ConversationAlertSettingsRows(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "notificationChannelTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "fun notificationChannelTitle(",
+        "test_ids": ["NTF-031"]
+      },
+      {
         "surface": "Present-row reconciliation retains cleanup intent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupDeleteCleanupJournal.kt",
         "anchor": "internal suspend fun reconcilePendingLocalGroupDeleteCleanup(",
@@ -745,6 +877,12 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
         "anchor": "fun content(): Map<String, InlineTextContent>",
         "test_ids": ["MSG-022", "MSG-023", "MSG-024"]
+      },
+      {
+        "surface": "Private share send lease storage failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": ["SYS-005"]
       },
       {
         "surface": "Empty document send feedback",
@@ -10987,6 +11125,96 @@
     ],
     "settings_controls": [
       {
+        "surface": "Accessible category sound scope",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_sound_scope_control",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Chat category preference save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.toast_notification_scope_update_failed",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Ordinary chat alert pause action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_pause_ordinary_alerts",
+        "test_ids": ["NTF-031", "NTF-028"]
+      },
+      {
+        "surface": "Paused category explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_alert_paused",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Paused chat summary mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notify_nothing_while_muted",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Paused chat summary silence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notify_nothing",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Chat alert save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.toast_notification_scope_update_failed",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Chat alerts ConversationAlertSettingsRows.kt notification_system_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_system_blocked",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationAlertSettingsRows.kt notification_alerts_on_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_alerts_on_device",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationSettingsScreen.kt notification_alerts_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_alerts_detail",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationSettingsScreen.kt notification_sound_appearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_sound_appearance",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat sound drawer notification_sound_appearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
+        "anchor": "R.string.notification_sound_appearance",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationCategoryRows.kt notification_scope_choose",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_scope_choose",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
         "surface": "string:member_removal_pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
         "anchor": "R.string.member_removal_pending",
@@ -15546,22 +15774,6 @@
         ]
       },
       {
-        "surface": "string:notification_scope_switch_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
-        "anchor": "R.string.notification_scope_switch_detail",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:mute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.mute",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:notification_categories",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.notification_categories",
@@ -15578,14 +15790,6 @@
         ]
       },
       {
-        "surface": "string:notification_chat_categories_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.notification_chat_categories_detail",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:notification_mute_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.notification_mute_detail",
@@ -15594,25 +15798,9 @@
         ]
       },
       {
-        "surface": "string:notification_notify_restore",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.notification_notify_restore",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:notifications",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.notifications",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:notify_for",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.notify_for",
         "test_ids": [
           "GRP-001"
         ]
@@ -25762,6 +25950,15 @@
         ]
       },
       {
+        "surface": "intent:*/*",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "*/*",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
         "surface": "intent:android.intent.action.SEND",
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "android.intent.action.SEND",
@@ -25841,22 +26038,6 @@
         ]
       },
       {
-        "surface": "intent:application/*",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "application/*",
-        "test_ids": [
-          "SYS-004"
-        ]
-      },
-      {
-        "surface": "intent:audio/*",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "audio/*",
-        "test_ids": [
-          "SYS-004"
-        ]
-      },
-      {
         "surface": "intent:com.google.firebase.MESSAGING_EVENT",
         "source": "app/src/main/AndroidManifest.xml",
         "anchor": "com.google.firebase.MESSAGING_EVENT",
@@ -25866,14 +26047,6 @@
           "NTF-006",
           "NTF-019",
           "NTF-020"
-        ]
-      },
-      {
-        "surface": "intent:image/*",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "image/*",
-        "test_ids": [
-          "SYS-004"
         ]
       },
       {
@@ -25895,22 +26068,6 @@
         ]
       },
       {
-        "surface": "intent:text/plain",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "text/plain",
-        "test_ids": [
-          "SYS-004"
-        ]
-      },
-      {
-        "surface": "intent:video/*",
-        "source": "app/src/main/AndroidManifest.xml",
-        "anchor": "video/*",
-        "test_ids": [
-          "SYS-004"
-        ]
-      },
-      {
         "surface": "android-direct-share:conversation-shortcuts",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
         "anchor": "class ShareShortcutPublisher",
@@ -25920,6 +26077,54 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Share picker staging rejection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
+        "anchor": "R.string.no_share_target_available",
+        "test_ids": ["SYS-004", "SYS-005"]
+      },
+      {
+        "surface": "Queued share source retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun untrackInFlightMediaUpload(",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "Private share account wipe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": ".leases.releaseAccount(account)",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "Share destination rollback ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShelfCommit.kt",
+        "anchor": "fun retainShareAtDestination(",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "Share-owned attachment discard storage recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": ["SYS-005"]
+      },
+      {
+        "surface": "Share destination storage recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Share destination identity recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "R.string.toast_notification_account_unavailable",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
       {
         "surface": "Failed original send precedence for Retry and Discard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
@@ -26701,6 +26906,42 @@
         "surface": "Cancelled shared attachment fetch finishes its active worker and notification",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
         "anchor": "attachment_fetch_cancelled",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Automatic attachment work backs off after Android interruptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "setBackoffForSystemInterruptions()",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Pre-upgrade attachment work adopts the interruption backoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "private fun adoptInterruptionBackoff(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Explicit attachment request replaces waiting automatic work",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "internal fun enqueueExplicit(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Retired attachment work cannot be resurrected by interruption backoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "internal fun retireWork(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Concurrent explicit attachment requests share one replacement decision",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ExplicitEnqueueFence.kt",
+        "anchor": "internal class ExplicitEnqueueFence(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Transient attachment failure follow-up survives platform interruptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadIntentStore.kt",
+        "anchor": "fun hasSpentTransientRetry(",
         "test_ids": ["MED-022"]
       },
       {
@@ -31293,6 +31534,159 @@
         ]
       },
       {
+        "surface": "Inbound share recovery: cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_batch_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_batch_limit",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_count_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_count_limit",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_empty",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_error_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_error_title",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_file_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_file_limit",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_interrupted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_interrupted",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_metadata",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_progress",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_recovery",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_rejected_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_rejected_count",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_scheme",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_scheme",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_storage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_title",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_import_unreadable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_import_unreadable",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Inbound share recovery: share_to",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+        "anchor": "R.string.share_to",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
         "surface": "Forward source read from MarmotKit's retained copy",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt",
         "anchor": "internal suspend fun readRetainedForwardPlaintext(",
@@ -31306,6 +31700,30 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "Automatic unsent reply handoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationReplyDraftHandoff.kt",
+        "anchor": "internal class NotificationReplyDraftHandoff(",
+        "test_ids": ["NTF-032"]
+      },
+      {
+        "surface": "Reply draft restore failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_reply_draft_restore_failed",
+        "test_ids": ["NTF-032"]
+      },
+      {
+        "surface": "Draft save failure before sign-out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_draft_save_failed",
+        "test_ids": ["ACC-013", "NTF-032"]
+      },
+      {
+        "surface": "Draft save failure notice",
+        "source": "app/src/main/res/values/strings.xml",
+        "anchor": "name=\"toast_draft_save_failed\"",
+        "test_ids": ["ACC-013", "NTF-032"]
+      },
       {
         "surface": "Direct Share preview privacy fence",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",

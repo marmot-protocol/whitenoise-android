@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.os.Handler
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -18,10 +19,18 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.android.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -38,9 +47,17 @@ import kotlin.coroutines.Continuation
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
+@OptIn(ExperimentalCoroutinesApi::class)
 class ForwardDiagnosticsProductionPathTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val messageIdCounter = AtomicInteger(0)
+    private var fixtureState: WhiteNoiseAppState? = null
+
+    /** Bind this sandbox's Looper instead of reusing a dispatcher created by a different SDK sandbox. */
+    @Before
+    fun bindFixtureMainDispatcher() {
+        Dispatchers.setMain(Handler(Looper.getMainLooper()).asCoroutineDispatcher("ForwardDiagnosticsFixture"))
+    }
 
     @Suppress("UNCHECKED_CAST")
     private val marmot =
@@ -92,7 +109,20 @@ class ForwardDiagnosticsProductionPathTest {
     /** Leaves the process-local diagnostics session closed for later tests. */
     @After
     fun stopDiagnostics() {
-        PerformanceDiagnostics.stop()
+        val scope = fixtureState?.mutationsScope
+        val job = scope?.coroutineContext?.get(Job)
+        scope?.cancel()
+        val deadline = System.currentTimeMillis() + FIXTURE_WAIT_MILLIS
+        while (job?.isCompleted == false && System.currentTimeMillis() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(5)
+        }
+        try {
+            check(job?.isCompleted != false) { "forward fixture jobs did not stop" }
+        } finally {
+            PerformanceDiagnostics.stop()
+            Dispatchers.resetMain()
+        }
     }
 
     /** One uncached single-attachment forward to one destination emits the full phase sequence and nothing else. */
@@ -147,6 +177,7 @@ class ForwardDiagnosticsProductionPathTest {
             accounts = listOf(account()),
             activeAccountRef = ACCOUNT,
         ).also { state ->
+            fixtureState = state
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
                 .apply { isAccessible = true }
@@ -167,7 +198,7 @@ class ForwardDiagnosticsProductionPathTest {
     /** Waits for both terminal UI state and the independently scheduled terminal diagnostic before exporting. */
     private fun awaitTerminalDiagnostics(
         appState: WhiteNoiseAppState,
-        timeoutMillis: Long = 20_000,
+        timeoutMillis: Long = FIXTURE_WAIT_MILLIS,
     ): ForwardOperationSnapshot {
         val deadline = System.currentTimeMillis() + timeoutMillis
         while (System.currentTimeMillis() < deadline) {
@@ -180,7 +211,16 @@ class ForwardDiagnosticsProductionPathTest {
             if (snapshot != null && !snapshot.isActive && diagnosticComplete) return snapshot
             Thread.sleep(5)
         }
-        error("forward operation did not reach terminal state and emit its terminal diagnostic")
+        val snapshot = appState.activeForwardOperation.value
+        val phases =
+            PerformanceDiagnostics
+                .exportLines()
+                .filter { " op=message_forward " in it }
+                .map { it.substringAfter(" phase=").substringBefore(' ') }
+        error(
+            "forward diagnostic timeout: phase=${snapshot?.phase}, " +
+                "active=${snapshot?.isActive}, diagnostics=${PerformanceDiagnostics.status()}, phases=$phases",
+        )
     }
 
     /** Builds one complete authoritative media reference. */
@@ -210,6 +250,7 @@ class ForwardDiagnosticsProductionPathTest {
         )
 
     private companion object {
+        const val FIXTURE_WAIT_MILLIS = 20_000L
         const val ACCOUNT = "forward-diagnostics-account"
         const val SOURCE_GROUP = "f1e2d3c4b5a69788"
         const val TARGET_GROUP = "0011223344556677"

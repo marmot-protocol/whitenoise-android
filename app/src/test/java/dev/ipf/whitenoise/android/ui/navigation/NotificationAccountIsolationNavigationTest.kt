@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -30,6 +31,7 @@ import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.NotificationMessageDirectLoadOutcome
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
+import dev.ipf.whitenoise.android.notifications.NotificationReplyDraft
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.notifications.loadNotificationMessageDirectly
@@ -42,7 +44,9 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -90,6 +94,52 @@ class NotificationAccountIsolationNavigationTest {
     @Test
     fun inactiveAccountTap_preloadOpensBeforeBroadActivationWork_preservesSourceAccountCards() {
         verifyInactiveAccountTapIsolation(preloadFinishesFirst = true)
+    }
+
+    @Test
+    fun failedNotificationDraftStillOpensAndConsumesItsRouteWithoutLaterNavigationHijack() {
+        val gate = RouteOrderGate(preloadFinishesFirst = true)
+        gate.releaseActivation.countDown()
+        val state = appState(fakeMarmot(gate))
+        state.setAppInForeground(true)
+        val holder = MainShellStateHolder(state, SavedStateHandle())
+        val routed = routedTarget(SOURCE_ACCOUNT)
+        val target =
+            checkNotNull(routed.notificationTarget).copy(
+                replyDraft = NotificationReplyDraft("failed-route", "partial reply"),
+            )
+        val inbound = mutableStateOf<NotificationTarget?>(target)
+        val handled = AtomicInteger()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                MainShell(
+                    appState = state,
+                    stateHolder = holder,
+                    inboundNotificationTarget = inbound.value,
+                    inboundNotificationRequestId = routed.notificationRequestId,
+                    onNotificationTargetHandled = { _, _ ->
+                        handled.incrementAndGet()
+                        inbound.value = null
+                    },
+                )
+            }
+        }
+        awaitCondition { handled.get() == 1 }
+        assertEquals(SHARED_GROUP, holder.selectedChat.value?.id)
+        awaitCondition { gate.draftReadCount.get() >= 6 }
+        composeRule.runOnIdle {
+            holder.selectedChat.value = null
+            state.setAppInForeground(false)
+            state.setAppInForeground(true)
+        }
+        composeRule.waitForIdle()
+        assertEquals(1, handled.get())
+        assertEquals(null, holder.selectedChat.value)
+        composeRule.runOnIdle {
+            state.mutationsScope.cancel()
+            holder.release()
+        }
+        awaitCondition { state.mutationsScope.coroutineContext[Job]?.isCompleted != false }
     }
 
     @Test
@@ -579,6 +629,10 @@ class NotificationAccountIsolationNavigationTest {
                 }
                 "subscribeAccountAttention" -> MarmotWindowTestFakes.accountAttention()
                 "subscribeBlockedUsers" -> MarmotWindowTestFakes.blockList()
+                "messageDraft" -> {
+                    gate.draftReadCount.incrementAndGet()
+                    error("Forced draft storage failure")
+                }
                 "toString" -> "NotificationAccountIsolationMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
                 "equals" -> proxy === arguments?.firstOrNull()
@@ -760,6 +814,7 @@ class NotificationAccountIsolationNavigationTest {
         val releaseSourceBroadList = CountDownLatch(if (holdSourceBroadList) 1 else 0)
         val projectionReadCount = AtomicInteger()
         val rosterReadCount = AtomicInteger()
+        val draftReadCount = AtomicInteger()
     }
 
     private object NoopDraftPersistence : DraftPersistence {
