@@ -2279,4 +2279,19 @@
     <string name="notification_show_previews">Показывать содержимое уведомлений</string>
     <string name="notification_show_previews_detail">При отключении скрывает имена и содержимое сообщений. Применяется ко всем аккаунтам.</string>
     <string name="notification_preview_update_failed">Изменения могут потеряться после перезапуска.</string>
+    <string name="profile_readiness_loading">Загрузка профиля…</string>
+    <string name="profile_readiness_unavailable">Статус профиля недоступен · Нажмите для редактирования</string>
+    <string name="profile_readiness_editor_unavailable">Статус профиля недоступен</string>
+    <string name="profile_readiness_setup">Настройте профиль</string>
+    <string name="profile_readiness_ready">Профиль готов</string>
+    <string name="profile_readiness_optional">Профиль готов · Можно добавить необязательные сведения</string>
+    <string name="profile_readiness_name">Отображаемое имя</string>
+    <string name="profile_readiness_picture">Фото профиля</string>
+    <string name="profile_readiness_bio">О себе</string>
+    <string name="profile_readiness_banner">Баннер</string>
+    <string name="profile_readiness_address">Подтверждённый адрес</string>
+    <string name="profile_readiness_lightning">Lightning-адрес</string>
+    <string name="profile_readiness_added">Добавлено</string>
+    <string name="profile_readiness_recommended">Рекомендуется</string>
+    <string name="profile_readiness_field_optional">Необязательно</string>
 </resources>

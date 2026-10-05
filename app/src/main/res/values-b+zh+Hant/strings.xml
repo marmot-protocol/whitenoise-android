@@ -2179,4 +2179,20 @@
     <string name="notification_show_previews">顯示通知預覽</string>
     <string name="notification_show_previews_detail">關閉時隱藏姓名和訊息內容。適用於所有帳戶。</string>
     <string name="notification_preview_update_failed">重新啟動後變更可能會遺失。</string>
+
+    <string name="profile_readiness_loading">正在載入個人檔案…</string>
+    <string name="profile_readiness_unavailable">無法取得個人檔案狀態 · 點選以編輯</string>
+    <string name="profile_readiness_editor_unavailable">無法取得個人檔案狀態</string>
+    <string name="profile_readiness_setup">設定您的個人檔案</string>
+    <string name="profile_readiness_ready">個人檔案已就緒</string>
+    <string name="profile_readiness_optional">個人檔案已就緒 · 可新增選填資訊</string>
+    <string name="profile_readiness_name">顯示名稱</string>
+    <string name="profile_readiness_picture">個人檔案照片</string>
+    <string name="profile_readiness_bio">自我介紹</string>
+    <string name="profile_readiness_banner">橫幅圖片</string>
+    <string name="profile_readiness_address">已驗證地址</string>
+    <string name="profile_readiness_lightning">閃電網路地址</string>
+    <string name="profile_readiness_added">已新增</string>
+    <string name="profile_readiness_recommended">建議填寫</string>
+    <string name="profile_readiness_field_optional">選填</string>
 </resources>

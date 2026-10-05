@@ -93,6 +93,7 @@ internal class ProfileEditFields(
 @Composable
 internal fun ProfileEditContent(
     fields: ProfileEditFields,
+    readiness: ProfileReadiness = ProfileReadiness.Loading,
     seed: String,
     hasAccount: Boolean,
     editing: Boolean,
@@ -234,6 +235,7 @@ internal fun ProfileEditContent(
                     title = stringResource(R.string.profile_is_public),
                     text = stringResource(R.string.profile_public_description),
                 )
+                ProfileReadinessChecklist(readiness)
             }
             WhiteNoiseTextField(
                 state = fields.name,
