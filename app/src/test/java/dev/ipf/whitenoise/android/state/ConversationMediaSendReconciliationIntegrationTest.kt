@@ -50,7 +50,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -163,7 +164,9 @@ class ConversationMediaSendReconciliationIntegrationTest {
                 assertFalse(controller.retryAttachmentTransfer(CONFIRMED_MESSAGE_ID, 0, {}, {}))
             } finally {
                 controller.onCleared()
-                state.mutationsScope.cancel()
+                // Cache writes can return from IO after cancellation; finish them before replacing Main.
+                state.mutationsScope.coroutineContext.job
+                    .cancelAndJoin()
                 Dispatchers.resetMain()
             }
         }
@@ -247,7 +250,9 @@ class ConversationMediaSendReconciliationIntegrationTest {
                         )
                     } finally {
                         controller.onCleared()
-                        state.mutationsScope.cancel()
+                        // Accepted sends launch cache IO outside runTest; cancellation alone does not drain it.
+                        state.mutationsScope.coroutineContext.job
+                            .cancelAndJoin()
                     }
                 }
             } finally {
