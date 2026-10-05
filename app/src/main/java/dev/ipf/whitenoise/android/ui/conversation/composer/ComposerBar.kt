@@ -1017,8 +1017,10 @@ internal fun ComposerBar(
         val composerHeightTransitionActive =
             composerHeightTransitionEpoch != completedComposerHeightTransitionEpoch
         val currentAutomaticEstimate = automaticLayoutEstimate?.takeIf { it.first == textFieldValue }
+        val sizingEstimateNeeded =
+            composerExpansion.mode != ComposerExpansionMode.Automatic || composerHeightTransitionActive
         val automaticHeightPx =
-            if ((composerExpansion.mode != ComposerExpansionMode.Automatic || composerHeightTransitionActive) &&
+            if (sizingEstimateNeeded &&
                 currentAutomaticEstimate != null &&
                 currentAutomaticEstimate != measuredAutomaticLayoutEstimate
             ) {
