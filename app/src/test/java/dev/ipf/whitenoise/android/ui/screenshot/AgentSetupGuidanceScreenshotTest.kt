@@ -1,14 +1,12 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.settings.AiAgentsContent
@@ -49,10 +47,9 @@ class AgentSetupGuidanceScreenshotTest {
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
-                LocalDensity provides Density(LocalDensity.current.density, if (largeRtl) 2f else 1f),
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(darkTheme = dark) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = if (largeRtl) 2f else 1f) {
                     AiAgentsContent(npub = PREVIEW_NPUB, onBack = {}, onCopy = { _, _ -> }, onOpenDocs = { true })
                 }
             }
