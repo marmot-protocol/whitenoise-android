@@ -71,11 +71,8 @@ object LocalNotificationPolicy {
             return enabled != false &&
                 update.trigger == NotificationTriggerFfi.NEW_MESSAGE && update.isMention && !update.isFromSelf
         }
-        return enabled ?: when (conversationNotifyMode(update.accountRef, update.groupIdHex)) {
-            ChatNotifyMode.ALL -> true
-            ChatNotifyMode.MENTIONS_ONLY -> update.isMention
-            ChatNotifyMode.NONE -> false
-        }
+        val mode = conversationNotifyMode(update.accountRef, update.groupIdHex)
+        return mode != ChatNotifyMode.NONE && (enabled ?: (mode == ChatNotifyMode.ALL || update.isMention))
     }
 
     /**

@@ -5,4 +5,6 @@
     <string name="notification_system_blocked">Blocked in Android settings</string>
     <string name="notification_alerts_detail">Choose alerts for this device. Pausing ordinary alerts still allows enabled mentions. Group membership notices use separate settings.</string>
     <string name="notification_scope_choose">Sound settings</string>
+    <string name="notification_pause_ordinary_alerts">Pause ordinary alerts</string>
+    <string name="notification_alert_paused">Paused while this chat is muted</string>
 </resources>

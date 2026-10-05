@@ -6273,6 +6273,9 @@ class WhiteNoiseAppState private constructor(
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
+            withContext(Dispatchers.IO) {
+                check(conversationAlertPreferences.clearAccount(wipedRef)) { "Could not clear local alert settings" }
+            }
             wipeDecryptedMediaFromDisk()
             if (!clearHiddenMessagesForAccount(wipedRef)) {
                 appStateDebug { "hidden-message cleanup failed after wipe account=${wipedRef.take(8)}" }
@@ -11488,6 +11491,7 @@ class WhiteNoiseAppState private constructor(
             // Load the persisted per-chat channel scopes before the settings UI
             // can request them, without blocking the main-thread constructor.
             mutationsScope.launch(Dispatchers.IO) { conversationNotificationRouting }
+            mutationsScope.launch(Dispatchers.IO) { conversationAlertPreferences }
             if (requireAppUnlock) {
                 // Pre-warm the Keystore-backed unlock timestamp off-main so the
                 // first foreground lock evaluation is a cache hit. Assigned on

@@ -44,6 +44,22 @@ class ConversationAlertPreferencesTest {
         assertFalse(store.setEnabled("", "dm", NotificationChannelSpec.MENTIONS, false))
     }
 
+    @Test
+    fun accountRemovalErasesItsAlertChoicesButKeepsOtherAccounts() {
+        val store = store()
+        store.setEnabled("removed", "group", NotificationChannelSpec.MENTIONS, false)
+        store.setEnabled("kept", "group", NotificationChannelSpec.MENTIONS, false)
+        assertTrue(store.clearAccount("removed"))
+        assertNull(store.choice("removed", "group", NotificationChannelSpec.MENTIONS))
+        assertEquals(false, store.choice("kept", "group", NotificationChannelSpec.MENTIONS))
+        val restarted = store()
+        assertNull(restarted.choice("removed", "group", NotificationChannelSpec.MENTIONS))
+        assertTrue(restarted.retainAccounts(listOf("kept")))
+        assertEquals(false, restarted.choice("kept", "group", NotificationChannelSpec.MENTIONS))
+        assertTrue(restarted.retainAccounts(emptyList()))
+        assertTrue(store().state.value.isEmpty())
+    }
+
     private fun store(): ConversationAlertPreferences {
         val context = RuntimeEnvironment.getApplication().applicationContext
         return ConversationAlertPreferences(context, context.getSharedPreferences("alert-test", Context.MODE_PRIVATE))

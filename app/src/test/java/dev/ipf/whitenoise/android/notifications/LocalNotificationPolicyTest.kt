@@ -68,6 +68,21 @@ class LocalNotificationPolicyTest {
     }
 
     @Test
+    fun fullLegacySuppressionCannotBeOverriddenByAnEnabledCategory() {
+        assertFalse(
+            LocalNotificationPolicy.shouldPost(
+                update = update("group", isMention = true),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.NONE },
+                categoryEnabled = { _, _, _ -> true },
+            ),
+        )
+    }
+
+    @Test
     fun foregroundActiveConversationNotificationIsSuppressed() {
         assertFalse(
             LocalNotificationPolicy.shouldPost(

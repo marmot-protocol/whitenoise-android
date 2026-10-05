@@ -10712,6 +10712,30 @@
     ],
     "settings_controls": [
       {
+        "surface": "Ordinary chat alert pause action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_pause_ordinary_alerts",
+        "test_ids": ["NTF-031", "NTF-028"]
+      },
+      {
+        "surface": "Paused category explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_alert_paused",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Paused chat summary mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notify_nothing_while_muted",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Paused chat summary silence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notify_nothing",
+        "test_ids": ["NTF-031"]
+      },
+      {
         "surface": "Chat alert save failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.toast_notification_scope_update_failed",
@@ -15308,14 +15332,6 @@
         "surface": "string:notification_scope_default_all_chats",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
         "anchor": "R.string.notification_scope_default_all_chats",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:mute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.mute",
         "test_ids": [
           "GRP-001"
         ]

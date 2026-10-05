@@ -119,7 +119,6 @@ internal fun ConversationNotificationSettingsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(accountRef, groupIdHex, isDm, vibrationPattern, resumeGeneration, routingState) {
-        blockedChannels = emptySet()
         val shortcut = accountRef?.let { conversationShortcutId(it, groupIdHex) }
         if (shortcut != null) {
             blockedChannels = withContext(Dispatchers.IO) {
@@ -151,7 +150,6 @@ internal fun ConversationNotificationSettingsScreen(
         SettingsList {
             item { SettingsSection(stringResource(R.string.notifications)) }
             item {
-                val accountRef = appState.activeAccountRef
                 val channels = listOf(
                     ConversationNotificationChannels.primaryMessageParent(isDm),
                     NotificationChannelSpec.MENTIONS,
@@ -168,6 +166,7 @@ internal fun ConversationNotificationSettingsScreen(
                                 channel == NotificationChannelSpec.MENTIONS || notifyForMode == ChatNotifyMode.ALL
                             ),
                             channel in blockedChannels,
+                            isMuted && channel != NotificationChannelSpec.MENTIONS,
                         )
                     },
                     busy = alertSavePending || accountRef == null,
@@ -473,7 +472,7 @@ internal fun ConversationMuteSettingsSwitch(
 ) {
     SettingsSwitch(
         context = rowContext,
-        title = stringResource(R.string.mute),
+        title = stringResource(R.string.notification_pause_ordinary_alerts),
         checked = isMuted,
         onCheckedChange = onToggleMute,
         modifier = Modifier.testTag(MUTE_SWITCH_ROW_TAG),

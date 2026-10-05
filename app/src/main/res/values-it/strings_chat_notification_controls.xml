@@ -5,4 +5,6 @@
     <string name="notification_system_blocked">Bloccato nelle impostazioni Android</string>
     <string name="notification_alerts_detail">Scegli gli avvisi per questo dispositivo. La pausa degli avvisi ordinari consente ancora le menzioni attivate. Gli avvisi di appartenenza al gruppo hanno impostazioni separate.</string>
     <string name="notification_scope_choose">Impostazioni audio</string>
+    <string name="notification_pause_ordinary_alerts">Sospendi gli avvisi ordinari</string>
+    <string name="notification_alert_paused">In pausa mentre questa chat è silenziata</string>
 </resources>

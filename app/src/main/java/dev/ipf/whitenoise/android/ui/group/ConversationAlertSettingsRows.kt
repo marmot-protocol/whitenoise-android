@@ -22,6 +22,7 @@ internal data class ConversationAlertSetting(
     val channel: NotificationChannelSpec,
     val enabled: Boolean,
     val blockedByAndroid: Boolean = false,
+    val pausedByMute: Boolean = false,
 )
 
 /** Binary alert choices, with the same controls for direct and group conversations. */
@@ -44,6 +45,8 @@ internal fun ConversationAlertSettingsRows(
                     subtitle = stringResource(
                         if (setting.blockedByAndroid) {
                             R.string.notification_system_blocked
+                        } else if (setting.pausedByMute) {
+                            R.string.notification_alert_paused
                         } else {
                             R.string.notification_alerts_on_device
                         },
@@ -69,5 +72,15 @@ internal fun conversationNotificationSummary(
             preferences.choice(accountRef, groupIdHex, it) != null
         }
     }
-    return if (hasChoices) null else notificationModeLabel(legacyMode)
+    return when {
+        legacyMode == ChatNotifyMode.NONE -> stringResource(
+            if (accountRef != null && preferences.choice(accountRef, groupIdHex, NotificationChannelSpec.MENTIONS) == false) {
+                R.string.notify_nothing
+            } else {
+                R.string.notify_nothing_while_muted
+            },
+        )
+        hasChoices -> null
+        else -> notificationModeLabel(legacyMode)
+    }
 }

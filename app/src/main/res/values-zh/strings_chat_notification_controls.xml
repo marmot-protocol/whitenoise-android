@@ -5,4 +5,6 @@
     <string name="notification_system_blocked">已在 Android 设置中屏蔽</string>
     <string name="notification_alerts_detail">选择此设备的提醒。暂停普通提醒后，已启用的提及仍可提醒。群组成员变动通知使用单独设置。</string>
     <string name="notification_scope_choose">声音设置</string>
+    <string name="notification_pause_ordinary_alerts">暂停普通提醒</string>
+    <string name="notification_alert_paused">此聊天静音时暂停</string>
 </resources>

@@ -76,4 +76,5 @@ internal fun WhiteNoiseAppState.setMemberMutedInGroup(
 /** Drops per-member mutes belonging to local accounts that no longer exist on this device. */
 internal fun WhiteNoiseAppState.retainMemberMutesForAccounts(accountRefs: Collection<String>) {
     memberMutePreferences.retainAccounts(accountRefs)
+    conversationAlertPreferences.retainAccounts(accountRefs)
 }

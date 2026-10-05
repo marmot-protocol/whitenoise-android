@@ -5,4 +5,6 @@
     <string name="notification_system_blocked">Bloqueado nas definições do Android</string>
     <string name="notification_alerts_detail">Escolha os alertas para este dispositivo. Ao pausar alertas comuns, as menções ativadas continuam permitidas. Os avisos de participação no grupo têm definições próprias.</string>
     <string name="notification_scope_choose">Definições de som</string>
+    <string name="notification_pause_ordinary_alerts">Pausar alertas comuns</string>
+    <string name="notification_alert_paused">Em pausa enquanto esta conversa está silenciada</string>
 </resources>

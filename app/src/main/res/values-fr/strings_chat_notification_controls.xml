@@ -5,4 +5,6 @@
     <string name="notification_system_blocked">Bloqué dans les paramètres Android</string>
     <string name="notification_alerts_detail">Choisissez les alertes sur cet appareil. La pause des alertes ordinaires laisse passer les mentions activées. Les avis de participation au groupe ont leurs propres paramètres.</string>
     <string name="notification_scope_choose">Paramètres du son</string>
+    <string name="notification_pause_ordinary_alerts">Suspendre les alertes ordinaires</string>
+    <string name="notification_alert_paused">En pause tant que cette discussion est en sourdine</string>
 </resources>

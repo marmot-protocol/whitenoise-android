@@ -5,4 +5,6 @@
     <string name="notification_system_blocked">In den Android-Einstellungen blockiert</string>
     <string name="notification_alerts_detail">Wähle Hinweise für dieses Gerät. Beim Pausieren gewöhnlicher Hinweise bleiben aktivierte Erwähnungen möglich. Gruppenmitgliedschaftshinweise haben eigene Einstellungen.</string>
     <string name="notification_scope_choose">Toneinstellungen</string>
+    <string name="notification_pause_ordinary_alerts">Gewöhnliche Hinweise pausieren</string>
+    <string name="notification_alert_paused">Während der Stummschaltung pausiert</string>
 </resources>

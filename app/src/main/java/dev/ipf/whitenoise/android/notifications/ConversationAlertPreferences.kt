@@ -32,12 +32,37 @@ internal class ConversationAlertPreferences(
             val key = key(accountRef, groupIdHex, channel) ?: return@synchronized false
             val updated = _state.value + (key to enabled)
             val committed = preferences.edit().putBoolean(key, enabled).commit()
-            if (committed) _state.value = updated
+            if (committed) {
+                _state.value = updated
+            } else {
+                // commit can change SharedPreferences memory before its disk write fails.
+                val rollback = preferences.edit()
+                _state.value[key]?.let { rollback.putBoolean(key, it) } ?: rollback.remove(key)
+                rollback.apply()
+            }
             committed
         }
 
     private fun read(): Map<String, Boolean> =
         preferences.all.mapNotNull { (key, value) -> (value as? Boolean)?.let { key to it } }.toMap()
+
+    fun retainAccounts(accountRefs: Collection<String>): Boolean {
+        val retained = accountRefs.map { sha256Hex(it) }.toSet()
+        return removeChoices { key -> key.substringBefore(':') !in retained }
+    }
+
+    fun clearAccount(accountRef: String): Boolean =
+        removeChoices { key -> key.substringBefore(':') == sha256Hex(accountRef) }
+
+    private fun removeChoices(remove: (String) -> Boolean): Boolean =
+        synchronized(mutationLock) {
+            val updated = _state.value.filterKeys { !remove(it) }
+            val editor = preferences.edit()
+            (_state.value.keys - updated.keys).forEach(editor::remove)
+            val committed = editor.commit()
+            if (committed) _state.value = updated
+            committed
+        }
 
     private fun key(
         accountRef: String,
@@ -45,7 +70,7 @@ internal class ConversationAlertPreferences(
         channel: NotificationChannelSpec,
     ): String? =
         if (channel in supportedChannels) {
-            conversationShortcutId(accountRef, groupIdHex)?.let { "$it:${channel.id}" }
+            conversationShortcutId(accountRef, groupIdHex)?.let { "${sha256Hex(accountRef)}:$it:${channel.id}" }
         } else {
             null
         }

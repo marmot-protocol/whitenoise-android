@@ -5,4 +5,6 @@
     <string name="notification_system_blocked">Заблокировано в настройках Android</string>
     <string name="notification_alerts_detail">Выберите уведомления для этого устройства. При паузе обычных уведомлений включённые упоминания остаются разрешены. Уведомления об участии в группе имеют отдельные настройки.</string>
     <string name="notification_scope_choose">Настройки звука</string>
+    <string name="notification_pause_ordinary_alerts">Приостановить обычные уведомления</string>
+    <string name="notification_alert_paused">Приостановлено, пока чат заглушён</string>
 </resources>
