@@ -422,6 +422,9 @@ class NotificationStreamForegroundService : Service() {
         private var activeHost: NotificationStreamForegroundService? = null
         private val connectionStartEpoch = AtomicLong()
 
+        /** Teardown uses the current Android record, rather than a separate presentation pointer. */
+        internal fun releaseCompletedDictation(): Boolean = activeHost?.dictation?.releaseIfCompleted() == true
+
         /** Reconcile the existing host without creating a service or reopening a microphone. */
         internal fun onAppForegrounded(controller: ConversationDictationController?) {
             controller?.onAppForegrounded()

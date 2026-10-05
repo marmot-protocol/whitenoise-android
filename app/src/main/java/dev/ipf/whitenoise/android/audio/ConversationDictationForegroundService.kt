@@ -216,6 +216,13 @@ internal class ConversationDictationForegroundService(
         service.foreground.releaseDictation()
     }
 
+    /** A completed controller must release the adapter owned by the current Android host. */
+    internal fun releaseIfCompleted(): Boolean {
+        if (promotedController?.hasDurableSession == true) return false
+        removeForegroundNotification()
+        return true
+    }
+
     /** Keeps system controls truthful when capture becomes finalization or an irrevocable dispatch. */
     private fun observeNotification(
         controller: ConversationDictationController,
@@ -362,12 +369,9 @@ internal class ConversationDictationForegroundService(
         /** Releases only dictation; connection work keeps the shared host alive. */
         @Suppress("UNUSED_PARAMETER") // Existing controller API accepts its application context.
         fun stop(context: Context) {
-            val current = activeService
-            val accepted = current != null && current.promotedController?.hasDurableSession != true
-            if (accepted) current?.removeForegroundNotification()
+            val accepted = NotificationStreamForegroundService.releaseCompletedDictation()
             conversationDictationDiagnostic(
-                "event=foreground_service_stop accepted=$accepted active=${current != null} " +
-                    "durable=${current?.promotedController?.hasDurableSession == true}",
+                "event=foreground_service_stop accepted=$accepted",
             )
         }
 

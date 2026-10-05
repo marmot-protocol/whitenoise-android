@@ -60,7 +60,8 @@ internal class ConversationForegroundRecord(
         val keepsExistingType = publishedServiceType == type || keepsAuthorizedMicrophone
         val requiresRecordUpdate = acquireMicrophone || replaceRecord
         val notificationId = NotificationStreamForegroundService.foregroundNotificationId(notification)
-        if (foregroundPromoted && !requiresRecordUpdate && keepsExistingType && notificationId == publishedNotificationId) {
+        val canUpdatePresentation = keepsExistingType && notificationId == publishedNotificationId
+        if (foregroundPromoted && !requiresRecordUpdate && canUpdatePresentation) {
             // Keep the authorized record intact while capture continues. Removed ordinary type
             // bits are narrowed after capture closes; never reassert microphone from a wake.
             notifyPresentation(notification)

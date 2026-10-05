@@ -34,14 +34,18 @@ internal class ConversationDictationDraftRecovery(
     fun owns(session: Long, target: ConversationDictationTarget): Boolean =
         receipt?.let { it.session == session && it.target == target } == true
 
-    fun markCleared(session: Long, target: ConversationDictationTarget, revision: Long?) {
-        if (owns(session, target) && revision != null) receipt = receipt?.copy(emptiedRevision = revision)
-    }
-
-    fun markRestored(session: Long, target: ConversationDictationTarget, revision: Long?) {
+    /** Tracks only the clear or restoration actually performed by this session's dispatch. */
+    fun updateDispatch(
+        session: Long,
+        target: ConversationDictationTarget,
+        clearedRevision: Long? = null,
+        restoredRevision: Long? = null,
+    ) {
         val saved = receipt?.takeIf { owns(session, target) } ?: return
-        if (revision != null) {
-            receipt = saved.copy(draft = saved.draft.copy(revision = revision), emptiedRevision = null)
+        if (clearedRevision != null) {
+            receipt = saved.copy(emptiedRevision = clearedRevision)
+        } else if (restoredRevision != null) {
+            receipt = saved.copy(draft = saved.draft.copy(revision = restoredRevision), emptiedRevision = null)
         }
     }
 
@@ -137,12 +141,16 @@ internal class ConversationDictationDraftRecovery(
 
     /** A recovered draft is an admission fence, not a replacement for the immutable outgoing payload. */
     fun sendTarget(session: Long, target: ConversationDictationTarget): ConversationDictationTarget? {
-        val saved = receipt?.takeIf { it.session == session && it.target == target } ?: return target
-        val current = runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull() ?: return null
-        return if (saved.sendEligible && sameDraft(saved.draft, current)) {
-            target.copy(capturedDraft = current.value, capturedDraftRevision = current.revision)
+        val saved = receipt?.takeIf { it.session == session && it.target == target }
+        return if (saved == null) {
+            target
         } else {
-            null
+            val current = runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull()
+            if (saved.sendEligible && current != null && sameDraft(saved.draft, current)) {
+                target.copy(capturedDraft = current.value, capturedDraftRevision = current.revision)
+            } else {
+                null
+            }
         }
     }
 

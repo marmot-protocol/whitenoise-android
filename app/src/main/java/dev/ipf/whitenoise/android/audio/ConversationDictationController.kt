@@ -420,8 +420,8 @@ private data class ConversationDictationKey(
  * The immutable target prevents a delayed recognizer callback from writing to
  * whichever conversation happens to be visible when recognition completes.
  * Caller-audio mode keeps bounded PCM in volatile memory without persisting it.
- * MDK owns draft writes and message dispatch; failed Send recovery stays separate
- * from the visible draft until the user explicitly chooses its outcome.
+ * MDK owns draft writes and message dispatch. Recognized text is recovered into the original
+ * draft on failure; the captured Send payload remains immutable and uncertain sends never retry.
  */
 @Stable
 @Suppress("LargeClass", "ReturnCount", "TooManyFunctions")
@@ -3267,12 +3267,12 @@ internal class ConversationDictationController internal constructor(
             sendRequest.copy(
                 beginDispatch = {
                     beginDictationDispatch(sessionId, admissionTarget, claim).also { started ->
-                        if (started) draftRecovery.markCleared(sessionId, target, claim.emptiedRevision)
+                        if (started) draftRecovery.updateDispatch(sessionId, target, clearedRevision = claim.emptiedRevision)
                     }
                 },
                 onDispatchRejectedBeforeTransport = {
                     rejectDictationDispatchBeforeTransport(sessionId, admissionTarget, claim)
-                    draftRecovery.markRestored(sessionId, target, claim.restoredRevision)
+                    draftRecovery.updateDispatch(sessionId, target, restoredRevision = claim.restoredRevision)
                 },
                 onPendingShown = { completePendingDictationDispatch(sessionId, target) },
             )
@@ -3314,7 +3314,7 @@ internal class ConversationDictationController internal constructor(
         claim.restoredRevision =
             restoreDraftAfterFailedDispatch(admissionTarget, claim.emptiedRevision) ?: claim.restoredRevision
         val hadRecovery = draftRecovery.owns(sessionId, target)
-        draftRecovery.markRestored(sessionId, target, claim.restoredRevision)
+        draftRecovery.updateDispatch(sessionId, target, restoredRevision = claim.restoredRevision)
         val failedTarget = if (hadRecovery) target else claim.recoveredTarget(target)
         if (!draftTargetRemoved && targetAvailable(target.accountRef, target.groupIdHex)) {
             draftRecovery.recover(
@@ -3543,10 +3543,9 @@ internal class ConversationDictationController internal constructor(
         acknowledgedPrefix: String? = null,
     ): Boolean {
         if (transcript.isNullOrBlank() || draftTargetRemoved || state.sessionId != sessionId) return false
-        if (completedTargetValidation(target.copy(replyToMessageIdHex = null)) ==
+        val available = completedTargetValidation(target.copy(replyToMessageIdHex = null)) !=
             ConversationDictationTargetValidation.DefinitelyRemoved
-        ) return false
-        val recovered = draftRecovery.recover(sessionId, target, transcript, options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = acknowledgedPrefix))
+        val recovered = available && draftRecovery.recover(sessionId, target, transcript, options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = acknowledgedPrefix))
         conversationDictationDiagnostic("event=paste_write outcome=${if (recovered) "accepted" else "retained"} source=latest_draft")
         return recovered
     }
