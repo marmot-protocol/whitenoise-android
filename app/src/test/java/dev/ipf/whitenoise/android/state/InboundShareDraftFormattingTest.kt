@@ -44,7 +44,7 @@ class InboundShareDraftFormattingTest {
             val state =
                 WhiteNoiseAppState(
                     context = ApplicationProvider.getApplicationContext(),
-                    draftStore = DraftStore(TestDraftPersistence()),
+                    draftStore = DraftStore(FormattingDraftPersistence()),
                     accountIdHexResolver = { account.accountIdHex },
                     accounts = listOf(account),
                     activeAccountRef = account.label,
@@ -53,7 +53,13 @@ class InboundShareDraftFormattingTest {
                 )
             try {
                 val incoming = "  original text\n\tsecond line\n"
-                assertTrue(state.stageInboundShare(account.label, listOf("group"), SharePayload(incoming, emptyList(), "text/plain")))
+                assertTrue(
+                    state.stageInboundShare(
+                        account.label,
+                        listOf("group"),
+                        SharePayload(incoming, emptyList(), "text/plain"),
+                    ),
+                )
                 runCurrent()
                 assertEquals(incoming, gateway.current?.content)
                 assertEquals(incoming, state.draftStore.get(account.label, "group"))
@@ -65,6 +71,18 @@ class InboundShareDraftFormattingTest {
                 Dispatchers.resetMain()
             }
         }
+}
+
+/** The composer owns its in-memory projection; this fixture does not touch Android preference or encrypted files. */
+private class FormattingDraftPersistence : DraftPersistence {
+    /** Starts with no composer content. */
+    override fun read(): Map<String, String> = emptyMap()
+
+    /** Leaves native persistence observation to FormattingDraftGateway. */
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
 }
 
 /** Records the exact content passed through the native draft boundary; it performs no merge or normalization. */
