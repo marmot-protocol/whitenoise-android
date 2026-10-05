@@ -5,7 +5,6 @@ package dev.ipf.whitenoise.android.ui.share
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -18,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.ShareImportProgress
 import dev.ipf.whitenoise.android.share.SharePayload
@@ -76,7 +76,7 @@ private fun ShareImportErrorDialog(
         onDismissRequest = onCancel,
         title = { Text(stringResource(R.string.share_import_error_title)) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
                 if (payload.importRejectedCount > 0) {
                     Text(stringResource(R.string.share_import_rejected_count, payload.importRejectedCount))
                 }

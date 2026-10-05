@@ -29,7 +29,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -101,6 +100,7 @@ import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.delay
@@ -678,7 +678,7 @@ private fun ProfileKeysDialogs(
             text = {
                 Text(
                     stringResource(R.string.export_private_key_consequence),
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fadingVerticalScroll(rememberScrollState()),
                 )
             },
             confirmButton = {
@@ -774,7 +774,7 @@ private fun ExportPasswordDialog(
         title = { Text(stringResource(R.string.encrypted_private_key)) },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
                 WhiteNoiseSecureTextField(
@@ -837,7 +837,7 @@ private fun EncryptedBackupResultDialog(
         title = { Text(stringResource(R.string.encrypted_backup_result_title)) },
         text = {
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier.fadingVerticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
             ) {
                 Text(stringResource(R.string.key_export_preview_help))

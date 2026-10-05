@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -38,6 +37,7 @@ import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
@@ -89,7 +89,7 @@ internal fun ProfileSwitcherSheet(
                 LoadingIndicator()
             }
         } else {
-            LazyColumn(
+            WhiteNoiseLazyColumn(
                 modifier = Modifier.weight(1f, fill = false).heightIn(max = PROFILE_SWITCHER_LIST_MAX_HEIGHT),
                 contentPadding = PaddingValues(horizontal = PROFILE_SWITCHER_CONTENT_INSET),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseListItemDefaults.segmentedGap),

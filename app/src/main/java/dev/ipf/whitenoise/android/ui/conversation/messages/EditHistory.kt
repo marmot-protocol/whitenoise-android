@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +38,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import java.time.DateTimeException
@@ -96,7 +96,7 @@ internal fun EditHistoryDialog(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
+                            .fadingVerticalScroll(rememberScrollState())
                             .padding(WhiteNoiseSpacing.CompactScreenMargin),
                     verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
                 ) {

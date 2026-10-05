@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +20,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 /** The pinned top-bar scroll behaviour a [WhiteNoiseScaffold] shares with its [WhiteNoiseTopBar]. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,5 +71,5 @@ fun Modifier.whiteNoiseVerticalScroll(state: ScrollState = rememberScrollState()
     LaunchedEffect(state, behavior) {
         snapshotFlow { state.value }.collect { behavior?.state?.contentOffset = -it.toFloat() }
     }
-    return verticalScroll(state)
+    return fadingVerticalScroll(state)
 }

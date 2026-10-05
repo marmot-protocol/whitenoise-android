@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -33,6 +34,7 @@ import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Shared by the live editing session and render tests; replacement is always an explicit draft edit. */
@@ -161,7 +163,13 @@ private fun SmartFolderPresetMenu(onSelect: (Boolean) -> Unit) {
         IconButton(onClick = { open = true }, modifier = Modifier.testTag("folder.presets")) {
             Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.smart_folder_presets))
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        val menuScrollState = rememberScrollState()
+        DropdownMenu(
+            scrollState = menuScrollState,
+            modifier = Modifier.scrollEdgeFade(menuScrollState),
+            expanded = open,
+            onDismissRequest = { open = false },
+        ) {
             listOf(true, false).forEach { allRead ->
                 val title = if (allRead) R.string.smart_folder_preset_read else R.string.smart_folder_preset_mentions
                 DropdownMenuItem(

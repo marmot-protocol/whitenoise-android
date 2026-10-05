@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -82,6 +83,7 @@ import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
@@ -378,7 +380,10 @@ internal fun AvatarViewerFrame(
                         tint = Color.White,
                     )
                 }
+                val menuScrollState = rememberScrollState()
                 DropdownMenu(
+                    scrollState = menuScrollState,
+                    modifier = Modifier.scrollEdgeFade(menuScrollState),
                     expanded = menuOpen,
                     onDismissRequest = { onMenuOpenChange(false) },
                 ) {

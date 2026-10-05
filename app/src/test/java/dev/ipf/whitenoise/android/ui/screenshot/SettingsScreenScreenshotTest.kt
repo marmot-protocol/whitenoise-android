@@ -213,12 +213,17 @@ class SettingsScreenScreenshotTest {
                             appState = appState,
                             onBack = {},
                             isOfflineSpeechToTextInstalled = { true },
+                            resolveProviderPackage = { _, _ -> null },
                         )
                     }
                 }
             }
         }
 
+        // Resolve the provider before scrolling: its explainer changes the height of the first item.
+        composeRule
+            .onNodeWithText("The speech service installed on this device processes the audio", substring = true)
+            .assertExists()
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("dictation.pause_other_audio"))
         composeRule.onNodeWithTag("dictation.pause_other_audio").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("Pause other audio").assertExists()

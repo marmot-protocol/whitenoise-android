@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 // Roomier than Material's default menu-item padding so conversation overflow
@@ -89,10 +91,12 @@ internal fun KeyboardPreservingDropdownMenu(
             )
         }
     }
+    val menuScrollState = rememberScrollState()
     DropdownMenu(
+        scrollState = menuScrollState,
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        modifier = modifier,
+        modifier = (modifier).scrollEdgeFade(menuScrollState),
         offset = offset,
         shape = shape,
         border = amoledSurfaceBorderStroke(),

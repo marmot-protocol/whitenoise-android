@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
@@ -63,6 +62,7 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -241,7 +241,7 @@ internal fun TextAttachmentReaderScreen(
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxSize().padding(padding).fadingVerticalScroll(rememberScrollState())) {
             TextAttachmentMetadata(candidate = candidate, byteCount = preview?.byteCount, onCopy = onCopy)
             HorizontalDivider()
             TextAttachmentReaderContent(
@@ -322,7 +322,7 @@ private fun TextAttachmentReaderBottomBar(
             .fillMaxWidth()
             .navigationBarsPadding()
             .heightIn(max = maximumHeight)
-            .verticalScroll(rememberScrollState())
+            .fadingVerticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp),
     ) {
         transport()
@@ -409,7 +409,7 @@ private fun TextAttachmentFilenameDialog(
         title = { Text(stringResource(R.string.text_attachment_filename)) },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
             ) {
                 SelectionContainer {
                     Text(

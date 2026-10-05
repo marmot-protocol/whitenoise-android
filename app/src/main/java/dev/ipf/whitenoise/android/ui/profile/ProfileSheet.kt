@@ -27,12 +27,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Shield
@@ -120,6 +118,8 @@ import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerCol
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
@@ -972,7 +972,7 @@ internal fun ProfileSheet(
                         title = stringResource(R.string.person_add_to_group),
                         onBack = { if (!addingToGroups) page = pickerParent },
                     ) {
-                        Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        Box(Modifier.fillMaxSize().fadingVerticalScroll(rememberScrollState())) {
                             ProfileAddToGroupsContent(
                                 appState = appState,
                                 targetName = displayTitle,
@@ -994,7 +994,7 @@ internal fun ProfileSheet(
                         title = stringResource(R.string.person_promote_groups),
                         onBack = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
                     ) {
-                        Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        Box(Modifier.fillMaxSize().fadingVerticalScroll(rememberScrollState())) {
                             ProfileMakeAdminContent(
                                 appState = appState,
                                 targetName = displayTitle,
@@ -1198,7 +1198,7 @@ internal fun ContactPrivateDetailsDialog(
             title = { Text(stringResource(R.string.profile_nickname_and_notes)) },
             text = {
                 Column(
-                    Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                    Modifier.heightIn(max = 360.dp).fadingVerticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Text(stringResource(R.string.profile_name_from_profile, profileName))
@@ -1363,7 +1363,7 @@ internal fun ProfileAddToGroupsContent(
                     placeholder = stringResource(R.string.forward_search_chats),
                     modifier = Modifier.padding(horizontal = Dimens.spaceLg),
                 )
-                LazyColumn(
+                WhiteNoiseLazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
                 ) {
                     if (filteredGroups.isEmpty()) {
@@ -1519,7 +1519,7 @@ internal fun ProfileMakeAdminContent(
                     placeholder = stringResource(R.string.forward_search_chats),
                     modifier = Modifier.padding(horizontal = Dimens.spaceLg),
                 )
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+                WhiteNoiseLazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
                     if (filteredGroups.isEmpty()) {
                         item {
                             Text(

@@ -129,8 +129,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
@@ -908,7 +910,7 @@ internal fun ComposerPill(
             Column(modifier = Modifier.then(expandedHeightModifier)) {
                 if (accessoryContent != null) {
                     Box(
-                        Modifier.boundedComposerAccessory().verticalScroll(rememberScrollState()),
+                        Modifier.boundedComposerAccessory().fadingVerticalScroll(rememberScrollState()),
                     ) {
                         accessoryContent()
                     }
@@ -1052,7 +1054,10 @@ internal fun ComposerPill(
                                     // resulting scroll state here so programmatic bulk
                                     // commits can follow the real selection, not merely
                                     // the final text line or the conversation tail.
-                                    .verticalScroll(composerScrollState)
+                                    .scrollEdgeFade(
+                                        composerScrollState,
+                                        fadeEnabled = !composerFocused && textFieldValue.selection.collapsed,
+                                    ).verticalScroll(composerScrollState)
                                     .onGloballyPositioned { editorBounds = it.boundsInWindow() }
                                     .pointerInput(composerFocused, inputContentVisible, inputFocusEnabled) {
                                         if (!composerFocused && inputContentVisible && inputFocusEnabled) {

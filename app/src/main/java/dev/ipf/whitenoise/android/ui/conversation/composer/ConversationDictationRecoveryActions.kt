@@ -6,7 +6,6 @@ import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -29,6 +28,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 /** Chooses the settings page that can actually clear a failure, and retry for the rest. */
 @Composable
@@ -151,7 +151,7 @@ internal fun ConversationDictationPartialSendDialog(
             Column {
                 Text(
                     text = stringResource(R.string.dictation_incomplete_text),
-                    modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    modifier = Modifier.weight(1f, fill = false).fadingVerticalScroll(rememberScrollState()),
                 )
                 if (onOpenSettings != null) {
                     TextButton(onClick = onOpenSettings) { Text(settingsLabel) }
