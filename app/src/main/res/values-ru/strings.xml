@@ -637,7 +637,7 @@
     <string name="preview">Предварительный просмотр</string>
     <string name="no_active_account_period">Нет активного аккаунта.</string>
     <string name="about">Описание</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">Адрес NIP-05</string>
     <string name="nsec_or_npub">Введите ваш приватный ключ</string>
     <string name="white_noise_logo">Логотип White Noise</string>
     <string name="identity_entry_error_invalid_key">Это не похоже на действительный ключ nsec или npub.</string>
@@ -2289,7 +2289,7 @@
     <string name="profile_readiness_picture">Фото профиля</string>
     <string name="profile_readiness_bio">О себе</string>
     <string name="profile_readiness_banner">Баннер</string>
-    <string name="profile_readiness_address">Подтверждённый адрес</string>
+    <string name="profile_readiness_address">Адрес NIP-05</string>
     <string name="profile_readiness_lightning">Lightning-адрес</string>
     <string name="profile_readiness_added">Добавлено</string>
     <string name="profile_readiness_recommended">Рекомендуется</string>

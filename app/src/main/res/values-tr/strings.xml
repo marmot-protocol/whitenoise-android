@@ -601,7 +601,7 @@
     <string name="preview">Önizleme</string>
     <string name="no_active_account_period">Etkin hesap yok.</string>
     <string name="about">Hakkında</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">NIP-05 adresi</string>
     <string name="nsec_or_npub">Özel anahtarınızı girin</string>
     <string name="white_noise_logo">White Noise logosu</string>
     <string name="identity_entry_error_invalid_key">Bu geçerli bir nsec veya npub anahtarına benzemiyor.</string>
@@ -2219,7 +2219,7 @@
     <string name="profile_readiness_picture">Profil fotoğrafı</string>
     <string name="profile_readiness_bio">Biyografi</string>
     <string name="profile_readiness_banner">Kapak görseli</string>
-    <string name="profile_readiness_address">Doğrulanmış adres</string>
+    <string name="profile_readiness_address">NIP-05 adresi</string>
     <string name="profile_readiness_lightning">Lightning adresi</string>
     <string name="profile_readiness_added">Eklendi</string>
     <string name="profile_readiness_recommended">Önerilen</string>
