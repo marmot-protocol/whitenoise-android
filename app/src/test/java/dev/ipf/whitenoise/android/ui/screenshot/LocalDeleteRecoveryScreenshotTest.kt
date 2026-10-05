@@ -134,9 +134,13 @@ class LocalDeleteRecoveryScreenshotTest {
             composeRule.onNodeWithText(context.getString(R.string.details)).performClick()
             composeRule.onNodeWithText(detail + "\n\n" + report).assertIsDisplayed()
             composeRule.onNodeWithText(context.getString(R.string.copy)).assertIsDisplayed()
-            composeRule.onNodeWithTag("local-delete-details").captureRoboImage("src/test/snapshots/local_delete_$suffix.png")
+            composeRule.onNodeWithTag("local-delete-details").captureRoboImage(
+                "src/test/snapshots/local_delete_$suffix.png",
+            )
         } else {
-            composeRule.onNodeWithTag("local-delete-notice").captureRoboImage("src/test/snapshots/local_delete_$suffix.png")
+            composeRule.onNodeWithTag("local-delete-notice").captureRoboImage(
+                "src/test/snapshots/local_delete_$suffix.png",
+            )
         }
     }
 

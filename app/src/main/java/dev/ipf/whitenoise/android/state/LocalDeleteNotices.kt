@@ -17,12 +17,14 @@ internal fun WhiteNoiseAppState.presentLocalDeleteFailure(
     notice: LocalDeleteNotice,
 ) {
     val report = failure?.let { privacySafeErrorPresentation("CHAT_LOCAL_DELETE", it, detail).report }
-    toast = ToastMessage(
-        title = AppText.Resource(titleRes),
-        detail = detail,
-        copyable = report != null,
-        diagnosticReport = report,
-        localDeleteNotice = notice,
+    presentText(
+        ToastMessage(
+            title = AppText.Resource(titleRes),
+            detail = detail,
+            copyable = report != null,
+            diagnosticReport = report,
+            localDeleteNotice = notice,
+        ),
     )
 }
 
@@ -39,6 +41,6 @@ internal fun WhiteNoiseAppState.dismissLocalDeleteFailure(
     if (remaining.isEmpty()) {
         clearToast(current)
     } else {
-        toast = current.copy(localDeleteNotice = notice.copy(groupIds = remaining))
+        presentText(current.copy(localDeleteNotice = notice.copy(groupIds = remaining)))
     }
 }

@@ -14,6 +14,21 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 class LocalDeleteNoticesTest {
     @Test
+    fun scopedPublisherRetainsIdentityAndCannotCopyVisibleTextWithoutAReport() {
+        val state = emptyAppState()
+        val scope = LocalDeleteNotice("account", setOf("group"))
+        state.presentText(
+            ToastMessage(
+                title = AppText.Plain("Failure"), copyable = true,
+                diagnosticReport = "   ", localDeleteNotice = scope,
+            ),
+        )
+        assertSame(scope, state.toast?.localDeleteNotice)
+        assertEquals(false, state.toast?.copyable)
+        assertEquals(null, state.toast?.diagnosticReport)
+    }
+
+    @Test
     fun unrelatedAccountOrGroupCannotRetireTheWarning() {
         val state = emptyAppState()
         state.presentLocalDeleteFailure(
