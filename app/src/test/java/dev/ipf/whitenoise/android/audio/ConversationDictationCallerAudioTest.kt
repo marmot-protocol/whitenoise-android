@@ -290,6 +290,54 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
+    /** Completion before any outstanding read drains available audio without entering a blocking read. */
+    @Test
+    fun finishBeforeFirstReadNeverWaitsForFreshSamples() {
+        val readModes = CopyOnWriteArrayList<Boolean>()
+        val reads = AtomicInteger(0)
+        val closed = CountDownLatch(1)
+        val finishArmed = AtomicBoolean(false)
+        lateinit var capture: ConversationDictationCallerAudio
+        val device =
+            object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
+                override fun read(
+                    target: ShortArray,
+                    waitForSamples: Boolean,
+                ): Int {
+                    readModes += waitForSamples
+                    check(!waitForSamples) { "No read was outstanding when completion was requested" }
+                    if (reads.getAndIncrement() > 0) return 0
+                    target[0] = 1_000
+                    target[1] = 1_000
+                    return 2
+                }
+            }
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 8L, chunkBytes = 24, maxBufferedBytes = 24)
+        capture =
+            callerAudio(
+                device = device,
+                buffer = buffer,
+                elapsedRealtime = {
+                    if (
+                        Thread.currentThread().name == "dictation-caller-audio-capture" &&
+                        finishArmed.compareAndSet(false, true)
+                    ) {
+                        capture.finish(closed::countDown)
+                    }
+                    0L
+                },
+            )
+        try {
+            assertTrue(capture.start())
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
+            assertEquals(listOf(false, false), readModes)
+            assertEquals(4, buffer.bufferedBytes)
+            assertTrue(buffer.hasPending)
+        } finally {
+            capture.discard {}
+        }
+    }
+
     /** An empty native buffer closes immediately after the outstanding read, even with a stalled provider. */
     @Test
     fun finishWithEmptyNativeBufferClosesBeforeProviderFeedFinishes() {
@@ -591,7 +639,7 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
-    /** Finishing keeps the six recorder tail reads together instead of creating a tiny final request. */
+    /** Finishing keeps available recorder audio together instead of creating a tiny final request. */
     @Test
     fun finishDoesNotSplitAtASentenceBoundaryDuringRecorderDrain() {
         val clock = FakeElapsedRealtime()
