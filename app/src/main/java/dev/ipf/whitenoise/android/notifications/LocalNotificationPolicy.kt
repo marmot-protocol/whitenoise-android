@@ -24,6 +24,7 @@ object LocalNotificationPolicy {
         conversationNotifyMode: (accountRef: String, groupIdHex: String) -> ChatNotifyMode = { _, _ -> ChatNotifyMode.ALL },
         engineMuted: Boolean = false,
         senderMutedInGroup: GroupSenderMutePredicate = { _, _, _ -> false },
+        categoryEnabled: (String, String, NotificationChannelSpec) -> Boolean? = { _, _, _ -> null },
     ): Boolean {
         if (appLockScreenVisible) return false
         if (
@@ -40,7 +41,7 @@ object LocalNotificationPolicy {
         // mute controls its content, not the safety-critical fact that this
         // account can no longer participate in the group.
         if (!isGlobalMembershipEvent &&
-            !conversationMuteAllowsUpdate(update, engineMuted, conversationNotifyMode)
+            !conversationMuteAllowsUpdate(update, engineMuted, conversationNotifyMode, categoryEnabled)
         ) {
             return false
         }
@@ -63,15 +64,17 @@ object LocalNotificationPolicy {
         update: NotificationUpdateFfi,
         engineMuted: Boolean,
         conversationNotifyMode: (accountRef: String, groupIdHex: String) -> ChatNotifyMode,
+        categoryEnabled: (String, String, NotificationChannelSpec) -> Boolean?,
     ): Boolean {
+        val enabled = categoryEnabled(update.accountRef, update.groupIdHex, NotificationChannelSpec.forUpdate(update))
         if (engineMuted) {
-            return update.trigger == NotificationTriggerFfi.NEW_MESSAGE && update.isMention && !update.isFromSelf
+            return enabled != false &&
+                update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
+                update.isMention &&
+                !update.isFromSelf
         }
-        return when (conversationNotifyMode(update.accountRef, update.groupIdHex)) {
-            ChatNotifyMode.ALL -> true
-            ChatNotifyMode.MENTIONS_ONLY -> update.isMention
-            ChatNotifyMode.NONE -> false
-        }
+        val mode = conversationNotifyMode(update.accountRef, update.groupIdHex)
+        return mode != ChatNotifyMode.NONE && (enabled ?: (mode == ChatNotifyMode.ALL || update.isMention))
     }
 
     /**

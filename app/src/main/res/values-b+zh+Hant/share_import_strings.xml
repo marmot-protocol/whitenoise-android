@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_import_title">正在匯入共享檔案</string>
+    <string name="share_import_error_title">部分檔案無法匯入</string>
+    <string name="share_import_recovery">取消並從來源應用程式重新分享，或繼續使用可用項目。</string>
+    <string name="share_import_unreadable">檔案無法讀取或存取權限已過期。</string>
+    <string name="share_import_scheme">僅支援內容提供者的檔案。</string>
+    <string name="share_import_empty">共享檔案為空。</string>
+    <string name="share_import_file_limit">檔案超過匯入限制（圖片為 64 MiB，其他檔案為 32 MiB）。</string>
+    <string name="share_import_batch_limit">檔案總大小超過 256 MiB 限制。</string>
+    <string name="share_import_count_limit">只能匯入前 10 個檔案。</string>
+    <string name="share_import_metadata">檔案中繼資料無效或大小已變更。</string>
+    <string name="share_import_storage">私有儲存空間無法使用或已滿。</string>
+    <string name="share_import_interrupted">匯入已中斷。請重新分享檔案。</string>
+    <string name="share_import_progress">檔案 %1$d/%2$d：%3$d 位元組</string>
+    <string name="share_import_rejected_count">未匯入的檔案：%1$d</string>
+    <string name="share_import_recovered_limit">選取的附件超過了 10 個。傳送前請移除多餘的附件。</string>
+</resources>

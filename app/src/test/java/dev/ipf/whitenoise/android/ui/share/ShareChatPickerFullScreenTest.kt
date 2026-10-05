@@ -468,6 +468,7 @@ class ShareChatPickerFullScreenTest {
         composeRule.onNodeWithText("Alice").performClick().assertIsSelected()
     }
 
+    /** Checks the selected destination snapshot and single dismissal after successful staging. */
     @Test
     fun primaryActionStagesEverySelectedConversationAndDismissesOnce() {
         val profiles =
@@ -512,6 +513,39 @@ class ShareChatPickerFullScreenTest {
         composeRule.onNodeWithText(app.getString(R.string.share_search_chats)).assertIsNotFocused()
     }
 
+    /** Delays dismissal after acceptance to verify a second primary action cannot restage the same request. */
+    @Test
+    fun successfulStageCannotRepeatWhilePickerDismissalIsPending() {
+        val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice"))
+        val appState = appStateWithDirectChat(GROUP_A, PEER_A, profiles = profiles)
+        var commits = 0
+        var dismissals = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    payload = payload,
+                    onDismiss = { dismissals++ },
+                    onStage = { _, _ ->
+                        commits++
+                        true
+                    },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Alice").performClick()
+        val action = app.resources.getQuantityString(R.plurals.share_to_chats_count, 1, 1)
+        composeRule.onNodeWithText(action).performClick()
+        composeRule.runOnIdle { assertEquals(1, commits) }
+        // Keep the old UI mounted to exercise the interval before its route is removed.
+        composeRule.onNodeWithText(action).performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, commits)
+            assertEquals(1, dismissals)
+        }
+    }
+
+    /** Rejects staging and preserves the picker rather than acknowledging or discarding the request. */
     @Test
     fun rejectedStageKeepsThePickerOpenForRecovery() {
         val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice"))
@@ -537,6 +571,10 @@ class ShareChatPickerFullScreenTest {
         composeRule.runOnIdle { assertEquals(0, dismissCount) }
         composeRule.onNodeWithText(app.getString(R.string.share_search_chats)).assertIsDisplayed()
         composeRule.onNodeWithText(app.getString(R.string.no_share_target_available)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(app.getString(R.string.close)).performClick()
+        composeRule.runOnIdle { assertEquals(1, dismissCount) }
+        composeRule.onNodeWithContentDescription(app.getString(R.string.close)).performClick()
+        composeRule.runOnIdle { assertEquals(1, dismissCount) }
     }
 
     @Test

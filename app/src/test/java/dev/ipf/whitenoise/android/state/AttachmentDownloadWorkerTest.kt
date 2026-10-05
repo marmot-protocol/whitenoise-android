@@ -12,8 +12,8 @@ class AttachmentDownloadWorkerTest {
     /** Runtime mode and signed-out failures cannot be repaired by repeating attachment network work. */
     @Test
     fun nativePermissionErrorsAreTerminalForTheWorker() {
-        assertFalse(shouldRetryAttachmentDownloadWork(0, MarmotKitException.AttachmentModeRequired()))
-        assertFalse(shouldRetryAttachmentDownloadWork(0, MarmotKitException.AttachmentAccountSignedOut()))
+        assertFalse(shouldRetryAttachmentDownloadWork(false, MarmotKitException.AttachmentModeRequired()))
+        assertFalse(shouldRetryAttachmentDownloadWork(false, MarmotKitException.AttachmentAccountSignedOut()))
     }
 
     /** Recovering native source identity must not strand pre-upgrade work or cancellation markers. */
@@ -121,11 +121,11 @@ class AttachmentDownloadWorkerTest {
     fun durableWorkerRetriesOneLaterAttemptWithoutRestoringTheOldThreeMinuteLoop() {
         val timeout = MarmotKitException.Runtime("request timed out")
 
-        assertTrue(shouldRetryAttachmentDownloadWork(runAttemptCount = 0, timeout))
-        assertFalse(shouldRetryAttachmentDownloadWork(runAttemptCount = 1, timeout))
+        assertTrue(shouldRetryAttachmentDownloadWork(transientRetrySpent = false, timeout))
+        assertFalse(shouldRetryAttachmentDownloadWork(transientRetrySpent = true, timeout))
         assertFalse(
             shouldRetryAttachmentDownloadWork(
-                runAttemptCount = 0,
+                transientRetrySpent = false,
                 MarmotKitException.InvalidMediaReference("media decryption failed"),
             ),
         )
