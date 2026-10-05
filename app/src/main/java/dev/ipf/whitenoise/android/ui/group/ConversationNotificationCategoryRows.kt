@@ -105,8 +105,10 @@ private fun ConversationNotificationCategoryGroup(
                             },
                         ),
                     onClick = { choosingScope = true },
-                    modifier = Modifier.testTag("conversation-sound-scope-${setting.channel.id}")
-                        .semantics { contentDescription = scopeDescription },
+                    modifier =
+                        Modifier
+                            .testTag("conversation-sound-scope-${setting.channel.id}")
+                            .semantics { contentDescription = scopeDescription },
                     enabled = scopeChangesEnabled,
                 )
             }

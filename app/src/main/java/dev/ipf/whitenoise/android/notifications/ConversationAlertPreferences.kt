@@ -43,9 +43,10 @@ internal class ConversationAlertPreferences(
             committed
         }
 
-    private fun read(): Map<String, Boolean> = preferences.all
-        .mapNotNull { (key, value) -> (value as? Boolean)?.let { key to it } }
-        .toMap()
+    private fun read(): Map<String, Boolean> =
+        preferences.all
+            .mapNotNull { (key, value) -> (value as? Boolean)?.let { key to it } }
+            .toMap()
 
     fun retainAccounts(accountRefs: Collection<String>): Boolean {
         val retained = accountRefs.map { sha256Hex(it) }.toSet()
@@ -57,7 +58,10 @@ internal class ConversationAlertPreferences(
         return removeChoices { key -> key.substringBefore(':') == prefix }
     }
 
-    private fun removeChoices(durable: Boolean = true, remove: (String) -> Boolean): Boolean =
+    private fun removeChoices(
+        durable: Boolean = true,
+        remove: (String) -> Boolean,
+    ): Boolean =
         synchronized(mutationLock) {
             val updated = _state.value.filterKeys { !remove(it) }
             val editor = preferences.edit()

@@ -6282,9 +6282,10 @@ class WhiteNoiseAppState private constructor(
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
             withContext(NonCancellable + Dispatchers.IO) {
-                val alertsCleared = runCatching {
-                    conversationAlertPreferences.clearAccount(wipedRef)
-                }.getOrDefault(false)
+                val alertsCleared =
+                    runCatching {
+                        conversationAlertPreferences.clearAccount(wipedRef)
+                    }.getOrDefault(false)
                 if (!alertsCleared) {
                     appStateDebug { "local alert preference cleanup will retry during account retention" }
                 }
