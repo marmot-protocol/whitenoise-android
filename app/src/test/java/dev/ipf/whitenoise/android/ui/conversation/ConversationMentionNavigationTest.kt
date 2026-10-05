@@ -256,12 +256,18 @@ class ConversationMentionNavigationTest {
         override var firstVisibleItemIndex = 0
         val writes = mutableListOf<Write>()
 
-        override suspend fun scrollToItem(index: Int, scrollOffset: Int) {
+        override suspend fun scrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
             firstVisibleItemIndex = index
             writes += Write(false, index, scrollOffset)
         }
 
-        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) {
+        override suspend fun animateScrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
             firstVisibleItemIndex = index
             writes += Write(true, index, scrollOffset)
         }

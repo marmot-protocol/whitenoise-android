@@ -94,13 +94,19 @@ class ConversationMentionCorrectionTest {
         override var firstVisibleItemIndex = 0
         val writes = mutableListOf<Pair<Int, Int>>()
 
-        override suspend fun scrollToItem(index: Int, scrollOffset: Int) {
+        override suspend fun scrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
             firstVisibleItemIndex = index
             writes += index to scrollOffset
             onSnap()
         }
 
-        override suspend fun animateScrollToItem(index: Int, scrollOffset: Int) {
+        override suspend fun animateScrollToItem(
+            index: Int,
+            scrollOffset: Int,
+        ) {
             firstVisibleItemIndex = index
             writes += index to scrollOffset
         }

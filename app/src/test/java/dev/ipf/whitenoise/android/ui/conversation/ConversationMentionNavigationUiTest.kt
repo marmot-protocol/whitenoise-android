@@ -137,8 +137,16 @@ class ConversationMentionNavigationUiTest {
         }
         composeRule.onNodeWithTag("mention-jump").performClick()
         composeRule.waitForIdle()
-        val listTop = composeRule.onNodeWithTag("mention-list").getUnclippedBoundsInRoot().top.value
-        val messageTop = composeRule.onNodeWithTag("message-$targetIndex").getUnclippedBoundsInRoot().top.value
+        val listTop =
+            composeRule
+                .onNodeWithTag("mention-list")
+                .getUnclippedBoundsInRoot()
+                .top.value
+        val messageTop =
+            composeRule
+                .onNodeWithTag("message-$targetIndex")
+                .getUnclippedBoundsInRoot()
+                .top.value
         assertEquals(listTop, messageTop, 1f)
         composeRule.runOnIdle { assertTrue(completed) }
     }
