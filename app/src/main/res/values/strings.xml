@@ -2359,4 +2359,7 @@
     <string name="onboarding_details_expanded">Expanded</string>
     <string name="onboarding_details_collapsed">Collapsed</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
+    <string name="notification_show_previews">Show notification previews</string>
+    <string name="notification_show_previews_detail">Hide names and message content when off. Applies to all accounts.</string>
+    <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>
 </resources>

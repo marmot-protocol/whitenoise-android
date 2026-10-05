@@ -2203,4 +2203,7 @@
     <string name="onboarding_details_expanded">Développé</string>
     <string name="onboarding_details_collapsed">Réduit</string>
     <string name="group_svg_rejected_detail">Impossible de préparer ce SVG. Choisissez un SVG simple, un PNG ou un JPEG.</string>
+    <string name="notification_show_previews">Afficher les aperçus des notifications</string>
+    <string name="notification_show_previews_detail">Désactivé : masque les noms et le contenu des messages pour tous les comptes.</string>
+    <string name="notification_preview_update_failed">Les modifications peuvent être perdues après un redémarrage.</string>
 </resources>
