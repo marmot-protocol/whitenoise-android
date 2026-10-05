@@ -120,12 +120,14 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag(messagesTag).performClick()
         composeRule.waitUntil(5_000) {
             ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == false
+                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == false &&
+                !composeRule.onNodeWithTag(reactionsTag).fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)
         }
         composeRule.onNodeWithTag(reactionsTag).performClick()
         composeRule.waitUntil(5_000) {
             ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS) == false
+                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS) == false &&
+                !composeRule.onNodeWithTag(messagesTag).fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)
         }
         composeRule.onNodeWithTag(messagesTag).assertIsOff()
         composeRule.onNodeWithTag(reactionsTag).assertIsOff()
