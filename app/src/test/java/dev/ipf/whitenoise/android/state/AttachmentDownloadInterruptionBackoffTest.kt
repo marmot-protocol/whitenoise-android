@@ -175,12 +175,9 @@ class AttachmentDownloadInterruptionBackoffTest {
         startAndStop(id, STOP_REASON_QUOTA)
         AttachmentDownloadWorker.cancelForRequest(application, testRequest())
 
-        eventually("cancelled work retired") {
-            WorkManager
-                .getInstance(application)
-                .getWorkInfosForUniqueWork(workName())
-                .get()
-                .all { it.state.isFinished }
+        eventually("retirement completes without recreating cancelled work") {
+            val infos = WorkManager.getInstance(application).getWorkInfosForUniqueWork(workName()).get()
+            infos.all { it.state.isFinished }
         }
     }
 
@@ -425,12 +422,9 @@ class AttachmentDownloadInterruptionBackoffTest {
 
         AttachmentDownloadWorker.cancelForRequest(application, testRequest())
 
-        eventually("cancelled work retired") {
-            WorkManager
-                .getInstance(application)
-                .getWorkInfosForUniqueWork(workName())
-                .get()
-                .all { it.state.isFinished }
+        eventually("cancelled work retirement completes") {
+            val infos = WorkManager.getInstance(application).getWorkInfosForUniqueWork(workName()).get()
+            infos.all { it.state.isFinished }
         }
         assertFalse(intentStore().hasSpentTransientRetry(testRequest()))
     }
