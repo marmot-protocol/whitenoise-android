@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.media.editor.CoalescingMessageDraftWriter
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMergeReceipt
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -22,7 +23,7 @@ internal class NotificationReplyDraftHandoff(
     private val store: DraftStore,
     private val available: (NotificationTarget) -> Boolean = { true },
     private val onFailed: () -> Unit = {},
-    private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000L },
+    private val nowMillis: () -> Long = { TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) },
     private val onHydrated: () -> Unit,
 ) {
     private val deliveries = linkedMapOf<String, Deferred<Boolean>>()
