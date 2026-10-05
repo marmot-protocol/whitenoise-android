@@ -1656,7 +1656,7 @@
     <string name="ai_agents_connector_docs_subtitle">安裝指令碼、健康檢查與疑難排解</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Nous Research 的終端代理</string>
-    <string name="agent_connector_hermes_prompt">這是一則安裝提示，用於透過 Marmot 將此 Hermes 安裝連接到 White Noise。請閱讀最新的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請安裝並驗證連接器，然後回覆你的代理 npub。</string>
+    <string name="agent_connector_hermes_prompt">這是一則安裝提示，用於透過 Marmot 將此 Hermes 安裝連接到 White Noise。請閱讀最新的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md / https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請安裝並驗證連接器，然後回覆你的代理 npub。 提出變更前，請確認目標 Hermes 設定、Hermes 目錄、Marmot 目錄和通訊端、助手帳號與服務，以及閘道實例。不要逕自選擇預設設定，也不要覆寫其他安裝。使用校驗和已驗證的 Hermes 安裝程式。區分邀請授權和訊息傳送者授權。指引我從手機邀請並傳送測試訊息，確認所選設定在 White Noise 中回覆後，才能宣告配對完成。</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">自架個人 AI 助手</string>
     <string name="agent_connector_openclaw_prompt">這是一則安裝提示，用於透過 Marmot 將此 OpenClaw 執行個體連接到 White Noise。請閱讀最新的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請安裝並驗證連接器，然後回覆你的代理 npub。</string>
@@ -2199,4 +2199,7 @@
     <string name="profile_readiness_added">已新增</string>
     <string name="profile_readiness_recommended">建議填寫</string>
     <string name="profile_readiness_field_optional">選填</string>
+    <string name="agent_connector_claude_subtitle">Claude Code CLI 程式設計助手</string>
+    <string name="agent_connector_claude_prompt">這是一則安裝提示，用於透過 Marmot 將此 Claude Code 設定連接到 White Noise。請閱讀權威 Claude Code harness 指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md，以及長期有效的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。確認前提條件：Claude Code CLI 已安裝、已驗證並可在 PATH 中使用，且此機器使用與手機相同的公開中繼集合。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請使用經過校驗和驗證的 install-claude-marmot.sh 發佈流程，為該 npub 引導 wn-agent 並使用允許的 welcomer，接著驗證 wn-claude --version。然後回覆你的代理 npub，請我在 White Noise 中邀請它，並透過已設定的中繼從這個允許的 npub 傳送測試訊息。在 wn-claude 透過 White Noise 回覆之前，不要宣告設定完成；若無法自動驗證這個往返流程，請清楚標示仍需要裝置驗證。</string>
+    <string name="ai_agents_project_groups_tip">每個專案使用獨立的群組，先說明專案位置和上下文。不同連接器的工作階段控制不同，使用恢復工作階段或分支命令前請查看對應指南。</string>
 </resources>

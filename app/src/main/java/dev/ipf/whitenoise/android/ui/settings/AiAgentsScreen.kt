@@ -150,6 +150,7 @@ internal fun AiAgentsContent(
                 }
             }
             item { SettingsExplainer(manualSetup) }
+            item { SettingsExplainer(stringResource(R.string.ai_agents_project_groups_tip)) }
             feedback?.let { message ->
                 item {
                     SettingsCallout(

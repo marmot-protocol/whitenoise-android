@@ -20012,6 +20012,36 @@
         ]
       },
       {
+        "surface": "string:ai_agents_project_groups_tip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_project_groups_tip",
+        "test_ids": ["SET-016"]
+      },
+      {
+        "surface": "string:agent_connector_claude_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_name",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_claude_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_subtitle",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_claude_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_prompt",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_hermes_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_hermes_prompt",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
         "surface": "string:ai_agents_manual_setup_body",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
         "anchor": "R.string.ai_agents_manual_setup_body",
