@@ -64,6 +64,7 @@ internal fun ShareImportStatus(
     }
 }
 
+/** Requires explicit partial-batch acknowledgement; an empty batch offers close without staging a destination. */
 @Composable
 private fun ShareImportErrorDialog(
     payload: SharePayload,
@@ -96,6 +97,7 @@ private fun ShareImportErrorDialog(
     )
 }
 
+/** Maps bounded import outcomes to localized, payload-free recovery explanations. */
 private fun ShareImportError.messageResource(): Int =
     when (this) {
         ShareImportError.Unreadable -> R.string.share_import_unreadable

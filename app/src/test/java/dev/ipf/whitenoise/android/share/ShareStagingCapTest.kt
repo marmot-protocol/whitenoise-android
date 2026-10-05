@@ -39,6 +39,7 @@ class ShareStagingCapTest {
         assertEquals(2, capped.droppedCount)
     }
 
+    /** Consumes the staged key once and reports overflow without returning the same payload again. */
     @Test
     fun consumeCapped_isOneShotAndAppliesCap() {
         val store = ShareStagingStore()
@@ -57,6 +58,7 @@ class ShareStagingCapTest {
         assertNull(store.consumeCapped("acct", "group", 0, 0, 10))
     }
 
+    /** Counts existing and incoming visual/document items together when applying the shared shelf limit. */
     @Test
     fun mixedMediaAndDocumentsShareOneTenItemShelf() {
         val capped =

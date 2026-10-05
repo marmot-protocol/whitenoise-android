@@ -62,6 +62,7 @@ class ShareInboundStagerTest {
         assertEquals("existing\nincoming", draftStore.get("acct", "g1"))
     }
 
+    /** Stages a mixed visual/document payload into the account/group shelf without invoking a send. */
     @Test
     fun stagesStreamsIntoShareStagingStore() {
         val context = RuntimeEnvironment.getApplication()
@@ -80,6 +81,7 @@ class ShareInboundStagerTest {
         assertNull(draftStore.get("acct", "g1"))
     }
 
+    /** Preserves import order through document staging rather than regrouping provider MIME families. */
     @Test
     fun importedMixedFilesKeepTheirSuppliedOrderThroughTheOrdinaryDocumentShelf() {
         val context = RuntimeEnvironment.getApplication()

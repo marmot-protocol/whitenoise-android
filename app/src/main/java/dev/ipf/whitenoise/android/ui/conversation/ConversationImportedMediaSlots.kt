@@ -46,6 +46,7 @@ internal fun importedComposerExceedsLimit(
     return media.any { owns(it.uri) } || documents.any(owns)
 }
 
+/** Adds unique picks within remaining capacity without truncating an already recovered overflowing shelf. */
 internal fun appendRecoveredDocuments(
     current: List<Uri>,
     added: List<Uri>,

@@ -86,6 +86,7 @@ class InboundShareAccountOwnershipTest {
         assertEquals(1, appState.shareStaging.revision)
     }
 
+    /** Changes request ownership between validation points and verifies no draft is staged from the stale picker. */
     @Test
     fun supersededPickerCannotCommitAfterProviderPreparation() =
         kotlinx.coroutines.runBlocking {
@@ -103,6 +104,7 @@ class InboundShareAccountOwnershipTest {
             assertNull(state.shareStaging.consume(personal.accountIdHex, "chat"))
         }
 
+    /** Signs out the chosen account at final validation; the prepared request must not enter its draft. */
     @Test
     fun signOutAtCommitKeepsTheShareRecoverableWithoutStaging() =
         kotlinx.coroutines.runBlocking {

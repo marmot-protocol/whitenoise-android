@@ -26,26 +26,31 @@ import java.io.File
 class ImportedShareShelfBehaviorTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Restores native attachments after the private shelf to exercise the late hydration order. */
     @Test
     fun lateOrdinaryDraftRestoreKeepsPrivateShelfFiles() {
         assertBothRestoresKeepPrivateFiles(draftFirst = false)
     }
 
+    /** Hydrates native attachments first to verify the private shelf adds rather than replaces them. */
     @Test
     fun ordinaryDraftRestoreBeforeShareRestoreKeepsPrivateShelfFiles() {
         assertBothRestoresKeepPrivateFiles(draftFirst = true)
     }
 
+    /** Restores eleven accepted sources with native hydration first; no limit handling may delete originals. */
     @Test
     fun nativeFirstOverflowDoesNotDeleteAcceptedPrivateOriginals() {
         assertBothRestoresKeepPrivateFiles(draftFirst = true, ordinaryCount = 8, importedCount = 3)
     }
 
+    /** Reverses the overflowing restore order to verify the same retention contract. */
     @Test
     fun shelfFirstOverflowDoesNotDeleteAcceptedPrivateOriginals() {
         assertBothRestoresKeepPrivateFiles(draftFirst = false, ordinaryCount = 8, importedCount = 3)
     }
 
+    /** Mounts the real shelf effect and checks both visible items and durable files for a chosen restore order. */
     private fun assertBothRestoresKeepPrivateFiles(
         draftFirst: Boolean,
         ordinaryCount: Int = 1,
@@ -103,6 +108,7 @@ class ImportedShareShelfBehaviorTest {
         }
     }
 
+    /** Blocks the storage lock while the composer removes a source, then rejects stale restoration on release. */
     @Test
     fun revisionRestoreCannotResurrectRemovalWhileStorageIsBlocked() {
         val context = RuntimeEnvironment.getApplication()
@@ -155,6 +161,7 @@ class ImportedShareShelfBehaviorTest {
         }
     }
 
+    /** Obstructs the next shelf write after restoration and verifies the recoverable error preserves owned files. */
     @Test
     fun failedComposerPersistenceReportsRecoveryWithoutCrashingOrDeletingSources() {
         val context = RuntimeEnvironment.getApplication()

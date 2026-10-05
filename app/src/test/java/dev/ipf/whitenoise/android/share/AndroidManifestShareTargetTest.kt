@@ -33,6 +33,7 @@ class AndroidManifestShareTargetTest {
         assertEquals(ActivityInfo.LAUNCH_SINGLE_TASK, activityInfo.launchMode)
     }
 
+    /** Parses the shipping shortcut resource to verify the Direct Share target class, category and MIME scope. */
     @Test
     fun mainActivityDeclaresShortcutsMetadataAndShareTarget() {
         val context = RuntimeEnvironment.getApplication()
@@ -73,6 +74,7 @@ class AndroidManifestShareTargetTest {
         assertTrue(sendMultiple.any { it.activityInfo.name == mainActivityName })
     }
 
+    /** Queries actual manifest resolution for both share actions across document and visual MIME families. */
     @Test
     fun allSupportedFileFamiliesResolveExactlyOnceForBothActions() {
         val context = RuntimeEnvironment.getApplication()
@@ -103,6 +105,7 @@ class AndroidManifestShareTargetTest {
         }
     }
 
+    /** Keeps the external dispatcher in the test package rather than adding a production exported entry point. */
     @Test
     fun externalShareDispatcherReliesOnTestPackageDefaults() {
         val manifest =
@@ -116,6 +119,7 @@ class AndroidManifestShareTargetTest {
         assertTrue(!manifest.contains("android:taskAffinity="))
     }
 
+    /** Checks provider exposure and both backup resource contracts for private staged content. */
     @Test
     fun privateIntakeCannotBeExportedOrIncludedInBackup() {
         val context = RuntimeEnvironment.getApplication()

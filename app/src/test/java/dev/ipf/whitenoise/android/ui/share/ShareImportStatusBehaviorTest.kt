@@ -24,6 +24,7 @@ import org.robolectric.annotation.Config
 class ShareImportStatusBehaviorTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Clicks cancel during progress while recipient content remains gated behind unfinished import. */
     @Test
     fun progressCancelCallsOnlyCancellationAndNeverExposesRecipients() {
         var cancels = 0
@@ -37,6 +38,7 @@ class ShareImportStatusBehaviorTest {
         assertEquals(1, cancels)
     }
 
+    /** Keeps accepted content hidden until the user acknowledges the visible partial-import failure. */
     @Test
     fun aPartialBatchRequiresExplicitAcknowledgementBeforeRecipientSelection() {
         val request =
@@ -63,6 +65,7 @@ class ShareImportStatusBehaviorTest {
         composeRule.onNodeWithText("Recipients").assertExists()
     }
 
+    /** Restores an interrupted empty batch and permits only closing, without exposing recipient selection. */
     @Test
     fun noAcceptedItemOffersCloseWithoutAnEmptyComposer() {
         var cancels = 0

@@ -21,6 +21,7 @@ import java.util.UUID
 @PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class PrivateSharePlatformPersistenceDeviceTest {
+    /** Launches real external intake for an app-owned provider and verifies rejection before private data access. */
     @Test
     fun externalIntentCannotImportOurOtherPrivateFileProvider() =
         kotlinx.coroutines.runBlocking {
@@ -55,6 +56,9 @@ class PrivateSharePlatformPersistenceDeviceTest {
             }
         }
 
+    /**
+     * Recreates the repository around a completed file, then reads metadata and bytes through the platform provider.
+     */
     @Test
     fun privateMetadataAndReadOnlyProviderSurviveRepositoryRecreation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -73,6 +77,7 @@ class PrivateSharePlatformPersistenceDeviceTest {
         }
     }
 
+    /** Recreates the encrypted store and verifies the process-interruption marker survives. */
     @Test
     fun encryptedInterruptionMarkerSurvivesStoreRecreation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -80,6 +85,7 @@ class PrivateSharePlatformPersistenceDeviceTest {
         val directory = File(context.noBackupFilesDir, "share-platform-test-$id")
         val alias = "share-platform-test-$id"
 
+        /** Constructs a fresh context-backed serialized store for the platform persistence boundary. */
         fun store() =
             EncryptedPendingShareRequestStore(
                 DiskByteCache(

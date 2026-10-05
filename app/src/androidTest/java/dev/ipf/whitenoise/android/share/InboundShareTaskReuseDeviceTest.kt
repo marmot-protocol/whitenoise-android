@@ -37,6 +37,9 @@ class InboundShareTaskReuseDeviceTest {
     @get:Rule
     val composeRule = createEmptyComposeRule()
 
+    /**
+     * Uses external intents, background return and activity recreation to verify one task and newest-request ownership.
+     */
     @Test
     fun repeatedExternalFileSharesReuseOneTaskAndKeepOnlyNewestRequest() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -229,6 +232,7 @@ class InboundShareTaskReuseDeviceTest {
         )
     }
 
+    /** Reads private provider display metadata so task assertions compare source names rather than generated URIs. */
     private fun sharedName(uri: android.net.Uri): String? {
         if (uri.authority?.endsWith(".private-share") != true) return uri.lastPathSegment
         return InstrumentationRegistry
@@ -243,6 +247,7 @@ class InboundShareTaskReuseDeviceTest {
             )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
     }
 
+    /** Waits for a completed import with the exact expected source name before asserting task reuse. */
     private fun awaitPendingShare(streamName: String): MainActivity =
         awaitResumedMainActivity { activity ->
             activity.pendingInboundShareRequestForTest
@@ -293,6 +298,9 @@ class InboundShareTaskReuseDeviceTest {
         }
     }
 
+    /**
+     * Polls the main-thread lifecycle with a deadline, excluding a replaced activity and retaining safe diagnostics.
+     */
     private fun awaitResumedMainActivity(
         excluding: MainActivity? = null,
         predicate: (MainActivity) -> Boolean = { true },

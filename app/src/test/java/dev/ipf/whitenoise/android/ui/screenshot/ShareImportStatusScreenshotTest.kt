@@ -22,6 +22,7 @@ import org.robolectric.annotation.GraphicsMode
 class ShareImportStatusScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Captures the bounded byte-progress dialog in the light theme using synthetic content. */
     @Test fun progressLight() {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
@@ -31,6 +32,7 @@ class ShareImportStatusScreenshotTest {
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/share_import_progress_light.png")
     }
 
+    /** Captures an empty interrupted batch in the dark theme, including its close-only recovery action. */
     @Test fun interruptedDark() {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
@@ -49,6 +51,7 @@ class ShareImportStatusScreenshotTest {
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/share_import_interrupted_dark.png")
     }
 
+    /** Captures partial recovery at large font scale and RTL with both rejection explanations visible. */
     @Test
     fun partialFailureLargeFontRtl() {
         composeRule.setContent {

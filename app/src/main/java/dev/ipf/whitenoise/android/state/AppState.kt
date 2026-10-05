@@ -869,6 +869,7 @@ internal class ConversationStateRetention(
         }
     }
 
+    /** Evicts idle conversations only; active uploads may temporarily exceed the ordinary retention window. */
     private fun evictOverflow(protectedKey: String?): List<String> {
         val evicted = mutableListOf<String>()
         while (recentKeys.size > maxEntries) {
@@ -3014,6 +3015,7 @@ class WhiteNoiseAppState private constructor(
                 ?.get(confirmedMessageIdHex)
         }
 
+    /** Returns the account/group retained queue whose removal callback releases private source ownership. */
     internal fun retainedMediaUploads(
         accountRef: String?,
         groupIdHex: String,
@@ -3053,6 +3055,7 @@ class WhiteNoiseAppState private constructor(
         return job
     }
 
+    /** Removes only the matching upload job, then prunes conversations whose active-source protection has ended. */
     internal fun untrackInFlightMediaUpload(
         accountRef: String?,
         groupIdHex: String,
@@ -3097,6 +3100,7 @@ class WhiteNoiseAppState private constructor(
             .forEach(::removeConversationState)
     }
 
+    /** Drops all cached conversation overlays and clears the retained queue to release its source owners. */
     private fun removeConversationState(staleKey: String) {
         optimisticMessagesByConversation.remove(staleKey)
         durableAcceptanceCallbacksByConversation.remove(staleKey)?.clear()

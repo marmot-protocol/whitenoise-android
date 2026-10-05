@@ -450,6 +450,7 @@ private class ShareChatPickerState(
     val canStage: Boolean
         get() = selected.isNotEmpty() && selected.all(targetGroupIds::contains)
 
+    /** Matches folded presentation values, restricting identity aliases to queries shaped like account identifiers. */
     fun filtered(presentedTargets: List<ShareChatPickerTargetPresentation>): List<ShareChatPickerTargetPresentation> {
         val needle = query.trim()
         return if (needle.isEmpty()) {
@@ -469,6 +470,7 @@ private class ShareChatPickerState(
 
     var isCommitting: () -> Boolean = { false }
 
+    /** Ignores recipient changes while a destination commit owns the selected snapshot. */
     fun toggleSelection(groupId: String) {
         if (isCommitting()) return
         selectedState.value =
@@ -477,6 +479,7 @@ private class ShareChatPickerState(
             }
     }
 
+    /** Rejects account changes during commit; an accepted switch clears recipients belonging to the prior account. */
     fun chooseAccount(accountRef: String) {
         if (isCommitting()) return
         if (accountRef == selectedAccountRef || accounts.none { it.label == accountRef }) return
@@ -497,6 +500,9 @@ private class ShareChatPickerState(
         retryLoadAction()
     }
 
+    /**
+     * Rechecks the chosen signing account and current target membership before passing a stable destination snapshot.
+     */
     suspend fun stage(onStage: suspend (String, List<String>) -> Boolean): Boolean =
         selectedAccountRef?.let { accountRef ->
             accounts.any { it.label == accountRef && it.isSignedInSigningAccount() } &&
@@ -505,6 +511,7 @@ private class ShareChatPickerState(
         } == true
 }
 
+/** Keeps the sending-account selector locked while the picker commits its destination snapshot. */
 @Composable
 private fun ShareChatPickerAccountRow(
     pickerState: ShareChatPickerState,

@@ -49,6 +49,7 @@ class PendingShareRequestStoreTest {
         dir.deleteRecursively()
     }
 
+    /** Decodes a future outcome as interruption while preserving the request caption and sources. */
     @Test
     fun futureErrorNamesPreserveTheRecoverableRequest() {
         val original = request("future", text = "retained caption")
@@ -60,6 +61,7 @@ class PendingShareRequestStoreTest {
         assertEquals(listOf(ShareImportError.Interrupted), recovered.payload.importErrors)
     }
 
+    /** Round-trips the maximum meaningful rejection list through encrypted persistence. */
     @Test
     fun allBoundedImportOutcomesSurviveEncryptedRecovery() {
         val errors =
@@ -71,6 +73,7 @@ class PendingShareRequestStoreTest {
         assertEquals(interrupted, store().load(interrupted.requestId))
     }
 
+    /** Inspects persisted bytes for the fixture caption and reloads using a fresh store instance. */
     @Test
     fun requestRoundTripsAcrossStoreRecreationWithoutPlaintextOnDisk() {
         val request = request("request-1", text = "private shared text")
@@ -88,6 +91,7 @@ class PendingShareRequestStoreTest {
         assertEquals(request, store().load(request.requestId))
     }
 
+    /** Checks the durable interruption marker inside the import callback, then cancels before completion. */
     @Test
     fun importBridgePersistsAnInterruptedOutcomeBeforeTouchingSources() =
         runTest {
@@ -110,6 +114,7 @@ class PendingShareRequestStoreTest {
             assertTrue(restored.payload.importReady)
         }
 
+    /** Rejects marker persistence and verifies that provider import is never started. */
     @Test
     fun failedInterruptionMarkerDoesNotOpenAnyExternalSource() =
         kotlinx.coroutines.runBlocking {

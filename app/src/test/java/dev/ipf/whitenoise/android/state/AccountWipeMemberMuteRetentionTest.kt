@@ -126,6 +126,7 @@ class AccountWipeMemberMuteRetentionTest {
             )
         }
 
+    /** Stages originals for two accounts and verifies successful cleanup releases only the wiped account. */
     @Test
     fun successfulWipePurgesItsPrivateShareShelfAndPreservesAnotherAccount() =
         runBlocking {
@@ -145,6 +146,7 @@ class AccountWipeMemberMuteRetentionTest {
             }
         }
 
+    /** Makes native local cleanup incomplete and verifies the Android source owner is retained for recovery. */
     @Test
     fun failedNativeLocalCleanupKeepsThePrivateShareShelf() =
         runBlocking {
@@ -162,6 +164,7 @@ class AccountWipeMemberMuteRetentionTest {
             }
         }
 
+    /** Creates a completed one-byte original with an account-scoped shelf lease for wipe assertions. */
     private fun stagedFile(
         files: dev.ipf.whitenoise.android.share.PrivateShareFiles,
         account: String,

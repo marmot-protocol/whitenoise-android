@@ -28,6 +28,7 @@ internal class RetainedMediaUpload(
         return available
     }
 
+    /** Clears ownership before invoking cleanup, making removal and delayed acceptance releases idempotent. */
     fun releaseSource() {
         val release = sourceRelease
         sourceRelease = null

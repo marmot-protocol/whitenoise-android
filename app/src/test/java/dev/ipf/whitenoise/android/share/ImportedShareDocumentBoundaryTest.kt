@@ -24,6 +24,7 @@ import java.io.ByteArrayInputStream
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ImportedShareDocumentBoundaryTest {
+    /** Pauses real attachment preparation across shelf removal; the independent send lease must retain the bytes. */
     @Test
     fun sendOwnershipKeepsSourceReadableWhenBackClearsShelfDuringPreparation() =
         runBlocking {
@@ -57,6 +58,7 @@ class ImportedShareDocumentBoundaryTest {
             org.junit.Assert.assertNull(files.resolve(uri))
         }
 
+    /** Builds the production attachment reader with inert draft persistence and no native connection. */
     private fun fixtureReader(context: Context): ConversationAttachmentReader {
         val persistence =
             object : DraftPersistence {
@@ -79,6 +81,7 @@ class ImportedShareDocumentBoundaryTest {
         return ConversationAttachmentReader(state, context)
     }
 
+    /** Uses a valid PNG with a sparse tail to verify compression for both image and generic provider MIME. */
     @Test
     fun sourceImageAboveSendBudgetStillUsesTheOrdinaryCompressionPath() =
         runBlocking {
@@ -140,6 +143,7 @@ class ImportedShareDocumentBoundaryTest {
             }
         }
 
+    /** Revokes external access before preparing a pending attachment, then releases intake ownership afterward. */
     @Test
     fun expiredSourceEntersTheOrdinaryPendingAttachmentBoundaryWithExactBytesAndMetadata() =
         runBlocking {
@@ -194,6 +198,7 @@ class ImportedShareDocumentBoundaryTest {
             assertArrayEquals(bytes, attachment.plaintextBytes)
         }
 
+    /** Exercises the actual retained queue and delayed acceptance callbacks to prove idempotent shared release. */
     @Test
     fun actualRetainedQueueRemovalAndDiscardReleaseEverySourceOwnerExactlyOnce() =
         runBlocking {
@@ -259,6 +264,7 @@ class ImportedShareDocumentBoundaryTest {
             releases[1]()
         }
 
+    /** Changes the shelf inside a rejected commit; rollback may remove only this intake transaction. */
     @Test
     fun rejectedDestinationCommitPreservesConcurrentComposerRemovalAndAddition() =
         runBlocking {
@@ -299,6 +305,7 @@ class ImportedShareDocumentBoundaryTest {
             assertTrue(files.availableBytes() == PRIVATE_SHARE_BATCH_MAX_BYTES)
         }
 
+    /** Rejects a multi-destination commit and verifies prior shelves plus pending request ownership are retained. */
     @Test
     fun rejectedDestinationCommitKeepsTheRecoverableRequestAndRestoresPriorShelves() =
         runBlocking {

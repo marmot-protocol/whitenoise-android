@@ -17,6 +17,7 @@ import org.robolectric.annotation.Config
 class ConversationImportedMediaSlotsTest {
     private val owns: (Uri) -> Boolean = { it.authority == "private-share" }
 
+    /** Restores mixed content with a media URI on the document shelf and preserves its existing edited slot. */
     @Test
     fun mixedShelfRefreshPreservesAnExistingEditedMediaOccurrence() {
         val edited = PendingMediaSlot("edited-preview", Uri.parse("content://private-share/image"))
@@ -33,6 +34,7 @@ class ConversationImportedMediaSlotsTest {
         assertEquals(listOf(document), recovered.documentUris)
     }
 
+    /** Checks eleven restored sources in both hydration orders; sending resumes only after explicit removal. */
     @Test
     fun bothRestoreOrdersKeepAllAcceptedSourcesAndRequireExplicitOverflowRemoval() {
         val ordinary =
@@ -52,6 +54,7 @@ class ConversationImportedMediaSlotsTest {
         assertFalse(importedComposerExceedsLimit(nativeFirst.mediaSlots.dropLast(1), emptyList(), 10, owns))
     }
 
+    /** Appends to an already overflowing recovered shelf without truncating its accepted originals. */
     @Test
     fun aNewDocumentPickCannotTrimAlreadyRecoveredSources() {
         val recovered = List(11) { Uri.parse("content://private-share/$it") }
@@ -59,6 +62,7 @@ class ConversationImportedMediaSlotsTest {
         assertFalse(importedComposerExceedsLimit(emptyList(), recovered, 10) { false })
     }
 
+    /** Repeats shelf revisions and removal while checking slot object identity, including the camera item. */
     @Test
     fun revisionsPreserveExistingPreviewIdentityAndOnlyAddNewSources() {
         val camera = PendingMediaSlot("camera", Uri.parse("content://camera/photo"))
@@ -76,6 +80,7 @@ class ConversationImportedMediaSlotsTest {
         assertEquals(listOf(camera, restored[2]), removed)
     }
 
+    /** Feeds a stale native snapshot containing a removed private URI; current private ownership wins. */
     @Test
     fun ordinaryRestorePreservesCurrentPrivateSourcesAndCannotResurrectRemovedOnes() {
         val ordinary = PendingMediaSlot("native", Uri.parse("content://native/photo"))

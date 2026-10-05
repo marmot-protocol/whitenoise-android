@@ -82,6 +82,9 @@ class ShareIntentTest {
         assertNull(parseShareIntent(null))
     }
 
+    /**
+     * Verifies raw EXTRA_TEXT parsing independently of stream contents; production draft merge is tested separately.
+     */
     @Test
     fun plainTextPreservesWhitespaceWithoutReadingFileContents() {
         val intent =

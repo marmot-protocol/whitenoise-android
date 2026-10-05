@@ -468,6 +468,7 @@ class ShareChatPickerFullScreenTest {
         composeRule.onNodeWithText("Alice").performClick().assertIsSelected()
     }
 
+    /** Checks the selected destination snapshot and single dismissal after successful staging. */
     @Test
     fun primaryActionStagesEverySelectedConversationAndDismissesOnce() {
         val profiles =
@@ -512,6 +513,7 @@ class ShareChatPickerFullScreenTest {
         composeRule.onNodeWithText(app.getString(R.string.share_search_chats)).assertIsNotFocused()
     }
 
+    /** Delays dismissal after acceptance to verify a second primary action cannot restage the same request. */
     @Test
     fun successfulStageCannotRepeatWhilePickerDismissalIsPending() {
         val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice"))
@@ -543,6 +545,7 @@ class ShareChatPickerFullScreenTest {
         }
     }
 
+    /** Rejects staging and preserves the picker rather than acknowledging or discarding the request. */
     @Test
     fun rejectedStageKeepsThePickerOpenForRecovery() {
         val profiles = mutableMapOf(PEER_A to profile(displayName = "Alice"))

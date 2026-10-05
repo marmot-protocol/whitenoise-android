@@ -525,6 +525,7 @@ internal class ConversationMediaSender(
         }
     }
 
+    /** Uploads seeded sends in order; durable acceptance releases each source owner and clears the draft only once. */
     private suspend fun uploadStagedAttachments(
         seeded: List<ConversationController.QueuedAttachmentSend>,
         releases: List<() -> Unit>?,

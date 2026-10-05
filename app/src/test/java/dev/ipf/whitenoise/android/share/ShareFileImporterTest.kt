@@ -31,21 +31,26 @@ class ShareFileImporterTest {
     private lateinit var files: PrivateShareFiles
     private val source = Uri.parse("content://external/document")
 
+    /** Uses a fresh private directory so retained bytes from another case cannot affect the storage budget. */
     @Before fun setup() {
         root = Files.createTempDirectory("private-intake").toFile()
         files = PrivateShareFiles(root, "test.private-share")
     }
 
+    /** Removes the fixture directory, including leases left by negative import cases. */
     @After fun cleanup() {
         root.deleteRecursively()
     }
 
+    /** Counts directory access to enforce lazy storage initialization during URI ownership checks. */
     @Test fun constructionAndOwnershipChecksDoNotTouchAndroidStorage() {
         var directoryReads = 0
         val context =
             object : ContextWrapper(RuntimeEnvironment.getApplication()) {
+                /** Keeps the counting wrapper as the application context used by the storage adapter. */
                 override fun getApplicationContext(): Context = this
 
+                /** Records the first actual storage access rather than merely constructing the adapter. */
                 override fun getNoBackupFilesDir(): File {
                     directoryReads++
                     return root
@@ -58,6 +63,7 @@ class ShareFileImporterTest {
         assertEquals(1, directoryReads)
     }
 
+    /** Revokes the source after import and verifies that recreated storage reads only the private copy. */
     @Test fun bytesAndSafeMetadataSurviveSourceRevocationAndStoreRecreation() =
         runBlocking {
             var available = true
@@ -81,6 +87,7 @@ class ShareFileImporterTest {
             assertTrue(imported.payload.importErrors.isEmpty())
         }
 
+    /** Shares one file between accounts to distinguish account cleanup from last-owner file deletion. */
     @Test fun accountWipeReleasesOnlyItsShelvesAndQueuedSends() =
         runBlocking {
             val importer =
@@ -107,6 +114,7 @@ class ShareFileImporterTest {
             assertTrue(root.listFiles().orEmpty().isEmpty())
         }
 
+    /** Exercises unknown provider size and conflicting MIME hints at the completed-file boundary. */
     @Test fun missingSizeIsMeasuredAndProviderMimeBeatsIntentMime() =
         runBlocking {
             val importer =
@@ -121,6 +129,7 @@ class ShareFileImporterTest {
             assertEquals("text/csv", metadata.getString("mime"))
         }
 
+    /** Mixes provider failures with a misleading size hint; accepted bytes must retain their own outcome. */
     @Test fun unsupportedEmptyAndUnreadableStayDistinctWhileActualBytesOverrideSizeHints() =
         runBlocking {
             val uris =
@@ -157,6 +166,7 @@ class ShareFileImporterTest {
             assertEquals(1L, files.metadata(result.payload.streamUris.single())!!.getLong("size"))
         }
 
+    /** Makes provider callbacks fail if invoked, including Android user-prefixed app-owned authorities. */
     @Test fun appOwnedProvidersAreRejectedBeforeMetadataOrOpen() =
         runBlocking {
             val importer =
@@ -177,6 +187,7 @@ class ShareFileImporterTest {
             assertTrue(result.payload.streamUris.isEmpty())
         }
 
+    /** Supplies unusable metadata while keeping readable bytes, requiring a safe fallback name and measured size. */
     @Test fun blankFilenameAndZeroSizeHintDoNotRejectReadableContent() =
         runBlocking {
             val importer =
@@ -191,6 +202,7 @@ class ShareFileImporterTest {
             assertEquals(2L, metadata.getLong("size"))
         }
 
+    /** Exercises blocked open, EOF and I/O cancellation while retaining the earlier completed import. */
     @Test fun timedOutBatchRetainsCompletedFilesAndClosesOnlyThePartialSource() =
         runBlocking {
             for (mode in CancelledProvider.entries) {
@@ -219,6 +231,7 @@ class ShareFileImporterTest {
             }
         }
 
+    /** Blocks open or read until cancellation; its close latch proves the partial provider was released. */
     private fun cancelledSource(
         mode: CancelledProvider,
         signal: android.os.CancellationSignal,
@@ -244,6 +257,7 @@ class ShareFileImporterTest {
 
     private enum class CancelledProvider { EOF, IO, OPEN }
 
+    /** Checks normalized ownership lookup separately from the original user-prefixed URI needed for access. */
     @Test fun externalUserIdPrefixIsPreservedForTheGrantedRead() =
         runBlocking {
             val granted = Uri.parse("content://10@external/document")
@@ -267,6 +281,7 @@ class ShareFileImporterTest {
             assertTrue(imported.payload.importErrors.isEmpty())
         }
 
+    /** Uses sparse retained files to verify that intake uses the remaining budget without deleting old drafts. */
     @Test fun tinyShareUsesTheActualFreeSpaceAlongsideLargeRetainedDrafts() =
         runBlocking {
             val retained =
@@ -290,6 +305,7 @@ class ShareFileImporterTest {
             assertEquals(retained, files.leases.loadShelf("account", "existing"))
         }
 
+    /** Exhausts private storage and makes metadata/open callbacks fail if rejection happens too late. */
     @Test fun fullRetainedShelfRejectsNewIntakeWithoutOpeningTheSource() =
         runBlocking {
             val retained =
@@ -313,6 +329,7 @@ class ShareFileImporterTest {
             retained.forEach { assertEquals(PRIVATE_SHARE_MAX_BYTES, files.metadata(it)!!.getLong("size")) }
         }
 
+    /** Feeds an unbounded stream with a false size hint to verify bounded probing and partial-file cleanup. */
     @Test fun oversizedStreamingInputReadsAtMostBudgetPlusOneAndDeletesPartial() =
         runBlocking {
             var readBytes = 0L
@@ -342,6 +359,7 @@ class ShareFileImporterTest {
             assertEquals(0, root.listFiles()!!.count { it.extension == "bin" })
         }
 
+    /** Duplicates an eleven-source batch; only unique excess items produce the visible limit outcome. */
     @Test fun tenItemLimitDeduplicatesAndKeepsValidItemsWithVisibleOverflow() =
         runBlocking {
             val importer =
@@ -356,6 +374,7 @@ class ShareFileImporterTest {
             assertEquals(listOf(ShareImportError.TooMany), result.payload.importErrors)
         }
 
+    /** Recreates storage between releases to prove durable destination ownership, including account isolation. */
     @Test fun twoDestinationLeasesKeepBytesUntilBothAreRemoved() =
         runBlocking {
             val importer =
@@ -380,6 +399,7 @@ class ShareFileImporterTest {
             assertNull(files.resolve(uri))
         }
 
+    /** Rejects recursive private intake, foreign authorities and traversal without opening any source. */
     @Test fun privateUriAndTraversalCannotBeImportedOrResolved() =
         runBlocking {
             val importer =
@@ -403,6 +423,7 @@ class ShareFileImporterTest {
             assertNull(files.resolve(Uri.parse("content://foreign/00000000-0000-0000-0000-000000000000")))
         }
 
+    /** Cancels through the progress callback and requires cleanup without returning a ready request. */
     @Test fun cancelledImportClosesInputAndDeletesPartialWithoutAcknowledging() =
         runBlocking {
             var closed = false
@@ -428,6 +449,7 @@ class ShareFileImporterTest {
             assertEquals(0, root.listFiles()!!.count { it.extension == "bin" })
         }
 
+    /** Reads the real provider and manifest contract, then verifies that output access is rejected. */
     @Test fun productionProviderPreservesMetadataAndDeniesWritesOrGrants() =
         runBlocking {
             val context = org.robolectric.RuntimeEnvironment.getApplication()
@@ -463,6 +485,7 @@ class ShareFileImporterTest {
             providerFiles.leases.releaseRequest("request")
         }
 
+    /** Checks the actual no-backup path and filesystem permissions rather than an in-memory ownership model. */
     @Test fun privateFilesHaveOwnerOnlyPermissionsAndNoBackupRoot() {
         val context = org.robolectric.RuntimeEnvironment.getApplication()
         val (uri, file) = PrivateShareFiles(context).newFile()
@@ -481,6 +504,7 @@ class ShareFileImporterTest {
         PrivateShareFiles(context).delete(uri)
     }
 
+    /** Streams files across the cumulative limit and verifies that a later fitting item can still complete. */
     @Test fun exactByteBoundaryAndCumulativeOverflowKeepOnlyCompleteFiles() =
         runBlocking {
             val sizes = List(3) { PRIVATE_SHARE_MAX_BYTES } + listOf(PRIVATE_SHARE_MAX_BYTES - 1, 2L, 1L)
@@ -500,6 +524,7 @@ class ShareFileImporterTest {
             )
         }
 
+    /** Mutates a completed file, then replaces it with a symlink; neither remains a valid private source. */
     @Test fun symlinksAndChangedPrivateBytesCannotBeReadAsACompletedImport() =
         runBlocking {
             val importer =
@@ -522,6 +547,7 @@ class ShareFileImporterTest {
             assertNull(files.resolve(uri))
         }
 
+    /** Uses latches to cancel an active blocking read and waits for cleanup before inspecting storage. */
     @Test fun cancelledBlockedReadClosesProviderAndRemovesThePartialFile() =
         runBlocking {
             val entered = java.util.concurrent.CountDownLatch(1)
@@ -560,6 +586,7 @@ class ShareFileImporterTest {
             assertEquals(0, root.listFiles()!!.count { it.extension == "bin" })
         }
 
+    /** Clears the composer shelf while a send owns the source; only the final send release deletes it. */
     @Test fun completedSendLeaseProtectsBytesUntilDurableAcceptance() =
         runBlocking {
             val importer =
@@ -583,6 +610,7 @@ class ShareFileImporterTest {
             assertNull(files.resolve(uri))
         }
 
+    /** Separates incomplete-file recovery from the explicit maximum lifetime of completed originals. */
     @Test fun restartRecoveryDeletesUnfinishedFilesAndExpiryBoundsCompleteRetention() =
         runBlocking {
             val unfinished = files.newFile().second.apply { writeBytes(byteArrayOf(1)) }
@@ -603,6 +631,7 @@ class ShareFileImporterTest {
             assertNull(files.resolve(uri))
         }
 
+    /** Replays stale shelf snapshots around addition and removal to verify revision-aware ownership changes. */
     @Test fun lateComposerSnapshotCannotOverwriteANewerImportOrResurrectRemovedFiles() =
         runBlocking {
             val importer =
@@ -623,6 +652,7 @@ class ShareFileImporterTest {
             assertEquals(listOf(newer), files.leases.loadShelf("account", "chat"))
         }
 
+    /** Restores an interrupted request marker and requires local cleanup without another provider read. */
     @Test fun interruptedProcessMarkerCleansTheLeasedPartialSourceWithoutReopeningIt() {
         val context = org.robolectric.RuntimeEnvironment.getApplication()
         val privateFiles = PrivateShareFiles(context)
@@ -639,6 +669,7 @@ class ShareFileImporterTest {
         assertFalse(file.exists())
     }
 
+    /** Blocks the private directory with a regular file and expects the storage-specific recovery outcome. */
     @Test fun unavailablePrivateStorageIsDistinctFromProviderFailure() =
         runBlocking {
             val unavailable = File(root, "not-a-directory").apply { writeText("fixture") }
@@ -654,6 +685,7 @@ class ShareFileImporterTest {
             )
         }
 
+    /** Covers control characters, traversal separators, length bounds and MIME fallback precedence. */
     @Test fun filenameAndMimeNormalizationPreserveSafeExtensionsAndRejectUnusableNames() {
         assertEquals("report.csv", sanitizeShareFilename("report.csv"))
         assertEquals("archive.tar.gz", sanitizeShareFilename("archive.tar.gz"))
@@ -665,6 +697,7 @@ class ShareFileImporterTest {
         assertEquals("application/octet-stream", resolveShareMime("invalid", "*/*"))
     }
 
+    /** Replaces pending intake after destination staging to verify that existing chat ownership survives. */
     @Test fun replacementReleasesOnlyTheUncommittedRequestAndNeverAnotherChat() =
         runBlocking {
             val importer =
@@ -688,6 +721,7 @@ class ShareFileImporterTest {
             assertNull(files.resolve(first))
         }
 
+    /** Generates a counted stream without allocating the large byte arrays used by budget-boundary cases. */
     private fun sizedStream(length: Long): InputStream =
         object : InputStream() {
             var remaining = length
@@ -707,6 +741,7 @@ class ShareFileImporterTest {
             }
         }
 
+    /** Uses one stable request owner so lease-release assertions match the imported batch identity. */
     private fun request(uris: List<Uri>) =
         ShareRequest(
             SharePayload(null, uris, "application/octet-stream"),
