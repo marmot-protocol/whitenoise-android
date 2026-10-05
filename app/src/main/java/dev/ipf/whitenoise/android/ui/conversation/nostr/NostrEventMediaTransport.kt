@@ -53,6 +53,5 @@ internal fun HttpUrl.isSafeMediaDestination(): Boolean =
         else -> !HostSafety.isPrivateOrLoopbackHost(host)
     }
 
-
 private const val MAX_MEDIA_REDIRECTS = 5
 private const val STANDARD_HTTPS_PORT = 443

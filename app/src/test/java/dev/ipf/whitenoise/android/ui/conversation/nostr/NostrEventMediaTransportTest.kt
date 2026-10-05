@@ -11,8 +11,8 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 import java.net.InetAddress
@@ -79,7 +79,13 @@ class NostrEventMediaTransportTest {
     @Test
     fun privateHostnameIsRejectedBeforeDnsLookup() {
         var calls = 0
-        val dns = PublicMediaDns(Dns { calls++; listOf(address(8, 8, 8, 8)) })
+        val dns =
+            PublicMediaDns(
+                Dns {
+                    calls++
+                    listOf(address(8, 8, 8, 8))
+                },
+            )
         assertThrows(UnknownHostException::class.java) { dns.lookup("localhost") }
         assertEquals(0, calls)
     }
@@ -88,22 +94,25 @@ class NostrEventMediaTransportTest {
     fun largeProgressiveRangesRemainLazyAndKeepTheirRangeHeader() {
         listOf(null, "bytes=0-", "bytes=700000000-").forEach { range ->
             var sourceCalls = 0
-            val body = object : ResponseBody() {
-                override fun contentType(): MediaType? = null
+            val body =
+                object : ResponseBody() {
+                    override fun contentType(): MediaType? = null
 
-                override fun contentLength(): Long = 4L * 1024 * 1024 * 1024
+                    override fun contentLength(): Long = 4L * 1024 * 1024 * 1024
 
-                override fun source(): Buffer {
-                    sourceCalls++
-                    return Buffer().writeUtf8("sample")
+                    override fun source(): Buffer {
+                        sourceCalls++
+                        return Buffer().writeUtf8("sample")
+                    }
                 }
-            }
             val client =
-                OkHttpClient.Builder()
+                OkHttpClient
+                    .Builder()
                     .addInterceptor(::nostrMediaResponse)
                     .addInterceptor { chain ->
                         assertEquals(range, chain.request().header("Range"))
-                        Response.Builder()
+                        Response
+                            .Builder()
                             .request(chain.request())
                             .protocol(Protocol.HTTP_1_1)
                             .code(if (range == null) 200 else 206)
@@ -111,7 +120,10 @@ class NostrEventMediaTransportTest {
                             .body(body)
                             .build()
                     }.build()
-            val request = Request.Builder().url("https://media.example/video")
+            val request =
+                Request
+                    .Builder()
+                    .url("https://media.example/video")
             range?.let { request.header("Range", it) }
             client.newCall(request.build()).execute().use { response ->
                 assertEquals(0, sourceCalls)
@@ -121,9 +133,7 @@ class NostrEventMediaTransportTest {
         }
     }
 
-    private fun address(vararg bytes: Int): InetAddress =
-        InetAddress.getByAddress(bytes.map(Int::toByte).toByteArray())
-
+    private fun address(vararg bytes: Int): InetAddress = InetAddress.getByAddress(bytes.map(Int::toByte).toByteArray())
 }
 
 /** Exercises the real OkHttp application chain; the scripted final interceptor never dials. */
