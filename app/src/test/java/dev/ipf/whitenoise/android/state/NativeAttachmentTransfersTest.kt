@@ -105,7 +105,7 @@ class NativeAttachmentTransfersTest {
         val failure = NativeAttachmentTerminalException(AttachmentTransferStateFfi.FAILED)
 
         assertFalse(isTransientAttachmentDownloadFailure(failure))
-        assertFalse(shouldRetryAttachmentDownloadWork(runAttemptCount = 0, failure = failure))
+        assertFalse(shouldRetryAttachmentDownloadWork(transientRetrySpent = false, failure = failure))
     }
 
     /** A canonical pre-admission snapshot proves cancellation needs no native command. */
