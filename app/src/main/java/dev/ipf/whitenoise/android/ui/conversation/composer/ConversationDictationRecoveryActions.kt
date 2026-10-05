@@ -97,6 +97,7 @@ private fun ConversationDictationSendConfirmation(
             onDismiss()
             if (controller.state === state) controller.sendRecognizedText()
         },
+        sendEnabled = controller.canRetryRecoveredSend,
         onOpenSettings = confirmationRecoveryAction(state, controller, recovery, context, onDismiss),
         settingsLabel =
             stringResource(
@@ -138,6 +139,7 @@ private fun confirmationRecoveryAction(
 internal fun ConversationDictationPartialSendDialog(
     onDismiss: () -> Unit,
     onSend: () -> Unit,
+    sendEnabled: Boolean = true,
     onOpenSettings: (() -> Unit)? = null,
     settingsLabel: String = "",
 ) {
@@ -157,7 +159,9 @@ internal fun ConversationDictationPartialSendDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onSend) { Text(stringResource(R.string.dictation_send_recognized_text)) }
+            TextButton(onClick = onSend, enabled = sendEnabled) {
+                Text(stringResource(R.string.dictation_send_recognized_text))
+            }
         },
     )
 }

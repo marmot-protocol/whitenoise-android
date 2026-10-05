@@ -2859,6 +2859,7 @@ internal class ConversationDictationController internal constructor(
                 retainedTranscript = transcript,
             )
         } else if (draftRecovery.owns(sessionId, target)) {
+            clearRecognitionSession(cancel = true, releaseDurableSession = false)
             if (recoverRecognizedDraft(sessionId, target, transcript)) {
                 complete(target)
             } else {

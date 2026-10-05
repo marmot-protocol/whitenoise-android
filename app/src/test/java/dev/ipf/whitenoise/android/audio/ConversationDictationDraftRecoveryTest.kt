@@ -123,6 +123,10 @@ internal class ConversationDictationDraftRecoveryTest {
             ),
         )
         assertEquals("Draft first second edited third", f.draft.value.text)
+        assertTrue(f.recovery.recover(1, f.target, "first second third fourth"))
+        assertEquals("Draft first second edited third fourth", f.draft.value.text)
+        assertTrue(f.recovery.recover(1, f.target, "FIRST, second, third fourth fifth"))
+        assertEquals("Draft first second edited third fourth fifth", f.draft.value.text)
         assertNull(f.recovery.sendTarget(1, f.target))
     }
 
@@ -136,7 +140,7 @@ internal class ConversationDictationDraftRecoveryTest {
             options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first"),
         )
         f.edit("Draft first preview edited")
-        assertTrue(
+        assertFalse(
             f.recovery.recover(
                 1,
                 f.target,
@@ -144,12 +148,12 @@ internal class ConversationDictationDraftRecoveryTest {
                 options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first corrected result"),
             ),
         )
-        assertEquals("Draft first preview edited corrected result", f.draft.value.text)
+        assertEquals("Draft first preview edited", f.draft.value.text)
         assertNull(f.recovery.sendTarget(1, f.target))
     }
 
     @Test
-    fun aFullyRewrittenProviderResultStillAppearsInAnEditedDraft() {
+    fun aFullyRewrittenProviderResultCannotDuplicateAnEditedDraft() {
         val f = Fixture()
         f.recovery.recover(
             1,
@@ -158,8 +162,8 @@ internal class ConversationDictationDraftRecoveryTest {
             options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = ""),
         )
         f.edit("Draft blue sky edited")
-        assertTrue(f.recovery.recover(1, f.target, "green fields"))
-        assertEquals("Draft blue sky edited green fields", f.draft.value.text)
+        assertFalse(f.recovery.recover(1, f.target, "green fields"))
+        assertEquals("Draft blue sky edited", f.draft.value.text)
         assertNull(f.recovery.sendTarget(1, f.target))
     }
 

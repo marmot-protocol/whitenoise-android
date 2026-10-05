@@ -84,9 +84,18 @@ internal class ConversationForegroundRecord(
     }
 
     private fun notifyPresentation(notification: Notification) {
+        val presentation =
+            if (NotificationStreamForegroundService.foregroundNotificationId(notification) != publishedNotificationId) {
+                // A rejected identity switch must clear controls on the still-authorized channel.
+                Notification.Builder.recoverBuilder(service, notification)
+                    .setChannelId(ConversationDictationForegroundService.CHANNEL_ID)
+                    .build()
+            } else {
+                notification
+            }
         service.getSystemService(NotificationManager::class.java).notify(
             publishedNotificationId,
-            notification,
+            presentation,
         )
     }
 

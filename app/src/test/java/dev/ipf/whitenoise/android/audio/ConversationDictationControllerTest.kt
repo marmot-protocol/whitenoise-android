@@ -6218,6 +6218,72 @@ class ConversationDictationControllerTest {
             assertFalse(f.controller.hasDurableSession)
         }
 
+    /** Audio Retry appends only its new suffix and never consumes a concurrently edited recovered draft. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun editedRecoveredDraftKeepsRetainedAudioRetryFromSending() =
+        runTest {
+            val sent = mutableListOf<String>()
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        sent += it.payload
+                        true
+                    },
+                )
+            failRecognizedTail(f, send = true)
+            assertEquals("Draft first", f.drafts.getValue(key()).text)
+            f.edit(key(), TextFieldValue("Draft first edited"))
+            assertFalse(f.controller.canRetryRecoveredSend)
+            f.controller.retry()
+            f.scheduler.runDelay(500L)
+            f.platform.pendingCallerAudio = false
+            f.platform.listener.onResult("suffix")
+            advanceUntilIdle()
+            assertTrue(sent.isEmpty())
+            assertEquals("Draft first edited suffix", f.drafts.getValue(key()).text)
+            assertTrue(f.controller.state is ConversationDictationState.Failed)
+            assertFalse(f.controller.canRetryRecoveredSend)
+        }
+
+    /** Confirmed origin loss cannot create a draft while an indeterminate membership read can preserve it. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun automaticRecoveryRespectsRemovedAndIndeterminateOrigins() =
+        runTest {
+            listOf(
+                ConversationDictationTargetValidation.DefinitelyRemoved,
+                ConversationDictationTargetValidation.Indeterminate,
+            ).forEach { validation ->
+                var localAvailable = true
+                val f =
+                    fixture(
+                        draft = TextFieldValue("Draft", TextRange(5)),
+                        targetAvailable = { localAvailable },
+                        targetValidator = { _, _ -> validation },
+                        targetValidationScope = this,
+                    )
+                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+                if (validation == ConversationDictationTargetValidation.DefinitelyRemoved) {
+                    localAvailable = false
+                    f.controller.onTargetUnavailable(ACCOUNT, GROUP)
+                } else {
+                    f.controller.send()
+                    f.platform.listener.onResult("recognized")
+                }
+                advanceUntilIdle()
+                val expected =
+                    if (validation == ConversationDictationTargetValidation.DefinitelyRemoved) {
+                        "Draft"
+                    } else {
+                        "Draft recognized"
+                    }
+                assertEquals(expected, f.drafts.getValue(key()).text)
+            }
+        }
+
     /** Builds a deterministic controller harness with injectable ownership, validation, and delivery seams. */
     private fun fixture(
         draft: TextFieldValue,

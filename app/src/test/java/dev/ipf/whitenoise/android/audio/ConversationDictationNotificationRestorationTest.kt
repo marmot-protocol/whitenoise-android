@@ -44,6 +44,45 @@ class ConversationDictationNotificationRestorationTest {
         NotificationStreamForegroundService.foregroundPublisher = modelForegroundIdReplacement(defaultPublisher)
     }
 
+    /** A rejected narrowing cannot rely on a blocked ordinary channel to retire microphone controls. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun rejectedIdentitySwitchUsesAControlFreeCardOnTheAuthorizedChannel() =
+        runTest {
+            val harness = Harness(this)
+            ConversationDictationForegroundService.hostResolver = { harness }
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            val manager = service.getSystemService(NotificationManager::class.java)
+            try {
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+                val ordinary = manager.getNotificationChannel(BackgroundConnectionNotification.CHANNEL_ID)
+                ordinary.importance = NotificationManager.IMPORTANCE_NONE
+                manager.createNotificationChannel(ordinary)
+                NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
+                    if (notification.channelId == BackgroundConnectionNotification.CHANNEL_ID) {
+                        throw SecurityException("narrowing rejected")
+                    }
+                    defaultPublisher(owner, notification, type)
+                }
+                harness.conversationDictation.paste()
+                harness.platform.listener.onResult("recognized")
+                runCurrent()
+                Snapshot.sendApplyNotifications()
+                shadowOf(Looper.getMainLooper()).idle()
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+                val remaining = manager.activeNotifications.single().notification
+                assertEquals(ConversationDictationForegroundService.CHANNEL_ID, remaining.channelId)
+                assertTrue(remaining.actions.isNullOrEmpty())
+                assertNull(remaining.contentView)
+                assertTrue(service.foreground.connectionServiceType != 0)
+                assertFalse(shadowOf(service as Service).isForegroundStopped)
+            } finally {
+                lifecycle.destroy()
+            }
+        }
+
     /** Android cancels the previous foreground ID even if the replacement card is suppressed. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test

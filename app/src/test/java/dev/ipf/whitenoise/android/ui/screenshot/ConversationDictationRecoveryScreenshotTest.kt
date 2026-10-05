@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -59,6 +60,25 @@ class ConversationDictationRecoveryScreenshotTest {
             rtl = true,
             retryAudio = true,
         )
+
+    /** Retained audio/settings remain accessible while a changed recovered draft refuses partial Send. */
+    @Test
+    fun changedRecoveryDraftDisablesPartialSend() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ConversationDictationPartialSendDialog(
+                    onDismiss = {},
+                    onSend = {},
+                    sendEnabled = false,
+                    onOpenSettings = {},
+                    settingsLabel = "Retry",
+                )
+            }
+        }
+        composeRule.onNodeWithText("Send recognized text").assertIsNotEnabled()
+        composeRule.onNodeWithText("Retry").assertIsDisplayed()
+        composeRule.onNodeWithText("Paste").assertDoesNotExist()
+    }
 
     private fun capture(
         name: String,

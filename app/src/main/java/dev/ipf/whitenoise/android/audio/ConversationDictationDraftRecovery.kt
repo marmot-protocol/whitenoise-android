@@ -19,7 +19,7 @@ internal class ConversationDictationDraftRecovery(
         val draft: ConversationDictationDraftSnapshot,
         val sendEligible: Boolean,
         val base: TextFieldValue,
-        val transcriptPrefix: String = "",
+        val baseTranscript: String = "",
         val appendOnly: Boolean = false,
         val appendPayload: Boolean = false,
         val emptiedRevision: Long? = null,
@@ -59,7 +59,8 @@ internal class ConversationDictationDraftRecovery(
 
     private data class Insertion(
         val base: TextFieldValue,
-        val prefix: String,
+        val prefixLength: Int,
+        val baseTranscript: String,
         val appendOnly: Boolean,
         val appendPayload: Boolean,
     )
@@ -78,7 +79,7 @@ internal class ConversationDictationDraftRecovery(
             val current = runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull() ?: return false
             if (previous?.transcript == text && previous.emptiedRevision == null) return true
             val unchanged = previous?.draft?.let { sameDraft(it, current) } == true
-            val insertion = planInsertion(previous, current, text, options)
+            val insertion = planInsertion(previous, current, text, options) ?: return false
             val value = insertionValue(target, text, insertion)
             val revision =
                 runCatching { write(target.accountRef, target.groupIdHex, current.revision, value) }
@@ -106,7 +107,7 @@ internal class ConversationDictationDraftRecovery(
                     ConversationDictationDraftSnapshot(value, revision),
                     sendEligible,
                     insertion.base,
-                    insertion.prefix,
+                    insertion.baseTranscript,
                     insertion.appendOnly,
                     insertion.appendPayload,
                 )
@@ -120,25 +121,25 @@ internal class ConversationDictationDraftRecovery(
         current: ConversationDictationDraftSnapshot,
         text: String,
         options: Options,
-    ): Insertion {
-        if (previous != null && sameDraft(previous.draft, current)) {
-            return Insertion(previous.base, previous.transcriptPrefix, previous.appendOnly, previous.appendPayload)
+    ): Insertion? {
+        return if (previous != null && sameDraft(previous.draft, current)) {
+            representedPrefixLength(previous.baseTranscript, text)?.let { prefixLength ->
+                Insertion(
+                    previous.base,
+                    prefixLength,
+                    previous.baseTranscript,
+                    previous.appendOnly,
+                    previous.appendPayload,
+                )
+            }
+        } else {
+            val restoringPayload = previous?.emptiedRevision != null || options.restoreCapturedPrefix
+            val represented = previous?.transcript?.takeIf { !restoringPayload }.orEmpty()
+            // A rewrite already mixed with editor changes remains retained, never appended twice.
+            representedPrefixLength(represented, text)?.let { prefixLength ->
+                Insertion(current.value, prefixLength, represented, previous != null, restoringPayload)
+            }
         }
-        val restoringPayload = previous?.emptiedRevision != null || options.restoreCapturedPrefix
-        val prefix = if (previous != null && !restoringPayload) recognizedPrefix(previous, text) else ""
-        return Insertion(current.value, prefix, previous != null, restoringPayload)
-    }
-
-    private fun recognizedPrefix(
-        previous: Receipt,
-        text: String,
-    ): String {
-        if (text.startsWith(previous.transcript)) return previous.transcript
-        val acknowledged = previous.acknowledgedPrefix.takeIf { text.startsWith(it) }.orEmpty()
-        val length = maxOf(acknowledged.length, commonWordPrefixLength(previous.transcript, text))
-        // A completely rewritten result has no shared prefix to discard. Preserve it for review;
-        // an edited draft is already ineligible for Retry Send.
-        return text.take(length)
     }
 
     private fun insertionValue(
@@ -146,7 +147,7 @@ internal class ConversationDictationDraftRecovery(
         text: String,
         insertion: Insertion,
     ): TextFieldValue {
-        val delta = text.removePrefix(insertion.prefix).trim()
+        val delta = text.drop(insertion.prefixLength).trim()
         return when {
             insertion.appendPayload -> {
                 val originalPayload =
@@ -190,32 +191,35 @@ internal class ConversationDictationDraftRecovery(
         b: ConversationDictationDraftSnapshot,
     ): Boolean = a.revision == b.revision && a.value.text == b.value.text
 
-    /** Provider punctuation/case changes cannot repeat a shared spoken prefix after an editor change. */
-    private fun commonWordPrefixLength(
+    /** The base's entire represented transcript must survive before any suffix can be appended. */
+    private fun representedPrefixLength(
         previous: String,
         current: String,
-    ): Int {
-        fun words(text: String): List<Pair<String, Int>> {
-            val boundaries = BreakIterator.getWordInstance(Locale.ROOT)
-            boundaries.setText(text)
-            val words = mutableListOf<Pair<String, Int>>()
-            var start = boundaries.first()
-            var end = boundaries.next()
-            while (end != BreakIterator.DONE) {
-                val word = text.substring(start, end)
-                if (word.any(Char::isLetterOrDigit)) words += word.lowercase(Locale.ROOT) to end
-                start = end
-                end = boundaries.next()
-            }
-            return words
-        }
+    ): Int? {
         val before = words(previous)
         val after = words(current)
-        var end = 0
-        for ((a, b) in before.zip(after)) {
-            if (a.first != b.first) break
-            end = b.second
+        val represented =
+            before.isNotEmpty() && after.size >= before.size &&
+                before.indices.all { before[it].first == after[it].first }
+        return when {
+            previous.isEmpty() -> 0
+            represented -> after.getOrNull(before.size)?.second ?: current.length
+            else -> null
         }
-        return end
+    }
+
+    private fun words(text: String): List<Pair<String, Int>> {
+        val boundaries = BreakIterator.getWordInstance(Locale.ROOT)
+        boundaries.setText(text)
+        val result = mutableListOf<Pair<String, Int>>()
+        var start = boundaries.first()
+        var end = boundaries.next()
+        while (end != BreakIterator.DONE) {
+            val word = text.substring(start, end)
+            if (word.any(Char::isLetterOrDigit)) result += word.lowercase(Locale.ROOT) to start
+            start = end
+            end = boundaries.next()
+        }
+        return result
     }
 }
