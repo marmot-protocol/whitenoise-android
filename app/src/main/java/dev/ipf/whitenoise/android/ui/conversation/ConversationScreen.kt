@@ -4286,7 +4286,8 @@ internal fun ConversationScreen(
                         rememberKeptMessageEntries(keptMessagesController, keptAccountRef) { key ->
                             controller.timeline.firstOrNull { row ->
                                 key.groupIdHex == controller.group.groupIdHex &&
-                                    row.record.messageIdHex == key.messageIdHex
+                                    row.record.messageIdHex == key.messageIdHex &&
+                                    !MessageProjector.isDeleted(row.record.messageIdHex, controller.deletedMessageIds)
                             }
                         }
                     val youLabel = stringResource(R.string.you)
@@ -4297,6 +4298,8 @@ internal fun ConversationScreen(
                             youLabel = youLabel,
                             isMine = controller::isMessageMine,
                             senderName = appState::displayName,
+                            controller = controller,
+                            thumbnailRevision = mediaCacheRevision,
                         )
                     KeptMessagesOverlay(
                         state = KeptMessagesOverlayState(keptEntries, keptMessagesController, keptAccountRef),

@@ -2235,4 +2235,9 @@
     <string name="nostr_event_image_failed">Impossibile caricare questa immagine. Riprova.</string>
     <string name="nostr_event_type_image">Immagine</string>
     <string name="nostr_event_expand">Visualizza evento completo</string>
+    <string name="floating_attachment_resolving">Verifica della disponibilità</string>
+    <string name="floating_attachment_available">Disponibile su questo dispositivo</string>
+    <string name="floating_attachment_remote">Apri l’originale per visualizzarlo</string>
+    <string name="floating_attachment_failed">Download non riuscito. Apri l’originale per riprovare</string>
+    <string name="floating_attachment_more">Altri %1$d allegati</string>
 </resources>

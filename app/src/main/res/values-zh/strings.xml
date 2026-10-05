@@ -2203,4 +2203,9 @@
     <string name="nostr_event_image_failed">无法加载此图片，请重试。</string>
     <string name="nostr_event_type_image">图片</string>
     <string name="nostr_event_expand">查看完整事件</string>
+    <string name="floating_attachment_resolving">正在检查可用性</string>
+    <string name="floating_attachment_available">可在此设备上使用</string>
+    <string name="floating_attachment_remote">打开原消息查看</string>
+    <string name="floating_attachment_failed">下载失败。打开原消息重试</string>
+    <string name="floating_attachment_more">还有 %1$d 个附件</string>
 </resources>
