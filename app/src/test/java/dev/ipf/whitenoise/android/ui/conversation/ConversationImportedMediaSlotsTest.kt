@@ -36,18 +36,18 @@ class ConversationImportedMediaSlotsTest {
         val current = PendingMediaSlot(old.id, Uri.parse("content://camera/current"))
         val picked = PendingMediaSlot("picked", Uri.parse("content://picker/photo"))
         val duplicate = PendingMediaSlot("picked-again", picked.uri)
-        val private = PendingMediaSlot("private", Uri.parse("content://private-share/photo"))
+        val imported = PendingMediaSlot("private", Uri.parse("content://private-share/photo"))
         val oldDocument = Uri.parse("content://native/document")
         val newDocument = Uri.parse("content://picker/document")
         val privateDocument = Uri.parse("content://private-share/document")
         val merged =
             mergeRestoredComposerAttachments(
-                listOf(current, picked, duplicate, private),
+                listOf(current, picked, duplicate, imported),
                 listOf(newDocument, privateDocument),
                 RestoredConversationAttachments(listOf(old), listOf(oldDocument)),
                 owns,
             )
-        assertEquals(listOf(current, picked, duplicate, private), merged.mediaSlots)
+        assertEquals(listOf(current, picked, duplicate, imported), merged.mediaSlots)
         assertSame(current, merged.mediaSlots.first())
         assertSame(picked, merged.mediaSlots[1])
         assertSame(duplicate, merged.mediaSlots[2])
