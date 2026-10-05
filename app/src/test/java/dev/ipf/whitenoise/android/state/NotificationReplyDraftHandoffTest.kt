@@ -169,6 +169,17 @@ class NotificationReplyDraftHandoffTest {
         }
 
     @Test
+    fun accountRemovalRejectsTheCompletionOfAnAlreadyStartedMerge() =
+        runTest {
+            val fixture = fixture()
+            fixture.gateway.onNextRead = { fixture.writer.removeAccount("account-b") }
+            val merge = async { fixture.writer.mergeText("account-b", "group-b", "retired text") }
+            advanceUntilIdle()
+            assertTrue(merge.isCancelled)
+            assertNull(fixture.store.get("account-b", "group-b"))
+        }
+
+    @Test
     fun lateSuccessfulImportCannotRetryAfterReceiptPruningAndANewerEdit() =
         runTest {
             val fixture = fixture(debounceMillis = 3_500L)
@@ -360,11 +371,15 @@ private class HandoffDraftGateway : MessageDraftGateway {
     var cancelNextRead = false
     var failBeforeSaveCount = 0
     var attempts = 0
+    var onNextRead: (() -> Unit)? = null
 
     override fun read(
         accountRef: String,
         groupIdHex: String,
     ): MessageDraftFfi? {
+        val callback = onNextRead
+        onNextRead = null
+        callback?.invoke()
         if (cancelNextRead) {
             cancelNextRead = false
             throw CancellationException("cancelled native delivery")

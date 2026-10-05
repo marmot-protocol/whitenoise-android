@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media.editor
 
 import dev.ipf.marmotkit.MessageDraftFfi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -287,6 +288,9 @@ internal class CoalescingMessageDraftWriter(
             flush(key)
             val completed =
                 synchronized(lock) {
+                    if (activeMerges[key] !== activeMerge) {
+                        throw CancellationException("Draft merge retired with its account")
+                    }
                     if (pending[key]?.job == null) {
                         mergeCompletion(activeMerge.latestResult, activeMerge.latestContent, mergeResult)
                             .copy(generation = drafts.coordinated.generation(key.accountRef, key.groupIdHex))
