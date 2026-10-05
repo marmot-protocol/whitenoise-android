@@ -27,7 +27,7 @@ class StartChatErrorCardTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test
-    fun inviteStateKeepsKnownNameAndUsesGenericFallback() {
+    fun invalidPackageKeepsKnownNameWithoutSuggestingInstallation() {
         val error = MarmotKitException.InvalidKeyPackageEvent("unsupported cipher suite")
 
         val known =
@@ -38,9 +38,10 @@ class StartChatErrorCardTest {
                 recipientName = "Alice",
                 displayName = { "ignored" },
             )
-        assertEquals(AppText.Resource(R.string.invite_to_white_noise_description, listOf("Alice")), known.detail)
+        assertEquals(AppText.Resource(R.string.error_invalid_key_package_for, listOf("Alice")), known.detail)
         assertEquals("Alice", known.recipientName)
-        assertEquals(true, known.invitation)
+        assertFalse(known.invitation)
+        assertEquals(AppText.Resource(R.string.toast_couldnt_start_chat), known.title)
 
         val unknown =
             startChatErrorUiState(
@@ -50,9 +51,44 @@ class StartChatErrorCardTest {
                 recipientName = null,
                 displayName = { "ignored" },
             )
-        assertEquals(AppText.Resource(R.string.unknown_invite_to_white_noise_description), unknown.detail)
+        assertEquals(AppText.Resource(R.string.error_invalid_key_package), unknown.detail)
         assertNull(unknown.recipientName)
-        assertEquals(true, unknown.invitation)
+        assertFalse(unknown.invitation)
+    }
+
+    @Test
+    fun missingKeyKeepsFailureTitleAndOptionalShareWithoutAssumingInstallation() {
+        val error =
+            startChatErrorUiState(
+                npub = "npub1alice",
+                progressHex = "alice",
+                error = MarmotKitException.MissingKeyPackage("alice"),
+                recipientName = "Alice",
+                displayName = { "Alice" },
+            )
+        assertTrue(error.invitation)
+        assertEquals(AppText.Resource(R.string.toast_couldnt_start_chat), error.title)
+        assertEquals(AppText.Resource(R.string.error_missing_key_package_for, listOf("Alice")), error.detail)
+    }
+
+    @Test
+    fun missingInboxShowsSettingsGuidanceWithoutShare() {
+        val error =
+            startChatErrorUiState(
+                npub = "npub1alice",
+                progressHex = "alice",
+                error = MarmotKitException.MissingMemberInboxRoute("alice"),
+                recipientName = "Alice",
+                displayName = { "Alice" },
+            )
+        assertFalse(error.invitation)
+        assertEquals(AppText.Resource(R.string.error_missing_member_inbox_for, listOf("Alice")), error.detail)
+        composeRule.setContent {
+            StartChatErrorCard(error, onRetry = {}, onInvite = {}, onCopy = {})
+        }
+        composeRule.onNodeWithText(context.getString(R.string.error_missing_member_inbox_for, "Alice")).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.retry)).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.share)).assertDoesNotExist()
     }
 
     @Test

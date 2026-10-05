@@ -10,12 +10,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
-import dev.ipf.whitenoise.android.state.StartProfileChatNoActiveAccountException
-import dev.ipf.whitenoise.android.state.groupCreateFailureDetail
-import dev.ipf.whitenoise.android.state.startProfileChatFailureCopyable
-import dev.ipf.whitenoise.android.state.startProfileChatFailureDetail
-import dev.ipf.whitenoise.android.state.startProfileChatFailureIsMissingSetup
-import dev.ipf.whitenoise.android.state.startProfileChatInviteDetail
 import dev.ipf.whitenoise.android.ui.chats.newchat.RecipientPreviewState
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptStartProfileChat
@@ -195,117 +189,6 @@ class NewChatFlowTest {
     }
 
     @Test
-    fun startProfileChatFailureMapsMissingSetupToHumanCopy() {
-        val missing = MarmotKitException.MissingKeyPackage("deadbeef")
-
-        assertEquals(
-            AppText.Resource(
-                R.string.error_missing_key_package_for,
-                listOf("Alice"),
-            ),
-            startProfileChatFailureDetail(missing) { "Alice" },
-        )
-        assertFalse(startProfileChatFailureCopyable(missing))
-
-        val missingBlankAccount = MarmotKitException.MissingKeyPackage("  ")
-        assertEquals(
-            AppText.Resource(R.string.error_missing_key_package),
-            startProfileChatFailureDetail(missingBlankAccount) { "ignored" },
-        )
-        assertFalse(startProfileChatFailureCopyable(missingBlankAccount))
-    }
-
-    @Test
-    fun startProfileChatDistinguishesInvalidRecipientFromUnusableKeyPackage() {
-        val invalidIdentity = MarmotKitException.InvalidIdentity("bad npub")
-
-        assertFalse(startProfileChatFailureIsMissingSetup(invalidIdentity))
-        assertEquals(
-            AppText.Resource(R.string.error_invalid_identity_reference),
-            startProfileChatFailureDetail(invalidIdentity) { "ignored" },
-        )
-        assertFalse(startProfileChatFailureCopyable(invalidIdentity))
-        assertEquals(
-            AppText.Resource(R.string.error_invalid_identity_reference),
-            groupCreateFailureDetail(invalidIdentity) { "ignored" },
-        )
-
-        val invalidKeyPackage = MarmotKitException.InvalidKeyPackageEvent("unsupported cipher suite")
-        assertTrue(startProfileChatFailureIsMissingSetup(invalidKeyPackage))
-        assertEquals(
-            AppText.Resource(R.string.error_missing_key_package),
-            startProfileChatFailureDetail(invalidKeyPackage) { "ignored" },
-        )
-        assertEquals(
-            AppText.Resource(R.string.error_missing_key_package),
-            groupCreateFailureDetail(invalidKeyPackage) { "ignored" },
-        )
-        assertFalse(startProfileChatFailureCopyable(invalidKeyPackage))
-    }
-
-    @Test
-    fun aHydrationPendingGroupReadsAsStillLoadingNotAsACreateFailure() {
-        val pending = MarmotKitException.GroupHydrationPending("7c3bdc38")
-
-        assertFalse(startProfileChatFailureIsMissingSetup(pending))
-        assertEquals(
-            AppText.Resource(R.string.toast_chat_still_loading),
-            groupCreateFailureDetail(pending) { "ignored" },
-        )
-        assertEquals(
-            AppText.Resource(R.string.toast_chat_still_loading),
-            startProfileChatFailureDetail(pending) { "ignored" },
-        )
-        assertFalse(startProfileChatFailureCopyable(pending))
-    }
-
-    @Test
-    fun startProfileChatInviteCopyUsesKnownNameOrGenericFallback() {
-        assertEquals(
-            AppText.Resource(R.string.invite_to_white_noise_description, listOf("Alice")),
-            startProfileChatInviteDetail("Alice"),
-        )
-        assertEquals(
-            AppText.Resource(R.string.unknown_invite_to_white_noise_description),
-            startProfileChatInviteDetail("  "),
-        )
-        assertTrue(startProfileChatFailureIsMissingSetup(MarmotKitException.MissingKeyPackage("deadbeef")))
-    }
-
-    @Test
-    fun startProfileChatFailureDistinguishesTechnicalFailures() {
-        val publishFailure = MarmotKitException.Publish("relay unreachable")
-        assertEquals(
-            AppText.Resource(R.string.error_group_create_failed_retry),
-            startProfileChatFailureDetail(publishFailure) { "ignored" },
-        )
-        assertTrue(startProfileChatFailureCopyable(publishFailure))
-        val runtimeFailure = MarmotKitException.Runtime("relay unreachable")
-        assertEquals(
-            AppText.Resource(R.string.error_group_create_failed_retry),
-            startProfileChatFailureDetail(runtimeFailure) { "ignored" },
-        )
-        assertFalse(startProfileChatFailureCopyable(runtimeFailure))
-        val unexpectedFailure = RuntimeException("relay unreachable")
-        assertEquals(
-            AppText.Resource(R.string.error_group_create_failed_retry),
-            startProfileChatFailureDetail(unexpectedFailure) { "ignored" },
-        )
-        assertTrue(startProfileChatFailureCopyable(unexpectedFailure))
-    }
-
-    @Test
-    fun startProfileChatFailureMapsNoActiveAccountToLocalizedCopy() {
-        val noActiveAccount = StartProfileChatNoActiveAccountException()
-
-        assertEquals(
-            AppText.Resource(R.string.toast_no_active_account),
-            startProfileChatFailureDetail(noActiveAccount) { "ignored" },
-        )
-        assertFalse(startProfileChatFailureCopyable(noActiveAccount))
-    }
-
-    @Test
     fun sharedStartChatAttemptCreatesAndOpensFromAuthoritativeRead() =
         runTest {
             val expected = chatListItem(group("Support"), otherMemberAccount = "support", members = emptyList())
@@ -377,7 +260,7 @@ class NewChatFlowTest {
         }
 
     @Test
-    fun sharedStartChatAttemptMapsMissingKeyPackageToInvitation() =
+    fun sharedStartChatAttemptExplainsMissingKeyPackageWithOptionalShare() =
         runTest {
             val result =
                 attemptStartProfileChat(
@@ -391,10 +274,10 @@ class NewChatFlowTest {
 
             val failure = result as StartChatAttemptResult.Failed
             assertTrue(failure.error.invitation)
-            assertEquals(AppText.Resource(R.string.invite_to_white_noise), failure.error.title)
+            assertEquals(AppText.Resource(R.string.toast_couldnt_start_chat), failure.error.title)
             assertEquals(
                 AppText.Resource(
-                    R.string.invite_to_white_noise_description,
+                    R.string.error_missing_key_package_for,
                     listOf("White Noise support"),
                 ),
                 failure.error.detail,

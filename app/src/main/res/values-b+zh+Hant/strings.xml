@@ -192,8 +192,8 @@
     <string name="invite">邀請</string>
     <string name="new_chat">新聊天</string>
     <string name="error_not_white_noise_profile_qr">該 QR 程式碼不是 White Noise 設定檔。</string>
-    <string name="error_missing_key_package">此人尚未設定加密訊息。請對方安裝 White Noise 並開啟一次應用程式，然後重試。</string>
-    <string name="error_missing_key_package_for">%1$s 尚未設定加密訊息。請對方安裝 White Noise 並開啟一次應用程式，然後重試。</string>
+    <string name="error_missing_key_package">未找到此使用者的可用聊天金鑰。請對方安裝或更新 White Noise 並開啟應用程式，然後重試。</string>
+    <string name="error_missing_key_package_for">未找到%1$s的可用聊天金鑰。請對方安裝或更新 White Noise 並開啟應用程式，然後重試。</string>
     <string name="invite_to_white_noise">邀請加入 White Noise</string>
     <string name="invite_friends">邀請朋友</string>
     <string name="invite_to_white_noise_description">%1$s 尚未加入 White Noise。分享此應用程式即可開始安全聊天。</string>
@@ -2172,6 +2172,10 @@
     <string name="onboarding_details_expanded">已展開</string>
     <string name="onboarding_details_collapsed">已收合</string>
     <string name="group_svg_rejected_detail">無法處理此 SVG。請選擇簡單的 SVG、PNG 或 JPEG。</string>
+    <string name="error_invalid_key_package">無法驗證此使用者發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
+    <string name="error_invalid_key_package_for">無法驗證%1$s發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
+    <string name="error_missing_member_inbox">此使用者沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
+    <string name="error_missing_member_inbox_for">%1$s沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="notification_show_previews">顯示通知預覽</string>
     <string name="notification_show_previews_detail">關閉時隱藏姓名和訊息內容。適用於所有帳戶。</string>
     <string name="notification_preview_update_failed">重新啟動後變更可能會遺失。</string>

@@ -203,8 +203,8 @@
     <string name="invite">Convidar</string>
     <string name="new_chat">Novo chat</string>
     <string name="error_not_white_noise_profile_qr">Esse código QR não é um perfil White Noise.</string>
-    <string name="error_missing_key_package">Esta pessoa ainda não configurou mensagens criptografadas. Peça para ela instalar o White Noise e abrir o app uma vez; depois tente novamente.</string>
-    <string name="error_missing_key_package_for">%1$s ainda não configurou mensagens criptografadas. Peça para ela instalar o White Noise e abrir o app uma vez; depois tente novamente.</string>
+    <string name="error_missing_key_package">Não encontramos uma chave de conversa utilizável para esta pessoa. Peça para ela instalar ou atualizar o White Noise e abri-lo e tente novamente.</string>
+    <string name="error_missing_key_package_for">Não encontramos uma chave de conversa utilizável para %1$s. Peça para ela instalar ou atualizar o White Noise e abri-lo e tente novamente.</string>
     <string name="invite_to_white_noise">Convidar para o White Noise</string>
     <string name="invite_friends">Convidar amigos</string>
     <string name="invite_to_white_noise_description">%1$s ainda não está no White Noise. Compartilhe o app para iniciar uma conversa segura.</string>
@@ -2204,6 +2204,10 @@
     <string name="onboarding_details_expanded">Expandido</string>
     <string name="onboarding_details_collapsed">Recolhido</string>
     <string name="group_svg_rejected_detail">Não foi possível preparar este SVG. Escolha um SVG simples, PNG ou JPEG.</string>
+    <string name="error_invalid_key_package">Não foi possível validar a chave de conversa publicada desta pessoa. Peça para ela atualizar o White Noise e publicar uma nova chave de conversa e tente novamente.</string>
+    <string name="error_invalid_key_package_for">Não foi possível validar a chave de conversa publicada de %1$s. Peça para ela atualizar o White Noise e publicar uma nova chave de conversa e tente novamente.</string>
+    <string name="error_missing_member_inbox">Não existe um relay de entrada utilizável para esta pessoa. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
+    <string name="error_missing_member_inbox_for">Não existe um relay de entrada utilizável para %1$s. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="notification_show_previews">Mostrar prévias das notificações</string>
     <string name="notification_show_previews_detail">Quando desativado, oculta nomes e o conteúdo das mensagens. Aplica-se a todas as contas.</string>
     <string name="notification_preview_update_failed">Alterações podem ser perdidas após reiniciar.</string>
