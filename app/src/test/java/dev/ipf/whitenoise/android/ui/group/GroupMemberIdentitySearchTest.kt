@@ -10,11 +10,17 @@ class GroupMemberIdentitySearchTest {
     @Test
     fun supportedReferencesNormalizeToTheExistingMdkPublicIdentity() {
         listOf(
-            MEMBER_NPUB, MEMBER_HEX.uppercase(), MEMBER_NPROFILE,
-            "nostr:$MEMBER_NPUB", "nostr:$MEMBER_NPROFILE",
-            "marmot://profile/$MEMBER_NPUB?from=qr", "whitenoise://profile/$MEMBER_NPUB",
-            "whitenoise-dev://profile/$MEMBER_NPUB", "whitenoise-staging://profile/$MEMBER_NPUB",
-            "https://whitenoise.chat/profile/$MEMBER_NPUB", "http://marmot.app/$MEMBER_NPUB",
+            MEMBER_NPUB,
+            MEMBER_HEX.uppercase(),
+            MEMBER_NPROFILE,
+            "nostr:$MEMBER_NPUB",
+            "nostr:$MEMBER_NPROFILE",
+            "marmot://profile/$MEMBER_NPUB?from=qr",
+            "whitenoise://profile/$MEMBER_NPUB",
+            "whitenoise-dev://profile/$MEMBER_NPUB",
+            "whitenoise-staging://profile/$MEMBER_NPUB",
+            "https://whitenoise.chat/profile/$MEMBER_NPUB",
+            "http://marmot.app/$MEMBER_NPUB",
         ).forEach { reference ->
             val raw = "  $reference \n"
             val input = GroupMemberIdentitySearch.decoderInput(raw)
@@ -28,10 +34,19 @@ class GroupMemberIdentitySearchTest {
     @Test
     fun malformedPrivateAndEventReferencesNeverFallBackToNameMatching() {
         listOf(
-            "npub1", MEMBER_NPUB.dropLast(1) + "q", "nprofile1", "nsec1private", "note1event",
-            "nevent1event", "naddr1event", "nostr:nsec1private", "https://evil.example/$MEMBER_NPUB",
-            "marmot://event/$MEMBER_NPUB", "ftp://profile/$MEMBER_NPUB",
-            "https://user@whitenoise.chat/$MEMBER_NPUB", "https://whitenoise.chat/profile/$MEMBER_NPUB/extra",
+            "npub1",
+            MEMBER_NPUB.dropLast(1) + "q",
+            "nprofile1",
+            "nsec1private",
+            "note1event",
+            "nevent1event",
+            "naddr1event",
+            "nostr:nsec1private",
+            "https://evil.example/$MEMBER_NPUB",
+            "marmot://event/$MEMBER_NPUB",
+            "ftp://profile/$MEMBER_NPUB",
+            "https://user@whitenoise.chat/$MEMBER_NPUB",
+            "https://whitenoise.chat/profile/$MEMBER_NPUB/extra",
         ).forEach { input ->
             val hex = validatedFixtureIdentity(GroupMemberIdentitySearch.decoderInput(input))
             assertNull(input, hex)

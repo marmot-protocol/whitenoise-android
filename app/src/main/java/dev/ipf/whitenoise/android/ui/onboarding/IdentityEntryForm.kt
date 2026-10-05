@@ -225,8 +225,11 @@ internal fun PublicIdentifierFieldTrailingAction(
                     clipboardManager.withPrimaryClipForPaste { clip ->
                         val clipboardText = clip.plainText(context)
                         val pasteValue =
-                            if (clipboardInput != null) clipboardInput(clipboardText)
-                            else ClipboardPasteAffordance.pasteValue(clipboardText, allowHexPublicKey)
+                            if (clipboardInput != null) {
+                                clipboardInput(clipboardText)
+                            } else {
+                                ClipboardPasteAffordance.pasteValue(clipboardText, allowHexPublicKey)
+                            }
                         if (pasteValue != null) onValueChange(pasteValue)
                     }
                 },

@@ -45,19 +45,20 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import java.util.concurrent.atomic.AtomicBoolean
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi-en")
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class GroupMemberIdentitySearchUiTest {
-    @get:Rule val composeRule = createComposeRule()
+    @get:Rule
+    val composeRule = createComposeRule()
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Test
@@ -143,7 +144,10 @@ class GroupMemberIdentitySearchUiTest {
     fun groupSwitchCancelsInFlightSearch() {
         val pending = CompletableDeferred<String?>()
         val started = CompletableDeferred<Unit>()
-        val first = fixture { started.complete(Unit); pending.await() }
+        val first = fixture {
+            started.complete(Unit)
+            pending.await()
+        }
         val current = mutableStateOf(first)
         render(current)
         openSearch()
@@ -176,8 +180,12 @@ class GroupMemberIdentitySearchUiTest {
         val pending = CompletableDeferred<String?>()
         val started = CompletableDeferred<Unit>()
         val current = fixture { input ->
-            if (input == MEMBER_NPUB) { started.complete(Unit); pending.await() }
-            else validatedFixtureIdentity(input)
+            if (input == MEMBER_NPUB) {
+                started.complete(Unit)
+                pending.await()
+            } else {
+                validatedFixtureIdentity(input)
+            }
         }
         render(current)
         openSearch()
@@ -242,61 +250,91 @@ class GroupMemberIdentitySearchUiTest {
         groupId: String = "group-a",
         decode: suspend (String) -> String? = { validatedFixtureIdentity(it) },
     ): Fixture {
-        val state = WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(object : DraftPersistence {
-                override fun read(): Map<String, String> = emptyMap()
-                override fun write(key: String, value: String?) = Unit
-            }),
-            accountIdHexResolver = decode,
-            accounts = listOf(AccountSummaryFfi(
+        val state =
+            WhiteNoiseAppState(
+                context = context,
+                draftStore =
+                    DraftStore(
+                        object : DraftPersistence {
+                            override fun read(): Map<String, String> = emptyMap()
+
+                            override fun write(
+                                key: String,
+                                value: String?,
+                            ) = Unit
+                        },
+                    ),
+                accountIdHexResolver = decode,
+                accounts = accounts(),
+                activeAccountRef = "account-a",
+                profileReader = { key ->
+                    if (key == MEMBER_HEX) {
+                        null
+                    } else {
+                        UserProfileMetadataFfi("Bob: work", null, null, null, null, null, null)
+                    }
+                },
+            )
+        val members = (listOf(MEMBER_HEX, OTHER_HEX) + (1..4).map { "%064x".format(it) }).toMutableList()
+        val group = group(groupId)
+        val controller =
+            ConversationController(
+                appState = state,
+                initialGroup = group,
+                initialMemberSnapshot =
+                    GroupMemberSnapshot(
+                        members.map { AppGroupMemberRecordFfi(it, null, it == OTHER_HEX) },
+                    ),
+                groupRosterReader = { _, id ->
+                    check(!rosterFailure) { "Roster unavailable" }
+                    GroupRosterFfi(
+                        id,
+                        members.map(::memberDetails),
+                        1uL,
+                        1uL,
+                        SelfMembershipFfi.MEMBER,
+                        members.size.toUInt(),
+                        GroupLifecycleStateFfi.STABLE,
+                    )
+                },
+            )
+        runBlocking {
+            controller.retryMembers()
+            state.warmProfilePresentationsBlocking(members)
+        }
+        return Fixture(state, controller, members)
+    }
+
+    private fun accounts(): List<AccountSummaryFfi> =
+        listOf(
+            AccountSummaryFfi(
                 label = "account-a",
                 accountIdHex = OTHER_HEX,
                 localSigning = true,
                 externalSigning = false,
                 signedOut = false,
                 running = true,
-            ), AccountSummaryFfi(
+            ),
+            AccountSummaryFfi(
                 label = "account-b",
                 accountIdHex = NON_MEMBER_HEX,
                 localSigning = true,
                 externalSigning = false,
                 signedOut = false,
                 running = true,
-            )),
-            activeAccountRef = "account-a",
-            profileReader = { key ->
-                if (key == MEMBER_HEX) null else UserProfileMetadataFfi("Bob: work", null, null, null, null, null, null)
-            },
-        )
-        val members = (listOf(MEMBER_HEX, OTHER_HEX) + (1..4).map { "%064x".format(it) }).toMutableList()
-        val group = group(groupId)
-        val controller = ConversationController(
-            appState = state,
-            initialGroup = group,
-            initialMemberSnapshot = GroupMemberSnapshot(
-                members.map { AppGroupMemberRecordFfi(it, null, it == OTHER_HEX) },
             ),
-            groupRosterReader = { _, id ->
-                check(!rosterFailure) { "Roster unavailable" }
-                GroupRosterFfi(
-                    id,
-                    members.map { GroupMemberDetailsFfi(
-                        memberIdHex = it,
-                        account = null,
-                        local = it == OTHER_HEX,
-                        isAdmin = false,
-                        isSelf = it == OTHER_HEX,
-                        npub = MEMBER_NPUB,
-                        displayName = null,
-                    ) },
-                    1uL, 1uL, SelfMembershipFfi.MEMBER, members.size.toUInt(), GroupLifecycleStateFfi.STABLE,
-                )
-            },
         )
-        runBlocking { controller.retryMembers(); state.warmProfilePresentationsBlocking(members) }
-        return Fixture(state, controller, members)
-    }
+
+    private fun memberDetails(memberHex: String): GroupMemberDetailsFfi =
+        GroupMemberDetailsFfi(
+            memberIdHex = memberHex,
+            account = null,
+            local = memberHex == OTHER_HEX,
+            isAdmin = false,
+            isSelf = memberHex == OTHER_HEX,
+            npub = MEMBER_NPUB,
+            displayName = null,
+        )
 
     private data class Fixture(
         val state: WhiteNoiseAppState,

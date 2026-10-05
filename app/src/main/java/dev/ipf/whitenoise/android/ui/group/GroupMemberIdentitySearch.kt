@@ -15,8 +15,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.Locale
 import java.net.URI
+import java.util.Locale
 
 private const val MEMBER_SEARCH_TIMEOUT_MS = 2_000L
 
@@ -25,8 +25,19 @@ internal object GroupMemberIdentitySearch {
     private val publicKeyHex = Regex("^[0-9a-fA-F]{64}$")
     private val identityPrefixes =
         listOf(
-            "npub1", "nprofile1", "nsec1", "note1", "nevent1", "naddr1", "nostr:",
-            "http:", "https:", "marmot:", "whitenoise:", "whitenoise-staging:", "whitenoise-dev:",
+            "npub1",
+            "nprofile1",
+            "nsec1",
+            "note1",
+            "nevent1",
+            "naddr1",
+            "nostr:",
+            "http:",
+            "https:",
+            "marmot:",
+            "whitenoise:",
+            "whitenoise-staging:",
+            "whitenoise-dev:",
             "${BuildConfig.WHITENOISE_DEEP_LINK_SCHEME.lowercase(Locale.ROOT)}:",
         )
 
@@ -39,13 +50,24 @@ internal object GroupMemberIdentitySearch {
     fun decoderInput(raw: String): String? {
         val query = raw.trim()
         val uri = if (query.contains("://")) runCatching { URI(query) }.getOrNull() else null
-        val malformedUrl = uri == null || uri.userInfo != null || uri.path.orEmpty().trim('/').split('/').size > 2
+        val malformedUrl =
+            uri == null || uri.userInfo != null ||
+                uri.path
+                    .orEmpty()
+                    .trim('/')
+                    .split('/')
+                    .size > 2
         val ambiguousUrl = query.contains("://") && malformedUrl
         val bare = if (query.startsWith("nostr:", ignoreCase = true)) query.drop("nostr:".length) else query
-        val publicBech32 = bare.startsWith("npub1", ignoreCase = true) ||
-            bare.startsWith("nprofile1", ignoreCase = true)
-        return if (ambiguousUrl) null else RecipientReference.normalize(query) ?: bare.takeIf {
-            publicBech32 && it.none { char -> char.isWhitespace() || char == ':' || char == '/' }
+        val publicBech32 =
+            bare.startsWith("npub1", ignoreCase = true) ||
+                bare.startsWith("nprofile1", ignoreCase = true)
+        return if (ambiguousUrl) {
+            null
+        } else {
+            RecipientReference.normalize(query) ?: bare.takeIf {
+                publicBech32 && it.none { char -> char.isWhitespace() || char == ':' || char == '/' }
+            }
         }
     }
 
