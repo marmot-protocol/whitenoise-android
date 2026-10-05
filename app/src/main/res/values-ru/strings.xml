@@ -1069,6 +1069,8 @@
     <string name="media_uploading">Отправка…</string>
     <string name="media_upload_failed">Не удалось загрузить</string>
     <string name="media_tap_to_retry">Нажмите, чтобы повторить</string>
+    <string name="media_too_large_to_preview">Слишком большое для предпросмотра</string>
+    <string name="media_too_large_to_preview_hint">Сохраните это изображение или поделитесь им, чтобы открыть его в другом приложении</string>
     <string name="media_tap_to_download">Нажмите, чтобы скачать</string>
     <string name="media_preparing_download">Подготовка к скачиванию</string>
     <string name="media_preparing_attachment">Подготовка вложения</string>
@@ -2269,4 +2271,7 @@
     <string name="onboarding_details_expanded">Развёрнуто</string>
     <string name="onboarding_details_collapsed">Свёрнуто</string>
     <string name="group_svg_rejected_detail">Не удалось обработать этот SVG. Выберите простой SVG, PNG или JPEG.</string>
+    <string name="notification_show_previews">Показывать содержимое уведомлений</string>
+    <string name="notification_show_previews_detail">При отключении скрывает имена и содержимое сообщений. Применяется ко всем аккаунтам.</string>
+    <string name="notification_preview_update_failed">Изменения могут потеряться после перезапуска.</string>
 </resources>

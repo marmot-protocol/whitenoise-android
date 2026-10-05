@@ -1005,6 +1005,8 @@
     <string name="media_uploading">上传中…</string>
     <string name="media_upload_failed">上传失败</string>
     <string name="media_tap_to_retry">点按重试</string>
+    <string name="media_too_large_to_preview">文件过大，无法预览</string>
+    <string name="media_too_large_to_preview_hint">保存或分享此图片，以在其他应用中查看</string>
     <string name="media_tap_to_download">点按下载</string>
     <string name="media_preparing_download">准备下载</string>
     <string name="media_preparing_attachment">正在准备附件</string>
@@ -2169,4 +2171,7 @@
     <string name="onboarding_details_expanded">已展开</string>
     <string name="onboarding_details_collapsed">已收起</string>
     <string name="group_svg_rejected_detail">无法处理此 SVG。请选择简单的 SVG、PNG 或 JPEG。</string>
+    <string name="notification_show_previews">显示通知预览</string>
+    <string name="notification_show_previews_detail">关闭时隐藏姓名和消息内容。适用于所有账户。</string>
+    <string name="notification_preview_update_failed">重新启动后更改可能会丢失。</string>
 </resources>

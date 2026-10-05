@@ -79,7 +79,7 @@ class MediaLifecycleRunnerTest(unittest.TestCase):
     def test_real_device_or_unknown_profile_is_refused_before_any_adb_call(self):
         """The fixture is for disposable emulators only; a physical serial never reaches adb."""
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(runner, "adb_command") as adb:
-            for serial, profile in (("46131FDAS003CG", "reference-api30-arm64"),
+            for serial, profile in (("PHYSICAL000TEST", "reference-api30-arm64"),
                                     ("emulator-5554", "pixel-api37-arm64")):
                 with self.assertRaises(ValueError):
                     runner.run("adb", serial, Path(directory), Path(directory) / "out.json", profile)

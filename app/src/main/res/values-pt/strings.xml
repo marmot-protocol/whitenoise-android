@@ -1023,6 +1023,8 @@
     <string name="media_uploading">Enviando…</string>
     <string name="media_upload_failed">Falha no envio</string>
     <string name="media_tap_to_retry">Toque para tentar novamente</string>
+    <string name="media_too_large_to_preview">Grande demais para pré-visualizar</string>
+    <string name="media_too_large_to_preview_hint">Salve ou compartilhe esta imagem para vê-la em outro aplicativo</string>
     <string name="media_tap_to_download">Toque para baixar</string>
     <string name="media_preparing_download">Preparando download</string>
     <string name="media_preparing_attachment">Preparando anexo</string>
@@ -2201,4 +2203,7 @@
     <string name="onboarding_details_expanded">Expandido</string>
     <string name="onboarding_details_collapsed">Recolhido</string>
     <string name="group_svg_rejected_detail">Não foi possível preparar este SVG. Escolha um SVG simples, PNG ou JPEG.</string>
+    <string name="notification_show_previews">Mostrar prévias das notificações</string>
+    <string name="notification_show_previews_detail">Quando desativado, oculta nomes e o conteúdo das mensagens. Aplica-se a todas as contas.</string>
+    <string name="notification_preview_update_failed">Alterações podem ser perdidas após reiniciar.</string>
 </resources>

@@ -82,6 +82,7 @@ internal fun conversationSettingsShortcut(
     avatarUrl: String?,
     existing: ShortcutInfoCompat? = null,
 ): ShortcutInfoCompat {
+    val previewToken = NotificationPreviewPreferences.capture(context)
     val requestedTitle = title.trim().ifBlank { context.getString(R.string.app_name) }
     val displayTitle = preferredConversationShortcutTitle(requestedTitle, existing?.longLabel?.toString())
     val avatarBitmap = AvatarImageLoader.peekBitmap(avatarUrl)
@@ -123,8 +124,11 @@ internal fun conversationSettingsShortcut(
         .setLocusId(LocusIdCompat(shortcutId))
         .setPerson(person)
         .setLongLived(true)
-        .setExtras(checkNotNull(conversationShortcutAccountExtras(accountRef)))
-        .build()
+        .setExtras(
+            checkNotNull(conversationShortcutAccountExtras(accountRef)).apply {
+                stampShortcutPreview(previewToken, this)
+            },
+        ).build()
 }
 
 internal fun sha256Hex(value: String): String =

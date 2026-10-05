@@ -49,7 +49,7 @@ class RecreationRunnerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(runner, "adb_command") as adb:
             output = Path(directory) / "out.json"
             for serial, distribution, profile in (
-                ("46131FDAS003CG", "Zapstore", "reference-api30-arm64"),
+                ("PHYSICAL000TEST", "Zapstore", "reference-api30-arm64"),
                 ("emulator-5554", "Zapstore", "pixel-api37-arm64"),
                 ("emulator-5554", "Other", "reference-api30-arm64"),
                 ("emulator-5554", "Play", "no-such-profile"),

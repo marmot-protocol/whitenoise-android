@@ -1023,6 +1023,8 @@
     <string name="media_uploading">Wird hochgeladen …</string>
     <string name="media_upload_failed">Upload fehlgeschlagen</string>
     <string name="media_tap_to_retry">Zum Wiederholen tippen</string>
+    <string name="media_too_large_to_preview">Zu groß für eine Vorschau</string>
+    <string name="media_too_large_to_preview_hint">Speichere oder teile dieses Bild, um es in einer anderen App anzusehen</string>
     <string name="media_tap_to_download">Zum Herunterladen tippen</string>
     <string name="media_preparing_download">Download wird vorbereitet</string>
     <string name="media_preparing_attachment">Anhang wird vorbereitet</string>
@@ -2218,4 +2220,7 @@
     <string name="onboarding_details_expanded">Ausgeklappt</string>
     <string name="onboarding_details_collapsed">Eingeklappt</string>
     <string name="group_svg_rejected_detail">Diese SVG konnte nicht verarbeitet werden. Wähle eine einfache SVG, PNG oder JPEG.</string>
+    <string name="notification_show_previews">Benachrichtigungsvorschau anzeigen</string>
+    <string name="notification_show_previews_detail">Wenn ausgeschaltet, werden Namen und Nachrichteninhalte verborgen. Gilt für alle Konten.</string>
+    <string name="notification_preview_update_failed">Änderungen können nach einem Neustart verloren gehen.</string>
 </resources>

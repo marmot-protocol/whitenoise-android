@@ -10236,11 +10236,16 @@ class ConversationController(
         throw AttachmentReferenceNotReadyException()
     }
 
+    /**
+     * Resolves one attachment's plaintext as an array of at most [maxBytes], which defaults to the presentation
+     * budget so a preview cannot allocate an unbounded array, explicit Save and Share name their own budget.
+     */
     internal suspend fun downloadAttachment(
         messageIdHex: String,
         attachmentIndex: Int,
         reference: MediaAttachmentReferenceFfi,
         priority: AttachmentDownloadPriority,
+        maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
     ): ByteArray {
         val account = conversationAccountRef ?: error("no active account")
         val request = attachmentRequest(account, messageIdHex, attachmentIndex)
@@ -10251,6 +10256,7 @@ class ConversationController(
             request = request,
             reference = reference,
             priority = priority,
+            maxBytes = maxBytes,
         )
     }
 
