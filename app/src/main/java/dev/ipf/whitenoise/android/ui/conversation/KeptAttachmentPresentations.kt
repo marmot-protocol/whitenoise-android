@@ -1,13 +1,16 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.MessageAttachments
@@ -16,9 +19,13 @@ import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.attachmentCancellationState
+import dev.ipf.whitenoise.android.state.attachmentFilePresentationState
+import dev.ipf.whitenoise.android.state.attachmentNativeProgress
+import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
 import dev.ipf.whitenoise.android.ui.conversation.media.TileTransfer
-import dev.ipf.whitenoise.android.ui.conversation.media.rememberTileTransfer
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberAttachmentFirstFrameCacheResolution
 import dev.ipf.whitenoise.android.ui.medialibrary.mediaAttachments
 
 /** The small visual vocabulary used by a kept attachment, including an explicit unsupported fallback. */
@@ -83,23 +90,15 @@ private fun keptAcceptedAttachmentPresentation(
             MediaReferenceSupport.isVideoMedia(reference) -> KeptAttachmentKind.Video
             else -> KeptAttachmentKind.File
         }
-    val transfer =
-        controller?.let {
-            rememberTileTransfer(
-                controller = it,
-                messageIdHex = message.record.messageIdHex,
-                attachmentIndex = index,
-                reference = reference,
-                mine = it.isMessageMine(message.record),
-                suppressed = false,
-                observeNative = false,
-            )
-        }
-    LaunchedEffect(controller, message.record.messageIdHex, index, thumbnailRevision) {
-        controller?.refreshAttachmentTransferState(message.record.messageIdHex, index)
-    }
+    val transfer = controller?.let { rememberKeptAttachmentTransfer(it, message, attachment, thumbnailRevision) }
+    val decodedRevision =
+        controller
+            ?.appState
+            ?.mediaThumbnailRevision
+            ?.collectAsStateWithLifecycle()
+            ?.value
     val thumbnail =
-        remember(controller, message.record.messageIdHex, index, thumbnailRevision) {
+        remember(controller, message.record.messageIdHex, index, decodedRevision) {
             controller?.thumbnailFor(message.record.messageIdHex, index)?.asImageBitmap()
         }
     return keptAttachmentPresentation(
@@ -107,6 +106,46 @@ private fun keptAcceptedAttachmentPresentation(
         reference.fileName.orEmpty(),
         stringResource(keptTransferLabel(transfer)),
         thumbnail,
+    )
+}
+
+/** Observes existing host/native work for every media type without acquiring or materializing bytes. */
+@Composable
+private fun rememberKeptAttachmentTransfer(
+    controller: ConversationController,
+    message: TimelineMessage,
+    attachment: IndexedAttachment,
+    cacheRevision: Long,
+): TileTransfer {
+    val id = message.record.messageIdHex
+    val (index, reference) = attachment
+    val initiallyAvailable = remember(controller, id, index) { controller.hasCachedAttachmentInMemory(id, index) }
+    val host by remember(controller, id, index) {
+        controller.attachmentTransferState(id, index, initiallyAvailable)
+    }.collectAsStateWithLifecycle()
+    DisposableEffect(controller, id, index) {
+        onDispose { controller.releaseAttachmentTransferState(id, index) }
+    }
+    val native by remember(controller, id, index, reference.ciphertextSha256, reference.sourceEpoch) {
+        controller.attachmentNativeProgress(id, index)
+    }.collectAsStateWithLifecycle(initialValue = null)
+    val cancellation by remember(controller, id, index) {
+        controller.attachmentCancellationState(id, index)
+    }.collectAsStateWithLifecycle()
+    val cacheResolved =
+        rememberAttachmentFirstFrameCacheResolution(controller, "$id#$index", initiallyAvailable) {
+            controller.refreshAttachmentTransferState(id, index)
+        }
+    LaunchedEffect(controller, id, index, cacheRevision) {
+        controller.refreshAttachmentTransferState(id, index)
+    }
+    val progress = if (controller.isMessageMine(message.record) && !cacheResolved) null else native
+    return TileTransfer(
+        state = attachmentFilePresentationState(host, progress, cancellation),
+        progress = progress,
+        cancellation = cancellation,
+        suppressed = false,
+        onCancel = {},
     )
 }
 

@@ -3,12 +3,15 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.core.MessageAttachments
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.conversation.keptMessagePresentations
 
@@ -35,12 +38,22 @@ internal fun KeptMediaTestHost(
     item: TimelineMessage?,
     onOpen: (KeptMessageKey) -> Unit = {},
     presentationOverride: ((KeptMessagePresentation) -> KeptMessagePresentation)? = null,
+    conversation: ConversationController? = null,
+    onPresentation: (KeptMessagePresentation?) -> Unit = {},
 ) {
     val key = KeptMessageKey(SWIPE_TEST_ACCOUNT_REF, SWIPE_TEST_GROUP_ID, SWIPE_TEST_MESSAGE_ID)
     val controller = remember { KeptMessagesController().apply { keep(key) } }
     Box(Modifier.fillMaxSize().testTag("kept-media-fixture")) {
         val entries = rememberKeptMessageEntries(controller, SWIPE_TEST_ACCOUNT_REF) { item }
-        val presentations = keptMessagePresentations(entries, "Design", "You", { false }, { "Alice" })
+        val cacheRevision =
+            conversation
+                ?.appState
+                ?.mediaCacheRevision
+                ?.collectAsStateWithLifecycle()
+                ?.value ?: 0L
+        val presentations =
+            keptMessagePresentations(entries, "Design", "You", { false }, { "Alice" }, conversation, cacheRevision)
+        SideEffect { onPresentation(presentations[key]) }
         KeptMessagesOverlay(
             state = KeptMessagesOverlayState(entries, controller, SWIPE_TEST_ACCOUNT_REF),
             composerHeight = 96.dp,
