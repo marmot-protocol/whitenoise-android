@@ -41,44 +41,44 @@ class ConversationMentionNavigationUiTest {
 
     @Test
     fun shortMentionStartsAtThePhysicalTop() {
-        assertMentionTop(rowHeight = 80, viewportHeight = 420, padding = 12)
+        assertMentionTop(target = Target(80), viewportHeight = 420, padding = 12)
     }
 
     @Test
     fun oversizedMentionStartsAtThePhysicalTop() {
-        assertMentionTop(rowHeight = 720, viewportHeight = 420, padding = 12)
+        assertMentionTop(target = Target(720), viewportHeight = 420, padding = 12)
     }
 
     @Test
     fun keyboardReducedViewportStillShowsTheBeginning() {
-        assertMentionTop(rowHeight = 720, viewportHeight = 260, padding = 32)
+        assertMentionTop(target = Target(720), viewportHeight = 260, padding = 32)
     }
 
     @Test
     fun expandedComposerOverlapDoesNotShiftTheReadingTop() {
-        assertMentionTop(rowHeight = 80, viewportHeight = 420, padding = 144, overlap = 120)
+        assertMentionTop(target = Target(80), viewportHeight = 420, padding = 144, overlap = 120)
     }
 
     @Test
     fun tallMentionWithExpandedComposerAndRtlShowsTheBeginning() {
-        assertMentionTop(rowHeight = 720, viewportHeight = 420, padding = 144, overlap = 120, rtl = true)
+        assertMentionTop(target = Target(720), viewportHeight = 420, padding = 144, overlap = 120, rtl = true)
     }
 
     @Test
     fun farUnmeasuredMentionUsesBoundedNavigationAndFreshGeometry() {
-        assertMentionTop(rowHeight = 720, viewportHeight = 420, padding = 12, targetIndex = 150)
+        assertMentionTop(target = Target(720, 150), viewportHeight = 420, padding = 12)
     }
 
     @Suppress("LongMethod") // One real-list fixture shares measurement and the production command.
     private fun assertMentionTop(
-        rowHeight: Int,
+        target: Target,
         viewportHeight: Int,
         padding: Int,
         overlap: Int = 0,
         rtl: Boolean = false,
-        targetIndex: Int = 8,
     ) {
         var completed = false
+        val targetIndex = target.index
         composeRule.setContent {
             WhiteNoiseTheme {
                 CompositionLocalProvider(
@@ -103,7 +103,7 @@ class ConversationMentionNavigationUiTest {
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .height((if (index == targetIndex) rowHeight else 72).dp)
+                                            .height((if (index == targetIndex) target.height else 72).dp)
                                             .testTag("message-$index"),
                                 )
                             }
@@ -142,4 +142,9 @@ class ConversationMentionNavigationUiTest {
         assertEquals(listTop, messageTop, 1f)
         composeRule.runOnIdle { assertTrue(completed) }
     }
+
+    private data class Target(
+        val height: Int,
+        val index: Int = 8,
+    )
 }
