@@ -22,6 +22,7 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
     resolveTargetIndex: () -> Int?,
     readLayout: (Int) -> ConversationMentionJumpLayout,
     awaitLayout: suspend () -> Unit = { withFrameNanos { } },
+    onCompleted: () -> Unit = {},
 ): Boolean {
     var reached = false
     val completed =
@@ -52,5 +53,6 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
             if (resolveTargetIndex() != measuredIndex) return@programmaticJump
             reached = true
         }
+    if (completed) onCompleted()
     return completed && reached
 }

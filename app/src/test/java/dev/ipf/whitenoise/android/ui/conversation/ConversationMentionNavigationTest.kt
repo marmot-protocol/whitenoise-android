@@ -16,14 +16,17 @@ class ConversationMentionNavigationTest {
     fun measuredShortMentionUsesNegativeReadingStartOffset() =
         runTest {
             val writer = RecordingWriter()
+            var completions = 0
             val reached =
                 ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
                     targetMessageId = "mention",
                     resolveTargetIndex = { 5 },
                     readLayout = { ConversationMentionJumpLayout(500, 80) },
                     awaitLayout = {},
+                    onCompleted = { completions++ },
                 )
             assertTrue(reached)
+            assertEquals(1, completions)
             assertEquals(listOf(Write(true, 5, -420)), writer.writes)
         }
 
@@ -92,15 +95,41 @@ class ConversationMentionNavigationTest {
     fun missingTargetDoesNotWriteOrReportSuccess() =
         runTest {
             val writer = RecordingWriter()
+            var completions = 0
             assertFalse(
                 ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
                     targetMessageId = "missing",
                     resolveTargetIndex = { null },
                     readLayout = { error("no target geometry should be read") },
                     awaitLayout = {},
+                    onCompleted = { completions++ },
                 ),
             )
             assertTrue(writer.writes.isEmpty())
+            assertEquals(1, completions)
+        }
+
+    @Test
+    fun completedButUnpositionedJumpReplacesTheOldRestoreBookmark() =
+        runTest {
+            val writer = RecordingWriter()
+            val coordinator =
+                ConversationScrollCoordinator(writer, ConversationScrollMode.ReadingHistory("old-reader", 12))
+            val oldAnchor = ConversationScrollAnchor(1, 12, "msg:old-reader", "old-reader")
+            val currentAnchor = ConversationScrollAnchor(5, 0, "msg:visible", "visible")
+            coordinator.settleReadingAt(oldAnchor)
+            val reached =
+                coordinator.jumpToMentionReadingStart(
+                    targetMessageId = "mention",
+                    resolveTargetIndex = { 5 },
+                    readLayout = { ConversationMentionJumpLayout(500, null) },
+                    awaitLayout = {},
+                    onCompleted = { coordinator.settleReadingAt(currentAnchor) },
+                )
+            assertFalse(reached)
+            assertEquals(currentAnchor, coordinator.bookmark(currentAnchor).anchor)
+            assertEquals(ConversationScrollMode.ReadingHistory("visible", 0), coordinator.mode)
+            assertEquals(listOf(Write(true, 5, 0)), writer.writes)
         }
 
     @Test
@@ -142,6 +171,7 @@ class ConversationMentionNavigationTest {
             val waiting = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             var reached = true
+            var completions = 0
             val jump =
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     reached =
@@ -153,6 +183,7 @@ class ConversationMentionNavigationTest {
                                 waiting.complete(Unit)
                                 release.await()
                             },
+                            onCompleted = { completions++ },
                         )
                 }
             waiting.await()
@@ -160,6 +191,7 @@ class ConversationMentionNavigationTest {
             release.complete(Unit)
             jump.join()
             assertFalse(reached)
+            assertEquals(0, completions)
             assertEquals(listOf(Write(true, 5, 0)), writer.writes)
         }
 
@@ -171,6 +203,7 @@ class ConversationMentionNavigationTest {
             val waiting = CompletableDeferred<Unit>()
             val release = CompletableDeferred<Unit>()
             var reached = true
+            var completions = 0
             val jump =
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     reached =
@@ -182,6 +215,7 @@ class ConversationMentionNavigationTest {
                                 waiting.complete(Unit)
                                 release.await()
                             },
+                            onCompleted = { completions++ },
                         )
                 }
             waiting.await()
@@ -193,6 +227,7 @@ class ConversationMentionNavigationTest {
             release.complete(Unit)
             jump.join()
             assertFalse(reached)
+            assertEquals(0, completions)
             assertEquals(listOf(Write(true, 5, 0), Write(false, 3, -20)), writer.writes)
         }
 

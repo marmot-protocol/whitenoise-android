@@ -2347,9 +2347,13 @@ internal fun ConversationScreen(
                                 estimatedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
                             )
                         },
+                        onCompleted = {
+                            if (navigationRequest.isCurrent()) {
+                                scrollCoordinator.settleReadingAt(currentScrollAnchor())
+                            }
+                        },
                     )
                 if (!reached || !navigationRequest.isCurrent()) return@launch
-                scrollCoordinator.settleReadingAt(currentScrollAnchor())
                 // Mark read up to the visited mention so the count — and the
                 // chat-list @-badge — decrement in step; advance the local read
                 // anchor so the chip's derived count updates immediately.
