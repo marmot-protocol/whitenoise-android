@@ -75,8 +75,9 @@ class ConversationAlertSettingsScreenshotTest {
         onChange: (NotificationChannelSpec, Boolean) -> Unit = { _, _ -> },
     ) {
         val primary = if (isDm) NotificationChannelSpec.DIRECT_MESSAGES else NotificationChannelSpec.GROUP_MESSAGES
-        val settings = listOf(primary, NotificationChannelSpec.MENTIONS, NotificationChannelSpec.REACTIONS)
-            .map { ConversationAlertSetting(it, it == NotificationChannelSpec.MENTIONS, blocked) }
+        val settings =
+            listOf(primary, NotificationChannelSpec.MENTIONS, NotificationChannelSpec.REACTIONS)
+                .map { ConversationAlertSetting(it, it == NotificationChannelSpec.MENTIONS, blocked) }
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,

@@ -24,6 +24,6 @@ internal fun androidBlockedConversationCategories(
                     false
                 }
             appBlocked || channel?.importance == NotificationManager.IMPORTANCE_NONE || groupBlocked
-        }
-        .map { it.channel }.toSet()
+        }.map { it.channel }
+        .toSet()
 }

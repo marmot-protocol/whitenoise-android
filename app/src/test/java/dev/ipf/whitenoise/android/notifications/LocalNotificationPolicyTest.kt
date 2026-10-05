@@ -13,17 +13,20 @@ class LocalNotificationPolicyTest {
     @Test
     fun explicitCategoryChoicesOverrideLegacyModeForGroupsAndDirectMessages() {
         listOf(false, true).forEach { isDm ->
-            fun permitted(mention: Boolean, choice: Boolean?, muted: Boolean = false) =
-                LocalNotificationPolicy.shouldPost(
-                    update = update("group", isMention = mention, isDm = isDm),
-                    appInForeground = false,
-                    activeConversationGroupIdHex = null,
-                    activeConversationAccountRef = null,
-                    appLockScreenVisible = false,
-                    conversationNotifyMode = { _, _ -> ChatNotifyMode.MENTIONS_ONLY },
-                    engineMuted = muted,
-                    categoryEnabled = { _, _, _ -> choice },
-                )
+            fun permitted(
+                mention: Boolean,
+                choice: Boolean?,
+                muted: Boolean = false,
+            ) = LocalNotificationPolicy.shouldPost(
+                update = update("group", isMention = mention, isDm = isDm),
+                appInForeground = false,
+                activeConversationGroupIdHex = null,
+                activeConversationAccountRef = null,
+                appLockScreenVisible = false,
+                conversationNotifyMode = { _, _ -> ChatNotifyMode.MENTIONS_ONLY },
+                engineMuted = muted,
+                categoryEnabled = { _, _, _ -> choice },
+            )
             assertFalse(permitted(mention = false, choice = null))
             assertTrue(permitted(mention = true, choice = null))
             assertTrue(permitted(mention = false, choice = true))
@@ -37,18 +40,21 @@ class LocalNotificationPolicyTest {
     @Test
     fun categoryFilterReceivesTheClassifiedReactionAndCannotHideMembershipRemoval() {
         var classified: NotificationChannelSpec? = null
-        fun permitted(trigger: NotificationTriggerFfi, reaction: String?) =
-            LocalNotificationPolicy.shouldPost(
-                update = update("group", trigger = trigger, reactionEmoji = reaction),
-                appInForeground = false,
-                activeConversationGroupIdHex = null,
-                activeConversationAccountRef = null,
-                appLockScreenVisible = false,
-                categoryEnabled = { _, _, channel ->
-                    classified = channel
-                    false
-                },
-            )
+
+        fun permitted(
+            trigger: NotificationTriggerFfi,
+            reaction: String?,
+        ) = LocalNotificationPolicy.shouldPost(
+            update = update("group", trigger = trigger, reactionEmoji = reaction),
+            appInForeground = false,
+            activeConversationGroupIdHex = null,
+            activeConversationAccountRef = null,
+            appLockScreenVisible = false,
+            categoryEnabled = { _, _, channel ->
+                classified = channel
+                false
+            },
+        )
         assertFalse(permitted(NotificationTriggerFfi.NEW_MESSAGE, "👍"))
         assertTrue(classified == NotificationChannelSpec.REACTIONS)
         assertTrue(permitted(NotificationTriggerFfi.REMOVED_FROM_GROUP, null))

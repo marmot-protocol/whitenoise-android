@@ -10,6 +10,8 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
@@ -41,6 +43,8 @@ import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
+import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -58,6 +62,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.rules.ErrorCollector
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -68,6 +73,10 @@ import org.robolectric.annotation.GraphicsMode
 class GroupDetailsEditNavigationTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** Verify both visual states even when the first golden needs an intentional update. */
+    @get:Rule
+    val visualErrors = ErrorCollector()
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
@@ -82,7 +91,7 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
     }
 
-    /** New groups show All; the existing picker retains an explicit mentions choice and can restore All. */
+    /** New groups keep All; independent device switches can retain mentions-only and restore All. */
     @Test
     fun newGroupStartsWithAllAndCanChooseOnlyMentions() {
         context
@@ -90,34 +99,46 @@ class GroupDetailsEditNavigationTest {
             .edit()
             .clear()
             .commit()
+        context.getSharedPreferences("whitenoise.conversation_alerts", Context.MODE_PRIVATE).edit().clear().commit()
         val fixture = controller(group())
+        val groupId = fixture.controller.group.groupIdHex
         render(fixture)
         composeRule
             .onNodeWithText(context.getString(R.string.sounds_and_notifications))
             .performScrollTo()
             .performClick()
-        composeRule.onNodeWithText(context.getString(R.string.notify_all_messages)).assertIsDisplayed()
-        composeRule.waitUntil(5_000) {
-            composeRule
-                .onAllNodesWithText(context.getString(R.string.notification_channel_group_messages))
-                .fetchSemanticsNodes()
-                .isNotEmpty()
+        val messagesTag = "conversation-alert-messages_group"
+        val reactionsTag = "conversation-alert-reactions_v2"
+        composeRule.onNodeWithTag(messagesTag).assertIsOn()
+        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
+        visualErrors.checkSucceeds {
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_all.png")
         }
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_all.png")
-        composeRule.onNodeWithText(context.getString(R.string.notify_for)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.notify_only_mentions)).assertIsDisplayed()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions.png")
-        val restored =
-            dev.ipf.whitenoise.android.state
-                .ChatMutePreferences(context)
-        assertEquals(
-            dev.ipf.whitenoise.android.state.ChatNotifyMode.MENTIONS_ONLY,
-            restored.mode(ACCOUNT_REF, fixture.controller.group.groupIdHex),
-        )
-        composeRule.onNodeWithText(context.getString(R.string.notify_for)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.notify_all_messages)).performClick()
-        composeRule.onNodeWithText(context.getString(R.string.notify_all_messages)).assertIsDisplayed()
+        composeRule.onNodeWithTag(messagesTag).performClick()
+        composeRule.waitUntil(5_000) {
+            ConversationAlertPreferences(context)
+                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == false
+        }
+        composeRule.onNodeWithTag(reactionsTag).performClick()
+        composeRule.waitUntil(5_000) {
+            ConversationAlertPreferences(context)
+                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS) == false
+        }
+        composeRule.onNodeWithTag(messagesTag).assertIsOff()
+        composeRule.onNodeWithTag(reactionsTag).assertIsOff()
+        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
+        visualErrors.checkSucceeds {
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions.png")
+        }
+        val restored = ConversationAlertPreferences(context)
+        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES))
+        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS))
+        composeRule.onNodeWithTag(messagesTag).performClick()
+        composeRule.waitUntil(5_000) {
+            ConversationAlertPreferences(context)
+                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == true
+        }
+        composeRule.onNodeWithTag(messagesTag).assertIsOn()
     }
 
     /** Unavailable call actions do not occupy the primary action row. */
