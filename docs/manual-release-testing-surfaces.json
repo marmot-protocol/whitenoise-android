@@ -15597,14 +15597,6 @@
         ]
       },
       {
-        "surface": "string:notification_notify_restore",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.notification_notify_restore",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:notifications",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.notifications",

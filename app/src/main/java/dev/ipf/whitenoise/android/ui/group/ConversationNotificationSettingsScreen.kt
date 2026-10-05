@@ -178,7 +178,6 @@ internal fun ConversationNotificationSettingsScreen(
                     }
                 }
             }
-            item { SettingsExplainer(stringResource(R.string.notification_notify_restore)) }
             item { SettingsSection(stringResource(R.string.notification_sound_appearance)) }
             item {
                 SettingsGroup {
