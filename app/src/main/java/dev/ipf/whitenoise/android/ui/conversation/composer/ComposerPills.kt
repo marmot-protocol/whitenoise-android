@@ -23,9 +23,11 @@ import androidx.compose.foundation.content.TransferableContent
 import androidx.compose.foundation.content.consume
 import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -46,20 +49,23 @@ import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMe
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -119,11 +125,10 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -135,7 +140,9 @@ import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -145,42 +152,18 @@ internal const val COMPOSER_RESIZE_GESTURE_TAG = "composer-resize-gesture"
 internal const val COMPOSER_RESIZE_ACCESSIBILITY_TAG = "composer-resize-accessibility"
 internal const val COMPOSER_RESIZE_INDICATOR_TAG = "composer-resize-indicator"
 internal const val COMPOSER_PILL_SURFACE_TAG = "composer-pill-surface"
+internal const val COMPOSER_DRAFT_TOP_TAG = "composer-draft-top"
 
 private val CompactEditorStartInset = 72.dp
 private val EditingEditorStartInset = 14.dp
 private val ExpandedEditorEndInset = 14.dp
-private val CompactEditorTopInset = 12.dp
-private val CompactEditorBottomInset = 12.dp
+private val CompactEditorTopInset = 24.dp
 
 // The drag strip's visible grip: Material's drag-handle proportions, drawn in the outline colour so it
 // reads as chrome rather than content.
 private val ComposerResizeHandleWidth = 32.dp
 private val ComposerResizeHandleThickness = 4.dp
-private val ExpandedEditorBottomInset = 44.dp
-
-private const val COMPOSER_ACTION_CENTER_BIAS = 0.5f
-
-/**
- * Vertical placement for the composer's inline action clusters: centred in the compact one-line row
- * and pinned to the bottom of the editing row, blending between the two with the animated editing
- * progress. The progress is read during placement so the text field never recomposes per frame.
- */
-private class ComposerActionRowAlignment(
-    private val horizontal: Alignment.Horizontal,
-    private val editingProgress: () -> Float,
-) : Alignment {
-    /** Places the cluster at the horizontal edge and at the progress-weighted vertical bias. */
-    override fun align(
-        size: IntSize,
-        space: IntSize,
-        layoutDirection: LayoutDirection,
-    ): IntOffset {
-        val x = horizontal.align(size.width, space.width, layoutDirection)
-        val slack = (space.height - size.height).coerceAtLeast(0)
-        val bias = COMPOSER_ACTION_CENTER_BIAS + (1f - COMPOSER_ACTION_CENTER_BIAS) * editingProgress().coerceIn(0f, 1f)
-        return IntOffset(x, (slack * bias).roundToInt())
-    }
-}
+private val ExpandedEditorBottomInset = 48.dp
 
 /** Interpolates one layout-space distance without allocating an animation object. */
 private fun interpolateDp(
@@ -427,6 +410,8 @@ internal fun ComposerPill(
     inputContentVisible: Boolean = true,
     inputFocusEnabled: Boolean = true,
     onMultilineControlsChanged: (Boolean) -> Unit = {},
+    onExtraControlsHeightChanged: (Dp) -> Unit = {},
+    scrollOwnerKey: Any? = null,
     // Compact-height viewports cannot afford the expanded control layout, whose
     // fixed header and action-row overhead consumes the whole compact composer
     // ceiling and squeezes the editor viewport to zero, so they pin the inline
@@ -583,7 +568,14 @@ internal fun ComposerPill(
         remember(textFieldValue.text, mentionVisualTransformation) {
             mentionVisualTransformation.filter(AnnotatedString(textFieldValue.text))
         }
-    val composerScrollState = rememberScrollState()
+    val composerScrollState = key(scrollOwnerKey) { rememberScrollState() }
+    val editorScrollScope = rememberCoroutineScope()
+    val editorFlingBehavior = ScrollableDefaults.flingBehavior()
+    val latestEditorFlingBehavior by rememberUpdatedState(editorFlingBehavior)
+    var editorScrollJob by remember { mutableStateOf<Job?>(null) }
+    LaunchedEffect(textFieldValue.text, textFieldValue.selection, inputContentVisible, scrollOwnerKey) {
+        editorScrollJob?.cancel()
+    }
     // Reading intent: a deliberate user scroll (touch drag, mouse wheel,
     // trackpad) anchors to the exact draft and selection it happened on and
     // suspends caret-following while that anchor still matches, so the next
@@ -591,7 +583,7 @@ internal fun ComposerPill(
     // selection change invalidates the anchor synchronously — the comparison
     // is a plain value check readable during measure — which preserves the
     // paste/dictation/bulk-replacement first-frame caret guarantees.
-    var readingScrollAnchor by remember { mutableStateOf<ComposerReadingAnchor?>(null) }
+    var readingScrollAnchor by remember(scrollOwnerKey) { mutableStateOf<ComposerReadingAnchor?>(null) }
     // Gesture handlers below outlive recomposition, so read the live field and
     // visual transformation instead of values captured when a handler started.
     val latestTextFieldValue by rememberUpdatedState(textFieldValue)
@@ -622,7 +614,7 @@ internal fun ComposerPill(
         // with no live reading intent behind it.
         if (readingScrollAnchor != null && !caretFollowSuspended) readingScrollAnchor = null
     }
-    val layoutCorrectionGate = remember { ComposerLayoutCaretCorrectionGate() }
+    val layoutCorrectionGate = remember(scrollOwnerKey) { ComposerLayoutCaretCorrectionGate() }
     var textLayoutSnapshot by remember { mutableStateOf<ComposerTextLayoutSnapshot?>(null) }
     val selectionLayout =
         remember(textLayoutSnapshot, textFieldValue.text, textFieldValue.selection, transformedText) {
@@ -657,13 +649,52 @@ internal fun ComposerPill(
             hasUserShare ||
             hasContactShare
     var multilineControls by remember { mutableStateOf(false) }
+    val showDraftTop by remember { derivedStateOf { composerScrollState.value > 0 } }
     val leadingControlsWidth = if (hasAttachmentAction) 80.dp else 40.dp
-    val reservedTrailingWidth =
+    val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
             (if (trailingAction != null) 40.dp else 0.dp)
+    val minimumDictationWidth =
+        when {
+            dictationControls != null -> DICTATION_ACTIVE_ACTIONS_WIDTH
+            onDictation != null -> 40.dp
+            else -> 0.dp
+        }
+    // Automatic geometry may still be animating its outer reservation; budget the smaller surface.
+    val navigationSurfaceWidth =
+        (compactMeasurementWidth ?: Dp.Infinity) -
+            (if (expansionMode == ComposerExpansionMode.Automatic) compactOuterEndInset else 0.dp)
+    val navigationRoom =
+        navigationSurfaceWidth - leadingControlsWidth - primaryTrailingWidth -
+            minimumDictationWidth - (if (sendAccessoryContent != null) 66.dp else 0.dp)
+    val textMeasurer = rememberTextMeasurer()
+    val draftTopLabel = stringResource(R.string.scroll_to_top)
+    val draftTopLabelStyle = MaterialTheme.typography.labelMedium
+    val draftTopLabelWidth =
+        remember(textMeasurer, density, draftTopLabel, draftTopLabelStyle) {
+            with(density) {
+                (
+                    textMeasurer
+                        .measure(draftTopLabel, style = draftTopLabelStyle)
+                        .size.width
+                        .toDp() + 16.dp
+                ).coerceAtLeast(64.dp)
+            }
+        }
+    val topOnSeparateRow = showDraftTop && inputContentVisible && navigationRoom < 48.dp
+    val draftTopWidth =
+        when {
+            !showDraftTop || !inputContentVisible -> 0.dp
+            topOnSeparateRow && navigationSurfaceWidth >= draftTopLabelWidth -> draftTopLabelWidth
+            navigationRoom >= draftTopLabelWidth -> draftTopLabelWidth
+            else -> 48.dp
+        }
+    val extraControlsHeight = if (topOnSeparateRow) 48.dp else 0.dp
+    SideEffect { onExtraControlsHeightChanged(extraControlsHeight) }
+    val reservedTrailingWidth = primaryTrailingWidth + if (topOnSeparateRow) 0.dp else draftTopWidth
     val availableDictationWidth =
-        compactMeasurementWidth?.let { width ->
-            (width - leadingControlsWidth - reservedTrailingWidth).coerceAtLeast(0.dp)
+        compactMeasurementWidth?.let {
+            (navigationSurfaceWidth - leadingControlsWidth - reservedTrailingWidth).coerceAtLeast(0.dp)
         } ?: DICTATION_ACTIVE_ACTIONS_WIDTH
     val targetDictationControlWidth =
         when {
@@ -678,7 +709,7 @@ internal fun ComposerPill(
             label = "composer dictation control morph",
         )
     val compactTrailingReserve =
-        4.dp + dictationControlWidth + expandedTrailingActionInset +
+        4.dp + (if (topOnSeparateRow) 0.dp else draftTopWidth) + dictationControlWidth + expandedTrailingActionInset +
             (if (trailingAction != null) 40.dp else 0.dp)
     // What the compact trailing reserve leaves over once the control row has taken its share: the 4dp
     // gap before the controls when nothing sits between them, and nothing at all when it does.
@@ -693,7 +724,6 @@ internal fun ComposerPill(
             color = MaterialTheme.colorScheme.onSurface,
             textDirection = TextDirection.ContentOrLtr,
         )
-    val textMeasurer = rememberTextMeasurer()
     val editingRequested =
         composerEditingRequested(
             focused = composerFocused,
@@ -741,9 +771,6 @@ internal fun ComposerPill(
     // The crossover is decided by the width the draft is leaving, even when the height targets the
     // width it is arriving at: the destination's own count can be lower and would suppress the change.
     val compactLineCount = compactDraftMeasurement?.crossoverLineCount
-    // The pill is also used without a measurement width, where the editor's own layout is the only line
-    // count there is. The grip needs one number from whichever path is live.
-    var editorLineCount by remember { mutableIntStateOf(1) }
     // The prototype animates the measured text row independently of discrete full-screen resizing.
     // Read frames in measurement so the field and its selection owner are never replaced.
     //
@@ -789,12 +816,7 @@ internal fun ComposerPill(
         }
     val expandedLayout = visualMultilineControls || expansionMode != ComposerExpansionMode.Automatic
 
-    // The grip marks a border that can be dragged, and the drag target exists from the second line on.
-    // Tying it to the multiline controls hid it until the third line, leaving a resizable border unmarked
-    // for exactly the drafts a reader is most likely to want smaller. Only the one-line row, which has
-    // nothing to shrink, goes without.
-    val composerCanResize =
-        expansionMode != ComposerExpansionMode.Automatic || (compactLineCount ?: editorLineCount) > 1
+    // A draft can always grow, including when empty; keep the grip discoverable at every height.
     // Keep the editor instance and selection owner stable while empty reading
     // mode unfolds into the full-width editing row above the native controls.
     val editingLayout =
@@ -811,12 +833,9 @@ internal fun ComposerPill(
                 ),
             label = "composer editing row",
         )
-    // The compact one-line row centres its inline actions; as the editing row
-    // unfolds they slide down to the bottom action row. Read during placement.
-    val leadingActionsAlignment =
-        remember(editingProgress) { ComposerActionRowAlignment(Alignment.Start) { editingProgress.value } }
-    val trailingActionsAlignment =
-        remember(editingProgress) { ComposerActionRowAlignment(Alignment.End) { editingProgress.value } }
+    // Keep every bottom control below the grip and aligned with the external Send/voice action.
+    val leadingActionsAlignment = if (multilineControlsSuppressed) Alignment.CenterStart else Alignment.BottomStart
+    val trailingActionsAlignment = if (multilineControlsSuppressed) Alignment.CenterEnd else Alignment.BottomEnd
     // The editor and action edges animate without reserving space above the surface.
     val expansionProgress =
         animateFloatAsState(
@@ -847,7 +866,7 @@ internal fun ComposerPill(
     }
     val toggleDescription =
         stringResource(
-            if (expansionMode != ComposerExpansionMode.Automatic) {
+            if (expansionMode == ComposerExpansionMode.FullScreen) {
                 R.string.composer_collapse
             } else {
                 R.string.composer_expand_full_screen
@@ -860,6 +879,33 @@ internal fun ComposerPill(
         } else {
             Modifier.fillMaxHeight()
         }
+    val draftTopAction: @Composable () -> Unit = {
+        OutlinedButton(
+            onClick = {
+                editorScrollJob?.cancel()
+                readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
+                editorScrollJob = editorScrollScope.launch { composerScrollState.scrollTo(0) }
+            },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+            contentPadding = PaddingValues(horizontal = 8.dp),
+            modifier = Modifier.width(draftTopWidth).height(40.dp).testTag(COMPOSER_DRAFT_TOP_TAG),
+        ) {
+            if (draftTopWidth > 48.dp) {
+                Text(
+                    text = draftTopLabel,
+                    style = draftTopLabelStyle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                Icon(
+                    painterResource(R.drawable.ic_text_start),
+                    contentDescription = stringResource(R.string.scroll_to_top),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
 
     /** Applies the one-line/three-line hysteresis to the measured editor line count. */
     fun updateMultilineControls(lineCount: Int) {
@@ -907,6 +953,7 @@ internal fun ComposerPill(
         ) {
             Column(modifier = Modifier.then(expandedHeightModifier)) {
                 if (accessoryContent != null) {
+                    Spacer(Modifier.height(if (multilineControlsSuppressed) 12.dp else CompactEditorTopInset))
                     Box(
                         Modifier.boundedComposerAccessory().verticalScroll(rememberScrollState()),
                     ) {
@@ -935,8 +982,18 @@ internal fun ComposerPill(
                                 // composerScrollState directly and arm reading
                                 // intent, while focused taps and long-press selection
                                 // pass through untouched.
-                                .pointerInput(Unit) {
+                                .pointerInput(inputContentVisible, scrollOwnerKey) {
+                                    if (!inputContentVisible) return@pointerInput
                                     composerEditorReadingScrollGestures(
+                                        onScrollInterrupted = { editorScrollJob?.cancel() },
+                                        onFling = { velocity ->
+                                            editorScrollJob =
+                                                editorScrollScope.launch {
+                                                    composerScrollState.scroll {
+                                                        with(latestEditorFlingBehavior) { performFling(velocity) }
+                                                    }
+                                                }
+                                        },
                                         scrollBy = { delta ->
                                             val before = composerScrollState.value
                                             composerScrollState.dispatchRawDelta(delta)
@@ -960,7 +1017,11 @@ internal fun ComposerPill(
                                         )
                                     },
                                     top = {
-                                        CompactEditorTopInset
+                                        if (multilineControlsSuppressed || accessoryContent != null) {
+                                            12.dp
+                                        } else {
+                                            interpolateDp(36.dp, CompactEditorTopInset, editingProgress.value)
+                                        }
                                     },
                                     end = {
                                         interpolateDp(
@@ -971,8 +1032,8 @@ internal fun ComposerPill(
                                     },
                                     bottom = {
                                         interpolateDp(
-                                            CompactEditorBottomInset,
-                                            ExpandedEditorBottomInset,
+                                            12.dp,
+                                            ExpandedEditorBottomInset + extraControlsHeight,
                                             editingProgress.value,
                                         )
                                     },
@@ -1033,6 +1094,7 @@ internal fun ComposerPill(
                                         // arm the anchor before moving the shared state,
                                         // overriding verticalScroll's un-anchored action.
                                         scrollBy { _, y ->
+                                            editorScrollJob?.cancel()
                                             // Report success and arm reading intent
                                             // only when the viewport actually moved:
                                             // a boundary or zero-delta action must
@@ -1160,7 +1222,6 @@ internal fun ComposerPill(
                             keyboardActions = KeyboardActions(onSend = { onImeSend() }),
                             maxLines = Int.MAX_VALUE,
                             onTextLayout = { layout ->
-                                editorLineCount = layout.lineCount
                                 if (compactLineCount == null) updateMultilineControls(layout.lineCount)
                                 val nextSnapshot =
                                     ComposerTextLayoutSnapshot(
@@ -1263,12 +1324,17 @@ internal fun ComposerPill(
                                     if (voiceReviewContent == null) trailingActionsAlignment else Alignment.BottomEnd,
                                 ).height(48.dp),
                     ) {
+                        if (draftTopWidth > 0.dp && !topOnSeparateRow) draftTopAction()
                         if (dictationControls != null) {
                             Row(
                                 Modifier.layout { measurable, constraints ->
-                                    val reserved = (leadingControlsWidth + reservedTrailingWidth).roundToPx()
-                                    val available = (constraints.maxWidth - reserved).coerceAtLeast(0)
-                                    val maximum = minOf(DICTATION_ACTIVE_ACTIONS_WIDTH.roundToPx(), available)
+                                    // Row constraints already exclude preceding children such as draft navigation.
+                                    val maximum =
+                                        minOf(
+                                            DICTATION_ACTIVE_ACTIONS_WIDTH.roundToPx(),
+                                            availableDictationWidth.roundToPx(),
+                                            constraints.maxWidth,
+                                        )
                                     val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maximum))
                                     layout(child.width, child.height) { child.placeRelative(0, 0) }
                                 },
@@ -1297,11 +1363,13 @@ internal fun ComposerPill(
                             Box(
                                 Modifier.layout { measurable, constraints ->
                                     // Stays clear of the leading tools; the label ellipsizes first.
-                                    val reserved =
-                                        (leadingControlsWidth + reservedTrailingWidth + dictationControlWidth)
-                                            .roundToPx()
-                                    val available = (constraints.maxWidth - reserved).coerceAtLeast(0)
-                                    val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = available))
+                                    val available =
+                                        (navigationSurfaceWidth - leadingControlsWidth - reservedTrailingWidth -
+                                            dictationControlWidth).coerceAtLeast(0.dp).roundToPx()
+                                    val child =
+                                        measurable.measure(
+                                            constraints.copy(minWidth = 0, maxWidth = minOf(constraints.maxWidth, available)),
+                                        )
                                     layout(child.width, child.height) { child.placeRelative(0, 0) }
                                 },
                             ) { sendAccessoryContent() }
@@ -1316,37 +1384,46 @@ internal fun ComposerPill(
                     if (voiceReviewContent != null) {
                         Box(Modifier.matchParentSize()) { voiceReviewContent() }
                     }
+                    if (topOnSeparateRow) {
+                        Box(
+                            Modifier.align(Alignment.BottomEnd).offset(y = -48.dp).height(48.dp),
+                            contentAlignment = Alignment.CenterEnd,
+                        ) {
+                            draftTopAction()
+                        }
+                    }
                 }
             }
         }
 
-        if (inputContentVisible && !multilineControlsSuppressed) {
-            if (composerCanResize) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
-                            .semantics {
-                                contentDescription = resizeComposerDescription
-                                customActions =
-                                    listOf(
-                                        CustomAccessibilityAction(toggleDescription) {
-                                            latestOnExpansionToggle()
-                                            true
-                                        },
-                                    )
-                            },
-                )
-            }
+        if (inputContentVisible) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
+                        .semantics {
+                            contentDescription = resizeComposerDescription
+                            customActions =
+                                listOf(
+                                    CustomAccessibilityAction(toggleDescription) {
+                                        latestOnExpansionToggle()
+                                        true
+                                    },
+                                )
+                        },
+            )
             // This existing padding contains no editor or accessory content. A
             // border-only pointer owner leaves reading drags and selection to
             // BasicTextField; a separate semantics leaf exposes the accessible action.
             ComposerResizeGestureStrip(
-                showHandle = composerCanResize,
-                onHeightDragStarted = { latestOnHeightDragStarted() },
+                compact = multilineControlsSuppressed,
+                onHeightDragStarted = {
+                    editorScrollJob?.cancel()
+                    latestOnHeightDragStarted()
+                },
                 onHeightDrag = { latestOnHeightDrag(it) },
                 onHeightDragStopped = { latestOnHeightDragStopped() },
                 onHeightDragSettled = onHeightDragSettled,
@@ -1369,7 +1446,7 @@ private fun Modifier.boundedComposerAccessory(): Modifier =
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
 private fun ComposerResizeGestureStrip(
-    showHandle: Boolean,
+    compact: Boolean,
     onHeightDragStarted: () -> Unit,
     onHeightDrag: (Float) -> Unit,
     onHeightDragStopped: () -> Unit,
@@ -1388,7 +1465,7 @@ private fun ComposerResizeGestureStrip(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(8.dp)
+                .height(if (compact) 12.dp else 24.dp)
                 .testTag(COMPOSER_RESIZE_GESTURE_TAG)
                 .onGloballyPositioned { gestureCoordinates = it }
                 .pointerInput(Unit) {
@@ -1420,16 +1497,14 @@ private fun ComposerResizeGestureStrip(
                 },
         contentAlignment = Alignment.Center,
     ) {
-        // Drawn only once the composer is tall enough to resize; the one-line composer has nothing to drag.
-        if (showHandle) {
-            Box(
-                Modifier
-                    .size(width = ComposerResizeHandleWidth, height = ComposerResizeHandleThickness)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.outlineVariant)
-                    .testTag(COMPOSER_RESIZE_HANDLE_TAG),
-            )
-        }
+        // Keep the same grip at both endpoints so a collapsed draft can always grow again.
+        Box(
+            Modifier
+                .size(width = ComposerResizeHandleWidth, height = ComposerResizeHandleThickness)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.outlineVariant)
+                .testTag(COMPOSER_RESIZE_HANDLE_TAG),
+        )
     }
 }
 

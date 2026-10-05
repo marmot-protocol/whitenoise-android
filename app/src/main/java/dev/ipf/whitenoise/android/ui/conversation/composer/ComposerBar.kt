@@ -96,7 +96,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlin.math.roundToInt
 
-private val ComposerManualMinimumHeight = 144.dp
+// One measured editor line, dedicated grip, bottom tools, and outer padding.
+private val ComposerManualChromeHeight = 84.dp
 
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
 private val ComposerSettleDeadband = 24.dp
@@ -517,6 +518,7 @@ internal fun ComposerBar(
         ) {
             mutableStateOf(false)
         }
+    var extraComposerControlsHeight by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(0.dp) }
     var automaticComposerHeightPx by
         remember(
             draftKey,
@@ -985,9 +987,10 @@ internal fun ComposerBar(
                 measuredEditorLineHeight = editorLineHeight,
             )
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
+        val manualAccessoryFactor = if (replyingTo != null || hasPendingAttachments) 2 else 1
         val minimumManualComposerHeightPx =
             with(density) {
-                ComposerManualMinimumHeight
+                ((editorLineHeight + ComposerManualChromeHeight + extraComposerControlsHeight) * manualAccessoryFactor)
                     .coerceAtMost(maximumComposerHeight)
                     .toPx()
             }
@@ -995,8 +998,7 @@ internal fun ComposerBar(
         val resolvedAutomaticHeightPx =
             (automaticComposerHeightPx.takeIf { it > 0f } ?: with(density) { 44.dp.toPx() })
                 .coerceAtMost(automaticComposerCeilingPx)
-        val minimumRenderedComposerHeightPx =
-            if (composerHeightDragActive) resolvedAutomaticHeightPx else minimumManualComposerHeightPx
+        val minimumRenderedComposerHeightPx = minimumManualComposerHeightPx
         val resolvedComposerHeight =
             with(density) {
                 composerHeightPx(
@@ -1393,19 +1395,19 @@ internal fun ComposerBar(
                                     state = composerHeightDragState ?: currentComposerExpansion(),
                                     dragDeltaYPx = dragAmount,
                                     automaticHeightPx = resolvedAutomaticHeightPx,
-                                    minimumManualHeightPx = resolvedAutomaticHeightPx,
+                                    minimumManualHeightPx = minimumManualComposerHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
                                 )
                         },
                         onHeightDragSettled = {
                             // A release keeps the height it was let go at. The endpoints keep a deadband
-                            // so the automatic height and full screen stay easy to land on deliberately,
+                            // so the one-line editor and full screen stay easy to land on deliberately,
                             // but everything between them is the reader's own choice and is retained.
                             val settledExpansion =
                                 settleComposerHeight(
                                     state = composerHeightDragState ?: currentComposerExpansion(),
                                     automaticHeightPx = resolvedAutomaticHeightPx,
-                                    minimumManualHeightPx = resolvedAutomaticHeightPx,
+                                    minimumManualHeightPx = minimumManualComposerHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
                                     deadbandPx = with(density) { ComposerSettleDeadband.toPx() },
                                 )
@@ -1436,6 +1438,8 @@ internal fun ComposerBar(
                                 null
                             },
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
+                        onExtraControlsHeightChanged = { extraComposerControlsHeight = it },
+                        scrollOwnerKey = Triple(draftKey, draftAccountRef, draftGroupIdHex),
                         multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
                         dismissInProgress = composerDismissInProgress,
                         collapsedBySend = textState.collapsedBySend,

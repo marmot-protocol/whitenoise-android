@@ -25585,6 +25585,18 @@
     ],
     "source_coverage": [
       {
+        "surface": "Composer compact draft navigation icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.drawable.ic_text_start",
+        "test_ids": ["CON-017"]
+      },
+      {
+        "surface": "Composer draft top navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.scroll_to_top",
+        "test_ids": ["CON-017"]
+      },
+      {
         "surface": "Failed original send precedence for Retry and Discard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "private fun failedEditForAction(",

@@ -78,13 +78,13 @@ class ComposerResizeHandleTest {
     }
 
     /**
-     * The one-line composer has nothing to resize, so it draws no grip. The draft is non-empty because
+     * The one-line composer can still grow, so it keeps the visible grip. The draft is non-empty because
      * that is what a real one-line composer holds, and non-empty text is itself an editing request.
      */
     @Test
-    fun oneLineComposerDrawsNoResizeHandle() {
+    fun oneLineComposerKeepsTheResizeHandle() {
         render(ComposerExpansionMode.Automatic, draft = "Line one")
-        composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertIsDisplayed()
     }
 
     /**

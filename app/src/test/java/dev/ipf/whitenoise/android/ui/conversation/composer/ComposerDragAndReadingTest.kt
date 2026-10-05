@@ -1,0 +1,411 @@
+package dev.ipf.whitenoise.android.ui.conversation.composer
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/** Real composer gestures keep one draft owner while resizing and reading. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class ComposerDragAndReadingTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    private var observed = TextFieldValue()
+    private var sends = 0
+    private var cancels = 0
+
+    @Test
+    fun emptyDraftCanGrowFromItsVisibleGrip() {
+        render("")
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertIsDisplayed()
+        val before = height()
+        drag(-320f)
+        assertTrue(height() > before + 200f)
+        assertEquals("", observed.text)
+    }
+
+    @Test
+    fun longDraftCanShrinkToOneEditorLineAndGrowAgain() {
+        render(longDraft)
+        val initial = height()
+        val original = observed
+        drag(600f)
+        assertTrue("manual minimum must be below automatic height", height() < initial)
+        assertTrue("only one text line plus grip and controls", pillHeight() <= 103f)
+        assertEquals(original, observed)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_manual_minimum_light.png")
+        drag(-600f)
+        assertTrue("the same grip reaches full height", height() > 450f)
+        assertEquals(original, observed)
+    }
+
+    @Test
+    fun jumpToTopPreservesTextAndSelectionAndHidesAtTop() {
+        render(longDraft, dark = true)
+        val original = observed
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_draft_top_dark.png")
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
+        composeRule.waitForIdle()
+        assertEquals(0f, scroll(), 1f)
+        assertEquals(original, observed)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
+        assertEquals("draft navigation must never submit", 0, sends)
+    }
+
+    @Test
+    fun readingFlickContinuesAfterReleaseWithoutMovingTheCaret() {
+        render(longDraft)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
+        composeRule.waitForIdle()
+        val original = observed
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNode(hasSetTextAction()).performTouchInput {
+            down(Offset(center.x, height - 8f))
+            moveTo(Offset(center.x, height / 2f), delayMillis = 16)
+            moveTo(Offset(center.x, 4f), delayMillis = 16)
+            up()
+        }
+        val releaseScroll = scroll()
+        composeRule.mainClock.advanceTimeBy(300)
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        assertTrue("release velocity should keep reading moving", scroll() > releaseScroll + 10f)
+        assertEquals(original, observed)
+    }
+
+    @Test
+    fun narrowLargeRtlDraftRetainsUsableMinimumAndTopAction() {
+        render(longDraft, width = 280, rtl = true, fontScale = 2f)
+        val original = observed
+        drag(600f)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_manual_minimum_large_rtl.png")
+        assertOneEditorLine()
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
+        composeRule.waitForIdle()
+        assertEquals(0f, scroll(), 1f)
+        assertEquals(original, observed)
+    }
+
+    @Test
+    fun freshTouchStopsReadingMomentum() {
+        render(longDraft)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        val editor = composeRule.onNode(hasSetTextAction())
+        editor.performTouchInput {
+            swipe(Offset(center.x, height - 8f), Offset(center.x, 4f), durationMillis = 80)
+        }
+        composeRule.mainClock.advanceTimeBy(64)
+        editor.performTouchInput { down(center) }
+        val stopped = scroll()
+        composeRule.mainClock.advanceTimeBy(100)
+        assertEquals("new touch must interrupt the old fling", stopped, scroll(), 1f)
+        editor.performTouchInput { up() }
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+    }
+
+    @Test
+    fun changingDraftOwnerStopsMomentumEvenForIdenticalTextAndSelection() {
+        lateinit var changeOwner: () -> Unit
+        val value = TextFieldValue(longDraft, TextRange(longDraft.length))
+        composeRule.setContent {
+            var owner by remember { mutableStateOf("first synthetic account") }
+            changeOwner = { owner = "second synthetic account" }
+            WhiteNoiseTheme {
+                Surface(Modifier.width(300.dp).height(192.dp)) {
+                    ComposerPill(
+                        textFieldValue = value,
+                        composerFocus = remember { FocusRequester() },
+                        emojiPickerOpen = false,
+                        onValueChange = {},
+                        onEmojiPickerToggle = {},
+                        onAttachmentsToggle = {},
+                        attachmentSheetOpen = false,
+                        onPickFromGallery = null,
+                        onPickDocument = null,
+                        expansionMode = ComposerExpansionMode.Manual,
+                        compactMeasurementWidth = 300.dp,
+                        scrollOwnerKey = owner,
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
+        composeRule.waitForIdle()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNode(hasSetTextAction()).performTouchInput {
+            swipe(Offset(center.x, height - 8f), Offset(center.x, 4f), durationMillis = 80)
+        }
+        composeRule.mainClock.advanceTimeBy(64)
+        composeRule.runOnIdle { changeOwner() }
+        composeRule.mainClock.advanceTimeByFrame()
+        val range =
+            composeRule
+                .onNode(hasSetTextAction())
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.VerticalScrollAxisRange]
+        assertEquals("new owner gets its own caret-visible viewport", range.maxValue(), scroll(), 1f)
+        val newOwnerScroll = scroll()
+        composeRule.mainClock.advanceTimeBy(200)
+        assertEquals("old owner's fling must not move the new viewport", newOwnerScroll, scroll(), 1f)
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+    }
+
+    @Test
+    fun narrowEditedDraftKeepsNavigationAndCancelUsable() {
+        render(longDraft, width = 280, rtl = true, fontScale = 2f, editing = true)
+        drag(600f)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_manual_minimum_edit_large_rtl.png")
+        composeRule.onNodeWithTag(COMPOSER_EDIT_CANCEL_TAG).assertIsDisplayed()
+        assertOneEditorLine()
+        composeRule.onNodeWithTag(COMPOSER_EDIT_CANCEL_TAG).performClick()
+        composeRule.waitForIdle()
+        assertEquals("navigation must not crowd out Cancel", 1, cancels)
+        assertEquals(0, sends)
+    }
+
+    @Test
+    fun navigationWrapsWithoutHidingActiveControlsOrTheEditor() {
+        var extra = 0.dp
+        var pressed = 0
+        val value = TextFieldValue(longDraft, TextRange(longDraft.length))
+        composeRule.setContent {
+            var extraHeight by remember { mutableStateOf(0.dp) }
+            WhiteNoiseTheme {
+                Surface(Modifier.width(240.dp).height(240.dp)) {
+                    Box(contentAlignment = Alignment.BottomCenter) {
+                        ComposerPill(
+                            textFieldValue = value,
+                            composerFocus = remember { FocusRequester() },
+                            emojiPickerOpen = false,
+                            onValueChange = {},
+                            onEmojiPickerToggle = {},
+                            onAttachmentsToggle = {},
+                            attachmentSheetOpen = false,
+                            onPickFromGallery = {},
+                            onPickDocument = {},
+                            expansionMode = ComposerExpansionMode.Manual,
+                            compactMeasurementWidth = 240.dp,
+                            dictationControls = {
+                                repeat(3) { index ->
+                                    IconButton(
+                                        onClick = { pressed++ },
+                                        modifier = Modifier.size(48.dp).testTag("synthetic-control-$index"),
+                                    ) { Text("${index + 1}") }
+                                }
+                            },
+                            onExtraControlsHeightChanged = {
+                                extraHeight = it
+                                extra = it
+                            },
+                            modifier = Modifier.height(96.dp + extraHeight),
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals(48.dp, extra)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        assertEquals(
+            "wrapping must leave one complete editor line",
+            24f,
+            composeRule
+                .onNode(hasSetTextAction())
+                .fetchSemanticsNode()
+                .boundsInRoot.height,
+            1f,
+        )
+        repeat(3) { index ->
+            composeRule.onNodeWithTag("synthetic-control-$index").assertIsDisplayed().performClick()
+        }
+        composeRule.waitForIdle()
+        assertEquals("all active controls remain actionable", 3, pressed)
+    }
+
+    @Test
+    fun resizeStripLeavesAccessoryActionsIndependent() {
+        var dismissed = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(300.dp).height(240.dp)) {
+                    ComposerPill(
+                        textFieldValue = TextFieldValue("Synthetic caption"),
+                        composerFocus = remember { FocusRequester() },
+                        emojiPickerOpen = false,
+                        onValueChange = {},
+                        onEmojiPickerToggle = {},
+                        onAttachmentsToggle = {},
+                        attachmentSheetOpen = false,
+                        onPickFromGallery = null,
+                        onPickDocument = null,
+                        expansionMode = ComposerExpansionMode.Manual,
+                        accessoryContent = {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .clickable { dismissed++ }
+                                    .testTag("synthetic-accessory"),
+                            )
+                        },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val strip = composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).fetchSemanticsNode().boundsInRoot
+        val accessory = composeRule.onNodeWithTag("synthetic-accessory")
+        assertTrue(
+            "the grip must not cover reply/attachment actions",
+            strip.bottom <= accessory.fetchSemanticsNode().boundsInRoot.top,
+        )
+        accessory.performClick()
+        composeRule.waitForIdle()
+        assertEquals(1, dismissed)
+    }
+
+    private fun drag(delta: Float) {
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
+            swipe(center, center + Offset(0f, delta), durationMillis = 320)
+        }
+        composeRule.waitForIdle()
+    }
+
+    private fun height() =
+        composeRule
+            .onNodeWithTag(TAG)
+            .fetchSemanticsNode()
+            .boundsInRoot.height
+
+    private fun pillHeight() =
+        composeRule
+            .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
+            .fetchSemanticsNode()
+            .boundsInRoot.height
+
+    private fun scroll() =
+        composeRule
+            .onNode(hasSetTextAction())
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange]
+            .value()
+
+    private fun assertOneEditorLine() {
+        val editor = composeRule.onNode(hasSetTextAction())
+        val layouts = mutableListOf<TextLayoutResult>()
+        editor.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        assertEquals(
+            "collapsed editor must expose exactly one measured text line",
+            layout.getLineTop(1) - layout.getLineTop(0),
+            editor.fetchSemanticsNode().boundsInRoot.height,
+            1f,
+        )
+    }
+
+    private fun render(
+        draft: String,
+        dark: Boolean = false,
+        width: Int = 360,
+        rtl: Boolean = false,
+        fontScale: Float = 1f,
+        editing: Boolean = false,
+    ) {
+        observed = TextFieldValue(draft, TextRange(draft.length))
+        sends = 0
+        cancels = 0
+        composeRule.setContent {
+            var value by remember { mutableStateOf(observed) }
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, fontScale),
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark) {
+                    Surface(Modifier.width(width.dp).height(600.dp)) {
+                        Box(contentAlignment = Alignment.BottomCenter) {
+                            ComposerBar(
+                                replyingTo = null,
+                                messageTextCopy = MessageTextCopy.Default,
+                                onCancelReply = {},
+                                onSend = { _, _ -> sends++ },
+                                onPickFromGallery = {},
+                                onPickDocument = {},
+                                editingMessageId = if (editing) "synthetic-message" else null,
+                                editingInitialText = draft.takeIf { editing },
+                                onCancelEdit = { cancels++ },
+                                initialDraft = value,
+                                onDraftChange = {
+                                    value = it
+                                    observed = it
+                                },
+                                modifier = Modifier.testTag(TAG),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    private companion object {
+        const val TAG = "composer-reading-test"
+        val longDraft = (1..80).joinToString("\n") { "Synthetic line $it in this long draft" }
+    }
+}

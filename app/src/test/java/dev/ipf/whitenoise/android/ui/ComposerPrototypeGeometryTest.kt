@@ -58,9 +58,9 @@ class ComposerPrototypeGeometryTest {
     private var accepted: (() -> Unit)? = null
     private var sentText: String? = null
 
-    /** Reading row keeps add emoji and send inside one48dp surface. */
+    /** Reading row keeps add, emoji, and Send aligned below the visible grip. */
     @Test
-    fun readingRowKeepsAddEmojiAndSendInsideOne48dpSurface() {
+    fun readingRowKeepsAddEmojiAndSendBelowTheGrip() {
         render(ComposerTextState(TextFieldValue()))
         val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
         val add = actionBounds(R.string.attach_options)
@@ -69,7 +69,7 @@ class ComposerPrototypeGeometryTest {
 
         assertEquals(16f, surface.left, 1f)
         assertEquals(328f, surface.width, 1f)
-        assertEquals(48f, surface.height, 1f)
+        assertEquals(72f, surface.height, 1f)
         assertTrue(add.center.x < emoji.center.x && emoji.center.x < send.center.x)
         assertEquals(add.center.y, emoji.center.y, 1f)
         assertEquals(emoji.center.y, send.center.y, 1f)
@@ -86,7 +86,7 @@ class ComposerPrototypeGeometryTest {
         render(state, dark = true)
         val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
         val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode()
-        assertEquals(80f, surface.height, 1f)
+        assertEquals(96f, surface.height, 1f)
         assertEquals(surface.left + 14f, editor.boundsInRoot.left, 1f)
         assertEquals(surface.right - 14f, editor.boundsInRoot.right, 1f)
         assertTrue(editor.boundsInRoot.bottom < actionBounds(R.string.send).center.y)
@@ -164,7 +164,7 @@ class ComposerPrototypeGeometryTest {
                 .boundsInRoot
         assertEquals(surface.top, resize.top, 1f)
         assertEquals(48f, resize.height, 1f)
-        assertEquals(104f, surface.height, 1f)
+        assertEquals(120f, surface.height, 1f)
     }
 
     /** Narrow large text rtl preserves draft and mirrors control order. */

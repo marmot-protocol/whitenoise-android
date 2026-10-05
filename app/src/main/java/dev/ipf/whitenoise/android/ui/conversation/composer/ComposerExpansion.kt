@@ -125,7 +125,7 @@ internal fun dragComposerHeight(
 
 /**
  * Preserve the exact release height except near either endpoint, where a small
- * deadband makes the automatic and full-screen destinations easy to land on.
+ * deadband makes the one-line manual and full-screen destinations easy to land on.
  */
 internal fun settleComposerHeight(
     state: ComposerExpansionState,
@@ -145,7 +145,7 @@ internal fun settleComposerHeight(
             maximumHeightPx = maximum,
         )
     return when {
-        abs(height - automatic) <= deadbandPx -> ComposerExpansionState()
+        abs(height - minimum) <= deadbandPx -> ComposerExpansionState(ComposerExpansionMode.Manual, minimum)
         abs(maximum - height) <= deadbandPx ->
             ComposerExpansionState(mode = ComposerExpansionMode.FullScreen)
         else -> ComposerExpansionState(ComposerExpansionMode.Manual, height)

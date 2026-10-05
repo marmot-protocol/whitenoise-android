@@ -120,7 +120,7 @@ class ComposerExpansionTest {
         assertEquals(middle, settleComposerHeight(middle, 200f, 140f, 600f, 20f))
 
         assertEquals(
-            ComposerExpansionState(),
+            ComposerExpansionState(ComposerExpansionMode.Manual, 214f),
             settleComposerHeight(middle.copy(manualHeightPx = 214f), 200f, 140f, 600f, 20f),
         )
         assertEquals(
@@ -133,7 +133,10 @@ class ComposerExpansionTest {
         val settle = { height: Float ->
             settleComposerHeight(middle.copy(manualHeightPx = height), 200f, 140f, 600f, 20f)
         }
-        assertEquals(ComposerExpansionMode.Automatic, settle(220f).mode)
+        assertEquals(ComposerExpansionMode.Manual, settle(160f).mode)
+        assertEquals(140f, settle(160f).manualHeightPx)
+        assertEquals(161f, settle(161f).manualHeightPx)
+        assertEquals(220f, settle(220f).manualHeightPx)
         assertEquals(ComposerExpansionMode.Manual, settle(221f).mode)
         assertEquals(221f, settle(221f).manualHeightPx)
         assertEquals(ComposerExpansionMode.FullScreen, settle(580f).mode)

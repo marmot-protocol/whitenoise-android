@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.click
@@ -266,7 +267,7 @@ class ComposerExpansionBehaviorTest {
         )
     }
 
-    /** The eight-pixel border gesture stays above the first editable line with no outside reservation. */
+    /** The dedicated border gesture stays above the first editable line with no outside reservation. */
     @Test
     fun resizeBorderDoesNotCoverTheEditorOrAddAnExpandedHeader() {
         val draft = longDraft()
@@ -276,8 +277,8 @@ class ComposerExpansionBehaviorTest {
         val editor = composeRule.onNodeWithText(draft).fetchSemanticsNode().boundsInRoot
         assertEquals(surface.top, strip.top, 1f)
         assertEquals(surface.width, strip.width, 1f)
-        assertEquals(8f, strip.height, 1f)
-        assertEquals(12f, editor.top - surface.top, 1f)
+        assertEquals(24f, strip.height, 1f)
+        assertEquals(24f, editor.top - surface.top, 1f)
         assertTrue(editor.top >= strip.bottom)
     }
 
@@ -304,7 +305,7 @@ class ComposerExpansionBehaviorTest {
         val resize = resizeHandle().fetchSemanticsNode().boundsInRoot
         assertEquals(surface.top, resize.top, 1f)
         assertEquals(48f, resize.height, 1f)
-        assertEquals(104f, surface.height, 1f)
+        assertEquals(120f, surface.height, 1f)
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }
 
@@ -367,7 +368,7 @@ class ComposerExpansionBehaviorTest {
             "one-line deactivation must expose an intermediate animated height",
             shrinkFrames.any { it < expandedTwoLineHeight - 1f && it > collapsedHeight + 1f },
         )
-        resizeHandle().assertDoesNotExist()
+        resizeHandle().assertIsDisplayed()
         editor.assertIsFocused()
         assertEquals("First line", editor.fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         assertEquals(
@@ -490,7 +491,7 @@ class ComposerExpansionBehaviorTest {
         }
         composeRule.waitForIdle()
 
-        resizeHandle().assertDoesNotExist()
+        resizeHandle().assertIsDisplayed()
         assertEditorState(editor, committedReplacement, TextRange(committedReplacement.length))
     }
 
@@ -663,7 +664,7 @@ class ComposerExpansionBehaviorTest {
         composeRule.onNodeWithText(draft).performTextReplacement("Short draft")
         composeRule.waitForIdle()
 
-        resizeHandle().assertDoesNotExist()
+        resizeHandle().assertIsDisplayed()
     }
 
     /** The longer automatic draft uses the new allowance without consuming the reading viewport. */
@@ -681,9 +682,9 @@ class ComposerExpansionBehaviorTest {
         assertTrue("automatic growth should leave a reading area", height <= 720f * 0.7f)
     }
 
-    /** Upward fling settles at the full screen endpoint. */
+    /** An upward drag keeps its selected larger height. */
     @Test
-    fun upwardFlingSettlesAtTheFullScreenEndpoint() {
+    fun upwardDragRetainsItsChosenLargerHeight() {
         render(longDraft())
         val initialBounds = composerBounds()
         val initialHeight = initialBounds.height
@@ -702,12 +703,12 @@ class ComposerExpansionBehaviorTest {
                 .fetchSemanticsNode()
                 .boundsInRoot.height
         assertTrue("upward fling should grow the composer", draggedHeight > initialHeight + 64f)
-        assertResizeHandleToggleLabel(R.string.composer_collapse)
+        assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
         assertComposerBottom(initialBounds.bottom)
         composeRule.onNodeWithText(longDraft()).assertExists()
     }
 
-    /** Downward drag keeps the current drafts compact endpoint. */
+    /** A downward drag can shrink beneath a long draft's content-driven height. */
     @Test
     fun downwardDragKeepsTheCurrentDraftsCompactEndpoint() {
         val draft = (1..40).joinToString("\n") { "Draft line $it" }
@@ -721,7 +722,7 @@ class ComposerExpansionBehaviorTest {
         composeRule.waitForIdle()
 
         val manualBounds = composerBounds()
-        assertEquals("compact remains content-sized", automaticBounds.height, manualBounds.height, 1f)
+        assertTrue("manual can shrink below the content height", manualBounds.height < automaticBounds.height - 150f)
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
         assertTrue(
             "manual resize must preserve the anchored bottom edge",

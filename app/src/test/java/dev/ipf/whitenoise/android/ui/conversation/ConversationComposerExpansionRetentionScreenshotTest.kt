@@ -652,7 +652,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         assertEquals(target.left, strip.left)
         assertEquals(target.right, strip.right)
         assertEquals(target.top, strip.top)
-        assertEquals(8.dp, strip.bottom - strip.top)
+        assertEquals(24.dp, strip.bottom - strip.top)
         composeRule.onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true).assertDoesNotExist()
     }
 
