@@ -2209,8 +2209,9 @@
     <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
     <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplar için geçerlidir.</string>
     <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>
-    <string name="profile_readiness_loading">Profil kontrol ediliyor…</string>
+    <string name="profile_readiness_loading">Profil yükleniyor…</string>
     <string name="profile_readiness_unavailable">Profil durumu kullanılamıyor · Düzenlemek için dokunun</string>
+    <string name="profile_readiness_editor_unavailable">Profil durumu kullanılamıyor</string>
     <string name="profile_readiness_setup">Profilinizi oluşturun</string>
     <string name="profile_readiness_ready">Profil hazır</string>
     <string name="profile_readiness_optional">Profil hazır · İsteğe bağlı bilgiler eklenebilir</string>

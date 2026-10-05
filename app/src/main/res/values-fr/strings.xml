@@ -2211,8 +2211,9 @@
     <string name="notification_show_previews">Afficher les aperçus des notifications</string>
     <string name="notification_show_previews_detail">Désactivé : masque les noms et le contenu des messages pour tous les comptes.</string>
     <string name="notification_preview_update_failed">Les modifications peuvent être perdues après un redémarrage.</string>
-    <string name="profile_readiness_loading">Vérification du profil…</string>
+    <string name="profile_readiness_loading">Chargement du profil…</string>
     <string name="profile_readiness_unavailable">Statut du profil indisponible · Appuyez pour modifier</string>
+    <string name="profile_readiness_editor_unavailable">Statut du profil indisponible</string>
     <string name="profile_readiness_setup">Configurez votre profil</string>
     <string name="profile_readiness_ready">Profil prêt</string>
     <string name="profile_readiness_optional">Profil prêt · Des informations facultatives peuvent être ajoutées</string>
@@ -2222,7 +2223,7 @@
     <string name="profile_readiness_banner">Bannière</string>
     <string name="profile_readiness_address">Adresse vérifiée</string>
     <string name="profile_readiness_lightning">Adresse Lightning</string>
-    <string name="profile_readiness_added">Ajouté</string>
+    <string name="profile_readiness_added">Ajout effectué</string>
     <string name="profile_readiness_recommended">Recommandé</string>
     <string name="profile_readiness_field_optional">Facultatif</string>
 </resources>

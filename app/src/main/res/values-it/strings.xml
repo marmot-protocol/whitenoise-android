@@ -2211,8 +2211,9 @@
     <string name="notification_show_previews">Mostra anteprime delle notifiche</string>
     <string name="notification_show_previews_detail">Se disattivato, nasconde nomi e contenuto dei messaggi. Vale per tutti gli account.</string>
     <string name="notification_preview_update_failed">Le modifiche potrebbero andare perse dopo il riavvio.</string>
-    <string name="profile_readiness_loading">Verifica del profilo…</string>
+    <string name="profile_readiness_loading">Caricamento del profilo…</string>
     <string name="profile_readiness_unavailable">Stato del profilo non disponibile · Tocca per modificare</string>
+    <string name="profile_readiness_editor_unavailable">Stato del profilo non disponibile</string>
     <string name="profile_readiness_setup">Configura il tuo profilo</string>
     <string name="profile_readiness_ready">Profilo pronto</string>
     <string name="profile_readiness_optional">Profilo pronto · Sono disponibili dettagli facoltativi</string>

@@ -2182,6 +2182,7 @@
 
     <string name="profile_readiness_loading">正在載入個人檔案…</string>
     <string name="profile_readiness_unavailable">無法取得個人檔案狀態 · 點選以編輯</string>
+    <string name="profile_readiness_editor_unavailable">無法取得個人檔案狀態</string>
     <string name="profile_readiness_setup">設定您的個人檔案</string>
     <string name="profile_readiness_ready">個人檔案已就緒</string>
     <string name="profile_readiness_optional">個人檔案已就緒 · 可新增選填資訊</string>

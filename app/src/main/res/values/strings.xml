@@ -2369,6 +2369,7 @@
     <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>
     <string name="profile_readiness_loading">Loading profile…</string>
     <string name="profile_readiness_unavailable">Profile status unavailable · Tap to edit</string>
+    <string name="profile_readiness_editor_unavailable">Profile status unavailable</string>
     <string name="profile_readiness_setup">Set up your profile</string>
     <string name="profile_readiness_ready">Profile ready</string>
     <string name="profile_readiness_optional">Profile ready · Optional details available</string>

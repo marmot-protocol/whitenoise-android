@@ -9,11 +9,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -88,10 +91,37 @@ class ProfileReadinessScreenshotTest {
                     frame.value = readiness
                 }
                 composeRule.onNodeWithText("Profile").assertHasClickAction()
-                composeRule.onRoot().captureRoboImage("src/test/snapshots/profile_readiness_${name}_$style.png")
+                captureDisclosure(name, readiness, style)
             }
         }
         composeRule.onNodeWithText("Profile").performClick()
         composeRule.runOnIdle { assertEquals(SettingsDetail.Profile, opened) }
+    }
+
+    /** Verify expansion exposes optionality, then restore the compact editor state for the next frame. */
+    private fun captureDisclosure(
+        name: String,
+        readiness: ProfileReadiness,
+        style: String,
+    ) {
+        if (name == "partial") {
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/profile_readiness_collapsed_$style.png")
+            composeRule.onNodeWithText("Bio · Optional").assertDoesNotExist()
+        }
+        if (readiness.fields.isNotEmpty()) {
+            toggleChecklist()
+            val lightningStatus = if (name == "full") "Added" else "Optional"
+            composeRule.onNodeWithText("Lightning address · $lightningStatus").assertExists()
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/profile_readiness_${name}_$style.png")
+        if (readiness.fields.isNotEmpty()) {
+            toggleChecklist()
+        }
+    }
+
+    /** Exercise the accessibility click action without capturing a transient pointer ripple. */
+    private fun toggleChecklist() {
+        composeRule.onNodeWithTag("profile.readiness.toggle").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        composeRule.waitForIdle()
     }
 }
