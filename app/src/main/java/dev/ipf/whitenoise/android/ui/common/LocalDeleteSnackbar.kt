@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -29,6 +29,7 @@ import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.whitenoise.android.R
 
 /** A short actionable message; guidance and the privacy-safe report stay behind Details. */
+@Suppress("FunctionNaming") // Composable component follows framework naming convention.
 @Composable
 internal fun LocalDeleteSnackbar(
     data: SnackbarData,
@@ -64,6 +65,7 @@ internal fun LocalDeleteSnackbar(
     }
 }
 
+@Suppress("FunctionNaming") // Composable component follows framework naming convention.
 @Composable
 private fun LocalDeleteDetails(
     visuals: ToastSnackbarVisuals,

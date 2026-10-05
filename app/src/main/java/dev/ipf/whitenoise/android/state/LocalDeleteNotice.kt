@@ -28,19 +28,33 @@ internal fun WhiteNoiseAppState.presentLocalDeleteFailure(
     )
 }
 
+/** Capture the account/runtime fence before offering a user-initiated retry. */
+internal fun WhiteNoiseAppState.localDeleteRetryNotice(
+    account: String,
+    groupId: String,
+    isCurrent: () -> Boolean,
+    retry: suspend () -> Unit,
+): LocalDeleteNotice = LocalDeleteNotice(account, setOf(groupId)) {
+    launchMutation {
+        if (isCurrent()) retry()
+    }
+}
+
 /** Only confirmed native absence resolves a deletion warning; client cleanup continues quietly. */
 internal fun WhiteNoiseAppState.dismissLocalDeleteFailure(
     account: String,
     groupId: String,
 ) {
-    val current = toast ?: return
-    val notice = current.localDeleteNotice ?: return
-    if (notice.accountRef != account) return
-    val remaining = notice.groupIds.filterNot { it.equals(groupId, ignoreCase = true) }.toSet()
-    if (remaining.size == notice.groupIds.size) return
-    if (remaining.isEmpty()) {
-        clearToast(current)
-    } else {
-        presentText(current.copy(localDeleteNotice = notice.copy(groupIds = remaining)))
+    val current = toast
+    val notice = current?.localDeleteNotice
+    if (current != null && notice != null && notice.accountRef == account) {
+        val remaining = notice.groupIds.filterNot { it.equals(groupId, ignoreCase = true) }.toSet()
+        if (remaining.size != notice.groupIds.size) {
+            if (remaining.isEmpty()) {
+                clearToast(current)
+            } else {
+                presentText(current.copy(localDeleteNotice = notice.copy(groupIds = remaining)))
+            }
+        }
     }
 }

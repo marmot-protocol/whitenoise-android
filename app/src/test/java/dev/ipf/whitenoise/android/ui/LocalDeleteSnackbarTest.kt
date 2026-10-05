@@ -2,8 +2,6 @@ package dev.ipf.whitenoise.android.ui
 
 import android.content.Context
 import androidx.compose.material3.SnackbarData
-import androidx.compose.material3.SnackbarVisuals
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -24,7 +22,8 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class LocalDeleteSnackbarTest {
-    @get:Rule val composeRule = createComposeRule()
+    @get:Rule
+    val composeRule = createComposeRule()
 
     @Test
     fun detailsAndDismissDoNotPerformTheDestructiveRetry() {
@@ -53,15 +52,24 @@ class LocalDeleteSnackbarTest {
     }
 
     private class NoticeData(context: Context) : SnackbarData {
-        override val visuals = ToastSnackbarVisuals(
-            message = context.getString(R.string.toast_couldnt_delete_chat),
-            copyable = true, copyText = REPORT, details = REPORT,
-            actionLabel = context.getString(R.string.retry),
-        )
+        override val visuals =
+            ToastSnackbarVisuals(
+                message = context.getString(R.string.toast_couldnt_delete_chat),
+                copyable = true,
+                copyText = REPORT,
+                details = REPORT,
+                actionLabel = context.getString(R.string.retry),
+            )
         var retries = 0
         var dismissals = 0
-        override fun performAction() { retries++ }
-        override fun dismiss() { dismissals++ }
+
+        override fun performAction() {
+            retries++
+        }
+
+        override fun dismiss() {
+            dismissals++
+        }
     }
 
     private companion object {

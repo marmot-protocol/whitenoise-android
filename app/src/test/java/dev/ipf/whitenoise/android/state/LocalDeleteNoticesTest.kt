@@ -19,8 +19,10 @@ class LocalDeleteNoticesTest {
         val scope = LocalDeleteNotice("account", setOf("group"))
         state.presentText(
             ToastMessage(
-                title = AppText.Plain("Failure"), copyable = true,
-                diagnosticReport = "   ", localDeleteNotice = scope,
+                title = AppText.Plain("Failure"),
+                copyable = true,
+                diagnosticReport = "   ",
+                localDeleteNotice = scope,
             ),
         )
         assertSame(scope, state.toast?.localDeleteNotice)
@@ -32,7 +34,8 @@ class LocalDeleteNoticesTest {
     fun unrelatedAccountOrGroupCannotRetireTheWarning() {
         val state = emptyAppState()
         state.presentLocalDeleteFailure(
-            R.string.toast_couldnt_delete_chat, IllegalStateException(),
+            R.string.toast_couldnt_delete_chat,
+            IllegalStateException(),
             notice = LocalDeleteNotice("account", setOf("group")),
         )
         val notice = state.toast
@@ -45,7 +48,8 @@ class LocalDeleteNoticesTest {
     fun partialRecoveryKeepsRemainingTargetsUntilEveryTargetResolves() {
         val state = emptyAppState()
         state.presentLocalDeleteFailure(
-            R.string.chat_list_delete_stopped, IllegalStateException(),
+            R.string.chat_list_delete_stopped,
+            IllegalStateException(),
             notice = LocalDeleteNotice("account", setOf("AA", "BB")),
         )
         state.dismissLocalDeleteFailure("account", "aa")
@@ -59,7 +63,8 @@ class LocalDeleteNoticesTest {
     fun recoveryPreservesANewerUnrelatedFailure() {
         val state = emptyAppState()
         state.presentLocalDeleteFailure(
-            R.string.toast_couldnt_delete_chat, IllegalStateException(),
+            R.string.toast_couldnt_delete_chat,
+            IllegalStateException(),
             notice = LocalDeleteNotice("account", setOf("group")),
         )
         state.present(R.string.error_try_again)

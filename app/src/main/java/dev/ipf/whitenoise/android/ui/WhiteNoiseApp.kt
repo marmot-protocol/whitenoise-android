@@ -400,7 +400,8 @@ internal fun WhiteNoiseApp(
             appState.enableDefaultNotificationsIfReady()
         }
     }
-    LaunchedEffect(toast) {
+    val deletionRetryLabel = stringResource(R.string.retry)
+    LaunchedEffect(toast, deletionRetryLabel) {
         if (toast != null) {
             val deletion = toast.localDeleteNotice
             val result = snackbarHostState.showSnackbar(
@@ -413,7 +414,7 @@ internal fun WhiteNoiseApp(
                     details = deletion?.let {
                         listOfNotNull(toast.detail?.resolve(context), toast.diagnosticReport).joinToString("\n\n")
                     },
-                    actionLabel = deletion?.retry?.let { context.getString(R.string.retry) },
+                    actionLabel = deletion?.retry?.let { deletionRetryLabel },
                 ),
             )
             val noticeIsCurrent = appState.toast === toast

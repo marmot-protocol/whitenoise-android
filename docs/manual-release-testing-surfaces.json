@@ -49,7 +49,7 @@
       },
       {
         "surface": "Scoped deletion warning retirement",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotices.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
         "anchor": "internal fun WhiteNoiseAppState.dismissLocalDeleteFailure(",
         "test_ids": [
           "CHL-024",
@@ -76,7 +76,7 @@
       },
       {
         "surface": "Local-delete retry guidance",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotices.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
         "anchor": "R.string.local_delete_retry_detail",
         "test_ids": [
           "CHL-024"
