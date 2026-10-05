@@ -1616,7 +1616,8 @@ class WhiteNoiseAppState private constructor(
             synchronized(ttsController) {
                 val state = ttsController.state.value
                 if (state is TtsState.Idle &&
-                    state.sessionId == preparingSessionId && ttsSpeechAccountRef == ownerAccount
+                    state.sessionId == preparingSessionId &&
+                    ttsSpeechAccountRef == ownerAccount
                 ) {
                     ttsSpeechAccountRef = null
                     ttsAutoReadSessionKey = null
