@@ -4956,6 +4956,18 @@
         ]
       },
       {
+        "surface": "Retained image preparation accessibility state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "R.string.media_opening",
+        "test_ids": ["MED-023"]
+      },
+      {
+        "surface": "Retained image accessible open action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": ["MED-023"]
+      },
+      {
         "surface": "RemoteGiphyMediaBubble",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
         "anchor": "fun RemoteGiphyMediaBubble(",
