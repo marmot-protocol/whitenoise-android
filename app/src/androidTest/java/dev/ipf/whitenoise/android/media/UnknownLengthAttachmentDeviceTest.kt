@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
@@ -28,6 +29,7 @@ import kotlin.math.roundToInt
 
 /** Opt-in generated native download and real platform semantics; ordinary runs skip the guarded probe. */
 @RunWith(AndroidJUnit4::class)
+@ManualDeviceFixture
 class UnknownLengthAttachmentDeviceTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()

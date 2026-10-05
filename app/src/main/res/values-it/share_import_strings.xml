@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_import_title">Importazione dei file condivisi</string>
+    <string name="share_import_error_title">Impossibile importare alcuni file</string>
+    <string name="share_import_recovery">Annulla e condividi di nuovo dall’app di origine oppure continua con gli elementi disponibili.</string>
+    <string name="share_import_unreadable">Un file non è leggibile o il suo accesso è scaduto.</string>
+    <string name="share_import_scheme">Sono supportati solo i file dei fornitori di contenuti.</string>
+    <string name="share_import_empty">Un file condiviso è vuoto.</string>
+    <string name="share_import_file_limit">Un file supera il limite di importazione (64 MiB per le immagini, 32 MiB per gli altri file).</string>
+    <string name="share_import_batch_limit">I file superano il limite totale di 256 MiB.</string>
+    <string name="share_import_count_limit">Si possono importare solo i primi 10 file.</string>
+    <string name="share_import_metadata">Un file ha metadati non validi o la sua dimensione è cambiata.</string>
+    <string name="share_import_storage">Lo spazio privato non è disponibile o è pieno.</string>
+    <string name="share_import_interrupted">Importazione interrotta. Condividi di nuovo i file.</string>
+    <string name="share_import_progress">File %1$d di %2$d: %3$d byte</string>
+    <string name="share_import_rejected_count">File non importati: %1$d</string>
+    <string name="share_import_recovered_limit">Sono selezionati più di 10 allegati. Rimuovi quelli in eccesso prima di inviare.</string>
+</resources>
