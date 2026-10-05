@@ -69,7 +69,9 @@ object LocalNotificationPolicy {
         val enabled = categoryEnabled(update.accountRef, update.groupIdHex, NotificationChannelSpec.forUpdate(update))
         if (engineMuted) {
             return enabled != false &&
-                update.trigger == NotificationTriggerFfi.NEW_MESSAGE && update.isMention && !update.isFromSelf
+                update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
+                update.isMention &&
+                !update.isFromSelf
         }
         val mode = conversationNotifyMode(update.accountRef, update.groupIdHex)
         return mode != ChatNotifyMode.NONE && (enabled ?: (mode == ChatNotifyMode.ALL || update.isMention))

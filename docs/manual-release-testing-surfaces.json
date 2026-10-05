@@ -10923,6 +10923,12 @@
     ],
     "settings_controls": [
       {
+        "surface": "Accessible category sound scope",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_sound_scope_control",
+        "test_ids": ["NTF-031"]
+      },
+      {
         "surface": "Chat category preference save failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
         "anchor": "R.string.toast_notification_scope_update_failed",

@@ -43,24 +43,38 @@ internal class ConversationAlertPreferences(
             committed
         }
 
-    private fun read(): Map<String, Boolean> =
-        preferences.all.mapNotNull { (key, value) -> (value as? Boolean)?.let { key to it } }.toMap()
+    private fun read(): Map<String, Boolean> = preferences.all
+        .mapNotNull { (key, value) -> (value as? Boolean)?.let { key to it } }
+        .toMap()
 
     fun retainAccounts(accountRefs: Collection<String>): Boolean {
         val retained = accountRefs.map { sha256Hex(it) }.toSet()
-        return removeChoices { key -> key.substringBefore(':') !in retained }
+        return removeChoices(durable = false) { key -> key.substringBefore(':') !in retained }
     }
 
-    fun clearAccount(accountRef: String): Boolean =
-        removeChoices { key -> key.substringBefore(':') == sha256Hex(accountRef) }
+    fun clearAccount(accountRef: String): Boolean {
+        val prefix = sha256Hex(accountRef)
+        return removeChoices { key -> key.substringBefore(':') == prefix }
+    }
 
-    private fun removeChoices(remove: (String) -> Boolean): Boolean =
+    private fun removeChoices(durable: Boolean = true, remove: (String) -> Boolean): Boolean =
         synchronized(mutationLock) {
             val updated = _state.value.filterKeys { !remove(it) }
             val editor = preferences.edit()
             (_state.value.keys - updated.keys).forEach(editor::remove)
+            if (!durable) {
+                editor.apply()
+                _state.value = updated
+                return@synchronized true
+            }
             val committed = editor.commit()
-            if (committed) _state.value = updated
+            if (committed) {
+                _state.value = updated
+            } else {
+                val rollback = preferences.edit()
+                _state.value.forEach { (key, value) -> rollback.putBoolean(key, value) }
+                rollback.apply()
+            }
             committed
         }
 

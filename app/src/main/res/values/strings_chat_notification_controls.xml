@@ -7,4 +7,5 @@
     <string name="notification_scope_choose">Sound settings</string>
     <string name="notification_pause_ordinary_alerts">Pause ordinary alerts</string>
     <string name="notification_alert_paused">Paused while this chat is muted</string>
+    <string name="notification_sound_scope_control">Sound settings for %1$s</string>
 </resources>

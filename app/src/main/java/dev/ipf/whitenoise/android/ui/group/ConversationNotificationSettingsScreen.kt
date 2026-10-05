@@ -54,7 +54,6 @@ import dev.ipf.whitenoise.android.notifications.openNotificationChannelSettings
 import dev.ipf.whitenoise.android.notifications.openPreparedConversationNotificationSettings
 import dev.ipf.whitenoise.android.state.ChatNotifyMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.conversationAlertPreferences
 import dev.ipf.whitenoise.android.ui.settings.SettingsExplainer
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
@@ -117,15 +116,17 @@ internal fun ConversationNotificationSettingsScreen(
     LaunchedEffect(accountRef, groupIdHex, isDm, vibrationPattern, resumeGeneration, routingState) {
         val shortcut = accountRef?.let { conversationShortcutId(it, groupIdHex) }
         if (shortcut != null) {
-            blockedChannels = withContext(Dispatchers.IO) {
-                val descriptor = NotificationConversationDescriptor(shortcut, isDm, conversationTitle, vibrationPattern)
-                runCatching {
-                    androidBlockedConversationCategories(
-                        context,
-                        appState.conversationNotificationRouting.settings(descriptor),
-                    )
-                }.getOrDefault(emptySet())
-            }
+            blockedChannels =
+                withContext(Dispatchers.IO) {
+                    val descriptor =
+                        NotificationConversationDescriptor(shortcut, isDm, conversationTitle, vibrationPattern)
+                    runCatching {
+                        androidBlockedConversationCategories(
+                            context,
+                            appState.conversationNotificationRouting.settings(descriptor),
+                        )
+                    }.getOrDefault(emptySet())
+                }
         }
     }
     val effectiveVibration =

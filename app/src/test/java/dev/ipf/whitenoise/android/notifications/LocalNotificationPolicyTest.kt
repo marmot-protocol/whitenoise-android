@@ -44,7 +44,10 @@ class LocalNotificationPolicyTest {
                 activeConversationGroupIdHex = null,
                 activeConversationAccountRef = null,
                 appLockScreenVisible = false,
-                categoryEnabled = { _, _, channel -> classified = channel; false },
+                categoryEnabled = { _, _, channel ->
+                    classified = channel
+                    false
+                },
             )
         assertFalse(permitted(NotificationTriggerFfi.NEW_MESSAGE, "👍"))
         assertTrue(classified == NotificationChannelSpec.REACTIONS)

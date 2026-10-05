@@ -12,12 +12,19 @@ internal fun androidBlockedConversationCategories(
 ): Set<NotificationChannelSpec> {
     val manager = context.getSystemService(NotificationManager::class.java)
     val appBlocked = !NotificationManagerCompat.from(context).areNotificationsEnabled()
-    return settings.filter { setting ->
-        val channel = manager?.getNotificationChannel(setting.settingsTarget.channelId)
-            ?: manager?.getNotificationChannel(setting.channel.id)
-        val groupBlocked = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            channel?.group?.let { manager?.getNotificationChannelGroup(it)?.isBlocked } == true
-        } else false
-        appBlocked || channel?.importance == NotificationManager.IMPORTANCE_NONE || groupBlocked
-    }.map { it.channel }.toSet()
+    return settings
+        .filter { setting ->
+            val channel =
+                manager?.getNotificationChannel(setting.settingsTarget.channelId)
+                    ?: manager?.getNotificationChannel(setting.channel.id)
+            val groupBlocked =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    channel?.group?.let { manager?.getNotificationChannelGroup(it)?.isBlocked } == true
+                } else {
+                    false
+                }
+            appBlocked || channel?.importance == NotificationManager.IMPORTANCE_NONE || groupBlocked
+        }
+        .map { it.channel }
+        .toSet()
 }

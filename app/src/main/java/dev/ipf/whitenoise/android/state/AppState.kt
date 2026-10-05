@@ -6281,8 +6281,13 @@ class WhiteNoiseAppState private constructor(
             stopTtsForRemovedAccount(wipedRef)
             clearContactPrivateDetailsForAccount(wipedRef)
             memberMutePreferences.clearAccount(wipedRef)
-            withContext(Dispatchers.IO) {
-                check(conversationAlertPreferences.clearAccount(wipedRef)) { "Could not clear local alert settings" }
+            withContext(NonCancellable + Dispatchers.IO) {
+                val alertsCleared = runCatching {
+                    conversationAlertPreferences.clearAccount(wipedRef)
+                }.getOrDefault(false)
+                if (!alertsCleared) {
+                    appStateDebug { "local alert preference cleanup will retry during account retention" }
+                }
             }
             wipeDecryptedMediaFromDisk()
             if (!clearHiddenMessagesForAccount(wipedRef)) {

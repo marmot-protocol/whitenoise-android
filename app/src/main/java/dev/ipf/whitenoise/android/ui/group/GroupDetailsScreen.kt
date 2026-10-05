@@ -1614,11 +1614,12 @@ internal fun GroupDetailsScreen(
                             title = stringResource(R.string.sounds_and_notifications),
                             onClick = { showNotificationSettings = true },
                             modifier = Modifier.performanceTestTag(PerformanceTestTags.GROUP_NOTIFICATION_SETTINGS),
-                            value = conversationNotificationSummary(
-                                appState,
-                                controller.group.groupIdHex,
-                                conversationNotifyMode,
-                            ),
+                            value =
+                                conversationNotificationSummary(
+                                    appState,
+                                    controller.group.groupIdHex,
+                                    conversationNotifyMode,
+                                ),
                             leading = { SettingsLeadingIcon(Icons.Filled.Notifications) },
                         )
                     }

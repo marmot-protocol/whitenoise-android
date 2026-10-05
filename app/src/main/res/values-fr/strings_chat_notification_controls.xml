@@ -7,4 +7,5 @@
     <string name="notification_scope_choose">Paramètres du son</string>
     <string name="notification_pause_ordinary_alerts">Suspendre les alertes ordinaires</string>
     <string name="notification_alert_paused">En pause tant que cette discussion est en sourdine</string>
+    <string name="notification_sound_scope_control">Paramètres du son pour %1$s</string>
 </resources>

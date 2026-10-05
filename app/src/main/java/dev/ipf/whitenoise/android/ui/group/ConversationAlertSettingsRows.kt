@@ -25,7 +25,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-
 /** Binary alert choices, with the same controls for direct and group conversations. */
 @Composable
 internal fun ConversationAlertControls(
@@ -41,31 +40,35 @@ internal fun ConversationAlertControls(
     val accountRef = appState.activeAccountRef
     var saving by remember(accountRef, groupIdHex) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val channels = listOf(
-        ConversationNotificationChannels.primaryMessageParent(isDm),
-        NotificationChannelSpec.MENTIONS,
-        NotificationChannelSpec.REACTIONS,
-    )
+    val channels =
+        listOf(
+            ConversationNotificationChannels.primaryMessageParent(isDm),
+            NotificationChannelSpec.MENTIONS,
+            NotificationChannelSpec.REACTIONS,
+        )
     ConversationAlertSettingsRows(
-        settings = channels.map { channel ->
-            val choice = remember(state, accountRef, groupIdHex, channel) {
-                accountRef?.let { preferences.choice(it, groupIdHex, channel) }
-            }
-            ConversationAlertSetting(
-                channel,
-                choice ?: (channel == NotificationChannelSpec.MENTIONS || legacyMode == ChatNotifyMode.ALL),
-                channel in blockedChannels,
-                isMuted && channel != NotificationChannelSpec.MENTIONS,
-            )
-        },
+        settings =
+            channels.map { channel ->
+                val choice =
+                    remember(state, accountRef, groupIdHex, channel) {
+                        accountRef?.let { preferences.choice(it, groupIdHex, channel) }
+                    }
+                ConversationAlertSetting(
+                    channel,
+                    choice ?: (channel == NotificationChannelSpec.MENTIONS || legacyMode == ChatNotifyMode.ALL),
+                    channel in blockedChannels,
+                    isMuted && channel != NotificationChannelSpec.MENTIONS,
+                )
+            },
         busy = saving || accountRef == null,
         onChange = { channel, enabled ->
             if (accountRef != null && !saving) {
                 saving = true
                 scope.launch {
-                    val saved = withContext(Dispatchers.IO) {
-                        preferences.setEnabled(accountRef, groupIdHex, channel, enabled)
-                    }
+                    val saved =
+                        withContext(Dispatchers.IO) {
+                            preferences.setEnabled(accountRef, groupIdHex, channel, enabled)
+                        }
                     saving = false
                     if (!saved && appState.activeAccountRef == accountRef) {
                         appState.present(R.string.toast_notification_scope_update_failed)
@@ -93,15 +96,16 @@ internal fun ConversationAlertSettingsRows(
                     enabled = !busy,
                     modifier = Modifier.testTag("conversation-alert-${setting.channel.id}"),
                     onCheckedChange = { onChange(setting.channel, it) },
-                    subtitle = stringResource(
-                        if (setting.blockedByAndroid) {
-                            R.string.notification_system_blocked
-                        } else if (setting.pausedByMute) {
-                            R.string.notification_alert_paused
-                        } else {
-                            R.string.notification_alerts_on_device
-                        },
-                    ),
+                    subtitle =
+                        stringResource(
+                            if (setting.blockedByAndroid) {
+                                R.string.notification_system_blocked
+                            } else if (setting.pausedByMute) {
+                                R.string.notification_alert_paused
+                            } else {
+                                R.string.notification_alerts_on_device
+                            },
+                        ),
                 )
             }
         }
@@ -118,19 +122,22 @@ internal fun conversationNotificationSummary(
     val preferences = appState.conversationAlertPreferences
     val state by preferences.state.collectAsStateWithLifecycle()
     val accountRef = appState.activeAccountRef
-    val hasChoices = remember(state, accountRef, groupIdHex) {
-        accountRef != null && ConversationAlertPreferences.supportedChannels.any {
-            preferences.choice(accountRef, groupIdHex, it) != null
+    val hasChoices =
+        remember(state, accountRef, groupIdHex) {
+            accountRef != null &&
+                ConversationAlertPreferences.supportedChannels.any {
+                    preferences.choice(accountRef, groupIdHex, it) != null
+                }
         }
-    }
     return when {
-        legacyMode == ChatNotifyMode.NONE -> stringResource(
-            if (accountRef?.let { preferences.choice(it, groupIdHex, NotificationChannelSpec.MENTIONS) } == false) {
-                R.string.notify_nothing
-            } else {
-                R.string.notify_nothing_while_muted
-            },
-        )
+        legacyMode == ChatNotifyMode.NONE ->
+            stringResource(
+                if (accountRef?.let { preferences.choice(it, groupIdHex, NotificationChannelSpec.MENTIONS) } == false) {
+                    R.string.notify_nothing
+                } else {
+                    R.string.notify_nothing_while_muted
+                },
+            )
         hasChoices -> null
         else -> notificationModeLabel(legacyMode)
     }

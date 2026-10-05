@@ -16,6 +16,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategorySetting
@@ -60,6 +62,7 @@ private fun ConversationNotificationCategoryGroup(
 ) {
     val usesCustom = setting.scope == ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT
     val title = notificationChannelTitle(setting.channel)
+    val scopeDescription = stringResource(R.string.notification_sound_scope_control, title)
     var choosingScope by remember(setting.channel) { mutableStateOf(false) }
     val openTag =
         if (
@@ -93,15 +96,17 @@ private fun ConversationNotificationCategoryGroup(
                 SettingsLink(
                     context = context,
                     title = stringResource(R.string.notification_scope_choose),
-                    value = stringResource(
-                        if (usesCustom) {
-                            R.string.notification_scope_custom_chat
-                        } else {
-                            R.string.notification_scope_default_all_chats
-                        },
-                    ),
+                    value =
+                        stringResource(
+                            if (usesCustom) {
+                                R.string.notification_scope_custom_chat
+                            } else {
+                                R.string.notification_scope_default_all_chats
+                            },
+                        ),
                     onClick = { choosingScope = true },
-                    modifier = Modifier.testTag("conversation-sound-scope-${setting.channel.id}"),
+                    modifier = Modifier.testTag("conversation-sound-scope-${setting.channel.id}")
+                        .semantics { contentDescription = scopeDescription },
                     enabled = scopeChangesEnabled,
                 )
             }

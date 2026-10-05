@@ -7,4 +7,5 @@
     <string name="notification_scope_choose">Ses ayarları</string>
     <string name="notification_pause_ordinary_alerts">Normal bildirimleri duraklat</string>
     <string name="notification_alert_paused">Bu sohbet sessizdeyken duraklatıldı</string>
+    <string name="notification_sound_scope_control">%1$s için ses ayarları</string>
 </resources>
