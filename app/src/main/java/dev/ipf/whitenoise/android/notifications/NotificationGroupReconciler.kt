@@ -122,8 +122,12 @@ internal class NotificationGroupReconciler(
         return summaryDone && artworkDone
     }
 
-    private fun summaryIsCurrent(children: List<NotificationGroupChild>, old: StatusBarNotification?): Boolean =
-        if (children.isEmpty()) old == null else matches(old, UserEventNotificationGroup.summaryState(children))
+    private fun summaryIsCurrent(
+        children: List<NotificationGroupChild>,
+        old: StatusBarNotification?,
+    ): Boolean {
+        return if (children.isEmpty()) old == null else matches(old, UserEventNotificationGroup.summaryState(children))
+    }
 
     /** Cleanup is not complete while a write is settling or an empty snapshot still needs confirmation. */
     private fun reconcileArtwork(

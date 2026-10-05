@@ -36,17 +36,19 @@ internal fun retainNotificationEmojiHistoryArtwork(
     context: Context,
     messages: List<NotificationCompat.MessagingStyle.Message>,
 ): AutoCloseable {
-    val names = messages.mapNotNull { message ->
-        val uri = message.dataUri
-        val segments = uri?.pathSegments.orEmpty()
-        val ownedProvider =
-            uri != null && uri.scheme == "content" && uri.authority == "${context.packageName}.fileprovider"
-        val ownedPath = segments.size == 2 && segments.first() == "notification_emoji"
-        if (ownedProvider && ownedPath) {
-            segments.last().takeIf(historyArtworkName::matches)
-        } else {
-            null
-        }
-    }.toSet()
+    val names =
+        messages
+            .mapNotNull { message ->
+                val uri = message.dataUri
+                val segments = uri?.pathSegments.orEmpty()
+                val ownedProvider =
+                    uri != null && uri.scheme == "content" && uri.authority == "${context.packageName}.fileprovider"
+                val ownedPath = segments.size == 2 && segments.first() == "notification_emoji"
+                if (ownedProvider && ownedPath) {
+                    segments.last().takeIf(historyArtworkName::matches)
+                } else {
+                    null
+                }
+            }.toSet()
     return NotificationEmojiLeases.retain(names)
 }

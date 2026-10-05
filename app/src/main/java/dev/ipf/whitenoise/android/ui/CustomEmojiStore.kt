@@ -199,7 +199,9 @@ internal class CustomEmojiStore(
 
         /** Shared display precedence: modern artwork first, then decodable legacy files in name order. */
         internal fun filesForPresentation(directory: File): List<File> =
-            directory.listFiles().orEmpty()
+            directory
+                .listFiles()
+                .orEmpty()
                 .filter { it.isFile && !it.name.startsWith('.') }
                 .sortedWith(compareBy({ !hasSendableExtension(it) }, { it.name }))
     }

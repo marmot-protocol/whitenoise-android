@@ -60,9 +60,11 @@ internal fun rememberReplyReceivedEmoji(
     val target =
         window.firstOrNull {
             it.record.messageIdHex == targetMessageIdHex &&
-                it.record.messageIdHex !in controller.deletedMessageIds && it.projected?.deleted != true
+                it.record.messageIdHex !in controller.deletedMessageIds &&
+                it.projected?.deleted != true
         }
-    return target?.takeUnless { controller.isRetainedRowGone(targetMessageIdHex) }
+    return target
+        ?.takeUnless { controller.isRetainedRowGone(targetMessageIdHex) }
         ?.let { rememberReceivedEmoji(it, controller, appState) } ?: ReceivedEmoji.None
 }
 

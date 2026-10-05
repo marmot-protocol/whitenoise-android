@@ -64,9 +64,10 @@ class NotificationEmojiArtworkTest {
             }
             val artifact = requireNotNull(notificationEmojiArtwork(context, ":wn: :marmot: :wn:"))
             artifact.use {
-                val bitmap = context.contentResolver.openInputStream(
-                    it.uri,
-                ).use { input -> BitmapFactory.decodeStream(input) }
+                val bitmap =
+                    context.contentResolver.openInputStream(
+                        it.uri,
+                    ).use { input -> BitmapFactory.decodeStream(input) }
                 assertEquals(256, bitmap.width)
                 assertEquals(128, bitmap.height)
                 assertEquals("image/png", context.contentResolver.getType(it.uri))
@@ -85,12 +86,13 @@ class NotificationEmojiArtworkTest {
         // Warm native graphics outside the optional notification budget.
         requireNotNull(notificationEmojiArtwork(context, ":wn:")).close()
         pruneNotificationEmojiArtwork(context, emptyArray())
-        val presenter = LocalNotificationPresenter(
-            context,
-            groupReconciliation = {},
-            enrichmentLauncher = {},
-            emojiArtworkTimeoutMs = 5_000L,
-        )
+        val presenter =
+            LocalNotificationPresenter(
+                context,
+                groupReconciliation = {},
+                enrichmentLauncher = {},
+                emojiArtworkTimeoutMs = 5_000L,
+            )
         presenter.ensureChannels()
         assertTrue(presenter.show(messageUpdate(":wn:", '6'), shortNpub = { "npub1fixture" }))
         val messages = styleOf(manager.activeNotifications.single().notification).messages
@@ -100,36 +102,38 @@ class NotificationEmojiArtworkTest {
 
     @Test
     fun carriedHistorySurvivesPruningBetweenReadAndPost() = runBlocking {
-        val presenter = LocalNotificationPresenter(
-            context,
-            groupReconciliation = {},
-            enrichmentLauncher = {},
-            emojiArtworkTimeoutMs = 5_000L,
-        )
+        val presenter =
+            LocalNotificationPresenter(
+                context,
+                groupReconciliation = {},
+                enrichmentLauncher = {},
+                emojiArtworkTimeoutMs = 5_000L,
+            )
         presenter.ensureChannels()
         assertTrue(presenter.show(messageUpdate(":wn:", '4'), shortNpub = { "npub1fixture" }))
         val original =
             requireNotNull(styleOf(manager.activeNotifications.single().notification).messages.first().dataUri)
         try {
-            ConversationCardPostSynchronizer.testHook = object : ConversationCardTestHook {
-                override fun onBarrier(
-                    op: ConversationCardOp,
-                    barrier: ConversationCardBarrier,
-                    notificationTag: String,
-                    notificationId: Int,
-                ) {
-                    if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_READ) {
-                        // Simulate SystemUI removing the card before its asynchronous delete callback.
-                        synchronized(UserEventNotificationGroup.mutationLock) {
-                            manager.cancelAll()
-                            pruneNotificationEmojiArtwork(context, emptyArray())
+            ConversationCardPostSynchronizer.testHook =
+                object : ConversationCardTestHook {
+                    override fun onBarrier(
+                        op: ConversationCardOp,
+                        barrier: ConversationCardBarrier,
+                        notificationTag: String,
+                        notificationId: Int,
+                    ) {
+                        if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_READ) {
+                            // Simulate SystemUI removing the card before its asynchronous delete callback.
+                            synchronized(UserEventNotificationGroup.mutationLock) {
+                                manager.cancelAll()
+                                pruneNotificationEmojiArtwork(context, emptyArray())
+                            }
+                            assertNotNull(
+                                context.contentResolver.openInputStream(original)?.use(BitmapFactory::decodeStream),
+                            )
                         }
-                        assertNotNull(
-                            context.contentResolver.openInputStream(original)?.use(BitmapFactory::decodeStream),
-                        )
                     }
                 }
-            }
             assertTrue(presenter.show(messageUpdate("Second message", '5'), shortNpub = { "npub1fixture" }))
             val messages = styleOf(manager.activeNotifications.single().notification).messages
             assertEquals(original, messages.first().dataUri)
@@ -173,9 +177,10 @@ class NotificationEmojiArtworkTest {
             val expected = requireNotNull(store.emoji[":wn:"]).image.asAndroidBitmap().getPixel(16, 16)
             val artifact = requireNotNull(notificationEmojiArtwork(context, ":wn:"))
             artifact.use {
-                val actual = context.contentResolver.openInputStream(
-                    it.uri,
-                ).use { input -> BitmapFactory.decodeStream(input) }
+                val actual =
+                    context.contentResolver.openInputStream(
+                        it.uri,
+                    ).use { input -> BitmapFactory.decodeStream(input) }
                 assertEquals(expected, actual.getPixel(64, 64))
                 assertEquals(Color.BLUE, expected)
                 actual.recycle()
@@ -188,20 +193,21 @@ class NotificationEmojiArtworkTest {
     @Test
     fun timedOutPreparationKeepsTextAndRequestsOrphanCleanup() = runBlocking {
         var reconciliations = 0
-        val presenter = LocalNotificationPresenter(
-            context,
-            groupReconciliation = { reconciliations++ },
-            enrichmentLauncher = {},
-            emojiArtworkPreparer = { text, _ ->
-                val artifact = requireNotNull(notificationEmojiArtwork(context, text))
-                try {
-                    kotlinx.coroutines.delay(NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS + 50L)
-                    artifact
-                } finally {
-                    artifact.close()
-                }
-            },
-        )
+        val presenter =
+            LocalNotificationPresenter(
+                context,
+                groupReconciliation = { reconciliations++ },
+                enrichmentLauncher = {},
+                emojiArtworkPreparer = { text, _ ->
+                    val artifact = requireNotNull(notificationEmojiArtwork(context, text))
+                    try {
+                        kotlinx.coroutines.delay(NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS + 50L)
+                        artifact
+                    } finally {
+                        artifact.close()
+                    }
+                },
+            )
         presenter.ensureChannels()
         assertTrue(presenter.show(messageUpdate(":wn:", '7'), shortNpub = { "npub1fixture" }))
         val messages = styleOf(manager.activeNotifications.single().notification).messages
@@ -215,18 +221,19 @@ class NotificationEmojiArtworkTest {
     @Test
     fun timeoutThatDiscardsACompletedResultReleasesItsLease() = runBlocking {
         val artifact = requireNotNull(notificationEmojiArtwork(context, ":wn:"))
-        val result = prepareNotificationEmojiArtwork(
-            prepare = { _, _ ->
-                // Simulate a source finishing despite cancellation just as the deadline wins the handoff.
-                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                    kotlinx.coroutines.delay(40L)
-                    artifact
-                }
-            },
-            text = ":wn:",
-            source = ":wn:",
-            timeoutMs = 5L,
-        )
+        val result =
+            prepareNotificationEmojiArtwork(
+                prepare = { _, _ ->
+                    // Simulate a source finishing despite cancellation just as the deadline wins the handoff.
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        kotlinx.coroutines.delay(40L)
+                        artifact
+                    }
+                },
+                text = ":wn:",
+                source = ":wn:",
+                timeoutMs = 5L,
+            )
         assertNull(result)
         pruneNotificationEmojiArtwork(context, emptyArray())
         assertTrue(artifacts().isEmpty())
@@ -284,9 +291,10 @@ class NotificationEmojiArtworkTest {
             }
             val artifact = requireNotNull(notificationEmojiArtwork(context, ":wn:"))
             artifact.use {
-                val bitmap = context.contentResolver.openInputStream(
-                    it.uri,
-                ).use { input -> BitmapFactory.decodeStream(input) }
+                val bitmap =
+                    context.contentResolver.openInputStream(
+                        it.uri,
+                    ).use { input -> BitmapFactory.decodeStream(input) }
                 assertEquals(Color.GREEN, bitmap.getPixel(64, 64))
                 assertTrue(File(context.filesDir, "emoji/wn.png").isFile)
             }

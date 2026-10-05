@@ -73,9 +73,10 @@ internal suspend fun prepareNotificationEmojiArtwork(
     var artifact: NotificationEmojiArtifact? = null
     var handedOff = false
     return try {
-        val result = withTimeoutOrNull(timeoutMs) {
-            prepare(text, source).also { artifact = it }
-        }
+        val result =
+            withTimeoutOrNull(timeoutMs) {
+                prepare(text, source).also { artifact = it }
+            }
         handedOff = result != null
         result
     } catch (cancelled: CancellationException) {
@@ -138,7 +139,10 @@ internal suspend fun notificationEmojiArtwork(
 }
 
 /** A flattened preview loses link annotations, so only qualified original text can supply artwork. */
-private fun notificationEmojiCodes(text: String, sourceText: String?): List<String> {
+private fun notificationEmojiCodes(
+    text: String,
+    sourceText: String?,
+): List<String> {
     val source = sourceText?.takeUnless { it.length > MAX_SOURCE_CHARS || '[' in it || "://" in it }
     return source?.let { EmojiShortcodes.presentationShortcodes(it).filter(text::contains).take(MAX_CANDIDATE_CODES) }
         ?: emptyList()
@@ -199,15 +203,18 @@ private suspend fun localNotificationEmojiBitmap(
         if (Files.isSymbolicLink(directory.toPath())) {
             emptyList()
         } else {
-            CustomEmojiStore.filesForPresentation(directory)
+            CustomEmojiStore
+                .filesForPresentation(directory)
                 .filter { it.nameWithoutExtension == localCode && it.length() <= CustomEmojiStore.MAX_BYTES }
                 .filterNot { Files.isSymbolicLink(it.toPath()) }
         }
     for (file in candidates) {
         coroutineContext.ensureActive()
         val bytes = runCatching { readBudget.read(file) }.getOrNull()
-        val bitmap = bytes?.takeIf { it.size <= CustomEmojiStore.MAX_BYTES }
-            ?.let { runCatching { decodeEmojiImage(it)?.asAndroidBitmap() }.getOrNull() }
+        val bitmap =
+            bytes
+                ?.takeIf { it.size <= CustomEmojiStore.MAX_BYTES }
+                ?.let { runCatching { decodeEmojiImage(it)?.asAndroidBitmap() }.getOrNull() }
         if (bitmap != null) return bitmap
     }
     return null

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.net.Uri
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationCompat.MessagingStyle.Message
 import androidx.core.app.Person
 import java.util.UUID
 
@@ -68,7 +69,6 @@ internal fun capNotificationLogicalHistory(
 }
 
 /** A silent replacement removes both image and text, not just the last platform row. */
-internal fun dropLastNotificationLogicalMessage(
-    messages: List<NotificationCompat.MessagingStyle.Message>,
-): List<NotificationCompat.MessagingStyle.Message> =
-    notificationLogicalMessageGroups(messages).dropLast(1).flatten()
+internal fun dropLastNotificationLogicalMessage(messages: List<Message>): List<Message> {
+    return notificationLogicalMessageGroups(messages).dropLast(1).flatten()
+}

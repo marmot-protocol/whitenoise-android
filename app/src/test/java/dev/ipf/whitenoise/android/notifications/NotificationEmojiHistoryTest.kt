@@ -47,9 +47,10 @@ class NotificationEmojiHistoryTest {
 
     @Test
     fun historyNeverExceedsPlatformRowsOrSplitsAPair() {
-        val history = (1L..25L).flatMap {
-            notificationEmojiMessages(":wn:", it, sender, Uri.parse("content://test/$it.png"))
-        }
+        val history =
+            (1L..25L).flatMap {
+                notificationEmojiMessages(":wn:", it, sender, Uri.parse("content://test/$it.png"))
+            }
         val capped = capNotificationLogicalHistory(history, logicalCap = 24, rowCap = 23)
         assertEquals(22, capped.size)
         assertEquals(11, notificationLogicalMessageGroups(capped).size)
@@ -61,10 +62,11 @@ class NotificationEmojiHistoryTest {
     @Test
     fun legacyRowsWithEqualTimesAreNotAccidentallyCombined() {
         val text = NotificationCompat.MessagingStyle.Message("text", 1L, sender)
-        val image = NotificationCompat.MessagingStyle.Message("image", 1L, sender).setData(
-            "image/png",
-            Uri.parse("content://test/legacy.png"),
-        )
+        val image =
+            NotificationCompat.MessagingStyle.Message("image", 1L, sender).setData(
+                "image/png",
+                Uri.parse("content://test/legacy.png"),
+            )
         assertEquals(2, notificationLogicalMessageGroups(listOf(image, text)).size)
         assertEquals(listOf(text), capNotificationLogicalHistory(listOf(image, text), logicalCap = 1))
     }

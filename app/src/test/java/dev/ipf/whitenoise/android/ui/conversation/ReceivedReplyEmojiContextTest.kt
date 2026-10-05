@@ -38,9 +38,10 @@ class ReceivedReplyEmojiContextTest : PollMessageTestFixtures() {
     fun recomposingAfterTheOriginalDeadlineDropsReplyArtwork() {
         pollState.stopAutomaticAttachmentDownloads()
         val source = emojiSource()
-        val projected = requireNotNull(source.projected).copy(
-            retentionExpiresAt = (pollClockMillis / 1_000L + 1L).toULong(),
-        )
+        val projected =
+            requireNotNull(source.projected).copy(
+                retentionExpiresAt = (pollClockMillis / 1_000L + 1L).toULong(),
+            )
         applyPage(projected)
         val revision = mutableStateOf(0)
         rule.setContent {
@@ -102,13 +103,14 @@ class ReceivedReplyEmojiContextTest : PollMessageTestFixtures() {
             if (current !== pollController) frames += emoji.attachmentIndexes
         }
         rule.waitUntil(5_000) { result.get().attachmentIndexes.isNotEmpty() }
-        val replacement = ConversationController(
-            appState = pollState,
-            initialGroup = group(),
-            initialMemberSnapshot = memberSnapshot(),
-            groupRosterReader = { _, _ -> authoritativeRoster() },
-            clockMillis = { pollClockMillis },
-        )
+        val replacement =
+            ConversationController(
+                appState = pollState,
+                initialGroup = group(),
+                initialMemberSnapshot = memberSnapshot(),
+                groupRosterReader = { _, _ -> authoritativeRoster() },
+                clockMillis = { pollClockMillis },
+            )
         otherController = replacement
         val noDefinition = requireNotNull(source.projected).copy(tags = emptyList(), media = emptyList())
         runBlocking {
@@ -125,13 +127,14 @@ class ReceivedReplyEmojiContextTest : PollMessageTestFixtures() {
     }
 
     private fun emojiSource(): TimelineMessage {
-        val source = fileTimelineMessage(
-            index = 16,
-            fileName = "emoji.png",
-            mine = true,
-            caption = ":remote:",
-            mediaType = "image/png",
-        )
+        val source =
+            fileTimelineMessage(
+                index = 16,
+                fileName = "emoji.png",
+                mine = true,
+                caption = ":remote:",
+                mediaType = "image/png",
+            )
         val tags = source.record.tags + MessageTagFfi(listOf("emoji", "remote", "https://media.example/emoji.png"))
         return source.copy(
             record = source.record.copy(tags = tags),
