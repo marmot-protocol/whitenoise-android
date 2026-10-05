@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -85,11 +87,22 @@ class NotificationScopeSettingsScreenshotTest {
         }
 
         composeRule.onNodeWithTag("conversation-sound-scope-${NotificationChannelSpec.REACTIONS.id}").performClick()
-        composeRule.onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.REACTIONS.id}-true").performClick()
+        composeRule.onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.REACTIONS.id}-false").assertIsSelected()
+        composeRule
+            .onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.REACTIONS.id}-true")
+            .assertIsNotSelected()
+            .performClick()
         composeRule.runOnIdle {
             assertEquals(NotificationChannelSpec.REACTIONS to true, toggled)
             assertTrue(opened == null)
         }
+        composeRule.onNodeWithTag("conversation-sound-scope-${NotificationChannelSpec.MENTIONS.id}").performClick()
+        composeRule.onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.MENTIONS.id}-true").assertIsSelected()
+        composeRule
+            .onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.MENTIONS.id}-false")
+            .assertIsNotSelected()
+            .performClick()
+        composeRule.runOnIdle { assertEquals(NotificationChannelSpec.MENTIONS to false, toggled) }
     }
 
     @Test

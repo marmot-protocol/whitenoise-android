@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
@@ -28,7 +29,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/** One settings group per category: the Android settings link, plus the custom-scope switch where allowed. */
+/** One settings group per category: the Android settings link and an explicit scope choice where allowed. */
 @Composable
 internal fun ConversationNotificationCategoriesList(
     settings: List<ConversationNotificationCategorySetting>,
@@ -51,7 +52,7 @@ internal fun ConversationNotificationCategoriesList(
     }
 }
 
-/** Settings group for one notification category: the Android settings link and the scope switch. */
+/** Settings group for one notification category: the Android settings link and the scope choice. */
 @Composable
 private fun ConversationNotificationCategoryGroup(
     setting: ConversationNotificationCategorySetting,
@@ -126,6 +127,7 @@ private fun NotificationSoundScopeDialog(
     onDismiss: () -> Unit,
     onScopeChange: (ConversationNotificationCategorySetting, Boolean) -> Unit,
 ) {
+    val usesCustom = setting.scope == ConversationNotificationScope.CUSTOM_FOR_THIS_CHAT
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(notificationChannelTitle(setting.channel)) },
@@ -133,7 +135,10 @@ private fun NotificationSoundScopeDialog(
             Column {
                 listOf(false, true).forEach { custom ->
                     TextButton(
-                        modifier = Modifier.testTag("sound-scope-choice-${setting.channel.id}-$custom"),
+                        modifier =
+                            Modifier
+                                .testTag("sound-scope-choice-${setting.channel.id}-$custom")
+                                .semantics { selected = custom == usesCustom },
                         onClick = {
                             onDismiss()
                             onScopeChange(setting, custom)
