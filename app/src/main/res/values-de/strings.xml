@@ -1023,6 +1023,8 @@
     <string name="media_uploading">Wird hochgeladen …</string>
     <string name="media_upload_failed">Upload fehlgeschlagen</string>
     <string name="media_tap_to_retry">Zum Wiederholen tippen</string>
+    <string name="media_too_large_to_preview">Zu groß für eine Vorschau</string>
+    <string name="media_too_large_to_preview_hint">Speichere oder teile dieses Bild, um es in einer anderen App anzusehen</string>
     <string name="media_tap_to_download">Zum Herunterladen tippen</string>
     <string name="media_preparing_download">Download wird vorbereitet</string>
     <string name="media_preparing_attachment">Anhang wird vorbereitet</string>

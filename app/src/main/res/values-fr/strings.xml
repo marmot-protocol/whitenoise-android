@@ -1023,6 +1023,8 @@
     <string name="media_uploading">Envoi…</string>
     <string name="media_upload_failed">Échec de l\'envoi</string>
     <string name="media_tap_to_retry">Appuyez pour réessayer</string>
+    <string name="media_too_large_to_preview">Trop volumineux pour l\'aperçu</string>
+    <string name="media_too_large_to_preview_hint">Enregistrez ou partagez cette image pour la voir dans une autre application</string>
     <string name="media_tap_to_download">Appuyez pour télécharger</string>
     <string name="media_preparing_download">Préparation du téléchargement</string>
     <string name="media_preparing_attachment">Préparation de la pièce jointe</string>

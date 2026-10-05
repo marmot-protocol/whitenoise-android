@@ -654,9 +654,58 @@
       {
         "surface": "TileTransferCaption",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
-        "anchor": "private fun TileTransferCaption(",
+        "anchor": "internal fun TileTransferCaption(",
         "test_ids": [
-          "MED-025"
+          "MED-025",
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "MediaTooLargeToPreviewControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaTooLargeToPreview.kt",
+        "anchor": "internal fun MediaTooLargeToPreviewControl(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "R.string.media_too_large_to_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaTooLargeToPreview.kt",
+        "anchor": "R.string.media_too_large_to_preview",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "string:media_open (too large to preview)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaTooLargeToPreview.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "MediaViewerTooLargeToPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerStates.kt",
+        "anchor": "internal fun MediaViewerTooLargeToPreview(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "R.string.media_too_large_to_preview (viewer)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerStates.kt",
+        "anchor": "R.string.media_too_large_to_preview",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "R.string.media_too_large_to_preview_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerStates.kt",
+        "anchor": "R.string.media_too_large_to_preview_hint",
+        "test_ids": [
+          "MED-027"
         ]
       },
       {
@@ -10596,6 +10645,12 @@
         "surface": "Poll inline vote failure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
         "anchor": "R.string.poll_vote_failed",
+        "test_ids": ["MSG-021"]
+      },
+      {
+        "surface": "Poll vote support rejection reason",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollVoteFailureAttribution.kt",
+        "anchor": "poll_vote_reason=",
         "test_ids": ["MSG-021"]
       },
       {
@@ -25403,6 +25458,30 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "private fun failedEditForAction(",
         "test_ids": ["MSG-004", "MSG-007"]
+      },
+      {
+        "surface": "Bounded presentation read of attachment plaintext",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+        "anchor": "internal fun AttachmentPlaintext.toByteArrayWithin(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "Presentation plaintext budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaCacheLimits.kt",
+        "anchor": "internal const val ATTACHMENT_PRESENTATION_MAX_BYTES",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "Byte-returning attachment reads stay within the caller's budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+        "anchor": "internal suspend fun AttachmentPlaintext.readWithin(",
+        "test_ids": [
+          "MED-027"
+        ]
       },
       {
         "surface": "Content-based animated image source admission",

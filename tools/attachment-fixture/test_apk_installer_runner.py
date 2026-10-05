@@ -37,6 +37,19 @@ class ApkInstallerRunnerTest(unittest.TestCase):
         self.assertFalse({"uninstall", "install", "clear"} & set(command))
         self.assertIn("fixtureApkStage", command)
 
+    def test_extra_selectors_sit_before_the_runner_component_and_default_to_none(self):
+        """Gap selectors are plain `-e` pairs placed before the instrumentation component, absent by default."""
+        with mock.patch.object(runner.subprocess, "run") as run:
+            run.return_value.stdout = "OK (1 test)"
+            runner.instrument("adb", "emulator-5554", (4001, 4002), "prepare", "3b6c9c1e-0000-4000-8000-000000000000",
+                              ["-e", "fixtureApkCancelRetry", "true"])
+            with_extra = run.call_args.args[0]
+            runner.instrument("adb", "emulator-5554", (4001, 4002), "prepare", "3b6c9c1e-0000-4000-8000-000000000000")
+            plain = run.call_args.args[0]
+        self.assertEqual(["-e", "fixtureApkCancelRetry", "true"], with_extra[-4:-1])
+        self.assertEqual(with_extra[-1], plain[-1])
+        self.assertNotIn("fixtureApkCancelRetry", plain)
+
     def test_permission_is_set_only_on_the_isolated_package_with_a_known_mode(self):
         """The host toggles one app-op on the fixture package; anything else is refused before adb."""
         with mock.patch.object(runner, "adb_command") as adb:
