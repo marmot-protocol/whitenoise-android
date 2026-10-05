@@ -249,9 +249,10 @@ internal class CoalescingMessageDraftWriter(
                 }
             if (pendingJob == null) return null
             pendingJob.join()
-            val failure = synchronized(lock) {
-                if (pending[key] === state) state?.lastResult as? MessageDraftMutationResult.Failure else null
-            }
+            val failure =
+                synchronized(lock) {
+                    if (pending[key] === state) state?.lastResult as? MessageDraftMutationResult.Failure else null
+                }
             if (failure != null) return failure
         }
     }
@@ -303,10 +304,11 @@ internal class CoalescingMessageDraftWriter(
     ) {
         delay(debounceMillis)
         while (true) {
-            val (content, generation) = synchronized(lock) {
-                activeMerges[key]?.receipt?.proposedContent = state.content
-                state.content to state.generation
-            }
+            val (content, generation) =
+                synchronized(lock) {
+                    activeMerges[key]?.receipt?.proposedContent = state.content
+                    state.content to state.generation
+                }
             val saved =
                 drafts.coordinated.saveAcceptedTextIfCurrent(
                     accountRef = key.accountRef,
@@ -371,10 +373,11 @@ internal class CoalescingMessageDraftWriter(
     private fun isHydrationBlocked(
         key: Key,
         generation: MessageDraftGeneration,
-    ): Boolean = synchronized(lock) {
-        val failed = pending[key]?.takeIf { it.lastResult is MessageDraftMutationResult.Failure }
-        hydrationBlockedGenerations[key] == generation || failed?.generation == generation.value
-    }
+    ): Boolean =
+        synchronized(lock) {
+            val failed = pending[key]?.takeIf { it.lastResult is MessageDraftMutationResult.Failure }
+            hydrationBlockedGenerations[key] == generation || failed?.generation == generation.value
+        }
 
     private data class Key(
         val accountRef: String,

@@ -31,8 +31,9 @@ internal class NotificationReplyDraftHandoff(
         val draft = target.replyDraft ?: return true
         val intake = pending.getOrPut(draft.id) { PendingReply(target) }
         val previous = deliveries[draft.id]
-        if (previous != null && (previous.isCancelled || (previous.isCompleted && !awaitDelivery(previous)))) {
-            deliveries.remove(draft.id, previous)
+        previous?.let { cached ->
+            val retryable = cached.isCancelled || (cached.isCompleted && !awaitDelivery(cached))
+            if (retryable) deliveries.remove(draft.id, cached)
         }
         val delivery = deliveries.getOrPut(draft.id) { scope.async { persist(intake) } }
         val applied = withTimeoutOrNull(HANDOFF_WAIT_MILLIS) { awaitDelivery(delivery) } == true
@@ -43,10 +44,15 @@ internal class NotificationReplyDraftHandoff(
     }
 
     /** Recovery changes only a draft, never navigation; the original tap is already consumed. */
-    suspend fun retryPending(accountRef: String, groupIdHex: String) {
-        pending.values.map { it.target }.filter {
-            it.accountRef == accountRef && it.groupIdHex == groupIdHex
-        }.forEach { stage(it) }
+    suspend fun retryPending(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
+        pending.values
+            .map { it.target }
+            .filter {
+                it.accountRef == accountRef && it.groupIdHex == groupIdHex
+            }.forEach { stage(it) }
     }
 
     fun removeAccount(accountRef: String) {
@@ -102,7 +108,9 @@ internal class NotificationReplyDraftHandoff(
             false
         }
 
-    private class PendingReply(val target: NotificationTarget) {
+    private class PendingReply(
+        val target: NotificationTarget,
+    ) {
         val receipt = MessageDraftMergeReceipt()
     }
 

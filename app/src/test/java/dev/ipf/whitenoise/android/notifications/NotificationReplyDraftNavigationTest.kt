@@ -90,6 +90,24 @@ class NotificationReplyDraftNavigationTest {
         assertNotNull(parse(launched))
     }
 
+    @Test
+    fun historyAndSavedStateRestoresCannotReimportAnAlreadyHandledReply() {
+        val history =
+            boundIntent()
+                .putExtra(Notification.EXTRA_REMOTE_INPUT_DRAFT, "already handled")
+                .addFlags(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)
+        assertNull(parse(history)?.replyDraft)
+        val restore = boundIntent().putExtra(Notification.EXTRA_REMOTE_INPUT_DRAFT, "already handled")
+        assertNull(
+            NotificationNavigation
+                .parse(
+                    restore,
+                    importReplyDraft = false,
+                    isTrustedTargetSignature = tokens::isValidTarget,
+                )?.replyDraft,
+        )
+    }
+
     private fun boundIntent(destination: NotificationTarget = target): Intent =
         Intent(context, MainActivity::class.java).also {
             NotificationNavigation.applyBoundToIntent(

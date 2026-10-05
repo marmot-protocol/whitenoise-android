@@ -21,17 +21,22 @@ class NotificationDraftTapMutabilityTest {
 
     @Test
     fun onlyOrdinaryMessageCardsAcceptMutableDraftFillIn() {
-        val cases = listOf(
-            update(NotificationTriggerFfi.NEW_MESSAGE, null) to true,
-            update(NotificationTriggerFfi.NEW_MESSAGE, "👍") to false,
-            update(NotificationTriggerFfi.GROUP_INVITE, null) to false,
-            update(NotificationTriggerFfi.REMOVED_FROM_GROUP, null) to false,
-            update(NotificationTriggerFfi.MADE_ADMIN, null) to false,
-        )
+        val cases =
+            listOf(
+                update(NotificationTriggerFfi.NEW_MESSAGE, null) to true,
+                update(NotificationTriggerFfi.NEW_MESSAGE, "👍") to false,
+                update(NotificationTriggerFfi.GROUP_INVITE, null) to false,
+                update(NotificationTriggerFfi.REMOVED_FROM_GROUP, null) to false,
+                update(NotificationTriggerFfi.MADE_ADMIN, null) to false,
+            )
         val presenter = LocalNotificationPresenter(context)
-        val method = presenter.javaClass.getDeclaredMethod(
-            "conversationPendingIntent", NotificationUpdateFfi::class.java, String::class.java,
-        ).apply { isAccessible = true }
+        val method =
+            presenter.javaClass
+                .getDeclaredMethod(
+                    "conversationPendingIntent",
+                    NotificationUpdateFfi::class.java,
+                    String::class.java,
+                ).apply { isAccessible = true }
         cases.forEachIndexed { index, (update, mutable) ->
             val pending = method.invoke(presenter, update, "card-$index") as PendingIntent
             val flags = shadowOf(pending).flags
@@ -40,7 +45,10 @@ class NotificationDraftTapMutabilityTest {
         }
     }
 
-    private fun update(trigger: NotificationTriggerFfi, reaction: String?): NotificationUpdateFfi {
+    private fun update(
+        trigger: NotificationTriggerFfi,
+        reaction: String?,
+    ): NotificationUpdateFfi {
         val user = NotificationUserFfi("1".repeat(64), "Alice", null)
         return NotificationUpdateFfi(
             notificationKey = "test-event",

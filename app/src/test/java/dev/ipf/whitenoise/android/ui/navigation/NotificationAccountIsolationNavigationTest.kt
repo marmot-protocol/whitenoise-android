@@ -44,7 +44,9 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -102,9 +104,10 @@ class NotificationAccountIsolationNavigationTest {
         state.setAppInForeground(true)
         val holder = MainShellStateHolder(state, SavedStateHandle())
         val routed = routedTarget(SOURCE_ACCOUNT)
-        val target = checkNotNull(routed.notificationTarget).copy(
-            replyDraft = NotificationReplyDraft("failed-route", "partial reply"),
-        )
+        val target =
+            checkNotNull(routed.notificationTarget).copy(
+                replyDraft = NotificationReplyDraft("failed-route", "partial reply"),
+            )
         val inbound = mutableStateOf<NotificationTarget?>(target)
         val handled = AtomicInteger()
         composeRule.setContent {
@@ -132,7 +135,11 @@ class NotificationAccountIsolationNavigationTest {
         composeRule.waitForIdle()
         assertEquals(1, handled.get())
         assertEquals(null, holder.selectedChat.value)
-        composeRule.runOnIdle { holder.release() }
+        composeRule.runOnIdle {
+            state.mutationsScope.cancel()
+            holder.release()
+        }
+        awaitCondition { state.mutationsScope.coroutineContext[Job]?.isCompleted != false }
     }
 
     @Test

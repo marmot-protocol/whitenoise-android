@@ -853,9 +853,10 @@ internal fun MainShell(
         val step =
             resolveNotificationNav(
                 target = target,
-                knownAccountRefs = appState.accounts
-                    .filter { target.replyDraft == null || !it.signedOut }
-                    .mapTo(mutableSetOf()) { it.label },
+                knownAccountRefs =
+                    appState.accounts
+                        .filter { target.replyDraft == null || !it.signedOut }
+                        .mapTo(mutableSetOf()) { it.label },
                 activeAccountRef = appState.activeAccountRef,
                 chatListReady = chatListReady,
                 availableGroupIds = availableGroupIds,

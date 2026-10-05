@@ -46,19 +46,32 @@ class NotificationReplyDraftHandoffTest {
             val fixture = fixture()
             val attachment =
                 MessageDraftAttachmentFfi(
-                    "file", "note.txt", "text/plain", byteArrayOf(1), null, null, null, emptyList(),
+                    "file",
+                    "note.txt",
+                    "text/plain",
+                    byteArrayOf(1),
+                    null,
+                    null,
+                    null,
+                    emptyList(),
                 )
-            fixture.gateway.drafts["account-b" to "group-b"] = draft("existing").copy(
-                replyToMessageIdHex = "quoted-message",
-                mediaAttachments = listOf(attachment),
-            )
+            fixture.gateway.drafts["account-b" to "group-b"] =
+                draft("existing").copy(
+                    replyToMessageIdHex = "quoted-message",
+                    mediaAttachments = listOf(attachment),
+                )
             fixture.gateway.drafts["account-a" to "group-b"] = draft("other account")
             assertTrue(fixture.handoff.stage(target("notification reply")))
             val saved = fixture.gateway.drafts.getValue("account-b" to "group-b")
             assertEquals("existing\nnotification reply", saved.content)
             assertEquals("quoted-message", saved.replyToMessageIdHex)
             assertEquals(listOf(attachment), saved.mediaAttachments)
-            assertEquals("other account", fixture.gateway.drafts.getValue("account-a" to "group-b").content)
+            assertEquals(
+                "other account",
+                fixture.gateway.drafts
+                    .getValue("account-a" to "group-b")
+                    .content,
+            )
         }
 
     @Test
@@ -86,7 +99,12 @@ class NotificationReplyDraftHandoffTest {
             fixture.gateway.failReadAfterCommit = true
             val target = target("partial")
             assertTrue(fixture.handoff.stage(target))
-            assertEquals("partial", fixture.gateway.drafts.getValue("account-b" to "group-b").content)
+            assertEquals(
+                "partial",
+                fixture.gateway.drafts
+                    .getValue("account-b" to "group-b")
+                    .content,
+            )
             assertEquals(1, fixture.gateway.saves)
             assertEquals("partial", fixture.store.get("account-b", "group-b"))
         }
@@ -255,7 +273,10 @@ private class HandoffDraftGateway : MessageDraftGateway {
     var failBeforeSaveCount = 0
     var attempts = 0
 
-    override fun read(accountRef: String, groupIdHex: String): MessageDraftFfi? {
+    override fun read(
+        accountRef: String,
+        groupIdHex: String,
+    ): MessageDraftFfi? {
         if (cancelNextRead) {
             cancelNextRead = false
             throw CancellationException("cancelled native delivery")
@@ -290,7 +311,10 @@ private class HandoffDraftGateway : MessageDraftGateway {
         return draft
     }
 
-    override fun delete(accountRef: String, groupIdHex: String) {
+    override fun delete(
+        accountRef: String,
+        groupIdHex: String,
+    ) {
         drafts.remove(accountRef to groupIdHex)
     }
 
@@ -299,11 +323,17 @@ private class HandoffDraftGateway : MessageDraftGateway {
 
 private object HandoffEditorStrings : EditorStringStore {
     override fun readAll(): Map<String, String> = emptyMap()
+
     override fun replaceAll(values: Map<String, String>): Boolean = true
+
     override fun clear() = Unit
 }
 
 private object HandoffDraftPersistence : DraftPersistence {
     override fun read(): Map<String, String> = emptyMap()
-    override fun write(key: String, value: String?) = Unit
+
+    override fun write(
+        key: String,
+        value: String?,
+    ) = Unit
 }

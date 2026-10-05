@@ -13,10 +13,16 @@ class NotificationTapTokens(
 ) {
     private val boundTap = NotificationBoundTap(preferences)
 
-    internal fun signatureFor(notificationKey: String, target: NotificationTarget): String? =
-        runCatching { boundTap.sign(notificationKey, tokenFor(notificationKey), target) }.getOrNull()
+    internal fun signatureFor(
+        notificationKey: String,
+        target: NotificationTarget,
+    ): String? = runCatching { boundTap.sign(notificationKey, tokenFor(notificationKey), target) }.getOrNull()
 
-    internal fun isValidTarget(notificationKey: String, signature: String?, target: NotificationTarget): Boolean {
+    internal fun isValidTarget(
+        notificationKey: String,
+        signature: String?,
+        target: NotificationTarget,
+    ): Boolean {
         val token = preferences.getString(storageKey(notificationKey), null)?.takeIf(::isPlausibleToken) ?: return false
         return boundTap.matches(notificationKey, token, target, signature)
     }

@@ -384,12 +384,18 @@ class MainActivity : AppCompatActivity() {
             setIntent(Intent(this, MainActivity::class.java))
             return
         }
+        val retainNotification = retainPendingShareOnRecreation && inboundNotificationTarget != null
         val parsedTarget =
-            NotificationNavigation.parse(
-                intent,
-                isTrustedTargetSignature = notificationTapTokens::isValidTarget,
-            ) { notificationKey, tapToken ->
-                notificationTapTokens.isValid(notificationKey, tapToken)
+            if (retainNotification) {
+                null
+            } else {
+                NotificationNavigation.parse(
+                    intent,
+                    importReplyDraft = !retainPendingShareOnRecreation,
+                    isTrustedTargetSignature = notificationTapTokens::isValidTarget,
+                ) { notificationKey, tapToken ->
+                    notificationTapTokens.isValid(notificationKey, tapToken)
+                }
             }
         val parsedShare =
             if (retainPendingShareOnRecreation && inboundShareRequest != null) {
@@ -401,7 +407,7 @@ class MainActivity : AppCompatActivity() {
             routeInboundIntent(
                 parsedTarget = parsedTarget,
                 shareRequest = parsedShare,
-                dataString = intent?.dataString,
+                dataString = intent?.dataString.takeUnless { retainNotification },
                 current =
                     InboundIntentRouting(
                         notificationTarget = inboundNotificationTarget,

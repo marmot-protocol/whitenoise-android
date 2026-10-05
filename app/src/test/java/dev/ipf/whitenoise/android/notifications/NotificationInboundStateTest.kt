@@ -13,10 +13,14 @@ class NotificationInboundStateTest {
     fun recreatedActivityOwnerRetainsPendingTextAndRequestIdentityUntilHandled() {
         val store = ViewModelStore()
         val original = state(store)
-        val target = NotificationTarget(
-            "account-b", "group-b", "message-b", NotificationTargetKind.MESSAGE,
-            NotificationReplyDraft("accepted-tap", "half typed"),
-        )
+        val target =
+            NotificationTarget(
+                "account-b",
+                "group-b",
+                "message-b",
+                NotificationTargetKind.MESSAGE,
+                NotificationReplyDraft("accepted-tap", "half typed"),
+            )
         original.target = target
         original.requestId = 7
 
@@ -33,20 +37,25 @@ class NotificationInboundStateTest {
     @Test
     fun separateTaskCannotInheritAnotherTasksPrivatePendingReply() {
         val firstStore = ViewModelStore()
-        state(firstStore).target = NotificationTarget(
-            "account-b", "group-b", null, NotificationTargetKind.MESSAGE,
-            NotificationReplyDraft("accepted-tap", "private text"),
-        )
+        state(firstStore).target =
+            NotificationTarget(
+                "account-b",
+                "group-b",
+                null,
+                NotificationTargetKind.MESSAGE,
+                NotificationReplyDraft("accepted-tap", "private text"),
+            )
         val secondStore = ViewModelStore()
         assertNull(state(secondStore).target)
         firstStore.clear()
         secondStore.clear()
     }
 
-    private fun state(store: ViewModelStore): NotificationInboundState = ViewModelProvider(
-        object : ViewModelStoreOwner {
-            override val viewModelStore: ViewModelStore = store
-        },
-        ViewModelProvider.NewInstanceFactory(),
-    )[NotificationInboundState::class.java]
+    private fun state(store: ViewModelStore): NotificationInboundState =
+        ViewModelProvider(
+            object : ViewModelStoreOwner {
+                override val viewModelStore: ViewModelStore = store
+            },
+            ViewModelProvider.NewInstanceFactory(),
+        )[NotificationInboundState::class.java]
 }

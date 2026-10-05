@@ -36,7 +36,8 @@ internal class NotificationBoundTap(
     ): Boolean {
         val secret = readSecret()
         val candidate = candidateSignature?.takeIf { it.length == SIGNATURE_CHARS }
-        return secret != null && candidate != null &&
+        return secret != null &&
+            candidate != null &&
             MessageDigest.isEqual(
                 signature(secret, notificationKey, tapToken, target).toByteArray(Charsets.UTF_8),
                 candidate.toByteArray(Charsets.UTF_8),

@@ -17,9 +17,13 @@ data class NotificationReplyDraft(
     override fun toString(): String = "NotificationReplyDraft(redacted)"
 }
 
-internal fun notificationReplyDraftFrom(intent: Intent, kind: NotificationTargetKind): NotificationReplyDraft? =
-    if (kind == NotificationTargetKind.MESSAGE) {
-        intent.getStringExtra(Notification.EXTRA_REMOTE_INPUT_DRAFT)
+internal fun notificationReplyDraftFrom(
+    intent: Intent,
+    kind: NotificationTargetKind,
+): NotificationReplyDraft? =
+    if (kind == NotificationTargetKind.MESSAGE && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) {
+        intent
+            .getStringExtra(Notification.EXTRA_REMOTE_INPUT_DRAFT)
             ?.takeIf { it.isNotBlank() && it.length <= MAX_REMOTE_DRAFT_CHARS }
             ?.let { NotificationReplyDraft(UUID.randomUUID().toString(), it) }
     } else {
@@ -44,5 +48,9 @@ internal fun NotificationNavigation.applyBoundToIntent(
     signature: String,
 ) {
     applyToIntent(intent, target, notificationKey, signature)
-    intent.data = intent.data?.buildUpon()?.appendQueryParameter(NOTIFICATION_BOUND_ROUTE_QUERY, "1")?.build()
+    intent.data =
+        intent.data
+            ?.buildUpon()
+            ?.appendQueryParameter(NOTIFICATION_BOUND_ROUTE_QUERY, "1")
+            ?.build()
 }
