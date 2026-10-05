@@ -439,7 +439,9 @@ class NotificationStreamForegroundService : Service() {
         }
 
         internal var foregroundPublisher: (NotificationStreamForegroundService, Notification, Int) -> Unit =
-            { service, notification, type -> service.startForeground(foregroundNotificationId(notification), notification, type) }
+            { service, notification, type ->
+                service.startForeground(foregroundNotificationId(notification), notification, type)
+            }
 
         /** Changing the presentation ID lets Android retire the old foreground card atomically. */
         internal fun foregroundNotificationId(notification: Notification): Int =

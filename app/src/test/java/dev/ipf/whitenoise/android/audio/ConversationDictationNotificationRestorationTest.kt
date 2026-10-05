@@ -72,14 +72,24 @@ class ConversationDictationNotificationRestorationTest {
                 try {
                     service.onStartCommand(startIntent(service, harness), 0, 1)
                     service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
-                    assertTrue(manager.activeNotifications.any { it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID })
+                    assertTrue(
+                        manager.activeNotifications.any {
+                            it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+                        },
+                    )
                     service.onStartCommand(actionCommand(service, harness, action), 0, 2)
-                    if (action != ConversationDictationForegroundService.ACTION_CANCEL) harness.platform.listener.onResult("recognized")
+                    if (action != ConversationDictationForegroundService.ACTION_CANCEL) {
+                        harness.platform.listener.onResult("recognized")
+                    }
                     runCurrent()
                     Snapshot.sendApplyNotifications()
                     shadowOf(Looper.getMainLooper()).idle()
                     assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-                    assertFalse(manager.activeNotifications.any { it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID })
+                    assertFalse(
+                        manager.activeNotifications.any {
+                            it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+                        },
+                    )
                     assertTrue(service.foreground.connectionServiceType != 0)
                     assertFalse(shadowOf(service as Service).isForegroundStopped)
                 } finally {

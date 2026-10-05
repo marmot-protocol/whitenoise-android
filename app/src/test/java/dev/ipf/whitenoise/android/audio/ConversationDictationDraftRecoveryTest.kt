@@ -82,7 +82,11 @@ internal class ConversationDictationDraftRecoveryTest {
                 1,
                 f.target,
                 "first",
-                options = ConversationDictationDraftRecovery.Options(restoreCapturedPrefix = true, ownedEmptyRevision = empty),
+                options =
+                    ConversationDictationDraftRecovery.Options(
+                        restoreCapturedPrefix = true,
+                        ownedEmptyRevision = empty,
+                    ),
             ),
         )
         assertEquals("Draft first", f.draft.value.text)
@@ -103,7 +107,12 @@ internal class ConversationDictationDraftRecoveryTest {
     @Test
     fun replayWordingChangesDoNotRepeatAnAcknowledgedPrefixAfterEditing() {
         val f = Fixture()
-        f.recovery.recover(1, f.target, "first second", options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first"))
+        f.recovery.recover(
+            1,
+            f.target,
+            "first second",
+            options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first"),
+        )
         f.edit("Draft first second edited")
         assertTrue(
             f.recovery.recover(
@@ -120,7 +129,12 @@ internal class ConversationDictationDraftRecoveryTest {
     @Test
     fun aDifferentUnacknowledgedResultIsNotBlindlyAppendedAfterEditing() {
         val f = Fixture()
-        f.recovery.recover(1, f.target, "first preview", options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first"))
+        f.recovery.recover(
+            1,
+            f.target,
+            "first preview",
+            options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first"),
+        )
         f.edit("Draft first preview edited")
         assertTrue(
             f.recovery.recover(
@@ -137,7 +151,12 @@ internal class ConversationDictationDraftRecoveryTest {
     @Test
     fun aFullyRewrittenProviderResultStillAppearsInAnEditedDraft() {
         val f = Fixture()
-        f.recovery.recover(1, f.target, "blue sky", options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = ""))
+        f.recovery.recover(
+            1,
+            f.target,
+            "blue sky",
+            options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = ""),
+        )
         f.edit("Draft blue sky edited")
         assertTrue(f.recovery.recover(1, f.target, "green fields"))
         assertEquals("Draft blue sky edited green fields", f.draft.value.text)

@@ -134,5 +134,7 @@ internal fun modelForegroundIdReplacement(
         val previous = shadowOf(service as Service).lastForegroundNotificationId
         publish(service, notification, type)
         val current = NotificationStreamForegroundService.foregroundNotificationId(notification)
-        if (previous != 0 && previous != current) service.getSystemService(NotificationManager::class.java).cancel(previous)
+        if (previous != 0 && previous != current) {
+            service.getSystemService(NotificationManager::class.java).cancel(previous)
+        }
     }

@@ -95,8 +95,10 @@ internal class ConversationForegroundRecord(
         if (!isCurrent() || !foregroundPromoted) return
         val type = connectionServiceType or dictation.foregroundServiceType
         val notification = foregroundNotification()
-        val sameId = NotificationStreamForegroundService.foregroundNotificationId(notification) == publishedNotificationId
-        if (type == publishedServiceType && sameId || type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0) return
+        val sameId =
+            NotificationStreamForegroundService.foregroundNotificationId(notification) == publishedNotificationId
+        val microphoneActive = type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0
+        if (type == publishedServiceType && sameId || microphoneActive) return
         if (type == 0) {
             removeForegroundAndStop(serviceStartId())
         } else {
@@ -170,7 +172,9 @@ internal class ConversationForegroundRecord(
             publishedNotificationId = 0
         }
         val stopped = service.stopSelfResult(startId)
-        conversationDictationDiagnostic("event=foreground_notification_closed accepted=$stopped foreground=$foregroundPromoted")
+        conversationDictationDiagnostic(
+            "event=foreground_notification_closed accepted=$stopped foreground=$foregroundPromoted",
+        )
     }
 
     fun onDestroy() {

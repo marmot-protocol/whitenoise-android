@@ -83,8 +83,20 @@ internal class ConversationDictationDraftRecovery(
             val revision =
                 runCatching { write(target.accountRef, target.groupIdHex, current.revision, value) }
                     .getOrNull() ?: return@repeat
-            val originalUnchanged = sameDraft(ConversationDictationDraftSnapshot(target.capturedDraft, target.capturedDraftRevision), current)
-            val ownsEmpty = (previous?.emptiedRevision ?: options.ownedEmptyRevision) == current.revision && current.value.text.isEmpty()
+            val originalUnchanged =
+                sameDraft(
+                    ConversationDictationDraftSnapshot(target.capturedDraft, target.capturedDraftRevision),
+                    current,
+                )
+            val ownsEmpty =
+                (previous?.emptiedRevision ?: options.ownedEmptyRevision) == current.revision &&
+                    current.value.text.isEmpty()
+            val sendEligible =
+                if (previous == null) {
+                    originalUnchanged || ownsEmpty
+                } else {
+                    (unchanged || ownsEmpty) && previous.sendEligible
+                }
             receipt =
                 Receipt(
                     session,
@@ -92,7 +104,7 @@ internal class ConversationDictationDraftRecovery(
                     text,
                     options.acknowledgedPrefix ?: previous?.acknowledgedPrefix ?: text,
                     ConversationDictationDraftSnapshot(value, revision),
-                    if (previous == null) originalUnchanged || ownsEmpty else (unchanged || ownsEmpty) && previous.sendEligible,
+                    sendEligible,
                     insertion.base,
                     insertion.prefix,
                     insertion.appendOnly,
@@ -149,7 +161,8 @@ internal class ConversationDictationDraftRecovery(
             else ->
                 when (val merged = mergeConversationDictationTranscript(target.capturedDraft, insertion.base, delta)) {
                     is ConversationDictationMerge.Applied -> merged.value
-                    ConversationDictationMerge.NeedsAppendFallback -> appendConversationDictationTranscript(insertion.base, delta)
+                    ConversationDictationMerge.NeedsAppendFallback ->
+                        appendConversationDictationTranscript(insertion.base, delta)
                 }
         }
     }

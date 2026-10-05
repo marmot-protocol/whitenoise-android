@@ -2862,7 +2862,12 @@ internal class ConversationDictationController internal constructor(
             if (recoverRecognizedDraft(sessionId, target, transcript)) {
                 complete(target)
             } else {
-                fail(sessionId, target, failureCause ?: ConversationDictationFailure.Unknown, retainedTranscript = transcript)
+                fail(
+                    sessionId,
+                    target,
+                    failureCause ?: ConversationDictationFailure.Unknown,
+                    retainedTranscript = transcript,
+                )
             }
         } else {
             clearRecognitionSession(cancel = true)
@@ -2946,7 +2951,10 @@ internal class ConversationDictationController internal constructor(
                 draftRecovered = recovered,
             )
         notificationActionGeneration += 1L
-        if (recovered && !foregroundMicrophoneRequired && !runCatching(platform::callerAudioHasPending).getOrDefault(true)) {
+        if (recovered &&
+            !foregroundMicrophoneRequired &&
+            !runCatching(platform::callerAudioHasPending).getOrDefault(true)
+        ) {
             releaseDurableSessionLease()
         }
         (state as ConversationDictationState.Failed)
@@ -3114,7 +3122,14 @@ internal class ConversationDictationController internal constructor(
             return
         }
         if (draftRecovery.owns(sessionId, target)) {
-            if (draftRecovery.recover(sessionId, target, transcript, options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = transcript))) {
+            val recovered =
+                draftRecovery.recover(
+                    sessionId,
+                    target,
+                    transcript,
+                    options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = transcript),
+                )
+            if (recovered) {
                 complete(target)
             } else {
                 fail(sessionId, target, ConversationDictationFailure.Unknown, retainedTranscript = transcript)
@@ -3225,7 +3240,12 @@ internal class ConversationDictationController internal constructor(
         transcript: String,
     ) {
         if (draftRecovery.owns(sessionId, target)) {
-            draftRecovery.recover(sessionId, target, transcript, options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = transcript))
+            draftRecovery.recover(
+                sessionId,
+                target,
+                transcript,
+                options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = transcript),
+            )
         }
         val admissionTarget = draftRecovery.sendTarget(sessionId, target)
         val current = readDraft(target.accountRef, target.groupIdHex)
@@ -3268,7 +3288,9 @@ internal class ConversationDictationController internal constructor(
             sendRequest.copy(
                 beginDispatch = {
                     beginDictationDispatch(sessionId, admissionTarget, claim).also { started ->
-                        if (started) draftRecovery.updateDispatch(sessionId, target, clearedRevision = claim.emptiedRevision)
+                        if (started) {
+                            draftRecovery.updateDispatch(sessionId, target, clearedRevision = claim.emptiedRevision)
+                        }
                     }
                 },
                 onDispatchRejectedBeforeTransport = {
@@ -3556,7 +3578,9 @@ internal class ConversationDictationController internal constructor(
                     transcript,
                     options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = acknowledgedPrefix),
                 )
-        conversationDictationDiagnostic("event=paste_write outcome=${if (recovered) "accepted" else "retained"} source=latest_draft")
+        conversationDictationDiagnostic(
+            "event=paste_write outcome=${if (recovered) "accepted" else "retained"} source=latest_draft",
+        )
         return recovered
     }
 
