@@ -123,6 +123,37 @@ class AttachmentDownloadWorkerClassTest {
             assertEquals(2, attempts)
         }
 
+    /** Platform interruptions inflate the run count, so the failure follow-up must not depend on it. */
+    @Test
+    fun transientFailureStillRetriesOnceAfterManyPlatformInterruptions() =
+        runTest {
+            val download: DownloadOverride = { _, _, _ ->
+                throw java.io.IOException("synthetic transport interruption")
+            }
+            val intents =
+                AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+
+            assertEquals(Result.retry(), buildWorkerWithDownloadOverride(download, runAttemptCount = 40).doWork())
+            assertTrue(intents.hasSpentTransientRetry(testRequest()))
+            assertEquals(Result.failure(), buildWorkerWithDownloadOverride(download, runAttemptCount = 41).doWork())
+            // Reaching a terminal result restores the follow-up for the next transfer of this attachment.
+            assertFalse(intents.hasSpentTransientRetry(testRequest()))
+            assertEquals(Result.retry(), buildWorkerWithDownloadOverride(download, runAttemptCount = 0).doWork())
+        }
+
+    /** A completed download restores the follow-up even when an earlier failure spent it. */
+    @Test
+    fun successRestoresTheTransientRetryFollowUp() =
+        runTest {
+            val intents =
+                AttachmentDownloadIntentStore(appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE))
+            intents.spendTransientRetry(testRequest())
+
+            assertEquals(Result.success(), buildWorkerWithDownloadOverride({ _, _, _ -> true }).doWork())
+
+            assertFalse(intents.hasSpentTransientRetry(testRequest()))
+        }
+
     @Test
     fun completedBodyWithoutRetentionIsTerminalForAutomaticAndInteractiveWork() =
         runTest {
@@ -226,6 +257,8 @@ class AttachmentDownloadWorkerClassTest {
             assertTrue(run.isCancelled)
             assertTrue(runCatching { run.await() }.exceptionOrNull() is CancellationException)
             assertTrue(intents.isInteractive(request))
+            // An interruption is not a download failure, so it leaves the failure follow-up untouched.
+            assertFalse(intents.hasSpentTransientRetry(request))
             val stopped =
                 ShadowLog.getLogsForTag("DMAttachmentWorker").filter { it.msg.startsWith("attachment_work_stopped") }
             assertEquals(1, stopped.size)
