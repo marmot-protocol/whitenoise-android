@@ -709,6 +709,8 @@ data class TimelineMessage(
      * duration and deadline.
      */
     val retentionAtSendSeconds: ULong? = null,
+    /** Transient row identity retained across an exact local-send handoff; actions still use [record]. */
+    val presentationId: String = id,
 )
 
 /**
@@ -6371,6 +6373,9 @@ class ConversationController(
     var timeline by mutableStateOf(initialTimeline)
         private set
 
+    /** UI identity aliases only, bounded to this controller's retained timeline window. */
+    private val timelinePresentationIds = mutableMapOf<String, String>()
+
     /** Recovery generation represented by the latest authoritative timeline. */
     var recoveryProjectionGeneration by mutableLongStateOf(0L)
         private set
@@ -8995,6 +9000,7 @@ class ConversationController(
                                 MessageStatus.Sent,
                                 timelineOrder = order,
                                 retentionAtSendSeconds = retentionAtSendSeconds,
+                                presentationId = key,
                             )
                         // Register the bridge through the same tracked preserve path
                         // as text sends so orphan cleanup can release its overrides
@@ -12741,6 +12747,7 @@ class ConversationController(
         optimisticId: String,
     ) {
         val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
+        timelinePresentationIds[projectedId] = optimistic.presentationId
         durableStreamPositionOverrideIds.remove(projectedId)
         durableStreamDisplayParentByMessageId.remove(projectedId)
         preservedTimelinePositionOverrideIds.add(projectedId)
@@ -13086,6 +13093,7 @@ class ConversationController(
                     },
             displayAfterMessageIdHex = durableStreamDisplayParentByMessageId[record.messageIdHex],
             retentionAtSendSeconds = retentionAtSendSeconds.takeIf { actionRecord.retentionSeconds == null },
+            presentationId = timelinePresentationIds[record.messageIdHex] ?: projectedItemId(record),
         )
     }
 
@@ -13240,6 +13248,7 @@ class ConversationController(
             orderTimelineMessagesForDisplay(
                 (visible + streamDebugTimelineItems.values).map { it.withOptimisticEditStatus() },
             )
+        timelinePresentationIds.keys.retainAll(timeline.mapTo(HashSet()) { it.record.messageIdHex })
         // The optimistic→confirmed handoff snapshot is intentionally preserved;
         // do not report it as the stale-override symptom this detector targets.
         logTimelineInversionsForDebug(timeline, optimisticSendPositionPreserves.snapshot())
