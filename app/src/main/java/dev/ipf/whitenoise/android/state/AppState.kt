@@ -6182,6 +6182,7 @@ class WhiteNoiseAppState private constructor(
         composerDraftExpansionBridge.removeAccount(signedOutRef)
         pendingMessageEditHandoff.removeAccount(signedOutRef)
         notificationReplyDraftHandoff.removeAccount(signedOutRef)
+        draftWriter.removeAccount(signedOutRef)
         conversationDictation.onAccountUnavailable(signedOutRef)
         stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
@@ -6278,6 +6279,7 @@ class WhiteNoiseAppState private constructor(
             composerDraftExpansionBridge.removeAccount(wipedRef)
             pendingMessageEditHandoff.removeAccount(wipedRef)
             notificationReplyDraftHandoff.removeAccount(wipedRef)
+            draftWriter.removeAccount(wipedRef)
             clearConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },

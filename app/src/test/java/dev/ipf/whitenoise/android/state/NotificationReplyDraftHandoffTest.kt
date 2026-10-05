@@ -17,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -133,6 +134,38 @@ class NotificationReplyDraftHandoffTest {
             assertTrue(fixture.handoff.stage(target))
             assertEquals(1, fixture.failures)
             assertEquals("partial", fixture.store.get("account-b", "group-b"))
+        }
+
+    @Test
+    fun routingRestartsShareOneNavigationWaitDeadline() =
+        runTest {
+            val fixture = fixture(debounceMillis = 10_000L)
+            fixture.writer.submit("account-b", "group-b", "queued")
+            val first = async { fixture.handoff.stage(target("partial")) }
+            runCurrent()
+            advanceTimeBy(1_000L)
+            first.cancel()
+            val second = async { fixture.handoff.stage(target("partial")) }
+            assertFalse(second.await())
+            assertEquals(3_000L, testScheduler.currentTime)
+            assertEquals(0, fixture.failures)
+            advanceUntilIdle()
+            assertEquals("queued\npartial", fixture.store.get("account-b", "group-b"))
+        }
+
+    @Test
+    fun accountRemovalRetiresFailedComposerTextBeforeTheAccountCanBeReused() =
+        runTest {
+            val fixture = fixture()
+            fixture.gateway.failBeforeSaveCount = 1
+            val oldGeneration = fixture.writer.submit("account-b", "group-b", "private failed edit")
+            advanceUntilIdle()
+            fixture.handoff.removeAccount("account-b")
+            fixture.writer.removeAccount("account-b")
+            assertFalse(fixture.writer.isCurrent("account-b", "group-b", oldGeneration))
+            assertTrue(fixture.handoff.stage(target("fresh reply")))
+            assertEquals("fresh reply", fixture.store.get("account-b", "group-b"))
+            assertEquals(1, fixture.gateway.saves)
         }
 
     @Test
@@ -284,7 +317,13 @@ class NotificationReplyDraftHandoffTest {
         val store = DraftStore(HandoffDraftPersistence)
         return DraftHandoffFixture(gateway, writer, store).also {
             it.handoff =
-                NotificationReplyDraftHandoff(this, writer, store, onFailed = { it.failures += 1 }) {
+                NotificationReplyDraftHandoff(
+                    this,
+                    writer,
+                    store,
+                    onFailed = { it.failures += 1 },
+                    nowMillis = { testScheduler.currentTime },
+                ) {
                     it.hydrations += 1
                 }
         }

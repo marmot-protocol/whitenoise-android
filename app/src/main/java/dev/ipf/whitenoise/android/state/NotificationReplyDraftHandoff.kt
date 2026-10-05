@@ -22,6 +22,7 @@ internal class NotificationReplyDraftHandoff(
     private val store: DraftStore,
     private val available: (NotificationTarget) -> Boolean = { true },
     private val onFailed: () -> Unit = {},
+    private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000L },
     private val onHydrated: () -> Unit,
 ) {
     private val deliveries = linkedMapOf<String, Deferred<Boolean>>()
@@ -30,14 +31,15 @@ internal class NotificationReplyDraftHandoff(
     /** A cancelled navigation waiter cannot cancel or replay an already-started local save. */
     suspend fun stage(target: NotificationTarget): Boolean {
         val draft = target.replyDraft ?: return true
-        val intake = pending.getOrPut(draft.id) { PendingReply(target) }
+        val intake = pending.getOrPut(draft.id) { PendingReply(target, nowMillis() + HANDOFF_WAIT_MILLIS) }
         val previous = deliveries[draft.id]
         previous?.let { cached ->
             val retryable = cached.isCancelled || (cached.isCompleted && !awaitDelivery(cached))
             if (retryable) deliveries.remove(draft.id, cached)
         }
         val delivery = deliveries.getOrPut(draft.id) { scope.async { deliver(intake) } }
-        val applied = withTimeoutOrNull(HANDOFF_WAIT_MILLIS) { awaitDelivery(delivery) } == true
+        val remainingWait = (intake.deadlineMillis - nowMillis()).coerceAtLeast(0L)
+        val applied = withTimeoutOrNull(remainingWait) { awaitDelivery(delivery) } == true
         if (applied || !available(target)) pending.remove(draft.id)
         if (!applied && delivery.isCompleted) deliveries.remove(draft.id, delivery)
         pruneReceipts()
@@ -127,6 +129,7 @@ internal class NotificationReplyDraftHandoff(
 
     private class PendingReply(
         val target: NotificationTarget,
+        val deadlineMillis: Long,
     ) {
         val receipt = MessageDraftMergeReceipt()
         var failureReported = false

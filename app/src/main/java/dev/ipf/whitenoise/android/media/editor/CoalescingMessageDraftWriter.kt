@@ -161,6 +161,24 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
+    /** Account removal retires unsaved private text and invalidates late saves/hydration without a native write. */
+    fun removeAccount(accountRef: String) {
+        val jobs =
+            synchronized(lock) {
+                val keys =
+                    (pending.keys + activeMerges.keys + hydrationBlockedGenerations.keys)
+                        .filter { it.accountRef == accountRef }
+                        .toSet()
+                keys.mapNotNull { key ->
+                    drafts.coordinated.acceptMutation(key.accountRef, key.groupIdHex)
+                    activeMerges.remove(key)
+                    hydrationBlockedGenerations.remove(key)
+                    pending.remove(key)?.job
+                }
+            }
+        jobs.forEach { it.cancel() }
+    }
+
     suspend fun loadIfCurrent(
         accountRef: String,
         groupIdHex: String,
