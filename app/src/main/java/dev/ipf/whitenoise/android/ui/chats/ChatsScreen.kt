@@ -102,6 +102,7 @@ import dev.ipf.whitenoise.android.state.deleteLocalChatsBatch
 import dev.ipf.whitenoise.android.state.hasEarlierChats
 import dev.ipf.whitenoise.android.state.loadEarlierChats
 import dev.ipf.whitenoise.android.state.loadMoreChats
+import dev.ipf.whitenoise.android.state.LocalDeleteNotice
 import dev.ipf.whitenoise.android.state.presentStoppedLocalChatDeleteBatch
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reportVisibleChat
@@ -1985,7 +1986,14 @@ internal fun ChatsScreen(
                             )
                         }
                     if (isCurrent() && result.deleted < result.total) {
-                        appState.presentStoppedLocalChatDeleteBatch(result, failure)
+                        val remaining = request.remaining(result.deleted)
+                        appState.presentStoppedLocalChatDeleteBatch(
+                            result,
+                            failure,
+                            notice = LocalDeleteNotice(requireNotNull(controller.accountRef), remaining.groupIds.toSet()) {
+                                if (isCurrent()) pendingBulkDelete = remaining
+                            },
+                        )
                     } else if (isCurrent() && result.deleted > 0 && !cleanupDeferred) {
                         appState.presentTransient(
                             context.resources.getQuantityString(

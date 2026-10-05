@@ -137,6 +137,7 @@ data class ToastMessage(
     // The send attempt this notice reports, when it reports one, so a later
     // recovery of that same send can retire it (#2666).
     val sendAttempt: SendFailureAttempt? = null,
+    val localDeleteNotice: LocalDeleteNotice? = null,
 )
 
 data class TransientNotice(

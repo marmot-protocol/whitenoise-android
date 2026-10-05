@@ -38,10 +38,13 @@ internal suspend fun deleteLocalChatsBatch(
 internal fun WhiteNoiseAppState.presentStoppedLocalChatDeleteBatch(
     result: LocalChatDeleteBatchResult,
     failure: Throwable?,
+    notice: LocalDeleteNotice? = toast?.localDeleteNotice,
 ) {
     if (result.total <= 1) return
     val detail = AppText.Resource(R.string.chat_list_delete_stopped_detail, listOf(result.deleted, result.total))
-    if (failure != null) {
+    if (notice != null) {
+        presentLocalDeleteFailure(R.string.chat_list_delete_stopped, failure, detail, notice)
+    } else if (failure != null) {
         presentFailure(R.string.chat_list_delete_stopped, "CHAT_LOCAL_DELETE", failure, detail)
     } else {
         present(R.string.chat_list_delete_stopped, detail)

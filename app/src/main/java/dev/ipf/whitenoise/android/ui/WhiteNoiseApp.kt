@@ -396,15 +396,22 @@ internal fun WhiteNoiseApp(
     }
     LaunchedEffect(toast) {
         if (toast != null) {
-            snackbarHostState.showSnackbar(
+            val deletion = toast.localDeleteNotice
+            val result = snackbarHostState.showSnackbar(
                 ToastSnackbarVisuals(
-                    message = listOfNotNull(toast.title.resolve(context), toast.detail?.resolve(context)).joinToString("\n"),
+                    message = if (deletion != null) toast.title.resolve(context) else
+                        listOfNotNull(toast.title.resolve(context), toast.detail?.resolve(context)).joinToString("\n"),
                     copyable = toast.copyable,
                     tier = toast.tier,
                     copyText = toast.diagnosticReport,
+                    details = deletion?.let {
+                        listOfNotNull(toast.detail?.resolve(context), toast.diagnosticReport).joinToString("\n\n")
+                    },
+                    actionLabel = deletion?.retry?.let { context.getString(R.string.retry) },
                 ),
             )
             appState.clearToast(toast)
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) deletion?.retry?.invoke()
         }
     }
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)

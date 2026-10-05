@@ -28,6 +28,7 @@ import java.lang.reflect.Proxy
 import java.time.Duration
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 
@@ -113,7 +114,7 @@ class LocalGroupDeleteControllerTest {
         }
 
     @Test
-    fun committedDeletionWithFailedClientCleanupKeepsRowAbsentAndExplainsDeferredCleanup() =
+    fun committedDeletionWithFailedClientCleanupKeepsRowAbsentAndRetriesQuietly() =
         runTest {
             val fixture = fixture("selectedMessageDraft")
             var cleanupDeferred = 0
@@ -128,12 +129,54 @@ class LocalGroupDeleteControllerTest {
             assertEquals(1, fixture.calls.count { it == "deleteGroupLocal" })
             assertTrue(fixture.controller.items.none { it.id == GROUP })
             assertTrue(fixture.state.localGroupDeleteCleanupJournal.hasPending())
-            assertEquals(AppText.Resource(R.string.toast_chat_deleted_local), fixture.state.toast?.title)
-            assertEquals(AppText.Resource(R.string.local_delete_cleanup_pending), fixture.state.toast?.detail)
-            assertTrue(requireNotNull(fixture.state.toast?.diagnosticReport).contains("phase=post_commit_cleanup"))
+            assertEquals(null, fixture.state.toast)
             assertEquals(null, fixture.state.transientNotice)
             assertFalse(fixture.calls.any { it.contains("leave", ignoreCase = true) })
         }
+
+    @Test
+    fun successfulRetryRetiresItsWarningAndKeepsTheSafePresenceCheck() = runTest {
+        val fixture = fixture("deleteGroupLocal")
+        assertFalse(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+        assertNotNull(fixture.state.toast?.localDeleteNotice?.retry)
+        fixture.failureMethod.set(null)
+        val readsBefore = fixture.calls.count { it == "chatListRow" }
+        assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+        assertTrue(fixture.calls.count { it == "chatListRow" } > readsBefore)
+        assertEquals(null, fixture.state.toast)
+        assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+    }
+
+    @Test
+    fun backgroundRecoveryRetiresTheWarningWithoutAnotherNativeDelete() = runTest {
+        val fixture = fixture("selectedMessageDraft")
+        assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+        fixture.state.presentLocalDeleteFailure(
+            R.string.toast_couldnt_delete_chat, MarmotKitException.TransportClosed(),
+            notice = LocalDeleteNotice(ACCOUNT, setOf(GROUP)),
+        )
+        fixture.failureMethod.set(null)
+        fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+        assertEquals(null, fixture.state.toast)
+        assertEquals(null, fixture.state.transientNotice)
+        assertEquals(1, fixture.calls.count { it == "deleteGroupLocal" })
+        assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+    }
+
+    @Test
+    fun deferredCleanupRetainsAnUnrelatedWarningAndRecoversSilently() = runTest {
+        val fixture = fixture("selectedMessageDraft")
+        fixture.state.present(R.string.toast_couldnt_delete_chat)
+        val other = fixture.state.toast
+        assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+        assertEquals(other, fixture.state.toast)
+        assertEquals(null, fixture.state.transientNotice)
+        fixture.failureMethod.set(null)
+        fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+        assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+        assertEquals(other, fixture.state.toast)
+        assertEquals(null, fixture.state.transientNotice)
+    }
 
     @Test
     fun retainedAccountReactivationRejectsGestureBeforeOptimisticRowRemoval() =
@@ -171,7 +214,8 @@ class LocalGroupDeleteControllerTest {
     ): Fixture {
         val calls = ConcurrentLinkedQueue<String>()
         val present = AtomicBoolean(true)
-        val native = native(calls, present, failing, onRowRead)
+        val failureMethod = AtomicReference(failing)
+        val native = native(calls, present, failureMethod, onRowRead)
         val context = ApplicationProvider.getApplicationContext<Context>()
         val state =
             WhiteNoiseAppState(
@@ -190,7 +234,7 @@ class LocalGroupDeleteControllerTest {
         controller.applyChatListRow(chatRow(GROUP))
         controller.setChatListVisible(true)
         assertEquals("fixture must begin with the real visible row", listOf(GROUP), controller.items.map { it.id })
-        return Fixture(state, controller, calls)
+        return Fixture(state, controller, calls, failureMethod)
     }
 
     /** Exercise the production debounced projection before checking visible-row mutations. */
@@ -201,7 +245,7 @@ class LocalGroupDeleteControllerTest {
     private fun native(
         calls: ConcurrentLinkedQueue<String>,
         present: AtomicBoolean,
-        failing: String?,
+        failing: AtomicReference<String?>,
         onRowRead: () -> Unit,
     ): MarmotInterface =
         Proxy.newProxyInstance(
@@ -210,7 +254,7 @@ class LocalGroupDeleteControllerTest {
         ) { proxy, method, arguments ->
             val name = method.name.substringBefore('-')
             calls += name
-            if (name == failing) {
+            if (name == failing.get()) {
                 val failure = MarmotKitException.TransportClosed()
                 val continuation = arguments?.lastOrNull() as? Continuation<*>
                 if (continuation != null) {
@@ -252,6 +296,7 @@ class LocalGroupDeleteControllerTest {
         val state: WhiteNoiseAppState,
         val controller: ChatsController,
         val calls: ConcurrentLinkedQueue<String>,
+        val failureMethod: AtomicReference<String?>,
     )
 
     private companion object {

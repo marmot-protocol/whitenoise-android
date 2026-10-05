@@ -4796,16 +4796,20 @@ class ChatsController private constructor(
                 }
                 if (failure is CancellationException) throw failure
                 if (isCurrent()) {
-                    appState.presentFailure(
+                    appState.presentLocalDeleteFailure(
                         failureMessage,
-                        "CHAT_LOCAL_DELETE",
                         failure,
-                        detail = AppText.Resource(R.string.local_delete_retry_detail),
+                        notice = LocalDeleteNotice(account, setOf(groupIdHex)) {
+                            appState.launchMutation {
+                                if (isCurrent()) deleteGroupLocalFromChatList(groupIdHex, failureMessage = failureMessage)
+                            }
+                        },
                     )
                     observer.onFailure(failure)
                 }
                 false
             } else if (isCurrent()) {
+                appState.dismissLocalDeleteFailure(account, groupIdHex)
                 removeChatRow(groupIdHex)
                 finishRemovedChatRowClientState(groupIdHex)
                 if (!wipe.getOrDefault(false)) observer.onCleanupDeferred()
