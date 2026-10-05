@@ -176,6 +176,29 @@ bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Zapstore referen
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-apk-recreation
 ```
 
+The `controller-forward` mode measures the shipping forward path for a small text attachment
+([#2556](https://github.com/marmot-protocol/whitenoise-android/issues/2556)). Two generated identities share three
+loopback groups: the author's source chat, the forwarder's own source chat and a destination chat. The author sends one
+generated 1 KiB `text/plain` file; the forwarder then sends the same bytes directly into the destination five times
+through `ConversationController.sendAttachments` as the baseline, and forwards through `startForwardMessages` five times
+each with the source **uncached** (never opened), **retained** (opened once, so held only in native retention) and
+**cached** (the forwarder's own send, whose encrypted host copy the shipping publication wrote). Each forward restarts a
+local diagnostics session and records the app's own `op=message_forward` phase lines (source lookup, source download,
+materialization, destination upload, commit-lock wait, publication, terminal), the time to the terminal state, and the
+author's genuine receipt and exact read of the forwarded copy. A numbered ledger marker brackets every sample.
+`forward_checker.py` requires every phase to be timed, exactly one completed message and one attachment per forward with
+no retry or convergence, the memory, host-disk and native layers in the state the variant declares, a source download
+only for the uncached source (a retained or host-cached source is served locally and never crosses the network again),
+exactly one receipt per forwarded copy, one distinct destination message per send, and the issue's per-forward ceilings
+(15 s for a retained or cached source, 30 s uncached) as loopback regression guards. It reports each variant's slowest forward against the direct-send median and the issue's two-times
+relation, but does not fail on that relation, because loopback fixed costs dominate both numbers. It records
+`physical_device_qualified: false`; the physical cached and uncached matrices on known-responsive infrastructure remain
+separate.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-forward
+```
+
 These are **transport interruption** checks. They do not simulate a JobScheduler
 stop or Android process death. Latency and sampled Java/native peaks remain in
 the report, but representative 4 MiB performance is explicitly unqualified;
