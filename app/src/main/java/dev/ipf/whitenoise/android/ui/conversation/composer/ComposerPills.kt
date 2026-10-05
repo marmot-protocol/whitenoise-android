@@ -128,7 +128,6 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
@@ -649,7 +648,7 @@ internal fun ComposerPill(
             hasUserShare ||
             hasContactShare
     var multilineControls by remember { mutableStateOf(false) }
-    val showDraftTop by remember { derivedStateOf { composerScrollState.value > 0 } }
+    val showDraftTop by remember(composerScrollState) { derivedStateOf { composerScrollState.value > 0 } }
     val leadingControlsWidth = if (hasAttachmentAction) 80.dp else 40.dp
     val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
@@ -1364,11 +1363,16 @@ internal fun ComposerPill(
                                 Modifier.layout { measurable, constraints ->
                                     // Stays clear of the leading tools; the label ellipsizes first.
                                     val available =
-                                        (navigationSurfaceWidth - leadingControlsWidth - reservedTrailingWidth -
-                                            dictationControlWidth).coerceAtLeast(0.dp).roundToPx()
+                                        (
+                                            navigationSurfaceWidth - leadingControlsWidth - reservedTrailingWidth -
+                                                dictationControlWidth
+                                        ).coerceAtLeast(0.dp).roundToPx()
                                     val child =
                                         measurable.measure(
-                                            constraints.copy(minWidth = 0, maxWidth = minOf(constraints.maxWidth, available)),
+                                            constraints.copy(
+                                                minWidth = 0,
+                                                maxWidth = minOf(constraints.maxWidth, available),
+                                            ),
                                         )
                                     layout(child.width, child.height) { child.placeRelative(0, 0) }
                                 },

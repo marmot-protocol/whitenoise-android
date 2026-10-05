@@ -31,8 +31,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -119,6 +119,60 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
         assertTrue("release velocity should keep reading moving", scroll() > releaseScroll + 10f)
         assertEquals(original, observed)
+    }
+
+    @Test
+    fun downwardReadingFlickReachesTheDraftStartWithoutMovingTheCaret() {
+        render((1..32).joinToString("\n") { "Synthetic line $it" })
+        val original = observed
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNode(hasSetTextAction()).performTouchInput {
+            swipe(Offset(center.x, 8f), Offset(center.x, height * 0.6f), durationMillis = 80)
+        }
+        assertTrue("the release must leave content for momentum to traverse", scroll() > 0f)
+        composeRule.mainClock.advanceTimeBy(2000)
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        assertEquals("momentum must reach the beginning", 0f, scroll(), 1f)
+        assertEquals(original, observed)
+    }
+
+    @Test
+    fun changingOwnerToAnUnscrolledDraftHidesThePreviousTopAction() {
+        lateinit var changeOwner: () -> Unit
+        composeRule.setContent {
+            var owner by remember { mutableStateOf(0) }
+            changeOwner = { owner++ }
+            WhiteNoiseTheme {
+                Surface(Modifier.width(300.dp).height(192.dp)) {
+                    ComposerPill(
+                        textFieldValue =
+                            if (owner == 0) {
+                                TextFieldValue(longDraft, TextRange(longDraft.length))
+                            } else {
+                                TextFieldValue("Short")
+                            },
+                        composerFocus = remember { FocusRequester() },
+                        emojiPickerOpen = false,
+                        onValueChange = {},
+                        onEmojiPickerToggle = {},
+                        onAttachmentsToggle = {},
+                        attachmentSheetOpen = false,
+                        onPickFromGallery = null,
+                        onPickDocument = null,
+                        expansionMode = ComposerExpansionMode.Manual,
+                        compactMeasurementWidth = 300.dp,
+                        scrollOwnerKey = owner,
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        composeRule.runOnIdle { changeOwner() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
+        assertEquals(0f, scroll(), 1f)
     }
 
     @Test
