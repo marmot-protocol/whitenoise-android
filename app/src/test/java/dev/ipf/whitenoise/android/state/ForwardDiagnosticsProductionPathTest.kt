@@ -110,7 +110,7 @@ class ForwardDiagnosticsProductionPathTest {
                 destinationAccountRef = ACCOUNT,
             )
         assertTrue(started)
-        val terminal = awaitTerminal(appState)
+        val terminal = awaitTerminalDiagnostics(appState)
         assertEquals(ForwardOperationPhase.Completed, terminal.phase)
 
         val lines = PerformanceDiagnostics.exportLines().filter { " op=message_forward " in it }
@@ -164,8 +164,8 @@ class ForwardDiagnosticsProductionPathTest {
             running = true,
         )
 
-    /** Pumps the main looper until the operation leaves its active phases. */
-    private fun awaitTerminal(
+    /** Waits for both terminal UI state and the independently scheduled terminal diagnostic before exporting. */
+    private fun awaitTerminalDiagnostics(
         appState: WhiteNoiseAppState,
         timeoutMillis: Long = 20_000,
     ): ForwardOperationSnapshot {
@@ -173,10 +173,14 @@ class ForwardDiagnosticsProductionPathTest {
         while (System.currentTimeMillis() < deadline) {
             shadowOf(Looper.getMainLooper()).idle()
             val snapshot = appState.activeForwardOperation.value
-            if (snapshot != null && !snapshot.isActive) return snapshot
+            val diagnosticComplete =
+                PerformanceDiagnostics.exportLines().any {
+                    " op=message_forward " in it && " phase=forward_complete " in it
+                }
+            if (snapshot != null && !snapshot.isActive && diagnosticComplete) return snapshot
             Thread.sleep(5)
         }
-        error("forward operation did not reach a terminal state")
+        error("forward operation did not reach terminal state and emit its terminal diagnostic")
     }
 
     /** Builds one complete authoritative media reference. */

@@ -601,7 +601,7 @@
     <string name="preview">Visualização</string>
     <string name="no_active_account_period">Nenhuma conta ativa.</string>
     <string name="about">Sobre</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">Endereço NIP-05</string>
     <string name="nsec_or_npub">Digite sua chave privada</string>
     <string name="white_noise_logo">Logotipo do White Noise</string>
     <string name="identity_entry_error_invalid_key">Isso não parece uma chave nsec ou npub válida.</string>
@@ -2221,7 +2221,7 @@
     <string name="profile_readiness_picture">Foto de perfil</string>
     <string name="profile_readiness_bio">Biografia</string>
     <string name="profile_readiness_banner">Imagem de capa</string>
-    <string name="profile_readiness_address">Endereço verificado</string>
+    <string name="profile_readiness_address">Endereço NIP-05</string>
     <string name="profile_readiness_lightning">Endereço Lightning</string>
     <string name="profile_readiness_added">Adicionado</string>
     <string name="profile_readiness_recommended">Recomendado</string>
