@@ -26868,11 +26868,12 @@
         ]
       },
       {
-        "surface": "Dictation capture-close callback retains an in-progress recorder read before Paste or Send",
+        "surface": "Dictation capture-close callback retains an in-progress recorder read and restores media after available audio drains",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
         "anchor": "internal fun onCaptureClosed(",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "DIC-007"
         ]
       },
       {
