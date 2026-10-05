@@ -21,6 +21,7 @@ internal class NotificationReplyDraftHandoff(
     private val writer: CoalescingMessageDraftWriter,
     private val store: DraftStore,
     private val available: (NotificationTarget) -> Boolean = { true },
+    private val onFailed: () -> Unit = {},
     private val onHydrated: () -> Unit,
 ) {
     private val deliveries = linkedMapOf<String, Deferred<Boolean>>()
@@ -35,7 +36,7 @@ internal class NotificationReplyDraftHandoff(
             val retryable = cached.isCancelled || (cached.isCompleted && !awaitDelivery(cached))
             if (retryable) deliveries.remove(draft.id, cached)
         }
-        val delivery = deliveries.getOrPut(draft.id) { scope.async { persist(intake) } }
+        val delivery = deliveries.getOrPut(draft.id) { scope.async { deliver(intake) } }
         val applied = withTimeoutOrNull(HANDOFF_WAIT_MILLIS) { awaitDelivery(delivery) } == true
         if (applied || !available(target)) pending.remove(draft.id)
         if (!applied && delivery.isCompleted) deliveries.remove(draft.id, delivery)
@@ -62,6 +63,19 @@ internal class NotificationReplyDraftHandoff(
             pending.remove(id)
             deliveries.remove(id)?.cancel()
         }
+    }
+
+    /** Retire late successes before receipt eviction; report an actual failure only once, never on wait timeout. */
+    private suspend fun deliver(intake: PendingReply): Boolean {
+        val applied = persist(intake)
+        val id = checkNotNull(intake.target.replyDraft).id
+        if (applied || !available(intake.target)) {
+            pending.remove(id, intake)
+        } else if (!intake.failureReported) {
+            intake.failureReported = true
+            onFailed()
+        }
+        return applied
     }
 
     /** Retry only local persistence; exact proposed content recognizes an uncertain commit. */
@@ -115,6 +129,7 @@ internal class NotificationReplyDraftHandoff(
         val target: NotificationTarget,
     ) {
         val receipt = MessageDraftMergeReceipt()
+        var failureReported = false
     }
 
     private companion object {

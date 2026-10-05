@@ -122,6 +122,46 @@ class NotificationReplyDraftHandoffTest {
         }
 
     @Test
+    fun repeatedTerminalFailuresReportOnceAndStillPermitRecovery() =
+        runTest {
+            val fixture = fixture()
+            fixture.gateway.failBeforeSaveCount = 6
+            val target = target("partial")
+            assertFalse(fixture.handoff.stage(target))
+            assertFalse(fixture.handoff.stage(target))
+            assertEquals(1, fixture.failures)
+            assertTrue(fixture.handoff.stage(target))
+            assertEquals(1, fixture.failures)
+            assertEquals("partial", fixture.store.get("account-b", "group-b"))
+        }
+
+    @Test
+    fun lateSuccessfulImportCannotRetryAfterReceiptPruningAndANewerEdit() =
+        runTest {
+            val fixture = fixture(debounceMillis = 3_500L)
+            fixture.writer.submit("account-b", "group-b", "queued")
+            assertFalse(fixture.handoff.stage(target("partial")))
+            assertEquals(0, fixture.failures)
+            advanceUntilIdle()
+            assertEquals("queued\npartial", fixture.store.get("account-b", "group-b"))
+            assertEquals(0, fixture.failures)
+            repeat(33) { index ->
+                val target =
+                    target("another reply").copy(
+                        groupIdHex = "other-group-$index",
+                        replyDraft = NotificationReplyDraft("other-delivery-$index", "another reply"),
+                    )
+                assertTrue(fixture.handoff.stage(target))
+            }
+            fixture.writer.submit("account-b", "group-b", "newer edit")
+            advanceUntilIdle()
+            val savesBeforeRetry = fixture.gateway.saves
+            fixture.handoff.retryPending("account-b", "group-b")
+            assertEquals(savesBeforeRetry, fixture.gateway.saves)
+            assertEquals("newer edit", fixture.gateway.drafts.getValue("account-b" to "group-b").content)
+        }
+
+    @Test
     fun failureAfterCancelledWaiterDoesNotPoisonTheNextRouteAttempt() =
         runTest {
             val fixture = fixture()
@@ -227,7 +267,7 @@ class NotificationReplyDraftHandoffTest {
             assertTrue(fixture.handoff.stage(target("partial")))
         }
 
-    private fun TestScope.fixture(): DraftHandoffFixture {
+    private fun TestScope.fixture(debounceMillis: Long = 250L): DraftHandoffFixture {
         val gateway = HandoffDraftGateway()
         val repository =
             MessageDraftRepository(
@@ -235,10 +275,13 @@ class NotificationReplyDraftHandoffTest {
                 EditorSessionStore(HandoffEditorStrings),
                 StandardTestDispatcher(testScheduler),
             )
-        val writer = CoalescingMessageDraftWriter(this, repository)
+        val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = debounceMillis)
         val store = DraftStore(HandoffDraftPersistence)
         return DraftHandoffFixture(gateway, writer, store).also {
-            it.handoff = NotificationReplyDraftHandoff(this, writer, store) { it.hydrations += 1 }
+            it.handoff =
+                NotificationReplyDraftHandoff(this, writer, store, onFailed = { it.failures += 1 }) {
+                    it.hydrations += 1
+                }
         }
     }
 
@@ -261,6 +304,7 @@ private class DraftHandoffFixture(
 ) {
     lateinit var handoff: NotificationReplyDraftHandoff
     var hydrations = 0
+    var failures = 0
 }
 
 private class HandoffDraftGateway : MessageDraftGateway {

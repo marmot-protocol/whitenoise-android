@@ -867,9 +867,7 @@ internal fun MainShell(
             )
 
         suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {
-            if (!appState.notificationReplyDraftHandoff.stage(target)) {
-                appState.present(R.string.toast_reply_draft_restore_failed)
-            }
+            appState.notificationReplyDraftHandoff.stage(target)
             // Await cancellation before publishing any route state. A superseded
             // effect must not partially commit while its platform call is pending.
             appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)

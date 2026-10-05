@@ -31284,7 +31284,7 @@
       },
       {
         "surface": "Reply draft restore failure",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "R.string.toast_reply_draft_restore_failed",
         "test_ids": ["NTF-032"]
       },

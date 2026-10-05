@@ -2374,6 +2374,7 @@ class WhiteNoiseAppState private constructor(
             draftWriter,
             draftStore,
             available = { target -> accounts.any { it.label == target.accountRef && !it.signedOut } },
+            onFailed = { present(R.string.toast_reply_draft_restore_failed) },
         ) { draftHydrationRevision += 1 }
     }
     private val composerDraftExpansionBridge =
