@@ -26781,6 +26781,42 @@
         "test_ids": ["MED-022"]
       },
       {
+        "surface": "Automatic attachment work backs off after Android interruptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "setBackoffForSystemInterruptions()",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Pre-upgrade attachment work adopts the interruption backoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "private fun adoptInterruptionBackoff(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Explicit attachment request replaces waiting automatic work",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "internal fun enqueueExplicit(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Retired attachment work cannot be resurrected by interruption backoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "internal fun retireWork(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Concurrent explicit attachment requests share one replacement decision",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ExplicitEnqueueFence.kt",
+        "anchor": "internal class ExplicitEnqueueFence(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Transient attachment failure follow-up survives platform interruptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadIntentStore.kt",
+        "anchor": "fun hasSpentTransientRetry(",
+        "test_ids": ["MED-022"]
+      },
+      {
         "surface": "Attachment scheduler stop diagnostics preserve reason and zero-based worker attempt without identity",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
         "anchor": "attachment_work_stopped reason=$reason run_attempt=$runAttemptCount",
