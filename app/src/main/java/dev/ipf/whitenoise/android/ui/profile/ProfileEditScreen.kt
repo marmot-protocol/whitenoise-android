@@ -507,6 +507,14 @@ internal fun ProfileEditScreen(
     var isEditing by remember(appState, activeAccountId) { mutableStateOf(openPictureActionsOnEntry) }
     var editRevision by remember(appState, activeAccountId) { mutableIntStateOf(0) }
     var acceptedSaveRevision by remember(appState, activeAccountId) { mutableIntStateOf(0) }
+    val readiness =
+        rememberProfileReadiness(
+            appState,
+            activeAccountId,
+            appState.profileRevisionForCompose to acceptedSaveRevision,
+            cachedProfile,
+            loadProfile,
+        )
     var imageDrafts by
         remember(appState, activeAccountId) {
             mutableStateOf(ProfileImageDrafts(picture = initialDraft.picture, banner = initialDraft.banner))
@@ -836,6 +844,7 @@ internal fun ProfileEditScreen(
     }
 
     ProfileEditContent(
+        readiness = readiness,
         fields = fields,
         seed = activeAccountId.orEmpty(),
         hasAccount = active != null,

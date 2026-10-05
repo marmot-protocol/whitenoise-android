@@ -96,6 +96,200 @@
         ]
       },
       {
+        "surface": "PendingGroupMembershipRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "fun PendingGroupMembershipRow(",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "Modifier.membershipVisibleDraw",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/MembershipVisibleDraw.kt",
+        "anchor": "fun Modifier.membershipVisibleDraw(",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "NotificationPreviewControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "fun NotificationPreviewControl(",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_loading",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_optional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_optional",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_ready",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_ready",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_setup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_setup",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadiness.kt",
+        "anchor": "R.string.profile_readiness_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_added",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_address",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_address",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_banner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_banner",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_bio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_bio",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_field",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_field",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_field_optional",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_field_optional",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_lightning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_lightning",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_name",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_picture",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_recommended",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_recommended",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ProfileReadinessFields",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "fun ProfileReadinessFields(",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.setup_hide_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.setup_hide_details",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.setup_details",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.setup_details",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_expanded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.onboarding_details_expanded",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.onboarding_details_collapsed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.onboarding_details_collapsed",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.profile_readiness_editor_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "R.string.profile_readiness_editor_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ProfileReadinessChecklist",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileReadinessChecklist.kt",
+        "anchor": "fun ProfileReadinessChecklist(",
+        "test_ids": ["ACC-002"]
+      },
+      {
         "surface": "ConversationViewportRestorationEffects",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
         "anchor": "fun ConversationViewportRestorationEffects(",
@@ -735,9 +929,58 @@
       {
         "surface": "TileTransferCaption",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
-        "anchor": "private fun TileTransferCaption(",
+        "anchor": "internal fun TileTransferCaption(",
         "test_ids": [
-          "MED-025"
+          "MED-025",
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "MediaTooLargeToPreviewControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaTooLargeToPreview.kt",
+        "anchor": "internal fun MediaTooLargeToPreviewControl(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "R.string.media_too_large_to_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaTooLargeToPreview.kt",
+        "anchor": "R.string.media_too_large_to_preview",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "string:media_open (too large to preview)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaTooLargeToPreview.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "MediaViewerTooLargeToPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerStates.kt",
+        "anchor": "internal fun MediaViewerTooLargeToPreview(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "R.string.media_too_large_to_preview (viewer)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerStates.kt",
+        "anchor": "R.string.media_too_large_to_preview",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "R.string.media_too_large_to_preview_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerStates.kt",
+        "anchor": "R.string.media_too_large_to_preview_hint",
+        "test_ids": [
+          "MED-027"
         ]
       },
       {
@@ -1966,7 +2209,7 @@
           "CHL-016",
           "CHL-019",
           "FIND-003"
-        ]
+        , "MSG-007"]
       },
       {
         "surface": "ChatRowPreviewLine",
@@ -4801,8 +5044,21 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
         "anchor": "fun MediaImageBubble(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-003"
         ]
+      },
+      {
+        "surface": "Retained image preparation accessibility state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "R.string.media_opening",
+        "test_ids": ["MED-023"]
+      },
+      {
+        "surface": "Retained image accessible open action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": ["MED-023"]
       },
       {
         "surface": "RemoteGiphyMediaBubble",
@@ -6580,7 +6836,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "fun ConversationNotificationSettingsScreen(",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "NTF-012"
         ]
       },
       {
@@ -10680,6 +10937,12 @@
         "test_ids": ["MSG-021"]
       },
       {
+        "surface": "Poll vote support rejection reason",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PollVoteFailureAttribution.kt",
+        "anchor": "poll_vote_reason=",
+        "test_ids": ["MSG-021"]
+      },
+      {
         "surface": "Poll unconfirmed vote",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
         "anchor": "R.string.delivery_not_confirmed",
@@ -10723,6 +10986,42 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "string:member_removal_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "R.string.member_removal_pending",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "string:invite_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "R.string.invite_pending",
+        "test_ids": ["GRP-026"]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "string:notification_show_previews",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_show_previews",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "string:notification_show_previews_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_show_previews_detail",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
       {
         "surface": "string:onboarding_details_accessibility",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsChoiceDetails.kt",
@@ -12481,17 +12780,6 @@
         "surface": "setting:invite_message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
         "anchor": "R.string.invite_message",
-        "test_ids": [
-          "NCH-001",
-          "NCH-002",
-          "ACC-003",
-          "ACC-017"
-        ]
-      },
-      {
-        "surface": "setting:invite_to_white_noise",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
-        "anchor": "R.string.invite_to_white_noise",
         "test_ids": [
           "NCH-001",
           "NCH-002",
@@ -18196,6 +18484,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
         "anchor": "R.string.nip_05",
         "test_ids": [
+          "ACC-002",
           "PRO-001",
           "PRO-002"
         ]
@@ -25094,6 +25383,146 @@
           "NTF-001",
           "NTF-023"
         ]
+      },
+      {
+        "surface": "setting:error_missing_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_missing_key_package",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_missing_key_package_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_missing_key_package_for",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_invalid_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_invalid_key_package",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_invalid_key_package_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_invalid_key_package_for",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_missing_member_inbox",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_missing_member_inbox",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_missing_member_inbox_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_missing_member_inbox_for",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_group_create_failed_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "R.string.error_group_create_failed_retry",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "setting:error_group_create_failed_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_group_create_failed_retry",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_invalid_identity_reference",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_invalid_identity_reference",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:toast_chat_still_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.toast_chat_still_loading",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:toast_no_active_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.toast_no_active_account",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:toast_couldnt_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_add_members",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:profile_invite_to_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.invite_to_white_noise",
+        "test_ids": ["ACC-003", "ACC-017"]
+      },
+      {
+        "surface": "setting:invite_to_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "R.string.invite_to_white_noise",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "setting:error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "GRP-005"
+        ]
       }
     ],
     "manifest_permissions": [
@@ -25466,6 +25895,30 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "private fun failedEditForAction(",
         "test_ids": ["MSG-004", "MSG-007"]
+      },
+      {
+        "surface": "Bounded presentation read of attachment plaintext",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+        "anchor": "internal fun AttachmentPlaintext.toByteArrayWithin(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "Presentation plaintext budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaCacheLimits.kt",
+        "anchor": "internal const val ATTACHMENT_PRESENTATION_MAX_BYTES",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "Byte-returning attachment reads stay within the caller's budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+        "anchor": "internal suspend fun AttachmentPlaintext.readWithin(",
+        "test_ids": [
+          "MED-027"
+        ]
       },
       {
         "surface": "Content-based animated image source admission",
@@ -26471,9 +26924,9 @@
         ]
       },
       {
-        "surface": "Pages without edit events skip aggregation without changing edit presentation",
+        "surface": "Native accepted edit summaries own bubble presentation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/core/MessageEdits.kt",
-        "anchor": "fun aggregateEdits(",
+        "anchor": "fun withAuthoritativeEdits(",
         "test_ids": [
           "MSG-007"
         ]
@@ -30808,9 +31261,81 @@
         "test_ids": [
           "FLD-004"
         ]
+      },
+      {
+        "surface": "Forward source read from MarmotKit's retained copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateForwardTransport.kt",
+        "anchor": "internal suspend fun readRetainedForwardPlaintext(",
+        "test_ids": ["MSG-010", "MED-020"]
+      },
+      {
+        "surface": "Forward phase diagnostics",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ForwardDiagnostics.kt",
+        "anchor": "internal class ForwardDiagnostics private constructor(",
+        "test_ids": ["MSG-010"]
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "Direct Share preview privacy fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
+        "anchor": "genericNotificationShortcut(context, shortcut)",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Notification preview failure restart guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_preview_update_failed",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic conversation channel description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewChannelNames.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic new conversation channel title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic new conversation channel description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic conversation shortcut display metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewShortcuts.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic notification preview title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Safe generic notification Mark as read action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.chat_row_action_mark_read",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Notification preview privacy payload",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
       {
         "surface": "Silent group summary channel name",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",

@@ -203,8 +203,8 @@
     <string name="invite">invitar</string>
     <string name="new_chat">Nuevo chat</string>
     <string name="error_not_white_noise_profile_qr">Ese código QR no es un perfil White Noise.</string>
-    <string name="error_missing_key_package">Esta persona aún no ha configurado la mensajería cifrada. Pídele que instale White Noise y abra la app una vez; luego vuelve a intentarlo.</string>
-    <string name="error_missing_key_package_for">%1$s aún no ha configurado la mensajería cifrada. Pídele que instale White Noise y abra la app una vez; luego vuelve a intentarlo.</string>
+    <string name="error_missing_key_package">No encontramos una clave de chat utilizable para esta persona. Pídele que instale o actualice White Noise y lo abra, y vuelve a intentarlo.</string>
+    <string name="error_missing_key_package_for">No encontramos una clave de chat utilizable para %1$s. Pídele que instale o actualice White Noise y lo abra, y vuelve a intentarlo.</string>
     <string name="invite_to_white_noise">Invitar a White Noise</string>
     <string name="invite_friends">Invitar a amigos</string>
     <string name="invite_to_white_noise_description">%1$s aún no está en White Noise. Comparte la app para iniciar un chat seguro.</string>
@@ -306,6 +306,7 @@
     <string name="large_group_invite_confirm_title">¿Invitar a un grupo grande?</string>
     <string name="large_group_invite_confirm_message">En grupos de 50 miembros o más, es posible que las invitaciones adicionales no se entreguen de forma fiable. Aun así, puedes continuar.</string>
     <string name="invite_pending">Invitación pendiente: %1$s</string>
+    <string name="member_removal_pending">Eliminación pendiente: %1$s</string>
     <string name="latest_group_error">Último error del grupo: %1$s</string>
     <string name="actions">Acciones</string>
     <string name="archive_chat">Archivar</string>
@@ -600,7 +601,7 @@
     <string name="preview">Vista previa</string>
     <string name="no_active_account_period">No hay cuenta activa.</string>
     <string name="about">Acerca de</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">Dirección NIP-05</string>
     <string name="nsec_or_npub">Introduce tu llave privada</string>
     <string name="white_noise_logo">Logotipo de White Noise</string>
     <string name="identity_entry_error_invalid_key">Eso no parece una clave nsec o npub válida.</string>
@@ -1023,6 +1024,8 @@
     <string name="media_uploading">Subiendo…</string>
     <string name="media_upload_failed">Error al subir</string>
     <string name="media_tap_to_retry">Toca para reintentar</string>
+    <string name="media_too_large_to_preview">Demasiado grande para la vista previa</string>
+    <string name="media_too_large_to_preview_hint">Guarda o comparte esta imagen para verla en otra aplicación</string>
     <string name="media_tap_to_download">Toca para descargar</string>
     <string name="media_preparing_download">Preparando descarga</string>
     <string name="media_preparing_attachment">Preparando archivo adjunto</string>
@@ -2205,4 +2208,26 @@
     <string name="chat_list_delete_stopped">Borrado detenido</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d de %2$d eliminaciones confirmadas. Reintenta Eliminar de este dispositivo para comprobar el resultado. Si sigue fallando, reinicia la aplicación.\u2069</string>
     <string name="group_svg_rejected_detail">No se pudo preparar este SVG. Elige un SVG sencillo, PNG o JPEG.</string>
+    <string name="error_invalid_key_package">No se pudo validar la clave de chat publicada de esta persona. Pídele que actualice White Noise y publique una nueva clave de chat, y vuelve a intentarlo.</string>
+    <string name="error_invalid_key_package_for">No se pudo validar la clave de chat publicada de %1$s. Pídele que actualice White Noise y publique una nueva clave de chat, y vuelve a intentarlo.</string>
+    <string name="error_missing_member_inbox">No hay un relay de entrada utilizable para esta persona. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
+    <string name="error_missing_member_inbox_for">No hay un relay de entrada utilizable para %1$s. Pídele que revise sus relays de entrada en los ajustes de White Noise, y vuelve a intentarlo.</string>
+    <string name="notification_show_previews">Mostrar vistas previas de notificaciones</string>
+    <string name="notification_show_previews_detail">Al desactivarlo, se ocultan los nombres y el contenido de los mensajes. Se aplica a todas las cuentas.</string>
+    <string name="notification_preview_update_failed">Los cambios pueden perderse al reiniciar.</string>
+    <string name="profile_readiness_loading">Cargando el perfil…</string>
+    <string name="profile_readiness_unavailable">Estado del perfil no disponible · Toca para editar</string>
+    <string name="profile_readiness_editor_unavailable">Estado del perfil no disponible</string>
+    <string name="profile_readiness_setup">Configura tu perfil</string>
+    <string name="profile_readiness_ready">Perfil listo</string>
+    <string name="profile_readiness_optional">Perfil listo · Puedes añadir datos opcionales</string>
+    <string name="profile_readiness_name">Nombre para mostrar</string>
+    <string name="profile_readiness_picture">Foto de perfil</string>
+    <string name="profile_readiness_bio">Biografía</string>
+    <string name="profile_readiness_banner">Portada</string>
+    <string name="profile_readiness_address">Dirección NIP-05</string>
+    <string name="profile_readiness_lightning">Dirección Lightning</string>
+    <string name="profile_readiness_added">Añadido</string>
+    <string name="profile_readiness_recommended">Recomendado</string>
+    <string name="profile_readiness_field_optional">Opcional</string>
 </resources>

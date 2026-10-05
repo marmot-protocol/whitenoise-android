@@ -255,8 +255,8 @@
     <string name="invite">Invite</string>
     <string name="new_chat">New Chat</string>
     <string name="error_not_white_noise_profile_qr">That QR code doesn’t contain a White Noise profile.</string>
-    <string name="error_missing_key_package">This person hasn’t set up encrypted messaging yet. Ask them to install White Noise and open it once, then try again.</string>
-    <string name="error_missing_key_package_for">%1$s hasn’t set up encrypted messaging yet. Ask them to install White Noise and open it once, then try again.</string>
+    <string name="error_missing_key_package">We couldn’t find a usable chat key for this person. Ask them to install or update White Noise and open it, then retry.</string>
+    <string name="error_missing_key_package_for">We couldn’t find a usable chat key for %1$s. Ask them to install or update White Noise and open it, then retry.</string>
     <string name="invite_to_white_noise">Invite to White Noise</string>
     <string name="invite_friends">Invite friends</string>
     <string name="invite_to_white_noise_description">%1$s isn\'t on White Noise yet. Share the app to start a secure chat.</string>
@@ -379,6 +379,7 @@
     <string name="mention_picker_member">Mention %1$s</string>
     <string name="mentioned_you">You were mentioned</string>
     <string name="invite_pending">Invite pending: %1$s</string>
+    <string name="member_removal_pending">Removal pending: %1$s</string>
     <string name="latest_group_error">Latest group error: %1$s</string>
     <string name="actions">Actions</string>
     <string name="archive_chat">Archive Chat</string>
@@ -855,7 +856,7 @@
     <string name="preview">Preview</string>
     <string name="no_active_account_period">No active account.</string>
     <string name="about">About</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">NIP-05 address</string>
     <string name="profile_picture_hint">Public HTTPS image URL</string>
     <string name="profile_picture_invalid">Only public HTTPS image URLs are allowed.</string>
     <string name="profile_picture_edit">Edit profile picture</string>
@@ -1396,6 +1397,8 @@
     <string name="media_uploading">Uploading…</string>
     <string name="media_upload_failed">Upload failed</string>
     <string name="media_tap_to_retry">Tap to retry</string>
+    <string name="media_too_large_to_preview">Too large to preview</string>
+    <string name="media_too_large_to_preview_hint">Save or share this image to view it with another app</string>
     <string name="media_tap_to_download">Tap to download</string>
     <string name="media_preparing_download">Preparing download</string>
     <string name="media_preparing_attachment">Preparing attachment</string>
@@ -2362,4 +2365,27 @@
     <string name="chat_list_delete_stopped">Deletion stopped</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d of %2$d deletions confirmed. Retry Delete from this device to check the result. If it keeps failing, restart the app.\u2069</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
+    <string name="error_invalid_key_package">The published chat key for this person couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
+    <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
+    <string name="error_missing_member_inbox">There is no usable inbox relay for this person. Ask them to check their inbox relays in White Noise settings, then retry.</string>
+    <string name="error_missing_member_inbox_for">There is no usable inbox relay for %1$s. Ask them to check their inbox relays in White Noise settings, then retry.</string>
+    <string name="notification_show_previews">Show notification previews</string>
+    <string name="notification_show_previews_detail">Hide names and message content when off. Applies to all accounts.</string>
+    <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>
+    <string name="profile_readiness_loading">Loading profile…</string>
+    <string name="profile_readiness_unavailable">Profile status unavailable · Tap to edit</string>
+    <string name="profile_readiness_editor_unavailable">Profile status unavailable</string>
+    <string name="profile_readiness_setup">Set up your profile</string>
+    <string name="profile_readiness_ready">Profile ready</string>
+    <string name="profile_readiness_optional">Profile ready · Optional details available</string>
+    <string name="profile_readiness_name">Display name</string>
+    <string name="profile_readiness_picture">Profile picture</string>
+    <string name="profile_readiness_bio">Bio</string>
+    <string name="profile_readiness_banner">Banner</string>
+    <string name="profile_readiness_address">NIP-05 address</string>
+    <string name="profile_readiness_lightning">Lightning address</string>
+    <string name="profile_readiness_added">Added</string>
+    <string name="profile_readiness_recommended">Recommended</string>
+    <string name="profile_readiness_field_optional">Optional</string>
+    <string name="profile_readiness_field" translatable="false">%1$s · %2$s</string>
 </resources>

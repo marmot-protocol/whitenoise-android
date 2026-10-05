@@ -203,8 +203,8 @@
     <string name="invite">Davet etmek</string>
     <string name="new_chat">Yeni sohbet</string>
     <string name="error_not_white_noise_profile_qr">Bu QR kodu bir White Noise profili değil.</string>
-    <string name="error_missing_key_package">Bu kişi henüz şifreli mesajlaşmayı ayarlamadı. White Noise uygulamasını yükleyip bir kez açmasını isteyin, ardından tekrar deneyin.</string>
-    <string name="error_missing_key_package_for">%1$s henüz şifreli mesajlaşmayı ayarlamadı. White Noise uygulamasını yükleyip bir kez açmasını isteyin, ardından tekrar deneyin.</string>
+    <string name="error_missing_key_package">Bu kişi için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını yüklemesini veya güncellemesini ve açmasını isteyin, sonra tekrar deneyin.</string>
+    <string name="error_missing_key_package_for">%1$s için kullanılabilir bir sohbet anahtarı bulamadık. White Noise uygulamasını yüklemesini veya güncellemesini ve açmasını isteyin, sonra tekrar deneyin.</string>
     <string name="invite_to_white_noise">White Noise\'a Davet Et</string>
     <string name="invite_friends">Arkadaşlarını davet et</string>
     <string name="invite_to_white_noise_description">%1$s henüz White Noise\'da değil. Güvenli bir sohbet başlatmak için uygulamayı paylaşın.</string>
@@ -306,6 +306,7 @@
     <string name="large_group_invite_confirm_title">Büyük bir gruba davet edilsin mi?</string>
     <string name="large_group_invite_confirm_message">50 veya daha fazla üyeli gruplarda ek davetler güvenilir şekilde teslim edilmeyebilir. Yine de devam edebilirsiniz.</string>
     <string name="invite_pending">Davet bekliyor: %1$s</string>
+    <string name="member_removal_pending">Üyenin kaldırılması bekleniyor: %1$s</string>
     <string name="latest_group_error">Son grup hatası: %1$s</string>
     <string name="actions">Eylemler</string>
     <string name="archive_chat">Arşivle</string>
@@ -600,7 +601,7 @@
     <string name="preview">Önizleme</string>
     <string name="no_active_account_period">Etkin hesap yok.</string>
     <string name="about">Hakkında</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">NIP-05 adresi</string>
     <string name="nsec_or_npub">Özel anahtarınızı girin</string>
     <string name="white_noise_logo">White Noise logosu</string>
     <string name="identity_entry_error_invalid_key">Bu geçerli bir nsec veya npub anahtarına benzemiyor.</string>
@@ -1023,6 +1024,8 @@
     <string name="media_uploading">Yükleniyor…</string>
     <string name="media_upload_failed">Yükleme başarısız</string>
     <string name="media_tap_to_retry">Yeniden denemek için dokunun</string>
+    <string name="media_too_large_to_preview">Önizleme için çok büyük</string>
+    <string name="media_too_large_to_preview_hint">Başka bir uygulamada görüntülemek için bu görseli kaydedin veya paylaşın</string>
     <string name="media_tap_to_download">İndirmek için dokunun</string>
     <string name="media_preparing_download">İndirme hazırlanıyor</string>
     <string name="media_preparing_attachment">Ek hazırlanıyor</string>
@@ -2203,4 +2206,26 @@
     <string name="chat_list_delete_stopped">Silme durdu</string>
     <string name="chat_list_delete_stopped_detail">\u2068%2$d silme işleminin %1$d tanesi doğrulandı. Sonucu kontrol etmek için Bu cihazdan sil işlemini tekrar deneyin. Hata devam ederse uygulamayı yeniden başlatın.\u2069</string>
     <string name="group_svg_rejected_detail">Bu SVG hazırlanamadı. Basit bir SVG, PNG veya JPEG seçin.</string>
+    <string name="error_invalid_key_package">Bu kişi için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
+    <string name="error_invalid_key_package_for">%1$s için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
+    <string name="error_missing_member_inbox">Bu kişi için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
+    <string name="error_missing_member_inbox_for">%1$s için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
+    <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
+    <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplar için geçerlidir.</string>
+    <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>
+    <string name="profile_readiness_loading">Profil yükleniyor…</string>
+    <string name="profile_readiness_unavailable">Profil durumu kullanılamıyor · Düzenlemek için dokunun</string>
+    <string name="profile_readiness_editor_unavailable">Profil durumu kullanılamıyor</string>
+    <string name="profile_readiness_setup">Profilinizi oluşturun</string>
+    <string name="profile_readiness_ready">Profil hazır</string>
+    <string name="profile_readiness_optional">Profil hazır · İsteğe bağlı bilgiler eklenebilir</string>
+    <string name="profile_readiness_name">Görünen ad</string>
+    <string name="profile_readiness_picture">Profil fotoğrafı</string>
+    <string name="profile_readiness_bio">Biyografi</string>
+    <string name="profile_readiness_banner">Kapak görseli</string>
+    <string name="profile_readiness_address">NIP-05 adresi</string>
+    <string name="profile_readiness_lightning">Lightning adresi</string>
+    <string name="profile_readiness_added">Eklendi</string>
+    <string name="profile_readiness_recommended">Önerilen</string>
+    <string name="profile_readiness_field_optional">İsteğe bağlı</string>
 </resources>

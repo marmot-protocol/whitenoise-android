@@ -203,8 +203,8 @@
     <string name="invite">Einladen</string>
     <string name="new_chat">Neuer Chat</string>
     <string name="error_not_white_noise_profile_qr">Dieser QR-Code ist kein White Noise-Profil.</string>
-    <string name="error_missing_key_package">Diese Person hat verschlüsselte Nachrichten noch nicht eingerichtet. Bitten Sie sie, White Noise zu installieren und einmal zu öffnen, und versuchen Sie es dann erneut.</string>
-    <string name="error_missing_key_package_for">%1$s hat verschlüsselte Nachrichten noch nicht eingerichtet. Bitten Sie diese Person, White Noise zu installieren und einmal zu öffnen, und versuchen Sie es dann erneut.</string>
+    <string name="error_missing_key_package">Für diese Person wurde kein nutzbarer Chat-Schlüssel gefunden. Bitten Sie die Person, White Noise zu installieren oder zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
+    <string name="error_missing_key_package_for">Für %1$s wurde kein nutzbarer Chat-Schlüssel gefunden. Bitten Sie die Person, White Noise zu installieren oder zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
     <string name="invite_to_white_noise">Zu White Noise einladen</string>
     <string name="invite_friends">Freunde einladen</string>
     <string name="invite_to_white_noise_description">%1$s ist noch nicht bei White Noise. Teilen Sie die App, um einen sicheren Chat zu starten.</string>
@@ -306,6 +306,7 @@
     <string name="large_group_invite_confirm_title">In eine große Gruppe einladen?</string>
     <string name="large_group_invite_confirm_message">In Gruppen mit mindestens 50 Mitgliedern werden weitere Einladungen möglicherweise nicht zuverlässig zugestellt. Sie können trotzdem fortfahren.</string>
     <string name="invite_pending">Einladung ausstehend: %1$s</string>
+    <string name="member_removal_pending">Entfernung ausstehend: %1$s</string>
     <string name="latest_group_error">Letzter Gruppenfehler: %1$s</string>
     <string name="actions">Aktionen</string>
     <string name="archive_chat">Archivieren</string>
@@ -600,7 +601,7 @@
     <string name="preview">Vorschau</string>
     <string name="no_active_account_period">Kein aktives Konto.</string>
     <string name="about">Über</string>
-    <string name="nip_05">Verified address</string>
+    <string name="nip_05">NIP-05-Adresse</string>
     <string name="nsec_or_npub">Privaten Schlüssel eingeben</string>
     <string name="white_noise_logo">White-Noise-Logo</string>
     <string name="identity_entry_error_invalid_key">Das sieht nicht wie ein gültiger nsec- oder npub-Schlüssel aus.</string>
@@ -1023,6 +1024,8 @@
     <string name="media_uploading">Wird hochgeladen …</string>
     <string name="media_upload_failed">Upload fehlgeschlagen</string>
     <string name="media_tap_to_retry">Zum Wiederholen tippen</string>
+    <string name="media_too_large_to_preview">Zu groß für eine Vorschau</string>
+    <string name="media_too_large_to_preview_hint">Speichere oder teile dieses Bild, um es in einer anderen App anzusehen</string>
     <string name="media_tap_to_download">Zum Herunterladen tippen</string>
     <string name="media_preparing_download">Download wird vorbereitet</string>
     <string name="media_preparing_attachment">Anhang wird vorbereitet</string>
@@ -2222,4 +2225,26 @@
     <string name="chat_list_delete_stopped">Löschen gestoppt</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d von %2$d Löschungen bestätigt. Versuche erneut „Auf diesem Gerät löschen“, um das Ergebnis zu prüfen. Bei weiteren Fehlern starte die App neu.\u2069</string>
     <string name="group_svg_rejected_detail">Diese SVG konnte nicht verarbeitet werden. Wähle eine einfache SVG, PNG oder JPEG.</string>
+    <string name="error_invalid_key_package">Der veröffentlichte Chat-Schlüssel für diese Person konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
+    <string name="error_invalid_key_package_for">Der veröffentlichte Chat-Schlüssel für %1$s konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
+    <string name="error_missing_member_inbox">Für diese Person gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
+    <string name="error_missing_member_inbox_for">Für %1$s gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
+    <string name="notification_show_previews">Benachrichtigungsvorschau anzeigen</string>
+    <string name="notification_show_previews_detail">Wenn ausgeschaltet, werden Namen und Nachrichteninhalte verborgen. Gilt für alle Konten.</string>
+    <string name="notification_preview_update_failed">Änderungen können nach einem Neustart verloren gehen.</string>
+    <string name="profile_readiness_loading">Profil wird geladen…</string>
+    <string name="profile_readiness_unavailable">Profilstatus nicht verfügbar · Zum Bearbeiten tippen</string>
+    <string name="profile_readiness_editor_unavailable">Profilstatus nicht verfügbar</string>
+    <string name="profile_readiness_setup">Richte dein Profil ein</string>
+    <string name="profile_readiness_ready">Profil bereit</string>
+    <string name="profile_readiness_optional">Profil bereit · Optionale Angaben verfügbar</string>
+    <string name="profile_readiness_name">Anzeigename</string>
+    <string name="profile_readiness_picture">Profilbild</string>
+    <string name="profile_readiness_bio">Über mich</string>
+    <string name="profile_readiness_banner">Titelbild</string>
+    <string name="profile_readiness_address">NIP-05-Adresse</string>
+    <string name="profile_readiness_lightning">Lightning-Adresse</string>
+    <string name="profile_readiness_added">Hinzugefügt</string>
+    <string name="profile_readiness_recommended">Empfohlen</string>
+    <string name="profile_readiness_field_optional">Freiwillig</string>
 </resources>

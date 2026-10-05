@@ -70,8 +70,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
+import dev.ipf.whitenoise.android.state.ATTACHMENT_EXPLICIT_READ_MAX_BYTES
+import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -112,6 +115,8 @@ internal suspend fun authoritativeVisualMediaReference(
  * plaintext in `pendingAttachmentsList` for own optimistic sends so the
  * viewer / save / share paths don't spin while waiting for the projection
  * to reconcile. Falls back to the standard FFI download for everything else.
+ * The array never exceeds [maxBytes]: previews keep the default presentation
+ * budget, an explicit Save or Share passes [ATTACHMENT_EXPLICIT_READ_MAX_BYTES].
  */
 internal suspend fun attachmentBytes(
     controller: ConversationController,
@@ -120,6 +125,7 @@ internal suspend fun attachmentBytes(
     reference: MediaAttachmentReferenceFfi,
     mine: Boolean,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
+    maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
 ): ByteArray {
     if (mine) {
         controller
@@ -133,7 +139,7 @@ internal suspend fun attachmentBytes(
         authoritativeVisualMediaReference(reference, mine) {
             controller.authoritativeAttachmentReference(messageIdHex, attachmentIndex, reference)
         }
-    return controller.downloadAttachment(messageIdHex, attachmentIndex, resolvedReference, priority)
+    return controller.downloadAttachment(messageIdHex, attachmentIndex, resolvedReference, priority, maxBytes)
 }
 
 // One page of the full-screen media viewer. Unlike the original single-album
@@ -509,7 +515,17 @@ internal fun FullScreenMediaViewer(
                                         saveVideoToGallery(context, file, ref.fileName, ref.mediaType)
                                     }
                                 } else {
-                                    val data = attachmentBytes(controller, msgId, attachmentIndex, ref, owned)
+                                    // An explicit Save hands the whole verified image to MediaStore, so it is not
+                                    // bounded by the preview budget that gates decoding.
+                                    val data =
+                                        attachmentBytes(
+                                            controller,
+                                            msgId,
+                                            attachmentIndex,
+                                            ref,
+                                            owned,
+                                            maxBytes = ATTACHMENT_EXPLICIT_READ_MAX_BYTES,
+                                        )
                                     withContext(Dispatchers.IO) {
                                         saveImageToGallery(context, data, ref.fileName, ref.mediaType)
                                     }
@@ -557,12 +573,15 @@ internal fun FullScreenMediaViewer(
                                 ).getOrThrow()
                             }
                             else -> {
+                                // An explicit Share stages the whole verified image for the chooser, so it is not
+                                // bounded by the preview budget that gates decoding.
                                 attachmentBytes(
                                     controller,
                                     request.messageIdHex,
                                     request.attachmentIndex,
                                     request.reference,
                                     request.mine,
+                                    maxBytes = ATTACHMENT_EXPLICIT_READ_MAX_BYTES,
                                 ).let {
                                     shareImage(
                                         context,
@@ -842,6 +861,8 @@ internal fun ViewerPage(
     val thumbhashImage = rememberThumbhashImage(reference.thumbhash)
     var presentation by remember(pageKey) { mutableStateOf<DecodedAttachmentPresentation?>(null) }
     var viewerFailed by remember(pageKey) { mutableStateOf(false) }
+    // A verified image above the preview budget is not a failure: Retry cannot shrink it, Save and Share still work.
+    var viewerTooLarge by remember(pageKey) { mutableStateOf(false) }
     var viewerReloadToken by remember(pageKey) { mutableIntStateOf(0) }
     val imageWidth =
         when (val current = presentation) {
@@ -862,6 +883,7 @@ internal fun ViewerPage(
         // once it becomes current; an already-decoded bitmap is kept.
         if (!isCurrent || presentation != null) return@LaunchedEffect
         viewerFailed = false
+        viewerTooLarge = false
         try {
             val data = attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
             val decoded =
@@ -877,6 +899,8 @@ internal fun ViewerPage(
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
+        } catch (_: AttachmentTooLargeToPresentException) {
+            viewerTooLarge = true
         } catch (_: Throwable) {
             viewerFailed = true
         }
@@ -969,6 +993,7 @@ internal fun ViewerPage(
                     thumbhashImage = thumbhashImage,
                     displayName = MediaPipeline.safeDisplayName(reference.fileName),
                     failed = viewerFailed,
+                    tooLarge = viewerTooLarge,
                     onRetry = {
                         controller.retryAttachmentTransfer(
                             messageIdHex,

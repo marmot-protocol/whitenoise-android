@@ -105,7 +105,7 @@ class RunnerContractTest(unittest.TestCase):
         """Physical-device rejection precedes even read-only adb interaction."""
         with patch.object(device_runner, "adb_command", side_effect=AssertionError("must not contact device")):
             with self.assertRaises(ValueError):
-                device_runner.run("adb", "46131FDAS003CG", Path("unused"), Path("unused"))
+                device_runner.run("adb", "PHYSICAL000TEST", Path("unused"), Path("unused"))
 
 
 if __name__ == "__main__":

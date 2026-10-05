@@ -6,7 +6,7 @@ serial="${1:?Pass the exact emulator serial}"
 distribution="${2:-Play}"
 budget_profile="${3:-reference-api30-arm64}"
 sender_mode="${4:-native}"
-case "$sender_mode" in native|controller|controller-cancel|controller-restart|controller-resume|controller-resume-changed|controller-unknown-length|controller-background|controller-lock|controller-automatic-resume|controller-phases|controller-media|controller-tile-transfer|controller-apk|controller-matrix) ;; *) echo 'Invalid fixture sender mode' >&2; exit 2 ;; esac
+case "$sender_mode" in native|controller|controller-cancel|controller-restart|controller-resume|controller-resume-changed|controller-unknown-length|controller-background|controller-lock|controller-automatic-resume|controller-phases|controller-media|controller-tile-transfer|controller-apk|controller-matrix|controller-apk-recreation|controller-forward) ;; *) echo 'Invalid fixture sender mode' >&2; exit 2 ;; esac
 runner_args=()
 if [[ "$sender_mode" != native ]]; then runner_args+=(--android-send-controller); fi
 if [[ "$sender_mode" == controller-cancel ]]; then runner_args+=(--held-cancellation); fi
@@ -56,8 +56,19 @@ if [[ "$sender_mode" == controller-tile-transfer ]]; then
     --output "app/build/reports/attachment-fixture/${report_name}.json" --budget-profile "$budget_profile"
   exit
 fi
+if [[ "$sender_mode" == controller-apk-recreation ]]; then
+  python3 tools/attachment-fixture/apk_recreation_runner.py --serial "$serial" --root "$report_root" \
+    --output "app/build/reports/attachment-fixture/${report_name}.json" --distribution "$distribution" \
+    --budget-profile "$budget_profile"
+  exit
+fi
 if [[ "$sender_mode" == controller-media ]]; then
   python3 tools/attachment-fixture/media_lifecycle_runner.py --serial "$serial" --root "$report_root" \
+    --output "app/build/reports/attachment-fixture/${report_name}.json" --budget-profile "$budget_profile"
+  exit
+fi
+if [[ "$sender_mode" == controller-forward ]]; then
+  python3 tools/attachment-fixture/forward_runner.py --serial "$serial" --root "$report_root" \
     --output "app/build/reports/attachment-fixture/${report_name}.json" --budget-profile "$budget_profile"
   exit
 fi
