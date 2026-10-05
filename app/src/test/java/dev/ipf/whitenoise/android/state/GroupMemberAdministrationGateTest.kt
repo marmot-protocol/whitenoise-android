@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.CompletableDeferred
@@ -27,6 +28,8 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class GroupMemberAdministrationGateTest {
+    private val invitee = "cc".repeat(32)
+
     @Test
     fun loadingRosterRejectsInviteAndClearsStaleMutationErrorBeforeCallingRuntime() =
         runBlocking {
@@ -245,6 +248,76 @@ class GroupMemberAdministrationGateTest {
             assertNull(controller.lastMutationError)
         }
 
+    @Test
+    fun profileInvitesPreserveRecipientGuidanceAndFailureCounts() =
+        runBlocking {
+            for ((failure, resource) in inviteFailures()) {
+                var calls = 0
+                val state =
+                    appState(marmotAccessObserver = {
+                        calls += 1
+                        throw failure
+                    })
+                // Generic failures must not request profiles or encode an uncached recipient name.
+                if (resource != R.string.error_try_again) state.setContactNickname(invitee, "Carol")
+                assertFalse(state.inviteProfileToGroups(invitee, listOf("one", "two")))
+                assertEquals(2, calls)
+                assertEquals(AppText.Resource(R.string.toast_couldnt_add_members), state.toast?.title)
+                assertEquals(expectedInviteDetail(state, resource), state.toast?.detail)
+                assertTrue(state.toast?.copyable == true)
+            }
+        }
+
+    @Test
+    fun conversationInvitesUseTypedRecipientAndNeutralGenericFailure() =
+        runBlocking {
+            for ((failure, resource) in inviteFailures()) {
+                var calls = 0
+                val state =
+                    appState(marmotAccessObserver = {
+                        calls += 1
+                        throw failure
+                    })
+                // Generic failures must not request profiles or encode an uncached recipient name.
+                if (resource != R.string.error_try_again) state.setContactNickname(invitee, "Carol")
+                val controller = readyController(state)
+                assertFalse(controller.inviteMembers(listOf(invitee)))
+                assertEquals(1, calls)
+                assertEquals(expectedInviteDetail(state, resource), controller.lastMutationError?.message)
+                assertEquals(AppText.Resource(R.string.toast_couldnt_add_members), state.toast?.title)
+                assertEquals(expectedInviteDetail(state, resource), state.toast?.detail)
+            }
+        }
+
+    @Test
+    fun conversationInvalidKeyDoesNotBlameOneMemberInAMultipleMemberInvite() =
+        runBlocking {
+            val state = appState(marmotAccessObserver = { throw MarmotKitException.InvalidKeyPackageEvent("private") })
+            state.setContactNickname(invitee, "Carol")
+            val controller = readyController(state)
+            assertFalse(controller.inviteMembers(listOf(invitee, "dd".repeat(32))))
+            assertEquals(AppText.Resource(R.string.error_invalid_key_package), controller.lastMutationError?.message)
+            assertEquals(AppText.Resource(R.string.error_invalid_key_package), state.toast?.detail)
+        }
+
+    private fun inviteFailures(): List<Pair<Throwable, Int>> =
+        listOf(
+            MarmotKitException.MissingKeyPackage(invitee) to R.string.error_missing_key_package_for,
+            MarmotKitException.MissingMemberInboxRoute(invitee) to R.string.error_missing_member_inbox_for,
+            MarmotKitException.InvalidKeyPackageEvent("private") to R.string.error_invalid_key_package_for,
+            MarmotKitException.Publish("private") to R.string.error_try_again,
+            MarmotKitException.Runtime("private") to R.string.error_try_again,
+            IllegalStateException("private") to R.string.error_try_again,
+        )
+
+    private fun expectedInviteDetail(
+        state: WhiteNoiseAppState,
+        resource: Int,
+    ): AppText {
+        val arguments = if (resource == R.string.error_try_again) emptyList() else listOf(state.displayName(invitee))
+        return AppText.Resource(resource, arguments)
+    }
+
     private fun rosterTracker(controller: ConversationController): GroupRosterLoadTracker {
         val field = ConversationController::class.java.getDeclaredField("memberRosterLoadTracker")
         field.isAccessible = true
@@ -331,25 +404,27 @@ class GroupMemberAdministrationGateTest {
             ErrorPresentation(AppText.Plain(error), "operation=TEST\nerror=TEST")
     }
 
-    private fun appState(runtimeAccess: RuntimeAccessRecorder? = null) =
-        WhiteNoiseAppState(
-            context = ApplicationProvider.getApplicationContext(),
-            draftStore = DraftStore(GroupMemberAdministrationDraftPersistence()),
-            accountIdHexResolver = { it },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = "alice",
-                        accountIdHex = "alice",
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
+    private fun appState(
+        runtimeAccess: RuntimeAccessRecorder? = null,
+        marmotAccessObserver: (() -> Unit)? = runtimeAccess?.let { it::record },
+    ) = WhiteNoiseAppState(
+        context = ApplicationProvider.getApplicationContext(),
+        draftStore = DraftStore(GroupMemberAdministrationDraftPersistence()),
+        accountIdHexResolver = { it },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = "alice",
+                    accountIdHex = "alice",
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
                 ),
-            activeAccountRef = "alice",
-            marmotAccessObserver = runtimeAccess?.let { it::record },
-        )
+            ),
+        activeAccountRef = "alice",
+        marmotAccessObserver = marmotAccessObserver,
+    )
 
     private fun group(admins: List<String> = listOf("alice")) =
         AppGroupRecordFfi(
