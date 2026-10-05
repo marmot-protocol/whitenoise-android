@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_alerts_on_device">此裝置上的提醒</string>
+    <string name="notification_sound_appearance">聲音與外觀</string>
+    <string name="notification_system_blocked">已在 Android 設定中封鎖</string>
+    <string name="notification_alerts_detail">選擇此裝置的提醒。暫停一般提醒後，已啟用的提及仍可提醒。群組成員變動通知使用個別設定。</string>
+    <string name="notification_scope_choose">聲音設定</string>
+    <string name="notification_pause_ordinary_alerts">暫停一般提醒</string>
+    <string name="notification_alert_paused">此聊天靜音時暫停</string>
+    <string name="notification_sound_scope_control">%1$s 的聲音設定</string>
+</resources>

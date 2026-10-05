@@ -3,6 +3,42 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "ConversationSoundAppearanceSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
+        "anchor": "fun ConversationSoundAppearanceSheet(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "ConversationAlertControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun ConversationAlertControls(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "NotificationSoundScopeDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "fun NotificationSoundScopeDialog(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "conversationNotificationSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun conversationNotificationSummary(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "ConversationAlertSettingsRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "fun ConversationAlertSettingsRows(",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "notificationChannelTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "fun notificationChannelTitle(",
+        "test_ids": ["NTF-031"]
+      },
+      {
         "surface": "Present-row reconciliation retains cleanup intent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupDeleteCleanupJournal.kt",
         "anchor": "internal suspend fun reconcilePendingLocalGroupDeleteCleanup(",
@@ -10987,6 +11023,96 @@
     ],
     "settings_controls": [
       {
+        "surface": "Accessible category sound scope",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_sound_scope_control",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Chat category preference save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.toast_notification_scope_update_failed",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Ordinary chat alert pause action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_pause_ordinary_alerts",
+        "test_ids": ["NTF-031", "NTF-028"]
+      },
+      {
+        "surface": "Paused category explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_alert_paused",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Paused chat summary mentions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notify_nothing_while_muted",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Paused chat summary silence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notify_nothing",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Chat alert save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.toast_notification_scope_update_failed",
+        "test_ids": ["NTF-031"]
+      },
+      {
+        "surface": "Chat alerts ConversationAlertSettingsRows.kt notification_system_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_system_blocked",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationAlertSettingsRows.kt notification_alerts_on_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationAlertSettingsRows.kt",
+        "anchor": "R.string.notification_alerts_on_device",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationSettingsScreen.kt notification_alerts_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_alerts_detail",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationSettingsScreen.kt notification_sound_appearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_sound_appearance",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat sound drawer notification_sound_appearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
+        "anchor": "R.string.notification_sound_appearance",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationCategoryRows.kt notification_scope_choose",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_scope_choose",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
         "surface": "string:member_removal_pending",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
         "anchor": "R.string.member_removal_pending",
@@ -15546,22 +15672,6 @@
         ]
       },
       {
-        "surface": "string:notification_scope_switch_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
-        "anchor": "R.string.notification_scope_switch_detail",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:mute",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.mute",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:notification_categories",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.notification_categories",
@@ -15578,14 +15688,6 @@
         ]
       },
       {
-        "surface": "string:notification_chat_categories_detail",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.notification_chat_categories_detail",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:notification_mute_detail",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.notification_mute_detail",
@@ -15594,25 +15696,9 @@
         ]
       },
       {
-        "surface": "string:notification_notify_restore",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.notification_notify_restore",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
         "surface": "string:notifications",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
         "anchor": "R.string.notifications",
-        "test_ids": [
-          "GRP-001"
-        ]
-      },
-      {
-        "surface": "string:notify_for",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
-        "anchor": "R.string.notify_for",
         "test_ids": [
           "GRP-001"
         ]
@@ -26683,6 +26769,42 @@
         "surface": "Cancelled shared attachment fetch finishes its active worker and notification",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
         "anchor": "attachment_fetch_cancelled",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Automatic attachment work backs off after Android interruptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "setBackoffForSystemInterruptions()",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Pre-upgrade attachment work adopts the interruption backoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "private fun adoptInterruptionBackoff(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Explicit attachment request replaces waiting automatic work",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "internal fun enqueueExplicit(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Retired attachment work cannot be resurrected by interruption backoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "internal fun retireWork(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Concurrent explicit attachment requests share one replacement decision",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ExplicitEnqueueFence.kt",
+        "anchor": "internal class ExplicitEnqueueFence(",
+        "test_ids": ["MED-022"]
+      },
+      {
+        "surface": "Transient attachment failure follow-up survives platform interruptions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadIntentStore.kt",
+        "anchor": "fun hasSpentTransientRetry(",
         "test_ids": ["MED-022"]
       },
       {
