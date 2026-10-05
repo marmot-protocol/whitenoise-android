@@ -33,3 +33,16 @@ class NotificationInboundState : ViewModel() {
 }
 
 private const val MAX_REMOTE_DRAFT_CHARS = 65_536
+
+internal const val NOTIFICATION_BOUND_ROUTE_QUERY = "bound"
+
+/** Stable card identity; the mutable fill-in cannot change its signed destination. */
+internal fun NotificationNavigation.applyBoundToIntent(
+    intent: Intent,
+    target: NotificationTarget,
+    notificationKey: String,
+    signature: String,
+) {
+    applyToIntent(intent, target, notificationKey, signature)
+    intent.data = intent.data?.buildUpon()?.appendQueryParameter(NOTIFICATION_BOUND_ROUTE_QUERY, "1")?.build()
+}

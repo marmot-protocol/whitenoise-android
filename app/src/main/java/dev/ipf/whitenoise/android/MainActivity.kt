@@ -509,6 +509,7 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         if (
             BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS &&
+            intent.action != NotificationNavigation.ACTION_OPEN &&
             intent.getBooleanExtra(BENCHMARK_RECREATE_ACTIVITY_EXTRA, false)
         ) {
             setIntent(Intent(this, MainActivity::class.java))

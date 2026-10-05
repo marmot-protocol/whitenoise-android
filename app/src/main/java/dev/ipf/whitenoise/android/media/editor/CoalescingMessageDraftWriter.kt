@@ -199,7 +199,7 @@ internal class CoalescingMessageDraftWriter(
         groupIdHex: String,
         incoming: String,
         trimIncoming: Boolean = true,
-        deduplicateSuffix: Boolean = false,
+        receipt: MessageDraftMergeReceipt? = null,
     ): MessageDraftMergeCompletion {
         val trimmedIncoming = if (trimIncoming) incoming.trim() else incoming
         if (trimmedIncoming.isEmpty()) {
@@ -212,14 +212,14 @@ internal class CoalescingMessageDraftWriter(
         val key = Key(accountRef, groupIdHex)
         val mergeLock = synchronized(lock) { mergeLocks.getOrPut(key) { Mutex() } }
         return mergeLock.withLock {
-            val activeMerge = ActiveMerge(trimmedIncoming, deduplicateSuffix)
+            val activeMerge = ActiveMerge(trimmedIncoming, receipt)
             val flushFailure = beginMerge(key, activeMerge)
             if (flushFailure != null) {
                 MessageDraftMergeCompletion(flushFailure, null, null)
             } else {
                 try {
                     val mergeResult =
-                        drafts.coordinated.mergeAcceptedText(accountRef, groupIdHex, trimmedIncoming, deduplicateSuffix)
+                        drafts.coordinated.mergeAcceptedText(accountRef, groupIdHex, trimmedIncoming, receipt)
                     finishMerge(key, activeMerge, mergeResult)
                 } finally {
                     synchronized(lock) { activeMerges.remove(key, activeMerge) }
@@ -303,7 +303,10 @@ internal class CoalescingMessageDraftWriter(
     ) {
         delay(debounceMillis)
         while (true) {
-            val (content, generation) = synchronized(lock) { state.content to state.generation }
+            val (content, generation) = synchronized(lock) {
+                activeMerges[key]?.receipt?.proposedContent = state.content
+                state.content to state.generation
+            }
             val saved =
                 drafts.coordinated.saveAcceptedTextIfCurrent(
                     accountRef = key.accountRef,
@@ -360,7 +363,7 @@ internal class CoalescingMessageDraftWriter(
         val state = pending.getOrPut(key) { Pending() }
         state.lastResult = null
         val merge = activeMerges[key]
-        state.content = merge?.let { mergeDraftText(content, it.incoming, it.deduplicateSuffix) } ?: content
+        state.content = merge?.let { mergeDraftText(content, it.incoming) } ?: content
         state.generation = generation.value
         if (state.job == null) state.job = scope.launch { drain(key, state) }
     }
@@ -388,7 +391,7 @@ internal class CoalescingMessageDraftWriter(
 
     private class ActiveMerge(
         val incoming: String,
-        val deduplicateSuffix: Boolean,
+        val receipt: MessageDraftMergeReceipt?,
         var latestResult: MessageDraftMutationResult? = null,
         var latestContent: String? = null,
     )
@@ -421,11 +424,8 @@ private fun mergeCompletion(
 internal fun mergeDraftText(
     existing: String,
     incoming: String,
-    deduplicateSuffix: Boolean = false,
 ): String =
-    if (deduplicateSuffix && (existing == incoming || existing.endsWith("\n$incoming"))) {
-        existing
-    } else if (existing.isBlank()) {
+    if (existing.isBlank()) {
         incoming
     } else {
         "${existing.trimEnd()}\n$incoming"

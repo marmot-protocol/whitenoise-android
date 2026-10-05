@@ -369,7 +369,6 @@ object NotificationNavigation {
     private const val EXTRA_TAP_TOKEN = "dev.ipf.whitenoise.android.extra.TAP_TOKEN"
     private const val URI_SCHEME = "whitenoise-notify"
     private const val URI_HOST_OPEN = "open"
-    private const val BOUND_ROUTE_QUERY = "bound"
 
     /**
      * Per-notification data URI. Android compares a PendingIntent's *data*
@@ -474,17 +473,6 @@ object NotificationNavigation {
         applyTargetExtras(intent, target)
     }
 
-    /** Keeps the card's PendingIntent identity stable and its destination authenticated. */
-    internal fun applyBoundToIntent(
-        intent: Intent,
-        target: NotificationTarget,
-        notificationKey: String,
-        signature: String,
-    ) {
-        applyToIntent(intent, target, notificationKey, signature)
-        intent.data = intent.data?.buildUpon()?.appendQueryParameter(BOUND_ROUTE_QUERY, "1")?.build()
-    }
-
     /** Parse a tapped content [intent] back into a target (untrusted). */
     fun parse(
         intent: Intent?,
@@ -501,7 +489,7 @@ object NotificationNavigation {
             kindName = intent.getStringExtra(EXTRA_KIND),
         ) ?: return null
         val token = intent.getStringExtra(EXTRA_TAP_TOKEN)
-        return if (intent.data?.getQueryParameter(BOUND_ROUTE_QUERY) == "1") {
+        return if (intent.data?.getQueryParameter(NOTIFICATION_BOUND_ROUTE_QUERY) == "1") {
             target.takeIf { isTrustedTargetSignature(notificationKey, token, it) }
                 ?.copy(replyDraft = notificationReplyDraftFrom(intent, target.kind))
         } else {

@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.notifications.NotificationReplyDraft
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -82,6 +83,7 @@ class NotificationReplyDraftHandoffTest {
         runTest {
             val fixture = fixture()
             fixture.gateway.failAfterSave = true
+            fixture.gateway.failReadAfterCommit = true
             val target = target("partial")
             assertTrue(fixture.handoff.stage(target))
             assertEquals("partial", fixture.gateway.drafts.getValue("account-b" to "group-b").content)
@@ -155,6 +157,58 @@ class NotificationReplyDraftHandoffTest {
             assertEquals(0, fixture.hydrations)
         }
 
+    @Test
+    fun firstImportDoesNotDiscardTextThatRepeatsTheExistingDraftSuffix() =
+        runTest {
+            val fixture = fixture()
+            fixture.gateway.drafts["account-b" to "group-b"] = draft("existing\npartial")
+            assertTrue(fixture.handoff.stage(target("partial")))
+            assertEquals("existing\npartial\npartial", fixture.store.get("account-b", "group-b"))
+        }
+
+    @Test
+    fun failedBeforeCommitDoesNotMistakeAnOldMatchingSuffixForThisDelivery() =
+        runTest {
+            val fixture = fixture()
+            fixture.gateway.drafts["account-b" to "group-b"] = draft("existing\npartial")
+            fixture.gateway.failBeforeSaveCount = 1
+            assertTrue(fixture.handoff.stage(target("partial")))
+            assertEquals("existing\npartial\npartial", fixture.store.get("account-b", "group-b"))
+        }
+
+    @Test
+    fun deferredFailureRecoversOnlyItsDraftWithoutANavigationCallback() =
+        runTest {
+            val fixture = fixture()
+            fixture.gateway.failBeforeSaveCount = 3
+            assertFalse(fixture.handoff.stage(target("partial")))
+            fixture.handoff.retryPending("other-account", "group-b")
+            assertEquals(3, fixture.gateway.attempts)
+            fixture.handoff.retryPending("account-b", "group-b")
+            assertEquals("partial", fixture.store.get("account-b", "group-b"))
+        }
+
+    @Test
+    fun retainedFailedComposerEditBlocksStaleNativeHydrationUntilMergeRecoversIt() =
+        runTest {
+            val fixture = fixture()
+            fixture.gateway.failBeforeSaveCount = 1
+            val generation = fixture.writer.submit("account-b", "group-b", "unsaved local edit")
+            advanceUntilIdle()
+            assertNull(fixture.writer.loadIfCurrent("account-b", "group-b", generation))
+            assertTrue(fixture.handoff.stage(target("partial")))
+            assertEquals("unsaved local edit\npartial", fixture.store.get("account-b", "group-b"))
+        }
+
+    @Test
+    fun cancelledDeliveryDoesNotCancelAnActiveRoutingCaller() =
+        runTest {
+            val fixture = fixture()
+            fixture.gateway.cancelNextRead = true
+            assertFalse(fixture.handoff.stage(target("partial")))
+            assertTrue(fixture.handoff.stage(target("partial")))
+        }
+
     private fun TestScope.fixture(): DraftHandoffFixture {
         val gateway = HandoffDraftGateway()
         val repository =
@@ -195,10 +249,23 @@ private class HandoffDraftGateway : MessageDraftGateway {
     val drafts = mutableMapOf<Pair<String, String>, MessageDraftFfi>()
     var saves = 0
     var failAfterSave = false
+    var failReadAfterCommit = false
+    var failReads = 0
+    var cancelNextRead = false
     var failBeforeSaveCount = 0
     var attempts = 0
 
-    override fun read(accountRef: String, groupIdHex: String): MessageDraftFfi? = drafts[accountRef to groupIdHex]
+    override fun read(accountRef: String, groupIdHex: String): MessageDraftFfi? {
+        if (cancelNextRead) {
+            cancelNextRead = false
+            throw CancellationException("cancelled native delivery")
+        }
+        if (failReads > 0) {
+            failReads -= 1
+            error("authoritative read unavailable")
+        }
+        return drafts[accountRef to groupIdHex]
+    }
 
     override fun save(
         accountRef: String,
@@ -217,6 +284,7 @@ private class HandoffDraftGateway : MessageDraftGateway {
         drafts[accountRef to groupIdHex] = draft
         if (failAfterSave) {
             failAfterSave = false
+            if (failReadAfterCommit) failReads = 1
             error("ambiguous commit")
         }
         return draft
@@ -232,6 +300,7 @@ private class HandoffDraftGateway : MessageDraftGateway {
 private object HandoffEditorStrings : EditorStringStore {
     override fun readAll(): Map<String, String> = emptyMap()
     override fun replaceAll(values: Map<String, String>): Boolean = true
+    override fun clear() = Unit
 }
 
 private object HandoffDraftPersistence : DraftPersistence {

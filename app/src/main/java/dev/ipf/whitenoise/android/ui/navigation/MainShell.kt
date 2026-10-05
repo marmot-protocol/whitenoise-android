@@ -768,7 +768,7 @@ internal fun MainShell(
     LaunchedEffect(
         inboundNotificationTarget,
         inboundNotificationRequestId,
-        appState.appInForeground,
+        inboundNotificationTarget?.replyDraft != null && appState.appInForeground,
         appState.activeAccountRef,
         appState.runtimeGeneration,
         appState.accounts,
@@ -853,7 +853,9 @@ internal fun MainShell(
         val step =
             resolveNotificationNav(
                 target = target,
-                knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
+                knownAccountRefs = appState.accounts
+                    .filter { target.replyDraft == null || !it.signedOut }
+                    .mapTo(mutableSetOf()) { it.label },
                 activeAccountRef = appState.activeAccountRef,
                 chatListReady = chatListReady,
                 availableGroupIds = availableGroupIds,
@@ -865,10 +867,7 @@ internal fun MainShell(
 
         suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {
             if (!appState.notificationReplyDraftHandoff.stage(target)) {
-                routingNotification = false
-                releaseNotificationFirstFrameGate(routingRequestId)
                 appState.present(R.string.toast_reply_draft_restore_failed)
-                return
             }
             // Await cancellation before publishing any route state. A superseded
             // effect must not partially commit while its platform call is pending.

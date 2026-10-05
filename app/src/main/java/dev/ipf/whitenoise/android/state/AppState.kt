@@ -2730,8 +2730,9 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ) {
         accountRef ?: return
-        val generation = draftWriter.generation(accountRef, groupIdHex)
         mutationsScope.launch {
+            notificationReplyDraftHandoff.retryPending(accountRef, groupIdHex)
+            val generation = draftWriter.generation(accountRef, groupIdHex)
             draftWriter
                 .loadIfCurrent(accountRef, groupIdHex, generation)
                 ?.onSuccess { draft ->
@@ -6179,6 +6180,7 @@ class WhiteNoiseAppState private constructor(
         composerExpansionStateRetention.removeAccount(signedOutRef)
         composerDraftExpansionBridge.removeAccount(signedOutRef)
         pendingMessageEditHandoff.removeAccount(signedOutRef)
+        notificationReplyDraftHandoff.removeAccount(signedOutRef)
         conversationDictation.onAccountUnavailable(signedOutRef)
         stopTtsForRemovedAccount(signedOutRef)
         clearInMemoryMediaCaches()
@@ -6273,6 +6275,7 @@ class WhiteNoiseAppState private constructor(
             composerExpansionStateRetention.removeAccount(wipedRef)
             composerDraftExpansionBridge.removeAccount(wipedRef)
             pendingMessageEditHandoff.removeAccount(wipedRef)
+            notificationReplyDraftHandoff.removeAccount(wipedRef)
             clearConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
