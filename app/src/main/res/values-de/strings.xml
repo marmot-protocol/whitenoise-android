@@ -203,8 +203,8 @@
     <string name="invite">Einladen</string>
     <string name="new_chat">Neuer Chat</string>
     <string name="error_not_white_noise_profile_qr">Dieser QR-Code ist kein White Noise-Profil.</string>
-    <string name="error_missing_key_package">Diese Person hat verschlüsselte Nachrichten noch nicht eingerichtet. Bitten Sie sie, White Noise zu installieren und einmal zu öffnen, und versuchen Sie es dann erneut.</string>
-    <string name="error_missing_key_package_for">%1$s hat verschlüsselte Nachrichten noch nicht eingerichtet. Bitten Sie diese Person, White Noise zu installieren und einmal zu öffnen, und versuchen Sie es dann erneut.</string>
+    <string name="error_missing_key_package">Für diese Person wurde kein nutzbarer Chat-Schlüssel gefunden. Bitten Sie die Person, White Noise zu installieren oder zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
+    <string name="error_missing_key_package_for">Für %1$s wurde kein nutzbarer Chat-Schlüssel gefunden. Bitten Sie die Person, White Noise zu installieren oder zu aktualisieren und zu öffnen, und versuchen Sie es erneut.</string>
     <string name="invite_to_white_noise">Zu White Noise einladen</string>
     <string name="invite_friends">Freunde einladen</string>
     <string name="invite_to_white_noise_description">%1$s ist noch nicht bei White Noise. Teilen Sie die App, um einen sicheren Chat zu starten.</string>
@@ -2220,6 +2220,10 @@
     <string name="onboarding_details_expanded">Ausgeklappt</string>
     <string name="onboarding_details_collapsed">Eingeklappt</string>
     <string name="group_svg_rejected_detail">Diese SVG konnte nicht verarbeitet werden. Wähle eine einfache SVG, PNG oder JPEG.</string>
+    <string name="error_invalid_key_package">Der veröffentlichte Chat-Schlüssel für diese Person konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
+    <string name="error_invalid_key_package_for">Der veröffentlichte Chat-Schlüssel für %1$s konnte nicht geprüft werden. Bitten Sie die Person, White Noise zu aktualisieren und einen neuen Chat-Schlüssel zu veröffentlichen, und versuchen Sie es erneut.</string>
+    <string name="error_missing_member_inbox">Für diese Person gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
+    <string name="error_missing_member_inbox_for">Für %1$s gibt es kein nutzbares Posteingangs-Relay. Bitten Sie die Person, die Posteingangs-Relays in den White Noise-Einstellungen zu prüfen, und versuchen Sie es erneut.</string>
     <string name="notification_show_previews">Benachrichtigungsvorschau anzeigen</string>
     <string name="notification_show_previews_detail">Wenn ausgeschaltet, werden Namen und Nachrichteninhalte verborgen. Gilt für alle Konten.</string>
     <string name="notification_preview_update_failed">Änderungen können nach einem Neustart verloren gehen.</string>

@@ -12555,17 +12555,6 @@
         ]
       },
       {
-        "surface": "setting:invite_to_white_noise",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
-        "anchor": "R.string.invite_to_white_noise",
-        "test_ids": [
-          "NCH-001",
-          "NCH-002",
-          "ACC-003",
-          "ACC-017"
-        ]
-      },
-      {
         "surface": "setting:new_message_chat_created",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
         "anchor": "R.string.new_message_chat_created",
@@ -25159,6 +25148,146 @@
         "test_ids": [
           "NTF-001",
           "NTF-023"
+        ]
+      },
+      {
+        "surface": "setting:error_missing_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_missing_key_package",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_missing_key_package_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_missing_key_package_for",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_invalid_key_package",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_invalid_key_package",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_invalid_key_package_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_invalid_key_package_for",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_missing_member_inbox",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_missing_member_inbox",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_missing_member_inbox_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_missing_member_inbox_for",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_group_create_failed_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "R.string.error_group_create_failed_retry",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "setting:error_group_create_failed_retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_group_create_failed_retry",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:error_invalid_identity_reference",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_invalid_identity_reference",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:toast_chat_still_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.toast_chat_still_loading",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:toast_no_active_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.toast_no_active_account",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002",
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:toast_couldnt_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_add_members",
+        "test_ids": [
+          "GRP-005"
+        ]
+      },
+      {
+        "surface": "setting:profile_invite_to_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.invite_to_white_noise",
+        "test_ids": ["ACC-003", "ACC-017"]
+      },
+      {
+        "surface": "setting:invite_to_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewChatFlow.kt",
+        "anchor": "R.string.invite_to_white_noise",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "setting:error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "GRP-005"
         ]
       }
     ],

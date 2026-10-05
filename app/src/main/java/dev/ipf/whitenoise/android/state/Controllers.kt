@@ -11384,7 +11384,20 @@ class ConversationController(
                         )
                         false
                     } else {
-                        recordMutationFailure(R.string.toast_couldnt_add_members, "GROUP_INVITE_MEMBER", throwable)
+                        recordMutationFailure(
+                            R.string.toast_couldnt_add_members,
+                            "GROUP_INVITE_MEMBER",
+                            throwable,
+                            inviteFailureDetail(
+                                throwable,
+                                appState::displayName,
+                                if (throwable is MarmotKitException.InvalidKeyPackageEvent) {
+                                    refs.singleOrNull()?.let(appState::displayName)
+                                } else {
+                                    null
+                                },
+                            ),
+                        )
                         false
                     }
                 }

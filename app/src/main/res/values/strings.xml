@@ -255,8 +255,8 @@
     <string name="invite">Invite</string>
     <string name="new_chat">New Chat</string>
     <string name="error_not_white_noise_profile_qr">That QR code doesn’t contain a White Noise profile.</string>
-    <string name="error_missing_key_package">This person hasn’t set up encrypted messaging yet. Ask them to install White Noise and open it once, then try again.</string>
-    <string name="error_missing_key_package_for">%1$s hasn’t set up encrypted messaging yet. Ask them to install White Noise and open it once, then try again.</string>
+    <string name="error_missing_key_package">We couldn’t find a usable chat key for this person. Ask them to install or update White Noise and open it, then retry.</string>
+    <string name="error_missing_key_package_for">We couldn’t find a usable chat key for %1$s. Ask them to install or update White Noise and open it, then retry.</string>
     <string name="invite_to_white_noise">Invite to White Noise</string>
     <string name="invite_friends">Invite friends</string>
     <string name="invite_to_white_noise_description">%1$s isn\'t on White Noise yet. Share the app to start a secure chat.</string>
@@ -2359,6 +2359,10 @@
     <string name="onboarding_details_expanded">Expanded</string>
     <string name="onboarding_details_collapsed">Collapsed</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
+    <string name="error_invalid_key_package">The published chat key for this person couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
+    <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
+    <string name="error_missing_member_inbox">There is no usable inbox relay for this person. Ask them to check their inbox relays in White Noise settings, then retry.</string>
+    <string name="error_missing_member_inbox_for">There is no usable inbox relay for %1$s. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="notification_show_previews">Show notification previews</string>
     <string name="notification_show_previews_detail">Hide names and message content when off. Applies to all accounts.</string>
     <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>
