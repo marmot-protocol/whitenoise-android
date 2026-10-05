@@ -61,7 +61,10 @@ internal interface ConversationDictationAudioCaptureDevice {
     fun start()
 
     /** Reads PCM16, optionally waiting for samples; completion drains only immediately available audio. */
-    fun read(target: ShortArray, waitForSamples: Boolean = true): Int
+    fun read(
+        target: ShortArray,
+        waitForSamples: Boolean = true,
+    ): Int
 
     /** Stops acquiring microphone samples without acknowledging any buffered audio. */
     fun stop()
