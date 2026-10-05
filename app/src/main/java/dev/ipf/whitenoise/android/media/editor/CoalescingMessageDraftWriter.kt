@@ -162,14 +162,32 @@ internal class CoalescingMessageDraftWriter(
         }
     }
 
-    /** Non-destructive sign-out saves accepted keystrokes before MDK deactivates the account. */
-    suspend fun flushAccount(accountRef: String) {
+    /** Flush accepted edits, retry each retained failure once, and report unsaved text before deactivation. */
+    suspend fun flushAccount(accountRef: String): Boolean {
+        val retried = mutableSetOf<Key>()
         while (true) {
             val jobs =
                 synchronized(lock) {
-                    pending.filterKeys { it.accountRef == accountRef }.values.mapNotNull(Pending::job)
+                    pending
+                        .filterKeys { it.accountRef == accountRef }
+                        .mapNotNull { (key, state) ->
+                            if (
+                                state.job == null &&
+                                state.lastResult is MessageDraftMutationResult.Failure &&
+                                retried.add(key)
+                            ) {
+                                state.job = scope.launch { drain(key, state) }
+                            }
+                            state.job
+                        }
                 }
-            if (jobs.isEmpty()) return
+            if (jobs.isEmpty()) {
+                return synchronized(lock) {
+                    pending.none { (key, state) ->
+                        key.accountRef == accountRef && state.lastResult is MessageDraftMutationResult.Failure
+                    }
+                }
+            }
             jobs.forEach { it.join() }
         }
     }

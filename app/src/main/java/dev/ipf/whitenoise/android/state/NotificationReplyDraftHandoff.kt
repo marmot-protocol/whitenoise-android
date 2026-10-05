@@ -26,23 +26,27 @@ internal class NotificationReplyDraftHandoff(
     private val nowMillis: () -> Long = { TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) },
     private val onHydrated: () -> Unit,
 ) {
-    private val deliveries = linkedMapOf<String, Deferred<Boolean>>()
+    private val deliveries = linkedMapOf<String, Delivery>()
     private val pending = linkedMapOf<String, PendingReply>()
 
     /** A cancelled navigation waiter cannot cancel or replay an already-started local save. */
     suspend fun stage(target: NotificationTarget): Boolean {
         val draft = target.replyDraft ?: return true
         val intake = pending.getOrPut(draft.id) { PendingReply(target, nowMillis() + HANDOFF_WAIT_MILLIS) }
-        val previous = deliveries[draft.id]
+        val previous = deliveries[draft.id]?.result
         previous?.let { cached ->
             val retryable = cached.isCancelled || (cached.isCompleted && !awaitDelivery(cached))
-            if (retryable) deliveries.remove(draft.id, cached)
+            if (retryable) deliveries.remove(draft.id)
         }
-        val delivery = deliveries.getOrPut(draft.id) { scope.async { deliver(intake) } }
+        val record =
+            deliveries.getOrPut(draft.id) {
+                Delivery(target.accountRef, scope.async { deliver(intake) })
+            }
+        val delivery = record.result
         val remainingWait = (intake.deadlineMillis - nowMillis()).coerceAtLeast(0L)
         val applied = withTimeoutOrNull(remainingWait) { awaitDelivery(delivery) } == true
         if (applied || !available(target)) pending.remove(draft.id)
-        if (!applied && delivery.isCompleted) deliveries.remove(draft.id, delivery)
+        if (!applied && delivery.isCompleted) deliveries.remove(draft.id, record)
         pruneReceipts()
         return applied
     }
@@ -61,10 +65,12 @@ internal class NotificationReplyDraftHandoff(
 
     /** Sign-out/wipe retires unsaved private input and cancels only that account's outstanding deliveries. */
     fun removeAccount(accountRef: String) {
-        val ids = pending.filterValues { it.target.accountRef == accountRef }.keys.toList()
+        val pendingIds = pending.filterValues { it.target.accountRef == accountRef }.keys
+        val deliveryIds = deliveries.filterValues { it.accountRef == accountRef }.keys
+        val ids = pendingIds + deliveryIds
         ids.forEach { id ->
             pending.remove(id)
-            deliveries.remove(id)?.cancel()
+            deliveries.remove(id)?.result?.cancel()
         }
     }
 
@@ -111,7 +117,7 @@ internal class NotificationReplyDraftHandoff(
     /** Bound completed delivery receipts without evicting active saves or the separate failed-save buffer. */
     private fun pruneReceipts() {
         while (deliveries.size > MAX_RECEIPTS) {
-            val completed = deliveries.entries.firstOrNull { entry -> entry.value.isCompleted } ?: break
+            val completed = deliveries.entries.firstOrNull { entry -> entry.value.result.isCompleted } ?: break
             deliveries.remove(completed.key)
         }
     }
@@ -135,6 +141,11 @@ internal class NotificationReplyDraftHandoff(
         val receipt = MessageDraftMergeReceipt()
         var failureReported = false
     }
+
+    private class Delivery(
+        val accountRef: String,
+        val result: Deferred<Boolean>,
+    )
 
     private companion object {
         const val MAX_RECEIPTS = 32

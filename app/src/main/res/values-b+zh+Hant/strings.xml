@@ -1000,6 +1000,7 @@
     <string name="message_status_streaming">串流中</string>
     <string name="toast_notification_account_unavailable">該帳戶已無法使用</string>
     <string name="toast_reply_draft_restore_failed">無法還原回覆。</string>
+    <string name="toast_draft_save_failed">無法儲存草稿。</string>
     <string name="toast_notification_conversation_unavailable">該對話已無法使用</string>
     <string name="toast_couldnt_decode_image">無法解碼該圖片</string>
     <string name="toast_couldnt_prepare_image">無法下載或處理該圖片。</string>

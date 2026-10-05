@@ -6150,7 +6150,7 @@ class WhiteNoiseAppState private constructor(
     @Suppress("ReturnCount") // No account, retained engine session, or completed local sign-out.
     suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
         val signedOutRef = activeAccountRef ?: return null
-        draftWriter.flushAccount(signedOutRef)
+        val draftsSaved = draftWriter.flushAccount(signedOutRef)
         // MDK 0.9.15 handles local and external signers through the same call.
         val engineResult =
             runCatchingCancellable {
@@ -6212,6 +6212,7 @@ class WhiteNoiseAppState private constructor(
         // device — other identities still need it on multi-account switch.
         if (next == null) pushTokenStore.clear()
         refreshLocalNotificationSettings()
+        if (!draftsSaved) present(R.string.toast_draft_save_failed)
         return signOutCompletion(engineOutcome)
     }
 

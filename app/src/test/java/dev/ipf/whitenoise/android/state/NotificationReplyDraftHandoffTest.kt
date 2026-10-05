@@ -185,6 +185,50 @@ class NotificationReplyDraftHandoffTest {
         }
 
     @Test
+    fun signOutRetriesARetainedFailedEditOnceAndReportsAnUnrecoverableSave() =
+        runTest {
+            val fixture = fixture()
+            fixture.gateway.failBeforeSaveCount = 1
+            fixture.writer.submit("account-b", "group-b", "retained edit")
+            advanceUntilIdle()
+            assertTrue(fixture.writer.flushAccount("account-b"))
+            assertEquals(2, fixture.gateway.attempts)
+            assertEquals(
+                "retained edit",
+                fixture.gateway.drafts
+                    .getValue("account-b" to "group-b")
+                    .content,
+            )
+            fixture.gateway.failBeforeSaveCount = 2
+            fixture.writer.submit("account-b", "group-b", "cannot persist")
+            advanceUntilIdle()
+            assertFalse(fixture.writer.flushAccount("account-b"))
+            assertEquals(4, fixture.gateway.attempts)
+        }
+
+    @Test
+    fun accountRemovalCancelsAnOutstandingDeliveryAfterItsPendingEntryWasRetired() =
+        runTest {
+            var accountAvailable = true
+            val fixture = fixture(debounceMillis = 10_000L, available = { accountAvailable })
+            fixture.writer.submit("account-b", "group-b", "queued")
+            val navigation = async { fixture.handoff.stage(target("retired reply")) }
+            runCurrent()
+            accountAvailable = false
+            assertFalse(navigation.await())
+            fixture.handoff.removeAccount("account-b")
+            accountAvailable = true
+            advanceUntilIdle()
+            assertEquals(1, fixture.gateway.saves)
+            assertEquals(
+                "queued",
+                fixture.gateway.drafts
+                    .getValue("account-b" to "group-b")
+                    .content,
+            )
+        }
+
+    @Test
     fun accountWipeCancelsQueuedPrivateTextWithoutDiscardingAnotherAccountsEdit() =
         runTest {
             val fixture = fixture()
@@ -350,7 +394,10 @@ class NotificationReplyDraftHandoffTest {
             assertTrue(fixture.handoff.stage(target("partial")))
         }
 
-    private fun TestScope.fixture(debounceMillis: Long = 250L): DraftHandoffFixture {
+    private fun TestScope.fixture(
+        debounceMillis: Long = 250L,
+        available: (NotificationTarget) -> Boolean = { true },
+    ): DraftHandoffFixture {
         val gateway = HandoffDraftGateway()
         val repository =
             MessageDraftRepository(
@@ -366,6 +413,7 @@ class NotificationReplyDraftHandoffTest {
                     this,
                     writer,
                     store,
+                    available = available,
                     onFailed = { it.failures += 1 },
                     nowMillis = { testScheduler.currentTime },
                 ) {

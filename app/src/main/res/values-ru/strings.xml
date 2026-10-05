@@ -1064,6 +1064,7 @@
     <string name="message_status_streaming">Потоковая передача</string>
     <string name="toast_notification_account_unavailable">Этот аккаунт больше недоступен</string>
     <string name="toast_reply_draft_restore_failed">Не удалось восстановить ответ.</string>
+    <string name="toast_draft_save_failed">Не удалось сохранить черновик.</string>
     <string name="toast_notification_conversation_unavailable">Этот разговор больше недоступен</string>
     <string name="toast_couldnt_decode_image">Не удалось декодировать изображение</string>
     <string name="toast_couldnt_prepare_image">Не удалось загрузить или подготовить изображение.</string>

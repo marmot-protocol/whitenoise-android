@@ -31411,6 +31411,18 @@
         "test_ids": ["NTF-032"]
       },
       {
+        "surface": "Draft save failure before sign-out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_draft_save_failed",
+        "test_ids": ["ACC-013", "NTF-032"]
+      },
+      {
+        "surface": "Draft save failure notice",
+        "source": "app/src/main/res/values/strings.xml",
+        "anchor": "name=\"toast_draft_save_failed\"",
+        "test_ids": ["ACC-013", "NTF-032"]
+      },
+      {
         "surface": "Direct Share preview privacy fence",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
         "anchor": "genericNotificationShortcut(context, shortcut)",

@@ -117,9 +117,12 @@ class ForwardDiagnosticsProductionPathTest {
             shadowOf(Looper.getMainLooper()).idle()
             Thread.sleep(5)
         }
-        check(job?.isCompleted != false) { "forward fixture jobs did not stop" }
-        PerformanceDiagnostics.stop()
-        Dispatchers.resetMain()
+        try {
+            check(job?.isCompleted != false) { "forward fixture jobs did not stop" }
+        } finally {
+            PerformanceDiagnostics.stop()
+            Dispatchers.resetMain()
+        }
     }
 
     /** One uncached single-attachment forward to one destination emits the full phase sequence and nothing else. */
