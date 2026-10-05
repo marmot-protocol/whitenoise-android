@@ -15,8 +15,7 @@ internal fun restoreImportedMediaSlots(
     val retained = current.filter { !owns(it.uri) || it.uri in restored }
     val added = restored.filterNot { uri -> retained.any { it.uri == uri } }
     val appended = appendPendingMediaSlots(retained, added, maxItems)
-    val importedInOrder =
-        appended.filter { owns(it.uri) }.sortedBy { restored.indexOf(it.uri) }.iterator()
+    val importedInOrder = appended.filter { owns(it.uri) }.sortedBy { restored.indexOf(it.uri) }.iterator()
     return appended.map { slot -> if (owns(slot.uri)) importedInOrder.next() else slot }
 }
 
