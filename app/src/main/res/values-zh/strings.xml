@@ -2221,4 +2221,9 @@
     <string name="profile_notification_scope_detail">适用于此账号所有对话中此人发送的消息。消息接收和未读数量不变。</string>
     <string name="profile_notification_precedence">先应用聊天静音和仅提及规则，再应用此人的静音或自定义 Android 设置。使用默认设置会恢复聊天和全局设置。现有通知保留原来的渠道。</string>
     <string name="profile_notification_channel_name">%1$s · 所有聊天中的消息</string>
+    <string name="destination_filter_all">全部聊天</string>
+    <string name="destination_filter_selected">查看已选（%1$d）</string>
+    <string name="destination_filter_label">筛选聊天</string>
+    <string name="forward_select_by_folder">按文件夹选择</string>
+    <string name="destination_filter_incomplete">尚未加载匹配的聊天。请重试或选择所有聊天。</string>
 </resources>

@@ -2412,4 +2412,9 @@
     <string name="profile_notification_scope_detail">Applies to messages from this person in every conversation for this account. Delivery and unread counts are unchanged.</string>
     <string name="profile_notification_precedence">Chat mute and mentions-only rules apply first. This person’s mute or custom Android settings apply next. Use defaults restores chat and global settings. Existing notifications keep their original channel.</string>
     <string name="profile_notification_channel_name">%1$s · Messages across chats</string>
+    <string name="destination_filter_all">All chats</string>
+    <string name="destination_filter_selected">Review selected (%1$d)</string>
+    <string name="destination_filter_label">Filter chats</string>
+    <string name="forward_select_by_folder">Select by folder</string>
+    <string name="destination_filter_incomplete">No matching chats are loaded yet. Retry or choose All chats.</string>
 </resources>

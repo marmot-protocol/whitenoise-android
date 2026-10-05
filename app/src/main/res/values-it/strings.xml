@@ -2254,4 +2254,9 @@
     <string name="profile_notification_scope_detail">Si applica ai messaggi di questa persona in tutte le conversazioni di questo account. La consegna e il conteggio dei messaggi non letti restano invariati.</string>
     <string name="profile_notification_precedence">Si applicano prima le regole del silenziamento della chat e delle sole menzioni. Seguono il silenziamento o le impostazioni Android personalizzate di questa persona. Le impostazioni predefinite ripristinano quelle della chat e globali. Le notifiche esistenti mantengono il canale originale.</string>
     <string name="profile_notification_channel_name">%1$s · Messaggi in tutte le chat</string>
+    <string name="destination_filter_all">Tutte le chat</string>
+    <string name="destination_filter_selected">Controlla selezione (%1$d)</string>
+    <string name="destination_filter_label">Filtra chat</string>
+    <string name="forward_select_by_folder">Seleziona per cartella</string>
+    <string name="destination_filter_incomplete">Nessuna chat corrispondente caricata. Riprova o scegli Tutte le chat.</string>
 </resources>

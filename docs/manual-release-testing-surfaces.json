@@ -736,6 +736,48 @@
         "test_ids": ["MSG-004"]
       },
       {
+        "surface": "ForwardEmptyTargets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardEmptyTargets(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationFilterIncomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFilterIncomplete.kt",
+        "anchor": "fun DestinationFilterIncomplete(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "FolderPillLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "fun FolderPillLabel(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "rememberDestinationFolderRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt",
+        "anchor": "fun rememberDestinationFolderRows(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationFolderFilters",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt",
+        "anchor": "fun DestinationFolderFilters(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationPickerSearch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationPickerSearch.kt",
+        "anchor": "fun DestinationPickerSearch(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationSearchField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationPickerSearch.kt",
+        "anchor": "fun DestinationSearchField(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
         "surface": "rememberShareChatPickerActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "fun rememberShareChatPickerActions(",
@@ -6654,7 +6696,7 @@
       {
         "surface": "Forwarding folder section label",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
-        "anchor": "R.string.chat_folders_title",
+        "anchor": "R.string.forward_select_by_folder",
         "test_ids": [
           "FLD-001",
           "MSG-010"

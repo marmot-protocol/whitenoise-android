@@ -2254,4 +2254,9 @@
     <string name="profile_notification_scope_detail">Aplica-se às mensagens desta pessoa em todas as conversas desta conta. A entrega e a contagem de mensagens não lidas permanecem iguais.</string>
     <string name="profile_notification_precedence">As regras de silenciamento do chat e de apenas menções se aplicam primeiro. Depois, o silenciamento ou as configurações personalizadas do Android desta pessoa. Usar padrões restaura as configurações do chat e globais. As notificações existentes mantêm o canal original.</string>
     <string name="profile_notification_channel_name">%1$s · Mensagens em todos os chats</string>
+    <string name="destination_filter_all">Todas as conversas</string>
+    <string name="destination_filter_selected">Rever seleção (%1$d)</string>
+    <string name="destination_filter_label">Filtrar conversas</string>
+    <string name="forward_select_by_folder">Selecionar por pasta</string>
+    <string name="destination_filter_incomplete">Ainda não foram carregadas conversas correspondentes. Tente novamente ou escolha Todas as conversas.</string>
 </resources>

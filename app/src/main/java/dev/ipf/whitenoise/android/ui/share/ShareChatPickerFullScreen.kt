@@ -33,7 +33,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -57,10 +56,10 @@ import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
-import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
+import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.PreparedVisibleGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
@@ -243,14 +242,30 @@ private fun rememberShareChatPickerPresentations(
 }
 
 @Composable
+@Suppress("LongMethod") // Keeps the bounded picker layout and transient filter in one account-owned surface.
 private fun ShareChatPickerContent(
     pickerState: ShareChatPickerState,
     presentedTargets: List<ShareChatPickerTargetPresentation>,
     modifier: Modifier = Modifier,
 ) {
+    val filter = remember(pickerState.selectedAccountRef) { DestinationFolderFilterState() }
+    val folders =
+        rememberDestinationFolderRows(
+            pickerState.appState,
+            pickerState.targets,
+            pickerState.selectedAccountRef,
+            pickerState.selectedAccountIdHex,
+            pickerState.memberSnapshotsRevision,
+        )
+    val filteredTargets =
+        pickerState.filtered(presentedTargets).filter {
+            filter.accepts(it.item.group.groupIdHex, folders, pickerState.selected)
+        }
+
     val listState = rememberLazyListState()
     BoxWithConstraints(modifier) {
         val compactHeight = maxHeight < 480.dp
+        val horizontalFilters = compactHeight && maxWidth >= 600.dp
         val selectedAccount = pickerState.selectedAccount
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -289,18 +304,20 @@ private fun ShareChatPickerContent(
                     )
                 }
             }
-            FlowSearchField(
-                value = pickerState.query,
-                onValueChange = { pickerState.query = it },
-                placeholder = stringResource(R.string.share_search_chats),
-                modifier =
-                    Modifier
-                        .padding(horizontal = Dimens.spaceLg)
-                        .onFocusChanged { pickerState.searchFocused = it.isFocused },
+            DestinationPickerSearch(
+                query = pickerState.query,
+                onQueryChange = { pickerState.query = it },
+                placeholder = R.string.share_search_chats,
+                folders = folders,
+                filter = filter,
+                selected = pickerState.selected,
+                horizontal = horizontalFilters,
+                onFocusChange = { pickerState.searchFocused = it },
             )
             ShareChatPickerTargetList(
                 pickerState = pickerState,
-                filteredTargets = pickerState.filtered(presentedTargets),
+                filteredTargets = filteredTargets,
+                browsingFiltered = filter.folderId != null || filter.reviewingSelected,
                 modifier = Modifier.weight(1f),
                 listState = listState,
             )
@@ -313,6 +330,7 @@ private fun ShareChatPickerContent(
 private fun ShareChatPickerTargetList(
     pickerState: ShareChatPickerState,
     filteredTargets: List<ShareChatPickerTargetPresentation>,
+    browsingFiltered: Boolean,
     modifier: Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
@@ -325,39 +343,35 @@ private fun ShareChatPickerTargetList(
         accountRef = pickerState.selectedAccountRef,
     ) {
         LazyColumn(
-            modifier = modifier.fillMaxWidth(),
+            modifier = modifier.fillMaxWidth().testTag("share.destinations"),
             state = listState,
             contentPadding = PaddingValues(bottom = Dimens.spaceLg),
         ) {
-            if (pickerState.targets.isEmpty()) {
-                pickerState.error?.let { failure ->
-                    item(key = "share-picker-load-error") {
-                        InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
-                    }
+            pickerState.error?.let { failure ->
+                item(key = "share-picker-load-error") {
+                    InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
                 }
-                item {
-                    Text(
-                        stringResource(R.string.share_no_chats),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                    )
-                }
+            }
+            if (browsingFiltered && pickerState.isLoading && filteredTargets.isEmpty()) {
+                item { LoadingScreen() }
             } else if (filteredTargets.isEmpty()) {
-                item {
-                    Text(
-                        stringResource(R.string.share_no_matches),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
-                    )
+                if (!browsingFiltered || pickerState.error == null) {
+                    item {
+                        if (browsingFiltered && !pickerState.targetsComplete) {
+                            DestinationFilterIncomplete(pickerState::retryLoad)
+                            return@item
+                        }
+                        val emptyLabel =
+                            if (pickerState.targets.isEmpty()) R.string.share_no_chats else R.string.share_no_matches
+                        Text(
+                            stringResource(emptyLabel),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Dimens.spaceLg, vertical = Dimens.spaceLg),
+                        )
+                    }
                 }
             } else {
-                pickerState.error?.let { failure ->
-                    item(key = "share-picker-load-error") {
-                        InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
-                    }
-                }
                 item { SectionHeader(stringResource(R.string.recent_chats)) }
                 items(filteredTargets, key = { it.item.group.groupIdHex }) { target ->
                     ShareTargetRow(
@@ -416,6 +430,7 @@ private class ShareChatPickerState(
     val selectedAccountRef: String?,
     val selectedAccountIdHex: String?,
     val isLoading: Boolean,
+    val targetsComplete: Boolean,
     val error: ErrorPresentation?,
     val memberSnapshotsRevision: Long,
     private val selectedAccountRefState: MutableState<String?>,
@@ -651,6 +666,7 @@ private fun rememberShareChatPickerState(
             selectedAccountRef = selectedAccountRef,
             selectedAccountIdHex = selectedAccount?.accountIdHex,
             isLoading = dataSource.isLoading,
+            targetsComplete = dataSource.targetsComplete,
             error = dataSource.error,
             memberSnapshotsRevision = dataSource.memberSnapshotsRevision,
             selectedAccountRefState = selectionState.selectedAccountRefState,

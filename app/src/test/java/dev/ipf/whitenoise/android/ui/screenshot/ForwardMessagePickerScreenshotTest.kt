@@ -8,10 +8,12 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -100,6 +102,18 @@ class ForwardMessagePickerScreenshotTest {
         )
     }
 
+    /** Landscape preserves destination scrolling at the maximum text scale with both folder control rows. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w780dp-h360dp-land-mdpi")
+    fun landscapeLargeFont() {
+        renderPicker(
+            2f,
+            LayoutDirection.Ltr,
+            "src/test/snapshots/forward_picker_landscape_large.png",
+            folderFixture = FolderFixture.ONE,
+        )
+    }
+
     /** Captures the production picker before scrolling, then proves destinations remain reachable. */
     private fun renderPicker(
         fontScale: Float,
@@ -143,6 +157,19 @@ class ForwardMessagePickerScreenshotTest {
             val region = composeRule.onNodeWithTag(FORWARD_FOLDER_CHIP_ROW_TEST_TAG).getUnclippedBoundsInRoot()
             assertTrue("folder controls must remain one bounded row", (region.bottom - region.top).value <= 80f)
         }
+        if (folderFixture != FolderFixture.NONE) {
+            val folder = appState.chatFolderPreferences.foldersFor(ACCOUNT_REF).last()
+            val filterTag = "destination.filter.${folder.id}"
+            composeRule.onNodeWithTag("destination.filters").performScrollToNode(hasTestTag(filterTag))
+            composeRule.onNodeWithTag(filterTag).performClick()
+            if (snapshotPath.contains("landscape")) {
+                composeRule.onNodeWithTag("forward.destinations").performScrollToNode(hasText("Person 1"))
+            }
+            composeRule
+                .onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG)
+                .captureRoboImage(snapshotPath.replace(".png", "_filtered.png"))
+            composeRule.onNodeWithTag("destination.filter.all").performClick()
+        }
         composeRule
             .onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
             .performScrollToNode(hasText("Person 8"))
@@ -168,6 +195,10 @@ class ForwardMessagePickerScreenshotTest {
             )
         appState.chatFolderPreferences.clearAllForAccount(ACCOUNT_REF)
         val groupIds = chats.map { it.first }
+        if (folderFixture == FolderFixture.NONE) {
+            val store = appState.chatFolderPreferences
+            store.foldersFor(ACCOUNT_REF).forEach { store.deleteFolder(ACCOUNT_REF, it.id) }
+        }
         seedFolders(
             appState = appState,
             groupIds = groupIds,

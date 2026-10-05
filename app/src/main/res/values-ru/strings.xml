@@ -2324,4 +2324,9 @@
     <string name="profile_notification_scope_detail">Применяется к сообщениям этого человека во всех беседах этого аккаунта. Доставка и счётчик непрочитанных сообщений не меняются.</string>
     <string name="profile_notification_precedence">Сначала действуют правила отключения уведомлений чата и уведомлений только об упоминаниях. Затем — отключение уведомлений или свои настройки Android для этого человека. Настройки по умолчанию возвращают настройки чата и общие настройки. Существующие уведомления сохраняют исходный канал.</string>
     <string name="profile_notification_channel_name">%1$s · Сообщения во всех чатах</string>
+    <string name="destination_filter_all">Все чаты</string>
+    <string name="destination_filter_selected">Проверить выбранные (%1$d)</string>
+    <string name="destination_filter_label">Фильтр чатов</string>
+    <string name="forward_select_by_folder">Выбрать по папке</string>
+    <string name="destination_filter_incomplete">Подходящие чаты ещё не загружены. Повторите попытку или выберите все чаты.</string>
 </resources>
