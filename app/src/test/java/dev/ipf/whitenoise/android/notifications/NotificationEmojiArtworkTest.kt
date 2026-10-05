@@ -99,6 +99,67 @@ class NotificationEmojiArtworkTest {
     }
 
     @Test
+    fun carriedHistorySurvivesPruningBetweenReadAndPost() = runBlocking {
+        val presenter = LocalNotificationPresenter(
+            context,
+            groupReconciliation = {},
+            enrichmentLauncher = {},
+            emojiArtworkTimeoutMs = 5_000L,
+        )
+        presenter.ensureChannels()
+        assertTrue(presenter.show(messageUpdate(":wn:", '4'), shortNpub = { "npub1fixture" }))
+        val original =
+            requireNotNull(styleOf(manager.activeNotifications.single().notification).messages.first().dataUri)
+        try {
+            ConversationCardPostSynchronizer.testHook = object : ConversationCardTestHook {
+                override fun onBarrier(
+                    op: ConversationCardOp,
+                    barrier: ConversationCardBarrier,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (op == ConversationCardOp.SHOW_NOTIFY && barrier == ConversationCardBarrier.AFTER_READ) {
+                        // Simulate SystemUI removing the card before its asynchronous delete callback.
+                        synchronized(UserEventNotificationGroup.mutationLock) {
+                            manager.cancelAll()
+                            pruneNotificationEmojiArtwork(context, emptyArray())
+                        }
+                        assertNotNull(
+                            context.contentResolver.openInputStream(original)?.use(BitmapFactory::decodeStream),
+                        )
+                    }
+                }
+            }
+            assertTrue(presenter.show(messageUpdate("Second message", '5'), shortNpub = { "npub1fixture" }))
+            val messages = styleOf(manager.activeNotifications.single().notification).messages
+            assertEquals(original, messages.first().dataUri)
+            assertEquals("Second message", messages.last().text.toString())
+        } finally {
+            ConversationCardPostSynchronizer.testHook = null
+        }
+        manager.cancelAll()
+        pruneNotificationEmojiArtwork(context, emptyArray())
+        assertTrue(artifacts().isEmpty())
+    }
+
+    @Test
+    fun overlappingHistoryLeasesAreIndependentAndIdempotent() = runBlocking {
+        val artifact = requireNotNull(notificationEmojiArtwork(context, ":wn:"))
+        val sender = androidx.core.app.Person.Builder().setName("Alice").build()
+        val history = notificationEmojiMessages(":wn:", 1L, sender, artifact.uri)
+        val first = retainNotificationEmojiHistoryArtwork(context, history)
+        val second = retainNotificationEmojiHistoryArtwork(context, history)
+        artifact.close()
+        first.close()
+        first.close()
+        pruneNotificationEmojiArtwork(context, emptyArray())
+        assertEquals(1, artifacts().size)
+        second.close()
+        pruneNotificationEmojiArtwork(context, emptyArray())
+        assertTrue(artifacts().isEmpty())
+    }
+
+    @Test
     fun notificationAndStoreShareModernAndLegacyPrecedence() = runBlocking {
         val directory = File(context.filesDir, CustomEmojiStore.DIRECTORY).apply { mkdirs() }
         val source = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }

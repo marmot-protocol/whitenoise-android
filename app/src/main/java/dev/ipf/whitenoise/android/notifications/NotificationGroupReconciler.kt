@@ -105,9 +105,8 @@ internal class NotificationGroupReconciler(
         val children = first.mapNotNull(UserEventNotificationGroup::child)
         val old = first.firstOrNull { it.tag == SUMMARY_TAG && it.id == SUMMARY_ID }
         if (children.isEmpty() && !allowEmpty) return false
-        val summaryMatches = children.isNotEmpty() && matches(old, UserEventNotificationGroup.summaryState(children))
         val summaryDone =
-            if (summaryMatches || (children.isEmpty() && old == null)) {
+            if (summaryIsCurrent(children, old)) {
                 true
             } else {
                 ensureSummaryChannel(summaryChannel)
@@ -122,6 +121,9 @@ internal class NotificationGroupReconciler(
         val artworkDone = reconcileArtwork(manager, expected, allowEmpty)
         return summaryDone && artworkDone
     }
+
+    private fun summaryIsCurrent(children: List<NotificationGroupChild>, old: StatusBarNotification?): Boolean =
+        if (children.isEmpty()) old == null else matches(old, UserEventNotificationGroup.summaryState(children))
 
     /** Cleanup is not complete while a write is settling or an empty snapshot still needs confirmation. */
     private fun reconcileArtwork(

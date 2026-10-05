@@ -637,6 +637,7 @@ class LocalNotificationPresenter(
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
         var emojiArtifact: NotificationEmojiArtifact? = null
+        var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
         try {
             written =
@@ -928,14 +929,19 @@ class LocalNotificationPresenter(
                                         if (redactContent) {
                                             null
                                         } else {
-                                            existingConversationMessages(
-                                                notificationContent.notificationTag,
-                                                notificationContent.notificationId,
-                                                replacingMessageIdHex =
-                                                    update.messageIdHex
-                                                        ?.takeIf(String::isNotBlank)
-                                                        ?.takeIf { replaceCurrentMessage },
-                                            )
+                                            synchronized(UserEventNotificationGroup.mutationLock) {
+                                                existingConversationMessages(
+                                                    notificationContent.notificationTag,
+                                                    notificationContent.notificationId,
+                                                    replacingMessageIdHex =
+                                                        update.messageIdHex
+                                                            ?.takeIf(String::isNotBlank)
+                                                            ?.takeIf { replaceCurrentMessage },
+                                                )?.also { history ->
+                                                    carriedArtworkLease =
+                                                        retainNotificationEmojiHistoryArtwork(context, history)
+                                                }
+                                            }
                                         }
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
@@ -1208,6 +1214,7 @@ class LocalNotificationPresenter(
                     true
                 }
         } finally {
+            carriedArtworkLease?.close()
             emojiArtifact?.close()
             if (emojiPreparationAttempted) groupReconciliation()
             rewriteLease?.let(NotificationCardGenerations::release)

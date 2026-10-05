@@ -26266,6 +26266,13 @@
     ],
     "source_coverage": [
       {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationEmojiLeases.kt",
+        "anchor": "fun retainNotificationEmojiHistoryArtwork(",
+        "test_ids": [
+          "NTF-033"
+        ]
+      },
+      {
         "surface": "Share picker staging rejection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "R.string.no_share_target_available",

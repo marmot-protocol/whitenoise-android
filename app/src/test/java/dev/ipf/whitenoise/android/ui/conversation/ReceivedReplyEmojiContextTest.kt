@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import dev.ipf.marmotkit.MessageTagFfi
@@ -34,7 +35,7 @@ class ReceivedReplyEmojiContextTest : PollMessageTestFixtures() {
     }
 
     @Test
-    fun disappearingOriginalCannotKeepReplyArtwork() {
+    fun recomposingAfterTheOriginalDeadlineDropsReplyArtwork() {
         pollState.stopAutomaticAttachmentDownloads()
         val source = emojiSource()
         val projected = requireNotNull(source.projected).copy(
@@ -43,13 +44,17 @@ class ReceivedReplyEmojiContextTest : PollMessageTestFixtures() {
         applyPage(projected)
         val revision = mutableStateOf(0)
         rule.setContent {
-            revision.value
-            result.set(rememberReplyReceivedEmoji(source.record.messageIdHex, pollController, pollState))
+            key(revision.value) {
+                result.set(rememberReplyReceivedEmoji(source.record.messageIdHex, pollController, pollState))
+            }
         }
         rule.waitUntil(5_000) { result.get().attachmentIndexes.isNotEmpty() }
         // Advance the controller's actual clock without requiring an engine-removal event.
-        pollClockMillis += 2_000L
-        rule.runOnIdle { revision.value++ }
+        rule.runOnIdle {
+            pollClockMillis += 2_000L
+            assertTrue(pollController.isRetainedRowGone(source.record.messageIdHex))
+            revision.value++
+        }
         rule.waitUntil(5_000) { result.get() === ReceivedEmoji.None }
     }
 

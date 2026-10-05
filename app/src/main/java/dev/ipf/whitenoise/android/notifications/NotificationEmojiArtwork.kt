@@ -36,8 +36,7 @@ private const val MAX_SOURCE_CHARS = 8192
 private const val MAX_ARTIFACTS = 64
 private const val EXPORT_DIRECTORY = "notification_emoji"
 private val ownedName = Regex("[0-9a-f-]{36}\\.png")
-private val artifactLock = Any()
-private val pending = mutableSetOf<String>()
+private val artifactLock = NotificationEmojiLeases.lock
 
 /** An entire optional preview reads no more than four source images' worth of bytes. */
 private class EmojiReadBudget {
@@ -55,10 +54,12 @@ private class EmojiReadBudget {
 /** An immutable derived image, held until its guarded post finishes. Original emoji files are never exported. */
 class NotificationEmojiArtifact internal constructor(
     val uri: Uri,
-    private val name: String,
+    name: String,
 ) : AutoCloseable {
+    private val lease = NotificationEmojiLeases.retain(setOf(name))
+
     override fun close() {
-        synchronized(artifactLock) { pending.remove(name) }
+        lease.close()
     }
 }
 
@@ -102,11 +103,7 @@ internal suspend fun notificationEmojiArtwork(
     var handedOff = false
     return try {
         withContext(Dispatchers.IO) {
-            // A flattened notification preview loses URL/link annotations. Do not guess artwork in those cases.
-            val source =
-                sourceText?.takeUnless { it.length > MAX_SOURCE_CHARS || '[' in it || "://" in it }
-                    ?: return@withContext null
-            val codes = EmojiShortcodes.presentationShortcodes(source).filter(text::contains).take(MAX_CANDIDATE_CODES)
+            val codes = notificationEmojiCodes(text, sourceText)
             if (codes.isEmpty()) return@withContext null
             val bitmaps = mutableListOf<Bitmap>()
             val readBudget = EmojiReadBudget()
@@ -138,6 +135,13 @@ internal suspend fun notificationEmojiArtwork(
     } finally {
         if (!handedOff) artifact?.close()
     }
+}
+
+/** A flattened preview loses link annotations, so only qualified original text can supply artwork. */
+private fun notificationEmojiCodes(text: String, sourceText: String?): List<String> {
+    val source = sourceText?.takeUnless { it.length > MAX_SOURCE_CHARS || '[' in it || "://" in it }
+    return source?.let { EmojiShortcodes.presentationShortcodes(it).filter(text::contains).take(MAX_CANDIDATE_CODES) }
+        ?: emptyList()
 }
 
 /** Copies at most four already bounded images into a static, aspect-preserving strip. */
@@ -191,15 +195,19 @@ private suspend fun localNotificationEmojiBitmap(
 ): Bitmap? {
     val directory = File(context.filesDir, CustomEmojiStore.DIRECTORY)
     val localCode = code.trim(':').takeIf { sanitizeEmojiCode(it) == it }
-    val candidates = CustomEmojiStore.filesForPresentation(directory).filter { it.nameWithoutExtension == localCode }
+    val candidates =
+        if (Files.isSymbolicLink(directory.toPath())) {
+            emptyList()
+        } else {
+            CustomEmojiStore.filesForPresentation(directory)
+                .filter { it.nameWithoutExtension == localCode && it.length() <= CustomEmojiStore.MAX_BYTES }
+                .filterNot { Files.isSymbolicLink(it.toPath()) }
+        }
     for (file in candidates) {
         coroutineContext.ensureActive()
-        if (localCode == null) break
-        if (file.length() > CustomEmojiStore.MAX_BYTES) continue
-        if (Files.isSymbolicLink(directory.toPath()) || Files.isSymbolicLink(file.toPath())) continue
         val bytes = runCatching { readBudget.read(file) }.getOrNull()
-        if (bytes == null || bytes.size > CustomEmojiStore.MAX_BYTES) continue
-        val bitmap = runCatching { decodeEmojiImage(bytes)?.asAndroidBitmap() }.getOrNull()
+        val bitmap = bytes?.takeIf { it.size <= CustomEmojiStore.MAX_BYTES }
+            ?.let { runCatching { decodeEmojiImage(it)?.asAndroidBitmap() }.getOrNull() }
         if (bitmap != null) return bitmap
     }
     return null
@@ -243,7 +251,6 @@ private fun writeNotificationEmojiArtifact(
             file.outputStream().use { it.write(bytes) }
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val artifact = NotificationEmojiArtifact(uri, name)
-            pending += name
             artifact
         } catch (_: java.io.IOException) {
             file.delete()
@@ -268,7 +275,9 @@ internal fun pruneNotificationEmojiArtwork(
         val directory = File(context.cacheDir, EXPORT_DIRECTORY)
         if (!directory.isDirectory || Files.isSymbolicLink(directory.toPath())) return
         directory.listFiles().orEmpty().filter { ownedName.matches(it.name) }.forEach { file ->
-            if (!file.isFile || Files.isSymbolicLink(file.toPath()) || file.name in pending) return@forEach
+            if (!file.isFile || Files.isSymbolicLink(file.toPath()) || NotificationEmojiLeases.contains(file.name)) {
+                return@forEach
+            }
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             if (uri !in live) {
                 context.revokeUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
