@@ -6,7 +6,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
-import dev.ipf.whitenoise.android.media.toByteArray
+import dev.ipf.whitenoise.android.media.readWithin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -24,21 +24,26 @@ internal suspend fun resolveAttachmentCacheAvailability(
         withContext(Dispatchers.IO) { diskContains(cacheKey) } ||
         withContext(Dispatchers.Main.immediate) { memoryContains(cacheKey) }
 
-/** Resolves every byte-returning consumer through the same native-aware retained-media owner. */
+/**
+ * Resolves every byte-returning consumer through the same native-aware retained-media owner, then copies at most
+ * [maxBytes] of the retained source onto the heap. A larger source is rejected with
+ * [dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException] before any array is allocated, and
+ * stays retained for the file-backed consumers. The lease is closed whether the copy completes, fails or is
+ * cancelled.
+ */
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintext(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     persistInteractiveIntent: Boolean = true,
+    maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
 ): ByteArray =
     downloadAttachmentPlaintextSource(
         request = request,
         reference = reference,
         priority = priority,
         persistInteractiveIntent = persistInteractiveIntent,
-    ).use { source ->
-        withContext(Dispatchers.IO) { source.toByteArray() }
-    }
+    ).use { source -> source.readWithin(maxBytes) }
 
 /** Returns bounded memory or an owner-private file lease that the caller must close. */
 @Suppress(

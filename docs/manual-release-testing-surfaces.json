@@ -3,6 +3,14 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "NotificationPreviewControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "fun NotificationPreviewControl(",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
         "surface": "ConversationViewportRestorationEffects",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationEffects.kt",
         "anchor": "fun ConversationViewportRestorationEffects(",
@@ -642,9 +650,58 @@
       {
         "surface": "TileTransferCaption",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TileTransfer.kt",
-        "anchor": "private fun TileTransferCaption(",
+        "anchor": "internal fun TileTransferCaption(",
         "test_ids": [
-          "MED-025"
+          "MED-025",
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "MediaTooLargeToPreviewControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaTooLargeToPreview.kt",
+        "anchor": "internal fun MediaTooLargeToPreviewControl(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "R.string.media_too_large_to_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaTooLargeToPreview.kt",
+        "anchor": "R.string.media_too_large_to_preview",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "string:media_open (too large to preview)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaTooLargeToPreview.kt",
+        "anchor": "R.string.media_open",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "MediaViewerTooLargeToPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerStates.kt",
+        "anchor": "internal fun MediaViewerTooLargeToPreview(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "R.string.media_too_large_to_preview (viewer)",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerStates.kt",
+        "anchor": "R.string.media_too_large_to_preview",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "R.string.media_too_large_to_preview_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerStates.kt",
+        "anchor": "R.string.media_too_large_to_preview_hint",
+        "test_ids": [
+          "MED-027"
         ]
       },
       {
@@ -10636,6 +10693,30 @@
       }
     ],
     "settings_controls": [
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "string:notification_show_previews",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_show_previews",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "string:notification_show_previews_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_show_previews_detail",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
       {
         "surface": "string:onboarding_details_accessibility",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsChoiceDetails.kt",
@@ -25504,6 +25585,30 @@
         "test_ids": ["MSG-004", "MSG-007"]
       },
       {
+        "surface": "Bounded presentation read of attachment plaintext",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+        "anchor": "internal fun AttachmentPlaintext.toByteArrayWithin(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "Presentation plaintext budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateMediaCacheLimits.kt",
+        "anchor": "internal const val ATTACHMENT_PRESENTATION_MAX_BYTES",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "Byte-returning attachment reads stay within the caller's budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+        "anchor": "internal suspend fun AttachmentPlaintext.readWithin(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
         "surface": "Content-based animated image source admission",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AnimationSourceAdmission.kt",
         "anchor": "internal fun admitAnimationSource(",
@@ -30847,6 +30952,66 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "Direct Share preview privacy fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
+        "anchor": "genericNotificationShortcut(context, shortcut)",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Notification preview failure restart guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt",
+        "anchor": "R.string.notification_preview_update_failed",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic conversation channel description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewChannelNames.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic new conversation channel title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic new conversation channel description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationChannels.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic conversation shortcut display metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewShortcuts.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": ["NTF-030"]
+      },
+      {
+        "surface": "Generic notification preview title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Safe generic notification Mark as read action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.chat_row_action_mark_read",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "Notification preview privacy payload",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "R.string.notification_hidden_content",
+        "test_ids": [
+          "NTF-030"
+        ]
+      },
       {
         "surface": "Silent group summary channel name",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",

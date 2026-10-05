@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
-import dev.ipf.whitenoise.android.media.toByteArray
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
+import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.media.toByteArrayWithin
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.qualifiedRequest
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
 import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
@@ -160,7 +162,9 @@ class MediaDownloadHostRegressionTest {
             val expected = bytes(reference(0).fileName)
             call.succeed(expected)
             assertArrayEquals(expected, returning.await())
-            sourceConsumer.await().use { assertArrayEquals(expected, it.toByteArray()) }
+            sourceConsumer.await().use {
+                assertArrayEquals(expected, it.toByteArrayWithin(ATTACHMENT_PRESENTATION_MAX_BYTES))
+            }
             assertArrayEquals(expected, download(0))
             assertEquals(1, fixture.calls.size)
         }
@@ -346,6 +350,78 @@ class MediaDownloadHostRegressionTest {
             assertArrayEquals(expected, download(0))
         }
 
+    /**
+     * A retained image above the caller's budget is rejected before any array is allocated and its lease is deleted,
+     * while the verified bytes stay retained for file-backed consumers and explicit reads, without a second transfer.
+     */
+    @Test
+    fun oversizedPlaintextIsRejectedBeforeAllocationAndStaysRetainedForFileConsumers() =
+        runTest(dispatcher) {
+            val oversized = ByteArray(SMALL_BUDGET_BYTES + 1) { it.toByte() }
+            // The failure is captured inside the child so the rejection cannot fail the test scope itself.
+            val preview =
+                async {
+                    runCatching {
+                        fixture.state.downloadAttachmentPlaintext(
+                            request(0),
+                            reference(0),
+                            AttachmentDownloadPriority.Automatic,
+                            persistInteractiveIntent = false,
+                            maxBytes = SMALL_BUDGET_BYTES.toLong(),
+                        )
+                    }
+                }
+            val call = fixture.entered.receive()
+            call.succeed(oversized)
+
+            val failure = preview.await().exceptionOrNull()
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            failure as AttachmentTooLargeToPresentException
+            assertEquals(oversized.size.toLong(), failure.declaredBytes)
+            assertEquals(SMALL_BUDGET_BYTES.toLong(), failure.limitBytes)
+            assertEquals("the rejected lease was not deleted", emptyList<String>(), leaseFileNames())
+
+            fixture.state
+                .downloadAttachmentPlaintextSource(request(0), reference(0), AttachmentDownloadPriority.Automatic)
+                .use { source ->
+                    assertEquals(oversized.size.toLong(), source.size)
+                    assertArrayEquals(oversized, source.toByteArrayWithin(ATTACHMENT_EXPLICIT_READ_MAX_BYTES))
+                }
+            assertEquals(emptyList<String>(), leaseFileNames())
+            assertEquals(1, fixture.calls.size)
+        }
+
+    /** Exactly the caller's budget is still read whole, so the boundary is inclusive. */
+    @Test
+    fun plaintextExactlyAtTheBudgetIsRead() =
+        runTest(dispatcher) {
+            val exact = ByteArray(SMALL_BUDGET_BYTES) { (it * 3).toByte() }
+            val preview =
+                async {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request(0),
+                        reference(0),
+                        AttachmentDownloadPriority.Automatic,
+                        persistInteractiveIntent = false,
+                        maxBytes = SMALL_BUDGET_BYTES.toLong(),
+                    )
+                }
+            fixture.entered.receive().succeed(exact)
+            assertArrayEquals(exact, preview.await())
+            assertEquals(emptyList<String>(), leaseFileNames())
+        }
+
+    /** Names of the native plaintext leases currently on disk, which must be empty between reads. */
+    private fun leaseFileNames(): List<String> =
+        java.io
+            .File(fixture.disk.siblingCacheRoot(), MediaCacheDirs.NATIVE_ATTACHMENT_LEASES)
+            .listFiles()
+            .orEmpty()
+            .map { it.name }
+
     /** Calls the production path with durable scheduling disabled only for synthetic explicit requests. */
     private suspend fun download(
         index: Int,
@@ -359,4 +435,9 @@ class MediaDownloadHostRegressionTest {
 
     /** Distinct bounded payloads catch accidental cross-attachment result reuse. */
     private fun bytes(name: String): ByteArray = ByteArray(64 * 1024) { (name.hashCode() + it).toByte() }
+
+    private companion object {
+        /** A small explicit budget keeps the boundary tests fast while exercising the production read path. */
+        const val SMALL_BUDGET_BYTES = 4 * 1024
+    }
 }

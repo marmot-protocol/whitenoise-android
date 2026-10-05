@@ -4,6 +4,9 @@ import android.content.Context
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
+import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
+import dev.ipf.whitenoise.android.media.DiskByteCacheLease
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -24,7 +27,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.File
 import java.io.OutputStream
+import java.io.RandomAccessFile
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -142,6 +147,63 @@ class RetainedAttachmentReadTest {
             assertEquals(ACCOUNT, appState.activeAccountRef)
         }
 
+    /** A retained asset above the budget is rejected by its declared size before it is read, and released. */
+    @Test
+    fun anOversizedRetainedAssetIsRejectedBeforeItIsRead() =
+        runTest(dispatcher) {
+            val plaintext = UnreadablePlaintext(size = SMALL_BUDGET_BYTES + 1)
+
+            val failure =
+                runCatching {
+                    appState.readRetainedAttachmentBytes(ACCOUNT, maxBytes = SMALL_BUDGET_BYTES) { plaintext }
+                }.exceptionOrNull()
+
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            assertEquals(SMALL_BUDGET_BYTES + 1, (failure as AttachmentTooLargeToPresentException).declaredBytes)
+            assertFalse("the oversized plaintext was read", plaintext.read)
+            assertTrue("the rejected lease was not released", plaintext.closed)
+        }
+
+    /** Without an explicit budget the presentation ceiling applies: one byte over is rejected, exactly at it reads. */
+    @Test
+    fun theDefaultBudgetIsThePresentationCeiling() =
+        runTest(dispatcher) {
+            val over = UnreadablePlaintext(size = ATTACHMENT_PRESENTATION_MAX_BYTES + 1)
+            val rejected = runCatching { appState.readRetainedAttachmentBytes(ACCOUNT) { over } }.exceptionOrNull()
+            assertTrue(rejected is AttachmentTooLargeToPresentException)
+            assertTrue(over.closed)
+
+            val exact =
+                File.createTempFile("retained-exact", ".lease").also { file ->
+                    RandomAccessFile(file, "rw").use { it.setLength(ATTACHMENT_PRESENTATION_MAX_BYTES) }
+                }
+            val bytes =
+                appState.readRetainedAttachmentBytes(ACCOUNT) { AttachmentPlaintext.Lease(DiskByteCacheLease(exact)) }
+
+            assertEquals(ATTACHMENT_PRESENTATION_MAX_BYTES, bytes?.size?.toLong())
+            assertFalse("the lease was not released after the read", exact.exists())
+        }
+
+    /** Cancelling the read mid-copy abandons the copy, releases the lease and hands nothing back. */
+    @Test
+    fun cancellationDuringTheReadReleasesTheLeaseAndPublishesNothing() =
+        runTest(dispatcher) {
+            val plaintext = ParkedPlaintext(BYTES)
+            val read = async { appState.readRetainedAttachmentBytes(ACCOUNT) { plaintext } }
+            plaintext.reading.await()
+
+            read.cancel()
+            plaintext.release()
+
+            val outcome = runCatching { read.await() }.exceptionOrNull()
+            assertTrue("a cancelled read must complete cancelled, got $outcome", outcome is CancellationException)
+            assertFalse("the cancelled copy still wrote its bytes", plaintext.completed)
+            assertTrue("the cancelled lease was not released", plaintext.closed)
+        }
+
     /** Records which thread streamed the bytes and whether it was released. */
     private open class RecordingPlaintext(
         private val bytes: ByteArray,
@@ -150,6 +212,9 @@ class RetainedAttachmentReadTest {
 
         @Volatile var closed = false
 
+        /** True once the bytes were handed to the sink and accepted. */
+        @Volatile var completed = false
+
         override val size: Long = bytes.size.toLong()
 
         /** Streams the bytes after noting the caller's thread and running the mid-read hook. */
@@ -157,6 +222,7 @@ class RetainedAttachmentReadTest {
             copiedOn = Thread.currentThread()
             beforeWrite()
             output.write(bytes)
+            completed = true
         }
 
         /** Runs after the thread is noted and before the bytes are written. */
@@ -185,6 +251,26 @@ class RetainedAttachmentReadTest {
         }
     }
 
+    /** Declares [size] and records whether anything tried to read it, which an oversized asset must not allow. */
+    private class UnreadablePlaintext(
+        override val size: Long,
+    ) : AttachmentPlaintext {
+        @Volatile var read = false
+
+        @Volatile var closed = false
+
+        /** Records the read attempt and fails, because an oversized declaration must be rejected first. */
+        override fun copyTo(output: OutputStream) {
+            read = true
+            error("an oversized plaintext must be rejected before it is read")
+        }
+
+        /** Notes that the lease was released. */
+        override fun close() {
+            closed = true
+        }
+    }
+
     /** Persists nothing, so the state never touches the real draft store. */
     private object EmptyDraftPersistence : DraftPersistence {
         override fun read(): Map<String, String> = emptyMap()
@@ -199,6 +285,7 @@ class RetainedAttachmentReadTest {
         const val ACCOUNT = "sample-account"
         const val OTHER_ACCOUNT = "other-account"
         const val PARK_TIMEOUT_SECONDS = 10L
+        const val SMALL_BUDGET_BYTES = 16L
         val BYTES = byteArrayOf(1, 2, 3, 4)
     }
 }

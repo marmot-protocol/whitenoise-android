@@ -1023,6 +1023,8 @@
     <string name="media_uploading">Yükleniyor…</string>
     <string name="media_upload_failed">Yükleme başarısız</string>
     <string name="media_tap_to_retry">Yeniden denemek için dokunun</string>
+    <string name="media_too_large_to_preview">Önizleme için çok büyük</string>
+    <string name="media_too_large_to_preview_hint">Başka bir uygulamada görüntülemek için bu görseli kaydedin veya paylaşın</string>
     <string name="media_tap_to_download">İndirmek için dokunun</string>
     <string name="media_preparing_download">İndirme hazırlanıyor</string>
     <string name="media_preparing_attachment">Ek hazırlanıyor</string>
@@ -2203,4 +2205,7 @@
     <string name="error_invalid_key_package_for">%1$s için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
     <string name="error_missing_member_inbox">Bu kişi için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
     <string name="error_missing_member_inbox_for">%1$s için kullanılabilir bir gelen kutusu rölesi yok. White Noise ayarlarında gelen kutusu rölelerini kontrol etmesini isteyin, sonra tekrar deneyin.</string>
+    <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
+    <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplar için geçerlidir.</string>
+    <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>
 </resources>

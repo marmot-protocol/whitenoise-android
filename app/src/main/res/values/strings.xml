@@ -1396,6 +1396,8 @@
     <string name="media_uploading">Uploading…</string>
     <string name="media_upload_failed">Upload failed</string>
     <string name="media_tap_to_retry">Tap to retry</string>
+    <string name="media_too_large_to_preview">Too large to preview</string>
+    <string name="media_too_large_to_preview_hint">Save or share this image to view it with another app</string>
     <string name="media_tap_to_download">Tap to download</string>
     <string name="media_preparing_download">Preparing download</string>
     <string name="media_preparing_attachment">Preparing attachment</string>
@@ -2361,4 +2363,7 @@
     <string name="error_invalid_key_package_for">The published chat key for %1$s couldn’t be validated. Ask them to update White Noise and publish a new chat key, then retry.</string>
     <string name="error_missing_member_inbox">There is no usable inbox relay for this person. Ask them to check their inbox relays in White Noise settings, then retry.</string>
     <string name="error_missing_member_inbox_for">There is no usable inbox relay for %1$s. Ask them to check their inbox relays in White Noise settings, then retry.</string>
+    <string name="notification_show_previews">Show notification previews</string>
+    <string name="notification_show_previews_detail">Hide names and message content when off. Applies to all accounts.</string>
+    <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>
 </resources>

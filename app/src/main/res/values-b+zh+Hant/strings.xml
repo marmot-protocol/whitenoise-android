@@ -1005,6 +1005,8 @@
     <string name="media_uploading">上傳中…</string>
     <string name="media_upload_failed">上傳失敗</string>
     <string name="media_tap_to_retry">輕觸以重試</string>
+    <string name="media_too_large_to_preview">檔案過大，無法預覽</string>
+    <string name="media_too_large_to_preview_hint">儲存或分享此圖片，以在其他應用程式中檢視</string>
     <string name="media_tap_to_download">輕觸以下載</string>
     <string name="media_preparing_download">準備下載</string>
     <string name="media_preparing_attachment">正在準備附件</string>
@@ -2173,4 +2175,7 @@
     <string name="error_invalid_key_package_for">無法驗證%1$s發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
     <string name="error_missing_member_inbox">此使用者沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
     <string name="error_missing_member_inbox_for">%1$s沒有可用的收件匣中繼。請對方在 White Noise 設定中檢查收件匣中繼，然後重試。</string>
+    <string name="notification_show_previews">顯示通知預覽</string>
+    <string name="notification_show_previews_detail">關閉時隱藏姓名和訊息內容。適用於所有帳戶。</string>
+    <string name="notification_preview_update_failed">重新啟動後變更可能會遺失。</string>
 </resources>

@@ -1,8 +1,9 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
-import dev.ipf.whitenoise.android.media.toByteArray
+import dev.ipf.whitenoise.android.media.readWithin
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 internal data class MediaCachePresentationSession(
@@ -21,15 +22,27 @@ internal fun ConversationController.hasCachedAttachmentInMemory(
     ) != null
 }
 
-/** Reads authenticated local bytes without allowing a missing or corrupt entry to initiate a native fetch. */
+/**
+ * Reads authenticated local bytes without allowing a missing or corrupt entry to initiate a native fetch.
+ *
+ * An entry small enough for the L1 cache is read directly, a larger one is authenticated into a private lease and
+ * copied within [maxBytes], so a cache-only render never holds more than the presentation budget on the heap.
+ */
 internal suspend fun ConversationController.cachedAttachmentPlaintext(
     messageIdHex: String,
     attachmentIndex: Int,
+    maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
 ): ByteArray? {
     val account = boundAccountRef ?: return null
     val key = mediaCacheKey(account, group.groupIdHex, messageIdHex, attachmentIndex)
     return withContext(Dispatchers.Main.immediate) { appState.cachedMediaPlaintext(key) }
-        ?: withContext(Dispatchers.IO) { appState.diskMediaCache.get(key) }
+        ?: withContext(Dispatchers.IO) {
+            appState.diskMediaCache.getIfSmall(key)
+                ?: appState.diskMediaCache
+                    .materialize(key) { ensureActive() }
+                    ?.let(AttachmentPlaintext::Lease)
+                    ?.use { lease -> lease.readWithin(maxBytes) }
+        }
 }
 
 /**
@@ -56,14 +69,17 @@ internal suspend fun ConversationController.retainedNativeAttachmentBytes(
 }
 
 /**
- * Materializes the plaintext [open] returns off the main thread and hands it back only while [accountRef] and the
- * media session epoch are still the live ones.
+ * Materializes the plaintext [open] returns off the main thread, within [maxBytes], and hands it back only while
+ * [accountRef] and the media session epoch are still the live ones.
  *
  * A controller's bound account never changes after it is created, so it cannot detect a switch. The live active
- * account and the epoch are read on Main both before the open starts and after the bytes are in memory.
+ * account and the epoch are read on Main both before the open starts and after the bytes are in memory. A retained
+ * asset above [maxBytes] is rejected before any array is allocated and its lease is closed, the caller presents it
+ * as too large to preview rather than as a failed transfer.
  */
 internal suspend fun WhiteNoiseAppState.readRetainedAttachmentBytes(
     accountRef: String,
+    maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
     open: suspend () -> AttachmentPlaintext?,
 ): ByteArray? {
     val session =
@@ -71,7 +87,7 @@ internal suspend fun WhiteNoiseAppState.readRetainedAttachmentBytes(
             MediaCachePresentationSession(accountRef, mediaUploadSessionEpoch())
         }
     if (!withContext(Dispatchers.Main.immediate) { mediaCachePresentationSessionCurrent(session) }) return null
-    val bytes = open()?.use { plaintext -> withContext(Dispatchers.IO) { plaintext.toByteArray() } }
+    val bytes = open()?.use { plaintext -> plaintext.readWithin(maxBytes) }
     return bytes?.takeIf { withContext(Dispatchers.Main.immediate) { mediaCachePresentationSessionCurrent(session) } }
 }
 

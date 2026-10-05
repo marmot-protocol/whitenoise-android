@@ -1023,6 +1023,8 @@
     <string name="media_uploading">Enviando…</string>
     <string name="media_upload_failed">Falha no envio</string>
     <string name="media_tap_to_retry">Toque para tentar novamente</string>
+    <string name="media_too_large_to_preview">Grande demais para pré-visualizar</string>
+    <string name="media_too_large_to_preview_hint">Salve ou compartilhe esta imagem para vê-la em outro aplicativo</string>
     <string name="media_tap_to_download">Toque para baixar</string>
     <string name="media_preparing_download">Preparando download</string>
     <string name="media_preparing_attachment">Preparando anexo</string>
@@ -2205,4 +2207,7 @@
     <string name="error_invalid_key_package_for">Não foi possível validar a chave de conversa publicada de %1$s. Peça para ela atualizar o White Noise e publicar uma nova chave de conversa e tente novamente.</string>
     <string name="error_missing_member_inbox">Não existe um relay de entrada utilizável para esta pessoa. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
     <string name="error_missing_member_inbox_for">Não existe um relay de entrada utilizável para %1$s. Peça para ela verificar os relays de entrada nas configurações do White Noise e tente novamente.</string>
+    <string name="notification_show_previews">Mostrar prévias das notificações</string>
+    <string name="notification_show_previews_detail">Quando desativado, oculta nomes e o conteúdo das mensagens. Aplica-se a todas as contas.</string>
+    <string name="notification_preview_update_failed">Alterações podem ser perdidas após reiniciar.</string>
 </resources>
