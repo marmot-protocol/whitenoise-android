@@ -2204,4 +2204,8 @@
     <string name="notification_show_previews">Bildirim önizlemelerini göster</string>
     <string name="notification_show_previews_detail">Kapalıyken adları ve mesaj içeriğini gizler. Tüm hesaplar için geçerlidir.</string>
     <string name="notification_preview_update_failed">Yeniden başlatıldığında değişiklikler kaybolabilir.</string>
+    <string name="nostr_event_view_image">Görseli görüntüle</string>
+    <string name="nostr_event_image_failed">Bu görsel yüklenemedi. Tekrar deneyin.</string>
+    <string name="nostr_event_type_image">Görsel</string>
+    <string name="nostr_event_expand">Etkinliğin tamamını göster</string>
 </resources>

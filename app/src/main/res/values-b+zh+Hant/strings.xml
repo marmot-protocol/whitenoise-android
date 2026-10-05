@@ -2174,4 +2174,8 @@
     <string name="notification_show_previews">顯示通知預覽</string>
     <string name="notification_show_previews_detail">關閉時隱藏姓名和訊息內容。適用於所有帳戶。</string>
     <string name="notification_preview_update_failed">重新啟動後變更可能會遺失。</string>
+    <string name="nostr_event_view_image">檢視圖片</string>
+    <string name="nostr_event_image_failed">無法載入此圖片，請再試一次。</string>
+    <string name="nostr_event_type_image">圖片</string>
+    <string name="nostr_event_expand">檢視完整事件</string>
 </resources>

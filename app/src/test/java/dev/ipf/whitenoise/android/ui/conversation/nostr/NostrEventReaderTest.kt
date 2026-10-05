@@ -3,11 +3,14 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.core.app.ApplicationProvider
@@ -60,8 +63,13 @@ class NostrEventReaderTest {
         composeRule.onNodeWithText("Alex Morgan ·", substring = true).assertIsDisplayed()
         composeRule.onNodeWithTag(NOSTR_EVENT_READER_REFERENCE_TAG).assertIsDisplayed()
         composeRule.onNodeWithText("The complete first paragraph is visible.").assertIsDisplayed()
+        composeRule.onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG).performScrollToNode(hasText(LONG_MIDDLE))
         composeRule.onNodeWithText(LONG_MIDDLE).fetchSemanticsNode()
-        composeRule.onNodeWithText("The final paragraph is visible too.").fetchSemanticsNode()
+        composeRule.onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG).performScrollToNode(
+            hasText("The final paragraph is visible too."),
+        )
+        composeRule.onNodeWithText("The final paragraph is visible too.").assertIsDisplayed()
+        composeRule.onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG).performScrollToNode(hasText("Visit the project page"))
         val linkLayouts = mutableListOf<TextLayoutResult>()
         composeRule
             .onNodeWithText("Visit the project page")
@@ -69,6 +77,9 @@ class NostrEventReaderTest {
         val linkText = linkLayouts.single().layoutInput.text
         assertTrue(linkText.getLinkAnnotations(0, linkText.length).isNotEmpty())
 
+        composeRule.onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG).performScrollToNode(
+            hasText("note1qqqqqqq", substring = true),
+        )
         val nestedReference = composeRule.onNodeWithText("note1qqqqqqq", substring = true).assertIsDisplayed()
         val nestedLayouts = mutableListOf<TextLayoutResult>()
         nestedReference.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> action(nestedLayouts) }
@@ -83,6 +94,129 @@ class NostrEventReaderTest {
         assertEquals(1, copies)
         assertEquals(1, externalOpens)
         assertEquals(1, dismissals)
+    }
+
+    @Test
+    fun largeBodyCanScrollToItsFinalParagraph() {
+        val fullBody = "Long context ".repeat(10_000) + "\nLast event paragraph"
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventReaderScreen(
+                    card = noteCard().copy(readerBody = fullBody),
+                    document =
+                        MarkdownDocumentFfi(
+                            listOf(
+                                paragraph(MarkdownInlineFfi.Text(fullBody.substringBefore("\nLast"))),
+                                paragraph(MarkdownInlineFfi.Text("Last event paragraph")),
+                            ),
+                            false,
+                            byteArrayOf(),
+                        ),
+                    parsing = false,
+                    authorDisplayName = { "Alex" },
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                    onDismiss = {},
+                )
+            }
+        }
+        composeRule
+            .onNodeWithTag(NOSTR_EVENT_READER_BODY_TAG)
+            .performScrollToNode(hasText("Last event paragraph", substring = true))
+        composeRule.onNodeWithText("Last event paragraph").assertIsDisplayed()
+    }
+
+    @Test
+    fun imageOnlyEventParsesAnEmptyBodyAndKeepsItsMediaControl() {
+        renderEmptyReaderDialog(
+            noteCard().copy(
+                kind = NostrEventCardKind.Generic,
+                eventKind = 20,
+                readerBody = null,
+                summary = null,
+                imageUrls = listOf("https://images.example/manual-only"),
+            ),
+        )
+        composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).assertIsDisplayed()
+    }
+
+    @Test
+    fun videoOnlyEventParsesAnEmptyBodyAndKeepsItsMediaControl() {
+        renderEmptyReaderDialog(
+            noteCard().copy(
+                kind = NostrEventCardKind.Video,
+                eventKind = 21,
+                readerBody = null,
+                summary = null,
+                mediaUrl = "https://media.example/manual-only",
+            ),
+        )
+        composeRule.onNodeWithText(string(R.string.nostr_event_play_video)).assertIsDisplayed()
+    }
+
+    @Test
+    fun profileMentionsUseTheResolvedUsernameAndKeepTheirInAppLink() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventReaderScreen(
+                    card = noteCard(),
+                    document =
+                        MarkdownDocumentFfi(
+                            listOf(
+                                paragraph(
+                                    MarkdownInlineFfi.NostrMention(
+                                        MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, "npub1example"),
+                                    ),
+                                ),
+                            ),
+                            false,
+                            byteArrayOf(),
+                        ),
+                    parsing = false,
+                    authorDisplayName = { "Alex" },
+                    mentionDisplayName = { "Alice" },
+                    onNostrProfileTap = {},
+                    onDismiss = {},
+                )
+            }
+        }
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithText("Alice", substring = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { action -> action(layouts) }
+        val text = layouts.single().layoutInput.text
+        assertTrue(text.text.contains("Alice"))
+        assertTrue(text.getLinkAnnotations(0, text.length).isNotEmpty())
+    }
+
+    private fun renderEmptyReaderDialog(card: NostrEventCardModel) {
+        val calls =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventReaderDialog(
+                    card = card,
+                    authoredReference = AUTHORED_REFERENCE,
+                    authorDisplayName = { "Alex" },
+                    mentionDisplayName = { null },
+                    onNostrProfileTap = {},
+                    parseMarkdown = { body ->
+                        assertEquals("", body)
+                        calls.incrementAndGet()
+                        MarkdownDocumentFfi(emptyList(), false, byteArrayOf())
+                    },
+                    onDismiss = {},
+                )
+            }
+        }
+        composeRule.waitUntil(10_000) {
+            calls.get() == 1 &&
+                composeRule
+                    .onAllNodesWithTag(NOSTR_EVENT_READER_LOADING_TAG)
+                    .fetchSemanticsNodes()
+                    .isEmpty()
+        }
     }
 
     /** Builds the exact kind-1 event shown by the reader fixture. */

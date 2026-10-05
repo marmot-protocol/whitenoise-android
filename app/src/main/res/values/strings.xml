@@ -2362,4 +2362,8 @@
     <string name="notification_show_previews">Show notification previews</string>
     <string name="notification_show_previews_detail">Hide names and message content when off. Applies to all accounts.</string>
     <string name="notification_preview_update_failed">Changes may be lost after restarting.</string>
+    <string name="nostr_event_view_image">View image</string>
+    <string name="nostr_event_image_failed">Couldn’t load this image. Try again.</string>
+    <string name="nostr_event_type_image">Image</string>
+    <string name="nostr_event_expand">View full event</string>
 </resources>

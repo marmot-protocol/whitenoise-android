@@ -2223,4 +2223,8 @@
     <string name="notification_show_previews">Benachrichtigungsvorschau anzeigen</string>
     <string name="notification_show_previews_detail">Wenn ausgeschaltet, werden Namen und Nachrichteninhalte verborgen. Gilt für alle Konten.</string>
     <string name="notification_preview_update_failed">Änderungen können nach einem Neustart verloren gehen.</string>
+    <string name="nostr_event_view_image">Bild anzeigen</string>
+    <string name="nostr_event_image_failed">Dieses Bild konnte nicht geladen werden. Versuche es erneut.</string>
+    <string name="nostr_event_type_image">Bild</string>
+    <string name="nostr_event_expand">Vollständiges Ereignis anzeigen</string>
 </resources>

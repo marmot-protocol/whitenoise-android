@@ -2206,4 +2206,8 @@
     <string name="notification_show_previews">Mostrar vistas previas de notificaciones</string>
     <string name="notification_show_previews_detail">Al desactivarlo, se ocultan los nombres y el contenido de los mensajes. Se aplica a todas las cuentas.</string>
     <string name="notification_preview_update_failed">Los cambios pueden perderse al reiniciar.</string>
+    <string name="nostr_event_view_image">Ver imagen</string>
+    <string name="nostr_event_image_failed">No se pudo cargar esta imagen. Inténtalo de nuevo.</string>
+    <string name="nostr_event_type_image">Imagen</string>
+    <string name="nostr_event_expand">Ver evento completo</string>
 </resources>

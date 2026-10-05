@@ -2206,4 +2206,8 @@
     <string name="notification_show_previews">Mostra anteprime delle notifiche</string>
     <string name="notification_show_previews_detail">Se disattivato, nasconde nomi e contenuto dei messaggi. Vale per tutti gli account.</string>
     <string name="notification_preview_update_failed">Le modifiche potrebbero andare perse dopo il riavvio.</string>
+    <string name="nostr_event_view_image">Visualizza immagine</string>
+    <string name="nostr_event_image_failed">Impossibile caricare questa immagine. Riprova.</string>
+    <string name="nostr_event_type_image">Immagine</string>
+    <string name="nostr_event_expand">Visualizza evento completo</string>
 </resources>

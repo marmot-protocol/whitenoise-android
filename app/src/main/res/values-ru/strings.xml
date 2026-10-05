@@ -2274,4 +2274,8 @@
     <string name="notification_show_previews">Показывать содержимое уведомлений</string>
     <string name="notification_show_previews_detail">При отключении скрывает имена и содержимое сообщений. Применяется ко всем аккаунтам.</string>
     <string name="notification_preview_update_failed">Изменения могут потеряться после перезапуска.</string>
+    <string name="nostr_event_view_image">Показать изображение</string>
+    <string name="nostr_event_image_failed">Не удалось загрузить изображение. Попробуйте ещё раз.</string>
+    <string name="nostr_event_type_image">Изображение</string>
+    <string name="nostr_event_expand">Посмотреть событие целиком</string>
 </resources>

@@ -58,7 +58,7 @@ class NostrEventCardTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("A short referenced note").assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_copy)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_open)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_expand)).performClick()
 
         assertEquals(1, copies)
         assertEquals(1, opens)
@@ -130,7 +130,7 @@ class NostrEventCardTest {
         }
 
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_read_article)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_play_video)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_expand)).assertIsDisplayed()
     }
 
     @Test
@@ -200,7 +200,7 @@ class NostrEventCardTest {
             click(Offset(x = width - 1f, y = centerY))
         }
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_copy)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_open)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_expand)).performClick()
 
         assertEquals(listOf(card, card, card), readCards)
         assertEquals(1, copies)
