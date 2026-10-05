@@ -2202,6 +2202,10 @@
     <string name="onboarding_details_accessibility">%1$s: %2$s</string>
     <string name="onboarding_details_expanded">Genişletildi</string>
     <string name="onboarding_details_collapsed">Daraltıldı</string>
+    <string name="local_delete_retry_detail">\u2068Silme durdu. Bu cihazdan sil seçeneğini tekrar seçin; önce önceki sonuç kontrol edilir. Hata sürerse uygulamayı yeniden başlatın.\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068Sohbet silindi. Yerel verilerin temizlenmesi otomatik olarak yeniden denenecek.\u2069</string>
+    <string name="chat_list_delete_stopped">Silme durdu</string>
+    <string name="chat_list_delete_stopped_detail">\u2068%2$d silme işleminin %1$d tanesi doğrulandı. Sonucu kontrol etmek için Bu cihazdan sil işlemini tekrar deneyin. Hata devam ederse uygulamayı yeniden başlatın.\u2069</string>
     <string name="group_svg_rejected_detail">Bu SVG hazırlanamadı. Basit bir SVG, PNG veya JPEG seçin.</string>
     <string name="error_invalid_key_package">Bu kişi için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>
     <string name="error_invalid_key_package_for">%1$s için yayımlanan sohbet anahtarı doğrulanamadı. White Noise uygulamasını güncelleyip yeni bir sohbet anahtarı yayımlamasını isteyin, sonra tekrar deneyin.</string>

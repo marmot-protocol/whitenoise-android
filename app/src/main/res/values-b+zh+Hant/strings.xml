@@ -2172,6 +2172,10 @@
     <string name="onboarding_details_accessibility">%1$s：%2$s</string>
     <string name="onboarding_details_expanded">已展開</string>
     <string name="onboarding_details_collapsed">已收合</string>
+    <string name="local_delete_retry_detail">\u2068刪除已停止。請再次選擇「從此裝置刪除」，系統會先檢查上次的結果。如果仍然失敗，請重新啟動應用程式。\u2069</string>
+    <string name="local_delete_cleanup_pending">\u2068聊天已刪除。本機資料清理將自動重試。\u2069</string>
+    <string name="chat_list_delete_stopped">刪除已停止</string>
+    <string name="chat_list_delete_stopped_detail">\u2068已確認 %1$d 次刪除，共 %2$d 次。請重試「從此裝置刪除」以檢查結果。若仍然失敗，請重新啟動應用程式。\u2069</string>
     <string name="group_svg_rejected_detail">無法處理此 SVG。請選擇簡單的 SVG、PNG 或 JPEG。</string>
     <string name="error_invalid_key_package">無法驗證此使用者發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>
     <string name="error_invalid_key_package_for">無法驗證%1$s發布的聊天金鑰。請對方更新 White Noise 並發布新的聊天金鑰，然後重試。</string>

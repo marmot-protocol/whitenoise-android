@@ -14,39 +14,75 @@ internal suspend fun deleteLocalGroupWithRecovery(
     isCurrent: () -> Boolean,
     delete: suspend () -> Unit,
     isGroupPresent: suspend () -> Boolean,
-    pause: suspend (Long) -> Unit = ::delay,
+    pause: (suspend (Long) -> Unit)? = null,
+    observer: LocalDeleteRecoveryObserver = LocalDeleteRecoveryObserver(),
 ) {
     var lastFailure: Throwable? = null
     for (attempt in 1..IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS) {
         if (!isCurrent()) throw CancellationException("chat binding changed during local deletion")
         try {
+            observer.onProgress(LocalDeletePhase.NativeDelete, attempt, null, false)
             delete()
+            observer.onProgress(LocalDeletePhase.NativeDelete, attempt, false, false)
             return
         } catch (failure: Throwable) {
             rethrowIfCancellation(failure)
             if (!isRetryableIdempotentMutationError(failure)) throw failure
             lastFailure = failure
+            if (isTransientRuntimeWorkerError(failure)) observer.recoverTransport()
         }
 
         // A committed wipe removes the durable chat-list row. A failed read leaves the
         // outcome uncertain and must not trigger another destructive call.
         var present: Boolean? = null
+        var reconciliationFailure: Throwable? = null
         for (read in attempt..IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS) {
             if (!isCurrent()) throw CancellationException("chat binding changed during local deletion")
             try {
+                observer.onProgress(LocalDeletePhase.PresenceReconciliation, read, null, false)
                 present = isGroupPresent()
+                if (!isCurrent()) throw CancellationException("chat binding changed during local deletion read")
+                observer.onProgress(LocalDeletePhase.PresenceReconciliation, read, present, false)
                 break
             } catch (failure: Throwable) {
                 rethrowIfCancellation(failure)
                 if (!isRetryableIdempotentMutationError(failure)) throw failure
+                reconciliationFailure = failure
                 if (read < IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS) {
-                    pause(IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS)
+                    recoverAndPauseLocalGroupDeleteRetry(failure, pause, observer)
                 }
             }
         }
         if (present == false) return
-        if (present == null || attempt == IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS) break
-        pause(IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS)
+        if (present == null || attempt == IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS) {
+            if (present == null) lastFailure = reconciliationFailure ?: lastFailure
+            observer.onProgress(
+                if (present == null) LocalDeletePhase.PresenceReconciliation else LocalDeletePhase.NativeDelete,
+                IDEMPOTENT_RUNTIME_MUTATION_RETRY_ATTEMPTS,
+                present,
+                true,
+            )
+            break
+        }
+        pauseLocalGroupDeleteRetry(pause)
     }
     throw lastFailure ?: IllegalStateException("local deletion retry budget exhausted")
+}
+
+private suspend fun recoverAndPauseLocalGroupDeleteRetry(
+    failure: Throwable,
+    pause: (suspend (Long) -> Unit)?,
+    observer: LocalDeleteRecoveryObserver,
+) {
+    if (isTransientRuntimeWorkerError(failure)) observer.recoverTransport()
+    pauseLocalGroupDeleteRetry(pause)
+}
+
+/** Keep production backoff out of suspend default-argument lowering; tests can supply a clock. */
+internal suspend fun pauseLocalGroupDeleteRetry(pause: (suspend (Long) -> Unit)?) {
+    if (pause == null) {
+        delay(IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS)
+    } else {
+        pause(IDEMPOTENT_RUNTIME_MUTATION_RETRY_BACKOFF_MS)
+    }
 }
