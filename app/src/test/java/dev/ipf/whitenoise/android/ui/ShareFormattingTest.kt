@@ -109,6 +109,12 @@ class ShareFormattingTest {
     }
 
     @Test
+    fun outOfRangeLinkDoesNotHideALaterValidLink() {
+        val body = "https://maps.google.com/maps?q=999,999 or https://maps.google.com/maps?q=11.871263,8.534887"
+        assertEquals(11.871263, parseSharedLocationFromText(body)?.latitude)
+    }
+
+    @Test
     fun contactParsesBackFromItsCaption() {
         val contact = SharedContact(name = "Ada Lovelace", phone = "+1 555 0100", email = "ada@example.org")
         val parsed = parseSharedContactFromText(formatContactShareText(contact))

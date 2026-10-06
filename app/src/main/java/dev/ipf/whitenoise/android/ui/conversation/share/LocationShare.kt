@@ -46,13 +46,20 @@ private val MAPS_QUERY_COORDINATE =
  * `%2C`-encoded comma, so a location shared by an older build (or another
  * client that pasted only a maps link) still renders a map instead of raw
  * text. The link may sit anywhere in the body ("Meet me here: <link>");
- * [isBareLocationShare] decides whether that prose also renders.
+ * [isBareLocationShare] decides whether that prose also renders. The first
+ * link with in-range coordinates wins, so a bad link cannot hide a later one.
  */
 internal fun parseSharedLocationFromText(text: String): SharedLocation? {
-    val match = MAPS_QUERY_COORDINATE.find(text) ?: return null
-    val lat = match.groupValues[1].toDoubleOrNull() ?: return null
-    val lng = match.groupValues[2].toDoubleOrNull() ?: return null
-    if (lat !in -90.0..90.0 || lng !in -180.0..180.0) return null
+    val matches = MAPS_QUERY_COORDINATE.findAll(text)
+    return matches.firstNotNullOfOrNull(::locationOf)
+}
+
+private fun locationOf(match: MatchResult): SharedLocation? {
+    val lat = match.groupValues[1].toDoubleOrNull()?.takeIf { it in -90.0..90.0 }
+    val lng = match.groupValues[2].toDoubleOrNull()?.takeIf { it in -180.0..180.0 }
+    if (lat == null || lng == null) {
+        return null
+    }
     return SharedLocation(latitude = lat, longitude = lng, accuracyMeters = null)
 }
 
