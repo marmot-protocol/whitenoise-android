@@ -100,8 +100,9 @@ internal data class ToastSnackbarVisuals(
     val copyable: Boolean = false,
     val tier: NoticeTier = if (copyable) NoticeTier.ActionableError else NoticeTier.Confirmation,
     val copyText: String? = null,
+    val details: String? = null,
+    override val actionLabel: String? = null,
 ) : SnackbarVisuals {
-    override val actionLabel: String? = null
     override val withDismissAction: Boolean = tier == NoticeTier.ActionableError
     override val duration: SnackbarDuration =
         if (tier == NoticeTier.ActionableError) {
@@ -119,7 +120,9 @@ internal data class ToastSnackbarVisuals(
  */
 internal fun snackbarShowsCopyAffordance(visuals: SnackbarVisuals): Boolean =
     visuals.actionLabel == null &&
-        (visuals as? ToastSnackbarVisuals)?.let { it.copyable && !it.copyText.isNullOrBlank() } == true
+        (visuals as? ToastSnackbarVisuals)?.let {
+            it.details == null && it.copyable && !it.copyText.isNullOrBlank()
+        } == true
 
 /**
  * The one snackbar surface treatment: AMOLED resolves `inverseSurface` to pure
@@ -173,7 +176,10 @@ fun SwipeDismissibleSnackbar(data: SnackbarData) {
         state = dismissState,
         backgroundContent = {},
     ) {
-        if (snackbarShowsCopyAffordance(data.visuals)) {
+        val deletionVisuals = (data.visuals as? ToastSnackbarVisuals)?.takeIf { it.details != null }
+        if (deletionVisuals != null) {
+            LocalDeleteSnackbar(data, deletionVisuals, reserveNoticeSpace)
+        } else if (snackbarShowsCopyAffordance(data.visuals)) {
             // Error/diagnostic toasts flagged copyable at their emit site get
             // a discoverable Copy affordance and a separate Dismiss control.
             // SelectionContainer still permits long-press copy (issues #543, #796).

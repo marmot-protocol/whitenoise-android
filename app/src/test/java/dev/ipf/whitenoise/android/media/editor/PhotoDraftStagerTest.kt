@@ -8,6 +8,8 @@ import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.restoredPhotosMissingFrom
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -61,6 +63,7 @@ class PhotoDraftStagerTest {
             assertTrue(first is PhotoDraftStageResult.Success)
             first as PhotoDraftStageResult.Success
             assertEquals(1, encodes)
+            assertFalse(first.photo.restoredFromNative)
             assertEquals(
                 "stable-id",
                 fixture.gateway.current
@@ -77,7 +80,17 @@ class PhotoDraftStagerTest {
                 fixture.stager.stageBytes(bytes, "ignored.png", "stable-id", ACCOUNT, GROUP, MediaQuality.High)
             assertTrue(recovered is PhotoDraftStageResult.Success)
             assertEquals(1, encodes)
-            assertEquals(MediaQuality.Standard, (recovered as PhotoDraftStageResult.Success).photo.quality)
+            val recoveredPhoto = (recovered as PhotoDraftStageResult.Success).photo
+            assertEquals(MediaQuality.Standard, recoveredPhoto.quality)
+            assertTrue(recoveredPhoto.restoredFromNative)
+            val slot = PendingMediaSlot("saved-picker", Uri.parse("content://picker/saved"))
+            assertEquals(
+                setOf(slot.id),
+                restoredPhotosMissingFrom(listOf(slot), emptyMap(), mapOf(slot.id to recoveredPhoto), emptySet()),
+            )
+            val freshMissing =
+                restoredPhotosMissingFrom(listOf(slot), emptyMap(), mapOf(slot.id to first.photo), emptySet())
+            assertTrue(freshMissing.isEmpty())
 
             fixture.stager.remove(ACCOUNT, GROUP, first.photo)
             assertNull(fixture.gateway.current)
@@ -234,6 +247,40 @@ class PhotoDraftStagerTest {
 
             fixture.stager.removePrepared(ACCOUNT, GROUP, result.photo)
             assertNull(fixture.gateway.current)
+        }
+
+    @Test
+    fun duplicateAttachmentDuringPreparationRetainsNativeOwnershipAndReleasesNewSource() =
+        runTest {
+            val native =
+                MessageDraftAttachmentFfi(
+                    "stable-id",
+                    "native.jpg",
+                    "image/jpeg",
+                    byteArrayOf(1, 2, 3),
+                    null,
+                    null,
+                    null,
+                    emptyList(),
+                )
+            lateinit var staged: Fixture
+            staged =
+                fixture(onEncode = {
+                    staged.gateway.current = MessageDraftFfi(GROUP, "", null, listOf(native), 1L, 1L)
+                })
+
+            val result =
+                staged.stager.stageBytes(pngBytes(), "picked.png", "stable-id", ACCOUNT, GROUP, MediaQuality.Standard)
+            assertTrue(result is PhotoDraftStageResult.PreparedOnly)
+            val photo = (result as PhotoDraftStageResult.PreparedOnly).photo
+            assertTrue(photo.restoredFromNative)
+            assertEquals(native, photo.attachment)
+            assertNull(staged.sources.bytes("lease-0"))
+            val slot = PendingMediaSlot("saved-picker", Uri.parse("content://picker/saved"))
+            assertEquals(
+                setOf(slot.id),
+                restoredPhotosMissingFrom(listOf(slot), mapOf(slot.id to photo), emptyMap(), emptySet()),
+            )
         }
 
     private fun fixture(onEncode: () -> Unit = {}): Fixture {

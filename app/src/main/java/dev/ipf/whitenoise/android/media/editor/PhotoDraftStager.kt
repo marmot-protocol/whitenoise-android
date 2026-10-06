@@ -23,6 +23,7 @@ internal data class DraftBackedPhoto(
     val sourceInfo: PhotoEditorSourceInfo,
     val recipe: PhotoEditRecipe,
     val quality: MediaQuality,
+    val restoredFromNative: Boolean = false,
 ) {
     fun pendingAttachment(): PendingAttachment =
         PendingAttachment(
@@ -37,6 +38,8 @@ internal data class DraftBackedPhoto(
 internal data class DraftPreparedPhoto(
     val attachment: MessageDraftAttachmentFfi,
     val attachmentDigest: String,
+    // Transient shelf ownership; fresh preparation must survive cleanup of an older native draft.
+    val restoredFromNative: Boolean = false,
 ) {
     fun pendingAttachment(): PendingAttachment =
         PendingAttachment(
@@ -233,6 +236,7 @@ internal class PhotoDraftStager(
                             DraftPreparedPhoto(
                                 attachment = reread,
                                 attachmentDigest = reread.editorDigest(),
+                                restoredFromNative = true,
                             ),
                         )
                     } else {
@@ -337,6 +341,7 @@ internal class PhotoDraftStager(
             sourceInfo = inspected.source,
             recipe = session.recipe,
             quality = MediaQuality.fromPreference(session.qualityPreference),
+            restoredFromNative = true,
         )
     }
 
@@ -359,6 +364,7 @@ internal class PhotoDraftStager(
                 DraftPreparedPhoto(
                     attachment = existing,
                     attachmentDigest = existing.editorDigest(),
+                    restoredFromNative = true,
                 ),
             )
     }
