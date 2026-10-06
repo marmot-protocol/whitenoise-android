@@ -3340,7 +3340,10 @@ internal class ConversationDictationController internal constructor(
         val hadRecovery = draftRecovery.owns(sessionId, target)
         draftRecovery.updateDispatch(sessionId, target, restoredRevision = claim.restoredRevision)
         val failedTarget = if (hadRecovery) target else claim.recoveredTarget(target)
-        if (!draftTargetRemoved && targetAvailable(target.accountRef, target.groupIdHex)) {
+        if (!draftTargetRemoved &&
+            completedTargetValidation(target.copy(replyToMessageIdHex = null)) !=
+            ConversationDictationTargetValidation.DefinitelyRemoved
+        ) {
             draftRecovery.recover(
                 sessionId,
                 failedTarget,
@@ -3508,6 +3511,11 @@ internal class ConversationDictationController internal constructor(
             conversationDictationDiagnostic("event=target_validation phase=delivery result=${validation.name}")
             if (state.sessionId != sessionId || state !is ConversationDictationState.Processing) return@launch
             val localValidation = completedTargetValidation(target)
+            if (validation == ConversationDictationTargetValidation.DefinitelyRemoved ||
+                localValidation == ConversationDictationTargetValidation.DefinitelyRemoved
+            ) {
+                draftTargetRemoved = true
+            }
             if (
                 validation != ConversationDictationTargetValidation.Available ||
                 localValidation != ConversationDictationTargetValidation.Available

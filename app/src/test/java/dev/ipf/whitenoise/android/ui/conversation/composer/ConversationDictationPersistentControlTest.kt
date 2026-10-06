@@ -167,7 +167,7 @@ class ConversationDictationPersistentControlTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
-    /** An uncertain dispatch stays visible without an edit action or duplicate draft text. */
+    /** The first rendered uncertain-delivery state exposes recovered text without a second recovery action. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun uncertainDeliveryShowsStatusWithoutAnEditOrRetryAction() =

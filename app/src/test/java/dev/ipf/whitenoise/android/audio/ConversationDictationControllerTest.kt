@@ -6212,8 +6212,11 @@ class ConversationDictationControllerTest {
             val failed = f.controller.state as ConversationDictationState.Failed
             assertEquals(ConversationDictationFailure.DeliveryUnknown, failed.reason)
             assertTrue(failed.draftRecovered)
+            repeat(2) { f.controller.onAppForegrounded() }
+            assertEquals("Draft recognized", f.drafts.getValue(key()).text)
             f.controller.retry()
             advanceUntilIdle()
+            assertEquals("Draft recognized", f.drafts.getValue(key()).text)
             assertEquals(1, sends)
             assertFalse(f.controller.hasDurableSession)
         }
@@ -6246,6 +6249,60 @@ class ConversationDictationControllerTest {
             assertEquals("Draft first edited suffix", f.drafts.getValue(key()).text)
             assertTrue(f.controller.state is ConversationDictationState.Failed)
             assertFalse(f.controller.canRetryRecoveredSend)
+        }
+
+    /** A throwing local membership read cannot strand a completed dispatch in Processing. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun failedDispatchSurvivesUnavailableLocalMembershipRead() =
+        runTest {
+            var membershipReadFails = false
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetAvailable = {
+                        if (membershipReadFails) error("local membership temporarily unavailable")
+                        true
+                    },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = { request ->
+                        assertTrue(request.beginDispatch())
+                        membershipReadFails = true
+                        false
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.send()
+            f.platform.listener.onResult("recognized")
+            advanceUntilIdle()
+            val failed = f.controller.state as ConversationDictationState.Failed
+            assertEquals(ConversationDictationFailure.DeliveryUnknown, failed.reason)
+            assertEquals("recognized", failed.retainedTranscript)
+        }
+
+    /** An authoritative removal rejects recovery even while the local origin still looks available. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun authoritativeRemovalPreventsRecoveryIntoLocallyAvailableOrigin() =
+        runTest {
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetAvailable = { true },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.DefinitelyRemoved },
+                    targetValidationScope = this,
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.send()
+            f.platform.listener.onResult("recognized")
+            advanceUntilIdle()
+            val failed = f.controller.state as ConversationDictationState.Failed
+            assertEquals("recognized", failed.retainedTranscript)
+            assertFalse(failed.draftRecovered)
+            assertEquals("Draft", f.drafts.getValue(key()).text)
+            f.controller.onAppForegrounded()
+            advanceUntilIdle()
+            assertEquals("Draft", f.drafts.getValue(key()).text)
         }
 
     /** Confirmed origin loss cannot create a draft while an indeterminate membership read can preserve it. */
