@@ -36,6 +36,7 @@ internal sealed interface ContactPictureChange {
 internal class ContactPictureStore(
     private val preferences: SharedPreferences,
     private val root: File,
+    private val deleteDirectory: (File) -> Boolean = File::deleteRecursively,
 ) {
     /** Memory-backed preference lookup: composition never touches the filesystem. */
     fun reference(
@@ -145,7 +146,10 @@ internal class ContactPictureStore(
             }
         }
 
-    /** Cleanup shares the commit lock; no suspended editor can resurrect this account after revocation. */
+    /**
+     * Revokes durable records under the Save lock. Failed byte removal is retried by orphan maintenance,
+     * so an inaccessible file cannot abort the remaining sign-out or wipe after ownership was revoked.
+     */
     fun clearAccount(account: String): Boolean =
         synchronized(lock) {
             val prefix = PREFIX + owner(account) + ":"
@@ -158,7 +162,8 @@ internal class ContactPictureStore(
                 return@synchronized false
             }
             val directory = File(root, owner(account))
-            !directory.exists() || directory.deleteRecursively()
+            if (directory.exists()) runCatching { deleteDirectory(directory) }
+            true
         }
 
     /** Removes files left by replacement or interrupted writes without touching another storage domain. */
@@ -167,6 +172,7 @@ internal class ContactPictureStore(
             root.listFiles()?.filter(File::isDirectory)?.forEach(::cleanOrphans)
         }
 
+    /** Retries unreferenced bytes in one opaque owner directory after replacement or account teardown. */
     private fun cleanOrphans(directory: File) {
         val prefix = PREFIX + directory.name + ":"
         val selected =
@@ -215,8 +221,10 @@ internal class ContactPictureStore(
             return PREFIX + owner(account!!) + ":" + digest(contact.trim().lowercase(java.util.Locale.ROOT))
         }
 
+        /** Matches nickname ownership normalization without exposing the account label in paths. */
         private fun owner(account: String): String = digest(account.trim())
 
+        /** Stable SHA-256 names keep contact identifiers out of local filenames and display handles. */
         private fun digest(value: String): String =
             MessageDigest
                 .getInstance("SHA-256")

@@ -30,6 +30,7 @@ class ContactPictureStoreTest {
     private val root get() = File(context.noBackupFilesDir, "pictures-test")
     private val store get() = ContactPictureStore(preferences, root)
 
+    /** Recreation uses normalized identities while keeping equal contacts in separate accounts isolated. */
     @Test fun normalizedOwnerAndContactPersistWithoutSharingPictures() {
         save(" personal ", " AA ", Color.RED)
         save("work", "aa", Color.BLUE)
@@ -44,6 +45,7 @@ class ContactPictureStoreTest {
         assertFalse(a.cacheKey.contains(root.absolutePath))
     }
 
+    /** Picture, nickname and notes become visible together; replaced bytes have no durable owner. */
     @Test fun replacementAndClearCommitAllFieldsAndLeaveNoOrphan() {
         save("a", "contact", Color.RED)
         val old = checkNotNull(store.reference("a", "contact"))
@@ -68,6 +70,7 @@ class ContactPictureStoreTest {
         assertEquals(0, root.walkTopDown().count(File::isFile))
     }
 
+    /** Revoked editor admission and malformed image bytes cannot partially replace saved private details. */
     @Test fun staleOwnerAndInvalidPixelsPreserveAllPreviousFields() {
         save("a", "contact", Color.RED)
         val old = store.reference("a", "contact")
@@ -89,6 +92,7 @@ class ContactPictureStoreTest {
         assertEquals(1, root.walkTopDown().count(File::isFile))
     }
 
+    /** Account cleanup survives recreation and preserves accounts whose labels share a prefix. */
     @Test fun cleanupIsDurableAndPrefixSafeAndRemovesInterruptedFiles() {
         save("a", "contact", Color.RED)
         save("ab", "contact", Color.BLUE)
@@ -105,6 +109,32 @@ class ContactPictureStoreTest {
         assertEquals(1, root.walkTopDown().count(File::isFile))
     }
 
+    /** A filesystem failure cannot interrupt teardown once durable picture ownership is revoked. */
+    @Test fun failedDirectoryDeletionLeavesOnlyUnreadableOrphansForMaintenance() {
+        for (throwOnDelete in listOf(false, true)) {
+            save("a", "contact", Color.RED)
+            save("ab", "contact", Color.BLUE)
+            val removed = checkNotNull(store.reference("a", "contact"))
+            val retained = checkNotNull(store.reference("ab", "contact"))
+            val failing =
+                ContactPictureStore(preferences, root) {
+                    if (throwOnDelete) throw SecurityException("storage unavailable")
+                    false
+                }
+            clearContactPrivateDetails(preferences, "a", failing)
+            assertNull(store.reference("a", "contact"))
+            assertNull(store.read(removed))
+            assertNull(ContactNicknamePreferences.readNickname(preferences, "a", "contact"))
+            assertNull(ContactNotesPreferences.readNotes(preferences, "a", "contact"))
+            assertTrue(File(File(root, removed.owner), removed.fileName).exists())
+            val restored = ContactPictureStore(preferences, root)
+            restored.cleanOrphans()
+            assertFalse(File(File(root, removed.owner), removed.fileName).exists())
+            assertArrayEquals(contactPicturePng(Color.BLUE), restored.read(retained))
+        }
+    }
+
+    /** Unavailable bytes fall back at read time without silently changing the saved user choice. */
     @Test fun missingCorruptAndOversizedFilesDoNotEraseTheRecord() {
         save("a", "contact", Color.RED)
         val ref = checkNotNull(store.reference("a", "contact"))
@@ -118,6 +148,7 @@ class ContactPictureStoreTest {
         assertEquals(ref, store.reference("a", "contact"))
     }
 
+    /** A failed durable commit restores the already-mutated SharedPreferences memory map before readers resume. */
     @Test fun failedDiskCommitRestoresAllFieldsAndRetainsTheOldImage() {
         save("a", "contact", Color.RED)
         val ref = store.reference("a", "contact")

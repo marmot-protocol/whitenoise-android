@@ -11799,6 +11799,7 @@ class ConversationController(
 
     fun memberSubtitle(member: AppGroupMemberRecordFfi): String = appState.shortNpub(member.memberIdHex)
 
+    /** Applies account-private member pictures while preserving the native profile URL as fallback. */
     fun memberAvatarUrl(member: AppGroupMemberRecordFfi): String? =
         appState.contactAvatarSource(
             member.memberIdHex,

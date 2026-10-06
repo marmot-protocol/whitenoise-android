@@ -73,6 +73,7 @@ internal object PrivateContactAvatarLoader {
         return image ?: selection.second?.let { AvatarImageLoader.load(it) }
     }
 
+    /** Revalidates display ownership before resolving a newer immutable selection for a captured handle. */
     private fun currentReference(reference: ContactPictureReference): ContactPictureReference? {
         val selectedStore = store ?: return null
         val account = activeAccount
@@ -80,6 +81,7 @@ internal object PrivateContactAvatarLoader {
         return selectedStore.current(reference)
     }
 
+    /** Accepts only the private-handle namespace and separates its opaque record from a public fallback. */
     private fun parse(source: String): Pair<ContactPictureReference, String?>? {
         if (!isPrivate(source) || source.length > MAX_SOURCE_LENGTH) return null
         val parts = source.removePrefix(PREFIX).split(':', limit = HANDLE_PARTS)

@@ -72,6 +72,7 @@ internal class ContactPictureEditorController(
             openCrop(checkNotNull(source))
         }
 
+    /** Decodes bounded picker bytes off the main thread and publishes crop state only to the still-current editor. */
     private suspend fun openCrop(bytes: ByteArray) {
         val renderer = PhotoEditorRenderer()
         val inspected = renderer.inspect(bytes) as? PhotoEditorInspectResult.Success
