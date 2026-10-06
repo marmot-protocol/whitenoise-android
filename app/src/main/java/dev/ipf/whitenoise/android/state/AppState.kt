@@ -5294,14 +5294,18 @@ class WhiteNoiseAppState private constructor(
                 globalBubbleColors.clear()
             }
             var publishedAccounts = accounts
-            accountListLifetime.runIfCurrent(requestToken) {
-                accountSetup.acceptAccounts(setupAccounts)
-                accounts = refreshedAccounts
-                refreshNativeAttachmentPermissions()
-                releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-                publishedAccounts = refreshedAccounts
+            val accepted =
+                accountListLifetime.runIfCurrent(requestToken) {
+                    accountSetup.acceptAccounts(setupAccounts)
+                    accounts = refreshedAccounts
+                    refreshNativeAttachmentPermissions()
+                    releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+                    publishedAccounts = refreshedAccounts
+                }
+            if (accepted) {
+                retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
             }
-            publishedAccounts
+            if (accountListLifetime.isCurrent(requestToken)) publishedAccounts else accounts
         }
 
     /** Publishes the newest account snapshot, then refreshes unread state for that accepted set. */
@@ -6200,11 +6204,16 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Local alert write failures are retryable; completed native removal must still reconcile the active account. */
     private suspend fun clearConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
     ) {
         withContext(Dispatchers.IO) {
+            val cleared = runCatching { profileNotificationOverrides.clearAccount(accountRef) }.getOrDefault(false)
+            if (!cleared) {
+                appStateDebug { "profile alert preference cleanup will retry after an authoritative account refresh" }
+            }
             localNotificationPresenter.clearConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
         }
     }
@@ -6434,14 +6443,20 @@ class WhiteNoiseAppState private constructor(
                     marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
                 }
             val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
-            accountListLifetime.advance {
-                accounts = refreshedAccounts
-                releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-                // An empty list here can mean "no accounts left" or "the read failed" -- retention
-                // is an allow-list, so only prune member mutes on a genuine successful read. A
-                // transient failure must not wipe every other account's mutes (#2782 follow-up).
-                refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
-                    retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+            val retainedAccountGeneration =
+                accountListLifetime.advance {
+                    accounts = refreshedAccounts
+                    releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+                    // An empty list here can mean "no accounts left" or "the read failed" -- retention
+                    // is an allow-list, so only prune member mutes on a genuine successful read. A
+                    // transient failure must not wipe every other account's mutes (#2782 follow-up).
+                    refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
+                        retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+                    }
+                }
+            refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
+                retainProfileAlertsForAccounts(successfulAccounts) {
+                    accountListLifetime.isCurrent(retainedAccountGeneration)
                 }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
@@ -11597,6 +11612,7 @@ class WhiteNoiseAppState private constructor(
             profileRevision += 1
             bumpProfileAccountRevision(accountIdHex)
             scheduleInviteNotificationIdentityRefresh(accountIdHex, presentation)
+            refreshProfileNotificationChannelLabels(accountIdHex, presentation.displayName)
         }
     }
 
