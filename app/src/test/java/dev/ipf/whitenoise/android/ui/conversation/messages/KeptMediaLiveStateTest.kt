@@ -95,17 +95,14 @@ class KeptMediaLiveStateTest {
                 )
             }
         }
-        composeRule.waitUntil(5_000) { presentation?.attachments?.singleOrNull()?.statusLabel == "Downloading" }
+        awaitPresentation { presentation?.attachments?.singleOrNull()?.statusLabel == "Downloading" }
         native.publish(AttachmentTransferStateFfi.FAILED)
-        composeRule.waitUntil(5_000) {
-            org.robolectric.Shadows
-                .shadowOf(android.os.Looper.getMainLooper())
-                .idle()
+        awaitPresentation {
             presentation?.attachments?.singleOrNull()?.statusLabel == "Download failed. Open the original to retry"
         }
         composeRule.onNodeWithText("Audio · Download failed. Open the original to retry").assertIsDisplayed()
         native.publish(AttachmentTransferStateFfi.REMOVED)
-        composeRule.waitUntil(5_000) {
+        awaitPresentation {
             presentation?.attachments?.singleOrNull()?.statusLabel == "Attachment unavailable"
         }
         assertNoAcquisition(native)
@@ -126,10 +123,7 @@ class KeptMediaLiveStateTest {
                 )
             }
         }
-        composeRule.waitUntil(5_000) {
-            org.robolectric.Shadows
-                .shadowOf(android.os.Looper.getMainLooper())
-                .idle()
+        awaitPresentation {
             presentation?.attachments?.singleOrNull()?.statusLabel == "Download failed. Open the original to retry"
         }
         composeRule.onNodeWithText("Video · Download failed. Open the original to retry").assertIsDisplayed()
@@ -158,11 +152,8 @@ class KeptMediaLiveStateTest {
             assertEquals("Available on this device", status)
         }
         composeRule.runOnIdle { surface.appState.removeMediaMemoryCacheEntry(cacheKey) }
-        composeRule.waitUntil(5_000) {
+        awaitPresentation {
             // Native observation probes Android's main-thread cache again after the disk miss.
-            org.robolectric.Shadows
-                .shadowOf(android.os.Looper.getMainLooper())
-                .idle()
             presentation?.attachments?.singleOrNull()?.statusLabel == "Download failed. Open the original to retry"
         }
         assertNoAcquisition(native)
@@ -192,12 +183,12 @@ class KeptMediaLiveStateTest {
                     )
                 }
             }
-            composeRule.waitUntil(5_000) { "subscribeAttachmentTransfers" in native.calls && probes.get() > 0 }
+            awaitPresentation { "subscribeAttachmentTransfers" in native.calls && probes.get() > 0 }
             composeRule.runOnIdle {
                 assertEquals("Checking availability", presentation!!.attachments.single().statusLabel)
             }
             firstProbe.countDown()
-            composeRule.waitUntil(5_000) {
+            awaitPresentation {
                 presentation?.attachments?.singleOrNull()?.statusLabel != "Checking availability"
             }
             composeRule.runOnIdle {
@@ -207,6 +198,16 @@ class KeptMediaLiveStateTest {
         } finally {
             firstProbe.countDown()
             laterProbe.countDown()
+        }
+    }
+
+    /** Native callbacks post through Android's paused main looper as well as the Compose test scheduler. */
+    private fun awaitPresentation(condition: () -> Boolean) {
+        composeRule.waitUntil(5_000) {
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idleFor(java.time.Duration.ofMillis(16))
+            condition()
         }
     }
 
