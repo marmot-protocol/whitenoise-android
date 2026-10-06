@@ -40,7 +40,7 @@ private const val PIPE_RETRY_MILLIS = 10L
 /** Allows an offline provider to finish binding/loading before declaring its caller-audio pipe dead. */
 private const val PIPE_STALL_TIMEOUT_MILLIS = 10_000L
 
-/** Retains the in-progress read plus five 100 ms reads after Paste or Send is requested. */
+/** Bounds the in-progress read plus immediately available native-buffer reads after completion. */
 private const val POST_ACTION_CAPTURE_DRAIN_READS = 6
 
 /** Bounds the tail drain even when recorder reads take longer than their nominal 100 ms. */
@@ -60,8 +60,11 @@ internal interface ConversationDictationAudioCaptureDevice {
     /** Begins microphone acquisition; the capture owner prevents duplicate starts. */
     fun start()
 
-    /** Reads mono PCM16 samples into the caller buffer and returns a sample count or device status. */
-    fun read(target: ShortArray): Int
+    /** Reads PCM16, optionally waiting for samples; completion drains only immediately available audio. */
+    fun read(
+        target: ShortArray,
+        waitForSamples: Boolean = true,
+    ): Int
 
     /** Stops acquiring microphone samples without acknowledging any buffered audio. */
     fun stop()
@@ -94,8 +97,17 @@ private class AndroidConversationDictationAudioCaptureDevice(
     /** Begins native microphone recording after the owner has checked device initialization. */
     override fun start() = recorder.startRecording()
 
-    /** Reads mono PCM16 samples into the caller buffer and returns a sample count or device status. */
-    override fun read(target: ShortArray): Int = recorder.read(target, 0, target.size)
+    /** Reads PCM16, optionally waiting for samples; completion drains only immediately available audio. */
+    override fun read(
+        target: ShortArray,
+        waitForSamples: Boolean,
+    ): Int =
+        recorder.read(
+            target,
+            0,
+            target.size,
+            if (waitForSamples) AudioRecord.READ_BLOCKING else AudioRecord.READ_NON_BLOCKING,
+        )
 
     /** Stops acquiring microphone samples without acknowledging any buffered audio. */
     override fun stop() = recorder.stop()
@@ -184,7 +196,7 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
     }
 
-    /** Arms a bounded recorder drain before sealing the final short chunk. */
+    /** Drains available recorder audio without waiting for fresh samples, then seals the final chunk. */
     fun finish(onClosed: () -> Unit) {
         onCaptureClosed(onClosed)
         synchronized(this) {
@@ -283,7 +295,8 @@ internal class ConversationDictationCallerAudio internal constructor(
         var currentChunkHasSpeech = false
         try {
             while (recording.get() && progress.stopReason == null) {
-                val read = device.read(samples)
+                // Keep an outstanding read, then drain the native buffer without recording a fresh tail.
+                val read = device.read(samples, waitForSamples = !finishing.get())
                 if (read <= 0) {
                     progress.stopReason = "read=$read"
                 } else {

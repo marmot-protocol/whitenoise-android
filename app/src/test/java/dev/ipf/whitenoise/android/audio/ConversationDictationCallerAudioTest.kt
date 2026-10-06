@@ -54,7 +54,10 @@ class ConversationDictationCallerAudioTest {
         val capture =
             callerAudio(
                 object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
-                    override fun read(target: ShortArray): Int {
+                    override fun read(
+                        target: ShortArray,
+                        waitForSamples: Boolean,
+                    ): Int {
                         readStarted.countDown()
                         check(returnRead.await(5, TimeUnit.SECONDS))
                         return 0
@@ -146,7 +149,10 @@ class ConversationDictationCallerAudioTest {
         val reads = AtomicInteger(0)
         val device =
             object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
-                override fun read(target: ShortArray): Int {
+                override fun read(
+                    target: ShortArray,
+                    waitForSamples: Boolean,
+                ): Int {
                     if (reads.incrementAndGet() == 1) {
                         target[0] = 1
                         target[1] = 2
@@ -195,7 +201,10 @@ class ConversationDictationCallerAudioTest {
         val stops = AtomicInteger(0)
         val device =
             object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
-                override fun read(target: ShortArray): Int {
+                override fun read(
+                    target: ShortArray,
+                    waitForSamples: Boolean,
+                ): Int {
                     if (reads.incrementAndGet() > 1) {
                         blockedRead.countDown()
                         check(returnRead.await(5, TimeUnit.SECONDS))
@@ -234,9 +243,9 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
-    /** Finishing retains the in-progress read plus five native recorder tail reads. */
+    /** Finishing preserves the outstanding read and drains available samples without waiting for fresh audio. */
     @Test
-    fun finishDrainsInProgressReadAndFiveTailReadsThenCloses() {
+    fun finishDrainsAvailableTailWithoutAdditionalBlockingReads() {
         val device = FinishingReadCaptureDevice()
         val writes = CopyOnWriteArrayList<Int>()
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 7L, chunkBytes = 24, maxBufferedBytes = 24)
@@ -264,6 +273,7 @@ class ConversationDictationCallerAudioTest {
             assertTrue(duplicateFinishClosed.await(2, TimeUnit.SECONDS))
             assertTrue(feedClosed.await(2, TimeUnit.SECONDS))
             assertEquals(6, device.readCount.get())
+            assertEquals(listOf(true, false, false, false, false, false), device.readModes)
             assertEquals(24, writes.sum())
             assertTrue(stream.fullyFed())
             assertTrue(stream.isFinalChunk())
@@ -274,6 +284,101 @@ class ConversationDictationCallerAudioTest {
             assertEquals(24, buffer.bufferedBytes)
         } finally {
             device.completeRead.countDown()
+            stream.cancel()
+            stream.closeProviderEnd()
+            capture.discard {}
+        }
+    }
+
+    /** Completion before any outstanding read drains available audio without entering a blocking read. */
+    @Test
+    fun finishBeforeFirstReadNeverWaitsForFreshSamples() {
+        val readModes = CopyOnWriteArrayList<Boolean>()
+        val reads = AtomicInteger(0)
+        val closed = CountDownLatch(1)
+        val finishArmed = AtomicBoolean(false)
+        lateinit var capture: ConversationDictationCallerAudio
+        val device =
+            object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
+                override fun read(
+                    target: ShortArray,
+                    waitForSamples: Boolean,
+                ): Int {
+                    readModes += waitForSamples
+                    check(!waitForSamples) { "No read was outstanding when completion was requested" }
+                    if (reads.getAndIncrement() > 0) return 0
+                    target[0] = 1_000
+                    target[1] = 1_000
+                    return 2
+                }
+            }
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 8L, chunkBytes = 24, maxBufferedBytes = 24)
+        capture =
+            callerAudio(
+                device = device,
+                buffer = buffer,
+                elapsedRealtime = {
+                    if (
+                        Thread.currentThread().name == "dictation-caller-audio-capture" &&
+                        finishArmed.compareAndSet(false, true)
+                    ) {
+                        capture.finish(closed::countDown)
+                    }
+                    0L
+                },
+            )
+        try {
+            assertTrue(capture.start())
+            assertTrue(closed.await(2, TimeUnit.SECONDS))
+            assertEquals(listOf(false, false), readModes)
+            assertEquals(4, buffer.bufferedBytes)
+            assertTrue(buffer.hasPending)
+        } finally {
+            capture.discard {}
+        }
+    }
+
+    /** An empty native buffer closes immediately after the outstanding read, even with a stalled provider. */
+    @Test
+    fun finishWithEmptyNativeBufferClosesBeforeProviderFeedFinishes() {
+        val device = FinishingReadCaptureDevice(availableReads = 0)
+        val buffer = ConversationDictationAudioChunkBuffer(sessionId = 8L, chunkBytes = 24, maxBufferedBytes = 24)
+        val allowFeed = CountDownLatch(1)
+        val feedStarted = CountDownLatch(1)
+        val feedClosed = CountDownLatch(1)
+        val captureClosed = CountDownLatch(1)
+        val capture =
+            callerAudio(
+                device = device,
+                buffer = buffer,
+                writer =
+                    ConversationDictationAudioPipeWriter { _, _, _, length ->
+                        feedStarted.countDown()
+                        check(allowFeed.await(2, TimeUnit.SECONDS))
+                        length
+                    },
+            )
+        val stream = checkNotNull(capture.openProviderStream())
+        stream.onFeedClosed(feedClosed::countDown)
+        try {
+            assertTrue(stream.start())
+            assertTrue(device.readStarted.await(2, TimeUnit.SECONDS))
+            stream.finishCapture(captureClosed::countDown)
+            assertEquals(1L, captureClosed.count)
+            device.completeRead.countDown()
+
+            assertTrue(captureClosed.await(2, TimeUnit.SECONDS))
+            assertTrue(feedStarted.await(2, TimeUnit.SECONDS))
+            assertEquals(listOf(true, false), device.readModes)
+            assertEquals(4, buffer.bufferedBytes)
+            assertEquals(1L, feedClosed.count)
+            allowFeed.countDown()
+            assertTrue(feedClosed.await(2, TimeUnit.SECONDS))
+            assertTrue(stream.fullyFed())
+            assertTrue(buffer.hasPending)
+        } finally {
+            device.completeRead.countDown()
+            allowFeed.countDown()
             stream.cancel()
             stream.closeProviderEnd()
             capture.discard {}
@@ -371,7 +476,10 @@ class ConversationDictationCallerAudioTest {
         val device =
             object : ConversationDictationAudioCaptureDevice by FakeCaptureDevice() {
                 /** Blocks the overflow read until the previous provider stream has released its lease. */
-                override fun read(target: ShortArray): Int {
+                override fun read(
+                    target: ShortArray,
+                    waitForSamples: Boolean,
+                ): Int {
                     check(allowRead.await(2, TimeUnit.SECONDS))
                     target[0] = 5
                     return 1
@@ -531,7 +639,7 @@ class ConversationDictationCallerAudioTest {
         }
     }
 
-    /** Finishing keeps the six recorder tail reads together instead of creating a tiny final request. */
+    /** Finishing keeps available recorder audio together instead of creating a tiny final request. */
     @Test
     fun finishDoesNotSplitAtASentenceBoundaryDuringRecorderDrain() {
         val clock = FakeElapsedRealtime()
@@ -641,7 +749,10 @@ class ConversationDictationCallerAudioTest {
         override fun start() = Unit
 
         /** Returns queued test samples, or a terminal read after the finite test input is consumed. */
-        override fun read(target: ShortArray): Int {
+        override fun read(
+            target: ShortArray,
+            waitForSamples: Boolean,
+        ): Int {
             val next = synchronized(queuedReads) { queuedReads.removeFirstOrNull() }
             if (next != null) {
                 next.copyInto(target)
@@ -686,7 +797,10 @@ class ConversationDictationCallerAudioTest {
 
         override fun start() = Unit
 
-        override fun read(target: ShortArray): Int =
+        override fun read(
+            target: ShortArray,
+            waitForSamples: Boolean,
+        ): Int =
             when (reads++) {
                 0 -> {
                     waitingForSpeech.countDown()
@@ -712,10 +826,13 @@ class ConversationDictationCallerAudioTest {
     }
 
     /** Holds one read across the terminal action, then exposes more native-buffered tail reads. */
-    private class FinishingReadCaptureDevice : ConversationDictationAudioCaptureDevice {
+    private class FinishingReadCaptureDevice(
+        private val availableReads: Int = 5,
+    ) : ConversationDictationAudioCaptureDevice {
         val readStarted = CountDownLatch(1)
         val completeRead = CountDownLatch(1)
         val readCount = AtomicInteger(0)
+        val readModes = CopyOnWriteArrayList<Boolean>()
 
         override val initialized: Boolean = true
 
@@ -723,10 +840,19 @@ class ConversationDictationCallerAudioTest {
 
         override fun start() = Unit
 
-        override fun read(target: ShortArray): Int {
-            if (readCount.getAndIncrement() == 0) {
+        override fun read(
+            target: ShortArray,
+            waitForSamples: Boolean,
+        ): Int {
+            readModes += waitForSamples
+            val readIndex = readCount.getAndIncrement()
+            if (readIndex == 0) {
                 readStarted.countDown()
                 check(completeRead.await(2, TimeUnit.SECONDS))
+            }
+            if (readIndex > 0) {
+                check(!waitForSamples) { "Completion must not wait for fresh microphone audio" }
+                if (readIndex > availableReads) return 0
             }
             target[0] = 1_000
             target[1] = 1_000
@@ -754,7 +880,10 @@ class ConversationDictationCallerAudioTest {
 
         override fun start() = Unit
 
-        override fun read(target: ShortArray): Int {
+        override fun read(
+            target: ShortArray,
+            waitForSamples: Boolean,
+        ): Int {
             if (readCount.getAndIncrement() == 0) {
                 readStarted.countDown()
                 check(completeRead.await(2, TimeUnit.SECONDS))
@@ -790,7 +919,10 @@ class ConversationDictationCallerAudioTest {
 
         override fun start() = Unit
 
-        override fun read(target: ShortArray): Int {
+        override fun read(
+            target: ShortArray,
+            waitForSamples: Boolean,
+        ): Int {
             when {
                 speechReads < 100 -> {
                     target.fill(1_000)
@@ -838,7 +970,10 @@ class ConversationDictationCallerAudioTest {
 
         override fun start() = Unit
 
-        override fun read(target: ShortArray): Int {
+        override fun read(
+            target: ShortArray,
+            waitForSamples: Boolean,
+        ): Int {
             when {
                 speechReads < 20 -> {
                     target.fill(1_000)
