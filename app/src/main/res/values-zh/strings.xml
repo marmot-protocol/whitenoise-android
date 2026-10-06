@@ -2199,4 +2199,8 @@
     <string name="profile_readiness_added">已添加</string>
     <string name="profile_readiness_recommended">建议填写</string>
     <string name="profile_readiness_field_optional">选填</string>
+    <string name="nostr_event_view_image">查看图片</string>
+    <string name="nostr_event_image_failed">无法加载此图片，请重试。</string>
+    <string name="nostr_event_type_image">图片</string>
+    <string name="nostr_event_expand">查看完整事件</string>
 </resources>

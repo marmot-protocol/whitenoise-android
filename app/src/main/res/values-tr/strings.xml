@@ -2229,4 +2229,8 @@
     <string name="profile_readiness_added">Eklendi</string>
     <string name="profile_readiness_recommended">Önerilen</string>
     <string name="profile_readiness_field_optional">İsteğe bağlı</string>
+    <string name="nostr_event_view_image">Görseli görüntüle</string>
+    <string name="nostr_event_image_failed">Bu görsel yüklenemedi. Tekrar deneyin.</string>
+    <string name="nostr_event_type_image">Görsel</string>
+    <string name="nostr_event_expand">Etkinliğin tamamını göster</string>
 </resources>

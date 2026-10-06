@@ -2248,4 +2248,8 @@
     <string name="profile_readiness_added">Hinzugefügt</string>
     <string name="profile_readiness_recommended">Empfohlen</string>
     <string name="profile_readiness_field_optional">Freiwillig</string>
+    <string name="nostr_event_view_image">Bild anzeigen</string>
+    <string name="nostr_event_image_failed">Dieses Bild konnte nicht geladen werden. Versuche es erneut.</string>
+    <string name="nostr_event_type_image">Bild</string>
+    <string name="nostr_event_expand">Vollständiges Ereignis anzeigen</string>
 </resources>

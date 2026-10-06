@@ -217,6 +217,56 @@ class NostrEventCardScreenshotTest {
         capture("nostr_note_reader_rtl")
     }
 
+    @Test
+    fun releaseReaderLight() {
+        renderExpandedEventReader(
+            kind = NostrEventCardKind.Release,
+            eventKind = 30063,
+            title = "Shared app release",
+            body = "The complete signed app description.\n\nComplete release notes and verified event context.",
+        )
+        capture("nostr_release_reader_light")
+    }
+
+    @Test
+    fun imageReaderLight() {
+        renderExpandedEventReader(
+            kind = NostrEventCardKind.Generic,
+            eventKind = 20,
+            title = "A referenced photograph",
+            body = "Photo shared by a Nostr user.",
+            imageUrls = listOf("https://images.example/manual-only"),
+        )
+        capture("nostr_image_reader_light")
+    }
+
+    private fun renderExpandedEventReader(
+        kind: NostrEventCardKind,
+        eventKind: Int,
+        title: String,
+        body: String,
+        imageUrls: List<String> = emptyList(),
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface(Modifier.width(360.dp).height(900.dp).testTag(TAG)) {
+                    NostrEventReaderScreen(
+                        card = card(kind, eventKind, title, body, readerBody = body).copy(imageUrls = imageUrls),
+                        authoredReference = AUTHORED_REFERENCE,
+                        document = null,
+                        parsing = false,
+                        authorDisplayName = { "Alex Morgan" },
+                        mentionDisplayName = { null },
+                        onNostrProfileTap = {},
+                        onCopyReference = {},
+                        onOpenExternal = {},
+                        onDismiss = {},
+                    )
+                }
+            }
+        }
+    }
+
     /** Renders a deterministic note-reader fixture under one requested visual configuration. */
     private fun renderNoteReader(
         darkTheme: Boolean,
