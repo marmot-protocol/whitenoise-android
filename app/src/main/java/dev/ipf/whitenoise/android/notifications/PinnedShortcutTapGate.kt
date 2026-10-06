@@ -17,21 +17,37 @@ import kotlinx.coroutines.launch
  * takes to start.
  */
 internal class PinnedShortcutTapGate(
-    private val appState: WhiteNoiseAppState,
+    private val lockDecision: () -> PinnedShortcutLockDecision,
+    private val activeAccount: () -> String?,
+    private val evaluationPending: () -> Boolean,
+    private val evaluateForeground: () -> Unit = {},
 ) {
+    /** Production ownership stays in AppState; callbacks let routing interleavings use the actual gate in tests. */
+    constructor(appState: WhiteNoiseAppState) : this(
+        lockDecision = { appState.pinnedShortcutLockDecision() },
+        activeAccount = { appState.activeAccountRef },
+        evaluationPending = { appState.appUnlockEvaluationPending },
+        evaluateForeground = { appState.maybeShowAppLockForForeground() },
+    )
+
     private var held: Intent? = null
 
     /** True while the lock decision for this pin tap is still loading; the tap is retained for [release]. */
     fun hold(intent: Intent?): Boolean {
         if (intent?.action != PinnedConversationNavigation.ACTION_OPEN) return false
-        appState.maybeShowAppLockForForeground()
-        val waiting = appState.pinnedShortcutLockDecision() == PinnedShortcutLockDecision.WAIT
-        if (waiting) held = intent
+        evaluateForeground()
+        val waiting = lockDecision() == PinnedShortcutLockDecision.WAIT
+        held = if (waiting) intent else null
         return waiting
     }
 
     /** Hands back the held tap once; null when nothing waits. */
     fun release(): Intent? = held.also { held = null }
+
+    /** A newer accepted route owns navigation, including while a pin waits for the lock decision. */
+    fun supersede() {
+        held = null
+    }
 
     /** Parses a pin tap under the decided lock state; a showing lock downgrades it to the app root. */
     fun target(
@@ -41,8 +57,8 @@ internal class PinnedShortcutTapGate(
         PinnedConversationNavigation.target(
             context,
             intent,
-            appState.activeAccountRef,
-            appState.pinnedShortcutLockDecision() == PinnedShortcutLockDecision.LOCKED,
+            activeAccount(),
+            lockDecision() == PinnedShortcutLockDecision.LOCKED,
         )
 
     /** Replays a held tap through [replay] each time the lock decision settles; the owner re-parses it. */
@@ -51,7 +67,7 @@ internal class PinnedShortcutTapGate(
         replay: (Intent) -> Unit,
     ): Job =
         scope.launch {
-            snapshotFlow { appState.appUnlockEvaluationPending }.collect { pending ->
+            snapshotFlow { evaluationPending() }.collect { pending ->
                 if (!pending) release()?.let(replay)
             }
         }

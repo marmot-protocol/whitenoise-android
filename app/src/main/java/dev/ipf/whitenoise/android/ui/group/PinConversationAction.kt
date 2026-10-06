@@ -13,8 +13,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -27,6 +25,7 @@ import dev.ipf.whitenoise.android.notifications.ConversationPinResult
 import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
+import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.appStateDebug
@@ -48,8 +47,6 @@ internal fun PinConversationAction(
     appState: WhiteNoiseAppState,
     controller: ConversationController,
     title: String,
-    avatarUrl: String?,
-    avatar: ImageBitmap?,
 ) {
     val androidContext = LocalContext.current
     val platform = remember(androidContext) { AndroidPinnedShortcutPlatform(androidContext) }
@@ -58,8 +55,6 @@ internal fun PinConversationAction(
     var busy by remember(controller) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val latestTitle by rememberUpdatedState(title)
-    val latestAvatarUrl by rememberUpdatedState(avatarUrl)
-    val latestAvatar by rememberUpdatedState(avatar)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         supported = runCatching { platform.supported() }.getOrDefault(false)
     }
@@ -78,7 +73,7 @@ internal fun PinConversationAction(
             fun stillCurrent(): Boolean = pinActionStillCurrent(appState, controller, account, group, runtime)
             scope.launch {
                 try {
-                    val capability =
+                    val request =
                         currentPinCapability(
                             androidContext,
                             appState,
@@ -88,14 +83,13 @@ internal fun PinConversationAction(
                             ::stillCurrent,
                         )
                     val result =
-                        if (capability == null || !stillCurrent()) {
+                        if (request == null || !stillCurrent()) {
                             ConversationPinResult.UNAVAILABLE
                         } else {
-                            val pinTitle = latestTitle
-                            val pinAvatarUrl = latestAvatarUrl
-                            val pinAvatar = latestAvatar?.asAndroidBitmap()
+                            val (capability, item) = request
+                            val presentation = appState.pinnedConversationPresentation(checkNotNull(account), item, latestTitle)
                             withContext(Dispatchers.IO) {
-                                shortcuts.request(capability, pinTitle, pinAvatarUrl, pinAvatar) {
+                                shortcuts.request(capability, presentation.title, null, presentation = presentation) {
                                     isActive && stillCurrent()
                                 }
                             }
@@ -121,7 +115,7 @@ private suspend fun currentPinCapability(
     group: String,
     requestGeneration: Long,
     stillCurrent: () -> Boolean,
-): PinnedConversationCapability? {
+): Pair<PinnedConversationCapability, ChatListItem>? {
     val currentRow =
         account?.takeIf { stillCurrent() }?.let {
             runCatchingCancellable { appState.preloadNotificationChatListItem(it, group) }.getOrNull()
@@ -141,6 +135,7 @@ private suspend fun currentPinCapability(
     return if (available && stillCurrent()) {
         withContext(Dispatchers.IO) {
             PinnedConversationTokens.create(context).issue(checkNotNull(account), group, requestGeneration)
+                ?.let { it to checkNotNull(currentRow) }
         }
     } else {
         null

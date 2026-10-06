@@ -305,6 +305,69 @@ class PinnedConversationShortcutsTest {
         assertNotEquals(Color.MAGENTA, (updated.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
     }
 
+    /** A queued request reads current private pixels at publication rather than retaining its captured picture. */
+    @Test
+    fun privatePictureClearedBeforeRequestIsNotPublished() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        val stale = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        var current: Bitmap? = stale
+        val presentation = PinnedConversationPresentation("Peer", stale, "peer", { current })
+        platform.afterInventoryRead = { current = null }
+        owner.request(capability, "Peer", null, stale, presentation) { true }
+        val icon = platform.requests.single().icon!!.loadDrawable(context) as BitmapDrawable
+        assertNotEquals(Color.MAGENTA, icon.bitmap.getPixel(0, 0))
+    }
+
+    /** Ordinary projection refresh preserves the private override and stamps ownership for off-window reconciliation. */
+    @Test
+    fun privatePictureRefreshAndOffWindowClearUseCurrentOwnedPixels() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        val privatePicture = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        val presentation = PinnedConversationPresentation("Peer", contact = "peer", currentAvatar = { privatePicture })
+        owner.request(capability, "Peer", null, presentation = presentation) { true }
+        platform.approve(platform.requests.single())
+        assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
+        val refreshed = platform.updates.single().single()
+        assertEquals(Color.MAGENTA, (refreshed.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
+        assertTrue(owner.refresh(ACCOUNT, emptyMap()))
+        val reconciled = mutableListOf<ShortcutInfoCompat>()
+        refreshContactPictureShortcuts(
+            context,
+            ACCOUNT,
+            "peer",
+            currentAvatar = { null },
+            isCurrent = { true },
+            platform = object : ContactPictureShortcutPlatform(context) {
+                override fun read(): List<ShortcutInfoCompat> = listOf(refreshed)
+                override fun update(shortcuts: List<ShortcutInfoCompat>) {
+                    reconciled += shortcuts
+                }
+            },
+        )
+        val cleared = reconciled.single()
+        assertEquals(refreshed.intent.data, cleared.intent.data)
+        assertNotEquals(Color.MAGENTA, (cleared.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
+    }
+
+    /** An older avatar-only refresh cannot overwrite a newer projection after waiting on launcher inventory. */
+    @Test
+    fun sharedPresentationRevisionRejectsAnOlderRefreshAfterANewerRename() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        owner.request(capability, "Original", null) { true }
+        platform.approve(platform.requests.single())
+        val revision = java.util.concurrent.atomic.AtomicLong(1)
+        platform.afterInventoryRead = {
+            platform.afterInventoryRead = null
+            revision.incrementAndGet()
+            assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to PinnedConversationPresentation("Renamed"))) { revision.get() == 2L })
+        }
+        assertFalse(owner.refresh(ACCOUNT, mapOf(GROUP to PinnedConversationPresentation("Old avatar snapshot"))) { revision.get() == 1L })
+        assertEquals("Renamed", platform.updates.single().single().longLabel)
+    }
+
     /** Opted-out publication reveals neither a title nor avatar while keeping an exact account/group intent. */
     @Test
     fun privacyDisabledRequestUsesGenericPresentation() =

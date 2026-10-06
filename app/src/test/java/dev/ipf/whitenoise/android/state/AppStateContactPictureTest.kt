@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+import dev.ipf.whitenoise.android.ui.share.group
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -80,6 +81,25 @@ class AppStateContactPictureTest {
             assertEquals(Color.RED, checkNotNull(AvatarImageLoader.peek(source)).asAndroidBitmap().getPixel(0, 0))
             assertEquals("Renamed", app.contactNickname("contact"))
             assertNull(app.contactNotes("contact"))
+        }
+
+    /** Pin snapshots resolve current private pixels and never replace a group-owned image with a peer picture. */
+    @Test fun pinPresentationRevalidatesPrivatePicturesAndPreservesGroupOwnership() =
+        runBlocking {
+            val app = app()
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", picture(Color.RED)) { true })
+            val dm = ChatListItem(group("dm"), null, "contact", 2, null)
+            val captured = app.pinnedConversationPresentation("a", dm, "Local")
+            assertEquals("contact", captured.contact)
+            assertEquals(Color.RED, checkNotNull(captured.currentAvatar?.invoke()).getPixel(0, 0))
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", picture(Color.BLUE)) { true })
+            assertEquals(Color.BLUE, checkNotNull(captured.currentAvatar?.invoke()).getPixel(0, 0))
+            val owned = dm.copy(group = dm.group.copy(avatarUrl = "https://group.example/picture"))
+            val groupPin = app.pinnedConversationPresentation("a", owned, "Group")
+            assertNull(groupPin.contact)
+            assertNull(groupPin.currentAvatar?.invoke())
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
+            assertNull(captured.currentAvatar?.invoke())
         }
 
     /** Creates a small synthetic normalized replacement without relying on external media. */

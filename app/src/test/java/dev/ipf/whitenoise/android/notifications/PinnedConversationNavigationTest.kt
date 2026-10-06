@@ -61,6 +61,39 @@ class PinnedConversationNavigationTest {
         )
     }
 
+    /** A newer accepted route supersedes a cold-start pin, while harmless recreation preserves the newest tap. */
+    @Test
+    fun heldPinCannotOverwriteANewerRouteWhenLockEvaluationSettles() {
+        var decision = PinnedShortcutLockDecision.WAIT
+        val gate = PinnedShortcutTapGate({ decision }, { "account-a" }, { decision == PinnedShortcutLockDecision.WAIT })
+        val first = PinnedConversationNavigation.intent(context, requireNotNull(tokens.issue("account-a", GROUP)))
+        assertTrue(gate.hold(first))
+        assertFalse(gate.hold(Intent(Intent.ACTION_MAIN)))
+        gate.supersede()
+        decision = PinnedShortcutLockDecision.OPEN
+        assertNull(gate.release())
+        decision = PinnedShortcutLockDecision.WAIT
+        assertTrue(gate.hold(first))
+        val newest = PinnedConversationNavigation.intent(context, requireNotNull(tokens.issue("account-b", GROUP)))
+        assertTrue(gate.hold(newest))
+        assertFalse(gate.hold(Intent(Intent.ACTION_MAIN)))
+        decision = PinnedShortcutLockDecision.OPEN
+        assertEquals(newest, gate.release())
+        assertNull(gate.release())
+    }
+
+    /** A second pin with a decided lock immediately replaces an older unresolved tap. */
+    @Test
+    fun readyPinDiscardsAnOlderHeldTap() {
+        var decision = PinnedShortcutLockDecision.WAIT
+        val gate = PinnedShortcutTapGate({ decision }, { "account-a" }, { decision == PinnedShortcutLockDecision.WAIT })
+        val first = PinnedConversationNavigation.intent(context, requireNotNull(tokens.issue("account-a", GROUP)))
+        assertTrue(gate.hold(first))
+        decision = PinnedShortcutLockDecision.OPEN
+        assertFalse(gate.hold(first))
+        assertNull(gate.release())
+    }
+
     /** Changing an account while retaining a valid pair of tokens invalidates both the URI identity and credentials. */
     @Test
     fun mismatchedAccountOpensSafeRoot() {

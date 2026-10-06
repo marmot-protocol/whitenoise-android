@@ -384,6 +384,7 @@ class MainActivity : AppCompatActivity() {
         retainPendingShareOnRecreation: Boolean = false,
     ) {
         if (AppUpdateNavigation.isUpdateTap(intent)) {
+            pinTapGate.supersede()
             inboundAppUpdateTap += 1
             // One-shot, like the notification tap below: clear the stored intent so
             // activity recreation cannot replay the same update tap.
@@ -428,6 +429,11 @@ class MainActivity : AppCompatActivity() {
                         notificationRequestId = inboundNotificationRequestId,
                     ),
             )
+        if (parsedTarget != null || parsedShare != null ||
+            (intent?.dataString != null && routing.profilePayload != null)
+        ) {
+            pinTapGate.supersede()
+        }
         if (parsedTarget != null) {
             foregroundConversationDismissal.onNotificationRouteObserved()
             NotificationRouteTrace.startRequest(routing.notificationRequestId)

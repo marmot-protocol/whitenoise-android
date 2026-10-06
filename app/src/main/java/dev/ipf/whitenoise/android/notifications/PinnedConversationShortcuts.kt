@@ -19,6 +19,8 @@ internal enum class ConversationPinResult { REQUESTED, ALREADY_PINNED, UNSUPPORT
 internal data class PinnedConversationPresentation(
     val title: String,
     val avatar: Bitmap? = null,
+    val contact: String? = null,
+    val currentAvatar: (() -> Bitmap?)? = null,
 )
 
 /** The platform owns approved pins, including denial, duplicate requests and process recreation. */
@@ -91,6 +93,7 @@ internal class PinnedConversationShortcuts(
         title: String,
         avatarUrl: String?,
         avatar: Bitmap? = null,
+        presentation: PinnedConversationPresentation? = null,
         stillCurrent: () -> Boolean,
     ): ConversationPinResult =
         synchronized(UserEventNotificationGroup.mutationLock) {
@@ -99,7 +102,7 @@ internal class PinnedConversationShortcuts(
                     !platform.supported() -> ConversationPinResult.UNSUPPORTED
                     !stillCurrent() || !tokens.isValid(capability) -> ConversationPinResult.UNAVAILABLE
                     platform.shortcuts().any { it.id == capability.shortcutId && it.isPinned && it.isEnabled } -> {
-                        val current = build(capability, title, avatarUrl, avatar)
+                        val current = build(capability, title, avatarUrl, avatar, presentation)
                         if (!stillCurrent() || !tokens.isValid(capability)) {
                             return@synchronized ConversationPinResult.UNAVAILABLE
                         }
@@ -117,7 +120,7 @@ internal class PinnedConversationShortcuts(
                                     PinnedConversationNavigation.callbackIntent(context, capability),
                                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                                 ).intentSender
-                        val current = build(capability, title, avatarUrl, avatar)
+                        val current = build(capability, title, avatarUrl, avatar, presentation)
                         if (!stillCurrent() || !tokens.isValid(capability)) {
                             return@synchronized ConversationPinResult.UNAVAILABLE
                         }
@@ -175,7 +178,7 @@ internal class PinnedConversationShortcuts(
                     } else if (presentation == null) {
                         genericNotificationShortcut(context, original)
                     } else {
-                        runCatching { build(capability, presentation.title, null, presentation.avatar) }
+                        runCatching { build(capability, presentation.title, null, presentation.avatar, presentation) }
                             .getOrElse { genericNotificationShortcut(context, original) }
                     }
                 }
@@ -222,6 +225,7 @@ internal class PinnedConversationShortcuts(
         title: String,
         avatarUrl: String?,
         avatar: Bitmap?,
+        presentation: PinnedConversationPresentation?,
     ): ShortcutInfoCompat {
         val privacy = NotificationPreviewPreferences.capture(context)
         val label =
@@ -232,7 +236,12 @@ internal class PinnedConversationShortcuts(
             }
         val icon =
             if (privacy.allowed) {
-                val bitmap = avatar ?: AvatarImageLoader.peekBitmap(avatarUrl)
+                val bitmap =
+                    if (presentation?.currentAvatar != null) {
+                        presentation.currentAvatar.invoke()
+                    } else {
+                        avatar ?: AvatarImageLoader.peekBitmap(avatarUrl)
+                    }
                 notificationConversationIcon(label, capability.shortcutId, bitmap?.let(::boundedPinnedAvatar))
             } else {
                 IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise)
@@ -251,6 +260,9 @@ internal class PinnedConversationShortcuts(
             .setLongLived(true)
             .setExtras(extras)
             .build()
+            .also { shortcut ->
+                presentation?.contact?.let { stampContactPictureShortcut(shortcut, it, conversationIcon = true) }
+            }
     }
 
     /** Bound platform icon bytes without acquiring media or mutating the source bitmap. */

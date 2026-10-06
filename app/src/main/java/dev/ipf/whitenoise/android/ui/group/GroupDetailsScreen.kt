@@ -1595,8 +1595,6 @@ internal fun GroupDetailsScreen(
                             appState,
                             controller,
                             conversationTitle,
-                            groupAvatar.pictureUrl,
-                            groupAvatar.image,
                         )
                     }
                     row("collapse_long_messages") { rowContext ->

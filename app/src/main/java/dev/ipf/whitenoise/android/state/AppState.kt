@@ -2367,6 +2367,7 @@ class WhiteNoiseAppState private constructor(
         })
     private var shareShortcutPublishJob: Job? = null
     private var pinnedShortcutRefreshJob: Job? = null
+    private val pinnedShortcutPresentationRevision = java.util.concurrent.atomic.AtomicLong()
 
     /**
      * `SupervisorJob` isolates siblings but does not swallow exceptions — an
@@ -3695,6 +3696,7 @@ class WhiteNoiseAppState private constructor(
         val accountRef = activeAccountRef ?: return
         val runtime = runtimeGeneration
         val publicationGeneration = PinnedConversationTokens.captureRequest()
+        val presentationRevision = pinnedShortcutPresentationRevision.incrementAndGet()
         val titleCopy = notificationGroupTitleCopy(appContext)
         val shareTitles =
             chats
@@ -3718,7 +3720,14 @@ class WhiteNoiseAppState private constructor(
                             },
                         ) { item -> shareTitles[item.group.groupIdHex].orEmpty() }
                     }
-                    refreshPinnedConversationPresentation(accountRef, runtime, publicationGeneration, chats, titleCopy)
+                    refreshPinnedConversationPresentation(
+                        accountRef,
+                        runtime,
+                        publicationGeneration,
+                        presentationRevision,
+                        chats,
+                        titleCopy,
+                    )
                 }.onFailure { failure -> appStateDebug(failure) { "share shortcut publication failed" } }
             }
     }
@@ -3731,14 +3740,45 @@ class WhiteNoiseAppState private constructor(
         val accountRef = activeAccountRef ?: return
         val runtime = runtimeGeneration
         val publicationGeneration = PinnedConversationTokens.captureRequest()
+        val presentationRevision = pinnedShortcutPresentationRevision.incrementAndGet()
         val titleCopy = notificationGroupTitleCopy(appContext)
         pinnedShortcutRefreshJob?.cancel()
         pinnedShortcutRefreshJob =
             mutationsScope.launch {
                 runCatchingCancellable {
-                    refreshPinnedConversationPresentation(accountRef, runtime, publicationGeneration, chats, titleCopy)
+                    refreshPinnedConversationPresentation(
+                        accountRef,
+                        runtime,
+                        publicationGeneration,
+                        presentationRevision,
+                        chats,
+                        titleCopy,
+                    )
                 }.onFailure { failure -> appStateDebug(failure) { "pinned shortcut presentation refresh failed" } }
             }
+    }
+
+    /** Resolves private contact pixels at the final launcher write; group-owned pictures retain precedence. */
+    internal fun pinnedConversationPresentation(
+        account: String,
+        item: ChatListItem,
+        title: String,
+    ): dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation {
+        val peer =
+            GroupProjector.avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+                ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
+        return dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation(
+            title = title,
+            contact = peer,
+            currentAvatar = {
+                val privateOverride = peer?.let { contactAvatarOverride(account, it) }
+                if (privateOverride?.first == true) {
+                    privateOverride.second
+                } else {
+                    firstFrameGroupAvatarSeed(item, account, ::avatarUrl)?.image?.asAndroidBitmap()
+                }
+            },
+        )
     }
 
     /** Rebuilds approved pins' labels and cached pixels for one captured account/runtime; no pins means no work. */
@@ -3746,6 +3786,7 @@ class WhiteNoiseAppState private constructor(
         accountRef: String,
         runtime: Int,
         publicationGeneration: Long,
+        presentationRevision: Long,
         chats: List<ChatListItem>,
         titleCopy: dev.ipf.whitenoise.android.core.GroupTitleCopy,
     ) {
@@ -3755,18 +3796,20 @@ class WhiteNoiseAppState private constructor(
             currentCoroutineContext().isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
         val ownsPublication =
             withContext(Dispatchers.IO) { PinnedConversationTokens.isPublicationCurrent(publicationGeneration) }
-        if (!hasPins || !ownsRuntime || !ownsPublication) return
+        if (!hasPins || !ownsRuntime || !ownsPublication ||
+            pinnedShortcutPresentationRevision.get() != presentationRevision
+        ) {
+            return
+        }
         val presentations =
             chats.associate { item ->
                 item.group.groupIdHex.lowercase(Locale.ROOT) to
-                    dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation(
-                        chatListItemDisplayTitle(item, this, titleCopy),
-                        firstFrameGroupAvatarSeed(item, accountRef, ::avatarUrl)?.image?.asAndroidBitmap(),
-                    )
+                    pinnedConversationPresentation(accountRef, item, chatListItemDisplayTitle(item, this, titleCopy))
             }
         withContext(Dispatchers.IO) {
             shortcuts.refresh(accountRef, presentations) {
-                isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
+                isActive && activeAccountRef == accountRef && runtimeGeneration == runtime &&
+                    pinnedShortcutPresentationRevision.get() == presentationRevision
             }
         }
     }
