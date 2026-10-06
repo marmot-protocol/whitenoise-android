@@ -277,8 +277,8 @@ class ComposerExpansionBehaviorTest {
         val editor = composeRule.onNodeWithText(draft).fetchSemanticsNode().boundsInRoot
         assertEquals(surface.top, strip.top, 1f)
         assertEquals(surface.width, strip.width, 1f)
-        assertEquals(24f, strip.height, 1f)
-        assertEquals(24f, editor.top - surface.top, 1f)
+        assertEquals(12f, strip.height, 1f)
+        assertEquals(12f, editor.top - surface.top, 1f)
         assertTrue(editor.top >= strip.bottom)
     }
 
@@ -305,7 +305,7 @@ class ComposerExpansionBehaviorTest {
         val resize = resizeHandle().fetchSemanticsNode().boundsInRoot
         assertEquals(surface.top, resize.top, 1f)
         assertEquals(48f, resize.height, 1f)
-        assertEquals(120f, surface.height, 1f)
+        assertEquals(108f, surface.height, 1f)
         assertResizeHandleToggleLabel(R.string.composer_expand_full_screen)
     }
 
