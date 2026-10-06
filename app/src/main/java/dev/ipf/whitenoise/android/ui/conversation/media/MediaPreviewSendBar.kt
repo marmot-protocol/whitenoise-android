@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 private val ADD_MORE_TILE = 56.dp
@@ -50,6 +51,8 @@ internal fun MediaPreviewSendBar(
     initialCaption: String,
     sending: Boolean,
     sendEnabled: Boolean,
+    // The composer's Send colours: the exact account accent, not the theme's readable-text tone.
+    actionColors: AccountActionColors,
     onSend: (String) -> Unit,
 ) {
     // Seeded from the composer draft so text typed before attaching carries
@@ -77,8 +80,8 @@ internal fun MediaPreviewSendBar(
             onClick = { if (sendEnabled) onSend(caption) },
             modifier = Modifier.semantics { if (!sendEnabled) disabled() },
             shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = actionColors.container,
+            contentColor = actionColors.content,
         ) {
             Icon(
                 painterResource(R.drawable.ic_arrow_upward),

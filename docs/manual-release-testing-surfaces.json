@@ -5610,7 +5610,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewSendBar.kt",
         "anchor": "fun MediaPreviewSendBar(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "SET-004"
         ]
       },
       {
