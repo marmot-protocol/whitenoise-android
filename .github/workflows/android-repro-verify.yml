@@ -12,15 +12,39 @@ on:
   pull_request:
     branches: [master]
   workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
 
 concurrency:
-  group: android-repro-verify-${{ github.workflow }}-${{ github.ref }}
+  group: android-repro-verify-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Classify reproduction campaign inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      supplemental_campaigns: ${{ steps.classify.outputs.supplemental_campaigns }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test conservative CI classification
+        run: python3 -m unittest scripts/test_check_ci_changes.py
+      - name: Classify complete PR diff
+        id: classify
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
+
   lint:
     name: Release lint (${{ matrix.variant }})
     runs-on: ubuntu-24.04
@@ -66,6 +90,8 @@ jobs:
           retention-days: 7
 
   build:
+    needs: changes
+    if: needs.changes.outputs.supplemental_campaigns != 'false'
     name: Independent unsigned build (${{ matrix.tree }})
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -152,29 +178,44 @@ jobs:
 
   verify:
     name: Verify unsigned production APK reproducibility
-    needs: [build, lint]
+    needs: [changes, build, lint]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Require independent builds and release lint
         env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          CAMPAIGNS: ${{ needs.changes.outputs.supplemental_campaigns }}
+          CI_EVENT: ${{ github.event_name }}
           BUILD_RESULT: ${{ needs.build.result }}
           LINT_RESULT: ${{ needs.lint.result }}
-        run: test "$BUILD_RESULT" = success && test "$LINT_RESULT" = success
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CHANGES_RESULT" = success
+          test "$LINT_RESULT" = success
+          case "$CAMPAIGNS" in
+            true) test "$BUILD_RESULT" = success ;;
+            false) test "$CI_EVENT" = pull_request && test "$BUILD_RESULT" = skipped ;;
+            *) exit 1 ;;
+          esac
 
       - name: Checkout
+        if: needs.changes.outputs.supplemental_campaigns == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
       - name: Download independent evidence
+        if: needs.changes.outputs.supplemental_campaigns == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: repro-*
           path: ${{ runner.temp }}/repro-inputs
 
       - name: Compare source, toolchains and unsigned APK bytes
+        if: needs.changes.outputs.supplemental_campaigns == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -184,7 +225,7 @@ jobs:
             "$RUNNER_TEMP/repro-verify-evidence" | tee repro-verify.log
 
       - name: Upload verified unsigned APK
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && needs.changes.outputs.supplemental_campaigns == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: whitenoise-repro-verify-${{ github.run_number }}-${{ github.sha }}

@@ -33,9 +33,12 @@ reproducibility and what remains out of scope.
 
 CI workflow [`.github/workflows/android-repro-verify.yml`](../.github/workflows/android-repro-verify.yml)
 runs two independent builds on separate runners through `scripts/repro-ci.sh`,
-using the same build helpers as the local script, on tag pushes, every pull
-request to `master`, and manual dispatch. A required comparison job checks source
-identity, matching recorded toolchain inputs, unsignedness, and APK bytes.
+using the same build helpers as the local script, on tag pushes, nightly,
+manual dispatch, and pull requests touching build/packaging/CI or unknown inputs.
+Known ordinary source/prose PRs defer these supplemental builds. When they run,
+the required comparison job checks source identity, matching recorded toolchain
+inputs, unsignedness, and APK bytes. See [CI request policy](ci-request-policy.md)
+for conservative whole-diff classification and nightly failure handling.
 Production and staging release lint run once each in separate required jobs.
 APK assembly in this verifier and PR runtime builds excludes those duplicate
 lint tasks; the reproducibility gate also requires both lint jobs to succeed.
