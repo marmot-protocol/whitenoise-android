@@ -16,6 +16,36 @@
       {"surface": "Kept media label: media_uploading", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/KeptAttachmentPresentations.kt", "anchor": "R.string.media_uploading", "test_ids": ["MSG-004"]},
       {"surface": "Kept media extra attachment count", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptAttachmentSummary.kt", "anchor": "R.plurals.floating_attachment_more", "test_ids": ["MSG-004"]},
       {
+        "surface": "Attachment read-aloud follow restoration policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+        "anchor": "fun rememberReaderFollowPolicy(",
+        "test_ids": ["MED-010"]
+      },
+      {
+        "surface": "Attachment read-aloud presentation and restoration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+        "anchor": "fun rememberTextAttachmentTtsUi(",
+        "test_ids": ["MED-010"]
+      },
+      {
+        "surface": "Attachment read-aloud seek gestures",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+        "anchor": "fun rememberReaderSeekModifier(",
+        "test_ids": ["MED-010"]
+      },
+      {
+        "surface": "Attachment read-aloud complete sentence geometry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+        "anchor": "fun rememberReaderSentenceLayoutReporter(",
+        "test_ids": ["MED-010"]
+      },
+      {
+        "surface": "Attachment toolbar document-top playback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.read_aloud",
+        "test_ids": ["MED-010"]
+      },
+      {
         "surface": "Unread mention reading-start navigation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionNavigation.kt",
         "anchor": "jumpToMentionReadingStart(",
@@ -26268,6 +26298,18 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Prepared attachment speech account-switch ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun speakAloudPrepared(",
+        "test_ids": ["MED-010", "NAV-006"]
+      },
+      {
+        "surface": "Reader speech geometry disposal after text replacement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReaderTextSelection.kt",
+        "anchor": "DisposableEffect(key, rendered.text, sentenceLayoutReporter)",
+        "test_ids": ["MED-010"]
+      },
       {
         "surface": "Share picker staging rejection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
