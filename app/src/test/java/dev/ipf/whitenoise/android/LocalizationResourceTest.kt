@@ -277,17 +277,7 @@ class LocalizationResourceTest {
             agentConnectorCopyRequirements[requireNotNull(file.parentFile).name]
                 ?: return listOf("${file.path}: missing localized copy requirements")
         return buildList {
-            val disclosure = strings["ai_agents_clipboard_disclosure"]
-            if (disclosure == null) {
-                add("${file.path}: missing ai_agents_clipboard_disclosure")
-            } else {
-                if (!disclosure.startsWith(requirements.disclosurePrefix)) {
-                    add("${file.path}: disclosure does not identify installation prompts first")
-                }
-                if (!disclosure.contains(requirements.disclosureFlow)) {
-                    add("${file.path}: disclosure does not explain choose-copy-paste flow")
-                }
-            }
+            addAll(agentConnectorDisclosureOffenders(file, strings["ai_agents_clipboard_disclosure"], requirements))
             agentConnectorPromptKeys.forEach { key ->
                 val value = strings[key]
                 if (value == null) {
@@ -336,6 +326,24 @@ class LocalizationResourceTest {
             }
         }
     }
+
+    private fun agentConnectorDisclosureOffenders(
+        file: File,
+        disclosure: String?,
+        requirements: AgentConnectorCopyRequirements,
+    ): List<String> =
+        buildList {
+            if (disclosure == null) {
+                add("${file.path}: missing ai_agents_clipboard_disclosure")
+            } else {
+                if (!disclosure.startsWith(requirements.disclosurePrefix)) {
+                    add("${file.path}: disclosure does not identify installation prompts first")
+                }
+                if (!disclosure.contains(requirements.disclosureFlow)) {
+                    add("${file.path}: disclosure does not explain choose-copy-paste flow")
+                }
+            }
+        }
 
     @Test
     fun hermesPromptGuardRejectsMissingOrAmbiguousHarnessGuides() {
