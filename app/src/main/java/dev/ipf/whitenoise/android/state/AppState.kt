@@ -10139,7 +10139,7 @@ class WhiteNoiseAppState private constructor(
         contactNicknameRevision
         val publicUrl = avatarUrl(accountIdHex)
         val account = contactNicknameAccountRefForAccess(accountRef, accounts, accountIdHex) ?: return publicUrl
-        if (isContactRefBeingCleared(account)) return publicUrl
+        if (isContactRefBeingCleared(account) || accounts.none { it.label == account && !it.signedOut }) return publicUrl
         val picture = contactPictureStore.reference(account, accountIdHex) ?: return publicUrl
         return dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
             .source(picture, publicUrl)

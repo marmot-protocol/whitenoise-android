@@ -688,7 +688,7 @@ internal fun ForwardFolderChips(
 /** One selectable destination chat row resolved through the owning account. */
 @Composable
 @Suppress("LongParameterList")
-private fun ForwardTargetRow(
+internal fun ForwardTargetRow(
     appState: WhiteNoiseAppState,
     item: ChatListItem,
     title: String,
@@ -703,7 +703,7 @@ private fun ForwardTargetRow(
             appState,
             item,
             ownerAccountRef,
-            avatarAccount?.let { appState.contactAvatarSource(it) },
+            avatarAccount?.let { appState.contactAvatarSource(it, ownerAccountRef) },
         )
     val membersPreview =
         remember(item, ownerAccountRef, ownerAccountIdHex, appState.profileRevisionForCompose) {

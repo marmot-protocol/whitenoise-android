@@ -10,6 +10,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
+import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
@@ -41,19 +42,25 @@ internal fun rememberGroupAvatarPresentation(
     firstFrameAvatar: ChatListAvatarSeed? = null,
     durableAvatarIsPersonPicture: Boolean = false,
 ): GroupAvatarPresentation {
+    val ownedFallback =
+        fallbackPictureUrl?.takeUnless { source ->
+            PrivateContactAvatarLoader.isPrivate(source) &&
+                (!appState.accounts.any { it.label == accountRef && !it.signedOut } ||
+                    !PrivateContactAvatarLoader.belongsToAccount(source, accountRef))
+        }
     val groupOwnsPicture =
         !durableAvatarIsPersonPicture &&
             (durableAvatar != null || !group.avatarUrl.isNullOrBlank() || !group.imageHashHex.isNullOrBlank())
     val privateSource =
-        fallbackPictureUrl
+        ownedFallback
             ?.takeUnless { groupOwnsPicture }
             ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
     val privateImage by key(appState, accountRef, privateSource, AvatarImageLoader.currentCacheLifetime()) {
         rememberRecoverableAvatar(
-            initialImage = AvatarImageLoader.peek(privateSource),
+            initialImage = privateSource?.let { PrivateContactAvatarLoader.peek(it, accountRef) },
             enabled = privateSource != null,
         ) {
-            AvatarImageLoader.load(checkNotNull(privateSource))
+            PrivateContactAvatarLoader.load(checkNotNull(privateSource), accountRef)
         }
     }
     // A missing/corrupt local image may still use this account's native public-avatar selection.
@@ -89,12 +96,12 @@ internal fun rememberGroupAvatarPresentation(
                     ChatListAvatarSource.LEGACY_URL -> it.key == legacyUrl
                     ChatListAvatarSource.ENCRYPTED_GROUP -> legacyUrl == null && it.key == encryptedKey
                     ChatListAvatarSource.FALLBACK_URL ->
-                        legacyUrl == null && encryptedImage == null && it.key == fallbackPictureUrl
+                        legacyUrl == null && encryptedImage == null && it.key == ownedFallback
                 }
             }?.image
     return GroupAvatarPresentation(
         image = seededImage ?: remoteImage ?: encryptedImage,
-        pictureUrl = legacyUrl ?: fallbackPictureUrl?.takeIf { encryptedImage == null },
+        pictureUrl = legacyUrl ?: ownedFallback?.takeIf { encryptedImage == null },
     )
 }
 

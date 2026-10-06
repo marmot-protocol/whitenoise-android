@@ -78,4 +78,32 @@ class PrivateContactAvatarLoaderTest {
             assertEquals(Color.BLUE, checkNotNull(AvatarImageLoader.load(second)).asAndroidBitmap().getPixel(0, 0))
             AvatarImageLoader.clear()
         }
+
+    /** Explicit picker ownership can read B without relaxing the active-account boundary for other avatars. */
+    @Test fun displayedOwnerReadsOnlyItsOwnPrivateRecord() =
+        runBlocking {
+            val context: Context = RuntimeEnvironment.getApplication()
+            val store =
+                ContactPictureStore(
+                    context.getSharedPreferences("scoped-owners", 0),
+                    File(context.noBackupFilesDir, "scoped-owners"),
+                )
+            PrivateContactAvatarLoader.attach(store) { "a" }
+            AvatarImageLoader.clear()
+            store.save("a", "contact", "", "", ContactPictureChange.Replace(contactPicturePng(Color.RED))) { true }
+            store.save("b", "contact", "", "", ContactPictureChange.Replace(contactPicturePng(Color.BLUE))) { true }
+            val sourceA = PrivateContactAvatarLoader.source(checkNotNull(store.reference("a", "contact")), null)
+            val sourceB = PrivateContactAvatarLoader.source(checkNotNull(store.reference("b", "contact")), null)
+            AvatarImageLoader.load(sourceA)
+            assertFalse(PrivateContactAvatarLoader.belongsToAccount(sourceA, "b"))
+            assertNull(PrivateContactAvatarLoader.peek(sourceA, "b"))
+            assertNull(PrivateContactAvatarLoader.load(sourceA, "b"))
+            assertEquals(Color.BLUE, checkNotNull(PrivateContactAvatarLoader.load(sourceB, "b")).asAndroidBitmap().getPixel(0, 0))
+            assertNull(AvatarImageLoader.peek(sourceB))
+            assertNull(AvatarImageLoader.load(sourceB))
+            store.clearAccount("b")
+            assertNull(PrivateContactAvatarLoader.load(sourceB, "b"))
+            AvatarImageLoader.clear()
+        }
+
 }

@@ -50,18 +50,33 @@ internal object PrivateContactAvatarLoader {
         return store?.belongsToAccount(reference, account()) == true
     }
 
-    /** First-frame cache-only read; decoding and filesystem access remain on the loader's IO lane. */
-    fun peek(source: String): ImageBitmap? {
+    /** An explicitly displayed local account cannot borrow a private handle from another owner. */
+    fun belongsToAccount(
+        source: String,
+        accountRef: String?,
+    ): Boolean {
+        val reference = parse(source)?.first ?: return false
+        return store?.belongsToAccount(reference, accountRef) == true
+    }
+
+    /** Reads cached pixels for an explicit displayed owner, or the live active owner when none is supplied. */
+    fun peek(
+        source: String,
+        accountRef: String? = null,
+    ): ImageBitmap? {
         val selection = parse(source) ?: return null
-        val current = currentReference(selection.first)
+        val current = currentReference(selection.first, accountRef)
         return current?.cacheKey?.let(AvatarImageLoader::cachedImage) ?: selection.second?.let(AvatarImageLoader::peek)
     }
 
-    /** A missing or corrupt local file falls back to the current published URL without erasing its record. */
-    suspend fun load(source: String): ImageBitmap? {
+    /** Decodes under the displayed account; a missing/corrupt file uses only its public fallback. */
+    suspend fun load(
+        source: String,
+        accountRef: String? = null,
+    ): ImageBitmap? {
         val selection = parse(source) ?: return null
         val lifetime = AvatarImageLoader.currentCacheLifetime()
-        val current = currentReference(selection.first)
+        val current = currentReference(selection.first, accountRef)
         val image =
             current?.let { ref ->
                 AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
@@ -69,15 +84,19 @@ internal object PrivateContactAvatarLoader {
                 }
             }
         val expired = AvatarImageLoader.currentCacheLifetime() != lifetime
-        if (expired || current != currentReference(selection.first)) return null
+        if (expired || current != currentReference(selection.first, accountRef)) return null
         return image ?: selection.second?.let { AvatarImageLoader.load(it) }
     }
 
     /** Revalidates display ownership before resolving a newer immutable selection for a captured handle. */
-    private fun currentReference(reference: ContactPictureReference): ContactPictureReference? {
+    private fun currentReference(
+        reference: ContactPictureReference,
+        accountRef: String?,
+    ): ContactPictureReference? {
         val selectedStore = store ?: return null
         val account = activeAccount
-        if (account != null && !selectedStore.belongsToAccount(reference, account())) return null
+        val owner = accountRef ?: account?.invoke()
+        if ((accountRef != null || account != null) && !selectedStore.belongsToAccount(reference, owner)) return null
         return selectedStore.current(reference)
     }
 
