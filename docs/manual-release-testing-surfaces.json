@@ -3,6 +3,92 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Scoped local-delete batch retry after navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
+        "anchor": "internal fun WhiteNoiseAppState.localDeleteBatchRetryNotice(",
+        "test_ids": ["CHL-024", "CHL-025"]
+      },
+      {
+        "surface": "Local-delete diagnostic Copy action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Local-delete Details action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "R.string.details",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Local-delete Dismiss action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Local-delete snackbar retry action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/WhiteNoiseApp.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Quiet local-delete cleanup recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
+        "anchor": "\"local delete client cleanup deferred\"",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Scoped deletion warning retirement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "internal fun WhiteNoiseAppState.dismissLocalDeleteFailure(",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "LocalDeleteSnackbar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "fun LocalDeleteSnackbar(",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "LocalDeleteDetails",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "fun LocalDeleteDetails(",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Local-delete retry guidance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalDeleteNotice.kt",
+        "anchor": "R.string.local_delete_retry_detail",
+        "test_ids": [
+          "CHL-024"
+        ]
+      },
+      {
         "surface": "rememberShareChatPickerActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "fun rememberShareChatPickerActions(",
@@ -162,22 +248,6 @@
         ]
       },
       {
-        "surface": "Local-delete retry guidance",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
-        "anchor": "R.string.local_delete_retry_detail",
-        "test_ids": [
-          "CHL-024"
-        ]
-      },
-      {
-        "surface": "Local-delete deferred cleanup notice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
-        "anchor": "R.string.local_delete_cleanup_pending",
-        "test_ids": [
-          "CHL-024"
-        ]
-      },
-      {
         "surface": "Stopped local-delete batch notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
         "anchor": "R.string.chat_list_delete_stopped",
@@ -215,14 +285,6 @@
         "surface": "Bounded local-delete phase diagnostics",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalGroupDeleteAttempt.kt",
         "anchor": "internal class LocalGroupDeleteFailure(",
-        "test_ids": [
-          "CHL-024"
-        ]
-      },
-      {
-        "surface": "R.string.toast_chat_deleted_local",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/GroupLocalRemoval.kt",
-        "anchor": "R.string.toast_chat_deleted_local",
         "test_ids": [
           "CHL-024"
         ]
@@ -11133,6 +11195,12 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHistoryBoundary.kt",
         "anchor": "R.string.conversation_history_retention_description",
         "test_ids": ["CON-023"]
+      },
+      {
+        "surface": "Restored attachment shelf after native send cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
+        "anchor": "restorePersistedAttachments(",
+        "test_ids": ["MED-003", "MED-009"]
       }
     ],
     "settings_controls": [

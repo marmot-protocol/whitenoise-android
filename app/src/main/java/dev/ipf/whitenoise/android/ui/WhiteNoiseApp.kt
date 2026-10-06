@@ -68,6 +68,7 @@ import dev.ipf.whitenoise.android.ui.common.StartupLoadingScreen
 import dev.ipf.whitenoise.android.ui.common.ToastSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.common.WarmResumeUsefulSurface
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSnackbarHost
+import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
 import dev.ipf.whitenoise.android.ui.conversation.media.SHARED_MEDIA_MAX_AGE_MS
 import dev.ipf.whitenoise.android.ui.conversation.media.sweepStaleSharedMedia
 import dev.ipf.whitenoise.android.ui.navigation.MainShell
@@ -400,17 +401,36 @@ internal fun WhiteNoiseApp(
             appState.enableDefaultNotificationsIfReady()
         }
     }
-    LaunchedEffect(toast) {
+    val deletionRetryLabel = stringResource(R.string.retry)
+    LaunchedEffect(toast, deletionRetryLabel) {
         if (toast != null) {
-            snackbarHostState.showSnackbar(
-                ToastSnackbarVisuals(
-                    message = listOfNotNull(toast.title.resolve(context), toast.detail?.resolve(context)).joinToString("\n"),
-                    copyable = toast.copyable,
-                    tier = toast.tier,
-                    copyText = toast.diagnosticReport,
-                ),
-            )
-            appState.clearToast(toast)
+            val deletion = toast.localDeleteNotice
+            val result =
+                snackbarHostState.showSnackbar(
+                    ToastSnackbarVisuals(
+                        message =
+                            if (deletion != null) {
+                                toast.title.resolve(context)
+                            } else {
+                                listOfNotNull(
+                                    toast.title.resolve(context),
+                                    toast.detail?.resolve(context),
+                                ).joinToString("\n")
+                            },
+                        copyable = toast.copyable,
+                        tier = toast.tier,
+                        copyText = toast.diagnosticReport,
+                        details =
+                            deletion?.let {
+                                listOfNotNull(
+                                    toast.detail?.resolve(context),
+                                    toast.diagnosticReport,
+                                ).joinToString("\n\n")
+                            },
+                        actionLabel = deletion?.retry?.let { deletionRetryLabel },
+                    ),
+                )
+            finishLocalDeleteSnackbar(appState, toast, result)
         }
     }
     TransientNoticeTimeoutEffect(transientNotice, appState::clearTransientNotice)

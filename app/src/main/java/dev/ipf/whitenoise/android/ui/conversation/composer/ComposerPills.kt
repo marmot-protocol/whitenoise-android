@@ -1506,9 +1506,7 @@ private fun Modifier.boundedComposerAccessory(): Modifier =
 /** The grip marks the parent-owned drag region without intercepting child controls. */
 @Composable
 @Suppress("FunctionNaming")
-private fun ComposerResizeGestureStrip(
-    modifier: Modifier = Modifier,
-) {
+private fun ComposerResizeGestureStrip(modifier: Modifier = Modifier) {
     Box(
         modifier =
             modifier
