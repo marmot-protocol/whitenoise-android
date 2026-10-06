@@ -96,17 +96,14 @@ class DestinationPickerCompletenessTest {
                 matches = folders.single { it.first.id == folder.id }.second
             }
         }
-        composeRule.waitUntil(5_000) { source?.targetsComplete == true && reads.isNotEmpty() }
+        awaitPicker { source?.targetsComplete == true && reads.isNotEmpty() }
         composeRule.runOnIdle {
             assertFalse(complete)
             assertTrue(matches.isEmpty())
             assertTrue(source!!.targets.any { it.group.groupIdHex == GROUP_B })
             roster.complete(Unit)
         }
-        composeRule.waitUntil(5_000) {
-            org.robolectric.Shadows
-                .shadowOf(android.os.Looper.getMainLooper())
-                .idle()
+        awaitPicker {
             complete && GROUP_B in matches
         }
         composeRule.runOnIdle {
@@ -118,17 +115,11 @@ class DestinationPickerCompletenessTest {
                 .shadowOf(android.os.Looper.getMainLooper())
                 .idleFor(java.time.Duration.ofMillis(100))
         }
-        composeRule.waitUntil(5_000) {
-            org.robolectric.Shadows
-                .shadowOf(android.os.Looper.getMainLooper())
-                .idle()
+        awaitPicker {
             reads.size == 2 && !complete
         }
         composeRule.runOnIdle { updatedRoster.complete(Unit) }
-        composeRule.waitUntil(5_000) {
-            org.robolectric.Shadows
-                .shadowOf(android.os.Looper.getMainLooper())
-                .idle()
+        awaitPicker {
             complete && matches.isEmpty()
         }
         composeRule.runOnIdle {
@@ -164,21 +155,28 @@ class DestinationPickerCompletenessTest {
             val current = rememberShareChatPickerDataSource(state, ACCOUNT_REF, { error("active owner") }, { _, _ -> })
             SideEffect { source = current }
         }
-        composeRule.waitUntil(5_000) { source?.targetsComplete == true }
+        awaitPicker { source?.targetsComplete == true }
         composeRule.runOnIdle {
             assertTrue(source!!.targets.any { it.group.groupIdHex == GROUP_B })
             failRead = true
             source!!.retryLoad()
         }
-        composeRule.waitUntil(5_000) {
-            org.robolectric.Shadows
-                .shadowOf(android.os.Looper.getMainLooper())
-                .idle()
+        awaitPicker {
             reads >= 2 && source?.targetsComplete == false
         }
         composeRule.runOnIdle {
             assertFalse(source!!.targetsComplete)
             assertTrue(source!!.targets.any { it.group.groupIdHex == GROUP_B })
+        }
+    }
+
+    /** Account reads and roster invalidation require both Android main-loop time and Compose frame progress. */
+    private fun awaitPicker(condition: () -> Boolean) {
+        composeRule.waitUntil(5_000) {
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idleFor(java.time.Duration.ofMillis(16))
+            condition()
         }
     }
 }
