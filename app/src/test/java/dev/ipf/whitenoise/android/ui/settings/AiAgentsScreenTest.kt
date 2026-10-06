@@ -50,7 +50,7 @@ class AiAgentsScreenTest {
 
     /** Claude Code joins the existing connectors without changing the Codex row's position. */
     @Test
-    fun agentConnectorsIncludeCodexAsFourthConnector() {
+    fun agentConnectorsAppendClaudeAfterCodex() {
         assertEquals(5, agentConnectors.size)
         assertEquals("codex", agentConnectors[3].id)
         assertEquals("claude", agentConnectors[4].id)
@@ -80,6 +80,20 @@ class AiAgentsScreenTest {
         assertTrue(prompt.contains("send a test message"))
         assertTrue(prompt.contains("Do not report setup complete until wn-codex returns a reply through White Noise"))
         assertTrue(prompt.contains("device verification required"))
+    }
+
+    /** Profile binding and a phone round trip must be explicit before Hermes pairing is complete. */
+    @Test
+    fun hermesPromptRequiresProfileConfirmationAndPhoneVerification() {
+        val prompt = app.getString(R.string.agent_connector_hermes_prompt, TEST_NPUB)
+
+        assertTrue(prompt.contains("integrations/hermes/marmot/README.md"))
+        assertTrue(prompt.contains("confirm the intended Hermes profile"))
+        assertTrue(prompt.contains("do not assume the default profile or overwrite another installation"))
+        assertTrue(prompt.contains("Distinguish invite authorization from message-sender authorization"))
+        assertTrue(
+            prompt.contains("verify that the selected profile replies in White Noise before calling pairing complete"),
+        )
     }
 
     /** Claude setup is available in-app and copying carries the active public key and harness guide. */

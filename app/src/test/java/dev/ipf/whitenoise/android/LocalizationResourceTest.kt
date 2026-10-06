@@ -293,7 +293,13 @@ class LocalizationResourceTest {
                 if (value == null) {
                     add("${file.path}: missing $key")
                 } else {
-                    val violations = agentConnectorPromptViolations(value, requirements)
+                    val violations =
+                        agentConnectorPromptViolations(value, requirements) +
+                            if (key == AGENT_CONNECTOR_HERMES_PROMPT_KEY) {
+                                hermesConnectorPromptTokenViolations(value)
+                            } else {
+                                emptyList()
+                            }
                     if (violations.isNotEmpty()) {
                         add("${file.path}: $key (${violations.joinToString(", ")})")
                     }
@@ -329,6 +335,14 @@ class LocalizationResourceTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun hermesPromptGuardRejectsMissingOrAmbiguousHarnessGuides() {
+        val prompt = "Read the Hermes harness guide at $HERMES_HARNESS_README_URL."
+        assertTrue(hermesConnectorPromptTokenViolations(prompt).isEmpty())
+        assertTrue(hermesConnectorPromptTokenViolations(prompt.replace(HERMES_HARNESS_README_URL, "")).isNotEmpty())
+        assertTrue(hermesConnectorPromptTokenViolations("$prompt $HERMES_HARNESS_README_URL").isNotEmpty())
     }
 
     @Test
@@ -718,6 +732,13 @@ class LocalizationResourceTest {
         Claude,
     }
 
+    private fun hermesConnectorPromptTokenViolations(prompt: String): List<String> =
+        if (prompt.windowed(HERMES_HARNESS_README_URL.length).count { it == HERMES_HARNESS_README_URL } == 1) {
+            emptyList()
+        } else {
+            listOf("missing single Hermes harness README URL")
+        }
+
     private fun claudeConnectorPromptTokenViolations(prompt: String): List<String> {
         val required = listOf(CLAUDE_HARNESS_README_URL, CLAUDE_INSTALLER_SCRIPT, "wn-claude --version", "wn-agent")
         val violations = required.filterNot(prompt::contains).map { "missing $it" }.toMutableList()
@@ -827,6 +848,9 @@ class LocalizationResourceTest {
                 "values-b+zh+Hant" to "恢復跟隨朗讀",
             )
 
+        const val AGENT_CONNECTOR_HERMES_PROMPT_KEY = "agent_connector_hermes_prompt"
+        const val HERMES_HARNESS_README_URL =
+            "https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md"
         const val AGENT_CONNECTOR_CODEX_PROMPT_KEY = "agent_connector_codex_prompt"
         const val AGENT_CONNECTOR_CLAUDE_PROMPT_KEY = "agent_connector_claude_prompt"
         const val AGENT_CONNECTOR_NPUB_PLACEHOLDER = "%1\$s"
