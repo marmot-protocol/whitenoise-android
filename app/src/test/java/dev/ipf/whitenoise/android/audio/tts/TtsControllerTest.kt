@@ -16,6 +16,44 @@ import kotlin.concurrent.thread
 
 @Suppress("LargeClass") // Controller lifecycle, focus, and seek cases share one fake engine/focus harness.
 class TtsControllerTest {
+    /** A document replaces message playback; blank or unavailable starts preserve the current queue. */
+    @Test
+    fun attachmentStartReplacesTheQueueAndRejectsBlankOrUnavailableSpeech() {
+        val engine = FakeTtsSpeechEngine()
+        val controller = controller(FakeTtsAudioFocus())
+        val document =
+            TtsSpeakableEntry(
+                "alice",
+                "Alice",
+                "Document body.",
+                messageIdHex = "attachment:m1:0",
+                attachmentDisplayName = "private-notes.txt",
+                projectionId = "document-projection",
+                spokenTextSpans = listOf(TtsSpokenTextSpan(TtsTextRange(0, 14), TtsVisibleTextSpan("body", 0, 14))),
+            )
+        assertFalse(controller.speak(listOf(document), Locale.US))
+        controller.attachEngine(engine)
+        assertTrue(controller.speak(listOf(TtsSpeakableEntry("bob", "Bob", "A message.")), Locale.US))
+        val previousSession = controller.state.value.sessionId
+        assertTrue(controller.speak(listOf(document), Locale.US))
+        assertEquals("Document body.", engine.spoken.last().text)
+        assertTrue(controller.state.value.sessionId != previousSession)
+        engine.range(index = engine.spoken.lastIndex, start = 9, end = 13)
+        assertEquals(
+            listOf(TtsVisibleTextSpan("body", 9, 13)),
+            controller.state.value.passage
+                ?.visibleWord,
+        )
+        val documentSession = controller.state.value.sessionId
+        assertFalse(controller.speak(listOf(document.copy(text = " ")), Locale.US))
+        assertEquals(documentSession, controller.state.value.sessionId)
+        assertEquals(
+            "attachment:m1:0",
+            controller.state.value.passage
+                ?.messageIdHex,
+        )
+    }
+
     @Test
     fun projectedMappingsSurviveChunkingAndEngineRangeCallbacks() {
         val engine = FakeTtsSpeechEngine()
