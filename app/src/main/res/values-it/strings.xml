@@ -2231,4 +2231,8 @@
     <string name="profile_readiness_added">Aggiunto</string>
     <string name="profile_readiness_recommended">Consigliato</string>
     <string name="profile_readiness_field_optional">Facoltativo</string>
+    <string name="nostr_event_view_image">Visualizza immagine</string>
+    <string name="nostr_event_image_failed">Impossibile caricare questa immagine. Riprova.</string>
+    <string name="nostr_event_type_image">Immagine</string>
+    <string name="nostr_event_expand">Visualizza evento completo</string>
 </resources>
