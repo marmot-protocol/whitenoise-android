@@ -1428,6 +1428,7 @@ internal class ControlledVoicePresentationRuntime(
         return control.hydratedDurationMs
     }
 
+    /** Publishes deterministic fixture playback ownership without starting real platform audio. */
     override suspend fun play(
         key: String,
         file: File,

@@ -230,6 +230,7 @@ private object DefaultVoiceAttachmentPresentationRuntime : VoiceAttachmentPresen
 
     override suspend fun durationMs(file: java.io.File): Int = VoicePlaybackController.probeDuration(file)
 
+    /** Starts platform playback with the captured attachment source and presentation owner kept together. */
     override suspend fun play(
         key: String,
         file: java.io.File,

@@ -1765,6 +1765,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Stops an owned conversation auto-read queue and revokes its account/history navigation ownership. */
     internal fun stopOwnedTtsAutoReadSession() {
         if (ttsAutoReadSessionKey == null) return
         ttsController.stop()
