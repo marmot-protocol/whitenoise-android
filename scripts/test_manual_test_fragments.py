@@ -50,7 +50,9 @@ class FragmentTest(unittest.TestCase):
         fragments.extract_source(self.root, source)
 
     def git(self, *args):
-        return subprocess.run(["git", *args], cwd=self.root, text=True, capture_output=True, check=True).stdout.strip()
+        # Background maintenance can recreate pack files after TemporaryDirectory starts removing this fixture.
+        command = ["git", "-c", "maintenance.auto=false", "-c", "gc.auto=0", *args]
+        return subprocess.run(command, cwd=self.root, text=True, capture_output=True, check=True).stdout.strip()
 
     def commit(self, message):
         self.git("add", ".")
