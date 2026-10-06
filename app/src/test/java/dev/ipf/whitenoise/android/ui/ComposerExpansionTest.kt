@@ -153,6 +153,19 @@ class ComposerExpansionTest {
     }
 
     @Test
+    fun oneLinePixelRoundingPreservesAutomaticGrowthAndCollapse() {
+        for ((automatic, minimum) in listOf(284f to 283.5f, 298f to 297f, 319f to 317.5f)) {
+            val state = ComposerExpansionState()
+            assertEquals(state, dragComposerHeight(state, 120f, automatic, minimum, 1_600f))
+            val collapsed = ComposerExpansionState(ComposerExpansionMode.Manual, minimum)
+            assertEquals(state, settleComposerHeight(collapsed, automatic, minimum, 1_600f, 60f))
+        }
+        // A genuinely taller draft still retains its smaller manual viewport.
+        val taller = ComposerExpansionState(ComposerExpansionMode.Manual, 283.5f)
+        assertEquals(taller, settleComposerHeight(taller, 345f, 283.5f, 1_600f, 60f))
+    }
+
+    @Test
     fun overlappingLandingZonesChooseTheCloserDestination() {
         val settle = { height: Float ->
             settleComposerHeight(ComposerExpansionState(ComposerExpansionMode.Manual, height), 132f, 108f, 600f, 24f)

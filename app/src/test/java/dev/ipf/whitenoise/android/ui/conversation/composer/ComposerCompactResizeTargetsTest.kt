@@ -1,19 +1,30 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextRange
@@ -40,6 +51,18 @@ class ComposerCompactResizeTargetsTest {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    private lateinit var focusManager: FocusManager
+
+    @Test
+    fun downwardGroupEntryUsesToolsAndExplicitEditorFocusStillWorks() {
+        render(onAction = {}, onResize = {}, onDelta = {})
+        composeRule.onNodeWithTag("synthetic-transcript").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.onNodeWithTag("synthetic-transcript").assertIsFocused()
+        composeRule.runOnIdle { assertTrue(focusManager.moveFocus(FocusDirection.Down)) }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker)).assertIsFocused()
+        composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.onNode(hasSetTextAction()).assertIsFocused()
+    }
 
     @Test
     fun topEdgeToolTapsWorkAndTheGripStillResizes() {
@@ -90,25 +113,30 @@ class ComposerCompactResizeTargetsTest {
     ) {
         val draft = (1..40).joinToString("\n") { "Synthetic compact line $it" }
         composeRule.setContent {
+            focusManager = LocalFocusManager.current
             WhiteNoiseTheme {
-                Surface(Modifier.width(360.dp).height(48.dp)) {
-                    ComposerPill(
-                        textFieldValue = TextFieldValue(draft, TextRange(draft.length)),
-                        composerFocus = remember { FocusRequester() },
-                        emojiPickerOpen = false,
-                        onValueChange = {},
-                        onEmojiPickerToggle = onAction,
-                        onAttachmentsToggle = onAction,
-                        attachmentSheetOpen = false,
-                        onPickFromGallery = {},
-                        onPickDocument = {},
-                        onDictation = onAction,
-                        expansionMode = ComposerExpansionMode.Manual,
-                        compactMeasurementWidth = 360.dp,
-                        multilineControlsSuppressed = true,
-                        onHeightDragStarted = onResize,
-                        onHeightDrag = onDelta,
-                    )
+                Surface(Modifier.width(360.dp).height(96.dp)) {
+                    Column {
+                        Box(Modifier.fillMaxWidth().height(48.dp).focusable().testTag("synthetic-transcript"))
+                        ComposerPill(
+                            modifier = Modifier.height(48.dp),
+                            textFieldValue = TextFieldValue(draft, TextRange(draft.length)),
+                            composerFocus = remember { FocusRequester() },
+                            emojiPickerOpen = false,
+                            onValueChange = {},
+                            onEmojiPickerToggle = onAction,
+                            onAttachmentsToggle = onAction,
+                            attachmentSheetOpen = false,
+                            onPickFromGallery = {},
+                            onPickDocument = {},
+                            onDictation = onAction,
+                            expansionMode = ComposerExpansionMode.Manual,
+                            compactMeasurementWidth = 360.dp,
+                            multilineControlsSuppressed = true,
+                            onHeightDragStarted = onResize,
+                            onHeightDrag = onDelta,
+                        )
+                    }
                 }
             }
         }

@@ -216,9 +216,11 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
                 PointerEventType.Release -> {
                     val released = event.changes.firstOrNull { it.id == trackedPointer && !it.pressed }
                     if (released != null) {
-                        if (owningDrag) {
+                        if (owningDrag && !released.isConsumed) {
                             velocityTracker.addPosition(released.uptimeMillis, released.position)
                             onFling(-velocityTracker.calculateVelocity().y)
+                        } else if (owningDrag) {
+                            onScrollInterrupted()
                         }
                         trackedPointer = null
                     }

@@ -89,6 +89,44 @@ class ComposerDragAndReadingTest {
     }
 
     @Test
+    @Config(qualifiers = "en-w360dp-h780dp-420dpi")
+    fun downwardOneLineDragAtFractionalDensityKeepsAutomaticGrowth() {
+        render("Short", fontScale = 1.15f)
+        composeRule.onNode(hasSetTextAction()).performClick()
+        composeRule.waitForIdle()
+        val before = height()
+        drag(1_600f)
+        assertEquals(before, height(), 2f)
+        composeRule.onNode(hasSetTextAction()).performTextReplacement(longDraft)
+        composeRule.waitForIdle()
+        assertTrue("fractional pixel rounding must not disable automatic growth", height() > before + 100f)
+    }
+
+    @Test
+    @Config(qualifiers = "en-w360dp-h780dp-440dpi")
+    fun expandedOneLineAtFractionalDensityCollapsesBackToSuggestions() {
+        val candidate =
+            MentionComposer.Candidate(
+                accountIdHex = "aa".repeat(32),
+                npub = "npub1" + "q".repeat(58),
+                displayName = "Ada",
+                nip05 = null,
+            )
+        render("Short", fontScale = 1.15f, mentionCandidates = listOf(candidate))
+        composeRule.onNode(hasSetTextAction()).performClick()
+        composeRule.waitForIdle()
+        val before = height()
+        drag(-500f)
+        assertTrue(height() > before + 100f)
+        drag(2_000f)
+        assertEquals(before, height(), 2f)
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("@Ad")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Ada").assertIsDisplayed()
+        assertEquals("@Ad", observed.text)
+    }
+
+    @Test
     fun firstUpwardDragFrameDoesNotJumpToTheManualMinimum() {
         render("")
         val before = height()
@@ -226,6 +264,28 @@ class ComposerDragAndReadingTest {
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
         assertTrue("release velocity should keep reading moving", scroll() > releaseScroll + 10f)
+        assertEquals(original, observed)
+    }
+
+    @Test
+    fun cancelledReadingTouchDoesNotStartMomentum() {
+        render(longDraft)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
+        composeRule.waitForIdle()
+        val original = observed
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNode(hasSetTextAction()).performTouchInput {
+            down(Offset(center.x, height - 8f))
+            moveTo(Offset(center.x, height / 2f), delayMillis = 16)
+            moveTo(Offset(center.x, 4f), delayMillis = 16)
+            cancel()
+        }
+        val cancelledScroll = scroll()
+        assertTrue("the touch must have scrolled before cancellation", cancelledScroll > 0f)
+        composeRule.mainClock.advanceTimeBy(300)
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        assertEquals("cancellation must not launch a fling", cancelledScroll, scroll(), 1f)
         assertEquals(original, observed)
     }
 
