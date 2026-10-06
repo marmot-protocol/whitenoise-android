@@ -41,6 +41,7 @@ internal fun copiedMessage(
             message.timestamp,
             replacement ?: message.person,
         ).also { copy ->
+            copy.extras.putAll(message.extras)
             val mimeType = message.dataMimeType
             val dataUri = message.dataUri
             if (mimeType != null && dataUri != null) copy.setData(mimeType, dataUri)

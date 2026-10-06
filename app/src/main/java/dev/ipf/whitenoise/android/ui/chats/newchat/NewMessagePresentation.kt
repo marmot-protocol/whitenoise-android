@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
@@ -246,7 +247,7 @@ internal fun NewMessagePersonRow(
                 } else {
                     null
                 },
-            content = { Text(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            content = { EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         )
         if (index < count - 1) HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerLow)
     }

@@ -109,6 +109,7 @@ import dev.ipf.whitenoise.android.state.ProfileGroupPickerState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPickerSheet
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
@@ -1022,7 +1023,9 @@ internal fun GroupDetailsScreen(
                     AlertDialog(
                         onDismissRequest = { pendingConfirm = null },
                         title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
-                        text = { Text(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName)) },
+                        text = {
+                            EmojiLabel(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName))
+                        },
                         confirmButton = {
                             TextButton(onClick = { pendingConfirm = null }) {
                                 Text(stringResource(R.string.cancel))
@@ -2085,7 +2088,7 @@ internal fun GroupDetailsHeader(
                 )
             }
             if (onEdit == null) {
-                Text(
+                EmojiLabel(
                     title,
                     modifier =
                         Modifier.padding(top = 4.dp).testTag("chat_info.name").onGloballyPositioned {
@@ -2115,7 +2118,7 @@ internal fun GroupDetailsHeader(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
+                    EmojiLabel(
                         title,
                         modifier = Modifier.weight(1f, fill = false),
                         style = MaterialTheme.typography.headlineSmall,
@@ -2134,7 +2137,7 @@ internal fun GroupDetailsHeader(
             if (description.isNotBlank()) {
                 val copyValue = descriptionCopyValue
                 if (copyValue == null) {
-                    Text(
+                    EmojiLabel(
                         description,
                         modifier = Modifier.widthIn(max = 440.dp),
                         style = MaterialTheme.typography.bodyLarge,

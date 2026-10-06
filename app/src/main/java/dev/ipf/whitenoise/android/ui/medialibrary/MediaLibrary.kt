@@ -78,6 +78,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
@@ -648,7 +649,7 @@ private fun SharedMediaTileCaption(
         color = MaterialTheme.colorScheme.surface.copy(alpha = SHARED_TILE_CAPTION_ALPHA),
     ) {
         Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-            Text(
+            EmojiLabel(
                 text = if (tile.mine) stringResource(R.string.you) else appState.displayName(tile.sender),
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
@@ -848,7 +849,7 @@ private fun VoiceLibraryRow(
         }
         SenderAvatar(sender = row.sender, appState = appState)
         Column(modifier = Modifier.weight(1f)) {
-            Text(
+            EmojiLabel(
                 appState.displayName(row.sender),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
@@ -1030,7 +1031,7 @@ private fun FileLibraryRow(
             // File size isn't carried on the imeta reference, so it's omitted
             // until the bytes are fetched; the MIME label + sender + timestamp
             // give the row enough identity without forcing a download.
-            Text(
+            EmojiLabel(
                 "${attachmentTypeLabel(presentation)} · ${appState.displayName(row.sender)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1223,7 +1224,7 @@ private fun UrlLibraryRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
+            EmojiLabel(
                 "${appState.displayName(entry.sender)} · $recordedAtLabel",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

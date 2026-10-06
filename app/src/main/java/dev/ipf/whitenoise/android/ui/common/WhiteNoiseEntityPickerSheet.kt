@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -79,7 +80,7 @@ fun WhiteNoiseEntityPickerSheet(
         Column(Modifier.fillMaxWidth().heightIn(max = maxHeight)) {
             WhiteNoiseSheetHeader(title, onClose = onDismiss)
             if (description != null) {
-                Text(
+                EmojiLabel(
                     description,
                     Modifier.padding(horizontal = WhiteNoiseSpacing.Section, vertical = WhiteNoiseSpacing.Related),
                     style = MaterialTheme.typography.bodyMedium,
@@ -174,7 +175,7 @@ private fun PickerRow(
             horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
         ) {
             Avatar(title = item.title, seed = item.avatarSeed, size = PickerAvatarSize, pictureUrl = item.avatarUrl)
-            Text(item.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            EmojiLabel(item.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (multiple && onSelect != null) {
                 Checkbox(
                     checked = checked,

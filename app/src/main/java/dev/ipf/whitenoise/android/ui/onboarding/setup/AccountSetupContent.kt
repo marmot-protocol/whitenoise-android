@@ -25,6 +25,7 @@ import dev.ipf.marmotkit.OnboardingSnapshotFfi
 import dev.ipf.marmotkit.OnboardingStepFfi
 import dev.ipf.marmotkit.OnboardingStepStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 
@@ -223,8 +224,8 @@ private fun SetupProposalContent(proposal: OnboardingRepairProposalFfi) {
     if (proposal.step == OnboardingStepFfi.PROFILE) {
         Text(stringResource(R.string.setup_profile_publish_help))
         proposal.profile?.let { profile ->
-            Text(profile.displayName.orEmpty())
-            Text(profile.about.orEmpty())
+            EmojiLabel(profile.displayName.orEmpty())
+            EmojiLabel(profile.about.orEmpty())
         }
     } else {
         if (proposal.previousEventId != null) SetupNotice(stringResource(R.string.setup_replacement_warning))

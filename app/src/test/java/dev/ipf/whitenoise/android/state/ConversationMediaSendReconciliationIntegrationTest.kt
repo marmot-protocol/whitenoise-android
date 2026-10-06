@@ -38,6 +38,7 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineReactionSummaryFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
@@ -302,16 +303,6 @@ class ConversationMediaSendReconciliationIntegrationTest {
                 Dispatchers.resetMain()
             }
         }
-
-    /** Drains cancelled cache IO even after a test timeout, before its process-global Main dispatcher is reset. */
-    private suspend fun finishMediaFixture(
-        controller: ConversationController,
-        state: WhiteNoiseAppState,
-    ) = withContext(NonCancellable) {
-        controller.onCleared()
-        state.mutationsScope.coroutineContext.job
-            .cancelAndJoin()
-    }
 
     /** Both a file and a multi-image album reveal after durable acceptance, including a canonical echo. */
     @Test
@@ -724,6 +715,74 @@ class ConversationMediaSendReconciliationIntegrationTest {
         assertEquals(MessageStatus.Pending, controller.timeline.single().status)
         assertFalse(controller.deleteMessage(pending, presentFailure = false))
     }
+}
+
+/** Covers native echo ordering while host-only thumbnail decoding suspends. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class ConversationMediaSendReconciliationThumbnailTest {
+    /** A native echo during asynchronous thumbnail preparation must inherit the pending row identity. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun nativeEchoDuringThumbnailDecodeKeepsPendingPresentationIdentity() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val reference = mediaReference()
+            lateinit var controller: ConversationController
+            var pendingId = ""
+            controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    mediaUploader = { _, _, _ -> uploadResult(reference) },
+                    mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                    mediaPublisher = { _, _, _, _ -> requireNotNull(uploadResult(reference).sent) },
+                    mediaThumbnailDecoder = {
+                        val original = controller.timeline.single()
+                        pendingId = original.presentationId
+                        val projection =
+                            projectedMediaMessage(original.record.recordedAt, reference)
+                                .copy(clientToken = original.record.messageIdHex)
+                        controller.testRefreshCurrentTimeline(ACCOUNT_REF) {
+                            TimelinePageFfi(listOf(projection), false, false)
+                        }
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
+                        assertEquals(pendingId, controller.timeline.single().presentationId)
+                        null
+                    },
+                )
+            try {
+                controller.retryMembers()
+                controller.sendAttachments(
+                    listOf(PendingAttachment(VIDEO_BYTES, VIDEO_MEDIA_TYPE, "clip.mp4", "1280x720")),
+                    null,
+                )
+                assertTrue(pendingId.isNotEmpty())
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID,
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex,
+                )
+                assertEquals(pendingId, controller.timeline.single().presentationId)
+            } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+}
+
+/** Drains cancelled cache IO even after a test timeout, before its process-global Main dispatcher is reset. */
+private suspend fun finishMediaFixture(
+    controller: ConversationController,
+    state: WhiteNoiseAppState,
+) = withContext(NonCancellable) {
+    controller.onCleared()
+    state.mutationsScope.coroutineContext.job
+        .cancelAndJoin()
 }
 
 /** Mounts the existing chat-list bridge so accepted media preview replacement remains observable. */

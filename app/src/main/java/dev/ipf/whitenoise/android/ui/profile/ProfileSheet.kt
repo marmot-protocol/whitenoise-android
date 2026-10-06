@@ -109,6 +109,7 @@ import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
@@ -1244,7 +1245,7 @@ internal fun ContactPrivateDetailsDialog(
                     Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Text(stringResource(R.string.profile_name_from_profile, profileName))
+                    EmojiLabel(stringResource(R.string.profile_name_from_profile, profileName))
                     dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
                         state = nickname,
                         label = { Text(stringResource(R.string.profile_contact_name_hint)) },
@@ -1370,12 +1371,12 @@ internal fun ProfileAddToGroupsContent(
                     .testTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
+            EmojiLabel(
                 stringResource(R.string.profile_add_to_groups_title, targetName),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
-            Text(
+            EmojiLabel(
                 stringResource(R.string.profile_add_to_groups_description, targetName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1526,12 +1527,12 @@ internal fun ProfileMakeAdminContent(
                     .testTag(PROFILE_MAKE_ADMIN_CONTENT_TAG),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
+            EmojiLabel(
                 stringResource(R.string.profile_make_admin_title, targetName),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
             )
-            Text(
+            EmojiLabel(
                 stringResource(R.string.profile_make_admin_description, targetName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

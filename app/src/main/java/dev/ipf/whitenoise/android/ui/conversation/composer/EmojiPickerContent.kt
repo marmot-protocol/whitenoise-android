@@ -59,7 +59,6 @@ import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.EmojiSection
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
-import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
 import dev.ipf.whitenoise.android.ui.emojiSearchSections
@@ -399,7 +398,7 @@ internal fun EmojiGlyph(
     modifier: Modifier = Modifier,
     size: Dp = EmojiPickerEmojiSize,
 ) {
-    val art = EmojiShortcodes.art(emoji, LocalCustomEmoji.current, LocalReceivedEmoji.current.art)
+    val art = EmojiShortcodes.art(emoji, LocalCustomEmoji.current, emptyMap())
     if (art != null) {
         EmojiArtImage(art, contentDescription = emoji, modifier = modifier.size(size))
         return
