@@ -17,3 +17,8 @@ dev.ipf.whitenoise.android.state.ChatListColdStartDirectPeerPresentationFfiInteg
 # Attachment progress and cancellation-before-external-dispatch regressions.
 dev.ipf.whitenoise.android.media.AttachmentProgressDeviceTest#phaseAndCancellationSemanticsRemainAccessibleAtLargeFontRtl
 dev.ipf.whitenoise.android.media.AttachmentOpenDispatchDeviceTest#cancelledOpenCannotLaunchBeforeDiskCleanup
+
+# Compose alignment-only placement must survive pooled lazy-item reuse (#2647).
+dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportAndroidTest#baselineQueryDuringReusedItemMeasurementDoesNotPlaceChildrenForReal
+dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportAndroidTest#lookaheadBaselineQueryDuringReuseKeepsRectListConsistent
+dev.ipf.whitenoise.android.ui.conversation.messages.ComposeRectListBackportAndroidTest#rowAlignmentDuringFarSnapKeepsRectListConsistent
