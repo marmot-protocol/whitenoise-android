@@ -68,6 +68,32 @@ test('renders the exact head provenance with snapshot evidence', () => {
   assert.match(section, /\| Current \|/)
 })
 
+test('keeps a large gallery publishable while retaining every changed baseline name', () => {
+  const files = Array.from({ length: 500 }, (_, index) => ({
+    filename: `app/src/test/snapshots/screen_${String(index).padStart(3, '0')}.png`,
+    status: 'modified',
+  }))
+  const section = renderSection(pr, files)
+  assert.ok(section.length < 50_000)
+  assert.equal((section.match(/!\[After:/g) || []).length, 12)
+  assert.match(section, /Showing 12 of 500 changed baselines/)
+  assert.match(section, /contributor\/fork\/tree\/head-sha\/app\/src\/test\/snapshots/)
+  for (const file of files) {
+    assert.ok(section.includes(`- ${file.filename.slice('app/src/test/snapshots/'.length)} (modified)`))
+  }
+})
+
+test('bounds the name list for thousands of long baseline paths', () => {
+  const section = renderSection(pr, Array.from({ length: 3000 }, (_, index) => ({
+    filename: `app/src/test/snapshots/${'long_baseline_name_'.repeat(12)}${index}.png`,
+    status: 'modified',
+  })))
+  assert.ok(section.length < 50_000)
+  assert.match(section, /Showing 12 of 3000 changed baselines/)
+  assert.match(section, /Files changed tab for every baseline/)
+  assert.match(section, /contributor\/fork\/tree\/head-sha\/app\/src\/test\/snapshots/)
+})
+
 test('updates the description before failing a UI change with no baseline', async () => {
   const updates = []
   const failures = []

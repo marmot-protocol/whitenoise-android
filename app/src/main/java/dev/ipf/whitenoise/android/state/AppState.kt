@@ -76,6 +76,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
 import dev.ipf.whitenoise.android.audio.tts.TtsPlaybackForegroundService
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
@@ -1270,6 +1271,10 @@ class WhiteNoiseAppState private constructor(
     private val mediaCacheRevisionState = MutableStateFlow(0L)
     internal val mediaCacheRevision: StateFlow<Long> = mediaCacheRevisionState.asStateFlow()
 
+    /** Decoded-thumbnail membership changes independently of plaintext availability. */
+    private val mediaThumbnailRevisionState = MutableStateFlow(0L)
+    internal val mediaThumbnailRevision: StateFlow<Long> = mediaThumbnailRevisionState.asStateFlow()
+
     /** Publishes one observable revision for an L1 or encrypted-L2 cache mutation. */
     private fun bumpMediaCacheRevision() {
         mediaCacheRevisionState.update { it + 1L }
@@ -1348,13 +1353,16 @@ class WhiteNoiseAppState private constructor(
         thumbnail: android.graphics.Bitmap,
     ) {
         assertMainThread { "cacheMediaThumbnail" }
-        mediaThumbnailCache.put(cacheKey, thumbnail)
+        val previous = mediaThumbnailCache.put(cacheKey, thumbnail)
+        if (mediaThumbnailCache.get(cacheKey) === thumbnail || previous != null) {
+            mediaThumbnailRevisionState.update { it + 1L }
+        }
     }
 
     internal fun removeMediaMemoryCacheEntry(cacheKey: String) {
         assertMainThread { "removeMediaMemoryCacheEntry" }
         mediaPlaintextCache.remove(cacheKey)
-        mediaThumbnailCache.remove(cacheKey)
+        if (mediaThumbnailCache.remove(cacheKey) != null) mediaThumbnailRevisionState.update { it + 1L }
         bumpMediaCacheRevision()
     }
 
@@ -1517,6 +1525,9 @@ class WhiteNoiseAppState private constructor(
     // owns decrypted text that must stop when its account is removed.
     private var ttsSpeechAccountRef: String? = null
 
+    /** Reader controls may only address speech owned by the current local account. */
+    internal fun ownsCurrentAccountSpeech(): Boolean = ttsSpeechAccountRef?.let { it == activeAccountRef } == true
+
     fun ownsTtsAutoReadSession(groupIdHex: String): Boolean {
         val key = ttsAutoReadSessionKey ?: return false
         return key == ttsAutoReadKey(activeAccountRef, groupIdHex)
@@ -1569,24 +1580,58 @@ class WhiteNoiseAppState private constructor(
         return started
     }
 
+    /**
+     * Prepares reader text off the controller lock, preserving caller/account ownership through playback commit.
+     * Account-switch generation prevents an A-B-A return from reviving old work. Cleanup is session-scoped so
+     * a revoked or cancelled request cannot clear a replacement queue's ownership.
+     */
     suspend fun speakAloudPrepared(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
         startSentenceIndex: Int = 0,
         startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
+        isCurrent: () -> Boolean = { true },
     ): Boolean {
         val ownerAccount = activeAccountRef
-        return ttsController
-            .speakAsync(entries, locale, startSentenceIndex, startRenderedHit) {
-                ttsSpeechAccountRef = ownerAccount
-                TtsPlaybackForegroundService.start(appContext)
-            }.also { started ->
-                if (started) {
+        val ownerGeneration = accountSwitchHandoff.capture()
+        var preparingSessionId: Long? = null
+        try {
+            val started =
+                ttsController.speakAsync(
+                    entries,
+                    locale,
+                    startSentenceIndex,
+                    startRenderedHit,
+                    isCurrent = {
+                        isCurrent() &&
+                            activeAccountRef == ownerAccount &&
+                            accountSwitchHandoff.isCurrent(ownerGeneration)
+                    },
+                ) {
+                    preparingSessionId = ttsController.state.value.sessionId
                     ttsSpeechAccountRef = ownerAccount
+                    TtsPlaybackForegroundService.start(appContext)
+                }
+            if (started) {
+                ttsSpeechAccountRef = ownerAccount
+                ttsAutoReadSessionKey = null
+                ttsHistorySession.onSessionCleared()
+            }
+            return started
+        } finally {
+            // Check and clear under the same monitor as queue starts, not against a stale Idle snapshot.
+            synchronized(ttsController) {
+                val state = ttsController.state.value
+                if (state is TtsState.Idle &&
+                    state.sessionId == preparingSessionId &&
+                    ttsSpeechAccountRef == ownerAccount
+                ) {
+                    ttsSpeechAccountRef = null
                     ttsAutoReadSessionKey = null
                     ttsHistorySession.onSessionCleared()
                 }
             }
+        }
     }
 
     suspend fun speakAloudAutoRead(
@@ -2246,6 +2291,18 @@ class WhiteNoiseAppState private constructor(
     // staleness-exempt: observable draft version combined into the composer revision.
     private var draftHydrationRevision by mutableIntStateOf(0)
 
+    // Transient view invalidation, bounded with the existing retained conversation state.
+    private val nativeComposerCleanupRevisions = mutableStateMapOf<String, Long>()
+
+    // Never reuse a stamp after conversation eviction or account-cache cleanup.
+    private var nativeComposerCleanupSequence = 0L
+
+    /** Only committed cleanup of this exact owner may refresh its native-restored media shelf. */
+    internal fun nativeComposerCleanupRevision(
+        accountRef: String?,
+        groupIdHex: String,
+    ): Long = nativeComposerCleanupRevisions[conversationKey(accountRef, groupIdHex)] ?: 0L
+
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
         get() = shareStaging.revision + draftHydrationRevision
@@ -2393,7 +2450,17 @@ class WhiteNoiseAppState private constructor(
             draftRepository = messageDraftRepository,
             expansionRetention = composerExpansionStateRetention,
             scope = mutationsScope,
-            onDraftPresentationRestored = { draftHydrationRevision += 1 },
+            onDraftPresentationChanged = { accountRef, groupIdHex, nativeDraftConsumed ->
+                if (nativeDraftConsumed) {
+                    synchronized(conversationStateLock) {
+                        val key = retainConversationState(accountRef, groupIdHex)
+                        nativeComposerCleanupSequence += 1
+                        nativeComposerCleanupRevisions[key] = nativeComposerCleanupSequence
+                    }
+                } else {
+                    draftHydrationRevision += 1
+                }
+            },
             onCleanupFailure = { groupIdHex, cause ->
                 appStateDebug(cause) { "sent draft cleanup failed group=${groupIdHex.take(8)}" }
             },
@@ -3106,6 +3173,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Drops all cached conversation overlays and clears the retained queue to release its source owners. */
     private fun removeConversationState(staleKey: String) {
+        nativeComposerCleanupRevisions.remove(staleKey)
         optimisticMessagesByConversation.remove(staleKey)
         durableAcceptanceCallbacksByConversation.remove(staleKey)?.clear()
         projectedMessageIdsByConversation.remove(staleKey)
@@ -5984,6 +6052,7 @@ class WhiteNoiseAppState private constructor(
         pendingSendDiagnostics.clear()
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        mediaThumbnailRevisionState.update { it + 1L }
         bumpMediaCacheRevision()
         MediaInventory.clear()
         mediaUploadSessionLifetime.advance()
@@ -6029,6 +6098,7 @@ class WhiteNoiseAppState private constructor(
             optimisticSendPhasesByConversation.values.forEach { it.clear() }
             optimisticSendPhasesByConversation.clear()
             optimisticCancellationGenerationByConversation.clear()
+            nativeComposerCleanupRevisions.clear()
         }
         // Cancel any in-flight downloads (their Deferred may hold plaintext or
         // a retained-media outcome) and drop both indexes so the next session
@@ -10488,18 +10558,25 @@ class WhiteNoiseAppState private constructor(
         tier: NoticeTier = NoticeTier.ActionableError,
         sendAttempt: SendFailureAttempt? = null,
     ) {
-        val safeReport = diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
-        toast =
+        presentText(
             ToastMessage(
                 title = title,
                 detail = detail,
-                // A Copy affordance is valid only when there is a deliberately
-                // constructed privacy-safe report. Legacy callers that merely
-                // set copyable=true must never copy visible UI text.
-                copyable = copyable && safeReport != null,
+                copyable = copyable,
                 tier = tier,
-                diagnosticReport = safeReport,
+                diagnosticReport = diagnosticReport,
                 sendAttempt = sendAttempt,
+            ),
+        )
+    }
+
+    /** Publishes a scoped UI notice through the same privacy-safe copy gate as ordinary errors. */
+    internal fun presentText(notice: ToastMessage) {
+        val safeReport = notice.diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
+        toast =
+            notice.copy(
+                copyable = notice.copyable && safeReport != null,
+                diagnosticReport = safeReport,
             )
     }
 

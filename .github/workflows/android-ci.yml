@@ -1,8 +1,8 @@
 name: Android CI
 
 # Required validation CI for the Android client. Runs the same checks a
-# contributor should run locally before pushing (see README "Continuous
-# Integration"). Dev debug variant only: no signing secrets, no
+# contributor must require on GitHub (see README "Continuous
+# Integration" and docs/ci-request-policy.md). Dev debug variant only: no signing secrets, no
 # google-services.json, so this never depends on release/Play/Zapstore
 # credentials.
 #
@@ -25,7 +25,118 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Classify complete PR changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Test conservative CI classification
+        run: python3 -m unittest scripts/test_check_ci_changes.py
+
+      - name: Classify complete PR diff
+        id: classify
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
+
+  tooling-contracts:
+    name: Validate tooling and documentation contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Test manual release guide and viewport coverage validators
+        run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_check_viewport_restoration_coverage.py
+
+      # This must run outside the path-filtered fuzz workflow: missing a parser
+      # trigger would otherwise also skip the check intended to catch it.
+      - name: Validate fuzz PR production triggers
+        run: |
+          python3 scripts/check_fuzz_pr_triggers.py
+          python3 -m unittest scripts/test_check_fuzz_pr_triggers.py
+
+      - name: Test attachment fixture HTTP ledger and cancellation contracts
+        run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
+
+      - name: Validate manual release guide
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 scripts/check_manual_test_guide.py
+          if [[ -n "$PR_BASE_SHA" ]]; then
+            python3 scripts/check_manual_test_guide.py --base "$PR_BASE_SHA"
+          fi
+
+      - name: Test PR screenshot renderer
+        run: node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
+
+      - name: Test GitHub triage reconciliation
+        run: python3 -m unittest scripts/test_check_github_triage.py
+
+      - name: Test stale-result recurrence classifier
+        run: python3 -m unittest scripts/test_stale_result_recurrence.py
+
+      - name: Test package-replacement startup reporter
+        run: bash .github/scripts/test-package-replacement-startup-report.sh
+
+      - name: Test preview security and update contracts
+        run: |
+          bash .github/scripts/test-pr-preview-contract.sh
+          bash .github/scripts/test-pr-preview-validation.sh
+
+      - name: Test PR preview publisher
+        run: bash .github/scripts/test-publish-pr-apk-to-github-release.sh
+
+      - name: Test release and staging transport tooling
+        run: |
+          ./scripts/release_test.sh
+          .github/scripts/test-staging-apk-transport.sh
+
+      - name: Test production release safety gates
+        run: python3 -m unittest scripts/test_release_pipeline.py
+
+      - name: Verify Android release metadata and store assets
+        run: ./scripts/check-release-metadata.py
+
+      - name: Test MarmotKit artifact preparation
+        run: ./scripts/test-prepare-marmotkit-artifact.sh
+
+      - name: Verify generated performance profiles
+        run: |
+          bash .github/scripts/test-verify-generated-profiles.sh
+          bash scripts/verify-generated-profiles.sh
+
+      - name: Test Android CI aggregate gate
+        run: python3 -m unittest scripts/test_android_ci_gate.py
+
+      - name: Check committed screenshot golden owners
+        run: |
+          python3 -m unittest scripts/test_check_screenshot_baseline_owners.py
+          python3 scripts/check_screenshot_baseline_owners.py
+
+      - name: Test instrumented dispatch and required cases
+        run: |
+          python3 -m unittest scripts/test_run_android_instrumented_dispatch.py
+          python3 -m unittest scripts/test_check_instrumented_required_cases.py
+
   offline-zsp:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     name: Verify real ZSP offline signer contract
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -51,6 +162,8 @@ jobs:
           retention-days: 14
 
   build-contracts:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     name: Build contracts (${{ matrix.phase }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -63,92 +176,6 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-
-      - name: Test manual release guide and viewport coverage validators
-        if: matrix.phase == 'tooling'
-        run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_check_viewport_restoration_coverage.py
-
-      # This must run outside the path-filtered fuzz workflow: missing a parser
-      # trigger would otherwise also skip the check intended to catch it.
-      - name: Validate fuzz PR production triggers
-        if: matrix.phase == 'tooling'
-        run: |
-          python3 scripts/check_fuzz_pr_triggers.py
-          python3 -m unittest scripts/test_check_fuzz_pr_triggers.py
-
-      - name: Test attachment fixture HTTP ledger and cancellation contracts
-        if: matrix.phase == 'tooling'
-        run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
-
-      - name: Validate manual release guide
-        if: matrix.phase == 'tooling'
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          python3 scripts/check_manual_test_guide.py
-          if [[ -n "$PR_BASE_SHA" ]]; then
-            python3 scripts/check_manual_test_guide.py --base "$PR_BASE_SHA"
-          fi
-
-      - name: Test PR screenshot renderer
-        if: matrix.phase == 'tooling'
-        run: node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
-
-      - name: Test GitHub triage reconciliation
-        if: matrix.phase == 'tooling'
-        run: python3 -m unittest scripts/test_check_github_triage.py
-
-      - name: Test stale-result recurrence classifier
-        if: matrix.phase == 'tooling'
-        run: python3 -m unittest scripts/test_stale_result_recurrence.py
-
-      - name: Test package-replacement startup reporter
-        if: matrix.phase == 'tooling'
-        run: bash .github/scripts/test-package-replacement-startup-report.sh
-
-      - name: Test PR preview publisher
-        if: matrix.phase == 'tooling'
-        run: bash .github/scripts/test-publish-pr-apk-to-github-release.sh
-
-      - name: Test release and staging transport tooling
-        if: matrix.phase == 'tooling'
-        run: |
-          ./scripts/release_test.sh
-          .github/scripts/test-staging-apk-transport.sh
-
-      - name: Test production release safety gates
-        if: matrix.phase == 'tooling'
-        run: python3 -m unittest scripts/test_release_pipeline.py
-
-      - name: Verify Android release metadata and store assets
-        if: matrix.phase == 'tooling'
-        run: ./scripts/check-release-metadata.py
-
-      - name: Test MarmotKit artifact preparation
-        if: matrix.phase == 'tooling'
-        run: ./scripts/test-prepare-marmotkit-artifact.sh
-
-      - name: Verify generated performance profiles
-        if: matrix.phase == 'tooling'
-        run: |
-          bash .github/scripts/test-verify-generated-profiles.sh
-          bash scripts/verify-generated-profiles.sh
-
-      - name: Test Android CI aggregate gate
-        if: matrix.phase == 'tooling'
-        run: python3 -m unittest scripts/test_android_ci_gate.py
-
-      - name: Check committed screenshot golden owners
-        if: matrix.phase == 'tooling'
-        run: |
-          python3 -m unittest scripts/test_check_screenshot_baseline_owners.py
-          python3 scripts/check_screenshot_baseline_owners.py
-
-      - name: Test instrumented dispatch and required cases
-        if: matrix.phase == 'tooling'
-        run: |
-          python3 -m unittest scripts/test_run_android_instrumented_dispatch.py
-          python3 -m unittest scripts/test_check_instrumented_required_cases.py
 
       - name: Configure MarmotKit cache directory
         shell: bash
@@ -163,7 +190,7 @@ jobs:
 
       # Retain this job's task outputs instead of relying on the Play test cache.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
@@ -260,6 +287,8 @@ jobs:
           retention-days: 7
 
   compose-compiler:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     name: Compose compiler metrics and stability reports
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -278,7 +307,7 @@ jobs:
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
@@ -333,6 +362,8 @@ jobs:
           retention-days: 7
 
   static-analysis:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     name: Android lint (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -358,7 +389,7 @@ jobs:
 
       # Retain this job's task outputs instead of relying on the Play test cache.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
@@ -404,6 +435,8 @@ jobs:
           retention-days: 7
 
   screenshots:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     name: Curated screenshot verification (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -426,7 +459,7 @@ jobs:
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
@@ -482,6 +515,8 @@ jobs:
           retention-days: 7
 
   tests:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     name: Unit tests and coverage (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -509,7 +544,7 @@ jobs:
 
       # Retain both flavors' compilation outputs; fork PRs remain read-only.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
@@ -608,11 +643,11 @@ jobs:
           retention-days: 7
 
   # Preserve the existing check name for branch protection and consumers.
-  # always() is essential: a failed/skipped dependency must produce a red gate,
-  # rather than a skipped check that GitHub can treat as passing.
+  # A successful docs-only classifier permits only the named Android skips.
+  # Missing outputs, unexpected skips, failures and cancellations remain red.
   validate:
     name: Compile, test, ktlint, detekt, Android lint
-    needs: [offline-zsp, build-contracts, compose-compiler, static-analysis, screenshots, tests]
+    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, static-analysis, screenshots, tests]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -620,10 +655,19 @@ jobs:
       - name: Require every validation job to succeed
         env:
           JOB_RESULTS: ${{ toJSON(needs) }}
+          CI_EVENT: ${{ github.event_name }}
         shell: bash
         run: |
           set -euo pipefail
           printf '%s\n' "$JOB_RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-          printf '%s\n' "$JOB_RESULTS" | jq -e '
-            length > 0 and all(.[]; .result == "success")
+          printf '%s\n' "$JOB_RESULTS" | jq -e --arg event "$CI_EVENT" '
+            (keys == ["build-contracts", "changes", "compose-compiler", "offline-zsp", "screenshots", "static-analysis", "tests", "tooling-contracts"]) and
+            (.changes.result == "success") and
+            (."tooling-contracts".result == "success") and
+            (.changes.outputs.docs_only == "true" or .changes.outputs.docs_only == "false") and
+            (if .changes.outputs.docs_only == "true" then
+              $event == "pull_request" and all(to_entries[];
+                if .key == "changes" or .key == "tooling-contracts" then .value.result == "success"
+                else .value.result == "skipped" end)
+            else all(.[]; .result == "success") end)
           ' > /dev/null

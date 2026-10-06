@@ -2174,7 +2174,6 @@
     <string name="onboarding_details_expanded">已展开</string>
     <string name="onboarding_details_collapsed">已收起</string>
     <string name="local_delete_retry_detail">\u2068删除已停止。请再次选择“从此设备删除”，系统会先检查上次的结果。如果仍然失败，请重启应用。\u2069</string>
-    <string name="local_delete_cleanup_pending">\u2068聊天已删除。本地数据清理将自动重试。\u2069</string>
     <string name="chat_list_delete_stopped">删除已停止</string>
     <string name="chat_list_delete_stopped_detail">\u2068已确认 %1$d 次删除，共 %2$d 次。请重试“从此设备删除”以检查结果。若仍然失败，请重启应用。\u2069</string>
     <string name="group_svg_rejected_detail">无法处理此 SVG。请选择简单的 SVG、PNG 或 JPEG。</string>
@@ -2200,4 +2199,15 @@
     <string name="profile_readiness_added">已添加</string>
     <string name="profile_readiness_recommended">建议填写</string>
     <string name="profile_readiness_field_optional">选填</string>
+    <string name="nostr_event_view_image">查看图片</string>
+    <string name="nostr_event_image_failed">无法加载此图片，请重试。</string>
+    <string name="nostr_event_type_image">图片</string>
+    <string name="nostr_event_expand">查看完整事件</string>
+    <string name="floating_attachment_resolving">正在检查可用性</string>
+    <string name="floating_attachment_available">可在此设备上使用</string>
+    <string name="floating_attachment_remote">打开原消息查看</string>
+    <string name="floating_attachment_failed">下载失败。打开原消息重试</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="other">还有 %1$d 个附件</item>
+    </plurals>
 </resources>

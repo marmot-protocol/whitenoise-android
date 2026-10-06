@@ -1,19 +1,15 @@
 name: Android PR APK
 
-# This pull_request workflow is intentionally unprivileged. It compiles the PR
-# code and hands unsigned preview candidates to android-pr-preview-publish.yml;
-# it never receives signing or upload credentials. workflow_dispatch lets a
-# current internal PR head be rebuilt after merge to restore missing preview links.
+# This on-demand workflow is intentionally unprivileged. It compiles the exact
+# current internal PR head and hands unsigned candidates to the trusted publisher.
+# Request a human-test/debugging candidate or restore missing preview links;
+# intermediate pushes do not automatically request two more APK builds.
+# Signing and upload credentials remain exclusively in the trusted publisher.
 on:
-  pull_request:
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.github/ISSUE_TEMPLATE/**'
   workflow_dispatch:
     inputs:
       pr_number:
-        description: Open internal PR to rebuild and republish
+        description: Open internal PR whose current head needs test APKs
         required: true
         type: string
 
@@ -96,7 +92,7 @@ jobs:
           java-version: '17'
 
       - name: Set up Gradle read-only cache
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           cache-read-only: true
 

@@ -2363,7 +2363,6 @@
     <string name="onboarding_details_collapsed">Collapsed</string>
     <!-- Keep first-strong isolation balanced so counts and punctuation stay readable in RTL layouts. -->
     <string name="local_delete_retry_detail">\u2068Deletion stopped. Try Delete from this device again; the previous result will be checked first. If it keeps failing, restart the app.\u2069</string>
-    <string name="local_delete_cleanup_pending">\u2068The chat was deleted. Cleanup of local data will retry automatically.\u2069</string>
     <string name="chat_list_delete_stopped">Deletion stopped</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d of %2$d deletions confirmed. Retry Delete from this device to check the result. If it keeps failing, restart the app.\u2069</string>
     <string name="group_svg_rejected_detail">Couldn\'t prepare this SVG. Choose a simple SVG, PNG or JPEG.</string>
@@ -2390,4 +2389,16 @@
     <string name="profile_readiness_recommended">Recommended</string>
     <string name="profile_readiness_field_optional">Optional</string>
     <string name="profile_readiness_field" translatable="false">%1$s · %2$s</string>
+    <string name="nostr_event_view_image">View image</string>
+    <string name="nostr_event_image_failed">Couldn’t load this image. Try again.</string>
+    <string name="nostr_event_type_image">Image</string>
+    <string name="nostr_event_expand">View full event</string>
+    <string name="floating_attachment_resolving">Checking availability</string>
+    <string name="floating_attachment_available">Available on this device</string>
+    <string name="floating_attachment_remote">Open the original to view</string>
+    <string name="floating_attachment_failed">Download failed. Open the original to retry</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">+%1$d more attachment</item>
+        <item quantity="other">+%1$d more attachments</item>
+    </plurals>
 </resources>

@@ -42,12 +42,14 @@ internal fun Modifier.textAttachmentSelectionLongPress(
 
 /** Renders plain or Markdown attachment text under the shared selection controller. */
 @Composable
+@Suppress("LongParameterList") // Shared reader callbacks plus one optional speech presentation bundle.
 internal fun TextAttachmentSelectableContent(
     preview: TextAttachmentPreview,
     selection: TextAttachmentSelectionController,
     mentionDisplayName: ((String) -> String?)?,
     onNostrProfileTap: ((String) -> Unit)?,
     onCopyLink: (String) -> Unit,
+    speech: TextAttachmentTtsUi? = null,
 ) {
     val content: @Composable () -> Unit = {
         preview.markdownDocument?.takeIf { it.blocks.isNotEmpty() }?.let { document ->
@@ -59,10 +61,20 @@ internal fun TextAttachmentSelectableContent(
                 onSelectableTextLayoutChanged = selection.selectableTextLayoutReporter,
                 onLinkTextLayoutChanged = selection.markdownLinkLayoutReporter,
                 onCopyLink = onCopyLink,
+                ttsLeafHighlightResolver = speech?.highlight,
+                ttsReadAloudHighlightStyle = speech?.style,
+                ttsSentenceLayoutReporter = speech?.layoutReporter,
+                ttsSentenceActions = speech?.sentenceActions,
+                deferLinkActivation = speech?.deferLinkActivation,
             )
         } ?: ReaderSelectablePlainText(
             text = preview.text,
             onSelectableTextLayoutChanged = selection.selectableTextLayoutReporter,
+            leafId = "plain",
+            highlightResolver = speech?.highlight,
+            highlightStyle = speech?.style,
+            sentenceLayoutReporter = speech?.layoutReporter,
+            sentenceActions = speech?.sentenceActions,
         )
     }
     if (selection.active) {

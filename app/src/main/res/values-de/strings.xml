@@ -2223,7 +2223,6 @@
     <string name="onboarding_details_expanded">Ausgeklappt</string>
     <string name="onboarding_details_collapsed">Eingeklappt</string>
     <string name="local_delete_retry_detail">\u2068Löschen gestoppt. Versuche „Auf diesem Gerät löschen“ erneut; zuerst wird das vorherige Ergebnis geprüft. Wenn es weiter fehlschlägt, starte die App neu.\u2069</string>
-    <string name="local_delete_cleanup_pending">\u2068Der Chat wurde gelöscht. Die Bereinigung lokaler Daten wird automatisch erneut versucht.\u2069</string>
     <string name="chat_list_delete_stopped">Löschen gestoppt</string>
     <string name="chat_list_delete_stopped_detail">\u2068%1$d von %2$d Löschungen bestätigt. Versuche erneut „Auf diesem Gerät löschen“, um das Ergebnis zu prüfen. Bei weiteren Fehlern starte die App neu.\u2069</string>
     <string name="group_svg_rejected_detail">Diese SVG konnte nicht verarbeitet werden. Wähle eine einfache SVG, PNG oder JPEG.</string>
@@ -2249,4 +2248,16 @@
     <string name="profile_readiness_added">Hinzugefügt</string>
     <string name="profile_readiness_recommended">Empfohlen</string>
     <string name="profile_readiness_field_optional">Freiwillig</string>
+    <string name="nostr_event_view_image">Bild anzeigen</string>
+    <string name="nostr_event_image_failed">Dieses Bild konnte nicht geladen werden. Versuche es erneut.</string>
+    <string name="nostr_event_type_image">Bild</string>
+    <string name="nostr_event_expand">Vollständiges Ereignis anzeigen</string>
+    <string name="floating_attachment_resolving">Verfügbarkeit wird geprüft</string>
+    <string name="floating_attachment_available">Auf diesem Gerät verfügbar</string>
+    <string name="floating_attachment_remote">Original zum Anzeigen öffnen</string>
+    <string name="floating_attachment_failed">Download fehlgeschlagen. Original öffnen, um es erneut zu versuchen</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">+%1$d weiterer Anhang</item>
+        <item quantity="other">+%1$d weitere Anhänge</item>
+    </plurals>
 </resources>

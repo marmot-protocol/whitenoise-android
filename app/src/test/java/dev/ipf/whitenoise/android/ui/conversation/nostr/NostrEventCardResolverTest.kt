@@ -444,9 +444,9 @@ class NostrEventCardResolverTest {
         assertEquals("body", generic.summary)
     }
 
-    /** Verifies only readable note and article kinds retain a bounded full-content body. */
+    /** Verifies every supported event kind retains its complete accepted body. */
     @Test
-    fun noteRetainsFullReaderBodyWhileOtherTypedKindsRemainUnchanged() {
+    fun supportedKindsRetainTheFullReaderBody() {
         val fullNote = "n".repeat(70_000)
         val note = event("a".repeat(64), kind = 1, content = fullNote).toCardModel()
         val article = event("b".repeat(64), kind = 30_023, content = "Full article").toCardModel()
@@ -459,9 +459,9 @@ class NostrEventCardResolverTest {
             )
 
         assertEquals("n".repeat(420), note.summary)
-        assertEquals("n".repeat(64 * 1_024), note.readerBody)
+        assertEquals(fullNote, note.readerBody)
         assertEquals("Full article", article.readerBody)
-        assertTrue(nonReaders.all { it.readerBody == null })
+        assertEquals(listOf("Video", "Release", "File", "Generic"), nonReaders.map { it.readerBody })
     }
 
     @Test

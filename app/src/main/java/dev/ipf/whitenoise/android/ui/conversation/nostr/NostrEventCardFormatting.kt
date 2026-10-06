@@ -2,9 +2,9 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.runtime.Composable
@@ -37,8 +37,15 @@ internal fun NostrEventCardKind.label(eventKind: Int): String =
         NostrEventCardKind.Video -> stringResource(R.string.nostr_event_type_video)
         NostrEventCardKind.Release -> stringResource(R.string.nostr_event_type_release)
         NostrEventCardKind.File -> stringResource(R.string.nostr_event_type_file)
-        NostrEventCardKind.Generic -> stringResource(R.string.nostr_event_type_generic, eventKind)
+        NostrEventCardKind.Generic ->
+            if (eventKind == KIND_IMAGE_EVENT) {
+                stringResource(R.string.nostr_event_type_image)
+            } else {
+                stringResource(R.string.nostr_event_type_generic, eventKind)
+            }
     }
+
+private const val KIND_IMAGE_EVENT = 20
 
 @Composable
 internal fun eventByline(
@@ -78,14 +85,9 @@ internal fun NostrEventCardModel.primaryAction(): EventCardPrimaryAction =
                 icon = Icons.AutoMirrored.Outlined.Article,
                 description = stringResource(R.string.nostr_event_read_article),
             )
-        kind == NostrEventCardKind.Video && mediaUrl != null ->
-            EventCardPrimaryAction(
-                icon = Icons.Outlined.PlayCircleOutline,
-                description = stringResource(R.string.nostr_event_play_video),
-            )
         else ->
             EventCardPrimaryAction(
-                icon = Icons.AutoMirrored.Outlined.OpenInNew,
-                description = stringResource(R.string.nostr_event_open),
+                icon = Icons.Outlined.Fullscreen,
+                description = stringResource(R.string.nostr_event_expand),
             )
     }
