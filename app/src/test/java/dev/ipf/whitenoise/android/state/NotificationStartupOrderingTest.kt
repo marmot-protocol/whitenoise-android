@@ -789,6 +789,26 @@ class NotificationStartupOrderingTest {
         }
     }
 
+    /** Gives each late writer a distinct card, keeping other pending notification hooks out of its barriers. */
+    private fun lateCorrectionFixture(
+        accounts: List<AccountSummaryFfi>,
+        releaseFirstRead: CountDownLatch,
+    ): NotificationBootstrapTestFixture {
+        val fixtureIdentity = UUID.randomUUID().toString().replace("-", "").padEnd(64, '0')
+        return NotificationBootstrapTestFixture(
+            context = context,
+            notificationUsersHaveDisplayNames = true,
+            previewText = "**resolved after fallback**",
+            messageIdHex = fixtureIdentity,
+            groupIdHex = fixtureIdentity,
+            accounts = accounts,
+            onDisplayName = { _, _ ->
+                releaseFirstRead.await(5, TimeUnit.SECONDS)
+                "Alice"
+            },
+        )
+    }
+
     /** Holds a late writer at its final gate, applies invalidation, then releases it. */
     private suspend fun assertLateCorrectionRejectedAtFinalWrite(
         accounts: List<AccountSummaryFfi>,
@@ -801,20 +821,7 @@ class NotificationStartupOrderingTest {
         val correctionFinished = CountDownLatch(1)
         val writes = AtomicInteger(0)
         val correctionClaimed = AtomicBoolean(false)
-        val fixtureIdentity = UUID.randomUUID().toString().replace("-", "").padEnd(64, '0')
-        val fixture =
-            NotificationBootstrapTestFixture(
-                context = context,
-                notificationUsersHaveDisplayNames = true,
-                previewText = "**resolved after fallback**",
-                messageIdHex = fixtureIdentity,
-                groupIdHex = fixtureIdentity,
-                accounts = accounts,
-                onDisplayName = { _, _ ->
-                    releaseFirstRead.await(5, TimeUnit.SECONDS)
-                    "Alice"
-                },
-            )
+        val fixture = lateCorrectionFixture(accounts, releaseFirstRead)
         ConversationCardPostSynchronizer.testHook =
             object : ConversationCardTestHook {
                 override fun onBarrier(
