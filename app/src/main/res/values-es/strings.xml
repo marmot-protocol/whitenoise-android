@@ -1855,7 +1855,7 @@
     <string name="discard">Descartar</string>
     <string name="open_app_settings">Abrir ajustes de la aplicación</string>
     <string name="dictation_disclosure_title">Reconocimiento de voz externo</string>
-    <string name="dictation_disclosure_message">El servicio de voz instalado en este dispositivo procesa lo que dices y puede enviar el audio a su proveedor. White Noise conserva el texto devuelto solo hasta que lo pegas o lo envías. El envío automático está desactivado a menos que lo actives en los ajustes de Dictado.</string>
+    <string name="dictation_disclosure_message">El servicio de voz instalado en este dispositivo procesa lo que dices y puede enviar el audio a su proveedor. Tras un fallo, el texto reconocido puede guardarse automáticamente en el borrador original. El envío automático está desactivado a menos que lo actives en los ajustes de Dictado.</string>
     <string name="dictation_continue">Continuar</string>
     <string name="dictation_microphone_muted">El acceso al micrófono está desactivado</string>
     <string name="dictation_microphone_muted_help">Activa el acceso al micrófono en los ajustes de privacidad de Android o en los ajustes rápidos y vuelve a intentar el dictado.</string>
@@ -2234,4 +2234,32 @@
     <string name="agent_connector_claude_subtitle">Agente de programación con Claude Code CLI</string>
     <string name="agent_connector_claude_prompt">Esta es una instrucción de instalación para conectar esta configuración de Claude Code a White Noise mediante Marmot. Lee la guía autorizada del harness de Claude Code en https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md y la guía permanente del conector en https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explícame cómo funciona el conector y qué cambiará la instalación. Confirma los requisitos previos: la CLI de Claude Code está instalada, autenticada y disponible en PATH, y esta máquina usa el mismo conjunto de relays públicos que mi teléfono. Después, propón los pasos de instalación para mi npub pública: %1$s, y pide mi aprobación antes de realizar cualquier cambio. Una vez que lo apruebe, usa el flujo de release install-claude-marmot.sh verificado por checksum, inicializa wn-agent para esa npub con el welcomer permitido y verifica wn-claude --version. A continuación, responde con la npub de tu agente y pídeme que lo invite desde White Noise y envíe un mensaje de prueba desde esta npub permitida mediante los relays configurados. No informes que la configuración está completa hasta que wn-claude responda a través de White Noise; si no se puede verificar automáticamente este recorrido, indica claramente que se requiere verificación en el dispositivo.</string>
     <string name="ai_agents_project_groups_tip">Usa un grupo distinto para cada proyecto y empieza con su ubicación y contexto. Los controles de sesión varían según el conector; consulta su guía antes de usar comandos para reanudar o crear ramas.</string>
+    <string name="nostr_event_view_image">Ver imagen</string>
+    <string name="nostr_event_image_failed">No se pudo cargar esta imagen. Inténtalo de nuevo.</string>
+    <string name="nostr_event_type_image">Imagen</string>
+    <string name="nostr_event_expand">Ver evento completo</string>
+    <string name="floating_attachment_resolving">Comprobando disponibilidad</string>
+    <string name="floating_attachment_available">Disponible en este dispositivo</string>
+    <string name="floating_attachment_remote">Abre el original para verlo</string>
+    <string name="floating_attachment_failed">Error de descarga. Abre el original para reintentarlo</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">%1$d archivo adjunto más</item>
+        <item quantity="other">%1$d archivos adjuntos más</item>
+    </plurals>
+    <string name="profile_notifications_default">Predeterminado</string>
+    <string name="profile_notifications_muted">Silenciado</string>
+    <string name="profile_notifications_custom">Ajustes personalizados de Android</string>
+    <string name="profile_notifications_custom_vibration">Vibración personalizada</string>
+    <string name="profile_notifications_use_defaults">Usar valores predeterminados</string>
+    <string name="profile_notifications_mute">Silenciar notificaciones de esta persona</string>
+    <string name="profile_notifications_system">Sonido y comportamiento del sistema</string>
+    <string name="profile_notifications_android_vibration">Configurado por Android</string>
+    <string name="profile_notification_scope_detail">Se aplica a los mensajes de esta persona en todas las conversaciones de esta cuenta. La entrega y el recuento de mensajes sin leer no cambian.</string>
+    <string name="profile_notification_precedence">Primero se aplican las reglas de silencio del chat y de solo menciones. Después, el silencio o los ajustes personalizados de Android de esta persona. Usar valores predeterminados restaura los ajustes del chat y globales. Las notificaciones existentes conservan su canal original.</string>
+    <string name="profile_notification_channel_name">%1$s · Mensajes en todos los chats</string>
+    <string name="destination_filter_all">Todos los chats</string>
+    <string name="destination_filter_selected">Revisar selección (%1$d)</string>
+    <string name="destination_filter_label">Filtrar chats</string>
+    <string name="forward_select_by_folder">Seleccionar por carpeta</string>
+    <string name="destination_filter_incomplete">Es posible que falten algunos chats. Reintenta o elige Todos los chats.</string>
 </resources>

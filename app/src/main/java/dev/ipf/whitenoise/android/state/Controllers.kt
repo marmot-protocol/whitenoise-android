@@ -709,6 +709,8 @@ data class TimelineMessage(
      * duration and deadline.
      */
     val retentionAtSendSeconds: ULong? = null,
+    /** Transient row identity retained across an exact local-send handoff; actions still use [record]. */
+    val presentationId: String = id,
 )
 
 /**
@@ -5327,6 +5329,98 @@ class ChatsController private constructor(
         schedulePendingMemberFetches(groupIds)
     }
 
+    /**
+     * Hydrates the open picker's off-window rows through the existing bounded local roster reader.
+     * These rows never enter the native window. Cancellation and both controller lifetimes guard publication.
+     */
+    internal suspend fun resolveForwardTargetMembers(presented: List<PresentedChatRowFfi>) {
+        val account = accountRef ?: return
+        val epoch = bindEpoch
+        do {
+            val cacheEpoch = memberCacheEpoch
+            val pending =
+                presented.distinctBy { it.row.groupIdHex }.filter {
+                    memberSnapshotNeedsFetch(it.row.groupIdHex) && it.row.groupIdHex !in inFlightMemberFetches
+                }
+            val ids = pending.map { it.row.groupIdHex }
+            inFlightMemberFetches.addAll(ids)
+            try {
+                if (pending.isNotEmpty()) loadForwardTargetMembers(account, pending, epoch, cacheEpoch)
+            } finally {
+                if (isActiveBindEpoch(epoch)) inFlightMemberFetches.removeAll(ids.toSet())
+            }
+            // A live roster invalidation supersedes this read; retry under the same picker-owned coroutine.
+        } while (isActiveBindEpoch(epoch) && !memberCacheLifetime.isCurrent(cacheEpoch))
+    }
+
+    /** Prefers identifier-only local pages; failure falls back to the existing shared permit pool. */
+    private suspend fun loadForwardTargetMembers(
+        account: String,
+        pending: List<PresentedChatRowFfi>,
+        epoch: Long,
+        cacheEpoch: Long,
+    ) {
+        val projections = loadInitialMemberIdProjections(account, pending.map { it.row.groupIdHex })
+        if (projections != null) {
+            val byGroup = projections.associateBy { it.groupIdHex }
+            pending.forEach { presentedRow ->
+                val projection = byGroup[presentedRow.row.groupIdHex] ?: return@forEach
+                applyForwardTargetMembers(
+                    presentedRow.row,
+                    memberRecordsFromIds(projection.memberIdsHex, boundAccountIdHex()),
+                    epoch,
+                    cacheEpoch,
+                )
+            }
+        } else {
+            coroutineScope {
+                pending
+                    .map { presentedRow ->
+                        async {
+                            memberFetchGate.withPermit {
+                                val current = isActiveBindEpoch(epoch) && memberCacheLifetime.isCurrent(cacheEpoch)
+                                if (!current) return@withPermit
+                                val row = presentedRow.row
+                                if (!memberSnapshotNeedsFetch(row.groupIdHex)) return@withPermit
+                                val members =
+                                    runCatchingCancellable { memberSnapshotLoader(account, row.groupIdHex) }.getOrNull()
+                                        ?: return@withPermit
+                                applyForwardTargetMembers(row, members, epoch, cacheEpoch)
+                            }
+                        }
+                    }.awaitAll()
+            }
+        }
+    }
+
+    /** Uses the native snapshot's conversation kind when the retained window has no context for a roster. */
+    private fun applyForwardTargetMembers(
+        row: ChatListRowFfi,
+        members: List<AppGroupMemberRecordFfi>,
+        epoch: Long,
+        cacheEpoch: Long,
+    ) {
+        val count = GroupProjector.uniqueMemberCount(members)
+        val unresolvedDirect =
+            row.conversationKind == ChatConversationKindFfi.UNKNOWN &&
+                count <= 1 &&
+                GroupProjector.isUnnamed(row.groupName)
+        applyFetchedMemberSnapshot(
+            groupIdHex = row.groupIdHex,
+            members = members,
+            epoch = epoch,
+            cacheEpoch = cacheEpoch,
+            directConversationOverride =
+                unresolvedDirect ||
+                    GroupProjector.isDm(
+                        row.conversationKind,
+                        count,
+                        row.groupName,
+                    ),
+            requestProfileRefresh = false,
+        )
+    }
+
     internal fun retryMemberSnapshots(groupIds: Iterable<String>) {
         val targets = groupIds.distinct().toList()
         targets.forEach(::cancelMemberSnapshotRetry)
@@ -5409,11 +5503,17 @@ class ChatsController private constructor(
         epoch: Long,
         cacheEpoch: Long,
         scheduleRecomputeAfterPublish: Boolean = true,
+        directConversationOverride: Boolean? = null,
+        requestProfileRefresh: Boolean = true,
     ) {
         if (!isActiveBindEpoch(epoch) || !memberCacheLifetime.isCurrent(cacheEpoch)) return
         val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
         val knownSelfRemoval = knownSelfRemovalFor(groupIdHex)
-        val directConversationCandidate = directConversationCandidateFor(groupIdHex, members)
+        val directConversationCandidate =
+            directConversationOverride ?: directConversationCandidateFor(
+                groupIdHex,
+                members,
+            )
         val selfOnlyDirectRoster =
             isSelfOnlyDirectRoster(
                 members = members,
@@ -5434,10 +5534,9 @@ class ChatsController private constructor(
             scheduleMemberSnapshotRetry(groupIdHex, epoch)
             return
         }
-        members
-            .map { it.memberIdHex }
-            .filter { it.isNotBlank() }
-            .forEach(appState::requestProfile)
+        if (requestProfileRefresh) {
+            members.map { it.memberIdHex }.filter { it.isNotBlank() }.forEach(appState::requestProfile)
+        }
         memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
         failedMemberFetches.remove(groupIdHex)
         presentationMembersByGroup = presentationMembersByGroup - groupIdHex
@@ -5941,6 +6040,8 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher? = null,
+    private val mediaThumbnailDecoder: suspend (PendingAttachment) -> android.graphics.Bitmap? =
+        ::decodeMediaThumbnailOffMain,
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
         { account, groupIdHex, archived ->
@@ -6370,6 +6471,9 @@ class ConversationController(
 
     var timeline by mutableStateOf(initialTimeline)
         private set
+
+    /** UI identity aliases only, bounded to this controller's retained timeline window. */
+    private val timelinePresentationIds = mutableMapOf<String, String>()
 
     /** Recovery generation represented by the latest authoritative timeline. */
     var recoveryProjectionGeneration by mutableLongStateOf(0L)
@@ -8902,11 +9006,11 @@ class ConversationController(
                     optimisticMessageIdHex = tempId,
                     confirmedMessageIdHex = confirmedId,
                 )
-                optimisticMessages.remove(key)
-                messageById.remove(tempId)
                 // INVARIANT: the discard re-check must run BEFORE any cache mutation
                 // below, so a mid-flight discard never seeds the just-sent bytes.
                 if (discardedDuringRetry.remove(key)) {
+                    optimisticMessages.remove(key)
+                    messageById.remove(tempId)
                     // User discarded after publish committed; drop the local
                     // optimistic + bytes. The published event may still echo back
                     // via projection (publish already succeeded — not retractable).
@@ -8951,13 +9055,17 @@ class ConversationController(
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
-                        val decoded = decodeMediaThumbnailOffMain(attachment)
+                        val decoded = mediaThumbnailDecoder(attachment)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)
                         }
                     }
                 }
+                // Keep the pending row available to exact native reconciliation across thumbnail suspension.
+                // Removing it earlier lets a concurrent echo publish a new presentation identity.
+                optimisticMessages.remove(key)
+                messageById.remove(tempId)
                 retainedMediaUploads.remove(key)
                 activeUploadKeys.remove(key)
                 // Bridge the gap until the published event echoes back via the
@@ -8995,6 +9103,7 @@ class ConversationController(
                                 MessageStatus.Sent,
                                 timelineOrder = order,
                                 retentionAtSendSeconds = retentionAtSendSeconds,
+                                presentationId = key,
                             )
                         // Register the bridge through the same tracked preserve path
                         // as text sends so orphan cleanup can release its overrides
@@ -12741,6 +12850,7 @@ class ConversationController(
         optimisticId: String,
     ) {
         val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
+        timelinePresentationIds[projectedId] = optimistic.presentationId
         durableStreamPositionOverrideIds.remove(projectedId)
         durableStreamDisplayParentByMessageId.remove(projectedId)
         preservedTimelinePositionOverrideIds.add(projectedId)
@@ -13086,6 +13196,7 @@ class ConversationController(
                     },
             displayAfterMessageIdHex = durableStreamDisplayParentByMessageId[record.messageIdHex],
             retentionAtSendSeconds = retentionAtSendSeconds.takeIf { actionRecord.retentionSeconds == null },
+            presentationId = timelinePresentationIds[record.messageIdHex] ?: projectedItemId(record),
         )
     }
 
@@ -13240,6 +13351,7 @@ class ConversationController(
             orderTimelineMessagesForDisplay(
                 (visible + streamDebugTimelineItems.values).map { it.withOptimisticEditStatus() },
             )
+        timelinePresentationIds.keys.retainAll(timeline.mapTo(HashSet()) { it.record.messageIdHex })
         // The optimistic→confirmed handoff snapshot is intentionally preserved;
         // do not report it as the stale-override symptom this detector targets.
         logTimelineInversionsForDebug(timeline, optimisticSendPositionPreserves.snapshot())

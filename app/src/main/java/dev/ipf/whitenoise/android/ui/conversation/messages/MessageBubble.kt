@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.selection.rememberSelectionState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -121,6 +120,7 @@ import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
@@ -487,21 +487,21 @@ internal fun MessageBubble(
     // Freeze both the touch point and the selected message's window bounds when
     // the menu opens. The point seeds partial text selection; the bounds keep
     // the action surface visually attached to the selected bubble.
-    var longPressWindowPosition by remember(record.messageIdHex) { mutableStateOf<Offset?>(null) }
-    var selectionSeedVisibleOffset by remember(record.messageIdHex) { mutableStateOf<Int?>(null) }
+    var longPressWindowPosition by remember(item.presentationId) { mutableStateOf<Offset?>(null) }
+    var selectionSeedVisibleOffset by remember(item.presentationId) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
-    var actionMenuAnchorBounds by remember(record.messageIdHex) { mutableStateOf<IntRect?>(null) }
-    var initiatingMenuHoldActive by remember(record.messageIdHex) { mutableStateOf(false) }
+    var actionMenuAnchorBounds by remember(item.presentationId) { mutableStateOf<IntRect?>(null) }
+    var initiatingMenuHoldActive by remember(item.presentationId) { mutableStateOf(false) }
     var reportSheetOpen by remember(record.messageIdHex) { mutableStateOf(false) }
     var reportInFlight by remember(record.messageIdHex) { mutableStateOf(false) }
     val hasReports = item.projected?.hasReports == true
     var messageReports by remember(record.messageIdHex) { mutableStateOf<List<ContentReportFfi>?>(null) }
     var reportsRevision by remember(record.messageIdHex) { mutableIntStateOf(0) }
-    val rowCoordinates = remember(record.messageIdHex) { arrayOfNulls<LayoutCoordinates>(1) }
-    val messageBoundsInWindow = remember(record.messageIdHex) { arrayOfNulls<IntRect>(1) }
+    val rowCoordinates = remember(item.presentationId) { arrayOfNulls<LayoutCoordinates>(1) }
+    val messageBoundsInWindow = remember(item.presentationId) { arrayOfNulls<IntRect>(1) }
     val focusedMessageLayer = if (isActionMenuOpen) rememberGraphicsLayer() else null
-    var focusedMediaReady by remember(record.messageIdHex, focusedMessageLayer) { mutableStateOf(false) }
-    var focusedMediaSize by remember(record.messageIdHex) {
+    var focusedMediaReady by remember(item.presentationId, focusedMessageLayer) { mutableStateOf(false) }
+    var focusedMediaSize by remember(item.presentationId) {
         mutableStateOf(androidx.compose.ui.unit.IntSize.Zero)
     }
     val focusedWindowWidth =
@@ -954,7 +954,7 @@ internal fun MessageBubble(
         remember(ttsLinkTapCoordinator) {
             { action: () -> Unit -> ttsLinkTapCoordinator.activate(action) }
         }
-    key(record.messageIdHex) {
+    key(item.presentationId) {
         val currentActionMenuOpen by rememberUpdatedState(isActionMenuOpen)
         val currentActionMenuOpenChange by rememberUpdatedState(onActionMenuOpenChange)
         DisposableEffect(Unit) {
@@ -1769,6 +1769,12 @@ internal fun MessageBubble(
                     } else {
                         controller.replyPreview(item, messageTextCopy)
                     }
+                val replyReceivedEmoji =
+                    rememberReplyReceivedEmoji(
+                        controller.replyTargetMessageId(item).takeUnless { replyPreview?.originalUnavailable != false },
+                        controller,
+                        appState,
+                    )
                 val imageAttachments = bubbleMedia.images
                 val videoAttachments = bubbleMedia.videos
                 val fileAttachments = bubbleMedia.files
@@ -2058,7 +2064,7 @@ internal fun MessageBubble(
                 // of the text-only bubble otherwise.
                 val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     if (showSenderName) {
-                        Text(
+                        EmojiLabel(
                             appState.displayName(record.sender),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
@@ -2098,6 +2104,7 @@ internal fun MessageBubble(
                                 presentation = bubblePresentation,
                             )
                         ReplyPreviewCard(
+                            receivedEmoji = replyReceivedEmoji,
                             senderTitle =
                                 if (preview.originalUnavailable) {
                                     ""
@@ -2673,6 +2680,7 @@ internal fun MessageBubble(
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 replyPreview?.let { preview ->
                                     ReplyPreviewCard(
+                                        receivedEmoji = replyReceivedEmoji,
                                         senderTitle =
                                             if (preview.originalUnavailable) {
                                                 ""
@@ -2739,6 +2747,7 @@ internal fun MessageBubble(
                                     replyPreview?.let { preview ->
                                         {
                                             ReplyPreviewCard(
+                                                receivedEmoji = replyReceivedEmoji,
                                                 senderTitle =
                                                     if (preview.originalUnavailable) {
                                                         ""
@@ -2875,6 +2884,12 @@ internal fun MessageBubble(
                                 ComposerGate.COMPOSER ->
                                     if (!actionsReadOnly) {
                                         ComposerBar(
+                                            replyingToEmoji =
+                                                rememberReplyReceivedEmoji(
+                                                    controller.replyingTo?.messageIdHex,
+                                                    controller,
+                                                    appState,
+                                                ),
                                             replyingTo = controller.replyingTo,
                                             replyingToMedia =
                                                 controller.replyingTo

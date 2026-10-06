@@ -218,7 +218,7 @@ internal fun TimelineRow(
                     sameSenderAsNewerBubble = sameSenderAsNewerBubble,
                 )
             DismissMessageActionMenuOnDispose(
-                messageId = item.record.messageIdHex,
+                messageId = item.presentationId,
                 isOpen = isActionMenuOpen,
             ) {
                 onActionMenuOpenChange(false)
@@ -234,7 +234,7 @@ internal fun TimelineRow(
                         ),
                 ),
             ) {
-                key(controller.boundAccountRef, controller.group.groupIdHex, item.record.messageIdHex) {
+                key(controller.boundAccountRef, controller.group.groupIdHex, item.presentationId) {
                     TimelineRowMessageBubble(
                         messageIdHex = item.record.messageIdHex,
                         item = item,

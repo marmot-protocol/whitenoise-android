@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -801,7 +802,7 @@ private fun SettingsProfileRow(
     ) {
         ListItem(
             headlineContent = {
-                Text(
+                EmojiLabel(
                     text = account.title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

@@ -92,9 +92,8 @@ class ComposerDictationControlTest {
                 .getUnclippedBoundsInRoot()
         assertEquals(after.top, dictation.top)
         assertEquals(after.bottom, dictation.bottom)
-        // Focusing opens the 32 dp editing row above the action row, and the collapsed emoji sat
-        // centred 6 dp above its bottom-aligned editing position, so it travels the sum.
-        assertEquals(38.dp, after.top - before.top)
+        // Both layouts keep their tools below the persistent grip; focusing adds the editor row.
+        assertEquals(24.dp, after.top - before.top)
         composeRule.onNode(hasSetTextAction()).assertIsFocused()
     }
 

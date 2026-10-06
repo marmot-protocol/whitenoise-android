@@ -1917,7 +1917,7 @@
     <string name="discard">Удалить</string>
     <string name="open_app_settings">Открыть настройки приложения</string>
     <string name="dictation_disclosure_title">Внешнее распознавание речи</string>
-    <string name="dictation_disclosure_message">Установленная на этом устройстве служба распознавания речи обрабатывает сказанное и может отправлять звук своему поставщику. White Noise хранит полученный текст только до того, как вы вставите или отправите его. Автоматическая отправка выключена, пока вы не включите её в настройках диктовки.</string>
+    <string name="dictation_disclosure_message">Установленная на этом устройстве служба распознавания речи обрабатывает сказанное и может отправлять звук своему поставщику. После сбоя распознанный текст может быть автоматически сохранён в исходном черновике. Автоматическая отправка выключена, пока вы не включите её в настройках диктовки.</string>
     <string name="dictation_continue">Продолжить</string>
     <string name="dictation_microphone_muted">Доступ к микрофону отключён</string>
     <string name="dictation_microphone_muted_help">Включите доступ к микрофону в настройках конфиденциальности Android или на панели быстрых настроек, затем повторите диктовку.</string>
@@ -2302,4 +2302,34 @@
     <string name="agent_connector_claude_subtitle">Агент для программирования Claude Code CLI</string>
     <string name="agent_connector_claude_prompt">Это запрос на установку для подключения этой конфигурации Claude Code к White Noise через Marmot. Прочитайте авторитетное руководство по harness Claude Code: https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md и постоянное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Подтвердите предварительные требования: CLI Claude Code установлена, аутентифицирована и доступна в PATH, а эта машина использует тот же набор публичных релеев, что и мой телефон. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения используйте релизный поток install-claude-marmot.sh с проверкой контрольной суммы, выполните bootstrap wn-agent для этой npub с разрешенным welcomer и проверьте wn-claude --version. Затем ответьте npub вашего агента и попросите меня пригласить его из White Noise и отправить тестовое сообщение с этой разрешенной npub через настроенные реле. Не сообщайте о завершении настройки, пока wn-claude не ответит через White Noise; если этот обмен нельзя проверить автоматически, явно укажите, что требуется проверка на устройстве.</string>
     <string name="ai_agents_project_groups_tip">Используй отдельную группу для каждого проекта и начинай с его расположения и контекста. Команды сеанса зависят от коннектора; проверь руководство перед возобновлением сеанса или созданием ветки.</string>
+    <string name="nostr_event_view_image">Показать изображение</string>
+    <string name="nostr_event_image_failed">Не удалось загрузить изображение. Попробуйте ещё раз.</string>
+    <string name="nostr_event_type_image">Изображение</string>
+    <string name="nostr_event_expand">Посмотреть событие целиком</string>
+    <string name="floating_attachment_resolving">Проверка доступности</string>
+    <string name="floating_attachment_available">Доступно на этом устройстве</string>
+    <string name="floating_attachment_remote">Откройте оригинал для просмотра</string>
+    <string name="floating_attachment_failed">Не удалось скачать. Откройте оригинал, чтобы повторить</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">Ещё %1$d вложение</item>
+        <item quantity="few">Ещё %1$d вложения</item>
+        <item quantity="many">Ещё %1$d вложений</item>
+        <item quantity="other">Ещё %1$d вложения</item>
+    </plurals>
+    <string name="profile_notifications_default">По умолчанию</string>
+    <string name="profile_notifications_muted">Без уведомлений</string>
+    <string name="profile_notifications_custom">Свои настройки Android</string>
+    <string name="profile_notifications_custom_vibration">Своя вибрация</string>
+    <string name="profile_notifications_use_defaults">Использовать настройки по умолчанию</string>
+    <string name="profile_notifications_mute">Отключить уведомления от этого человека</string>
+    <string name="profile_notifications_system">Звук и системные настройки</string>
+    <string name="profile_notifications_android_vibration">Задано в Android</string>
+    <string name="profile_notification_scope_detail">Применяется к сообщениям этого человека во всех беседах этого аккаунта. Доставка и счётчик непрочитанных сообщений не меняются.</string>
+    <string name="profile_notification_precedence">Сначала действуют правила отключения уведомлений чата и уведомлений только об упоминаниях. Затем — отключение уведомлений или свои настройки Android для этого человека. Настройки по умолчанию возвращают настройки чата и общие настройки. Существующие уведомления сохраняют исходный канал.</string>
+    <string name="profile_notification_channel_name">%1$s · Сообщения во всех чатах</string>
+    <string name="destination_filter_all">Все чаты</string>
+    <string name="destination_filter_selected">Проверить выбранные (%1$d)</string>
+    <string name="destination_filter_label">Фильтр чатов</string>
+    <string name="forward_select_by_folder">Выбрать по папке</string>
+    <string name="destination_filter_incomplete">Некоторые чаты могут отсутствовать. Повторите попытку или выберите все чаты.</string>
 </resources>

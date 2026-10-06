@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 
 /**
  * Contact-card bubble drawn from the share caption (name + phone), so no vCard
@@ -68,7 +69,7 @@ internal fun ContactMessageBubble(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(
+                    EmojiLabel(
                         contact.displayName,
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface,

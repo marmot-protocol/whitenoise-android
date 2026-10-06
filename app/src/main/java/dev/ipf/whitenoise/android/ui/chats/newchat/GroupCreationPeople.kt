@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
@@ -80,7 +81,7 @@ internal fun GroupCreationPersonRow(
             { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
     val headline: @Composable () -> Unit = {
-        Text(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        EmojiLabel(candidate.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         if (onClick == null) {
@@ -159,7 +160,7 @@ internal fun GroupSelectedPerson(
                 }
             }
         }
-        Text(
+        EmojiLabel(
             candidate.displayName,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

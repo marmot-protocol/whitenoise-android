@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -89,6 +90,8 @@ internal fun PersonProfileContent(
     onBlock: () -> Unit = {},
     memberMute: ProfileMemberMuteRowState? = null,
     onMemberMute: () -> Unit = {},
+    notificationSummary: String? = null,
+    onNotifications: () -> Unit = {},
     sharedAvatars: @Composable () -> Unit = {},
     error: @Composable () -> Unit = {},
     adminActions: @Composable () -> Unit = {},
@@ -162,6 +165,19 @@ internal fun PersonProfileContent(
                                     enabled = !busy,
                                     leading = sharedAvatars,
                                     modifier = Modifier.testTag("person_profile.groups"),
+                                )
+                            }
+                        }
+                        if (notificationSummary != null) {
+                            row("notifications") { row ->
+                                SettingsLink(
+                                    row,
+                                    stringResource(R.string.notifications),
+                                    onNotifications,
+                                    value = notificationSummary,
+                                    enabled = !busy,
+                                    leading = { Icon(painterResource(R.drawable.ic_settings_notifications), null) },
+                                    modifier = Modifier.testTag("person_profile.notifications"),
                                 )
                             }
                         }
@@ -312,7 +328,7 @@ private fun PersonProfileIdentity(
             ) {
                 Avatar(person.title, person.seed, avatarSize, pictureUrl = person.pictureUrl)
             }
-            Text(
+            EmojiLabel(
                 person.title,
                 Modifier
                     .padding(start = 16.dp, end = 16.dp, top = WhiteNoiseSpacing.FormField)
@@ -322,7 +338,7 @@ private fun PersonProfileIdentity(
                 textAlign = TextAlign.Center,
             )
             if (person.title != person.publishedName) {
-                Text(
+                EmojiLabel(
                     person.publishedName,
                     Modifier.padding(horizontal = 16.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -339,7 +355,7 @@ private fun PersonProfileIdentity(
                     shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ) {
-                    Text(
+                    EmojiLabel(
                         about,
                         Modifier.fillMaxWidth().padding(16.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

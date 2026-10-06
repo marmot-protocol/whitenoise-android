@@ -45,6 +45,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
@@ -205,7 +206,7 @@ internal fun PollCard(
             Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
+            EmojiLabel(
                 poll.question,
                 style = MaterialTheme.typography.titleMedium.copy(textDirection = TextDirection.Content),
             )
@@ -321,7 +322,7 @@ private fun PollOptionRow(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
+            EmojiLabel(
                 (if (selected) "✓  " else "") + option.label,
                 modifier = Modifier.weight(1f),
                 maxLines = 2,

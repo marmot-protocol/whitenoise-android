@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.conversation.KeptAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlin.math.roundToInt
 
@@ -56,6 +58,7 @@ internal data class KeptMessagePresentation(
     val body: String,
     val chatTitle: String,
     val timeLabel: String,
+    val attachments: List<KeptAttachmentPresentation> = emptyList(),
 )
 
 /** The kept-message stack this overlay is drawing, and who owns it. */
@@ -328,10 +331,13 @@ private fun KeptMessageBody(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Box(Modifier.padding(top = KEPT_MESSAGE_BODY_GAP)) {
-                Text(text = presentation.body, style = MaterialTheme.typography.bodyMedium)
+            KeptAttachmentSummary(presentation.attachments, expanded = true)
+            if (presentation.body.isNotBlank()) {
+                Box(Modifier.padding(top = KEPT_MESSAGE_BODY_GAP)) {
+                    Text(text = presentation.body, style = MaterialTheme.typography.bodyMedium)
+                }
             }
-            Text(
+            EmojiLabel(
                 text = stringResource(R.string.floating_source, presentation.chatTitle, presentation.timeLabel),
                 modifier = Modifier.padding(top = KEPT_MESSAGE_BODY_GAP).testTag(KEPT_MESSAGE_SOURCE_TAG),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -339,13 +345,17 @@ private fun KeptMessageBody(
                 overflow = TextOverflow.Ellipsis,
             )
         } else {
-            Text(
-                text = presentation.body,
-                modifier = Modifier.testTag(KEPT_MESSAGE_TEXT_TAG),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = KeptMessageMetrics.COLLAPSED_PREVIEW_LINES,
-                overflow = TextOverflow.Ellipsis,
-            )
+            KeptAttachmentSummary(presentation.attachments, expanded = false)
+            if (presentation.body.isNotBlank()) {
+                Text(
+                    text = presentation.body,
+                    modifier = Modifier.testTag(KEPT_MESSAGE_TEXT_TAG),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines =
+                        if (presentation.attachments.isEmpty()) KeptMessageMetrics.COLLAPSED_PREVIEW_LINES else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

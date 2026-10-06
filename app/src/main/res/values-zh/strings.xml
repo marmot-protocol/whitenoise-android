@@ -1826,7 +1826,7 @@
     <string name="discard">丢弃</string>
     <string name="open_app_settings">打开应用设置</string>
     <string name="dictation_disclosure_title">外部语音识别</string>
-    <string name="dictation_disclosure_message">此设备上安装的语音服务会处理你说的内容，并可能将音频发送给其提供商。White Noise 只会在你粘贴或发送前保留返回的文本。除非你在“听写”设置中开启，否则不会自动发送。</string>
+    <string name="dictation_disclosure_message">此设备上安装的语音服务会处理你说的内容，并可能将音频发送给其提供商。发生错误后，识别的文字可能会自动保存到原始草稿中。除非你在“听写”设置中开启，否则不会自动发送。</string>
     <string name="dictation_continue">继续</string>
     <string name="dictation_microphone_muted">麦克风访问已关闭</string>
     <string name="dictation_microphone_muted_help">请在 Android 隐私设置或快捷设置中开启麦克风访问，然后重试听写。</string>
@@ -2202,4 +2202,31 @@
     <string name="agent_connector_claude_subtitle">Claude Code CLI 编程助手</string>
     <string name="agent_connector_claude_prompt">这是一条安装提示，用于通过 Marmot 将此 Claude Code 设置连接到 White Noise。请阅读权威 Claude Code harness 指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md，以及长期有效的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。确认前提条件：Claude Code CLI 已安装、已认证并可在 PATH 中使用，且此机器使用与手机相同的公共中继集合。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请使用经过校验和验证的 install-claude-marmot.sh 发布流程，为该 npub 引导 wn-agent 并使用允许的 welcomer，然后验证 wn-claude --version。接下来回复你的代理 npub，请我在 White Noise 中邀请它，并通过已配置的中继从这个允许的 npub 发送测试消息。在 wn-claude 通过 White Noise 回复之前，不要声称设置已完成；如果无法自动验证这一往返流程，请明确标记仍需设备验证。</string>
     <string name="ai_agents_project_groups_tip">每个项目使用单独的群组，先说明项目位置和上下文。不同连接器的会话控制不同，使用恢复会话或分支命令前请查看对应指南。</string>
+    <string name="nostr_event_view_image">查看图片</string>
+    <string name="nostr_event_image_failed">无法加载此图片，请重试。</string>
+    <string name="nostr_event_type_image">图片</string>
+    <string name="nostr_event_expand">查看完整事件</string>
+    <string name="floating_attachment_resolving">正在检查可用性</string>
+    <string name="floating_attachment_available">可在此设备上使用</string>
+    <string name="floating_attachment_remote">打开原消息查看</string>
+    <string name="floating_attachment_failed">下载失败。打开原消息重试</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="other">还有 %1$d 个附件</item>
+    </plurals>
+    <string name="profile_notifications_default">默认</string>
+    <string name="profile_notifications_muted">已静音</string>
+    <string name="profile_notifications_custom">自定义 Android 设置</string>
+    <string name="profile_notifications_custom_vibration">自定义振动</string>
+    <string name="profile_notifications_use_defaults">使用默认设置</string>
+    <string name="profile_notifications_mute">将此人的通知静音</string>
+    <string name="profile_notifications_system">声音和系统行为</string>
+    <string name="profile_notifications_android_vibration">由 Android 设置</string>
+    <string name="profile_notification_scope_detail">适用于此账号所有对话中此人发送的消息。消息接收和未读数量不变。</string>
+    <string name="profile_notification_precedence">先应用聊天静音和仅提及规则，再应用此人的静音或自定义 Android 设置。使用默认设置会恢复聊天和全局设置。现有通知保留原来的渠道。</string>
+    <string name="profile_notification_channel_name">%1$s · 所有聊天中的消息</string>
+    <string name="destination_filter_all">全部聊天</string>
+    <string name="destination_filter_selected">查看已选（%1$d）</string>
+    <string name="destination_filter_label">筛选聊天</string>
+    <string name="forward_select_by_folder">按文件夹选择</string>
+    <string name="destination_filter_incomplete">部分聊天可能缺失。请重试或选择所有聊天。</string>
 </resources>

@@ -76,6 +76,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsHistorySession
 import dev.ipf.whitenoise.android.audio.tts.TtsPlaybackForegroundService
 import dev.ipf.whitenoise.android.audio.tts.TtsResolutionResult
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVoiceResolution
 import dev.ipf.whitenoise.android.audio.tts.adoptTtsEngineSelection
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
@@ -1270,6 +1271,10 @@ class WhiteNoiseAppState private constructor(
     private val mediaCacheRevisionState = MutableStateFlow(0L)
     internal val mediaCacheRevision: StateFlow<Long> = mediaCacheRevisionState.asStateFlow()
 
+    /** Decoded-thumbnail membership changes independently of plaintext availability. */
+    private val mediaThumbnailRevisionState = MutableStateFlow(0L)
+    internal val mediaThumbnailRevision: StateFlow<Long> = mediaThumbnailRevisionState.asStateFlow()
+
     /** Publishes one observable revision for an L1 or encrypted-L2 cache mutation. */
     private fun bumpMediaCacheRevision() {
         mediaCacheRevisionState.update { it + 1L }
@@ -1348,13 +1353,16 @@ class WhiteNoiseAppState private constructor(
         thumbnail: android.graphics.Bitmap,
     ) {
         assertMainThread { "cacheMediaThumbnail" }
-        mediaThumbnailCache.put(cacheKey, thumbnail)
+        val previous = mediaThumbnailCache.put(cacheKey, thumbnail)
+        if (mediaThumbnailCache.get(cacheKey) === thumbnail || previous != null) {
+            mediaThumbnailRevisionState.update { it + 1L }
+        }
     }
 
     internal fun removeMediaMemoryCacheEntry(cacheKey: String) {
         assertMainThread { "removeMediaMemoryCacheEntry" }
         mediaPlaintextCache.remove(cacheKey)
-        mediaThumbnailCache.remove(cacheKey)
+        if (mediaThumbnailCache.remove(cacheKey) != null) mediaThumbnailRevisionState.update { it + 1L }
         bumpMediaCacheRevision()
     }
 
@@ -1517,6 +1525,9 @@ class WhiteNoiseAppState private constructor(
     // owns decrypted text that must stop when its account is removed.
     private var ttsSpeechAccountRef: String? = null
 
+    /** Reader controls may only address speech owned by the current local account. */
+    internal fun ownsCurrentAccountSpeech(): Boolean = ttsSpeechAccountRef?.let { it == activeAccountRef } == true
+
     fun ownsTtsAutoReadSession(groupIdHex: String): Boolean {
         val key = ttsAutoReadSessionKey ?: return false
         return key == ttsAutoReadKey(activeAccountRef, groupIdHex)
@@ -1569,24 +1580,58 @@ class WhiteNoiseAppState private constructor(
         return started
     }
 
+    /**
+     * Prepares reader text off the controller lock, preserving caller/account ownership through playback commit.
+     * Account-switch generation prevents an A-B-A return from reviving old work. Cleanup is session-scoped so
+     * a revoked or cancelled request cannot clear a replacement queue's ownership.
+     */
     suspend fun speakAloudPrepared(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
         startSentenceIndex: Int = 0,
         startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
+        isCurrent: () -> Boolean = { true },
     ): Boolean {
         val ownerAccount = activeAccountRef
-        return ttsController
-            .speakAsync(entries, locale, startSentenceIndex, startRenderedHit) {
-                ttsSpeechAccountRef = ownerAccount
-                TtsPlaybackForegroundService.start(appContext)
-            }.also { started ->
-                if (started) {
+        val ownerGeneration = accountSwitchHandoff.capture()
+        var preparingSessionId: Long? = null
+        try {
+            val started =
+                ttsController.speakAsync(
+                    entries,
+                    locale,
+                    startSentenceIndex,
+                    startRenderedHit,
+                    isCurrent = {
+                        isCurrent() &&
+                            activeAccountRef == ownerAccount &&
+                            accountSwitchHandoff.isCurrent(ownerGeneration)
+                    },
+                ) {
+                    preparingSessionId = ttsController.state.value.sessionId
                     ttsSpeechAccountRef = ownerAccount
+                    TtsPlaybackForegroundService.start(appContext)
+                }
+            if (started) {
+                ttsSpeechAccountRef = ownerAccount
+                ttsAutoReadSessionKey = null
+                ttsHistorySession.onSessionCleared()
+            }
+            return started
+        } finally {
+            // Check and clear under the same monitor as queue starts, not against a stale Idle snapshot.
+            synchronized(ttsController) {
+                val state = ttsController.state.value
+                if (state is TtsState.Idle &&
+                    state.sessionId == preparingSessionId &&
+                    ttsSpeechAccountRef == ownerAccount
+                ) {
+                    ttsSpeechAccountRef = null
                     ttsAutoReadSessionKey = null
                     ttsHistorySession.onSessionCleared()
                 }
             }
+        }
     }
 
     suspend fun speakAloudAutoRead(
@@ -3453,7 +3498,7 @@ class WhiteNoiseAppState private constructor(
     fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
 
     /** Account-wide forward targets beyond the active controller's window (#2618); null when none is attached. */
-    internal suspend fun loadAccountWideForwardTargets(): List<ChatListItem>? {
+    internal suspend fun loadAccountWideForwardTargets(): AccountWideForwardTargets? {
         val controller = chatsController ?: return null
         return controller.loadAccountWideForwardTargets()
     }
@@ -5249,14 +5294,18 @@ class WhiteNoiseAppState private constructor(
                 globalBubbleColors.clear()
             }
             var publishedAccounts = accounts
-            accountListLifetime.runIfCurrent(requestToken) {
-                accountSetup.acceptAccounts(setupAccounts)
-                accounts = refreshedAccounts
-                refreshNativeAttachmentPermissions()
-                releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-                publishedAccounts = refreshedAccounts
+            val accepted =
+                accountListLifetime.runIfCurrent(requestToken) {
+                    accountSetup.acceptAccounts(setupAccounts)
+                    accounts = refreshedAccounts
+                    refreshNativeAttachmentPermissions()
+                    releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+                    publishedAccounts = refreshedAccounts
+                }
+            if (accepted) {
+                retainProfileAlertsForAccounts(refreshedAccounts) { accountListLifetime.isCurrent(requestToken) }
             }
-            publishedAccounts
+            if (accountListLifetime.isCurrent(requestToken)) publishedAccounts else accounts
         }
 
     /** Publishes the newest account snapshot, then refreshes unread state for that accepted set. */
@@ -6007,6 +6056,7 @@ class WhiteNoiseAppState private constructor(
         pendingSendDiagnostics.clear()
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        mediaThumbnailRevisionState.update { it + 1L }
         bumpMediaCacheRevision()
         MediaInventory.clear()
         mediaUploadSessionLifetime.advance()
@@ -6154,11 +6204,16 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Local alert write failures are retryable; completed native removal must still reconcile the active account. */
     private suspend fun clearConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
     ) {
         withContext(Dispatchers.IO) {
+            val cleared = runCatching { profileNotificationOverrides.clearAccount(accountRef) }.getOrDefault(false)
+            if (!cleared) {
+                appStateDebug { "profile alert preference cleanup will retry after an authoritative account refresh" }
+            }
             localNotificationPresenter.clearConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
         }
     }
@@ -6388,14 +6443,20 @@ class WhiteNoiseAppState private constructor(
                     marmotIo(MarmotTraceSection.ACCOUNT_LIST) { listAccounts() }
                 }
             val refreshedAccounts = refreshedAccountsResult.getOrDefault(emptyList())
-            accountListLifetime.advance {
-                accounts = refreshedAccounts
-                releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
-                // An empty list here can mean "no accounts left" or "the read failed" -- retention
-                // is an allow-list, so only prune member mutes on a genuine successful read. A
-                // transient failure must not wipe every other account's mutes (#2782 follow-up).
-                refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
-                    retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+            val retainedAccountGeneration =
+                accountListLifetime.advance {
+                    accounts = refreshedAccounts
+                    releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+                    // An empty list here can mean "no accounts left" or "the read failed" -- retention
+                    // is an allow-list, so only prune member mutes on a genuine successful read. A
+                    // transient failure must not wipe every other account's mutes (#2782 follow-up).
+                    refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
+                        retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+                    }
+                }
+            refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
+                retainProfileAlertsForAccounts(successfulAccounts) {
+                    accountListLifetime.isCurrent(retainedAccountGeneration)
                 }
             }
             refreshAccountUnreadCounts(refreshedAccounts)
@@ -11551,6 +11612,7 @@ class WhiteNoiseAppState private constructor(
             profileRevision += 1
             bumpProfileAccountRevision(accountIdHex)
             scheduleInviteNotificationIdentityRefresh(accountIdHex, presentation)
+            refreshProfileNotificationChannelLabels(accountIdHex, presentation.displayName)
         }
     }
 

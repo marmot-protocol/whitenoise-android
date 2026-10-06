@@ -77,6 +77,8 @@ data class TtsSpeakableEntry(
     val visibleLeaves: Map<String, String> = emptyMap(),
     val speechMode: SpeechMode = SpeechMode.Default,
     val speechRoles: Map<String, SpeechSourceRun> = emptyMap(),
+    /** Attachment metadata stays separate from sender identity; document speech starts directly with its body. */
+    val attachmentDisplayName: String? = null,
 )
 
 // A hazard bound, not a feature knob: an inflated unread count would anchor

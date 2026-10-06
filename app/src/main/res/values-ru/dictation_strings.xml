@@ -6,7 +6,7 @@
     <string name="notification_channel_dictation">Диктовка</string>
     <string name="notification_channel_dictation_description">Управляет активной диктовкой в поле сообщения</string>
     <string name="dictation_settings_title">Диктовка</string>
-    <string name="dictation_settings_explainer">Служба распознавания речи, установленная на этом устройстве, обрабатывает звук и может отправлять его своему поставщику. White Noise хранит полученный текст только до того, как вы вставите или отправите его.</string>
+    <string name="dictation_settings_explainer">Служба распознавания речи, установленная на этом устройстве, обрабатывает звук и может отправлять его своему поставщику. Восстановленный текст остаётся в исходном черновике.</string>
     <string name="dictation_ostt_recommendation_title">Установить Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Рекомендуемое приложение для конфиденциальной локальной расшифровки диктовки. Доступно в Zapstore, но не в Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Не удалось открыть страницу Offline Speech to Text в Zapstore.</string>
@@ -18,7 +18,7 @@
     <string name="dictation_result_paste_description">Проверить или изменить текст перед отправкой</string>
     <string name="dictation_result_send">Отправить сообщение</string>
     <string name="dictation_result_send_description">Отправляется, только если чат и черновик не изменились</string>
-    <string name="dictation_send_safety_note">Если чат или черновик изменится до отправки, диктовка останется неотправленной. Повторите отправку или выберите «Вставить», чтобы проверить текст.</string>
+    <string name="dictation_send_safety_note">Если отправка заблокирована, доступный распознанный текст восстанавливается в исходном черновике. Проверьте его перед повторной отправкой.</string>
     <string name="dictation_send_blocked">Не отправлено</string>
     <string name="dictation_retry_send">Повторить отправку</string>
     <string name="dictation_recovery_title">Диктовка требует внимания</string>
@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">Срок восстановления диктовки истёк</string>
     <string name="dictation_recovery_expired_text">Незавершённая диктовка удалена с этого устройства.</string>
     <string name="dictation_incomplete_title">Неполная диктовка</string>
-    <string name="dictation_incomplete_text">Расшифровка остановилась до завершения. Можно отправить распознанный текст или вставить его для проверки.</string>
+    <string name="dictation_incomplete_text">Расшифровка остановилась до завершения. Проверьте распознанный текст в черновике перед отправкой.</string>
     <string name="dictation_send_recognized_text">Отправить распознанный текст</string>
 </resources>

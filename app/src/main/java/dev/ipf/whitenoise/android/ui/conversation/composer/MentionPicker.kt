@@ -10,7 +10,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,6 +20,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -66,7 +66,7 @@ private fun MentionPickerRow(
     val mentionLabel = stringResource(R.string.mention_picker_member, candidate.displayName)
     ListItem(
         headlineContent = {
-            Text(
+            EmojiLabel(
                 candidate.displayName,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
