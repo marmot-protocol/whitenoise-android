@@ -43,6 +43,32 @@ class ConfiguredMessageSwipeTest {
         assertEquals(SWIPE_TEST_MESSAGE_ID, surface.controller.replyingTo?.messageIdHex)
     }
 
+    /** Local send rows expose the same Reply action before native acknowledgement and after send failure. */
+    @Test fun pendingOptimisticMessageStillReplies() {
+        render(optimistic = dev.ipf.whitenoise.android.state.MessageStatus.Pending)
+        drag(100f)
+        assertEquals(SWIPE_TEST_MESSAGE_ID, surface.controller.replyingTo?.messageIdHex)
+    }
+
+    @Test fun failedOptimisticMessageStillReplies() {
+        render(optimistic = dev.ipf.whitenoise.android.state.MessageStatus.Failed)
+        drag(100f)
+        assertEquals(SWIPE_TEST_MESSAGE_ID, surface.controller.replyingTo?.messageIdHex)
+    }
+
+    @Test fun removedOptimisticMessageCannotCommitAHeldSwipe() {
+        render(optimistic = dev.ipf.whitenoise.android.state.MessageStatus.Pending)
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(100f, 0f))
+        }
+        rule.runOnIdle {
+            surface.appState.optimisticMessages(SWIPE_TEST_ACCOUNT_REF, SWIPE_TEST_GROUP_ID).clear()
+        }
+        row().performTouchInput { up() }
+        assertNull(surface.controller.replyingTo)
+    }
+
     @Test fun defaultLeftIsInactive() {
         render()
         drag(-100f)
@@ -188,8 +214,15 @@ class ConfiguredMessageSwipeTest {
         left: SwipeAction = SwipeAction.Default,
         right: SwipeAction = SwipeAction.Default,
         rtl: Boolean = false,
+        optimistic: dev.ipf.whitenoise.android.state.MessageStatus? = null,
     ) {
-        surface = swipeTestSurface(context, reacted = true, mine = false, media = false)
+        surface = swipeTestSurface(context, reacted = true, mine = optimistic != null, media = false)
+        if (optimistic != null) {
+            val item = surface.item.copy(status = optimistic, projected = null)
+            surface.controller.removeProjectedRecord(SWIPE_TEST_MESSAGE_ID)
+            surface.appState.optimisticMessages(SWIPE_TEST_ACCOUNT_REF, SWIPE_TEST_GROUP_ID)[item.id] = item
+            surface = surface.copy(item = item)
+        }
         surface.appState.swipePreferences.set(SwipeBinding.MessageLeft, left)
         surface.appState.swipePreferences.set(SwipeBinding.MessageRight, right)
         rule.setContent {

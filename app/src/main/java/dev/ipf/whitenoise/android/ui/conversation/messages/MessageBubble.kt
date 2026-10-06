@@ -1486,7 +1486,7 @@ internal fun MessageBubble(
         /** Re-resolves the retained row and owner before reusing the normal reply/chooser handlers. */
         @Suppress("ReturnCount") // Separate missing target, owner and eligibility rejection boundaries.
         fun commitSwipe(direction: Int) {
-            val current = controller.retainedTimelineItem(record.messageIdHex) ?: return
+            val current = controller.currentActionTimelineItem(record.messageIdHex) ?: return
             val gestureCurrent = swipeMounted[0] && appState.swipePreferences.state == swipeSettings
             val ownerCurrent =
                 appState.runtimeGeneration == swipeRuntime &&

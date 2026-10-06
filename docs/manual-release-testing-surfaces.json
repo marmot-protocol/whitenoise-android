@@ -788,6 +788,12 @@
         "test_ids": ["FLD-001", "SYS-004"]
       },
       {
+        "surface": "BoxScope.ChatSwipeCue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "fun BoxScope.ChatSwipeCue(",
+        "test_ids": ["SET-032"]
+      },
+      {
         "surface": "GestureSettingsPreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
         "anchor": "fun GestureSettingsPreview(",

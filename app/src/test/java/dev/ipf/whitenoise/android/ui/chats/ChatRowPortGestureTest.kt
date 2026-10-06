@@ -45,6 +45,7 @@ class ChatRowPortGestureTest {
     private val visible = mutableStateOf(true)
     private val swipeSettings = mutableStateOf(SwipePreferenceState())
     private val swipes = mutableListOf<SwipeAction>()
+    private val heldMenu = mutableStateOf(false)
 
     /** A physical tap opens exactly once, through the native ListItem callback. */
     @Test fun tapOpensOnce() {
@@ -70,10 +71,24 @@ class ChatRowPortGestureTest {
 
     /** Range drag survives the actual row recomposing from normal mode to active selection during the gesture. */
     @Test fun verticalHoldDragKeepsItsOwnerThroughSelectionRecomposition() {
+        verifyVerticalHold()
+    }
+
+    /** An enabled ancestor swipe must not cancel the child when the menu opens or range selection begins. */
+    @Test fun configuredSwipePreservesHeldMenuAndRangeSelection() {
+        swipeSettings.value = SwipePreferenceState(chatRight = SwipeAction.PinUnpin)
+        verifyVerticalHold()
+    }
+
+    private fun verifyVerticalHold() {
         render()
         row().performTouchInput {
             down(center)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset.Zero)
+        }
+        composeRule.waitForIdle()
+        row().performTouchInput {
             moveTo(Offset(center.x, center.y + viewConfiguration.touchSlop + 24f))
         }
         composeRule.waitForIdle()
@@ -125,6 +140,10 @@ class ChatRowPortGestureTest {
         row().performTouchInput {
             down(center)
             advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            moveBy(Offset.Zero)
+        }
+        composeRule.waitForIdle()
+        row().performTouchInput {
             moveTo(Offset(center.x, center.y + viewConfiguration.touchSlop + 24f))
         }
         composeRule.runOnIdle { visible.value = false }
@@ -272,7 +291,7 @@ class ChatRowPortGestureTest {
                             ChatSwipeActions(
                                 owner = state,
                                 settings = swipeSettings.value,
-                                enabled = enabled && !selecting.value && !rangeActive.value,
+                                enabled = enabled && !selecting.value && !rangeActive.value && !heldMenu.value,
                                 leftAllowed = chatSwipeAllowed(swipeSettings.value.chatLeft, item, null),
                                 rightAllowed = chatSwipeAllowed(swipeSettings.value.chatRight, item, null),
                                 onCommit = { swipes.add(it) },
@@ -287,6 +306,7 @@ class ChatRowPortGestureTest {
                                     onOpen = { events.opens++ },
                                     onOpenProfile = { error("Named group has no DM avatar action") },
                                     onOpenActions = { events.actions++ },
+                                    onActionsHeldChange = { heldMenu.value = it },
                                     onDragSelectionStart = {
                                         events.starts++
                                         selecting.value = true

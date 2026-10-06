@@ -5,6 +5,9 @@ package dev.ipf.whitenoise.android.ui.common
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlin.math.abs
@@ -56,12 +59,13 @@ internal fun Modifier.directionalSwipe(
     onDistance: (Float, Int) -> Unit,
     onRelease: (Int) -> Unit,
     onCancel: () -> Unit,
+    canRecognize: (Int) -> Boolean = { true },
 ): Modifier =
     if (!left && !right) {
         this
     } else {
         pointerInput(owner, settings, left, right) {
-            detectDirectionalSwipe(left, right, onDistance, onRelease, onCancel)
+            detectDirectionalSwipe(left, right, onDistance, onRelease, onCancel, canRecognize)
         }
     }
 
@@ -73,24 +77,34 @@ private suspend fun PointerInputScope.detectDirectionalSwipe(
     onDistance: (Float, Int) -> Unit,
     onRelease: (Int) -> Unit,
     onCancel: () -> Unit,
+    canRecognize: (Int) -> Boolean,
 ) {
     try {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
+            if (!canRecognize(0)) return@awaitEachGesture
             val intent = DirectionalSwipeIntent(viewConfiguration.touchSlop, left, right)
             while (true) {
                 val event = awaitPointerEvent()
-                val change = event.changes.firstOrNull { it.id == down.id }
-                if (change == null || event.changes.count { it.pressed } > 1 || change.isConsumed) {
+                val change = event.exclusiveSwipeChange(down.id)
+                if (change == null) {
+                    onCancel()
+                    break
+                }
+                if (!canRecognize(intent.direction)) {
                     onCancel()
                     break
                 }
                 if (!change.pressed) {
-                    if (intent.direction != 0 && !intent.cancelled) onRelease(intent.direction) else onCancel()
+                    intent.release(onRelease, onCancel)
                     break
                 }
                 val delta = change.position - change.previousPosition
                 if (intent.move(delta.x, delta.y)) {
+                    if (!canRecognize(intent.direction)) {
+                        onCancel()
+                        break
+                    }
                     change.consume()
                     onDistance(abs(intent.x), intent.direction)
                 } else if (intent.cancelled) {
@@ -105,3 +119,17 @@ private suspend fun PointerInputScope.detectDirectionalSwipe(
 }
 
 private const val HORIZONTAL_DOMINANCE = 1.2f
+
+/** Another recognizer or a second pressed pointer revokes this stream before horizontal consumption. */
+private fun PointerEvent.exclusiveSwipeChange(id: PointerId): PointerInputChange? =
+    changes.firstOrNull { it.id == id }?.takeUnless {
+        it.isConsumed || changes.count { pointer -> pointer.pressed } > 1
+    }
+
+/** An unclaimed or abandoned stream never dispatches a release action. */
+private fun DirectionalSwipeIntent.release(
+    onRelease: (Int) -> Unit,
+    onCancel: () -> Unit,
+) {
+    if (direction != 0 && !cancelled) onRelease(direction) else onCancel()
+}

@@ -7070,6 +7070,19 @@ class ConversationController(
         return timelineItemsById[itemId]
     }
 
+    /** Resolves a current visible action target, including local sends, without trusting a stale Compose row. */
+    internal fun currentActionTimelineItem(messageId: String): TimelineMessage? {
+        val item =
+            optimisticMessages.values.firstOrNull { it.record.messageIdHex == messageId }
+                ?: retainedTimelineItem(messageId) ?: return null
+        val order = firstMessageOrder(sweepExpiryMessages().map { it.record.messageIdHex })
+        val gone =
+            item.projected?.deleted == true ||
+                MessageProjector.isDeleted(messageId, deletedMessageIds) ||
+                isTimelineRecordLocallyExpired(clockMillis(), item.record, localExpiryRow(item, order))
+        return item.takeUnless { gone }
+    }
+
     /** The retained row's expiry input, ordered like the timeline filter and the sweep (optimistic ids first). */
     private fun retainedExpiryRow(messageId: String): Pair<TimelineMessage, DisappearingMessageSweep.LocalExpiryRow>? {
         val item = retainedTimelineItem(messageId) ?: return null
