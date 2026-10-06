@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -60,6 +61,25 @@ class ConversationDictationRecoveryScreenshotTest {
             retryAudio = true,
         )
 
+    /** Retained audio/settings remain accessible while a changed recovered draft refuses partial Send. */
+    @Test
+    fun changedRecoveryDraftDisablesPartialSend() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ConversationDictationPartialSendDialog(
+                    onDismiss = {},
+                    onSend = {},
+                    sendEnabled = false,
+                    onOpenSettings = {},
+                    settingsLabel = "Retry",
+                )
+            }
+        }
+        composeRule.onNodeWithText("Send recognized text").assertIsNotEnabled()
+        composeRule.onNodeWithText("Retry").assertIsDisplayed()
+        composeRule.onNodeWithText("Paste").assertDoesNotExist()
+    }
+
     private fun capture(
         name: String,
         dark: Boolean,
@@ -79,7 +99,6 @@ class ConversationDictationRecoveryScreenshotTest {
                         ConversationDictationPartialSendDialog(
                             onDismiss = {},
                             onSend = {},
-                            onPaste = {},
                             onOpenSettings = {},
                             settingsLabel = recoveryLabel,
                         )
@@ -94,7 +113,7 @@ class ConversationDictationRecoveryScreenshotTest {
                 .captureRoboImage("build/outputs/roborazzi/diagnostics/$name")
         }
         assertWholeAction("Send recognized text")
-        assertWholeAction("Paste")
+        composeRule.onNodeWithText("Paste", useUnmergedTree = true).assertDoesNotExist()
         assertWholeAction(recoveryLabel)
         composeRule.onNodeWithTag("dictation-partial-send-dialog").captureRoboImage("src/test/snapshots/$name")
     }

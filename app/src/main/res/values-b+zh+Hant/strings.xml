@@ -1826,7 +1826,7 @@
     <string name="discard">捨棄</string>
     <string name="open_app_settings">開啟應用程式設定</string>
     <string name="dictation_disclosure_title">外部語音辨識</string>
-    <string name="dictation_disclosure_message">此裝置上安裝的語音服務會處理你說的內容，並可能將音訊傳送給其供應商。White Noise 只會在你貼上或傳送前保留傳回的文字。除非你在「聽寫」設定中開啟，否則不會自動傳送。</string>
+    <string name="dictation_disclosure_message">此裝置上安裝的語音服務會處理你說的內容，並可能將音訊傳送給其供應商。發生錯誤後，辨識的文字可能會自動儲存到原始草稿中。除非你在「聽寫」設定中開啟，否則不會自動傳送。</string>
     <string name="dictation_continue">繼續</string>
     <string name="dictation_microphone_muted">麥克風存取已關閉</string>
     <string name="dictation_microphone_muted_help">請在 Android 隱私權設定或快速設定中開啟麥克風存取，然後重試聽寫。</string>

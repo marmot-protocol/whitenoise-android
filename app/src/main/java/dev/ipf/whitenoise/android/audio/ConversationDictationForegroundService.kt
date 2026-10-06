@@ -176,26 +176,18 @@ internal class ConversationDictationForegroundService(
             true
         } catch (_: SecurityException) {
             conversationDictationDiagnostic("event=foreground_service_promotion_rejected type=SecurityException")
-            cancelRejectedPromotion(controller, sessionToken, startId)
+            controller.onDurableServiceStartFailed(sessionToken)
+            service.foreground.releaseDictation(startId)
             false
         } catch (error: RuntimeException) {
             if (!error.isForegroundServiceStartRejection()) throw error
             conversationDictationDiagnostic(
                 "event=foreground_service_promotion_rejected type=${error.javaClass.simpleName}",
             )
-            cancelRejectedPromotion(controller, sessionToken, startId)
+            controller.onDurableServiceStartFailed(sessionToken)
+            service.foreground.releaseDictation(startId)
             false
         }
-
-    /** Releases controller ownership and stops this service after foreground promotion is rejected. */
-    private fun cancelRejectedPromotion(
-        controller: ConversationDictationController,
-        sessionToken: String,
-        startId: Int,
-    ) {
-        controller.onDurableServiceStartFailed(sessionToken)
-        service.foreground.releaseDictation(startId)
-    }
 
     /** Fails capture closed when Android removes the service that authorized background microphone use. */
     fun onDestroy() {
@@ -214,6 +206,13 @@ internal class ConversationDictationForegroundService(
         promotedSessionToken = null
         if (activeService === this) activeService = null
         service.foreground.releaseDictation()
+    }
+
+    /** A completed controller must release the adapter owned by the current Android host. */
+    internal fun releaseIfCompleted(): Boolean {
+        if (promotedController?.hasDurableSession == true) return false
+        removeForegroundNotification()
+        return true
     }
 
     /** Keeps system controls truthful when capture becomes finalization or an irrevocable dispatch. */
@@ -362,10 +361,10 @@ internal class ConversationDictationForegroundService(
         /** Releases only dictation; connection work keeps the shared host alive. */
         @Suppress("UNUSED_PARAMETER") // Existing controller API accepts its application context.
         fun stop(context: Context) {
-            activeService
-                ?.takeIf { it.promotedController?.hasDurableSession != true }
-                ?.removeForegroundNotification()
-            conversationDictationDiagnostic("event=foreground_service_stop accepted=true")
+            val accepted = NotificationStreamForegroundService.releaseCompletedDictation()
+            conversationDictationDiagnostic(
+                "event=foreground_service_stop accepted=$accepted",
+            )
         }
 
         internal const val ACTION_START = "dev.ipf.whitenoise.android.dictation.START"

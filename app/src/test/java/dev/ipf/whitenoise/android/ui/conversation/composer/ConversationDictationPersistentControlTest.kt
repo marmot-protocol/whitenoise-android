@@ -15,6 +15,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -166,7 +167,7 @@ class ConversationDictationPersistentControlTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
-    /** An uncertain dispatch stays visible without an edit action or duplicate draft text. */
+    /** The first rendered uncertain-delivery state exposes recovered text without a second recovery action. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun uncertainDeliveryShowsStatusWithoutAnEditOrRetryAction() =
@@ -187,7 +188,7 @@ class ConversationDictationPersistentControlTest {
             runCurrent()
             render(fixture)
 
-            assertEquals("Draft", fixture.draft.text)
+            assertEquals("dictated words Draft", fixture.draft.text)
             assertEquals(1, dispatches)
             val failed = fixture.controller.state as ConversationDictationState.Failed
             assertEquals(ConversationDictationFailure.DeliveryUnknown, failed.reason)
@@ -209,7 +210,7 @@ class ConversationDictationPersistentControlTest {
     /** The visible retry for a blocked Send sends retained text instead of pasting or recording again. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun blockedSendOffersExplicitPasteAndRetrySend() =
+    fun blockedSendRecoversDraftAndOffersRetrySend() =
         runTest {
             var accepted = false
             val sent = mutableListOf<String>()
@@ -231,8 +232,8 @@ class ConversationDictationPersistentControlTest {
             fixture.platform.listener.onResult("dictated")
             runCurrent()
             render(fixture)
-            assertEquals("Draft", fixture.draft.text)
-            composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+            assertEquals("Draft dictated", fixture.draft.text)
+            composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
             composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
             composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
             accepted = true
@@ -243,19 +244,19 @@ class ConversationDictationPersistentControlTest {
             assertTrue(fixture.controller.state is ConversationDictationState.Idle)
         }
 
-    /** Recovery into a changed draft requires an actual Paste gesture. */
+    /** Recognized text is recovered automatically without sending another writer's edits. */
     @Test
-    fun blockedSendExplicitPasteRecoversIntoChangedDraftWithoutSending() {
+    fun blockedSendAutomaticallyRecoversIntoChangedDraftWithoutSending() {
         val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         fixture.controller.send()
         fixture.edit(TextFieldValue("Updated", TextRange(7)))
         fixture.platform.listener.onResult("dictated")
         render(fixture)
-        assertEquals("Updated", fixture.draft.text)
-        composeRule.onNodeWithContentDescription("Paste").performClick()
         assertEquals("Updated dictated", fixture.draft.text)
-        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Retry Send").assertIsNotEnabled()
+        assertTrue(fixture.controller.state is ConversationDictationState.Failed)
     }
 
     /** Verifies provider-readiness feedback and cancellation fit at large font in RTL. */
@@ -313,7 +314,7 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithContentDescription("Open the speech service").assertIsDisplayed()
     }
 
-    /** Recognition failure keeps the unsent outcome explicit and offers review through Paste. */
+    /** Recognition failure keeps the unsent outcome explicit without a manual text-recovery action. */
     @Test
     fun partialSendFailureNamesBothUnsentOutcomeAndCause() {
         val fixture = fixture(TextFieldValue(""))
@@ -340,7 +341,7 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
         )
-        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Retry Send").performClick()
@@ -375,7 +376,7 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
         )
-        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Retry Send").performClick()
@@ -383,9 +384,9 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
     }
 
-    /** A failed Paste tail keeps its recognized prefix accessible alongside audio Retry and Dismiss. */
+    /** Error controls retain audio Retry and Dismiss without a manual text-recovery action. */
     @Test
-    fun failedAudioPrefixOffersPasteAtLargeRtl() {
+    fun failedAudioPrefixOffersRetryAndDismissAtLargeRtl() {
         val fixture = fixture(TextFieldValue(""))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         val initial = fixture.controller.state
@@ -402,7 +403,7 @@ class ConversationDictationPersistentControlTest {
                     recognitionIncomplete = true,
                 ),
         )
-        listOf("Paste", "Retry", "Dismiss").forEach { label ->
+        listOf("Retry", "Dismiss").forEach { label ->
             val bounds = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
             assertTrue(bounds.right - bounds.left >= 48.dp)
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
@@ -429,7 +430,7 @@ class ConversationDictationPersistentControlTest {
         )
         composeRule.onNodeWithContentDescription("Retry Send").performClick()
         composeRule.onNodeWithText("Open the speech service").assertIsDisplayed()
-        composeRule.onNodeWithText("Paste").assertIsDisplayed()
+        composeRule.onNodeWithText("Paste").assertDoesNotExist()
     }
 
     /** Completed recognition that failed validation must not be described as interrupted speech. */
@@ -451,7 +452,7 @@ class ConversationDictationPersistentControlTest {
         )
         composeRule.onNodeWithContentDescription("Retry Send").performClick()
         composeRule.onAllNodesWithText("Incomplete dictation").assertCountEquals(0)
-        composeRule.onNodeWithContentDescription("Paste").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Paste").assertDoesNotExist()
     }
 
     /** Unknown recognition failures still require explicit consent before sending a prefix. */

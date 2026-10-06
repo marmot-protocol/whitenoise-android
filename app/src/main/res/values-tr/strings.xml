@@ -1853,7 +1853,7 @@
     <string name="discard">Sil</string>
     <string name="open_app_settings">Uygulama ayarlarını aç</string>
     <string name="dictation_disclosure_title">Harici konuşma tanıma</string>
-    <string name="dictation_disclosure_message">Bu cihazda yüklü konuşma hizmeti söylediklerinizi işler ve sesi sağlayıcısına gönderebilir. White Noise, döndürülen metni yalnızca siz yapıştırana veya gönderene kadar saklar. Dikte ayarlarından açmadığınız sürece otomatik gönderme kapalıdır.</string>
+    <string name="dictation_disclosure_message">Bu cihazda yüklü konuşma hizmeti söylediklerinizi işler ve sesi sağlayıcısına gönderebilir. Bir hatadan sonra tanınan metin özgün taslağa otomatik olarak kaydedilebilir. Dikte ayarlarından açmadığınız sürece otomatik gönderme kapalıdır.</string>
     <string name="dictation_continue">Devam</string>
     <string name="dictation_microphone_muted">Mikrofon erişimi kapalı</string>
     <string name="dictation_microphone_muted_help">Android gizlilik ayarlarından veya Hızlı Ayarlar’dan mikrofon erişimini açın, ardından dikteyi tekrar deneyin.</string>
