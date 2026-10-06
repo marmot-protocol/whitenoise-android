@@ -161,7 +161,8 @@ secrets:
 - `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX`
 - `WHITENOISE_PUSH_RELAY_HINT`
 
-Run the same fast checks locally before pushing:
+Human contributors can run these checks locally before pushing. Coding agents
+use hosted CI and the [CI request policy](docs/ci-request-policy.md):
 
 ```bash
 ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin

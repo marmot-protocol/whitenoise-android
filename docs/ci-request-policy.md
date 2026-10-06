@@ -37,6 +37,11 @@ default branch, not PR-controlled workflow code. The workflow resolves and
 rechecks the open internal PR's exact head; the separate trusted publisher
 validates both candidates before signing, upload and description updates.
 
+Play-flavor release packaging and minification are checked by the requested
+preview build; core debug checks do not replace that coverage. For Play-specific
+release packaging or shrinker changes, request the current-head previews before
+readiness and inspect their build results.
+
 The description's preview links belong only to their displayed source revision.
 A new push makes an older preview unsuitable for current-head test proof. Verify
 the full head/artifact provenance through the existing handoff before recording
@@ -48,7 +53,8 @@ they are not permission to use old APKs or build a substitute locally.
 The core workflow always starts and reports the existing required check. Its
 `changes` job examines the **whole PR diff**, with rename detection disabled.
 A separate `tooling-contracts` job runs the non-Gradle tooling/metadata/manual-guide/
-fuzz-policy validators in parallel; it does not delay Android job startup.
+fuzz-policy validators in parallel, including the preview security/update
+contracts; it does not delay Android job startup.
 Only ordinary non-executable Markdown blobs in the named root guides or `docs/`
 qualify. JSON inventories, source-tree Markdown, build/workflow inputs,
 executables, symlinks, deleted code and unknown paths require full Android CI.

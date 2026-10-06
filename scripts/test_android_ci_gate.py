@@ -360,6 +360,14 @@ class AndroidCiGateTest(unittest.TestCase):
                 outcomes[job]['result'] = 'skipped'
         return outcomes
 
+    def test_preview_security_contracts_always_run_without_building_apks(self):
+        step = self.named_step(self.tooling_contracts, "Test preview security and update contracts")
+        self.assertNotIn("        if:", step)
+        self.assertNotIn("continue-on-error:", step)
+        self.assertIn("bash .github/scripts/test-pr-preview-contract.sh", step)
+        self.assertIn("bash .github/scripts/test-pr-preview-validation.sh", step)
+        self.assertNotIn("./gradlew", step)
+
     def test_slow_tooling_does_not_block_android_job_start(self):
         self.assertNotIn('    needs:', self.tooling_contracts.split('    steps:', 1)[0])
         for name in ('offline-zsp', 'build-contracts', 'compose-compiler',

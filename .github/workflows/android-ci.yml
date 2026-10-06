@@ -94,6 +94,11 @@ jobs:
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 
+      - name: Test preview security and update contracts
+        run: |
+          bash .github/scripts/test-pr-preview-contract.sh
+          bash .github/scripts/test-pr-preview-validation.sh
+
       - name: Test PR preview publisher
         run: bash .github/scripts/test-publish-pr-apk-to-github-release.sh
 
