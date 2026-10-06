@@ -215,23 +215,7 @@ internal fun preparedHitFromRenderedHit(
     entry: dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry,
     hit: RenderedTextHit,
 ): dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? {
-    val projection =
-        SpeakableTextProjection(
-            text = entry.text,
-            spans =
-                entry.spokenTextSpans.map { span ->
-                    SpeakableTextProjectionSpan(
-                        span.spoken.start,
-                        span.spoken.end,
-                        span.visible.leafId,
-                        span.visible.start,
-                        span.visible.end,
-                    )
-                },
-            projectionId = entry.projectionId,
-            visibleLeaves = entry.visibleLeaves,
-            speechRoles = entry.speechRoles,
-        )
+    val projection = entry.speakableProjection()
     return sourceOffsetAtRenderedHit(projection, hit)?.let { (leafId, offset) ->
         projection.visibleLeaves[leafId]?.let { original ->
             dev.ipf.whitenoise.android.audio.tts.speech
@@ -239,6 +223,25 @@ internal fun preparedHitFromRenderedHit(
         }
     }
 }
+
+/** Shares the exact entry projection between reader rendering and prepared seek mapping. */
+internal fun dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry.speakableProjection(): SpeakableTextProjection =
+    SpeakableTextProjection(
+        text = text,
+        spans =
+            spokenTextSpans.map { span ->
+                SpeakableTextProjectionSpan(
+                    span.spoken.start,
+                    span.spoken.end,
+                    span.visible.leafId,
+                    span.visible.start,
+                    span.visible.end,
+                )
+            },
+        projectionId = projectionId,
+        visibleLeaves = visibleLeaves,
+        speechRoles = speechRoles,
+    )
 
 /** Shares exact rendered-to-source alignment between selection startup and active playback seeking. */
 @Suppress("ReturnCount")

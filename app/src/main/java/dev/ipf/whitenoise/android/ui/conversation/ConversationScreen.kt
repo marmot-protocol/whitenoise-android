@@ -2334,13 +2334,26 @@ internal fun ConversationScreen(
                     return@launch
                 }
                 if (!navigationRequest.isCurrent()) return@launch
-                val centered =
-                    centerTimelineItemAt(
-                        targetMessageId,
-                        requireNotNull(currentTimelineListIndex(targetMessageId)),
-                        ConversationScrollReason.Mention,
+                val reached =
+                    scrollCoordinator.jumpToMentionReadingStart(
+                        targetMessageId = targetMessageId,
+                        resolveTargetIndex = { currentTimelineListIndex(targetMessageId) },
+                        readLayout = { index ->
+                            val layout = timelineViewport.readingLayoutInfo()
+                            ConversationMentionJumpLayout(
+                                viewportEndOffsetPx = layout.viewportEndOffset,
+                                itemHeightPx =
+                                    layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
+                                estimatedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
+                            )
+                        },
+                        onCompleted = {
+                            if (navigationRequest.isCurrent()) {
+                                scrollCoordinator.settleReadingAt(currentScrollAnchor())
+                            }
+                        },
                     )
-                if (!centered) return@launch
+                if (!reached || !navigationRequest.isCurrent()) return@launch
                 // Mark read up to the visited mention so the count — and the
                 // chat-list @-badge — decrement in step; advance the local read
                 // anchor so the chip's derived count updates immediately.
@@ -4286,7 +4299,8 @@ internal fun ConversationScreen(
                         rememberKeptMessageEntries(keptMessagesController, keptAccountRef) { key ->
                             controller.timeline.firstOrNull { row ->
                                 key.groupIdHex == controller.group.groupIdHex &&
-                                    row.record.messageIdHex == key.messageIdHex
+                                    row.record.messageIdHex == key.messageIdHex &&
+                                    !MessageProjector.isDeleted(row.record.messageIdHex, controller.deletedMessageIds)
                             }
                         }
                     val youLabel = stringResource(R.string.you)
@@ -4297,6 +4311,8 @@ internal fun ConversationScreen(
                             youLabel = youLabel,
                             isMine = controller::isMessageMine,
                             senderName = appState::displayName,
+                            controller = controller,
+                            thumbnailRevision = mediaCacheRevision,
                         )
                     KeptMessagesOverlay(
                         state = KeptMessagesOverlayState(keptEntries, keptMessagesController, keptAccountRef),

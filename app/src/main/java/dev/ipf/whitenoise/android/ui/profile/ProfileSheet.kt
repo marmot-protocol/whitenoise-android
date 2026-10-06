@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -103,6 +104,7 @@ import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.memberMutePreferences
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
+import dev.ipf.whitenoise.android.state.profileNotificationOverrides
 import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
@@ -422,6 +424,7 @@ private val ProfileAdminGlyphSize = 24.dp
 private enum class ProfileSheetPage {
     PROFILE,
     GROUPS_IN_COMMON,
+    NOTIFICATIONS,
     ADD_TO_GROUPS,
     MAKE_ADMIN,
 }
@@ -556,6 +559,7 @@ internal fun ProfileSheet(
     var creatingChat by remember(npub) { mutableStateOf(false) }
     var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
     var page by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
+    var notificationEntry by remember(npub) { mutableStateOf(Any()) }
     var pickerParent by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
@@ -646,7 +650,10 @@ internal fun ProfileSheet(
             when (page) {
                 ProfileSheetPage.ADD_TO_GROUPS -> addableGroupsState.pendingGroupIds
                 ProfileSheetPage.MAKE_ADMIN -> promotableGroupsState.pendingGroupIds
-                ProfileSheetPage.PROFILE, ProfileSheetPage.GROUPS_IN_COMMON -> emptySet()
+                ProfileSheetPage.PROFILE,
+                ProfileSheetPage.GROUPS_IN_COMMON,
+                ProfileSheetPage.NOTIFICATIONS,
+                -> emptySet()
             }
         if (pendingGroupIds.isNotEmpty()) {
             appState.requestProfileGroupMembers(pendingGroupIds)
@@ -755,6 +762,11 @@ internal fun ProfileSheet(
         }
     }
 
+    val notificationRevision by appState.profileNotificationOverrides.state.collectAsStateWithLifecycle()
+    val profileNotificationSelection =
+        remember(accountAtOpen, hex, notificationRevision) {
+            appState.profileNotificationOverrides.get(accountAtOpen, hex)
+        }
     val profileContent: @Composable () -> Unit = {
         PersonProfileContent(
             person =
@@ -787,6 +799,18 @@ internal fun ProfileSheet(
             copied = copied,
             onBack = { if (!creatingChat) owner.leave { currentDismiss() } },
             onMessage = { openOrCreateProfileChat() },
+            notificationSummary =
+                if (accountAtOpen != null && hex != null && !targetIsSelf) {
+                    profileNotificationSummary(profileNotificationSelection)
+                } else {
+                    null
+                },
+            onNotifications = {
+                if (owner.canAct()) {
+                    notificationEntry = Any()
+                    page = ProfileSheetPage.NOTIFICATIONS
+                }
+            },
             block =
                 hex?.takeIf { !targetIsSelf }?.let {
                     ProfileBlockRowState(
@@ -1043,6 +1067,25 @@ internal fun ProfileSheet(
                             avatar = { id -> sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image } },
                         )
                     }
+                ProfileSheetPage.NOTIFICATIONS -> {
+                    val author = hex
+                    if (accountAtOpen != null && author != null && !targetIsSelf) {
+                        key(notificationEntry) {
+                            val entry = notificationEntry
+                            ProfileNotificationOverrideRoot(
+                                appState.profileNotificationOverrides,
+                                accountAtOpen,
+                                author,
+                                displayTitle,
+                                ownerIsCurrent = {
+                                    val sameEntry = notificationEntry === entry
+                                    owner.canAct() && page == ProfileSheetPage.NOTIFICATIONS && sameEntry
+                                },
+                                onBack = { page = ProfileSheetPage.PROFILE },
+                            )
+                        }
+                    }
+                }
                 ProfileSheetPage.PROFILE -> profileContent()
             }
         }

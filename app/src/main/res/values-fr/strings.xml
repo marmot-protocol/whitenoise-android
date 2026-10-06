@@ -2235,4 +2235,23 @@
     <string name="nostr_event_image_failed">Impossible de charger cette image. Réessayez.</string>
     <string name="nostr_event_type_image">Photo</string>
     <string name="nostr_event_expand">Voir l’événement complet</string>
+    <string name="floating_attachment_resolving">Vérification de la disponibilité</string>
+    <string name="floating_attachment_available">Disponible sur cet appareil</string>
+    <string name="floating_attachment_remote">Ouvrez l’original pour le consulter</string>
+    <string name="floating_attachment_failed">Échec du téléchargement. Ouvrez l’original pour réessayer</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">%1$d pièce jointe supplémentaire</item>
+        <item quantity="other">%1$d pièces jointes supplémentaires</item>
+    </plurals>
+    <string name="profile_notifications_default">Par défaut</string>
+    <string name="profile_notifications_muted">En sourdine</string>
+    <string name="profile_notifications_custom">Réglages Android personnalisés</string>
+    <string name="profile_notifications_custom_vibration">Vibration personnalisée</string>
+    <string name="profile_notifications_use_defaults">Utiliser les réglages par défaut</string>
+    <string name="profile_notifications_mute">Couper les notifications de cette personne</string>
+    <string name="profile_notifications_system">Son et comportement du système</string>
+    <string name="profile_notifications_android_vibration">Défini par Android</string>
+    <string name="profile_notification_scope_detail">Ce réglage concerne les messages de cette personne dans toutes les conversations de ce compte. La réception et le nombre de messages non lus restent inchangés.</string>
+    <string name="profile_notification_precedence">Les règles de sourdine du chat et de mentions uniquement sont prioritaires. Viennent ensuite la sourdine ou les réglages Android personnalisés de cette personne. Les réglages par défaut rétablissent ceux du chat et les réglages globaux. Les notifications existantes gardent leur canal initial.</string>
+    <string name="profile_notification_channel_name">%1$s · Messages dans tous les chats</string>
 </resources>

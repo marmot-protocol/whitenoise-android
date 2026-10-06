@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOverlayBackRegistrar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -176,6 +177,7 @@ class ComposerImeHandoffBackTest {
             WhiteNoiseTheme {
                 Surface {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue = harness.value,
                         composerFocus = harness.focusRequester,
                         emojiPickerOpen = false,

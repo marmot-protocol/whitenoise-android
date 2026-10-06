@@ -113,6 +113,7 @@ class ActionColorScreenBehaviorTest {
         appState.updateActionColor(BubbleTheme.Light, 0xFFFFFFFFL)
         var primary = Color.Unspecified
         var onPrimary = Color.Unspecified
+        var primaryContainer = Color.Unspecified
         composeRule.setContent {
             val dark = appState.themeMode == AppThemeMode.Dark
             val theme = if (dark) BubbleTheme.Dark else BubbleTheme.Light
@@ -121,13 +122,14 @@ class ActionColorScreenBehaviorTest {
                 SideEffect {
                     primary = scheme.primary
                     onPrimary = scheme.onPrimary
+                    primaryContainer = scheme.primaryContainer
                 }
                 ActionColorScreen(appState = appState, onBack = { backCount++ })
             }
         }
-        composeRule.runOnIdle { assertEquals(Color.White, primary) }
+        composeRule.runOnIdle { assertEquals(Color.White, primaryContainer) }
         composeRule.onNodeWithTag("action_color.reset").performClick()
-        composeRule.runOnIdle { assertEquals(Color.White, primary) }
+        composeRule.runOnIdle { assertEquals(Color.White, primaryContainer) }
         composeRule.onNodeWithTag("action_color.save").performClick()
         composeRule.runOnIdle {
             assertNull(appState.actionColorArgb(BubbleTheme.Light))

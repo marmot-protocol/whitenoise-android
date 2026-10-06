@@ -368,7 +368,7 @@ class MessageBubbleAmoledStyleTest {
                             mine = false,
                             customArgb = resolveBubbleColorArgb(chatArgb, globalArgb, 0L),
                         )
-                    val action = MaterialTheme.colorScheme.primary
+                    val action = MaterialTheme.colorScheme.primaryContainer
                     SideEffect {
                         assertEquals(Color(actionArgb), action)
                         assertEquals(base.primary, colorFromArgb(mine.backgroundArgb))

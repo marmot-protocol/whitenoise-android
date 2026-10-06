@@ -2252,4 +2252,23 @@
     <string name="nostr_event_image_failed">Dieses Bild konnte nicht geladen werden. Versuche es erneut.</string>
     <string name="nostr_event_type_image">Bild</string>
     <string name="nostr_event_expand">Vollständiges Ereignis anzeigen</string>
+    <string name="floating_attachment_resolving">Verfügbarkeit wird geprüft</string>
+    <string name="floating_attachment_available">Auf diesem Gerät verfügbar</string>
+    <string name="floating_attachment_remote">Original zum Anzeigen öffnen</string>
+    <string name="floating_attachment_failed">Download fehlgeschlagen. Original öffnen, um es erneut zu versuchen</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">+%1$d weiterer Anhang</item>
+        <item quantity="other">+%1$d weitere Anhänge</item>
+    </plurals>
+    <string name="profile_notifications_default">Standard</string>
+    <string name="profile_notifications_muted">Stummgeschaltet</string>
+    <string name="profile_notifications_custom">Eigene Android-Einstellungen</string>
+    <string name="profile_notifications_custom_vibration">Eigenes Vibrationsmuster</string>
+    <string name="profile_notifications_use_defaults">Standard verwenden</string>
+    <string name="profile_notifications_mute">Benachrichtigungen dieser Person stummschalten</string>
+    <string name="profile_notifications_system">Ton und Systemverhalten</string>
+    <string name="profile_notifications_android_vibration">Von Android festgelegt</string>
+    <string name="profile_notification_scope_detail">Gilt für Nachrichten dieser Person in allen Unterhaltungen dieses Kontos. Zustellung und Anzahl ungelesener Nachrichten bleiben unverändert.</string>
+    <string name="profile_notification_precedence">Zuerst gelten die Chat-Regeln für Stummschaltung und Erwähnungen. Danach folgen Stummschaltung oder eigene Android-Einstellungen dieser Person. Standard stellt die Chat- und globalen Einstellungen wieder her. Bestehende Benachrichtigungen behalten ihren ursprünglichen Kanal.</string>
+    <string name="profile_notification_channel_name">%1$s · Nachrichten in allen Chats</string>
 </resources>

@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
@@ -113,6 +114,7 @@ class ComposerBarScreenshotTest {
             WhiteNoiseTheme(darkTheme = false) {
                 Surface(Modifier.width(360.dp).testTag(MENTION_COMPOSITION_TAG)) {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue =
                             TextFieldValue(
                                 text = draft,
