@@ -372,14 +372,6 @@
         ]
       },
       {
-        "surface": "Custom emoji authored labels: MessageActions",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
-        "anchor": "EmojiLabel(",
-        "test_ids": [
-          "MSG-037"
-        ]
-      },
-      {
         "surface": "Custom emoji authored labels: MessageBubble",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
         "anchor": "EmojiLabel(",
