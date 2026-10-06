@@ -381,7 +381,8 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
                 val notification = manager.activeNotifications.single().notification
                 // Android invokes no cancellation callback when the user hides an ongoing card.
                 assertNull(notification.deleteIntent)
-                manager.cancel(BackgroundConnectionNotification.NOTIFICATION_ID)
+                manager.cancel(NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID)
+                assertTrue(manager.activeNotifications.isEmpty())
                 assertTrue(harness.conversationDictation.hasDurableSession)
                 assertTrue(harness.conversationDictation.ownsMicrophone)
                 if (send) harness.conversationDictation.send() else harness.conversationDictation.paste()

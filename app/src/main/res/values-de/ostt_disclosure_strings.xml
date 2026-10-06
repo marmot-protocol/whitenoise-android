@@ -1,5 +1,5 @@
 <resources>
     <string name="dictation_disclosure_offline_title">Offline-Spracherkennung</string>
-    <string name="dictation_disclosure_offline_message">Offline Speech to Text verarbeitet das Gesprochene auf diesem Gerät. White Noise behält den zurückgegebenen Text nur, bis du ihn einfügst oder sendest. Automatisches Senden ist deaktiviert, sofern du es nicht in den Diktateinstellungen aktivierst.</string>
+    <string name="dictation_disclosure_offline_message">Offline Speech to Text verarbeitet das Gesprochene auf diesem Gerät. Nach einem Fehler kann erkannter Text automatisch im ursprünglichen Entwurf gespeichert werden. Automatisches Senden ist deaktiviert, sofern du es nicht in den Diktateinstellungen aktivierst.</string>
     <string name="dictation_settings_explainer_offline">Offline Speech to Text verarbeitet Diktate auf diesem Gerät. Wiederhergestellter Text bleibt im ursprünglichen Entwurf.</string>
 </resources>

@@ -1853,7 +1853,7 @@
     <string name="discard">Verwerfen</string>
     <string name="open_app_settings">App-Einstellungen öffnen</string>
     <string name="dictation_disclosure_title">Externe Spracherkennung</string>
-    <string name="dictation_disclosure_message">Der auf diesem Gerät installierte Sprachdienst verarbeitet, was du sagst, und sendet die Audiodaten möglicherweise an seinen Anbieter. White Noise behält den zurückgegebenen Text nur, bis du ihn einfügst oder sendest. Automatisches Senden ist aus, solange du es nicht in den Diktateinstellungen aktivierst.</string>
+    <string name="dictation_disclosure_message">Der auf diesem Gerät installierte Sprachdienst verarbeitet, was du sagst, und sendet die Audiodaten möglicherweise an seinen Anbieter. Nach einem Fehler kann erkannter Text automatisch im ursprünglichen Entwurf gespeichert werden. Automatisches Senden ist aus, solange du es nicht in den Diktateinstellungen aktivierst.</string>
     <string name="dictation_continue">Weiter</string>
     <string name="dictation_notification_title">Diktat aktiv</string>
     <string name="dictation_notification_text">Abbrechen, Einfügen oder Senden auswählen</string>

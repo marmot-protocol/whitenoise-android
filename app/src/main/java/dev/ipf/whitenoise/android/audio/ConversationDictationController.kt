@@ -1443,12 +1443,18 @@ internal class ConversationDictationController internal constructor(
         foregroundMicrophoneRequired = false
         captureClosureTimeoutHandle?.cancel()
         captureClosureTimeoutHandle = null
+        if (pendingForegroundRecoverySessionId == sessionId &&
+            (state as? ConversationDictationState.Failed)?.draftRecovered == true &&
+            !runCatching(platform::callerAudioHasPending).getOrDefault(true)
+        ) {
+            releaseDurableSessionLease()
+        }
         reattachForegroundRecoveryAfterClosure()
     }
 
     /** Retries any deferred narrowing only after a real foreground return. */
     fun onAppForegrounded() {
-        pendingForegroundRecoverySessionId = null
+        pendingForegroundRecoverySessionId = (state as? ConversationDictationState.Failed)?.sessionId
         if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed
         if (failed != null &&

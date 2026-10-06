@@ -3293,6 +3293,31 @@ class ConversationDictationControllerTest {
         fixture.controller.dismissFailure()
     }
 
+    /** A first foreground return releases the saved-text card only after real provider capture closure. */
+    @Test
+    fun recoveredForegroundFailureReleasesItsLeaseAfterDelayedNativeClosure() {
+        val f = fixture(draft = TextFieldValue(""), platform = FakePlatform(deferCaptureCompletion = true))
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.platform.session.completeCapture()
+        f.platform.listener.onResult("body")
+        f.scheduler.runDelay(500L)
+        f.platform.listener.onBeginningOfSpeech()
+        f.controller.send()
+        val closingCapture = f.platform.session
+        f.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
+        assertEquals("body", f.drafts.getValue(key()).text)
+        f.controller.onAppForegrounded()
+        assertTrue(f.controller.foregroundMicrophoneRequired)
+        assertTrue(f.controller.hasDurableSession)
+        closingCapture.completeCapture()
+        assertFalse(f.controller.foregroundMicrophoneRequired)
+        assertFalse(f.controller.hasDurableSession)
+        assertEquals("body", f.drafts.getValue(key()).text)
+        assertEquals(1, f.writes)
+        assertTrue(f.controller.state is ConversationDictationState.Failed)
+    }
+
     /** Returning before closure preserves the watchdog and only then reattaches non-microphone recovery. */
     @Test
     fun recoveryReattachWaitsForClosure() = checkDeferredRecoveryReattach(leaveForeground = false)

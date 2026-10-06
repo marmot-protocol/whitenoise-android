@@ -1826,7 +1826,7 @@
     <string name="discard">丢弃</string>
     <string name="open_app_settings">打开应用设置</string>
     <string name="dictation_disclosure_title">外部语音识别</string>
-    <string name="dictation_disclosure_message">此设备上安装的语音服务会处理你说的内容，并可能将音频发送给其提供商。White Noise 只会在你粘贴或发送前保留返回的文本。除非你在“听写”设置中开启，否则不会自动发送。</string>
+    <string name="dictation_disclosure_message">此设备上安装的语音服务会处理你说的内容，并可能将音频发送给其提供商。发生错误后，识别的文字可能会自动保存到原始草稿中。除非你在“听写”设置中开启，否则不会自动发送。</string>
     <string name="dictation_continue">继续</string>
     <string name="dictation_microphone_muted">麦克风访问已关闭</string>
     <string name="dictation_microphone_muted_help">请在 Android 隐私设置或快捷设置中开启麦克风访问，然后重试听写。</string>
