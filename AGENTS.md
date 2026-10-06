@@ -19,12 +19,18 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
 
 ## Working and validation
 
+- Follow [CI request policy](docs/ci-request-policy.md): batch related fixups into
+  one candidate push, reuse exact-head results and request previews only for an
+  actual debugging/human-test candidate. All CI-covered compilation, tests,
+  lint and preview builds run on GitHub; do not duplicate them locally.
 - Preserve unrelated changes and active owners; check live assignees and related
   PRs before issue implementation. Follow workspace signing/review/publication gates.
 - Follow existing Kotlin/Compose patterns; close subscriptions, cancel screen jobs,
   and reject late results after account/chat changes.
-- Run focused checks and exact-head PR CI. Docs-only changes need link/path checks
-  and `git diff --check`. State-wiping connected tests require explicit authorization.
+- Inspect source, run necessary non-compiling preflight checks, and require
+  exact-head PR CI. Docs-only changes still need the successful classifier,
+  applicable validators and required aggregate. State-wiping connected tests
+  require explicit authorization.
 - For user-visible changes, update permanent IDs in the [manual checklist](docs/manual-release-testing.md)
   and [surface inventory](docs/manual-release-testing-surfaces.json) in the same PR.
   Never reuse/renumber IDs; keep boxes unchecked. Run

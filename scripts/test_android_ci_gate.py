@@ -23,6 +23,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def setUpClass(cls):
         """Read the actual inline shell gate, avoiding a separate test-only copy."""
         cls.workflow = WORKFLOW.read_text()
+        cls.changes = cls.job_block(cls.workflow, 'changes')
         cls.build_contracts = cls.job_block(cls.workflow, 'build-contracts')
         cls.compose_compiler = cls.job_block(cls.workflow, 'compose-compiler')
         cls.static_analysis = cls.job_block(cls.workflow, 'static-analysis')
@@ -66,13 +67,15 @@ class AndroidCiGateTest(unittest.TestCase):
         """Run the production shell with synthetic, untrusted JSON input."""
         return subprocess.run(
             ['bash', '-c', self.script],
-            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes)},
+            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': 'pull_request'},
             capture_output=True, text=True, check=False,
         )
 
     def successful_outcomes(self):
         """Model GitHub's needs object, including empty per-job outputs."""
-        return {job: {'result': 'success', 'outputs': {}} for job in self.dependencies}
+        outcomes = {job: {'result': 'success', 'outputs': {}} for job in self.dependencies}
+        outcomes['changes']['outputs'] = {'docs_only': 'false'}
+        return outcomes
 
     def test_aggregate_covers_every_job_and_runs_after_failures(self):
         """Every producer must reach the aggregate even after a dependency fails."""
@@ -89,9 +92,9 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('  pull_request:\n    branches: [master]', events)
         self.assertNotIn('paths:', events)
         self.assertNotIn('paths-ignore:', events)
-        self.assertNotIn('\n    if:', self.build_contracts.split('    steps:', 1)[0])
-        step = self.named_step(self.build_contracts, 'Validate fuzz PR production triggers')
-        self.assertIn("        if: matrix.phase == 'tooling'\n", step)
+        self.assertNotIn('\n    if:', self.changes.split('    steps:', 1)[0])
+        step = self.named_step(self.changes, 'Validate fuzz PR production triggers')
+        self.assertNotIn('        if:', step)
         self.assertIn('python3 scripts/check_fuzz_pr_triggers.py\n', step)
         self.assertIn('python3 -m unittest scripts/test_check_fuzz_pr_triggers.py', step)
         self.assertNotIn('continue-on-error:', step)
@@ -204,7 +207,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/check_viewport_restoration_coverage.py', floor)
         self.assertNotIn('continue-on-error:', floor)
         self.assertNotIn('./gradlew', floor)
-        self.assertIn('scripts/test_check_viewport_restoration_coverage.py', self.build_contracts)
+        self.assertIn('scripts/test_check_viewport_restoration_coverage.py', self.changes)
 
     def test_screenshot_owners_come_from_the_checked_registry(self):
         """Both flavors verify the registered owners, then prove every golden was compared."""
@@ -223,15 +226,15 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn("--tests '", step)
         self.assertNotIn('\n        if:', step)
         self.assertNotIn('continue-on-error:', self.screenshots)
-        static = self.named_step(self.build_contracts, 'Check committed screenshot golden owners')
-        self.assertIn("        if: matrix.phase == 'tooling'\n", static)
+        static = self.named_step(self.changes, 'Check committed screenshot golden owners')
+        self.assertNotIn('        if:', static)
         self.assertIn('python3 -m unittest scripts/test_check_screenshot_baseline_owners.py', static)
         self.assertIn('python3 scripts/check_screenshot_baseline_owners.py\n', static)
 
     def test_instrumented_dispatch_tooling_runs_without_an_emulator(self):
         """The dispatcher and required-case parser tests run in the fast tooling phase."""
-        step = self.named_step(self.build_contracts, 'Test instrumented dispatch and required cases')
-        self.assertIn("        if: matrix.phase == 'tooling'\n", step)
+        step = self.named_step(self.changes, 'Test instrumented dispatch and required cases')
+        self.assertNotIn('        if:', step)
         self.assertIn('python3 -m unittest scripts/test_run_android_instrumented_dispatch.py', step)
         self.assertIn('python3 -m unittest scripts/test_check_instrumented_required_cases.py', step)
 
@@ -347,6 +350,46 @@ class AndroidCiGateTest(unittest.TestCase):
                     result = self.run_gate(outcomes)
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn(f'{job}: {outcome}', result.stdout)
+
+    def docs_outcomes(self):
+        outcomes = self.successful_outcomes()
+        outcomes['changes']['outputs']['docs_only'] = 'true'
+        for job in self.dependencies:
+            if job != 'changes':
+                outcomes[job]['result'] = 'skipped'
+        return outcomes
+
+    def test_docs_only_accepts_only_classified_skips(self):
+        self.assertEqual(self.run_gate(self.docs_outcomes()).returncode, 0)
+        for value in ('false', '', 'unexpected'):
+            outcomes = self.docs_outcomes()
+            outcomes['changes']['outputs']['docs_only'] = value
+            self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+        outcomes = self.docs_outcomes()
+        outcomes['changes']['outputs'] = {}
+        self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+
+    def test_docs_classification_never_masks_failures_or_cancellations(self):
+        for job in self.dependencies:
+            for outcome in ('failure', 'cancelled'):
+                outcomes = self.docs_outcomes()
+                outcomes[job]['result'] = outcome
+                self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+
+    def test_docs_mode_cannot_be_used_for_master_pushes(self):
+        result = subprocess.run(['bash', '-c', self.script],
+                                env={**os.environ, 'JOB_RESULTS': json.dumps(self.docs_outcomes()),
+                                     'CI_EVENT': 'push'}, capture_output=True, check=False)
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_missing_or_extra_dependency_evidence_blocks(self):
+        for job in self.dependencies:
+            outcomes = self.successful_outcomes()
+            del outcomes[job]
+            self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+        outcomes = self.successful_outcomes()
+        outcomes['unexpected'] = {'result': 'success', 'outputs': {}}
+        self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
 
     def test_empty_results_do_not_pass_vacuously(self):
         """Absent dependency evidence must never produce a green aggregate."""
