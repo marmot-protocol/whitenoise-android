@@ -263,6 +263,7 @@ class NotificationEmojiArtworkTest {
                     },
                 )
             presenter.ensureChannels()
+            reconciliations = 0 // Channel initialization has its own mandatory startup reconciliation.
             assertFalse(presenter.show(messageUpdate("plain body", 'a'), shortNpub = { "npub1fixture" }))
             // Failed post and cancellation each publish before/after mutation fences.
             assertEquals(4, reconciliations)
