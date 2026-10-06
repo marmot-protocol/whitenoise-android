@@ -99,6 +99,10 @@
             android:authorities="${applicationId}.private-share"
             android:exported="false"
             android:grantUriPermissions="false" />
+        <receiver
+            android:name=".notifications.PinnedConversationPinReceiver"
+            android:exported="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

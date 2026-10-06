@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.PinnedConversationNavigation
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.share.ShareRequest
@@ -384,12 +385,20 @@ class MainActivity : AppCompatActivity() {
             setIntent(Intent(this, MainActivity::class.java))
             return
         }
+        if (intent?.action == PinnedConversationNavigation.ACTION_OPEN) appState.maybeShowAppLockForForeground()
+        val pinTarget =
+            PinnedConversationNavigation.target(
+                this,
+                intent,
+                appState.activeAccountRef,
+                appState.appLockScreenVisible || appState.appUnlockEvaluationPending,
+            )
         val retainNotification = retainPendingShareOnRecreation && inboundNotificationTarget != null
         val parsedTarget =
             if (retainNotification) {
                 null
             } else {
-                NotificationNavigation.parse(
+                pinTarget ?: NotificationNavigation.parse(
                     intent,
                     importReplyDraft = !retainPendingShareOnRecreation,
                     isTrustedTargetSignature = notificationTapTokens::isValidTarget,

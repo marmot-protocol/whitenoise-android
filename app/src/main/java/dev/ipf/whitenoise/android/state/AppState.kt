@@ -3686,6 +3686,18 @@ class WhiteNoiseAppState private constructor(
         shareShortcutPublisher.publish(accountRef, chats) { item ->
             chatListItemDisplayTitle(item, this, titleCopy)
         }
+        runCatching {
+            dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts(appContext).refresh(
+                accountRef,
+                chats.associate { item ->
+                    item.group.groupIdHex to
+                        dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation(
+                            chatListItemDisplayTitle(item, this, titleCopy),
+                            firstFrameGroupAvatarSeed(item, accountRef, ::avatarUrl)?.image?.asAndroidBitmap(),
+                        )
+                },
+            )
+        }
     }
 
     /**

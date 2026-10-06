@@ -2279,4 +2279,11 @@
     <string name="contact_picture_clear">Remover imagem privada</string>
     <string name="contact_picture_local_only">Apenas para esta conta neste dispositivo. Nunca é partilhada nem enviada.</string>
     <string name="contact_picture_failed">Não foi possível usar esta imagem ou guardar as alterações. A seleção anterior não foi alterada. Tente novamente.</string>
+
+    <string name="add_conversation_to_home_screen">Adicionar ao ecrã inicial</string>
+    <string name="pinned_shortcut_unsupported">O seu iniciador não suporta atalhos fixados.</string>
+    <string name="pinned_shortcut_already_added">Esta conversa já está no seu ecrã inicial.</string>
+    <string name="pinned_shortcut_finish">Confirme no iniciador para adicionar esta conversa.</string>
+    <string name="pinned_shortcut_unavailable">Esta conversa já não está disponível.</string>
+    <string name="pinned_shortcut_failed">Não foi possível solicitar um atalho. Tente novamente.</string>
 </resources>

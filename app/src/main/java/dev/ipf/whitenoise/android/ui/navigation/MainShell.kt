@@ -78,6 +78,7 @@ import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.observePlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.observePlaybackTransportVisible
 import dev.ipf.whitenoise.android.state.playbackSourceRetained
+import dev.ipf.whitenoise.android.state.pinnedShortcutTargetIsCurrent
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
@@ -860,7 +861,7 @@ internal fun MainShell(
                 target = target,
                 knownAccountRefs =
                     appState.accounts
-                        .filter { target.replyDraft == null || !it.signedOut }
+                        .filter { (target.replyDraft == null && target.shortcutCapability == null) || !it.signedOut }
                         .mapTo(mutableSetOf()) { it.label },
                 activeAccountRef = appState.activeAccountRef,
                 chatListReady = chatListReady,
@@ -871,12 +872,41 @@ internal fun MainShell(
                 exactPreloadReady = exactPreloadState is NotificationMessagePreloadState.Ready,
             )
 
+        fun fallBackToChatList() {
+            sectionName = MainSection.Chats.name
+            settingsDetailName = null
+            chatListReturnHeadSnap = resetChatListReturnHeadSnap()
+            supersedePendingGroupCreateOpen()
+            selectedChat = null
+            // Notification routing never opens a just-created conversation, so
+            // clear any leftover open-time state from a prior New Chat / Create
+            // Group flow; otherwise a stale justCreated flag would auto-raise
+            // the IME on the next opened conversation (issue #321 guard).
+            selectedChatOpenContext = ConversationOpenContext()
+            selectedChatJustCreated = false
+            selectedChatOpenedAsDmHint = false
+        }
+
+        /** A queued pin loses authority immediately after local removal, sign-out or an app-lock transition. */
+        fun rejectUnavailablePin(): Boolean {
+            if (appState.pinnedShortcutTargetIsCurrent(target)) return false
+            releaseNotificationFirstFrameGate(routingRequestId)
+            routingNotification = false
+            fallBackToChatList()
+            onNotificationTargetHandled(target, routingRequestId)
+            NotificationRouteTrace.finishRequest(routingRequestId)
+            return true
+        }
+        if (rejectUnavailablePin()) return@LaunchedEffect
+
         suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {
+            if (rejectUnavailablePin()) return
             if (target.replyDraft != null) routingNotification = true
             appState.notificationReplyDraftHandoff.stage(target)
             // Await cancellation before publishing any route state. A superseded
             // effect must not partially commit while its platform call is pending.
             appState.dismissNotificationRouteCards(target.accountRef, target.groupIdHex)
+            if (rejectUnavailablePin()) return
             sectionName = MainSection.Chats.name
             settingsDetailName = null
             settingsHomeViewport =
@@ -928,20 +958,6 @@ internal fun MainShell(
             onNotificationTargetHandled(target, routingRequestId)
         }
 
-        fun fallBackToChatList() {
-            sectionName = MainSection.Chats.name
-            settingsDetailName = null
-            chatListReturnHeadSnap = resetChatListReturnHeadSnap()
-            supersedePendingGroupCreateOpen()
-            selectedChat = null
-            // Notification routing never opens a just-created conversation, so
-            // clear any leftover open-time state from a prior New Chat / Create
-            // Group flow; otherwise a stale justCreated flag would auto-raise
-            // the IME on the next opened conversation (issue #321 guard).
-            selectedChatOpenContext = ConversationOpenContext()
-            selectedChatJustCreated = false
-            selectedChatOpenedAsDmHint = false
-        }
         when (step) {
             is NotificationNavStep.SwitchAccount -> {
                 // Hold a single loading state over the whole switch→open route so
@@ -971,6 +987,7 @@ internal fun MainShell(
                 // or after this exact request committed an early open (#586).
                 fun switchStillCurrent(): Boolean =
                     currentInboundNotificationRequestId == routingRequestId &&
+                        appState.pinnedShortcutTargetIsCurrent(target) &&
                         currentRuntimeGeneration == routeRuntimeGeneration &&
                         (
                             currentInboundNotificationTarget == target ||
@@ -1075,6 +1092,13 @@ internal fun MainShell(
                         )
                     } else {
                         activateAccount()
+                    }
+                    if (
+                        currentInboundNotificationRequestId == routingRequestId &&
+                        currentInboundNotificationTarget == target &&
+                        rejectUnavailablePin()
+                    ) {
+                        return
                     }
                     if (switchStillCurrent() && appState.activeAccountRef != step.accountRef) {
                         // The switch never landed. A route that never opened a
@@ -1193,6 +1217,11 @@ internal fun MainShell(
                             // rather than claiming a conversation that may well exist is gone.
                             releaseNotificationFirstFrameGate(routingRequestId)
                             routingNotification = false
+                            if (target.shortcutCapability != null) {
+                                fallBackToChatList()
+                                onNotificationTargetHandled(target, routingRequestId)
+                                NotificationRouteTrace.finishRequest(routingRequestId)
+                            }
                         }
                     }
                     null -> {
@@ -1218,6 +1247,11 @@ internal fun MainShell(
                                 // the existing chat-list state will re-fire this route.
                                 releaseNotificationFirstFrameGate(routingRequestId)
                                 routingNotification = false
+                                if (target.shortcutCapability != null) {
+                                    fallBackToChatList()
+                                    onNotificationTargetHandled(target, routingRequestId)
+                                    NotificationRouteTrace.finishRequest(routingRequestId)
+                                }
                             }
                         }
                     }

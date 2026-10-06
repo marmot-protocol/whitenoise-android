@@ -2279,4 +2279,11 @@
     <string name="contact_picture_clear">Rimuovi immagine privata</string>
     <string name="contact_picture_local_only">Solo per questo account su questo dispositivo. Mai condivisa o caricata.</string>
     <string name="contact_picture_failed">Impossibile usare questa immagine o salvare le modifiche. La selezione precedente è invariata. Riprova.</string>
+
+    <string name="add_conversation_to_home_screen">Aggiungi alla schermata Home</string>
+    <string name="pinned_shortcut_unsupported">Il launcher non supporta le scorciatoie fissate.</string>
+    <string name="pinned_shortcut_already_added">Questa conversazione è già nella schermata Home.</string>
+    <string name="pinned_shortcut_finish">Conferma nel launcher per aggiungere questa conversazione.</string>
+    <string name="pinned_shortcut_unavailable">Questa conversazione non è più disponibile.</string>
+    <string name="pinned_shortcut_failed">Impossibile richiedere una scorciatoia. Riprova.</string>
 </resources>

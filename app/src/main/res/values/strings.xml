@@ -2437,4 +2437,11 @@
     <string name="contact_picture_clear">Clear private picture</string>
     <string name="contact_picture_local_only">Only for this account on this device. Never shared or uploaded.</string>
     <string name="contact_picture_failed">Couldn’t use this picture or save your changes. Your previous selection is unchanged. Try again.</string>
+
+    <string name="add_conversation_to_home_screen">Add to Home screen</string>
+    <string name="pinned_shortcut_unsupported">Your launcher does not support pinned shortcuts.</string>
+    <string name="pinned_shortcut_already_added">This conversation is already on your Home screen.</string>
+    <string name="pinned_shortcut_finish">Confirm with your launcher to add this conversation.</string>
+    <string name="pinned_shortcut_unavailable">This conversation is no longer available.</string>
+    <string name="pinned_shortcut_failed">Could not request a Home screen shortcut. Try again.</string>
 </resources>

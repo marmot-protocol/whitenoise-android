@@ -30,7 +30,7 @@ class NotificationConversationOpenCoverageTest {
         val commit =
             source
                 .substring(start)
-                .substringBefore("fun fallBackToChatList()")
+                .substringBefore("when (step)")
         val dismiss = commit.indexOf("appState.dismissNotificationRouteCards(")
         val navigation = commit.indexOf("sectionName = MainSection.Chats.name")
         val selected = commit.indexOf("selectedChat = chatItem")

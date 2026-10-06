@@ -86,6 +86,9 @@ internal fun clearConversationShortcutsForAccount(
     accountRef: String,
     includeUnscopedLegacy: Boolean,
 ) {
+    synchronized(UserEventNotificationGroup.mutationLock) {
+        PinnedConversationTokens.create(context).revokeAccount(accountRef)
+    }
     val plan =
         accountConversationShortcutCleanupPlan(
             shortcuts =
