@@ -205,10 +205,11 @@ class EmojiLabelScreenshotTest {
                             poll =
                                 PollProjectionFfi(
                                     question = "Choose :party: :wn:",
-                                    options = listOf(
-                                        PollOptionResultFfi("a", "Local :party:", 2uL),
-                                        PollOptionResultFfi("b", "Builtin :marmot: :unknown:", 1uL),
-                                    ),
+                                    options =
+                                        listOf(
+                                            PollOptionResultFfi("a", "Local :party:", 2uL),
+                                            PollOptionResultFfi("b", "Builtin :marmot: :unknown:", 1uL),
+                                        ),
                                     pollType = PollTypeFfi.SINGLE_CHOICE,
                                     participants = 3uL,
                                     localSelection = listOf("a"),

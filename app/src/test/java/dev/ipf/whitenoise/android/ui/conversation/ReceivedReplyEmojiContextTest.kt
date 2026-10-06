@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.material3.Text
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -46,7 +50,9 @@ class ReceivedReplyEmojiContextTest : PollMessageTestFixtures() {
         val revision = mutableStateOf(0)
         rule.setContent {
             key(revision.value) {
-                result.set(rememberReplyReceivedEmoji(source.record.messageIdHex, pollController, pollState))
+                val emoji = rememberReplyReceivedEmoji(source.record.messageIdHex, pollController, pollState)
+                SideEffect { result.set(emoji) }
+                Text(if (emoji === ReceivedEmoji.None) "No source artwork" else "Source available")
             }
         }
         rule.waitUntil(5_000) { result.get().attachmentIndexes.isNotEmpty() }
@@ -56,7 +62,9 @@ class ReceivedReplyEmojiContextTest : PollMessageTestFixtures() {
             assertTrue(pollController.isRetainedRowGone(source.record.messageIdHex))
             revision.value++
         }
-        rule.waitUntil(5_000) { result.get() === ReceivedEmoji.None }
+        rule.waitForIdle()
+        rule.onNodeWithText("No source artwork").assertExists()
+        assertTrue(result.get() === ReceivedEmoji.None)
     }
 
     @Test
