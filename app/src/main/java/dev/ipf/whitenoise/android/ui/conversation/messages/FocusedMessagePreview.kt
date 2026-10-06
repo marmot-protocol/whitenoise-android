@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.ui.markdownInlinesToAnnotatedString
@@ -134,7 +135,7 @@ internal fun FocusedTextMessagePreview(
             )
         }
     val content: @Composable (Boolean) -> Unit = { compact ->
-        senderName?.let { Text(it, style = MaterialTheme.typography.labelMedium) }
+        senderName?.let { EmojiLabel(it, style = MaterialTheme.typography.labelMedium) }
         BubbleFooterLayout(
             footer = footer,
             lastLineWidth = lastLineWidth.takeIf { warning == null },

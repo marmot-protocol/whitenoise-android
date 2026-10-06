@@ -18,6 +18,15 @@ import org.junit.Test
 
 class EmojiShortcodesTest {
     @Test
+    fun notificationPresentationUsesTheSameLiteralExclusions() {
+        assertEquals(
+            listOf(":wn:", ":marmot:"),
+            EmojiShortcodes.presentationShortcodes(":wn: `:hidden:` :wn: :marmot:"),
+        )
+        assertEquals(emptyList<String>(), EmojiShortcodes.presentationShortcodes("```\n:wn:\n```"))
+    }
+
+    @Test
     fun closingFenceBoundaries() {
         val fencedBodies =
             listOf(
