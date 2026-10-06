@@ -350,7 +350,7 @@ class PlaybackTransportOwnershipTest {
         val engine = FakeSessionEngine()
         appState.ttsController.attachEngine(engine)
         var current = true
-        var replacementSession = 0L
+        var replacementSession: Long? = null
         var preparationStarts = 0
         var preparingState: TtsState? = null
         var replacementStarted = false
@@ -384,8 +384,8 @@ class PlaybackTransportOwnershipTest {
         assertEquals("Preparation service was not admitted: $failure", 1, preparationStarts)
         assertTrue("Expected Preparing at service admission: $preparingState", preparingState is TtsState.Preparing)
         assertTrue("Replacement speech was refused: $failure", replacementStarted)
-        assertTrue(replacementSession > 0L)
-        assertEquals(replacementSession, appState.ttsController.state.value.sessionId)
+        val acceptedSession = checkNotNull(replacementSession) { "Replacement session was not captured" }
+        assertEquals(acceptedSession, appState.ttsController.state.value.sessionId)
         assertTrue(appState.ttsController.state.value is TtsState.Speaking)
         assertTrue(appState.ownsCurrentAccountSpeech())
         assertEquals(1, engine.spoken.size)
