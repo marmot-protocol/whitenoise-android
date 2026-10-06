@@ -276,7 +276,8 @@ class LocalGroupDeleteControllerTest {
                         listOf("already-deleted", GROUP).map { chatListItemFromProjection(chatRow(it)) },
                         fixture.controller,
                         fixture.state,
-                    ).remaining(1)
+                    )
+                        .remaining(1)
                 val notice =
                     fixture.state.localDeleteBatchRetryNotice(fixture.controller, request.groupIds) {
                         request.isCurrent(fixture.state, fixture.controller)

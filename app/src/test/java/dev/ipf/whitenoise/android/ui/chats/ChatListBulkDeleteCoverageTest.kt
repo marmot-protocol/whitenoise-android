@@ -61,7 +61,9 @@ class ChatListBulkDeleteCoverageTest {
         assertTrue("the whole batch must share one readiness budget", "observer = observer" in confirmBlock)
         assertTrue(
             "stopped batches must not use a success banner",
-            "presentStoppedLocalChatDeleteBatch(" in confirmBlock && "failure," in confirmBlock,
+            "presentStoppedLocalChatDeleteBatch( result, failure, notice = " +
+                "appState.localDeleteBatchRetryNotice(controller, remaining.groupIds, isCurrent)," in
+                confirmBlock.replace(Regex("\\s+"), " "),
         )
         assertTrue(
             "deferred cleanup must not also show a usual success banner",
