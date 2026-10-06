@@ -2210,4 +2210,15 @@
     <plurals name="floating_attachment_more">
         <item quantity="other">还有 %1$d 个附件</item>
     </plurals>
+    <string name="profile_notifications_default">默认</string>
+    <string name="profile_notifications_muted">已静音</string>
+    <string name="profile_notifications_custom">自定义 Android 设置</string>
+    <string name="profile_notifications_custom_vibration">自定义振动</string>
+    <string name="profile_notifications_use_defaults">使用默认设置</string>
+    <string name="profile_notifications_mute">将此人的通知静音</string>
+    <string name="profile_notifications_system">声音和系统行为</string>
+    <string name="profile_notifications_android_vibration">由 Android 设置</string>
+    <string name="profile_notification_scope_detail">适用于此账号所有对话中此人发送的消息。消息接收和未读数量不变。</string>
+    <string name="profile_notification_precedence">先应用聊天静音和仅提及规则，再应用此人的静音或自定义 Android 设置。使用默认设置会恢复聊天和全局设置。现有通知保留原来的渠道。</string>
+    <string name="profile_notification_channel_name">%1$s · 所有聊天中的消息</string>
 </resources>

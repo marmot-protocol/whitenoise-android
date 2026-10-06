@@ -14,8 +14,10 @@ internal fun redactNotificationChannelNames(context: Context): Boolean =
                 NotificationChannelSpec.entries.firstOrNull {
                     channel.id.startsWith("${it.id}:conv:$CONVERSATION_SHORTCUT_PREFIX")
                 }
-            if (parent != null) {
-                val name = NotificationChannels.baseName(context, parent)
+            if (parent != null || channel.id.startsWith(ProfileNotificationChannels.PREFIX)) {
+                val name =
+                    parent?.let { NotificationChannels.baseName(context, it) }
+                        ?: context.getString(R.string.notifications)
                 if (channel.name.toString() != name || channel.description != description) {
                     channel.name = name
                     channel.description = description

@@ -2243,4 +2243,15 @@
         <item quantity="one">Mais %1$d anexo</item>
         <item quantity="other">Mais %1$d anexos</item>
     </plurals>
+    <string name="profile_notifications_default">Padrão</string>
+    <string name="profile_notifications_muted">Silenciado</string>
+    <string name="profile_notifications_custom">Configurações personalizadas do Android</string>
+    <string name="profile_notifications_custom_vibration">Vibração personalizada</string>
+    <string name="profile_notifications_use_defaults">Usar padrões</string>
+    <string name="profile_notifications_mute">Silenciar notificações desta pessoa</string>
+    <string name="profile_notifications_system">Som e comportamento do sistema</string>
+    <string name="profile_notifications_android_vibration">Definido pelo Android</string>
+    <string name="profile_notification_scope_detail">Aplica-se às mensagens desta pessoa em todas as conversas desta conta. A entrega e a contagem de mensagens não lidas permanecem iguais.</string>
+    <string name="profile_notification_precedence">As regras de silenciamento do chat e de apenas menções se aplicam primeiro. Depois, o silenciamento ou as configurações personalizadas do Android desta pessoa. Usar padrões restaura as configurações do chat e globais. As notificações existentes mantêm o canal original.</string>
+    <string name="profile_notification_channel_name">%1$s · Mensagens em todos os chats</string>
 </resources>

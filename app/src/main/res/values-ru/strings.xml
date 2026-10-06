@@ -2313,4 +2313,15 @@
         <item quantity="many">Ещё %1$d вложений</item>
         <item quantity="other">Ещё %1$d вложения</item>
     </plurals>
+    <string name="profile_notifications_default">По умолчанию</string>
+    <string name="profile_notifications_muted">Без уведомлений</string>
+    <string name="profile_notifications_custom">Свои настройки Android</string>
+    <string name="profile_notifications_custom_vibration">Своя вибрация</string>
+    <string name="profile_notifications_use_defaults">Использовать настройки по умолчанию</string>
+    <string name="profile_notifications_mute">Отключить уведомления от этого человека</string>
+    <string name="profile_notifications_system">Звук и системные настройки</string>
+    <string name="profile_notifications_android_vibration">Задано в Android</string>
+    <string name="profile_notification_scope_detail">Применяется к сообщениям этого человека во всех беседах этого аккаунта. Доставка и счётчик непрочитанных сообщений не меняются.</string>
+    <string name="profile_notification_precedence">Сначала действуют правила отключения уведомлений чата и уведомлений только об упоминаниях. Затем — отключение уведомлений или свои настройки Android для этого человека. Настройки по умолчанию возвращают настройки чата и общие настройки. Существующие уведомления сохраняют исходный канал.</string>
+    <string name="profile_notification_channel_name">%1$s · Сообщения во всех чатах</string>
 </resources>
