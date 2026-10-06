@@ -9,20 +9,36 @@ import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import javax.crypto.spec.SecretKeySpec
 
 /** Platform responses are scripted; actual shortcut objects and private credential storage are exercised. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class PinnedConversationShortcutsTest {
+    /**
+     * Runs production encrypted persistence with a deterministic test key instead of an unavailable Android
+     * Keystore.
+     */
+    @Before fun installTestKey() {
+        setPinnedConversationTestKey(SecretKeySpec(ByteArray(32) { it.toByte() }, "AES"))
+    }
+
+    /** Prevents the fixture's key from leaking into another sandbox or provider-failure scenario. */
+    @After fun releaseTestKey() {
+        setPinnedConversationTestKey(null)
+    }
+
     private val context: Context get() = RuntimeEnvironment.getApplication()
     private val tokens get() = PinnedConversationTokens.create(context)
     private val capability get() = requireNotNull(tokens.issue(ACCOUNT, GROUP))

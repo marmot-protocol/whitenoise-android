@@ -6251,7 +6251,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Local alert write failures are retryable; completed native removal must still reconcile the active account. */
-    private suspend fun clearConversationShortcutsForAccount(
+    private suspend fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
     ) {
@@ -6260,7 +6260,7 @@ class WhiteNoiseAppState private constructor(
             if (!cleared) {
                 appStateDebug { "profile alert preference cleanup will retry after an authoritative account refresh" }
             }
-            localNotificationPresenter.clearConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
+            localNotificationPresenter.clearRevokedConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
         }
     }
 
@@ -6311,12 +6311,20 @@ class WhiteNoiseAppState private constructor(
     suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
         val signedOutRef = activeAccountRef ?: return null
         val draftsSaved = draftWriter.flushAccount(signedOutRef)
-        // MDK 0.9.15 handles local and external signers through the same call.
-        val engineResult =
-            withRevokedPinnedTarget(signedOutRef) {
-                // Credential persistence failures must not enter the native-error fail-open path.
-                runCatchingCancellable { marmotIo { signOut(signedOutRef, deleteKeyPackages) } }
-            }
+        return withRevokedPinnedTarget(signedOutRef) {
+            finishRevokedAccountSignOut(signedOutRef, deleteKeyPackages, draftsSaved)
+        }
+    }
+
+    /** Keeps launcher issuance fenced until native completion and Android account ownership agree. */
+    @Suppress("ReturnCount", "LongMethod")
+    private suspend fun finishRevokedAccountSignOut(
+        signedOutRef: String,
+        deleteKeyPackages: Boolean,
+        draftsSaved: Boolean,
+    ): SignOutCompletion {
+        // Credential persistence failures never enter the native-error fail-open path.
+        val engineResult = runCatchingCancellable { marmotIo { signOut(signedOutRef, deleteKeyPackages) } }
         val engineOutcome = engineResult.getOrNull()
         if (engineOutcome?.localCleanup?.completed == false) {
             appStateDebug {
@@ -6330,6 +6338,10 @@ class WhiteNoiseAppState private constructor(
             }
         }
         if (engineOutcome != null) {
+            // Publish known native completion before any fallible/suspending cleanup can release the fence.
+            accountListLifetime.advance {
+                accounts = reconcileCachedAccountsAfterSignOut(accounts, signedOutRef)
+            }
             // MDK deactivated push; discard stale retries and registration cache.
             pushTokenStore.clearPendingDisable(signedOutRef)
             nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
@@ -6350,7 +6362,7 @@ class WhiteNoiseAppState private constructor(
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
-        clearConversationShortcutsForAccount(
+        clearRevokedConversationShortcutsForAccount(
             accountRef = signedOutRef,
             includeUnscopedLegacy = accounts.none { it.label != signedOutRef && it.isSignedInSigningAccount() },
         )
@@ -6398,6 +6410,22 @@ class WhiteNoiseAppState private constructor(
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
+        var admitted = false
+        return runCatchingCancellable {
+            withRevokedPinnedTarget(wipedRef) {
+                admitted = true
+                finishRevokedAccountWipe(wipedRef)
+            }
+        }.getOrElse { failure ->
+            if (admitted) throw failure
+            appStateDebug(failure) { "account wipe credential revocation failed before native work" }
+            null
+        }
+    }
+
+    /** The caller holds launcher revocation through cleanup; completed native ownership is published first. */
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
+    private suspend fun finishRevokedAccountWipe(wipedRef: String): WipeOutcomeFfi? {
         val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
@@ -6405,9 +6433,11 @@ class WhiteNoiseAppState private constructor(
             val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
                 nativePushSyncMutex.withSerializedNativePushWipe {
-                    runCatching { withRevokedPinnedTarget(wipedRef) { marmotIo { signOutAndWipe(wipedRef) } } }
+                    runCatching { marmotIo { signOutAndWipe(wipedRef) } }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
+                                // Publish native removal before encrypted push cleanup can throw.
+                                accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
                                 pushTokenStore.clearPendingDisable(wipedRef)
                                 // The wipe invalidates server-side registration state for this account.
                                 // withSerializedNativePushWipe already holds nativePushSyncMutex here.
@@ -6444,7 +6474,7 @@ class WhiteNoiseAppState private constructor(
             pendingMessageEditHandoff.removeAccount(wipedRef)
             notificationReplyDraftHandoff.removeAccount(wipedRef)
             draftWriter.removeAccount(wipedRef)
-            clearConversationShortcutsForAccount(
+            clearRevokedConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
             )

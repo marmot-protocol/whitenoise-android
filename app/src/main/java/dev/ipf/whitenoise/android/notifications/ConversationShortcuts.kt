@@ -89,6 +89,15 @@ internal fun clearConversationShortcutsForAccount(
     synchronized(UserEventNotificationGroup.mutationLock) {
         PinnedConversationTokens.create(context).revokeAccount(accountRef)
     }
+    clearRevokedConversationShortcutsForAccount(context, accountRef, includeUnscopedLegacy)
+}
+
+/** Removes platform entries after the caller has durably revoked and fenced account credentials. */
+internal fun clearRevokedConversationShortcutsForAccount(
+    context: Context,
+    accountRef: String,
+    includeUnscopedLegacy: Boolean,
+) {
     val plan =
         accountConversationShortcutCleanupPlan(
             shortcuts =

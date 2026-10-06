@@ -3,21 +3,37 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import javax.crypto.spec.SecretKeySpec
 
 /** Exercises the actual launcher intent codec and durable revocation checks, without a second routing table. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class PinnedConversationNavigationTest {
+    /**
+     * Runs production encrypted persistence with a deterministic test key instead of an unavailable Android
+     * Keystore.
+     */
+    @Before fun installTestKey() {
+        setPinnedConversationTestKey(SecretKeySpec(ByteArray(32) { it.toByte() }, "AES"))
+    }
+
+    /** Prevents the fixture's key from leaking into another sandbox or provider-failure scenario. */
+    @After fun releaseTestKey() {
+        setPinnedConversationTestKey(null)
+    }
+
     private val context: Context get() = RuntimeEnvironment.getApplication()
     private val tokens get() = PinnedConversationTokens.create(context)
 

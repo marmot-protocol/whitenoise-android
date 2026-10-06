@@ -28,6 +28,17 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
     }
 }
 
+/** Platform failure cannot undo native removal after durable revocation; later refresh retries presentation cleanup. */
+internal suspend fun WhiteNoiseAppState.removeRevokedPinnedConversationShortcuts(
+    accountRef: String,
+    groupIdHex: String,
+) {
+    withContext(Dispatchers.IO) {
+        runCatching { PinnedConversationShortcuts(appContext).removeRevokedGroup(accountRef, groupIdHex) }
+            .onFailure { appStateDebug(it) { "revoked launcher presentation cleanup deferred" } }
+    }
+}
+
 /** Persist credential revocation before a native deletion, reset or account sign-out can become durable. */
 internal suspend fun <T> WhiteNoiseAppState.withRevokedPinnedTarget(
     accountRef: String,

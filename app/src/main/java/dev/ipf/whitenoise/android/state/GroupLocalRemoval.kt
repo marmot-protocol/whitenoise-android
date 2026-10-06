@@ -47,10 +47,12 @@ internal suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
     withRevokedPinnedTarget(
         accountRef = account,
         groupIdHex = groupIdHex,
-    ) { marmotIo { deleteGroupLocal(account, groupIdHex) } }
-    removePinnedConversationShortcuts(account, groupIdHex)
-    removeComposerExpansionForGroup(account, groupIdHex)
-    dismissConversationNotifications(account, groupIdHex)
+    ) {
+        marmotIo { deleteGroupLocal(account, groupIdHex) }
+        removeRevokedPinnedConversationShortcuts(account, groupIdHex)
+        removeComposerExpansionForGroup(account, groupIdHex)
+        dismissConversationNotifications(account, groupIdHex)
+    }
 }
 
 /** The recoverable wipe preserves client data until commit; launcher authority is revoked before the native attempt. */
@@ -264,9 +266,11 @@ internal suspend fun WhiteNoiseAppState.forgetGroupLocalWithClientCleanup(
     conversationDictation.onTargetRemoved(account, groupIdHex)
     evictGroupMediaCaches(account, groupIdHex)
     deleteDraftBeforeGroupRemoval(account, groupIdHex)
-    val reset = withRevokedPinnedTarget(account, groupIdHex) { marmotIo { forgetGroupLocal(account, groupIdHex) } }
-    removePinnedConversationShortcuts(account, groupIdHex)
-    removeComposerExpansionForGroup(account, groupIdHex)
-    dismissConversationNotifications(account, groupIdHex)
-    return reset
+    return withRevokedPinnedTarget(account, groupIdHex) {
+        val reset = marmotIo { forgetGroupLocal(account, groupIdHex) }
+        removeRevokedPinnedConversationShortcuts(account, groupIdHex)
+        removeComposerExpansionForGroup(account, groupIdHex)
+        dismissConversationNotifications(account, groupIdHex)
+        reset
+    }
 }

@@ -173,6 +173,14 @@ internal class PinnedConversationShortcuts(
         groupIdHex: String,
     ) = synchronized(UserEventNotificationGroup.mutationLock) {
         tokens.revokeGroup(accountRef, groupIdHex)
+        removeRevokedGroup(accountRef, groupIdHex)
+    }
+
+    /** Platform-only cleanup; the caller must already hold the durable account/group revocation fence. */
+    fun removeRevokedGroup(
+        accountRef: String,
+        groupIdHex: String,
+    ) = synchronized(UserEventNotificationGroup.mutationLock) {
         val baseId = conversationShortcutId(accountRef, groupIdHex) ?: return@synchronized
         val old = platform.shortcuts().filter { it.id == baseId || it.id.startsWith("$baseId-pin-") }
         val ids = old.map { it.id }

@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
 import android.content.SharedPreferences
+import dev.ipf.whitenoise.android.state.AndroidKeystoreSecretKeyProvider
+import dev.ipf.whitenoise.android.state.KeystoreSecureStore
 import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -30,11 +32,14 @@ class PinnedConversationCapability internal constructor(
 
 /**
  * Revocable Android launcher credentials, separate from notification tokens' bounded recency cache.
+ * Reusable tokens are sealed by the Android Keystore; separate one-way verifiers are the routing authority.
  * Hashed keys contain no shortcut-to-group mapping; the launcher owns each pin and its destination intent.
  * Credentials do not claim a pin exists: launcher inventory is authoritative after approval, denial or restart.
  */
 internal class PinnedConversationTokens(
-    private val preferences: SharedPreferences,
+    private val secureStore: KeystoreSecureStore,
+    private val verifiers: SharedPreferences,
+    private val legacyPreferences: SharedPreferences,
 ) {
     /** Must run off the main thread; commit both credentials before exposing a launcher request. */
     fun issue(
@@ -49,13 +54,18 @@ internal class PinnedConversationTokens(
             val accountKey = accountKey(account)
             val groupKey = groupKey(account, group)
             if (removals.containsKey(accountKey) || removals.containsKey(groupKey)) return@synchronized null
-            val accountToken = preferences.getString(accountKey, null)?.takeIf(::validToken) ?: newToken()
-            val groupToken = preferences.getString(groupKey, null)?.takeIf(::validToken) ?: newToken()
+            clearLegacyCredentials()
+            val stored = secureStore.readAll()
+            val accountToken = reusableToken(stored[accountKey], verifiers.getString(accountKey, null))
+            val groupToken = reusableToken(stored[groupKey], verifiers.getString(groupKey, null))
+            check(secureStore.replaceAllDurably(stored + mapOf(accountKey to accountToken, groupKey to groupToken))) {
+                "Unable to encrypt launcher credentials"
+            }
             check(
-                preferences
+                verifiers
                     .edit()
-                    .putString(accountKey, accountToken)
-                    .putString(groupKey, groupToken)
+                    .putString(accountKey, sha256Hex(accountToken))
+                    .putString(groupKey, sha256Hex(groupToken))
                     .commit(),
             ) {
                 "Unable to persist launcher credentials"
@@ -65,17 +75,17 @@ internal class PinnedConversationTokens(
 
     /** Validation never creates credentials; deletion stays revoked across process recreation and late callbacks. */
     fun isValid(capability: PinnedConversationCapability): Boolean =
-        synchronized(lock) {
-            runCatching {
-                val account = capability.accountRef
-                val group = capability.groupIdHex
-                account.isNotBlank() &&
-                    account == account.trim() &&
-                    groupPattern.matches(group) &&
-                    matches(preferences.getString(accountKey(account), null), capability.accountToken) &&
-                    matches(preferences.getString(groupKey(account, group), null), capability.groupToken)
-            }.getOrDefault(false)
-        }
+        runCatching {
+            // SharedPreferences gives one atomic snapshot; never wait behind a mutation's Keystore work.
+            val current = verifiers.all
+            val account = capability.accountRef
+            val group = capability.groupIdHex
+            account.isNotBlank() &&
+                account == account.trim() &&
+                groupPattern.matches(group) &&
+                matches(current[accountKey(account)] as? String, capability.accountToken) &&
+                matches(current[groupKey(account, group)] as? String, capability.groupToken)
+        }.getOrDefault(false)
 
     /** Durably invalidates visible and still-pending pins for one removed conversation. */
     fun revokeGroup(
@@ -83,23 +93,42 @@ internal class PinnedConversationTokens(
         groupIdHex: String,
     ) = synchronized(lock) {
         revocations.advance()
-        check(preferences.edit().remove(groupKey(accountRef, groupIdHex.lowercase(Locale.ROOT))).commit()) {
+        clearLegacyCredentials()
+        val key = groupKey(accountRef, groupIdHex.lowercase(Locale.ROOT))
+        check(verifiers.edit().remove(key).commit()) {
             "Unable to revoke launcher credentials"
         }
+        removeEncryptedCredentials { it == key }
     }
 
     /** Prefix-safe account cleanup also revokes requests the launcher has not yet added to its inventory. */
     fun revokeAccount(accountRef: String) =
         synchronized(lock) {
             revocations.advance()
+            clearLegacyCredentials()
             val accountKey = accountKey(accountRef)
             val groupPrefix = "group.${sha256Hex(accountRef)}."
-            val editor = preferences.edit().remove(accountKey)
-            preferences.all.keys
+            val editor = verifiers.edit().remove(accountKey)
+            verifiers.all.keys
                 .filter { it.startsWith(groupPrefix) }
                 .forEach(editor::remove)
             check(editor.commit()) { "Unable to revoke launcher credentials" }
+            removeEncryptedCredentials { it == accountKey || it.startsWith(groupPrefix) }
         }
+
+    /** Preview credentials are invalid in the new verifier namespace and must never be imported or reauthorized. */
+    private fun clearLegacyCredentials() {
+        check(legacyPreferences.edit().clear().commit()) { "Unable to remove legacy launcher credentials" }
+    }
+
+    /** Verifier removal already revoked authority; a locked/corrupt Keystore must not block completed removal. */
+    private fun removeEncryptedCredentials(removed: (String) -> Boolean) {
+        runCatching {
+            val stored = secureStore.readAll()
+            val retained = stored.filterKeys { !removed(it) }
+            if (retained != stored) secureStore.replaceAllDurably(retained)
+        }
+    }
 
     /**
      * Revoke durably before a native removal can commit, and block new credentials while it runs.
@@ -125,7 +154,9 @@ internal class PinnedConversationTokens(
             if (started) {
                 withContext(NonCancellable + Dispatchers.IO) {
                     synchronized(lock) {
-                        revokeTarget(accountRef, groupIdHex)
+                        // Entry revoked durably; the fence prevented new authority throughout native work.
+                        // Invalidate queued requests without adding a fallible write after native completion.
+                        revocations.advance()
                         val remaining = checkNotNull(removals[key]) - 1
                         if (remaining == 0) removals.remove(key) else removals[key] = remaining
                     }
@@ -147,9 +178,11 @@ internal class PinnedConversationTokens(
         private val revocations = StalenessGuard()
         private val removals = mutableMapOf<String, Int>()
         private val random = SecureRandom()
+        private val keyProvider = AndroidKeystoreSecretKeyProvider("whitenoise.pinned_conversation_tokens.aes_gcm.v1")
         private val groupPattern = Regex("[0-9a-f]{64}")
         private const val TOKEN_BYTES = 32
         private const val TOKEN_LENGTH = 43
+        private const val SHA256_HEX_LENGTH = 64
 
         /** Capture before suspending so a queued credential write cannot outlive a removal or sign-out. */
         fun captureRequest(): Long = revocations.capture()
@@ -157,6 +190,11 @@ internal class PinnedConversationTokens(
         /** App-private, backup-excluded launcher authority; callers must never export these preferences. */
         fun create(context: Context): PinnedConversationTokens =
             PinnedConversationTokens(
+                KeystoreSecureStore(context, "pinned_conversation_tokens.keystore", keyProvider),
+                context.applicationContext.getSharedPreferences(
+                    "pinned_conversation_token_verifiers",
+                    Context.MODE_PRIVATE,
+                ),
                 context.applicationContext.getSharedPreferences("pinned_conversation_tokens", Context.MODE_PRIVATE),
             )
 
@@ -169,26 +207,48 @@ internal class PinnedConversationTokens(
             group: String,
         ): String = "group.${sha256Hex(account)}.${sha256Hex(group)}"
 
-        /** Cryptographic random bearer material is stored only in the app's private credentials and launcher intent. */
+        /** Random bearer material is retained only in Keystore ciphertext and the approved launcher intent. */
         private fun newToken(): String =
             Base64
                 .getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(ByteArray(TOKEN_BYTES).also(random::nextBytes))
 
+        /**
+         * A missing encrypted copy cannot silently rotate an existing pin; only absent authority permits a new
+         * token.
+         */
+        private fun reusableToken(
+            stored: String?,
+            verifier: String?,
+        ): String {
+            if (verifier == null) return newToken()
+            check(stored != null && matches(verifier, stored)) {
+                "Active launcher credentials cannot be decrypted consistently"
+            }
+            return stored
+        }
+
         /** Reject corrupt persisted values before constant-time comparison. */
         private fun validToken(value: String): Boolean =
             value.length == TOKEN_LENGTH &&
                 value.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_' }
 
-        /** Equal-length secret comparisons do not expose a matching prefix. */
+        /**
+         * High-entropy token digests validate synchronously without decrypting reusable credentials on the UI
+         * thread.
+         */
         private fun matches(
             expected: String?,
             candidate: String,
         ): Boolean =
             expected != null &&
-                validToken(expected) &&
+                expected.length == SHA256_HEX_LENGTH &&
+                expected.all { it in '0'..'9' || it in 'a'..'f' } &&
                 validToken(candidate) &&
-                MessageDigest.isEqual(expected.toByteArray(Charsets.UTF_8), candidate.toByteArray(Charsets.UTF_8))
+                MessageDigest.isEqual(
+                    expected.toByteArray(Charsets.UTF_8),
+                    sha256Hex(candidate).toByteArray(Charsets.UTF_8),
+                )
     }
 }
