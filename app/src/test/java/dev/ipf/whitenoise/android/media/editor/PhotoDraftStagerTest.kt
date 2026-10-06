@@ -249,6 +249,40 @@ class PhotoDraftStagerTest {
             assertNull(fixture.gateway.current)
         }
 
+    @Test
+    fun duplicateAttachmentDuringPreparationRetainsNativeOwnershipAndReleasesNewSource() =
+        runTest {
+            val native =
+                MessageDraftAttachmentFfi(
+                    "stable-id",
+                    "native.jpg",
+                    "image/jpeg",
+                    byteArrayOf(1, 2, 3),
+                    null,
+                    null,
+                    null,
+                    emptyList(),
+                )
+            lateinit var staged: Fixture
+            staged =
+                fixture(onEncode = {
+                    staged.gateway.current = MessageDraftFfi(GROUP, "", null, listOf(native), 1L, 1L)
+                })
+
+            val result =
+                staged.stager.stageBytes(pngBytes(), "picked.png", "stable-id", ACCOUNT, GROUP, MediaQuality.Standard)
+            assertTrue(result is PhotoDraftStageResult.PreparedOnly)
+            val photo = (result as PhotoDraftStageResult.PreparedOnly).photo
+            assertTrue(photo.restoredFromNative)
+            assertEquals(native, photo.attachment)
+            assertNull(staged.sources.bytes("lease-0"))
+            val slot = PendingMediaSlot("saved-picker", Uri.parse("content://picker/saved"))
+            assertEquals(
+                setOf(slot.id),
+                restoredPhotosMissingFrom(listOf(slot), mapOf(slot.id to photo), emptyMap(), emptySet()),
+            )
+        }
+
     private fun fixture(onEncode: () -> Unit = {}): Fixture {
         val payloads = StagerPayloadStore()
         val sources =

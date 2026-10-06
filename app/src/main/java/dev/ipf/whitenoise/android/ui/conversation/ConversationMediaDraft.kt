@@ -399,8 +399,7 @@ internal class ConversationMediaDraftState(
             }
             val accountRef = owner.accountRef
             val attachments =
-                appState.messageDraftRepository
-                    .draft(accountRef, controller.group.groupIdHex)
+                readDraftForRestoration(appState.messageDraftRepository, accountRef, controller.group.groupIdHex)
                     .getOrElse { return@withLock null }
                     ?.mediaAttachments
                     .orEmpty()

@@ -236,6 +236,7 @@ internal class PhotoDraftStager(
                             DraftPreparedPhoto(
                                 attachment = reread,
                                 attachmentDigest = reread.editorDigest(),
+                                restoredFromNative = true,
                             ),
                         )
                     } else {

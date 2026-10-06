@@ -92,6 +92,7 @@ class ConversationDraftRestoreRemovalTest {
                 // Matches the screen: its preparation effect takes the owner mutex first.
                 owner.prepareMissingAttachments()
                 advanceUntilIdle()
+                gateway.beforeReadReturns = { error("transient native read failure") }
                 val restored = requireNotNull(owner.restorePersistedAttachments())
                 assertEquals(2, restored.mediaSlots.size)
                 val newerPick =
