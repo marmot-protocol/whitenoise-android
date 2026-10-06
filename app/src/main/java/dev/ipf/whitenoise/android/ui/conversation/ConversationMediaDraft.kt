@@ -25,8 +25,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
-import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
-import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStageResult
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStager
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
@@ -49,7 +47,6 @@ import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.clearMediaTempFiles
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.editor.PhotoEditorStateHolder
-import dev.ipf.whitenoise.android.ui.conversation.media.isLegacyRestore
 import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.media.selectablePhotoQuality
@@ -822,47 +819,6 @@ private fun preparedPhotoQualities(
             hdDimensions = dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.High)),
         )
     }
-
-private fun legacyOccurrenceIndex(
-    slots: List<PendingMediaSlot>,
-    slot: PendingMediaSlot,
-): Int? =
-    if (slot.isLegacyRestore()) {
-        slots.takeWhile { it.id != slot.id }.count { it.isLegacyRestore() && it.uri == slot.uri }
-    } else {
-        null
-    }
-
-private suspend fun stageGenericAttachment(
-    drafts: MessageDraftRepository,
-    groupIdHex: String,
-    accountRef: String,
-    attachmentId: String,
-    pending: PendingAttachment,
-): DraftPreparedPhoto? {
-    val attachment = pending.toMessageDraftAttachment(attachmentId)
-    val admission =
-        drafts.addAttachment(accountRef, groupIdHex, attachment)
-    val committed =
-        when (admission) {
-            is MessageDraftMutationResult.Success -> attachment
-            MessageDraftMutationResult.DuplicateAttachment ->
-                drafts
-                    .draft(accountRef, groupIdHex)
-                    .getOrNull()
-                    ?.mediaAttachments
-                    ?.firstOrNull { it.id == attachmentId }
-            else -> null
-        } ?: return null
-    return DraftPreparedPhoto(
-        committed,
-        committed.editorDigest(),
-        restoredFromNative =
-            admission == MessageDraftMutationResult.DuplicateAttachment &&
-                committed.isComposerVisual() &&
-                !committed.isComposerDocument(),
-    )
-}
 
 /** A native refresh cannot replace locally editable bytes or relabel freshly prepared picks. */
 internal fun nativePhotosNeedingRestoration(
