@@ -75,7 +75,7 @@ class ComposerSendAcceptanceBoundaryTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText(sentText).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.composer_resize)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.composer_resize)).assertExists()
         composeRule.onNodeWithContentDescription(context.getString(R.string.composer_collapse)).assertDoesNotExist()
         assertEquals(emptyList<String>(), persistedDraftChanges)
         assertEquals(1, afterSendCount)

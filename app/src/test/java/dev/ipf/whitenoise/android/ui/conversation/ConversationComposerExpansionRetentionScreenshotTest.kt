@@ -632,7 +632,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         assertEquals(context.getString(labelRes), label)
     }
 
-    /** Re-entry restores the accessible surface and border drag target without a visible handle. */
+    /** Re-entry restores the accessible surface and persistent border drag target. */
     private fun awaitResizeHandleAfterReentry() {
         val description = context.getString(R.string.composer_resize)
         composeRule.waitUntil(timeoutMillis = 5_000) {
@@ -652,7 +652,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         assertEquals(target.left, strip.left)
         assertEquals(target.right, strip.right)
         assertEquals(target.top, strip.top)
-        assertEquals(8.dp, strip.bottom - strip.top)
+        assertEquals(12.dp, strip.bottom - strip.top)
         composeRule.onNodeWithTag(COMPOSER_RESIZE_INDICATOR_TAG, useUnmergedTree = true).assertDoesNotExist()
     }
 
