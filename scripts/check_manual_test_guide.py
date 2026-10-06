@@ -9,16 +9,24 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    from manual_test_fragments import (
+        CASE_DIR, SURFACE_DIR, GUIDE_PATH, INVENTORY_PATH, ID_RE, DEFINITION_RE, FragmentError, definitions,
+        extract_case, extract_source, load_guide, load_inventory, source_inventory, source_digest,
+        historical_definitions, read_tree,
+    )
+except ModuleNotFoundError:
+    from scripts.manual_test_fragments import (
+        CASE_DIR, SURFACE_DIR, GUIDE_PATH, INVENTORY_PATH, ID_RE, DEFINITION_RE, FragmentError, definitions,
+        extract_case, extract_source, load_guide, load_inventory, source_inventory, source_digest,
+        historical_definitions, read_tree,
+    )
+
 ROOT = Path(__file__).resolve().parents[1]
-GUIDE = ROOT / "docs/manual-release-testing.md"
-INVENTORY = ROOT / "docs/manual-release-testing-surfaces.json"
+GUIDE = ROOT / GUIDE_PATH
+INVENTORY = ROOT / INVENTORY_PATH
 README = ROOT / "README.md"
 AGENTS = ROOT / "AGENTS.md"
-ID_RE = re.compile(r"[A-Z]{3,4}-\d{3}")
-DEFINITION_RE = re.compile(
-    r"^(\d+)\. \[ \] \*\*(?P<id>[A-Z]{3,4}-\d{3}) — (?P<title>[^*]+)\*\* — "
-    r"(?P<body>.+?) → \*\*Expected:\*\* (?P<expected>.+)$"
-)
 CANDIDATE_RE = re.compile(r"^(?:\d+\.|[-*])\s*\[[^]]*]\s*\*\*|\*\*[A-Z]{3,4}-\d{3}")
 ANNOTATION_RE = re.compile(r"@[A-Za-z_][A-Za-z0-9_.]*")
 IDENTIFIER_RE = re.compile(r"(?:[A-Za-z_][A-Za-z0-9_]*|`[^`\n]+`)")
@@ -54,6 +62,8 @@ REQUIRED_HEADINGS = [
 
 
 def finding(path: Path, line: int, key: str, message: str) -> str:
+    if path == GUIDE:
+        key = f"assembled guide {key}"
     return f"{path.relative_to(ROOT)}:{line}: {key}: {message}"
 
 
@@ -490,8 +500,8 @@ def current_composable_surfaces() -> set[tuple[str, str]]:
 
 def validate_inventory(active: set[str], errors: list[str]) -> None:
     try:
-        data = json.loads(INVENTORY.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        data = load_inventory(ROOT, str(INVENTORY.relative_to(ROOT)))
+    except (OSError, ValueError) as exc:
         errors.append(finding(INVENTORY, 0, "inventory", f"cannot read inventory: {exc}"))
         return
     categories = data.get("categories")
@@ -580,17 +590,25 @@ def validate_inventory(active: set[str], errors: list[str]) -> None:
             )
 
 
-def parse_revision_guide(revision: str) -> tuple[set[str], set[str]] | None:
-    result = subprocess.run(["git", "show", f"{revision}:docs/manual-release-testing.md"], cwd=ROOT, capture_output=True, text=True)
-    if result.returncode != 0:
-        return None
-    active, retired, _ = parse_guide(result.stdout)
+def parse_revision_guide(revision: str) -> tuple[set[str], set[str]]:
+    # Preserve IDs without requiring the broken base to satisfy current rules.
+    # Unreadable history and malformed fragment identities still fail closed.
+    active = set(historical_definitions(ROOT, revision))
+    lines = read_tree(ROOT, revision, GUIDE_PATH).splitlines()
+    start, end = section_bounds(lines, "## Retired IDs")
+    retired = set()
+    if start >= 0:
+        for line in lines[start + 1:end]:
+            if match := re.match(r"^\|\s*([A-Z]{3,4}-\d{3})\s*\|", line):
+                retired.add(match[1])
     return active, retired
 
 
 def validate_history(base: str, active: set[str], retired: set[str], errors: list[str]) -> None:
-    previous = parse_revision_guide(base)
-    if previous is None:
+    try:
+        previous = parse_revision_guide(base)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        errors.append(finding(GUIDE, 0, "history", str(exc)))
         return
     old_active, old_retired = previous
     for test_id in sorted(old_active - active - retired):
@@ -607,8 +625,6 @@ def validate_history(base: str, active: set[str], retired: set[str], errors: lis
             errors.append(finding(GUIDE, 0, test_id, "new ID must append above the previous prefix maximum"))
 
 
-GUIDE_PATH = "docs/manual-release-testing.md"
-INVENTORY_PATH = "docs/manual-release-testing-surfaces.json"
 USER_FACING_SOURCE_PREFIXES = (
     # Conservatively gate every Android source-set file. User-visible behavior
     # can enter through Kotlin, manifests, resources, or flavor/debug/staging
@@ -641,7 +657,12 @@ def maintenance_files_missing(changed: set[str]) -> set[str]:
     has_user_facing_change = any(is_user_facing_source(path) for path in changed)
     if not has_user_facing_change:
         return set()
-    return {GUIDE_PATH, INVENTORY_PATH} - changed
+    missing = {GUIDE_PATH, INVENTORY_PATH} - changed
+    if any(re.fullmatch(rf"{CASE_DIR}/[A-Z]{{3,4}}-\d{{3}}\.md", path) for path in changed):
+        missing.discard(GUIDE_PATH)
+    if any(path.startswith(SURFACE_DIR + "/") and path.endswith(".json") for path in changed):
+        missing.discard(INVENTORY_PATH)
+    return missing
 
 
 def added_surface_tokens(diff: str) -> list[tuple[str, str]]:
@@ -668,12 +689,47 @@ def added_surface_tokens(diff: str) -> list[tuple[str, str]]:
 
 
 def inventory_anchor_index() -> set[tuple[str, str]]:
-    data = json.loads(INVENTORY.read_text(encoding="utf-8"))
+    data = load_inventory(ROOT, str(INVENTORY.relative_to(ROOT)))
     return {
         (entry.get("source", ""), entry.get("anchor", ""))
         for entries in data.get("categories", {}).values()
         for entry in entries
     }
+
+
+def validate_fragment_maintenance(base: str, changed: set[str], errors: list[str]) -> None:
+    """A fragment must change effective coverage of this PR's production source."""
+    sources = {path for path in changed if is_user_facing_source(path)}
+    if not sources:
+        return
+    try:
+        current_inventory = load_inventory(ROOT)
+        old_inventory = load_inventory(ROOT, revision=base, check_legacy_hash=False)
+        affected_ids = set()
+        changed_mappings = set()
+        for source in sources:
+            old = source_inventory(old_inventory, source)
+            current = source_inventory(current_inventory, source)
+            if source_digest(old_inventory, source) != source_digest(current_inventory, source):
+                changed_mappings.add(source)
+            for data in (old, current):
+                for entries in data["categories"].values():
+                    for entry in entries:
+                        affected_ids.update(entry.get("test_ids", []))
+        if INVENTORY_PATH not in changed and not any(
+            f"{SURFACE_DIR}/{source}.json" in changed for source in changed_mappings
+        ):
+            errors.append(finding(INVENTORY, 0, "maintenance", "fragment must change effective coverage for a changed production source"))
+        if GUIDE_PATH not in changed:
+            old_cases = historical_definitions(ROOT, base)
+            current_cases = definitions(load_guide(ROOT))
+            if not any(
+                f"{CASE_DIR}/{test_id}.md" in changed and old_cases.get(test_id) != current_cases.get(test_id)
+                for test_id in affected_ids
+            ):
+                errors.append(finding(GUIDE, 0, "maintenance", "fragment must change an effective scenario referenced by affected coverage"))
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        errors.append(finding(GUIDE, 0, "maintenance", str(exc)))
 
 
 def validate_changed_surface_contract(base: str, errors: list[str]) -> None:
@@ -686,9 +742,12 @@ def validate_changed_surface_contract(base: str, errors: list[str]) -> None:
     if result.returncode != 0:
         errors.append(finding(GUIDE, 0, "maintenance", f"cannot compare changed files with {base}"))
         return
-    missing = maintenance_files_missing(set(result.stdout.splitlines()))
+    changed = set(result.stdout.splitlines())
+    missing = maintenance_files_missing(changed)
     for path in sorted(missing):
         errors.append(finding(GUIDE, 0, "maintenance", f"user-facing source changed without updating {path}"))
+    if not missing and any(path.startswith((CASE_DIR + "/", SURFACE_DIR + "/")) for path in changed):
+        validate_fragment_maintenance(base, changed, errors)
     diff_result = subprocess.run(
         ["git", "diff", "--unified=0", base, "--", "app/src"],
         cwd=ROOT,
@@ -714,16 +773,39 @@ def validate_changed_surface_contract(base: str, errors: list[str]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base")
+    parser.add_argument("--output-dir", type=Path)
+    extraction = parser.add_mutually_exclusive_group()
+    extraction.add_argument("--extract-case")
+    extraction.add_argument("--extract-source")
     args = parser.parse_args()
-    active, retired, errors = parse_guide(GUIDE.read_text(encoding="utf-8"))
-    validate_links(errors)
-    validate_inventory(active, errors)
-    if args.base:
-        validate_history(args.base, active, retired, errors)
-        validate_changed_surface_contract(args.base, errors)
+    try:
+        if args.extract_case or args.extract_source:
+            if args.base or args.output_dir:
+                raise FragmentError("extraction cannot be combined with validation/output options")
+            if args.extract_case:
+                extract_case(ROOT, args.extract_case)
+            else:
+                extract_source(ROOT, args.extract_source)
+            return 0
+        guide = load_guide(ROOT, str(GUIDE.relative_to(ROOT)))
+        active, retired, errors = parse_guide(guide)
+        validate_links(errors)
+        validate_inventory(active, errors)
+        if args.base:
+            validate_history(args.base, active, retired, errors)
+            validate_changed_surface_contract(args.base, errors)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        print(f"manual test inputs: {exc}")
+        return 1
     if errors:
         print("\n".join(errors))
         return 1
+    if args.output_dir:
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        (args.output_dir / "manual-release-testing.md").write_text(guide, encoding="utf-8")
+        (args.output_dir / "manual-release-testing-surfaces.json").write_text(
+            json.dumps(load_inventory(ROOT), indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
+        )
     print(f"manual test guide OK: {len(active)} active IDs, {len(retired)} retired IDs")
     return 0
 
