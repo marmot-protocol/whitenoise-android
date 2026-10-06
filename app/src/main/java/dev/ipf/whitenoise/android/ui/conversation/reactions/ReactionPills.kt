@@ -187,7 +187,7 @@ private fun ReactionPillSurface(
         if (emoji != null) {
             Text(
                 text = EmojiShortcodes.annotate(AnnotatedString(emoji)),
-                inlineContent = EmojiShortcodes.content(),
+                inlineContent = EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None),
                 fontSize = with(LocalDensity.current) { ReactionEmojiSize.toSp() },
                 lineHeight = with(LocalDensity.current) { ReactionPillHeight.toSp() },
                 maxLines = 1,

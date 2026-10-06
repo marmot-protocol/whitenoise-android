@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.state.ForwardOperationPhase
 import dev.ipf.whitenoise.android.state.ForwardOperationSnapshot
 import dev.ipf.whitenoise.android.state.ForwardTargetProgress
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.util.Locale
@@ -231,7 +232,7 @@ private fun ForwardOperationStatusRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (destinationAccountName != null) {
-                    Text(
+                    EmojiLabel(
                         text = stringResource(R.string.share_sending_as_value, destinationAccountName),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

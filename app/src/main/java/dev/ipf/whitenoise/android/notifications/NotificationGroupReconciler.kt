@@ -96,7 +96,8 @@ internal class NotificationGroupReconciler(
         val manager = context.getSystemService(NotificationManager::class.java) ?: return false
         val summaryChannel = manager.getNotificationChannel(NotificationChannelSpec.USER_EVENT_SUMMARY.id)
         // Android owns a blocked channel's removal. Do not spend shared write slots on discarded summaries.
-        if (isNotificationSummaryChannelBlocked(manager, summaryChannel)) return true
+        val summaryBlocked = isNotificationSummaryChannelBlocked(manager, summaryChannel)
+        if (summaryBlocked) return reconcileArtwork(manager, expected, allowEmpty)
         val compat = NotificationManagerCompat.from(context)
         val first = read(manager)
         if (adoptLegacyCards(manager, compat, first)) return false
@@ -104,15 +105,55 @@ internal class NotificationGroupReconciler(
         val children = first.mapNotNull(UserEventNotificationGroup::child)
         val old = first.firstOrNull { it.tag == SUMMARY_TAG && it.id == SUMMARY_ID }
         if (children.isEmpty() && !allowEmpty) return false
-        if (children.isNotEmpty() && matches(old, UserEventNotificationGroup.summaryState(children))) return true
-        if (children.isEmpty() && old == null) return true
-        ensureSummaryChannel(summaryChannel)
-        // Pacing and coroutine suspension happen before the commit gate. Re-read after waiting.
-        if (revision.get() != expected) return false
-        pacer.awaitSlot()
-        return synchronized(UserEventNotificationGroup.mutationLock) {
-            if (revision.get() != expected) return@synchronized false
-            commitSummary(manager, compat, allowEmpty)
+        val summaryDone =
+            if (summaryIsCurrent(children, old)) {
+                true
+            } else {
+                ensureSummaryChannel(summaryChannel)
+                // Mandatory summary work must not wait for optional artwork cleanup.
+                if (revision.get() != expected) return false
+                pacer.awaitSlot()
+                synchronized(UserEventNotificationGroup.mutationLock) {
+                    if (revision.get() != expected) return@synchronized false
+                    commitSummary(manager, compat, allowEmpty)
+                }
+            }
+        val artworkDone = reconcileArtwork(manager, expected, allowEmpty)
+        return summaryDone && artworkDone
+    }
+
+    private fun summaryIsCurrent(
+        children: List<NotificationGroupChild>,
+        old: StatusBarNotification?,
+    ): Boolean {
+        val expected = if (children.isEmpty()) null else UserEventNotificationGroup.summaryState(children)
+        return if (expected == null) old == null else matches(old, expected)
+    }
+
+    /** Cleanup is not complete while a write is settling or an empty snapshot still needs confirmation. */
+    private fun reconcileArtwork(
+        manager: NotificationManager,
+        expected: Long,
+        allowEmpty: Boolean,
+    ): Boolean {
+        if (!hasNotificationEmojiArtwork(context)) return true
+        return try {
+            synchronized(UserEventNotificationGroup.mutationLock) {
+                if (revision.get() != expected || NotificationGroupWriteVisibility.remainingMillis(context) > 0L) {
+                    false
+                } else {
+                    val current = read(manager)
+                    if (current.none { UserEventNotificationGroup.child(it) != null } && !allowEmpty) {
+                        false
+                    } else {
+                        pruneNotificationEmojiArtwork(context, current)
+                        true
+                    }
+                }
+            }
+        } catch (_: RuntimeException) {
+            // An optional export/URI failure must not prevent required summary work.
+            false
         }
     }
 

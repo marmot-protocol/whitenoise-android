@@ -27,6 +27,7 @@ import dev.ipf.marmotkit.GroupRejoinInvitationFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -205,7 +206,7 @@ private fun GroupRejoinInvitationDialog(
         title = { Text(stringResource(R.string.group_rejoin_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.group_rejoin_invited_by, inviterName, inviterIdentity))
+                EmojiLabel(stringResource(R.string.group_rejoin_invited_by, inviterName, inviterIdentity))
                 Text(stringResource(R.string.group_rejoin_replaces_state))
                 Text(stringResource(R.string.group_rejoin_trust_warning))
             }

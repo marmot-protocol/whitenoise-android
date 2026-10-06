@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import kotlinx.coroutines.launch
 
@@ -282,7 +283,7 @@ private fun LoadedEventCard(
         )
         card.title?.takeIf(String::isNotBlank)?.let { title ->
             Spacer(Modifier.height(3.dp))
-            Text(
+            EmojiLabel(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
@@ -325,7 +326,7 @@ private fun LoadedEventHeader(
             pictureUrl = card.authorMetadata?.pictureUrl,
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
+            EmojiLabel(
                 text = author,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
@@ -393,7 +394,7 @@ private fun LoadedEventSummary(
             } else {
                 Modifier
             }
-        Text(
+        EmojiLabel(
             text = summary,
             modifier = modifier,
             style = MaterialTheme.typography.bodyMedium,
@@ -411,7 +412,7 @@ private fun LoadedEventMetadata(
 ) {
     if (metadata.isNotEmpty()) {
         Spacer(Modifier.height(3.dp))
-        Text(
+        EmojiLabel(
             text = metadata.joinToString(" · "),
             style = MaterialTheme.typography.labelSmall,
             color = contentColor.copy(alpha = 0.72f),

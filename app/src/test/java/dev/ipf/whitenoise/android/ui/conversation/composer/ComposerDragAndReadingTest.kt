@@ -348,6 +348,7 @@ class ComposerDragAndReadingTest {
         assertEquals(original, observed)
     }
 
+    /** A fresh draft must not inherit reading controls from the previous scrolled owner. */
     @Test
     fun changingOwnerToAnUnscrolledDraftHidesThePreviousTopAction() {
         lateinit var changeOwner: () -> Unit
@@ -421,6 +422,7 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
     }
 
+    /** Owner changes cancel old reading momentum even when draft text and selection are identical. */
     @Test
     fun changingDraftOwnerStopsMomentumEvenForIdenticalTextAndSelection() {
         lateinit var changeOwner: () -> Unit
@@ -485,6 +487,7 @@ class ComposerDragAndReadingTest {
         assertEquals(0, sends)
     }
 
+    /** Wrapped reading controls reserve a complete editor line while all accessory actions remain clickable. */
     @Test
     fun navigationWrapsWithoutHidingActiveControlsOrTheEditor() {
         var extra = 0.dp
@@ -545,6 +548,7 @@ class ComposerDragAndReadingTest {
         assertEquals("all active controls remain actionable", 3, pressed)
     }
 
+    /** The resize grip stays outside accessory bounds so attachment and reply actions remain reachable. */
     @Test
     fun resizeStripLeavesAccessoryActionsIndependent() {
         var dismissed = 0
