@@ -34,6 +34,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
+/** Emits the picker's dismiss action through a close control with a localized accessibility label. */
 @Composable
 internal fun ShareChatPickerCloseButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
@@ -41,6 +42,11 @@ internal fun ShareChatPickerCloseButton(onClick: () -> Unit) {
     }
 }
 
+/**
+ * Summarizes the pending share without changing its payload. [compact] limits
+ * the preview to one line so the destination list remains usable above the IME;
+ * the regular layout allows three lines and both ellipsize overflow.
+ */
 @Composable
 internal fun ShareChatPickerPreview(
     previewText: String,
@@ -64,6 +70,10 @@ internal fun ShareChatPickerPreview(
     }
 }
 
+/**
+ * Chooses a localized text-and-attachment summary, a pluralized attachment-only
+ * summary, or the supplied text. An empty share yields no preview text.
+ */
 @Composable
 private fun sharePickerPreviewText(
     previewText: String,
