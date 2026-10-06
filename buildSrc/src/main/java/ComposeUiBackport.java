@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import javax.inject.Inject;
@@ -26,6 +27,7 @@ import org.gradle.api.artifacts.transform.TransformParameters;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.FileSystemLocation;
 import org.gradle.api.file.RegularFileProperty;
+import org.gradle.api.logging.Logging;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.InputFile;
@@ -53,18 +55,26 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
 
     /** Immutable build inputs; the compiler's classpath deliberately resolves unpatched artifacts. */
     public interface Parameters extends TransformParameters {
+        /** Pinned standalone Kotlin compiler and its JVM runtime dependencies. */
         @Classpath ConfigurableFileCollection getCompilerClasspath();
+        /** Matching Compose compiler plugin, including stability-field generation. */
         @Classpath ConfigurableFileCollection getComposeCompiler();
+        /** Untransformed Google UI dependencies used only to compile the replacement sources. */
         @Classpath ConfigurableFileCollection getOriginalClasspath();
+        /** Hash-verified official UI 1.12.1 source archive. */
         @InputFile @PathSensitive(PathSensitivity.NONE) RegularFileProperty getSources();
+        /** Reviewed four-file production patch from the recorded AndroidX commit. */
         @InputFile @PathSensitive(PathSensitivity.NONE) RegularFileProperty getPatch();
+        /** Android 37 platform classes matching the app compile SDK. */
         @Classpath ConfigurableFileCollection getAndroidJar();
     }
 
+    /** The resolved AAR, before any Android artifact extraction or bytecode processing. */
     @InputArtifact
-    @PathSensitive(PathSensitivity.NAME_ONLY)
+    @PathSensitive(PathSensitivity.NONE)
     public abstract Provider<FileSystemLocation> getInputArtifact();
 
+    /** Gradle-managed process execution for patch checking and source compilation. */
     @Inject
     protected abstract ExecOperations getExecOperations();
 
@@ -72,11 +82,11 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
     @Override
     public void transform(TransformOutputs outputs) {
         File input = getInputArtifact().get().getAsFile();
-        if (!input.getName().startsWith("ui-android-")) {
-            outputs.file(input);
-            return;
-        }
         try {
+            if (!isComposeUiArtifact(input)) {
+                outputs.file(input);
+                return;
+            }
             verifyHash(input.toPath(), AAR_SHA);
             Path sourceJar = getParameters().getSources().get().getAsFile().toPath();
             verifyHash(sourceJar, SOURCES_SHA);
@@ -158,9 +168,28 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
                     ("upstream=" + COMMIT + "\nbase=1.12.1\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
             aar.put("classes.jar", writeZip(originalClasses));
             Files.write(output.toPath(), writeZip(aar));
+            Logging.getLogger(ComposeUiBackport.class).lifecycle(
+                    "Backported Compose UI 1.12.1 from {} ({} source-compiled classes; source hashes and JVM linkage verified)",
+                    COMMIT, replacements.size());
         } catch (Exception exception) {
             throw new GradleException("Compose 1.12.1 source backport failed; do not bypass the guard", exception);
         }
+    }
+
+    /** Identifies UI by its contents: Google's module metadata names this artifact ui.aar. */
+    private static boolean isComposeUiArtifact(File input) throws IOException {
+        try (ZipFile aar = new ZipFile(input)) {
+            ZipEntry classes = aar.getEntry("classes.jar");
+            if (classes == null) return false;
+            try (ZipInputStream jar = new ZipInputStream(aar.getInputStream(classes))) {
+                ZipEntry entry;
+                while ((entry = jar.getNextEntry()) != null) {
+                    if (entry.getName().equals("META-INF/androidx.compose.ui_ui.version") ||
+                            entry.getName().equals(PACKAGE + "AlignmentLines.class")) return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Prevents an enclosing checkout or inherited Git variables from changing patch semantics. */
