@@ -48,8 +48,7 @@ class PrivateContactDestinationAvatarTest {
 
     /** Distinct records for the same contact always select the destination account's pixels. */
     @Test
-    fun bothAccountsWithPicturesStillDisplayOnlyTheDestinationOwner() =
-        assertPickerOwners(hasA = true, hasB = true)
+    fun bothAccountsWithPicturesStillDisplayOnlyTheDestinationOwner() = assertPickerOwners(hasA = true, hasB = true)
 
     /** The shared group renderer rejects a mismatched private handle even if a caller supplies one. */
     @Test
@@ -111,7 +110,10 @@ class PrivateContactDestinationAvatarTest {
     fun clearPixels() = AvatarImageLoader.clear()
 
     /** Builds the actual forward/share row composables with the same peer and a different selected owner. */
-    private fun assertPickerOwners(hasA: Boolean, hasB: Boolean) {
+    private fun assertPickerOwners(
+        hasA: Boolean,
+        hasB: Boolean,
+    ) {
         AvatarImageLoader.clear()
         val appState = emptyAppState(accounts = accounts(), activeAccountRef = "a")
         listOf("a" to hasA, "b" to hasB).filter { it.second }.forEach { (account, _) ->
@@ -153,7 +155,10 @@ class PrivateContactDestinationAvatarTest {
     }
 
     /** Counts exact synthetic colours so initials, text and theme backgrounds cannot satisfy an image assertion. */
-    private fun colorPixels(tag: String, color: Int): Int {
+    private fun colorPixels(
+        tag: String,
+        color: Int,
+    ): Int {
         val bitmap = rule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)

@@ -794,7 +794,12 @@ class NotificationStartupOrderingTest {
         accounts: List<AccountSummaryFfi>,
         releaseFirstRead: CountDownLatch,
     ): NotificationBootstrapTestFixture {
-        val fixtureIdentity = UUID.randomUUID().toString().replace("-", "").padEnd(64, '0')
+        val fixtureIdentity =
+            UUID
+                .randomUUID()
+                .toString()
+                .replace("-", "")
+                .padEnd(64, '0')
         return NotificationBootstrapTestFixture(
             context = context,
             notificationUsersHaveDisplayNames = true,
@@ -868,7 +873,12 @@ class NotificationStartupOrderingTest {
             assertEquals(1, writes.get())
             assertEquals(
                 "**resolved after fallback**",
-                fixture.activeMessagingStyle().messages.single().text.toString(),
+                fixture
+                    .activeMessagingStyle()
+                    .messages
+                    .single()
+                    .text
+                    .toString(),
             )
 
             releaseFirstRead.countDown()

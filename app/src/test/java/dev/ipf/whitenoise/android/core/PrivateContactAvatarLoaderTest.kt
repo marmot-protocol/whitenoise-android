@@ -110,5 +110,4 @@ class PrivateContactAvatarLoaderTest {
             assertNull(PrivateContactAvatarLoader.load(sourceB, "b"))
             AvatarImageLoader.clear()
         }
-
 }
