@@ -17,8 +17,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -31,6 +33,34 @@ import org.robolectric.annotation.Config
 class NostrEventCardTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun verifiedCardKeepsItsReaderActionWhilePreviewParsingIsPending() {
+        val pending = CompletableDeferred<MarkdownDocumentFfi>()
+        val original = noteCard().copy(readerBody = "Complete signed body")
+        var opened: NostrEventCardModel? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                val presentation =
+                    rememberNostrEventPreviewState(
+                        NostrEventCardState.Loaded(original),
+                        mentionDisplayName = { null },
+                        parseMarkdown = { pending.await() },
+                    )
+                NostrEventCard(
+                    state = presentation,
+                    authorDisplayName = { "Alex" },
+                    contentColor = Color.Black,
+                    onRetry = {},
+                    onCopy = {},
+                    onOpen = { opened = it },
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_expand)).performClick()
+        assertEquals(original.eventIdHex, opened?.eventIdHex)
+        assertEquals(original.readerBody, opened?.readerBody)
+    }
 
     @Test
     fun loadedCardExposesCopyAndOpenActions() {
@@ -58,7 +88,7 @@ class NostrEventCardTest {
             .assertIsDisplayed()
         composeRule.onNodeWithText("A short referenced note").assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_copy)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_open)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_expand)).performClick()
 
         assertEquals(1, copies)
         assertEquals(1, opens)
@@ -130,7 +160,7 @@ class NostrEventCardTest {
         }
 
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_read_article)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_play_video)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_expand)).assertIsDisplayed()
     }
 
     @Test
@@ -200,7 +230,7 @@ class NostrEventCardTest {
             click(Offset(x = width - 1f, y = centerY))
         }
         composeRule.onNodeWithContentDescription(string(R.string.nostr_event_copy)).performClick()
-        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_open)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.nostr_event_expand)).performClick()
 
         assertEquals(listOf(card, card, card), readCards)
         assertEquals(1, copies)
