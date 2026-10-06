@@ -174,16 +174,17 @@ class ConversationDraftRestoreRemovalTest {
         id: String,
         name: String,
         mediaType: String,
-    ): MessageDraftAttachmentFfi = MessageDraftAttachmentFfi(
-        id,
-        name,
-        mediaType,
-        byteArrayOf(1, 2, 3),
-        null,
-        null,
-        null,
-        emptyList(),
-    )
+    ): MessageDraftAttachmentFfi =
+        MessageDraftAttachmentFfi(
+            id,
+            name,
+            mediaType,
+            byteArrayOf(1, 2, 3),
+            null,
+            null,
+            null,
+            emptyList(),
+        )
 
     private fun newPhotoUri(context: Context): Uri {
         val image = File(context.cacheDir, "new-photo.png")
@@ -272,7 +273,12 @@ class ConversationDraftRestoreRemovalTest {
                 assertNull(owner.restorePersistedAttachments())
                 assertTrue(owner.preparedAttachments().isEmpty())
 
-                app.setDraft("account", group.groupIdHex, androidx.compose.ui.text.input.TextFieldValue("next message"))
+                app.setDraft(
+                    "account",
+                    group.groupIdHex,
+                    androidx.compose.ui.text.input
+                        .TextFieldValue("next message"),
+                )
                 app.clearDraftAfterSuccessfulSend(pendingClear)
                 advanceUntilIdle()
                 assertEquals("next message", gateway.current?.content)
