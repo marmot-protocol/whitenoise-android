@@ -3,6 +3,36 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "Referenced event local emoji: NostrEventCards.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037",
+          "RDR-002",
+          "RDR-003"
+        ]
+      },
+      {
+        "surface": "Referenced event local emoji: NostrEventViewers.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037",
+          "RDR-002",
+          "RDR-003"
+        ]
+      },
+      {
+        "surface": "Referenced event local emoji: NostrEventReaderEmoji.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventReaderEmoji.kt",
+        "anchor": "fun NostrEventReaderBlock(",
+        "test_ids": [
+          "MSG-037",
+          "RDR-002",
+          "RDR-003"
+        ]
+      },
+      {
         "surface": "Custom emoji authored labels: InvitePreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
         "anchor": "EmojiLabel(",
