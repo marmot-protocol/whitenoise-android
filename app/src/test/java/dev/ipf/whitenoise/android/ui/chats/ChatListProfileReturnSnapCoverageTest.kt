@@ -121,7 +121,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val notificationCommitBlock =
             mainShell.requiredSection(
                 start = "fun commitNotificationConversationOpen(chatItem: ChatListItem) {",
-                end = "\n        fun fallBackToChatList() {",
+                end = "\n        when (step) {",
             )
         assertTrue(
             "shared notification-open commit must reset armed return-head provenance",

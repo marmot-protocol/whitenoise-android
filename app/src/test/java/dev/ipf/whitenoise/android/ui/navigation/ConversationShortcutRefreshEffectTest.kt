@@ -87,6 +87,8 @@ class ConversationShortcutRefreshEffectTest {
 
     /** Pump Android's paused main queue so the production coalescing delay reaches its publication boundary. */
     private fun awaitPublication(predicate: () -> Boolean) {
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeBy(150)
         composeRule.waitUntil(5_000) {
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(150))
             predicate()
@@ -95,6 +97,8 @@ class ConversationShortcutRefreshEffectTest {
 
     /** Advance beyond the production debounce after recomposition to prove an absent publication stays absent. */
     private fun settle() {
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeBy(300)
         composeRule.runOnIdle { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(300)) }
         composeRule.waitForIdle()
     }
