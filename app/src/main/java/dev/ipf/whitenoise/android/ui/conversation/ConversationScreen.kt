@@ -3170,10 +3170,28 @@ internal fun ConversationScreen(
             documentUris = pendingDocumentUris,
         )
 
-    LaunchedEffect(mediaDraftState, controller.boundAccountRef, chat.id) {
-        val restored = mediaDraftState.restorePersistedAttachments() ?: return@LaunchedEffect
+    val nativeComposerCleanupRevision =
+        appState.nativeComposerCleanupRevision(controller.boundAccountRef, controller.group.groupIdHex)
+    LaunchedEffect(
+        mediaDraftState,
+        controller.boundAccountRef,
+        chat.id,
+        nativeComposerCleanupRevision,
+        pendingMediaSlots,
+        pendingDocumentUris,
+    ) {
+        val capturedSlots = pendingMediaSlots
+        val capturedDocuments = pendingDocumentUris
+        val capturedAccount = controller.boundAccountRef
+        mediaDraftState.updateInputs(capturedSlots, capturedDocuments, capturedAccount)
+        val restored =
+            mediaDraftState.restorePersistedAttachments {
+                pendingMediaSlots == capturedSlots &&
+                    pendingDocumentUris == capturedDocuments &&
+                    controller.boundAccountRef == capturedAccount
+            } ?: return@LaunchedEffect
         val merged =
-            mergeRestoredComposerAttachments(
+            mergeReconciledComposerAttachments(
                 pendingMediaSlots,
                 pendingDocumentUris,
                 restored,
@@ -3181,6 +3199,8 @@ internal fun ConversationScreen(
             )
         pendingMediaSlots = merged.mediaSlots
         pendingDocumentUris = merged.documentUris
+        mediaDraftState.updateInputs(merged.mediaSlots, merged.documentUris, capturedAccount)
+        mediaDraftState.prepareMissingAttachments()
     }
 
     val pollVotesHost = remember(controller) { PollVotesHostState() }
