@@ -85,10 +85,9 @@ internal data class RestoredConversationAttachments(
 
 private data class DraftRestorationVersion(
     val owner: DraftDocumentOwner,
-    val nativeRevision: Int,
+    val nativeRevision: Long,
     val inputsRevision: Long,
 )
-
 
 /**
  * Owns the transient photo-draft workflow for one conversation.
@@ -387,7 +386,9 @@ internal class ConversationMediaDraftState(
 
     /** Reconciles native-restored shelf entries when the authoritative draft presentation changes. */
     @Suppress("LongMethod", "ReturnCount") // One guarded pass reads, materializes and publishes one native snapshot.
-    suspend fun restorePersistedAttachments(): RestoredConversationAttachments? =
+    suspend fun restorePersistedAttachments(
+        canPublish: () -> Boolean = { true },
+    ): RestoredConversationAttachments? =
         preparationMutex.withLock {
             val owner = documentOwnerFence.current() ?: return@withLock null
             val cleanupRevision = appState.nativeComposerCleanupRevision(owner.accountRef, controller.group.groupIdHex)
@@ -413,16 +414,11 @@ internal class ConversationMediaDraftState(
             // A later change during materialization still invalidates the publication below.
             val version = requested.copy(inputsRevision = inputsRevision)
             val nativeIds = attachments.mapTo(mutableSetOf()) { it.id }
-            // A restored slot uses the native id itself. A fresh picker occurrence has
-            // its own id and must survive an older send's native draft cleanup.
+            // Only bytes restored from native state are reconciled away. Freshly
+            // prepared picker occurrences survive an older send's cleanup.
             val removedPhotos = restoredPhotosMissingFrom(currentSlots, preparedPhotos, nativeIds)
-            val removedDocuments = restoredDocumentsMissingFrom(
-                    accountRef,
-                    controller.group.groupIdHex,
-                    currentDocumentUris,
-                    preparedDocuments,
-                    nativeIds,
-                )
+            val removedDocuments =
+                restoredDocumentsMissingFrom(currentDocumentUris, preparedDocuments, nativeIds)
             val retainedSlots = currentSlots.filterNot { it.id in removedPhotos }
             val retainedDocuments = currentDocumentUris.filterNot { it in removedDocuments }
             val reconciliation =
@@ -447,16 +443,21 @@ internal class ConversationMediaDraftState(
                     appState.nativeComposerCleanupRevision(version.owner.accountRef, controller.group.groupIdHex),
                     inputsRevision,
                 )
-            ) return@withLock null
+            ) {
+                return@withLock null
+            }
+            // Check the screen snapshot before committing owner state or its restored version.
+            // The caller applies the result on the main thread without another suspension.
+            if (!canPublish()) return@withLock null
             restoredDraftRevision = version
-            preparedPhotos = preparedPhotos.filterKeys { it !in removedPhotos } +
-                reconciliation.mediaBySlotId.mapValues { (_, attachment) ->
-                    DraftPreparedPhoto(attachment, attachment.editorDigest())
-                }
-            preparedDocuments = preparedDocuments.filterKeys { it !in removedDocuments } +
-                reconciliation.documentsByUriString
-                    .mapKeys { (uri, _) -> Uri.parse(uri) }
-                    .mapValues { (_, attachment) -> DraftPreparedPhoto(attachment, attachment.editorDigest()) }
+            preparedPhotos =
+                preparedPhotos.filterKeys { it !in removedPhotos } +
+                    reconciliation.mediaBySlotId.mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
+            preparedDocuments =
+                preparedDocuments.filterKeys { it !in removedDocuments } +
+                    reconciliation.documentsByUriString
+                        .mapKeys { (uri, _) -> Uri.parse(uri) }
+                        .mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
             nonEditableDescriptions = nonEditableDescriptions.filterKeys { it !in removedPhotos }
             reconciliation.mediaBySlotId.forEach { (slotId, attachment) ->
                 if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
@@ -477,7 +478,7 @@ internal class ConversationMediaDraftState(
     ) {
         materialized.forEach { (attachment, uri) ->
             if (attachment.id in removedDraftAttachmentIds(accountRef)) return@forEach
-            val prepared = DraftPreparedPhoto(attachment, attachment.editorDigest())
+            val prepared = attachment.asRestoredPhoto()
             if (attachment.isComposerVisual() && !attachment.isComposerDocument()) {
                 media += PendingMediaSlot(attachment.id, uri)
                 preparedPhotos += attachment.id to prepared
@@ -796,7 +797,7 @@ private fun materializeDraftAttachment(
 private fun restorationIsCurrent(
     version: DraftRestorationVersion,
     ownerFence: DraftDocumentOwnerFence,
-    cleanupRevision: Int,
+    cleanupRevision: Long,
     inputsRevision: Long,
 ): Boolean =
     ownerFence.isCurrent(version.owner) &&
@@ -836,26 +837,25 @@ private fun preparedPhotoQualities(
         )
     }
 
+private fun MessageDraftAttachmentFfi.asRestoredPhoto(): DraftPreparedPhoto =
+    DraftPreparedPhoto(this, editorDigest(), restoredFromNative = true)
+
 private fun restoredPhotosMissingFrom(
     slots: List<PendingMediaSlot>,
     prepared: Map<String, DraftPreparedPhoto>,
     nativeIds: Set<String>,
 ): Set<String> =
     slots.filter { slot ->
-        prepared[slot.id]?.attachment?.id == slot.id && slot.id !in nativeIds
+        prepared[slot.id]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
     }.mapTo(mutableSetOf()) { it.id }
 
 private fun restoredDocumentsMissingFrom(
-    accountRef: String,
-    groupIdHex: String,
     documents: List<Uri>,
     prepared: Map<Uri, DraftPreparedPhoto>,
     nativeIds: Set<String>,
 ): Set<Uri> =
     documents.filter { uri ->
-        val attachment = prepared[uri]?.attachment
-        attachment != null && attachment.id !in nativeIds &&
-            attachment.id != stagedDocumentAttachmentId(accountRef, groupIdHex, uri.toString())
+        prepared[uri]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
     }.toSet()
 
 /** Retains one caption acceptance generation across preview recompositions and staged-media edits. */

@@ -2247,13 +2247,15 @@ class WhiteNoiseAppState private constructor(
     private var draftHydrationRevision by mutableIntStateOf(0)
 
     // Transient view invalidation, bounded with the existing retained conversation state.
-    private val nativeComposerCleanupRevisions = mutableStateMapOf<String, Int>()
+    private val nativeComposerCleanupRevisions = mutableStateMapOf<String, Long>()
+    // Never reuse a stamp after conversation eviction or account-cache cleanup.
+    private var nativeComposerCleanupSequence = 0L
 
     /** Only committed cleanup of this exact owner may refresh its native-restored media shelf. */
     internal fun nativeComposerCleanupRevision(
         accountRef: String?,
         groupIdHex: String,
-    ): Int = nativeComposerCleanupRevisions[conversationKey(accountRef, groupIdHex)] ?: 0
+    ): Long = nativeComposerCleanupRevisions[conversationKey(accountRef, groupIdHex)] ?: 0L
 
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
@@ -2407,7 +2409,8 @@ class WhiteNoiseAppState private constructor(
                 if (nativeDraftConsumed) {
                     synchronized(conversationStateLock) {
                         val key = retainConversationState(accountRef, groupIdHex)
-                        nativeComposerCleanupRevisions[key] = (nativeComposerCleanupRevisions[key] ?: 0) + 1
+                        nativeComposerCleanupSequence += 1
+                        nativeComposerCleanupRevisions[key] = nativeComposerCleanupSequence
                     }
                 }
             },
@@ -6047,6 +6050,7 @@ class WhiteNoiseAppState private constructor(
             optimisticSendPhasesByConversation.values.forEach { it.clear() }
             optimisticSendPhasesByConversation.clear()
             optimisticCancellationGenerationByConversation.clear()
+            nativeComposerCleanupRevisions.clear()
         }
         // Cancel any in-flight downloads (their Deferred may hold plaintext or
         // a retained-media outcome) and drop both indexes so the next session

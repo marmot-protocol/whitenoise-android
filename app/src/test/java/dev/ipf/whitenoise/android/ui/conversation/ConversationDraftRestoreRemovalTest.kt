@@ -24,6 +24,8 @@ import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
+import dev.ipf.whitenoise.android.media.editor.stagedDocumentAttachmentId
+import dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -31,6 +33,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
+import dev.ipf.whitenoise.android.ui.conversation.media.composerVisualAttachmentWidth
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -67,23 +70,10 @@ class ConversationDraftRestoreRemovalTest {
             try {
                 val context = ApplicationProvider.getApplicationContext<Context>()
                 val group = conversationTimelineTestGroup()
-                val photos =
-                    (1..2).map { index ->
-                        MessageDraftAttachmentFfi(
-                            "native-photo-$index",
-                            "photo-$index.jpg",
-                            "image/jpeg",
-                            byteArrayOf(1, 2, 3),
-                            null,
-                            null,
-                            null,
-                            emptyList(),
-                        )
-                    }
+                val photos = cleanupAttachments(group.groupIdHex)
                 val gateway = RestoreGateway(MessageDraftFfi(group.groupIdHex, "caption", null, photos, 1L, 1L))
                 val repository = MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher)
-                val app =
-                    appForRestore(context, repository)
+                val app = appForRestore(context, repository)
                 val controller = ConversationController(appState = app, initialGroup = group)
                 val owner =
                     ConversationMediaDraftState(
@@ -93,11 +83,12 @@ class ConversationDraftRestoreRemovalTest {
                         backgroundScope,
                         PhotoEditorMessages("", "", "", ""),
                     )
-                owner.updateInputs(
-                    savedNativeSlots(requireNotNull(gateway.current).mediaAttachments),
-                    emptyList(),
-                    "account",
-                )
+                val savedSlots =
+                    listOf(
+                        savedNativeSlots(photos).first(),
+                        PendingMediaSlot("saved-picker", Uri.parse("content://picker/saved")),
+                    )
+                owner.updateInputs(savedSlots, listOf(Uri.parse("content://picker/document")), "account")
                 val restored = requireNotNull(owner.restorePersistedAttachments())
                 assertEquals(2, restored.mediaSlots.size)
                 val newerPick =
@@ -105,23 +96,48 @@ class ConversationDraftRestoreRemovalTest {
                         "new-picker-occurrence",
                         newPhotoUri(context),
                     )
-                owner.updateInputs(restored.mediaSlots + newerPick, emptyList(), "account")
                 val pendingClear = requireNotNull(app.captureDraftForSend("account", group.groupIdHex))
                 app.clearDraftAfterSuccessfulSend(pendingClear)
                 advanceUntilIdle()
                 assertNull(gateway.current)
 
-                val reconciled = requireNotNull(owner.restorePersistedAttachments())
+                // A picker change before SideEffect must reject publication without committing it.
+                assertNull(owner.restorePersistedAttachments { false })
+                assertEquals(2, owner.preparedAttachments().size)
+                assertEquals(1, owner.preparedDocumentAttachments().size)
+                owner.updateInputs(restored.mediaSlots + newerPick, restored.documentUris, "account")
+                val reconciled = requireNotNull(owner.restorePersistedAttachments { true })
 
                 assertEquals(listOf(newerPick), reconciled.mediaSlots)
                 finalShelf = reconciled.mediaSlots
                 assertTrue(owner.preparedAttachments().isEmpty())
+                assertTrue(reconciled.documentUris.isEmpty())
+                assertTrue(owner.preparedDocumentAttachments().isEmpty())
             } finally {
                 Dispatchers.resetMain()
             }
         }
         captureReconciledShelf(finalShelf)
     }
+
+    /** Covers native-id and saved picker-id photos plus a saved picker document. */
+    private fun cleanupAttachments(groupIdHex: String): List<MessageDraftAttachmentFfi> =
+        listOf(
+            nativeAttachment("native-photo-1", "photo-1.jpg", "image/jpeg"),
+            nativeAttachment(stagedPhotoAttachmentId("account", groupIdHex, "saved-picker"), "photo-2.jpg", "image/jpeg"),
+            nativeAttachment(
+                stagedDocumentAttachmentId("account", groupIdHex, "content://picker/document"),
+                "document.pdf",
+                "application/pdf",
+            ),
+        )
+
+    private fun nativeAttachment(
+        id: String,
+        name: String,
+        mediaType: String,
+    ): MessageDraftAttachmentFfi =
+        MessageDraftAttachmentFfi(id, name, mediaType, byteArrayOf(1, 2, 3), null, null, null, emptyList())
 
     private fun newPhotoUri(context: Context): Uri {
         val image = File(context.cacheDir, "new-photo.png")
@@ -147,11 +163,12 @@ class ConversationDraftRestoreRemovalTest {
                 }
             }
         }
+        val decodedPhotoWidth = composerVisualAttachmentWidth(160f / 100f)
         composeRule.waitUntil(5_000) {
             composeRule
                 .onNodeWithTag("conversation.composer.attachment.0")
                 .fetchSemanticsNode()
-                .size.width == 179
+                .size.width == decodedPhotoWidth
         }
         composeRule
             .onNodeWithTag("conversation.composer.attachments")
@@ -204,7 +221,7 @@ class ConversationDraftRestoreRemovalTest {
                 app.clearDraftAfterSuccessfulSend(other)
                 advanceUntilIdle()
 
-                assertEquals(0, app.nativeComposerCleanupRevision("account", group.groupIdHex))
+                assertEquals(0L, app.nativeComposerCleanupRevision("account", group.groupIdHex))
                 assertNull(owner.restorePersistedAttachments())
                 assertTrue(owner.preparedAttachments().isEmpty())
 
@@ -212,7 +229,7 @@ class ConversationDraftRestoreRemovalTest {
                 app.clearDraftAfterSuccessfulSend(pendingClear)
                 advanceUntilIdle()
                 assertEquals("next message", gateway.current?.content)
-                assertEquals(0, app.nativeComposerCleanupRevision("account", group.groupIdHex))
+                assertEquals(0L, app.nativeComposerCleanupRevision("account", group.groupIdHex))
                 assertNull(owner.restorePersistedAttachments())
             } finally {
                 Dispatchers.resetMain()
@@ -354,8 +371,7 @@ class ConversationDraftRestoreRemovalTest {
                     )
                 val gateway = RestoreGateway(MessageDraftFfi(group.groupIdHex, "", null, listOf(attachment), 1L, 1L))
                 val repository = MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher)
-                val app =
-                    appForRestore(context, repository)
+                val app = appForRestore(context, repository)
                 val controller = ConversationController(appState = app, initialGroup = group)
                 val owner =
                     ConversationMediaDraftState(

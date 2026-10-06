@@ -37,6 +37,8 @@ internal data class DraftBackedPhoto(
 internal data class DraftPreparedPhoto(
     val attachment: MessageDraftAttachmentFfi,
     val attachmentDigest: String,
+    // Transient shelf ownership; fresh preparation must survive cleanup of an older native draft.
+    val restoredFromNative: Boolean = false,
 ) {
     fun pendingAttachment(): PendingAttachment =
         PendingAttachment(
