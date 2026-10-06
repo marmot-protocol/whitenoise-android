@@ -188,9 +188,10 @@ internal class PinnedConversationTokens(
         fun captureRequest(): Long = revocations.capture()
 
         /** Rejects queued Direct Share writes across account/group cleanup, including requests born during removal. */
-        fun isPublicationCurrent(generation: Long): Boolean = synchronized(lock) {
-            revocations.isCurrent(generation) && removals.isEmpty()
-        }
+        fun isPublicationCurrent(generation: Long): Boolean =
+            synchronized(lock) {
+                revocations.isCurrent(generation) && removals.isEmpty()
+            }
 
         /** App-private, backup-excluded launcher authority; callers must never export these preferences. */
         fun create(context: Context): PinnedConversationTokens =
