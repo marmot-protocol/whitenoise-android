@@ -69,6 +69,7 @@ import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AttachmentOpenDestination
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.PinnedShortcutLockDecision
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
 import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
@@ -77,8 +78,9 @@ import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
 import dev.ipf.whitenoise.android.state.observePlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.observePlaybackTransportVisible
-import dev.ipf.whitenoise.android.state.playbackSourceRetained
+import dev.ipf.whitenoise.android.state.pinnedShortcutLockDecision
 import dev.ipf.whitenoise.android.state.pinnedShortcutTargetIsCurrent
+import dev.ipf.whitenoise.android.state.playbackSourceRetained
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
@@ -776,6 +778,7 @@ internal fun MainShell(
         inboundNotificationRequestId,
         inboundNotificationTarget?.replyDraft != null && appState.appInForeground,
         inboundNotificationTarget?.shortcutCapability != null && appState.appUnlockEvaluationPending,
+        inboundNotificationTarget?.shortcutCapability != null && appState.appLockScreenVisible,
         appState.activeAccountRef,
         appState.runtimeGeneration,
         appState.accounts,
@@ -823,6 +826,15 @@ internal fun MainShell(
             // not stick on NotificationLoading. Do not touch chat-list await
             // semantics — the effect re-runs when accounts arrive.
             routingNotification = false
+            // A lock that shows before accounts load still fails the pin closed here: an unlock made
+            // while the slow start continues must not open a conversation the tap could not reach.
+            if (
+                target.shortcutCapability != null &&
+                appState.pinnedShortcutLockDecision() == PinnedShortcutLockDecision.LOCKED
+            ) {
+                onNotificationTargetHandled(target, routingRequestId)
+                NotificationRouteTrace.finishRequest(routingRequestId)
+            }
             return@LaunchedEffect
         }
         val broadChatListReady =

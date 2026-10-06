@@ -36,6 +36,21 @@ class NotificationConversationOpenCoverageTest {
         assertTrue("pins must wait before the request is armed or consumed", wait >= 0 && wait < arm)
     }
 
+    /** A lock that shows while accounts are still loading consumes the pin before a later unlock could route it. */
+    @Test
+    fun pinnedShortcutRouteFailsClosedWhenTheLockShowsBeforeAccountsLoad() {
+        val source = mainShellSource()
+        val effect = source.substring(source.indexOf("LaunchedEffect(\n        inboundNotificationTarget,"))
+        val keys = effect.substringBefore(") {")
+        assertTrue("the routing effect must re-run when the lock shows", keys.contains("appState.appLockScreenVisible"))
+        val accountsEmpty = effect.indexOf("if (appState.accounts.isEmpty()) {")
+        val block = effect.substring(accountsEmpty).substringBefore("val broadChatListReady")
+        assertTrue(block.contains("pinnedShortcutLockDecision() == PinnedShortcutLockDecision.LOCKED"))
+        val consume = block.indexOf("onNotificationTargetHandled(target, routingRequestId)")
+        val earlyReturn = block.indexOf("return@LaunchedEffect")
+        assertTrue("a locked pin is consumed before the early return", consume >= 0 && consume < earlyReturn)
+    }
+
     /** Route state is published only after the awaited card cancellation has returned. */
     @Test
     fun routeCommitAwaitsDismissalBeforePublishingNavigationState() {
