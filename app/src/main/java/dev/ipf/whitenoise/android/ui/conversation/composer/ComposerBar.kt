@@ -1291,6 +1291,7 @@ internal fun ComposerBar(
                         textFieldValue = textFieldValue,
                         composerFocus = composerFocus,
                         emojiPickerOpen = composerEmojiPickerRequested,
+                        actionColors = actionColors,
                         onComposerFocusChanged = { focused ->
                             // A tap on the text field while the emoji pane is open
                             // asks for the keyboard; the pending guard drops the
