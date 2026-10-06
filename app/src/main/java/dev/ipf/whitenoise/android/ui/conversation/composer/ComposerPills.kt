@@ -592,7 +592,11 @@ internal fun ComposerPill(
     val latestTransformedText by rememberUpdatedState(transformedText)
     val latestReadingTopInset by
         rememberUpdatedState(
-            if (accessoryContent != null) 0.dp else if (multilineControlsSuppressed) 12.dp else 24.dp,
+            when {
+                accessoryContent != null -> 0.dp
+                multilineControlsSuppressed -> 12.dp
+                else -> 24.dp
+            },
         )
     val pasteFromClipboard: () -> Unit = {
         val pastedText = clipboardManager?.primaryClipPlainText(context)

@@ -58,7 +58,8 @@ class ComposerCompactResizeTargetsTest {
         render(onAction = {}, onResize = {}, onDelta = {})
         composeRule.onNodeWithTag("synthetic-transcript").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         composeRule.onNodeWithTag("synthetic-transcript").assertIsFocused()
-        composeRule.runOnIdle { assertTrue(focusManager.moveFocus(FocusDirection.Down)) }
+        // An onEnter redirect cancels the original search; assert the actual target, not its Boolean.
+        composeRule.runOnIdle { focusManager.moveFocus(FocusDirection.Down) }
         composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker)).assertIsFocused()
         composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         composeRule.onNode(hasSetTextAction()).assertIsFocused()
