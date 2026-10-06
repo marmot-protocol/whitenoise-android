@@ -81,6 +81,7 @@ internal fun textAttachmentSpeakableText(preview: TextAttachmentPreview): String
         ?.let(::markdownDocumentToSpeakableText)
         ?: legacyTextToSpeakableProjection(preview.text).text
 
+/** Documents read body-first; filename display metadata never masquerades as a message sender. */
 internal fun textAttachmentTtsEntry(
     preview: TextAttachmentPreview,
     senderKey: String,
@@ -98,7 +99,8 @@ internal fun textAttachmentTtsEntry(
             ?: legacyTextToSpeakableProjection(preview.text)
     return TtsSpeakableEntry(
         senderKey = senderKey,
-        senderDisplayName = "$senderDisplayName · ${preview.candidate.displayName}",
+        senderDisplayName = senderDisplayName,
+        attachmentDisplayName = preview.candidate.displayName,
         text = projection.text,
         messageIdHex = "attachment:$messageIdHex:$attachmentIndex",
         projectionId = projection.projectionId,

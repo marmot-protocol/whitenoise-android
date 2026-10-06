@@ -23,9 +23,11 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.notifications.ProfileNotificationMode
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.profileNotificationOverrides
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,6 +58,20 @@ class PersonProfileRouteTest {
             nip05 = null,
             lud16 = null,
         )
+
+    /** The actual profile route writes the captured account's preference and returns to one summary row. */
+    @Test fun notificationRowOpensAndReturnsWithTheSavedSummary() {
+        val app = show()
+        composeRule.onNodeWithTag("person_profile.notifications").performScrollTo().performClick()
+        composeRule.onNodeWithTag("profile_notifications.mute").performClick()
+        composeRule.waitUntil(5_000) {
+            app.profileNotificationOverrides.get("alice", target).mode == ProfileNotificationMode.MUTED
+        }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag("person_profile.notifications").performScrollTo()
+        composeRule.onNodeWithText("Muted").assertExists()
+        assertEquals(ProfileNotificationMode.DEFAULT, app.profileNotificationOverrides.get("carol", target).mode)
+    }
 
     /** Save writes only the viewer's private contact values and never replaces the published profile. */
     @Test fun privateSaveRetainsPublicMetadataAndCopyExcludesNotes() {

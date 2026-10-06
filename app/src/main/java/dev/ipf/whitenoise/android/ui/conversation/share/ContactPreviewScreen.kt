@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 
 /**
  * Full-screen confirmation for a contact share: the picked contact's name plus
@@ -98,7 +99,7 @@ internal fun ContactPreviewScreen(
                             )
                         }
                         Spacer(Modifier.width(16.dp))
-                        Text(
+                        EmojiLabel(
                             contact.displayName,
                             style = MaterialTheme.typography.titleLarge,
                             maxLines = 2,

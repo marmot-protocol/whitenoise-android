@@ -355,20 +355,33 @@ class TtsController internal constructor(
         }
     }
 
-    /** Text work runs outside the controller lock; only its current owner can commit. */
+    /**
+     * Text work runs outside the controller lock; only its current owner can commit.
+     * [isCurrent] runs under that monitor and must remain a quick, nonblocking ownership predicate,
+     * without IO or application locks ordered against this controller.
+     */
     internal suspend fun speakAsync(
         entries: List<TtsSpeakableEntry>,
         locale: Locale,
         startSentenceIndex: Int = 0,
         startRenderedHit: PreparedRenderedHit? = null,
+        isCurrent: () -> Boolean = { true },
         onPreparing: () -> Boolean,
     ): Boolean {
-        val ticket = synchronized(this) { preparationTicket(entries, locale) } ?: return false
+        val ticket =
+            synchronized(this) {
+                if (isCurrent()) {
+                    lastStartFailure = TtsStartFailure.None
+                    preparationTicket(entries, locale)
+                } else {
+                    null
+                }
+            } ?: return false
         try {
             return if (!onPreparing()) {
                 false
             } else {
-                completePreparation(ticket, entries, startSentenceIndex, startRenderedHit)
+                completePreparation(ticket, entries, startSentenceIndex, startRenderedHit, isCurrent)
             }
         } finally {
             synchronized(this) {
@@ -377,11 +390,17 @@ class TtsController internal constructor(
         }
     }
 
+    /**
+     * Resolves a prepared hit off-lock, then revalidates caller, ticket, engine and locale before commit.
+     * An explicit rendered hit cannot fall back to a guessed sentence. If an authorized replacement fails
+     * mapping, the caller may report a generic start refusal; the old queue is not resumed implicitly.
+     */
     private suspend fun completePreparation(
         ticket: Triple<Long, TtsSpeechEngine, Locale>,
         entries: List<TtsSpeakableEntry>,
         startSentenceIndex: Int,
         startRenderedHit: PreparedRenderedHit?,
+        isCurrent: () -> Boolean,
     ): Boolean {
         val preparedStart =
             withContext(Dispatchers.Default) {
@@ -400,13 +419,19 @@ class TtsController internal constructor(
                                 PreparedSeekResolver.resolve(prepared, hit)
                             }
                         }.let { target ->
-                            (target as? PreparedSeekTarget.Sentence)?.ordinal ?: startSentenceIndex
+                            if (startRenderedHit == null) {
+                                startSentenceIndex
+                            } else {
+                                (target as? PreparedSeekTarget.Sentence)?.ordinal
+                            }
                         }
                 messages to resolvedStart
             }
         val (messages, resolvedStart) = preparedStart
+        if (resolvedStart == null) return false
         return synchronized(this) {
-            if (!preparationRequests.isCurrent(ticket.first) ||
+            val currentOwner = isCurrent() && preparationRequests.isCurrent(ticket.first)
+            if (!currentOwner ||
                 engine !== ticket.second ||
                 (ticket.second.effectiveLocale ?: ticket.third) != ticket.third
             ) {

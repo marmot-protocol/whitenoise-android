@@ -140,6 +140,10 @@ class LocalNotificationPresenter(
     private val alertBudget: NotificationAlertBudget = NotificationAlertBudget(),
     private val dismissalRetryDelay: suspend () -> Unit = { delay(CONVERSATION_DISMISSAL_RETRY_DELAY_MS) },
     private val groupReconciliation: () -> Unit = { NotificationGroupReconciler.shared(context).request() },
+    private val emojiArtworkPreparer: suspend (String, String?) -> NotificationEmojiArtifact? = { text, source ->
+        notificationEmojiArtwork(context, text, source)
+    },
+    private val emojiArtworkTimeoutMs: Long = NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS,
     // Kept last so callers may still pass it as a trailing lambda.
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
@@ -154,6 +158,8 @@ class LocalNotificationPresenter(
     private val shortcutAccessClock = AtomicLong()
     private val tapTokens = NotificationTapTokens.create(context)
     private val conversationVibrationPreferences = ConversationVibrationPreferences(context)
+    private val profileNotificationOverrides by lazy { ProfileNotificationOverridePreferences(context) }
+    private val profileNotificationChannels by lazy { ProfileNotificationChannels(context) }
 
     // First used from show()'s Default-dispatcher routing block, so defer the
     // SharedPreferences-backed construction instead of adding disk-backed work
@@ -203,6 +209,14 @@ class LocalNotificationPresenter(
     ): Int =
         withContext(Dispatchers.Default) {
             if (accountRef.isBlank() || senderAccountIdHex.isBlank() || senderName.isBlank()) return@withContext 0
+            if (profileNotificationOverrides.hasChoice(accountRef, senderAccountIdHex)) {
+                profileNotificationChannels.refreshExisting(
+                    accountRef,
+                    senderAccountIdHex,
+                    senderName,
+                    isRefreshCurrent,
+                )
+            }
             val manager = context.getSystemService(NotificationManager::class.java) ?: return@withContext 0
             val active =
                 try {
@@ -560,6 +574,8 @@ class LocalNotificationPresenter(
         isPostStillAllowed: () -> Boolean = { true },
         shortNpub: (String) -> String,
     ): Boolean {
+        val profileAllowsPost = { isPostStillAllowed() && !profileNotificationOverrides.isMuted(update) }
+        if (!profileAllowsPost()) return false
         val previewToken = NotificationPreviewPreferences.capture(context)
         val formattedContent =
             LocalNotificationFormatter.content(
@@ -632,6 +648,9 @@ class LocalNotificationPresenter(
             }
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
+        var emojiArtifact: NotificationEmojiArtifact? = null
+        var carriedArtworkLease: AutoCloseable? = null
+        var emojiPreparationAttempted = false
         try {
             written =
                 ConversationCardPostSynchronizer.withRegisteredShow(
@@ -639,6 +658,17 @@ class LocalNotificationPresenter(
                     notificationContent.notificationId,
                     ConversationCardScope(update.accountRef, update.groupIdHex),
                 ) { showToken ->
+                    // Capture dismissal ownership before optional image I/O can suspend.
+                    if (!redactContent && decision.style == NotificationStyleChoice.Messaging) {
+                        emojiPreparationAttempted = true
+                        emojiArtifact =
+                            prepareNotificationEmojiArtwork(
+                                emojiArtworkPreparer,
+                                notificationContent.body,
+                                update.previewText,
+                                emojiArtworkTimeoutMs,
+                            )
+                    }
                     val showGenerationAllowsPost = {
                         if (replaceCurrentMessage) {
                             ConversationCardPostSynchronizer.isShowCurrent(showToken)
@@ -652,8 +682,9 @@ class LocalNotificationPresenter(
                         notificationContent.notificationTag,
                         notificationContent.notificationId,
                     )
-                    if (!isPostStillAllowed() || !showGenerationAllowsPost()) return@withRegisteredShow false
+                    if (!profileAllowsPost() || !showGenerationAllowsPost()) return@withRegisteredShow false
                     var replacementHasChanged = false
+                    var existingCardChannel: String? = null
                     val rewriteGeneration =
                         if (silentUpdate || replaceCurrentMessage) {
                             withContext(Dispatchers.Default) {
@@ -671,6 +702,8 @@ class LocalNotificationPresenter(
                                         active?.notification?.extras?.getString(
                                             LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
                                         )
+                                    val matchingCard = active?.takeIf { messageId == update.messageIdHex }
+                                    existingCardChannel = matchingCard?.notification?.channelId
                                     replacementHasChanged =
                                         replaceCurrentMessage &&
                                         active != null &&
@@ -714,7 +747,20 @@ class LocalNotificationPresenter(
                         }
                     val channelId =
                         withContext(Dispatchers.Default) {
-                            conversationNotificationRouting
+                            existingCardChannel ?: profileNotificationAuthor(update)?.let { author ->
+                                val selection = profileNotificationOverrides.get(update.accountRef, author)
+                                if (selection.mode == ProfileNotificationMode.CUSTOM) {
+                                    profileNotificationChannels.existing(
+                                        update.accountRef,
+                                        author,
+                                        selection.vibration,
+                                        senderNameOverride ?: update.sender.displayName,
+                                        redactContent,
+                                    )
+                                } else {
+                                    null
+                                }
+                            } ?: conversationNotificationRouting
                                 .resolveForPost(
                                     channel = NotificationChannelSpec.forUpdate(update),
                                     conversationShortcutId = channelShortcutId,
@@ -902,7 +948,7 @@ class LocalNotificationPresenter(
                                     ConversationCardOp.SHOW_NOTIFY,
                                 ) {
                                     if (
-                                        !isPostStillAllowed() ||
+                                        !profileAllowsPost() ||
                                         !showGenerationAllowsPost()
                                     ) {
                                         return@withLock false
@@ -911,14 +957,19 @@ class LocalNotificationPresenter(
                                         if (redactContent) {
                                             null
                                         } else {
-                                            existingConversationMessages(
-                                                notificationContent.notificationTag,
-                                                notificationContent.notificationId,
-                                                replacingMessageIdHex =
-                                                    update.messageIdHex
-                                                        ?.takeIf(String::isNotBlank)
-                                                        ?.takeIf { replaceCurrentMessage },
-                                            )
+                                            synchronized(UserEventNotificationGroup.mutationLock) {
+                                                existingConversationMessages(
+                                                    notificationContent.notificationTag,
+                                                    notificationContent.notificationId,
+                                                    replacingMessageIdHex =
+                                                        update.messageIdHex
+                                                            ?.takeIf(String::isNotBlank)
+                                                            ?.takeIf { replaceCurrentMessage },
+                                                )?.also { history ->
+                                                    carriedArtworkLease =
+                                                        retainNotificationEmojiHistoryArtwork(context, history)
+                                                }
+                                            }
                                         }
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
@@ -933,7 +984,8 @@ class LocalNotificationPresenter(
                                             body = notificationContent.body,
                                             carriedMessageCount = carried.orEmpty().size,
                                             redactContent = redactContent,
-                                        )
+                                        ) &&
+                                        emojiArtifact == null
                                     ) {
                                         builder
                                             .setContentTitle(notificationContent.title)
@@ -970,6 +1022,7 @@ class LocalNotificationPresenter(
                                                 carried,
                                                 messaging.sender,
                                                 presentationTimestampMs,
+                                                emojiArtifact?.uri,
                                             ),
                                         )
                                     }
@@ -987,7 +1040,7 @@ class LocalNotificationPresenter(
                                         notificationContent.notificationId,
                                     )
                                     if (
-                                        !isPostStillAllowed() ||
+                                        !profileAllowsPost() ||
                                         !showGenerationAllowsPost()
                                     ) {
                                         return@withLock false
@@ -1002,7 +1055,7 @@ class LocalNotificationPresenter(
                                             mustBeLive = rewriteGeneration != null,
                                             hiddenShortcut = hiddenShortcut,
                                             finalPostAllowed = {
-                                                isPostStillAllowed() &&
+                                                profileAllowsPost() &&
                                                     showGenerationAllowsPost() &&
                                                     rewriteLease?.dismissed?.get() != true
                                             },
@@ -1026,10 +1079,10 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationTag,
                                             notificationContent.notificationId,
                                         )
-                                        if (carried.isNullOrEmpty()) {
+                                        if (carried.isNullOrEmpty() && emojiArtifact == null) {
                                             false
                                         } else {
-                                            if (!isPostStillAllowed() || !showGenerationAllowsPost()) {
+                                            if (!profileAllowsPost() || !showGenerationAllowsPost()) {
                                                 return@withLock false
                                             }
                                             builder.setStyle(
@@ -1040,6 +1093,7 @@ class LocalNotificationPresenter(
                                                     carriedHistory = null,
                                                     sender = messaging.sender,
                                                     newMessageTimestampMs = presentationTimestampMs,
+                                                    emojiArtwork = null,
                                                 ),
                                             )
                                             val cleanNotification =
@@ -1059,7 +1113,7 @@ class LocalNotificationPresenter(
                                                     mustBeLive = rewriteGeneration != null,
                                                     hiddenShortcut = hiddenShortcut,
                                                     finalPostAllowed = {
-                                                        isPostStillAllowed() &&
+                                                        profileAllowsPost() &&
                                                             showGenerationAllowsPost() &&
                                                             rewriteLease?.dismissed?.get() != true
                                                     },
@@ -1101,7 +1155,7 @@ class LocalNotificationPresenter(
                                     ConversationCardOp.SHOW_NOTIFY,
                                 ) {
                                     if (
-                                        !isPostStillAllowed() ||
+                                        !profileAllowsPost() ||
                                         !showGenerationAllowsPost()
                                     ) {
                                         return@withLock false
@@ -1122,7 +1176,7 @@ class LocalNotificationPresenter(
                                         notificationContent.notificationId,
                                     )
                                     if (
-                                        !isPostStillAllowed() ||
+                                        !profileAllowsPost() ||
                                         !showGenerationAllowsPost()
                                     ) {
                                         return@withLock false
@@ -1137,7 +1191,7 @@ class LocalNotificationPresenter(
                                             mustBeLive = rewriteGeneration != null,
                                             hiddenShortcut = hiddenShortcut,
                                             finalPostAllowed = {
-                                                isPostStillAllowed() &&
+                                                profileAllowsPost() &&
                                                     showGenerationAllowsPost() &&
                                                     rewriteLease?.dismissed?.get() != true
                                             },
@@ -1178,7 +1232,7 @@ class LocalNotificationPresenter(
                             messaging = messaging,
                             showToken = rewriteLease?.let { showToken.copy(notificationGeneration = it) } ?: showToken,
                             directShareEligible = directShareEligible,
-                            isPostStillAllowed = isPostStillAllowed,
+                            isPostStillAllowed = profileAllowsPost,
                         )
                     }
                     notificationDebug {
@@ -1188,6 +1242,12 @@ class LocalNotificationPresenter(
                     true
                 }
         } finally {
+            carriedArtworkLease?.close()
+            emojiArtifact?.close()
+            // Plain-text cards create no exports; their normal write observer already reconciles the summary.
+            if (emojiPreparationAttempted && runCatching { hasNotificationEmojiArtwork(context) }.getOrDefault(false)) {
+                groupReconciliation()
+            }
             rewriteLease?.let(NotificationCardGenerations::release)
             if (!written) heldAlert?.release()
         }
@@ -1975,6 +2035,7 @@ class LocalNotificationPresenter(
         carriedHistory: List<NotificationCompat.MessagingStyle.Message>?,
         sender: Person,
         newMessageTimestampMs: Long,
+        emojiArtwork: android.net.Uri? = null,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -1984,8 +2045,16 @@ class LocalNotificationPresenter(
                 .build()
         // Cap carried-forward history; the extracted style is otherwise re-serialized unbounded across Binder on every post.
         val style = NotificationCompat.MessagingStyle(self)
+        val newMessages =
+            notificationEmojiMessages(
+                content.body,
+                newMessageTimestampMs,
+                sender,
+                emojiArtwork,
+                context.getString(R.string.custom_emoji),
+            )
         carriedHistory
-            ?.let { capNotificationHistory(it, historyCap) }
+            ?.let { capNotificationLogicalHistory(it, historyCap, MAX_NOTIFICATION_MESSAGE_HISTORY - newMessages.size) }
             ?.forEach { message ->
                 style.addMessage(
                     copiedMessage(
@@ -1999,7 +2068,7 @@ class LocalNotificationPresenter(
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.
         (conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let { style.conversationTitle = it }
-        style.addMessage(content.body, newMessageTimestampMs, sender)
+        newMessages.forEach(style::addMessage)
         return style
     }
 
@@ -2034,7 +2103,7 @@ class LocalNotificationPresenter(
             replacingMessageIdHex != null &&
             conversationCardMessageIdHex(existing) == replacingMessageIdHex
         ) {
-            messages?.dropLast(1)
+            messages?.let(::dropLastNotificationLogicalMessage)
         } else {
             messages
         }

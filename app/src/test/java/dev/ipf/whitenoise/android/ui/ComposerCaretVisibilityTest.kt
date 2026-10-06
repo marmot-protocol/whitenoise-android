@@ -32,6 +32,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerExpansionMode
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
@@ -132,6 +133,7 @@ class ComposerCaretVisibilityTest {
                 Surface {
                     Box(Modifier.width(300.dp).height(140.dp)) {
                         ComposerPill(
+                            actionColors = accountActionColors(appState = null),
                             textFieldValue = value,
                             composerFocus = focusRequester,
                             emojiPickerOpen = false,
@@ -196,6 +198,7 @@ class ComposerCaretVisibilityTest {
             WhiteNoiseTheme {
                 Surface {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue = value,
                         composerFocus = focusRequester,
                         emojiPickerOpen = false,
@@ -396,6 +399,7 @@ class ComposerCaretVisibilityTest {
                 Surface {
                     Box(Modifier.width(300.dp).height(140.dp)) {
                         ComposerPill(
+                            actionColors = accountActionColors(appState = null),
                             textFieldValue = harness.value,
                             composerFocus = harness.focusRequester,
                             emojiPickerOpen = false,

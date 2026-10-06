@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
@@ -142,7 +143,7 @@ internal fun ShareChatPickerAccountIdentity(
 ) {
     Column(modifier) {
         if (compact) {
-            Text(
+            EmojiLabel(
                 text = stringResource(R.string.share_sending_as_value, accountTitle),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,

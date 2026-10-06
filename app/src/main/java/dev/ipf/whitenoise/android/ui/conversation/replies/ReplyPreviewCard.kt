@@ -39,7 +39,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.ReceivedEmoji
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
@@ -87,6 +89,7 @@ internal fun ReplyPreviewCard(
     contentColor: Color? = null,
     accentColor: Color? = null,
     secondaryColor: Color? = null,
+    receivedEmoji: ReceivedEmoji = ReceivedEmoji.None,
 ) {
     val title =
         when {
@@ -181,7 +184,7 @@ internal fun ReplyPreviewCard(
                             .testTag("conversation.reply.bar"),
                 )
                 Column(modifier = if (fillWidth) Modifier.weight(1f) else Modifier) {
-                    Text(
+                    EmojiLabel(
                         title,
                         style = MaterialTheme.typography.labelMedium,
                         color = resolvedSurfaceContentColor,
@@ -203,7 +206,7 @@ internal fun ReplyPreviewCard(
                         }
                         Text(
                             remember(bodyText) { EmojiShortcodes.annotate(AnnotatedString(bodyText)) },
-                            inlineContent = EmojiShortcodes.content(),
+                            inlineContent = EmojiShortcodes.content(receivedEmoji),
                             style = MaterialTheme.typography.bodySmall,
                             color = resolvedContentColor,
                             maxLines = 2,

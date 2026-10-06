@@ -38,6 +38,7 @@ import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
@@ -107,7 +108,7 @@ internal fun MessageFullScreenView(
                 TopAppBar(
                     title = {
                         Column {
-                            Text(
+                            EmojiLabel(
                                 senderDisplayName,
                                 style = MaterialTheme.typography.titleMedium,
                                 maxLines = 1,

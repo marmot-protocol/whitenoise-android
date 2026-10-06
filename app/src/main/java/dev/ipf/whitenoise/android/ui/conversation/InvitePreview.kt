@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseOutlinedButton
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -49,7 +50,7 @@ internal fun InvitePreviewPlaceholder(inviterName: String?) {
                 modifier = Modifier.size(40.dp),
                 tint = MaterialTheme.colorScheme.primary,
             )
-            Text(
+            EmojiLabel(
                 text =
                     inviterName
                         ?.takeIf { it.isNotBlank() }

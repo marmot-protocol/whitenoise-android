@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.ConversationComposerLifecycleEffect
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -205,6 +206,7 @@ private fun ComposerLifecycleHarness(
         Surface {
             if (showComposer) {
                 ComposerPill(
+                    actionColors = accountActionColors(appState = null),
                     textFieldValue = value,
                     composerFocus = focusRequester,
                     emojiPickerOpen = false,

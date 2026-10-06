@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatFolderSource
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
@@ -213,7 +214,7 @@ internal fun ChatFolderDeleteDialog(
     WhiteNoiseAlertDialog(
         modifier = Modifier.testTag("folder.delete_dialog"),
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.folder_delete_title, folderName)) },
+        title = { EmojiLabel(stringResource(R.string.folder_delete_title, folderName)) },
         text = { Text(stringResource(R.string.folder_delete_detail)) },
         confirmButton = {
             TextButton(

@@ -64,6 +64,7 @@ class ComposeHotPathCoverageTest {
         )
     }
 
+    /** Playback ticks stay row-scoped, while native confirmation preserves the optimistic row identity. */
     @Test
     fun conversationScreenDoesNotSubscribeToTtsPlaybackState() {
         val screenSource = source("conversation/ConversationScreen.kt").readText()
@@ -80,9 +81,9 @@ class ComposeHotPathCoverageTest {
             "TimelineRowMessageBubble(" in timelineRowSource,
         )
         val bubbleScopeKey =
-            "key(controller.boundAccountRef, controller.group.groupIdHex, item.record.messageIdHex)"
+            "key(controller.boundAccountRef, controller.group.groupIdHex, item.presentationId)"
         assertTrue(
-            "TimelineRow must key the row-scoped restart scope by its owner and message id",
+            "TimelineRow must key the restart scope by account, group and stable presentation identity",
             bubbleScopeKey in timelineRowSource,
         )
         assertTrue(

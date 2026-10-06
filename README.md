@@ -63,6 +63,11 @@ Dev registers `whitenoise-dev://` deep links, staging registers `whitenoise-stag
 
 ## Continuous Integration
 
+Contributors and coding agents must follow the [CI request policy](docs/ci-request-policy.md):
+batch related edits into one candidate push, reuse matching results, retry diagnosed
+transient failures selectively, and request preview APKs only when testing needs them.
+Core code validation and final readiness/merge requirements remain mandatory.
+
 Every pull request to `master` (and every push to `master`) runs the
 `.github/workflows/android-ci.yml` validation workflow. It fails the build on
 Kotlin compile errors, unit-test failures, Compose screenshot regressions
@@ -86,11 +91,18 @@ environment, then stop the lightweight daemon before isolated builds. Tooling
 compilation and static analysis, baseline packaging, fresh Compose reports and
 independent reproducibility builds retain process isolation.
 Unit suites use three isolated 1 GiB workers;
-local tests stay serial unless `-PciTestForks=3` is set. Coverage reports run only
+tests outside CI stay serial unless `-PciTestForks=3` is set. Coding agents
+use hosted tests rather than duplicating CI compilation locally. Coverage reports run only
 after a successful unit step, so a
 failed suite cannot trigger a second full test execution. The existing
 `Compile, test, ktlint, detekt, Android lint` check aggregates every job, including
-the offline ZSP contract, and fails if any dependency fails, is cancelled, or skips.
+the offline ZSP contract, and fails if any dependency fails or is cancelled.
+A successful docs-only classifier permits only the explicitly named Android
+job skips on a PR. All tooling/manual-guide/metadata validators still run, and
+missing classification or unexpected skips fail the aggregate. Lightweight
+tooling contracts run separately in parallel and remain required. Classification
+uses the whole PR diff: a docs fixup on a code PR still runs the full matrix.
+Master pushes always run full validation.
 
 Coverage artifacts are `kover-coverage-report-Zapstore` and
 `kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
@@ -149,7 +161,8 @@ secrets:
 - `WHITENOISE_STAGING_PUSH_SERVER_PUBKEY_HEX`
 - `WHITENOISE_PUSH_RELAY_HINT`
 
-Run the same fast checks locally before pushing:
+Human contributors can run these checks locally before pushing. Coding agents
+use hosted CI and the [CI request policy](docs/ci-request-policy.md):
 
 ```bash
 ./gradlew :app:compileDevZapstoreDebugKotlin :app:compileDevPlayDebugKotlin

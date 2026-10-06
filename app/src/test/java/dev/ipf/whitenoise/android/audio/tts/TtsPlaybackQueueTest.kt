@@ -9,6 +9,50 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TtsPlaybackQueueTest {
+    /** Forced previous/next navigation never treats a document filename or its sender as spoken content. */
+    @Test
+    fun attachmentNavigationIsBodyFirstWhileMessageSendersRemainSpoken() {
+        val harness = TtsQueueHarness()
+        val document =
+            ttsMessageWithId("attachment:m1:0", "alice", "Alice", "First sentence.", "Second sentence.")
+                .copy(attachmentDisplayName = "notes.txt")
+        val message = ttsMessageWithId("m2", "bob", "Bob", "A message.")
+        harness.queue.start(listOf(document, message))
+        assertEquals(listOf("First sentence.", "Second sentence."), harness.enqueued.take(2).map { it.first.text })
+        harness.queue.skipNextMessage()
+        assertEquals(
+            "Bob: A message.",
+            harness.enqueued
+                .last()
+                .first.text,
+        )
+        val previousStart = harness.enqueued.size
+        harness.queue.skipPreviousMessage()
+        assertEquals(
+            listOf("First sentence.", "Second sentence."),
+            harness.enqueued
+                .drop(previousStart)
+                .take(2)
+                .map { it.first.text },
+        )
+        val sentenceStart = harness.enqueued.size
+        harness.queue.skipNextSentence()
+        val submitted = harness.enqueued[sentenceStart].first
+        assertEquals("Second sentence.", submitted.text)
+        assertNull(submitted.senderPrefix)
+        assertEquals(0, harness.queue.state.value.messageIndex)
+        assertEquals(1, harness.queue.state.value.sentenceIndexWithinMessage)
+    }
+
+    /** A document is not a spoken sender introduction, including before a message from the same person. */
+    @Test
+    fun messageAfterAttachmentStillAnnouncesItsActualSender() {
+        val harness = TtsQueueHarness()
+        val document = ttsMessage("alice", "Alice", "Document body.").copy(attachmentDisplayName = "notes.txt")
+        harness.queue.start(listOf(document, ttsMessage("alice", "Alice", "A message.")))
+        assertEquals(listOf("Document body.", "Alice: A message."), harness.lastSpokenTexts(2))
+    }
+
     /** Remaining seconds fall as the active message advances and halve when the rate doubles. */
     @Test
     fun remainingTimeEstimateTracksTheActiveMessageProgressAndRate() {

@@ -79,6 +79,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
@@ -103,10 +104,12 @@ import dev.ipf.whitenoise.android.state.createProfileChatGroup
 import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.memberMutePreferences
 import dev.ipf.whitenoise.android.state.presentationNpubFromReference
+import dev.ipf.whitenoise.android.state.profileNotificationOverrides
 import dev.ipf.whitenoise.android.state.requestProfileGroupMembers
 import dev.ipf.whitenoise.android.state.rethrowIfCancellation
 import dev.ipf.whitenoise.android.state.setMemberMutedInGroup
 import dev.ipf.whitenoise.android.state.setUserBlocked
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
 import dev.ipf.whitenoise.android.ui.chats.newchat.FlowSearchField
 import dev.ipf.whitenoise.android.ui.chats.newchat.SelectionIndicator
@@ -422,6 +425,7 @@ private val ProfileAdminGlyphSize = 24.dp
 private enum class ProfileSheetPage {
     PROFILE,
     GROUPS_IN_COMMON,
+    NOTIFICATIONS,
     ADD_TO_GROUPS,
     MAKE_ADMIN,
 }
@@ -556,6 +560,7 @@ internal fun ProfileSheet(
     var creatingChat by remember(npub) { mutableStateOf(false) }
     var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
     var page by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
+    var notificationEntry by remember(npub) { mutableStateOf(Any()) }
     var pickerParent by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
@@ -646,7 +651,10 @@ internal fun ProfileSheet(
             when (page) {
                 ProfileSheetPage.ADD_TO_GROUPS -> addableGroupsState.pendingGroupIds
                 ProfileSheetPage.MAKE_ADMIN -> promotableGroupsState.pendingGroupIds
-                ProfileSheetPage.PROFILE, ProfileSheetPage.GROUPS_IN_COMMON -> emptySet()
+                ProfileSheetPage.PROFILE,
+                ProfileSheetPage.GROUPS_IN_COMMON,
+                ProfileSheetPage.NOTIFICATIONS,
+                -> emptySet()
             }
         if (pendingGroupIds.isNotEmpty()) {
             appState.requestProfileGroupMembers(pendingGroupIds)
@@ -755,6 +763,11 @@ internal fun ProfileSheet(
         }
     }
 
+    val notificationRevision by appState.profileNotificationOverrides.state.collectAsStateWithLifecycle()
+    val profileNotificationSelection =
+        remember(accountAtOpen, hex, notificationRevision) {
+            appState.profileNotificationOverrides.get(accountAtOpen, hex)
+        }
     val profileContent: @Composable () -> Unit = {
         PersonProfileContent(
             person =
@@ -787,6 +800,18 @@ internal fun ProfileSheet(
             copied = copied,
             onBack = { if (!creatingChat) owner.leave { currentDismiss() } },
             onMessage = { openOrCreateProfileChat() },
+            notificationSummary =
+                if (accountAtOpen != null && hex != null && !targetIsSelf) {
+                    profileNotificationSummary(profileNotificationSelection)
+                } else {
+                    null
+                },
+            onNotifications = {
+                if (owner.canAct()) {
+                    notificationEntry = Any()
+                    page = ProfileSheetPage.NOTIFICATIONS
+                }
+            },
             block =
                 hex?.takeIf { !targetIsSelf }?.let {
                     ProfileBlockRowState(
@@ -1043,6 +1068,25 @@ internal fun ProfileSheet(
                             avatar = { id -> sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image } },
                         )
                     }
+                ProfileSheetPage.NOTIFICATIONS -> {
+                    val author = hex
+                    if (accountAtOpen != null && author != null && !targetIsSelf) {
+                        key(notificationEntry) {
+                            val entry = notificationEntry
+                            ProfileNotificationOverrideRoot(
+                                appState.profileNotificationOverrides,
+                                accountAtOpen,
+                                author,
+                                displayTitle,
+                                ownerIsCurrent = {
+                                    val sameEntry = notificationEntry === entry
+                                    owner.canAct() && page == ProfileSheetPage.NOTIFICATIONS && sameEntry
+                                },
+                                onBack = { page = ProfileSheetPage.PROFILE },
+                            )
+                        }
+                    }
+                }
                 ProfileSheetPage.PROFILE -> profileContent()
             }
         }
@@ -1201,7 +1245,7 @@ internal fun ContactPrivateDetailsDialog(
                     Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Text(stringResource(R.string.profile_name_from_profile, profileName))
+                    EmojiLabel(stringResource(R.string.profile_name_from_profile, profileName))
                     dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
                         state = nickname,
                         label = { Text(stringResource(R.string.profile_contact_name_hint)) },
@@ -1327,12 +1371,12 @@ internal fun ProfileAddToGroupsContent(
                     .testTag(PROFILE_ADD_TO_GROUPS_CONTENT_TAG),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
+            EmojiLabel(
                 stringResource(R.string.profile_add_to_groups_title, targetName),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
-            Text(
+            EmojiLabel(
                 stringResource(R.string.profile_add_to_groups_description, targetName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1483,12 +1527,12 @@ internal fun ProfileMakeAdminContent(
                     .testTag(PROFILE_MAKE_ADMIN_CONTENT_TAG),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
+            EmojiLabel(
                 stringResource(R.string.profile_make_admin_title, targetName),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
             )
-            Text(
+            EmojiLabel(
                 stringResource(R.string.profile_make_admin_description, targetName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

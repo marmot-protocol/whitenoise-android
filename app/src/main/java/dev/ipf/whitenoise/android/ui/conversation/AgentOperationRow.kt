@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
@@ -212,7 +213,7 @@ internal fun AgentOperationRow(
             }
             Column(modifier = Modifier.weight(1f)) {
                 if (sender != null) {
-                    Text(
+                    EmojiLabel(
                         text = sender.name,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

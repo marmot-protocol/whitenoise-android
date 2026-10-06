@@ -37,6 +37,7 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -111,7 +112,7 @@ internal fun ChatFolderPickerSheet(
                         Icon(painterResource(R.drawable.ic_folder), null, Modifier.size(FolderPickerIconSize))
                         Spacer(Modifier.width(WhiteNoiseSpacing.FormField))
                         Column(Modifier.weight(1f)) {
-                            Text(chatFolderDisplayName(folder))
+                            EmojiLabel(chatFolderDisplayName(folder))
                             if (folder.id in ruleMatchedFolderIds) {
                                 Text(
                                     stringResource(R.string.chat_folder_included_by_rule),
