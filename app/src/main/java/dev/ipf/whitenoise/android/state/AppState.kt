@@ -10488,18 +10488,25 @@ class WhiteNoiseAppState private constructor(
         tier: NoticeTier = NoticeTier.ActionableError,
         sendAttempt: SendFailureAttempt? = null,
     ) {
-        val safeReport = diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
-        toast =
+        presentText(
             ToastMessage(
                 title = title,
                 detail = detail,
-                // A Copy affordance is valid only when there is a deliberately
-                // constructed privacy-safe report. Legacy callers that merely
-                // set copyable=true must never copy visible UI text.
-                copyable = copyable && safeReport != null,
+                copyable = copyable,
                 tier = tier,
-                diagnosticReport = safeReport,
+                diagnosticReport = diagnosticReport,
                 sendAttempt = sendAttempt,
+            ),
+        )
+    }
+
+    /** Publishes a scoped UI notice through the same privacy-safe copy gate as ordinary errors. */
+    internal fun presentText(notice: ToastMessage) {
+        val safeReport = notice.diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
+        toast =
+            notice.copy(
+                copyable = notice.copyable && safeReport != null,
+                diagnosticReport = safeReport,
             )
     }
 
