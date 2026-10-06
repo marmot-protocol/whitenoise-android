@@ -69,17 +69,44 @@ on a code PR does not turn that PR into a docs-only candidate.
 
 Code candidates still run every existing core check, including both
 distributions, coverage, screenshots, baseline packaging and the offline signer
-contract. Release/runtime/reproducibility/security workflows retain their gates.
-Draft status is not permission to skip mandatory final validation.
+contract. Release lint, runtime regressions and security workflows retain their per-PR gates.
+Both complete unit suites also verify every committed screenshot golden in the same
+execution, with matching verification inputs for Kover reuse; there are no separate
+screenshot test runners.
 
-## Further optimization requires complete proof
+## Supplemental campaigns and draft parity
 
-Deferring suites to a finalized candidate needs trusted evidence bound to the
-PR head, current base and workflow definition, visible to readiness/merge
-automation. A green fast check, skipped draft job, or successful dispatch on
-the default branch is not that evidence. Do not introduce candidate-only
-release/security checks until those consumers require the complete proof.
+The same checks run on draft and ready PRs. Opening, reopening or pushing a PR
+starts its applicable CI; changing only readiness does not start another phase.
+The visual-description updater follows those same events and displays at most
+four inline comparisons, retaining links and the bounded list of all changes.
+
+Compose compiler reports and independent unsigned APK reproduction are
+supplemental campaigns. A complete raw diff permits their deferral only for
+known ordinary Kotlin/Java source, main resources, committed goldens and prose.
+Build, packaging, native pins, manifests, CI/tooling, executable/symlink changes,
+unknown inputs or unavailable evidence run the campaigns. All other compilation,
+full-unit/golden/coverage, style, lint, runtime and security gates stay required.
+A mixed PR uses the most demanding classification of its entire diff.
+
+Core CI runs daily at 02:43 UTC and reproduction at 03:17 UTC on default-branch
+HEAD, including both campaigns. Manual dispatches run them too; tag reproduction
+continues to require two independent builds and byte-for-byte comparison.
+Check the scheduled run summary each day, investigate a failure using its logs
+and artifacts, and fix the default branch through an owned PR. Do not publish a
+release using yesterday's nightly result: require successful reproduction for
+the exact release candidate via the tag/manual workflow, in addition to the
+release runbook's signing and distribution gates. A nightly failure is not
+permission to bypass those gates.
+
+The existing aggregate check names remain required. A successful explicit
+classification permits only the named supplemental skips; absent evidence,
+failures, cancellations and unrelated skips remain red. Reproduction's aggregate
+also requires both release-lint variants even when its two builds are deferred.
+The nightly/manual/tag events cannot accept deferred reproduction builds.
 
 Measure job requests, summed runner minutes, queue wait and time to final green
 checks together. Adding fewer jobs does not guarantee a particular speedup.
-This policy adds no paid runners or subscriptions.
+This policy adds no paid runners or subscriptions. Further candidate-only release
+or security deferral requires exact-head/current-base evidence that the readiness
+and merge consumers actually enforce.

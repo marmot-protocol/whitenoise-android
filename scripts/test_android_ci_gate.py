@@ -28,7 +28,6 @@ class AndroidCiGateTest(unittest.TestCase):
         cls.build_contracts = cls.job_block(cls.workflow, 'build-contracts')
         cls.compose_compiler = cls.job_block(cls.workflow, 'compose-compiler')
         cls.static_analysis = cls.job_block(cls.workflow, 'static-analysis')
-        cls.screenshots = cls.job_block(cls.workflow, 'screenshots')
         cls.tests_job = cls.job_block(cls.workflow, 'tests')
         cls.gate = cls.job_block(cls.workflow, 'validate')
         cls.app_build = APP_BUILD.read_text()
@@ -75,7 +74,7 @@ class AndroidCiGateTest(unittest.TestCase):
     def successful_outcomes(self):
         """Model GitHub's needs object, including empty per-job outputs."""
         outcomes = {job: {'result': 'success', 'outputs': {}} for job in self.dependencies}
-        outcomes['changes']['outputs'] = {'docs_only': 'false'}
+        outcomes['changes']['outputs'] = {'docs_only': 'false', 'supplemental_campaigns': 'true'}
         return outcomes
 
     def test_aggregate_covers_every_job_and_runs_after_failures(self):
@@ -129,7 +128,6 @@ class AndroidCiGateTest(unittest.TestCase):
             ('build-contracts', self.build_contracts),
             ('compose-compiler', self.compose_compiler),
             ('static-analysis', self.static_analysis),
-            ('screenshots', self.screenshots),
             ('tests', self.tests_job),
         ):
             for step_name in required_steps:
@@ -154,8 +152,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('android-ci-gradle-profiles-static-analysis-${{ matrix.flavor }}', self.static_analysis)
         self.assertIn('cache-read-only:', self.static_analysis)
 
-    def test_full_unit_suite_is_reused_by_coverage_without_verify_mode(self):
-        """Coverage reuses the full suite without widening screenshot ownership."""
+    def test_full_unit_suite_verifies_goldens_and_is_reused_by_coverage(self):
+        """Identical verification inputs let coverage reuse the complete suite."""
         expected_steps = {
             'Unit tests',
             'Coverage gate (Kover)',
@@ -167,7 +165,7 @@ class AndroidCiGateTest(unittest.TestCase):
         }
         for name, invocation in test_invocations.items():
             with self.subTest(step=name):
-                self.assertNotIn('-Proborazzi.test.verify=true', invocation)
+                self.assertIn('-Proborazzi.test.verify=true', invocation)
         self.assertIn(
             ':app:testDev${{ matrix.flavor }}DebugUnitTest',
             test_invocations['Unit tests'],
@@ -210,23 +208,15 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn('./gradlew', floor)
         self.assertIn('scripts/test_check_viewport_restoration_coverage.py', self.tooling_contracts)
 
-    def test_screenshot_owners_come_from_the_checked_registry(self):
-        """Both flavors verify the registered owners, then prove every golden was compared."""
-        self.assertIn("name: Curated screenshot verification (${{ matrix.flavor }})", self.screenshots)
-        self.assertIn('        flavor: [Zapstore, Play]\n', self.screenshots)
-        step = self.named_step(self.screenshots, 'Screenshot tests (Roborazzi)')
-        select = 'owner_filters="$(python3 scripts/check_screenshot_baseline_owners.py --gradle-test-args)"'
-        verify = ':app:verifyRoborazziDev${{ matrix.flavor }}Debug'
-        coverage = (
-            '--results app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json'
-        )
-        self.assertIn(select, step)
-        self.assertIn('"${owner_args[@]}"', step)
-        self.assertLess(step.index(select), step.index(verify))
-        self.assertLess(step.index(verify), step.index(coverage))
-        self.assertNotIn("--tests '", step)
-        self.assertNotIn('\n        if:', step)
-        self.assertNotIn('continue-on-error:', self.screenshots)
+    def test_full_suite_compares_every_committed_golden(self):
+        """Both full suites must prove complete golden coverage without filters."""
+        self.assertIn('        flavor: [Zapstore, Play]\n', self.tests_job)
+        self.assertNotIn('verifyRoborazziDev', self.workflow)
+        self.assertNotIn('--tests ', self.tests_job)
+        step = self.named_step(self.tests_job, 'Require every committed screenshot golden to be compared')
+        self.assertIn('--results app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json', step)
+        self.assertNotIn('continue-on-error:', step)
+        self.assertLess(self.tests_job.index('      - name: Unit tests'), self.tests_job.index(step))
         static = self.named_step(self.tooling_contracts, 'Check committed screenshot golden owners')
         self.assertNotIn('        if:', static)
         self.assertIn('python3 -m unittest scripts/test_check_screenshot_baseline_owners.py', static)
@@ -245,7 +235,7 @@ class AndroidCiGateTest(unittest.TestCase):
             r'(?ms)^      - name: Set up Gradle\n.*?(?=^      - |^  [a-z]|\Z)',
             self.workflow,
         )
-        self.assertEqual(len(gradle_setup_steps), 5)
+        self.assertEqual(len(gradle_setup_steps), 4)
         for step in gradle_setup_steps:
             self.assertIn(
                 "cache-read-only: ${{ github.event_name == 'pull_request' && "
@@ -253,7 +243,7 @@ class AndroidCiGateTest(unittest.TestCase):
                 step,
             )
         self.assertNotIn('uses: actions/cache@', self.workflow)
-        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 5)
+        self.assertEqual(self.workflow.count('uses: actions/cache/restore@'), 4)
         self.assertEqual(self.workflow.count('uses: actions/cache/save@'), 1)
         save_step = self.named_step(self.tests_job, 'Save MarmotKit artifact')
         self.assertIn("matrix.flavor == 'Play'", save_step)
@@ -329,17 +319,24 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('variant: [Production, Staging]', workflow)
         self.assertIn(':app:lintVital${{ matrix.variant }}ZapstoreRelease', workflow)
         gate = self.job_block(workflow, 'verify')
-        self.assertIn('needs: [build, lint]', gate)
+        self.assertIn('needs: [changes, build, lint]', gate)
         self.assertIn('if: always()', gate)
-        script = re.search(r'^        run: (test .*success)$', gate, re.MULTILINE).group(1)
-        for build in ('success', 'failure', 'cancelled', 'skipped'):
-            for lint in ('success', 'failure', 'cancelled', 'skipped'):
-                result = subprocess.run(
-                    ['bash', '-c', script],
-                    env={**os.environ, 'BUILD_RESULT': build, 'LINT_RESULT': lint},
-                    check=False,
-                )
-                self.assertEqual(result.returncode == 0, build == lint == 'success')
+        step = self.named_step(gate, 'Require independent builds and release lint')
+        script = textwrap.dedent(step.split('        run: |\n', 1)[1])
+        for campaign in ('true', 'false', '', 'unexpected'):
+            for event in ('pull_request', 'schedule', 'workflow_dispatch', 'push'):
+                for changes in ('success', 'failure', 'skipped', 'cancelled'):
+                    for build in ('success', 'failure', 'cancelled', 'skipped'):
+                        for lint in ('success', 'failure', 'cancelled', 'skipped'):
+                            result = subprocess.run(['bash', '-c', script], env={**os.environ,
+                                'CHANGES_RESULT': changes, 'CAMPAIGNS': campaign,
+                                'CI_EVENT': event, 'BUILD_RESULT': build, 'LINT_RESULT': lint},
+                                capture_output=True, check=False)
+                            expected = changes == lint == 'success' and (
+                                campaign == 'true' and build == 'success' or
+                                campaign == 'false' and event == 'pull_request' and build == 'skipped')
+                            self.assertEqual(result.returncode == 0, expected,
+                                             (campaign, event, changes, build, lint))
 
     def test_any_non_successful_job_blocks(self):
         """Failure, cancellation, and skipped matrix jobs all block the gate."""
@@ -354,7 +351,7 @@ class AndroidCiGateTest(unittest.TestCase):
 
     def docs_outcomes(self):
         outcomes = self.successful_outcomes()
-        outcomes['changes']['outputs']['docs_only'] = 'true'
+        outcomes['changes']['outputs'].update(docs_only='true', supplemental_campaigns='false')
         for job in self.dependencies:
             if job not in {'changes', 'tooling-contracts'}:
                 outcomes[job]['result'] = 'skipped'
@@ -371,10 +368,12 @@ class AndroidCiGateTest(unittest.TestCase):
     def test_slow_tooling_does_not_block_android_job_start(self):
         self.assertNotIn('    needs:', self.tooling_contracts.split('    steps:', 1)[0])
         for name in ('offline-zsp', 'build-contracts', 'compose-compiler',
-                     'static-analysis', 'screenshots', 'tests'):
+                     'static-analysis', 'tests'):
             job = self.job_block(self.workflow, name)
             self.assertIn('    needs: changes\n', job)
-            self.assertIn("    if: needs.changes.outputs.docs_only != 'true'\n", job)
+            self.assertIn("needs.changes.outputs.docs_only != 'true'", job)
+            if name == 'compose-compiler':
+                self.assertIn("needs.changes.outputs.supplemental_campaigns != 'false'", job)
             self.assertNotIn('    needs: tooling-contracts', job)
 
     def test_docs_only_accepts_only_classified_skips(self):
@@ -399,6 +398,32 @@ class AndroidCiGateTest(unittest.TestCase):
                                 env={**os.environ, 'JOB_RESULTS': json.dumps(self.docs_outcomes()),
                                      'CI_EVENT': 'push'}, capture_output=True, check=False)
         self.assertNotEqual(result.returncode, 0)
+
+    def test_campaign_deferral_is_explicit_and_cannot_mask_failed_reports(self):
+        outcomes = self.successful_outcomes()
+        outcomes['changes']['outputs']['supplemental_campaigns'] = 'false'
+        outcomes['compose-compiler']['result'] = 'skipped'
+        self.assertEqual(self.run_gate(outcomes).returncode, 0)
+        for value in ('true', '', 'unexpected', None):
+            outcomes['changes']['outputs']['supplemental_campaigns'] = value
+            self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+        outcomes['changes']['outputs']['supplemental_campaigns'] = 'false'
+        for result in ('failure', 'cancelled'):
+            outcomes['compose-compiler']['result'] = result
+            self.assertNotEqual(self.run_gate(outcomes).returncode, 0)
+
+    def test_campaigns_run_nightly_and_manual_with_draft_event_parity(self):
+        for filename in ('android-ci.yml', 'android-repro-verify.yml'):
+            workflow = WORKFLOW.with_name(filename).read_text()
+            events = workflow.split('\non:\n', 1)[1].split('\nconcurrency:', 1)[0]
+            self.assertIn('  schedule:\n', events)
+            self.assertIn('  workflow_dispatch:', events)
+            self.assertIn('  pull_request:\n    branches: [master]', events)
+        # A readiness-only trigger or draft guard would create a second CI phase.
+        for path in WORKFLOW.parent.glob('*.yml'):
+            text = path.read_text()
+            self.assertNotIn('ready_for_review', text, path.name)
+            self.assertNotRegex(text, r'github\.event\.pull_request\.draft', path.name)
 
     def test_missing_or_extra_dependency_evidence_blocks(self):
         for job in self.dependencies:
