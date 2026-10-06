@@ -294,6 +294,18 @@
       {"surface": "Profile notifications: R.string.profile_notification_channel_name", "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ProfileNotificationChannels.kt", "anchor": "R.string.profile_notification_channel_name", "test_ids": ["NTF-033"]},
       {"surface": "Profile notifications: R.string.profile_notification_scope_detail", "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ProfileNotificationChannels.kt", "anchor": "R.string.profile_notification_scope_detail", "test_ids": ["NTF-033"]},
       {
+        "surface": "Attachment speech keeps filenames separate from message sender identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReaderState.kt",
+        "anchor": "internal fun textAttachmentTtsEntry(",
+        "test_ids": ["MED-010"]
+      },
+      {
+        "surface": "Document navigation reads body-first while chat messages announce their sender",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackQueue.kt",
+        "anchor": "private fun announceChunk(",
+        "test_ids": ["MED-010"]
+      },
+      {
         "surface": "rememberShareChatPickerActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "fun rememberShareChatPickerActions(",
@@ -4773,6 +4785,18 @@
           "CON-013",
           "CON-017"
         ]
+      },
+      {
+        "surface": "Modifier.composerResizeGestures",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerResizeInput.kt",
+        "anchor": "fun Modifier.composerResizeGestures(",
+        "test_ids": ["CON-007", "CON-013", "CON-017"]
+      },
+      {
+        "surface": "ComposerResizeStripHeight",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerResizeInput.kt",
+        "anchor": "internal val ComposerResizeStripHeight = 12.dp",
+        "test_ids": ["CON-013", "CON-017"]
       },
       {
         "surface": "ComposerResizeGestureStrip",
@@ -26320,6 +26344,24 @@
       }
     ],
     "source_coverage": [
+      {
+        "surface": "Composer reading boundary reversal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerReadingAnchor.kt",
+        "anchor": "fun PointerInputScope.composerEditorReadingScrollGestures(",
+        "test_ids": ["CON-017"]
+      },
+      {
+        "surface": "Composer compact draft navigation icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.drawable.ic_text_start",
+        "test_ids": ["CON-017"]
+      },
+      {
+        "surface": "Composer draft top navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.scroll_to_top",
+        "test_ids": ["CON-017"]
+      },
       {
         "surface": "Prepared attachment speech account-switch ownership",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
