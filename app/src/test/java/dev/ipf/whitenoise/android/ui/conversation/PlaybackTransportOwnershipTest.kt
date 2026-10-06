@@ -351,16 +351,22 @@ class PlaybackTransportOwnershipTest {
         appState.ttsController.attachEngine(engine)
         var current = true
         var replacementSession = 0L
+        var preparationStarts = 0
+        var preparingState: TtsState? = null
+        var replacementStarted = false
+        var callbackFailure: Throwable? = null
         preparationContext.onStart = {
-            assertTrue(appState.ttsController.state.value is TtsState.Preparing)
+            preparationStarts += 1
+            preparingState = appState.ttsController.state.value
             current = false
-            assertTrue(
-                appState.speakAloud(
-                    listOf(TtsSpeakableEntry("sender", "Maya", "Replacement queue.")),
-                    Locale.US,
-                ),
-            )
-            replacementSession = appState.ttsController.state.value.sessionId
+            runCatching {
+                replacementStarted =
+                    appState.speakAloud(
+                        listOf(TtsSpeakableEntry("sender", "Maya", "Replacement queue.")),
+                        Locale.US,
+                    )
+                replacementSession = appState.ttsController.state.value.sessionId
+            }.onFailure { callbackFailure = it }
         }
         val actions = TextAttachmentNativeActions(sourceIsCurrent = { current }) {}
         val preview =
@@ -368,9 +374,16 @@ class PlaybackTransportOwnershipTest {
                 TextAttachmentCandidate("notes.txt", "text/plain", TextAttachmentFormat.PlainText),
                 "Obsolete attachment speech.",
             )
-        kotlinx.coroutines.runBlocking {
-            appState.speakTextAttachment(preview, "sender", "Maya", "obsolete", 0, actions)
+        rule.runOnIdle {
+            kotlinx.coroutines.runBlocking {
+                appState.speakTextAttachment(preview, "sender", "Maya", "obsolete", 0, actions)
+            }
         }
+        callbackFailure?.let { throw AssertionError("Replacement service callback failed", it) }
+        val failure = appState.ttsController.lastStartFailure
+        assertEquals("Preparation service was not admitted: $failure", 1, preparationStarts)
+        assertTrue("Expected Preparing at service admission: $preparingState", preparingState is TtsState.Preparing)
+        assertTrue("Replacement speech was refused: $failure", replacementStarted)
         assertTrue(replacementSession > 0L)
         assertEquals(replacementSession, appState.ttsController.state.value.sessionId)
         assertTrue(appState.ttsController.state.value is TtsState.Speaking)
