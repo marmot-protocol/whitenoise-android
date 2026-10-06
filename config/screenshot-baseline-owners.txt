@@ -109,3 +109,17 @@
 *.ProfileNotificationOverrideScreenTest.customScreenDark
 *.ProfileNotificationOverrideScreenTest.customScreenAmoled
 *.ProfileNotificationOverrideScreenTest.customScreenLargeRtl
+# Configurable swipe settings: themes, physical directions and large RTL text.
+*.GestureSettingsScreenTest.light
+*.GestureSettingsScreenTest.dark
+*.GestureSettingsScreenTest.amoled
+*.GestureSettingsScreenTest.largeRtl
+*.GestureSettingsScreenTest.configured
+
+# Current chat swipe cues.
+*.ChatRowPortGestureTest.readCueDark
+*.ChatRowPortGestureTest.muteCueAmoled
+*.ChatRowPortGestureTest.pinCueLargeRtl
+*.ChatRowPortGestureTest.unreadCueLight
+*.ChatRowPortGestureTest.unmuteCueDark
+*.ChatRowPortGestureTest.unpinCueLight

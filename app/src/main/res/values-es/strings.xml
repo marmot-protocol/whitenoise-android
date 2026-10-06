@@ -2262,4 +2262,16 @@
     <string name="destination_filter_label">Filtrar chats</string>
     <string name="forward_select_by_folder">Seleccionar por carpeta</string>
     <string name="destination_filter_incomplete">Es posible que falten algunos chats. Reintenta o elige Todos los chats.</string>
+    <string name="gestures_title">Acciones al deslizar</string>
+    <string name="gestures_physical_hint">Izquierda y derecha indican el movimiento del dedo. Tus elecciones se mantienen al cambiar de idioma. Predeterminado sigue la dirección de respuesta del idioma. Los gestos de chats están desactivados por defecto.</string>
+    <string name="gestures_messages">Mensajes</string>
+    <string name="gestures_left">Deslizar a la izquierda</string>
+    <string name="gestures_right">Deslizar a la derecha</string>
+    <string name="gestures_default">Predeterminado</string>
+    <string name="gestures_default_summary">Predeterminado: %1$s</string>
+    <string name="gestures_off">Desactivado</string>
+    <string name="gestures_react">Reaccionar</string>
+    <string name="gestures_read_unread">Leído / no leído</string>
+    <string name="gestures_mute_unmute">Silenciar / activar sonido</string>
+    <string name="gestures_pin_unpin">Fijar / desfijar</string>
 </resources>

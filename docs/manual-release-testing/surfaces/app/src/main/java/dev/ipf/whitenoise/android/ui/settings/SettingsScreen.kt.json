@@ -1,0 +1,427 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+  "legacy_sha256": "df73841661b098bb041a6aace063646f82599ce3b559d9fcfc0e2c91c69ad8ad",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: SettingsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "gestures_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.gestures_title",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "Settings profile avatar picture edit shortcut",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.profile_picture_edit",
+        "test_ids": [
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "AppUpdateGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun AppUpdateGroup(",
+        "test_ids": [
+          "SET-001",
+          "SYS-008",
+          "SYS-009",
+          "SYS-010"
+        ]
+      },
+      {
+        "surface": "SettingsDetailRoute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsDetailRoute(",
+        "test_ids": [
+          "SET-001",
+          "SET-029"
+        ]
+      },
+      {
+        "surface": "SettingsHomeContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsHomeContent(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsHomeScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsHomeScreen(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsHubGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsHubGroup(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsHubIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsHubIcon(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsHubLink",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsHubLink(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsHubSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsHubSection(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsProfileHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsProfileHeader(",
+        "test_ids": [
+          "SET-001",
+          "NAV-004",
+          "NAV-007"
+        ]
+      },
+      {
+        "surface": "SettingsProfileRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsProfileRow(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsProfileTrailing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsProfileTrailing(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SettingsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsScreen(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SignOutGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SignOutGroup(",
+        "test_ids": [
+          "SET-001",
+          "ONB-009"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.account",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:ai_agents",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.ai_agents",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:app_preferences",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.app_preferences",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "R.string.app_update_row_available",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.app_update_row_available",
+        "test_ids": [
+          "SET-001",
+          "SYS-008"
+        ]
+      },
+      {
+        "surface": "R.string.app_update_row_current",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.app_update_row_current",
+        "test_ids": [
+          "SET-001",
+          "SYS-008"
+        ]
+      },
+      {
+        "surface": "R.string.app_update_row_unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.app_update_row_unknown",
+        "test_ids": [
+          "SET-001",
+          "SYS-008"
+        ]
+      },
+      {
+        "surface": "string:app_update_settings_check_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.app_update_settings_check_failed",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:app_updates",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.app_updates",
+        "test_ids": [
+          "SET-001",
+          "SET-002",
+          "SET-003",
+          "SET-004",
+          "SET-005",
+          "SET-006",
+          "SET-007",
+          "SET-008",
+          "SET-009",
+          "SET-010",
+          "SET-011",
+          "SET-012",
+          "SET-016",
+          "SET-017",
+          "SET-018",
+          "SET-019",
+          "SET-020",
+          "SET-021",
+          "SET-022",
+          "SET-023",
+          "SET-024",
+          "SET-025"
+        ]
+      },
+      {
+        "surface": "string:appearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.appearance",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:chat_folders_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.chat_folders_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:chat_with_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.chat_with_support",
+        "test_ids": [
+          "SET-001",
+          "SET-002",
+          "SET-003",
+          "SET-004",
+          "SET-005",
+          "SET-006",
+          "SET-007",
+          "SET-008",
+          "SET-009",
+          "SET-010",
+          "SET-011",
+          "SET-012",
+          "SET-016",
+          "SET-017",
+          "SET-018",
+          "SET-019",
+          "SET-020",
+          "SET-021",
+          "SET-022",
+          "SET-023",
+          "SET-024",
+          "SET-025"
+        ]
+      },
+      {
+        "surface": "string:dictation_settings_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.dictation_settings_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:notifications",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.notifications",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.profile",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.relays",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_add_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_add_profile",
+        "test_ids": [
+          "SET-001",
+          "NAV-007"
+        ]
+      },
+      {
+        "surface": "string:settings_data_usage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_data_usage",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_developer_tools",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_developer_tools",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_donate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_donate",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_open_share_connect_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_open_share_connect_for",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_privacy_security",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_privacy_security",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_profile_keys",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_profile_keys",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_read_aloud",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_read_aloud",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_switch_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_switch_profile",
+        "test_ids": [
+          "SET-001",
+          "NAV-004",
+          "NAV-005"
+        ]
+      },
+      {
+        "surface": "string:sign_out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.sign_out",
+        "test_ids": [
+          "SET-001",
+          "ONB-009"
+        ]
+      },
+      {
+        "surface": "string:support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.support",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "Settings update retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun runSettingsAppUpdateAction(",
+        "test_ids": [
+          "SYS-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

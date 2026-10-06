@@ -2229,4 +2229,16 @@
     <string name="destination_filter_label">筛选聊天</string>
     <string name="forward_select_by_folder">按文件夹选择</string>
     <string name="destination_filter_incomplete">部分聊天可能缺失。请重试或选择所有聊天。</string>
+    <string name="gestures_title">滑动操作</string>
+    <string name="gestures_physical_hint">左和右指手指移动方向。更改语言后，明确选择的操作保持不变。默认设置遵循当前语言的回复方向。聊天滑动操作默认关闭。</string>
+    <string name="gestures_messages">消息</string>
+    <string name="gestures_left">向左滑动</string>
+    <string name="gestures_right">向右滑动</string>
+    <string name="gestures_default">默认</string>
+    <string name="gestures_default_summary">默认：%1$s</string>
+    <string name="gestures_off">关闭</string>
+    <string name="gestures_react">回应</string>
+    <string name="gestures_read_unread">已读 / 未读</string>
+    <string name="gestures_mute_unmute">静音 / 取消静音</string>
+    <string name="gestures_pin_unpin">置顶 / 取消置顶</string>
 </resources>

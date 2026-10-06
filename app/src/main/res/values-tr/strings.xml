@@ -2260,4 +2260,16 @@
     <string name="destination_filter_label">Sohbetleri filtrele</string>
     <string name="forward_select_by_folder">Klasöre göre seç</string>
     <string name="destination_filter_incomplete">Bazı sohbetler eksik olabilir. Tekrar deneyin veya Tüm sohbetler seçeneğini seçin.</string>
+    <string name="gestures_title">Kaydırma işlemleri</string>
+    <string name="gestures_physical_hint">Sol ve sağ parmağın hareket yönünü belirtir. Açıkça seçtiğiniz işlemler dil değiştiğinde aynı kalır. Varsayılan, dilin yanıt yönünü izler. Sohbet kaydırmaları varsayılan olarak kapalıdır.</string>
+    <string name="gestures_messages">Mesajlar</string>
+    <string name="gestures_left">Sola kaydır</string>
+    <string name="gestures_right">Sağa kaydır</string>
+    <string name="gestures_default">Varsayılan</string>
+    <string name="gestures_default_summary">Varsayılan: %1$s</string>
+    <string name="gestures_off">Kapalı</string>
+    <string name="gestures_react">Tepki ver</string>
+    <string name="gestures_read_unread">Okundu / okunmadı</string>
+    <string name="gestures_mute_unmute">Sessize al / sesi aç</string>
+    <string name="gestures_pin_unpin">Sabitle / sabitlemeyi kaldır</string>
 </resources>

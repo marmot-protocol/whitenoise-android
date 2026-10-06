@@ -39,7 +39,7 @@ class TtsQuickTransportWiringCoverageTest {
         // pass first so it can consume from the second finger down.
         val body = source("ui/conversation/messages/MessageBubble.kt")
         val gesture = body.indexOf(".twoFingerSwipeDown(")
-        val replySwipe = body.indexOf("detectHorizontalDragGestures(")
+        val replySwipe = body.indexOf("Modifier.directionalSwipe(")
         val longPress = body.indexOf("Modifier.longPressOrVerticalDrag(")
 
         assertTrue("expected all three gestures on the row", gesture > 0 && replySwipe > 0 && longPress > 0)

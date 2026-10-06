@@ -2262,4 +2262,16 @@
     <string name="destination_filter_label">Filtra chat</string>
     <string name="forward_select_by_folder">Seleziona per cartella</string>
     <string name="destination_filter_incomplete">Alcune chat potrebbero mancare. Riprova o scegli Tutte le chat.</string>
+    <string name="gestures_title">Azioni di scorrimento</string>
+    <string name="gestures_physical_hint">Sinistra e destra indicano il movimento del dito. Le scelte esplicite restano uguali quando cambi lingua. Il valore predefinito segue la direzione di risposta della lingua. I gesti nelle chat sono disattivati per impostazione predefinita.</string>
+    <string name="gestures_messages">Messaggi</string>
+    <string name="gestures_left">Scorri a sinistra</string>
+    <string name="gestures_right">Scorri a destra</string>
+    <string name="gestures_default">Predefinito</string>
+    <string name="gestures_default_summary">Predefinito: %1$s</string>
+    <string name="gestures_off">Disattivato</string>
+    <string name="gestures_react">Reagisci</string>
+    <string name="gestures_read_unread">Letto / non letto</string>
+    <string name="gestures_mute_unmute">Silenzia / riattiva</string>
+    <string name="gestures_pin_unpin">Fissa / rimuovi</string>
 </resources>
