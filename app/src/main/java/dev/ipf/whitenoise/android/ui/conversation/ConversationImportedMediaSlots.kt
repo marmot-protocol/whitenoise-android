@@ -69,3 +69,20 @@ internal fun mergeRestoredComposerAttachments(
         documentUris = (restored.documentUris.filterNot(owns) + currentDocuments).distinct(),
     )
 }
+
+/** Apply authoritative ordinary reconciliation while retaining independent imported picks in place. */
+internal fun mergeReconciledComposerAttachments(
+    currentMedia: List<PendingMediaSlot>,
+    currentDocuments: List<Uri>,
+    reconciled: RestoredConversationAttachments,
+    owns: (Uri) -> Boolean,
+): RestoredConversationAttachments {
+    val survivingIds = reconciled.mediaSlots.map(PendingMediaSlot::id).toSet()
+    val retainedMedia = currentMedia.filter { owns(it.uri) || it.id in survivingIds }
+    val retainedDocuments = currentDocuments.filter { owns(it) || it in reconciled.documentUris }
+    val currentIds = retainedMedia.map(PendingMediaSlot::id).toSet()
+    return RestoredConversationAttachments(
+        reconciled.mediaSlots.filter { !owns(it.uri) && it.id !in currentIds } + retainedMedia,
+        reconciled.documentUris.filter { !owns(it) && it !in retainedDocuments } + retainedDocuments,
+    )
+}
