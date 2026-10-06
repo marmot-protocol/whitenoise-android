@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import android.graphics.Bitmap
+import android.os.Looper
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -24,6 +25,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -241,7 +243,7 @@ class KeptMediaLiveStateTest {
         val profileJob = profiles.coroutineContext.job
         profileJob.cancel()
         composeRule.waitUntil(5_000) {
-            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            shadowOf(Looper.getMainLooper()).idle()
             profileJob.isCompleted
         }
         return surface.copy(item = surface.controller.timeline.single())
