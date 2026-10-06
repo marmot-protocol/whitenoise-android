@@ -1,5 +1,11 @@
 # White Noise Android manual release testing
 
+This file remains the compatible base checklist. Feature-specific updates can
+live in [small scenario and source files](manual-release-testing/README.md).
+For a tested candidate, use the combined `manual-release-testing-<commit>` CI
+artifact: it includes those updates and records the checkout's source revision.
+The checked-in base alone may not contain the latest overridden scenarios.
+
 ## Quick checklist for human testers
 
 Start here for a short everyday-use pass. The [detailed checklist](#full-release-checklist) below covers edge cases and remains required for release approval.
@@ -597,10 +603,10 @@ The shared settings components in `ui/settings/SettingsComponents.kt`, `ui/setti
 
 ### Maintenance contract
 
-- Any pull request that adds, removes, renames, or changes user-visible behavior or state must update the affected point(s) in this guide in the same pull request. This includes permissions, intents, navigation, settings, error/retry copy, build-flavor differences, background work, privacy behavior, and accessibility behavior.
+- Any pull request that adds, removes, renames, or changes user-visible behavior or state must update the affected point(s) in this guide or its [scenario files](manual-release-testing/README.md) in the same pull request. This includes permissions, intents, navigation, settings, error/retry copy, build-flavor differences, background work, privacy behavior, and accessibility behavior.
 - Keep existing IDs forever. Edit a point in place when its feature changes; append a new ID within the owning prefix for a new independently reportable behavior; mark removed behavior as retired in the pull request rather than reassigning its ID.
 - Every checklist point must remain an ordered Markdown checklist item with exactly one stable `<AREA>-<NNN>` ID, an action instruction a novice can execute, and one observable `**Expected:**` result after the `→` separator.
-- Before opening or updating a pull request, run `python3 scripts/check_manual_test_guide.py`, `python3 -m unittest scripts/test_check_manual_test_guide.py`, and the repository's required Hermes fast gate. Review the scope map whenever navigation, resources, manifest components/permissions, tests, or release documentation changes.
+- Before opening or updating a pull request, run `python3 scripts/check_manual_test_guide.py`, `python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py`, and the repository's required Hermes fast gate. Review the scope map whenever navigation, resources, manifest components/permissions, tests, or release documentation changes.
 
 ## Retired IDs
 
