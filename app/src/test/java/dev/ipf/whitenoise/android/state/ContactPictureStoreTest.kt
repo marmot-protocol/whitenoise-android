@@ -19,6 +19,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 /** Real private files and SharedPreferences exercise durable ownership, atomic editing and cleanup. */
 @RunWith(RobolectricTestRunner::class)
@@ -155,6 +158,7 @@ class ContactPictureStoreTest {
         val failing =
             ContactPictureStore(
                 object : SharedPreferences by preferences {
+                    /** Hands out an editor whose commits always report failure. */
                     override fun edit(): SharedPreferences.Editor = FailedEditor(preferences.edit())
                 },
                 root,
@@ -236,6 +240,60 @@ class ContactPictureStoreTest {
         }
     }
 
+    /** Readers resolve while a Save still prepares its bytes, because only the record commit holds the lock. */
+    @Test fun readersDoNotWaitForAWriterPreparingItsFile() {
+        save("a", "contact", Color.RED)
+        val old = checkNotNull(store.reference("a", "contact"))
+        val preparing = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val lockHeldAtChecks = mutableListOf<Boolean>()
+        val replacement = ContactPictureChange.Replace(contactPicturePng(Color.BLUE))
+        val writer =
+            thread {
+                store.save("a", "contact", "Renamed", "Note", replacement) {
+                    lockHeldAtChecks += Thread.holdsLock(ContactPictureStore.lock)
+                    if (lockHeldAtChecks.size == 1) {
+                        preparing.countDown()
+                        check(release.await(5, TimeUnit.SECONDS))
+                    }
+                    true
+                }
+            }
+        assertTrue(preparing.await(5, TimeUnit.SECONDS))
+        val readerDone = CountDownLatch(1)
+        var seen: ContactPictureReference? = null
+        thread {
+            seen = store.reference("a", "contact")
+            readerDone.countDown()
+        }
+        assertTrue("a reader must not wait for the writer", readerDone.await(2, TimeUnit.SECONDS))
+        assertEquals(old, seen)
+        release.countDown()
+        writer.join(5_000)
+        assertEquals(listOf(false, true), lockHeldAtChecks)
+        assertNotEquals(old, store.reference("a", "contact"))
+        assertEquals(1, root.walkTopDown().count(File::isFile))
+    }
+
+    /** A failing durable commit during teardown is reported, not thrown, so sign-out and wipe keep running. */
+    @Test fun failedCommitDuringTeardownDoesNotThrow() {
+        save("a", "contact", Color.RED)
+        val ref = checkNotNull(store.reference("a", "contact"))
+        val failing =
+            ContactPictureStore(
+                object : SharedPreferences by preferences {
+                    /** Hands out an editor whose commits always report failure. */
+                    override fun edit(): SharedPreferences.Editor = FailedEditor(preferences.edit())
+                },
+                root,
+            )
+        assertTrue(clearContactPrivateDetails(preferences, "a", failing))
+        assertNull(ContactNicknamePreferences.readNickname(preferences, "a", "contact"))
+        assertEquals(ref, store.reference("a", "contact"))
+        assertTrue(File(File(root, ref.owner), ref.fileName).exists())
+    }
+
+    /** Stores a solid-colour picture plus name and note for one account/contact pair, asserting success. */
     private fun save(
         account: String,
         contact: String,
@@ -255,6 +313,7 @@ class ContactPictureStoreTest {
     private class FailedEditor(
         private val delegate: SharedPreferences.Editor,
     ) : SharedPreferences.Editor by delegate {
+        /** Forwards the write to the delegate while keeping this failing editor in the chain. */
         override fun putString(
             key: String?,
             value: String?,
@@ -263,11 +322,13 @@ class ContactPictureStoreTest {
             return this
         }
 
+        /** Forwards the removal to the delegate while keeping this failing editor in the chain. */
         override fun remove(key: String?): SharedPreferences.Editor {
             delegate.remove(key)
             return this
         }
 
+        /** Commits through the delegate but reports the commit as failed. */
         override fun commit(): Boolean {
             delegate.commit()
             return false

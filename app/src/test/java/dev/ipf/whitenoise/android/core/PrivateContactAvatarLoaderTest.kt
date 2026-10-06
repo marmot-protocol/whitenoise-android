@@ -5,6 +5,7 @@ import android.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import dev.ipf.whitenoise.android.state.ContactPictureChange
 import dev.ipf.whitenoise.android.state.ContactPictureStore
+import dev.ipf.whitenoise.android.state.clearAccount
 import dev.ipf.whitenoise.android.state.contactPicturePng
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
