@@ -202,7 +202,10 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
-    /** Folder editing preserves the chat-list state and returns before the list Scaffold, including its playback wrapper. */
+    /**
+     * Folder editing preserves the chat-list state and returns before the list Scaffold, including its playback
+     * wrapper.
+     */
     @Test
     fun folderEditorHandoffPreservesChatListState() {
         val source = chatsScreenSource().readText()
