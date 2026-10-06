@@ -245,6 +245,34 @@ class NotificationEmojiArtworkTest {
             }
         }
 
+    /** Optional image cleanup must not enqueue summary retries for a plain-text failed child. */
+    @Test
+    fun plainTextPostsOnlyRequestMandatorySuccessfulWriteReconciliation() =
+        runBlocking {
+            var reconciliations = 0
+            var rejectChild = true
+            val presenter =
+                LocalNotificationPresenter(
+                    context,
+                    groupReconciliation = { reconciliations++ },
+                    enrichmentLauncher = {},
+                    emojiArtworkPreparer = { _, _ -> null },
+                    notificationPoster = { compat, tag, id, card ->
+                        if (rejectChild) throw IllegalStateException("child unavailable")
+                        compat.notify(tag, id, card)
+                    },
+                )
+            presenter.ensureChannels()
+            assertFalse(presenter.show(messageUpdate("plain body", 'a'), shortNpub = { "npub1fixture" }))
+            assertEquals(0, reconciliations)
+            assertTrue(manager.activeNotifications.isEmpty())
+            rejectChild = false
+            assertTrue(presenter.show(messageUpdate("plain body", 'b'), shortNpub = { "npub1fixture" }))
+            assertEquals(1, reconciliations)
+            assertEquals(1, manager.activeNotifications.size)
+            assertTrue(artifacts().isEmpty())
+        }
+
     @Test
     fun timedOutPreparationKeepsTextAndRequestsOrphanCleanup() =
         runBlocking {

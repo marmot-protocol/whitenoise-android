@@ -1216,7 +1216,10 @@ class LocalNotificationPresenter(
         } finally {
             carriedArtworkLease?.close()
             emojiArtifact?.close()
-            if (emojiPreparationAttempted) groupReconciliation()
+            // Plain-text cards create no exports; their normal write observer already reconciles the summary.
+            if (emojiPreparationAttempted && runCatching { hasNotificationEmojiArtwork(context) }.getOrDefault(false)) {
+                groupReconciliation()
+            }
             rewriteLease?.let(NotificationCardGenerations::release)
             if (!written) heldAlert?.release()
         }
