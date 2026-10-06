@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
 import androidx.compose.animation.core.updateTransition
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -101,6 +102,48 @@ class PlaybackHeaderNavigationScreenshotTest {
     /** Voice playback follows the same retained-screen transition as released read-aloud. */
     @Test fun voiceBackRetainsOutgoingChromeLight() {
         verifyBackChrome(speech = false)
+    }
+
+    /** A chat-row tap keeps departing read-aloud below its account header until the list is disposed. */
+    @Test fun speechChatEntryRetainsOutgoingListChromeLargeRtl() {
+        verifyChatEntryChrome(speech = true)
+    }
+
+    /** Voice follows the same list-to-conversation geometry without a transient shell player. */
+    @Test fun voiceChatEntryRetainsOutgoingListChromeLight() {
+        verifyChatEntryChrome(speech = false)
+    }
+
+    /** Measures both retained route slots around the real row click rather than only settled destinations. */
+    private fun verifyChatEntryChrome(speech: Boolean) {
+        conversation.value = false
+        rule.mainClock.autoAdvance = false
+        render(dark = speech, rtl = speech, animated = true)
+        startPlayback(speech)
+        rule.mainClock.advanceTimeByFrame()
+        rule.runOnIdle { }
+        val player = rule.onNodeWithTag("playback.list.player").getUnclippedBoundsInRoot()
+        val content = rule.onNodeWithTag("playback.list.content").getUnclippedBoundsInRoot()
+        val header = headerBounds()
+        rule.onNodeWithText("Recent conversations").performClick()
+        assertTrue(conversation.value)
+        rule.mainClock.advanceTimeByFrame()
+        rule.mainClock.advanceTimeBy(64L)
+        rule.runOnIdle { }
+        val exitingPlayer = rule.onNodeWithTag("playback.list.player").getUnclippedBoundsInRoot()
+        val exitingContent = rule.onNodeWithTag("playback.list.content").getUnclippedBoundsInRoot()
+        assertEquals(player.top, exitingPlayer.top)
+        assertEquals(player.bottom, exitingPlayer.bottom)
+        assertEquals(content.top, exitingContent.top)
+        assertTrue(header.bottom <= exitingPlayer.top)
+        val enteringPlayer = rule.onNodeWithTag("playback.conversation.player").getUnclippedBoundsInRoot()
+        assertTrue(enteringPlayer.bottom > enteringPlayer.top)
+        capture(if (speech) "speech_chat_entry_midpoint_dark_rtl" else "voice_chat_entry_midpoint_light")
+        rule.mainClock.advanceTimeBy(CONVERSATION_ROUTE_TRANSITION_MILLIS.toLong())
+        rule.mainClock.advanceTimeByFrame()
+        rule.runOnIdle { }
+        rule.onNodeWithTag("playback.list.player").assertDoesNotExist()
+        rule.onNodeWithTag("playback.conversation.player").assertIsDisplayed()
     }
 
     /** Samples real route animation before settlement, then exercises return through the player body. */
@@ -304,7 +347,12 @@ class PlaybackHeaderNavigationScreenshotTest {
                     ChatListBodyFrame(
                         ttsTransport = { Box(Modifier.testTag("playback.$route.player")) { Player() } },
                     ) {
-                        Text("Recent conversations", Modifier.testTag("playback.content"))
+                        Box(Modifier.testTag("playback.list.content")) {
+                            Text(
+                                "Recent conversations",
+                                Modifier.testTag("playback.content").clickable { conversation.value = true },
+                            )
+                        }
                     }
                 }
             }

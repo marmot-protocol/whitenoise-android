@@ -2166,7 +2166,9 @@ internal fun MainShell(
             appState.activeForwardOperation.map { it != null }.distinctUntilChanged()
         }.collectAsState(initial = false)
     val playbackVisible = appState.observePlaybackTransportVisible()
-    val playbackInChatList = section == MainSection.Chats && selectedChat == null && pendingConversationOpen == null
+    // The rendered Chats slot keeps its player during preparation and while AnimatedContent exits it.
+    // Promoting a pending tap to the shell would move the player above the account picker for one frame.
+    val playbackInChatList = section == MainSection.Chats
     val playbackInShell =
         playbackVisible &&
             !playbackInChatList &&

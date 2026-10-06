@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationInitialPresentation.kt",
+  "legacy_sha256": "6fd5986e5b313362cb02c1052786222da986cd97a1a0680a13d9e8195ff313f1",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationInitialLoadingOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationInitialPresentation.kt",
+        "anchor": "fun ConversationInitialLoadingOverlay(",
+        "test_ids": [
+          "CON-015",
+          "NTF-009",
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "SeededConversationAnchorBaselineEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationInitialPresentation.kt",
+        "anchor": "fun SeededConversationAnchorBaselineEffect(",
+        "test_ids": [
+          "CON-002",
+          "CON-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

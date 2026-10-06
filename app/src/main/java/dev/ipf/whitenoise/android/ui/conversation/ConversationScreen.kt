@@ -3866,9 +3866,13 @@ internal fun ConversationScreen(
                         ConversationInitialLoadingOverlay(
                             visible = true,
                             graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
+                            routeTransitionInProgress = routeTransitionInProgress,
                         )
                     renderedTimeline.isEmpty() && controller.isLoading ->
-                        ConversationInitialLoadingOverlay(visible = true)
+                        ConversationInitialLoadingOverlay(
+                            visible = true,
+                            routeTransitionInProgress = routeTransitionInProgress,
+                        )
                     renderedTimeline.isEmpty() &&
                         (
                             controller.groupRecoveryReadFailed ||
@@ -4193,6 +4197,7 @@ internal fun ConversationScreen(
                                         !transcriptPresentationNeedsRetry &&
                                         !seededTailAlignmentRecoveryVisible,
                                 graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
+                                routeTransitionInProgress = routeTransitionInProgress,
                             )
                             ConversationSeededTailAlignmentRecovery(
                                 visible = seededTailAlignmentRecoveryVisible,

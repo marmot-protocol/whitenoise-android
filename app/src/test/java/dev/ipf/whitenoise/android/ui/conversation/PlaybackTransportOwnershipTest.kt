@@ -403,6 +403,16 @@ class PlaybackTransportOwnershipTest {
         assertFalse(slot.contains("selectedChat"))
     }
 
+    /** The real shell wiring must not hoist or collapse the outgoing list player's geometry on a tap. */
+    @Test fun chatListPlaybackIsNotDeselectedByPendingOrSelectedConversation() {
+        val source = File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt").readText()
+        val placement = source.substringAfter("val playbackInChatList =").substringBefore("val playbackInShell =")
+        assertTrue(placement.contains("section == MainSection.Chats"))
+        assertFalse(placement.contains("selectedChat"))
+        assertFalse(placement.contains("pendingConversationOpen"))
+        assertTrue(source.contains("showPlaybackTransport = playbackInChatList"))
+    }
+
     /** Releases the process-wide player so a failed ownership assertion cannot leak a session into another fixture. */
     @After fun resetPlayer() {
         VoicePlaybackController.stop()
