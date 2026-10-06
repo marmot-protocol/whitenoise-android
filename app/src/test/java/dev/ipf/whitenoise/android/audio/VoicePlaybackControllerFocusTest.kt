@@ -524,7 +524,8 @@ class VoicePlaybackControllerFocusTest {
     }
 
     /** Returns the installed focus listener so tests follow the real callback path. */
-    private fun audioFocusListener(): AudioManager.OnAudioFocusChangeListener = audioFocusOwnerField("focusListener") as AudioManager.OnAudioFocusChangeListener
+    private fun audioFocusListener(): AudioManager.OnAudioFocusChangeListener =
+        audioFocusOwnerField("focusListener") as AudioManager.OnAudioFocusChangeListener
 
     /** Seeds only the test owner's focus fixture fields and leaves controller transition code intact. */
     private fun setAudioFocusOwnerField(

@@ -66,8 +66,8 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
-import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.conversation.messages.RenderedTextHit
 import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHitFromRenderedHit
@@ -122,15 +122,15 @@ internal suspend fun WhiteNoiseAppState.speakTextAttachment(
             present(if (entry.text.isBlank()) R.string.tts_bar_error else ttsStartFailureMessage())
         }
         // The prepared-start owner already cleans up its own session; never stop a replacement queue here.
-        return
-    }
-    val speech = ttsController.state.value
-    val source = actions.playbackSource
-    if (source != null && actions.isCurrent() && source.accountRef == activeAccountRef) {
-        attachmentSpeechDestination.value =
-            dev.ipf.whitenoise.android.audio
-                .AttachmentSpeechDestination(source, speech.sessionId)
-                .current(speech)
+    } else {
+        val speech = ttsController.state.value
+        val source = actions.playbackSource
+        if (source != null && actions.isCurrent() && source.accountRef == activeAccountRef) {
+            attachmentSpeechDestination.value =
+                dev.ipf.whitenoise.android.audio
+                    .AttachmentSpeechDestination(source, speech.sessionId)
+                    .current(speech)
+        }
     }
 }
 
