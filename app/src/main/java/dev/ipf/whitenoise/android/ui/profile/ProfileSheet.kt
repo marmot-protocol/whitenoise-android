@@ -559,6 +559,7 @@ internal fun ProfileSheet(
     var creatingChat by remember(npub) { mutableStateOf(false) }
     var startChatError by remember(npub) { mutableStateOf<StartChatErrorUiState?>(null) }
     var page by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
+    var notificationEntry by remember(npub) { mutableStateOf(Any()) }
     var pickerParent by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
@@ -804,7 +805,12 @@ internal fun ProfileSheet(
                 } else {
                     null
                 },
-            onNotifications = { if (owner.canAct()) page = ProfileSheetPage.NOTIFICATIONS },
+            onNotifications = {
+                if (owner.canAct()) {
+                    notificationEntry = Any()
+                    page = ProfileSheetPage.NOTIFICATIONS
+                }
+            },
             block =
                 hex?.takeIf { !targetIsSelf }?.let {
                     ProfileBlockRowState(
@@ -1064,14 +1070,20 @@ internal fun ProfileSheet(
                 ProfileSheetPage.NOTIFICATIONS -> {
                     val author = hex
                     if (accountAtOpen != null && author != null && !targetIsSelf) {
-                        ProfileNotificationOverrideRoot(
-                            appState.profileNotificationOverrides,
-                            accountAtOpen,
-                            author,
-                            displayTitle,
-                            ownerIsCurrent = { owner.canAct() && page == ProfileSheetPage.NOTIFICATIONS },
-                            onBack = { page = ProfileSheetPage.PROFILE },
-                        )
+                        key(notificationEntry) {
+                            val entry = notificationEntry
+                            ProfileNotificationOverrideRoot(
+                                appState.profileNotificationOverrides,
+                                accountAtOpen,
+                                author,
+                                displayTitle,
+                                ownerIsCurrent = {
+                                    val sameEntry = notificationEntry === entry
+                                    owner.canAct() && page == ProfileSheetPage.NOTIFICATIONS && sameEntry
+                                },
+                                onBack = { page = ProfileSheetPage.PROFILE },
+                            )
+                        }
                     }
                 }
                 ProfileSheetPage.PROFILE -> profileContent()
