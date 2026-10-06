@@ -68,7 +68,7 @@ class WhiteNoiseThemeTest {
         }
     }
 
-    /** A custom accent over dynamic colour drives every primary role and the surface tint. */
+    /** A custom accent over dynamic colour fills the containers exactly; primary is its readable tone. */
     @Test
     fun customAccentDrivesPrimaryRolesAndSurfaceTint() {
         var scheme: ColorScheme? = null
@@ -87,12 +87,14 @@ class WhiteNoiseThemeTest {
         composeRule.runOnIdle {
             val s = requireNotNull(scheme)
             val accent = Color(0xFFFFC107)
-            assertEquals(accent, s.primary)
-            assertEquals(Color.Black, s.onPrimary)
             assertEquals(accent, s.primaryContainer)
             assertEquals(Color.Black, s.onPrimaryContainer)
             assertEquals(accent, s.inversePrimary)
             assertEquals(accent, s.surfaceTint)
+            listOf(s.primary to s.surface, s.onPrimary to s.primary).forEach { (foreground, background) ->
+                val ratio = contrastRatio(foreground.toOpaqueArgb(), background.toOpaqueArgb())
+                assertTrue("primary contrast was $ratio", ratio >= WCAG_AA_NORMAL_TEXT_CONTRAST)
+            }
         }
     }
 
@@ -268,13 +270,11 @@ class WhiteNoiseThemeTest {
         composeRule.setContent { CaptureAccentSchemes(accent, captured) }
 
         composeRule.runOnIdle {
-            listOf(
-                captured.light to accent,
-                captured.dark to accent,
-                captured.amoled to expectedAmoledAccent,
-            ).forEach { (capturedScheme, expectedPrimary) ->
+            assertEquals(accent, requireNotNull(captured.light).primaryContainer)
+            assertEquals(accent, requireNotNull(captured.dark).primaryContainer)
+            assertEquals(expectedAmoledAccent, requireNotNull(captured.amoled).primary)
+            listOf(captured.light, captured.dark, captured.amoled).forEach { capturedScheme ->
                 val scheme = requireNotNull(capturedScheme)
-                assertEquals(expectedPrimary, scheme.primary)
                 val ratio =
                     contrastRatio(
                         scheme.inversePrimary.toOpaqueArgb(),

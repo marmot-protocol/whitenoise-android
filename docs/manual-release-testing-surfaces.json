@@ -2725,7 +2725,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
         "anchor": "fun ChatsNewMessageFab(",
         "test_ids": [
-          "NCH-001"
+          "NCH-001",
+          "SET-004"
         ]
       },
       {
@@ -4756,7 +4757,8 @@
           "CON-013",
           "CON-020",
           "CON-021",
-          "CON-024"
+          "CON-024",
+          "SET-004"
         ]
       },
       {
@@ -10770,7 +10772,8 @@
         "anchor": "fun WhiteNoiseTheme(",
         "test_ids": [
           "INT-001",
-          "SET-002"
+          "SET-002",
+          "SET-004"
         ]
       },
       {
@@ -14494,7 +14497,8 @@
         "anchor": "R.string.send",
         "test_ids": [
           "MSG-004",
-          "MSG-007"
+          "MSG-007",
+          "SET-004"
         ]
       },
       {
