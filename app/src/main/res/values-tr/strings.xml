@@ -2241,4 +2241,15 @@
         <item quantity="one">%1$d ek daha</item>
         <item quantity="other">%1$d ek daha</item>
     </plurals>
+    <string name="profile_notifications_default">Varsayılan</string>
+    <string name="profile_notifications_muted">Sessize alındı</string>
+    <string name="profile_notifications_custom">Özel Android ayarları</string>
+    <string name="profile_notifications_custom_vibration">Özel titreşim</string>
+    <string name="profile_notifications_use_defaults">Varsayılanları kullan</string>
+    <string name="profile_notifications_mute">Bu kişinin bildirimlerini sessize al</string>
+    <string name="profile_notifications_system">Ses ve sistem davranışı</string>
+    <string name="profile_notifications_android_vibration">Android tarafından ayarlandı</string>
+    <string name="profile_notification_scope_detail">Bu hesaptaki tüm sohbetlerde bu kişinin mesajlarına uygulanır. Teslimat ve okunmamış mesaj sayısı değişmez.</string>
+    <string name="profile_notification_precedence">Önce sohbeti sessize alma ve yalnızca bahsetmeler kuralları uygulanır. Ardından bu kişinin sessize alma veya özel Android ayarları gelir. Varsayılanları kullanmak sohbet ve genel ayarları geri getirir. Mevcut bildirimler özgün kanallarını korur.</string>
+    <string name="profile_notification_channel_name">%1$s · Tüm sohbetlerdeki mesajlar</string>
 </resources>
