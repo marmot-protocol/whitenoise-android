@@ -7,6 +7,7 @@ import java.util.Locale
 internal class TtsQueuePreparation(
     private val maxChunkLength: Int,
 ) {
+    /** Cancelling or failing any entry rejects the entire replacement queue. */
     fun List<TtsSpeakableEntry>.toQueuedMessages(
         locale: Locale,
         isCancelled: () -> Boolean = { false },
@@ -20,6 +21,7 @@ internal class TtsQueuePreparation(
             }
         }
 
+    /** Preserves rendered mappings and entry kind while budgeting only audible sender prefixes. */
     fun TtsSpeakableEntry.toQueuedMessage(
         locale: Locale,
         isCancelled: () -> Boolean = { false },
@@ -27,7 +29,7 @@ internal class TtsQueuePreparation(
         // Ad-hoc engine previews have no rendered projection to transform.
         return when {
             spokenTextSpans.isEmpty() && speechRoles.isEmpty() -> legacyQueuedMessage(locale)
-            senderAnnouncementReserve(senderDisplayName.trim()) >= maxChunkLength -> null
+            senderAnnouncementReserve() >= maxChunkLength -> null
             else ->
                 prepareSpeech(SpeechContext(voiceLocale = locale, mode = speechMode), isCancelled)?.let { prepared ->
                     preparedQueuedMessage(
@@ -37,21 +39,21 @@ internal class TtsQueuePreparation(
                         maxChunkLength =
                             (
                                 maxChunkLength -
-                                    senderAnnouncementReserve(
-                                        senderDisplayName.trim(),
-                                    )
+                                    senderAnnouncementReserve()
                             ).coerceAtLeast(1),
                         timelineAt = timelineAt,
                     )?.let { queued ->
                         queued.copy(
                             preview = queued.preview.take(TTS_PREVIEW_MAX_LENGTH),
                             announcementsPrepared = false,
+                            attachmentDisplayName = attachmentDisplayName,
                         )
                     }
                 }
         }
     }
 
+    /** Maps ad-hoc text into chunks without introducing document metadata into spoken content. */
     private fun TtsSpeakableEntry.legacyQueuedMessage(locale: Locale): TtsQueuedMessage? {
         val trimStart = text.indexOfFirst { !it.isWhitespace() }.takeIf { it >= 0 } ?: return null
         val trimEnd = text.indexOfLast { !it.isWhitespace() } + 1
@@ -62,12 +64,13 @@ internal class TtsQueuePreparation(
                 text = trimmed,
                 locale = locale,
                 maxChunkLength = maxChunkLength,
-                leadingChunkReserve = senderAnnouncementReserve(announcementName),
+                leadingChunkReserve = senderAnnouncementReserve(),
             )
         return sentenceChunks.takeIf { it.isNotEmpty() }?.let { chunks ->
             TtsQueuedMessage(
                 senderKey = senderKey,
                 senderDisplayName = announcementName,
+                attachmentDisplayName = attachmentDisplayName,
                 preview = trimmed.take(TTS_PREVIEW_MAX_LENGTH),
                 // The queue reflattens indices itself — sentence identity must survive.
                 chunks =
@@ -89,6 +92,7 @@ internal class TtsQueuePreparation(
         }
     }
 
+    /** Clips each source mapping to the chunk and rebases its spoken offsets. */
     private fun List<TtsSpokenTextSpan>.forChunk(
         sourceStart: Int,
         sourceEnd: Int,
@@ -112,8 +116,10 @@ internal class TtsQueuePreparation(
             }
         }
 
-    private fun senderAnnouncementReserve(displayName: String): Int =
-        displayName
-            .takeIf(String::isNotEmpty)
+    /** Only message entries reserve a spoken sender prefix; long filenames cannot reject document content. */
+    private fun TtsSpeakableEntry.senderAnnouncementReserve(): Int =
+        senderDisplayName
+            .trim()
+            .takeIf { attachmentDisplayName == null && it.isNotEmpty() }
             ?.let { "$it: ".length } ?: 0
 }

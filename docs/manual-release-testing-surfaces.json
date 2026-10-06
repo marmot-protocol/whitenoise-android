@@ -272,6 +272,18 @@
         "test_ids": ["MSG-004"]
       },
       {
+        "surface": "Attachment speech keeps filenames separate from message sender identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReaderState.kt",
+        "anchor": "internal fun textAttachmentTtsEntry(",
+        "test_ids": ["MED-010"]
+      },
+      {
+        "surface": "Document navigation reads body-first while chat messages announce their sender",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackQueue.kt",
+        "anchor": "private fun announceChunk(",
+        "test_ids": ["MED-010"]
+      },
+      {
         "surface": "rememberShareChatPickerActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "fun rememberShareChatPickerActions(",
