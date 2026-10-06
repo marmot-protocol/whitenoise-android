@@ -2256,5 +2256,8 @@
     <string name="floating_attachment_available">Auf diesem Gerät verfügbar</string>
     <string name="floating_attachment_remote">Original zum Anzeigen öffnen</string>
     <string name="floating_attachment_failed">Download fehlgeschlagen. Original öffnen, um es erneut zu versuchen</string>
-    <string name="floating_attachment_more">+%1$d weitere Anhänge</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">+%1$d weiterer Anhang</item>
+        <item quantity="other">+%1$d weitere Anhänge</item>
+    </plurals>
 </resources>

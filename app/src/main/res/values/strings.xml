@@ -2397,5 +2397,8 @@
     <string name="floating_attachment_available">Available on this device</string>
     <string name="floating_attachment_remote">Open the original to view</string>
     <string name="floating_attachment_failed">Download failed. Open the original to retry</string>
-    <string name="floating_attachment_more">+%1$d more attachments</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">+%1$d more attachment</item>
+        <item quantity="other">+%1$d more attachments</item>
+    </plurals>
 </resources>

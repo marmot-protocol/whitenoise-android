@@ -2239,5 +2239,8 @@
     <string name="floating_attachment_available">Disponible sur cet appareil</string>
     <string name="floating_attachment_remote">Ouvrez l’original pour le consulter</string>
     <string name="floating_attachment_failed">Échec du téléchargement. Ouvrez l’original pour réessayer</string>
-    <string name="floating_attachment_more">%1$d pièces jointes supplémentaires</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">%1$d pièce jointe supplémentaire</item>
+        <item quantity="other">%1$d pièces jointes supplémentaires</item>
+    </plurals>
 </resources>

@@ -2239,5 +2239,8 @@
     <string name="floating_attachment_available">Disponible en este dispositivo</string>
     <string name="floating_attachment_remote">Abre el original para verlo</string>
     <string name="floating_attachment_failed">Error de descarga. Abre el original para reintentarlo</string>
-    <string name="floating_attachment_more">%1$d archivos adjuntos más</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">%1$d archivo adjunto más</item>
+        <item quantity="other">%1$d archivos adjuntos más</item>
+    </plurals>
 </resources>

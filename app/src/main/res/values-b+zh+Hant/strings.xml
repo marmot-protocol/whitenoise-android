@@ -2208,5 +2208,7 @@
     <string name="floating_attachment_available">可在此裝置上使用</string>
     <string name="floating_attachment_remote">開啟原訊息查看</string>
     <string name="floating_attachment_failed">下載失敗。開啟原訊息重試</string>
-    <string name="floating_attachment_more">還有 %1$d 個附件</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="other">還有 %1$d 個附件</item>
+    </plurals>
 </resources>

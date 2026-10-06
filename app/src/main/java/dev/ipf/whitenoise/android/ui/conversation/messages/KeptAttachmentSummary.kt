@@ -21,7 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -71,8 +71,9 @@ internal fun KeptAttachmentSummary(
         }
     }
     if (!expanded && attachments.size > visible.size) {
+        val remaining = attachments.size - visible.size
         Text(
-            stringResource(R.string.floating_attachment_more, attachments.size - visible.size),
+            pluralStringResource(R.plurals.floating_attachment_more, remaining, remaining),
             style = MaterialTheme.typography.labelSmall,
         )
     }

@@ -2239,5 +2239,8 @@
     <string name="floating_attachment_available">Disponível neste dispositivo</string>
     <string name="floating_attachment_remote">Abra o original para ver</string>
     <string name="floating_attachment_failed">Falha na transferência. Abra o original para tentar novamente</string>
-    <string name="floating_attachment_more">Mais %1$d anexos</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">Mais %1$d anexo</item>
+        <item quantity="other">Mais %1$d anexos</item>
+    </plurals>
 </resources>

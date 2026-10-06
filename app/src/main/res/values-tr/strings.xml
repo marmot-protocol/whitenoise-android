@@ -2237,5 +2237,8 @@
     <string name="floating_attachment_available">Bu cihazda kullanılabilir</string>
     <string name="floating_attachment_remote">Görüntülemek için özgün mesajı açın</string>
     <string name="floating_attachment_failed">İndirme başarısız. Yeniden denemek için özgün mesajı açın</string>
-    <string name="floating_attachment_more">%1$d ek daha</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">%1$d ek daha</item>
+        <item quantity="other">%1$d ek daha</item>
+    </plurals>
 </resources>

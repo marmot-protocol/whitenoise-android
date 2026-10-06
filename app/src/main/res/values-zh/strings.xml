@@ -2207,5 +2207,7 @@
     <string name="floating_attachment_available">可在此设备上使用</string>
     <string name="floating_attachment_remote">打开原消息查看</string>
     <string name="floating_attachment_failed">下载失败。打开原消息重试</string>
-    <string name="floating_attachment_more">还有 %1$d 个附件</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="other">还有 %1$d 个附件</item>
+    </plurals>
 </resources>

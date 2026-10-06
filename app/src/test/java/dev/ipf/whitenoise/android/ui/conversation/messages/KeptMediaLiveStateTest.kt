@@ -98,6 +98,9 @@ class KeptMediaLiveStateTest {
         composeRule.waitUntil(5_000) { presentation?.attachments?.singleOrNull()?.statusLabel == "Downloading" }
         native.publish(AttachmentTransferStateFfi.FAILED)
         composeRule.waitUntil(5_000) {
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
             presentation?.attachments?.singleOrNull()?.statusLabel == "Download failed. Open the original to retry"
         }
         composeRule.onNodeWithText("Audio · Download failed. Open the original to retry").assertIsDisplayed()
@@ -124,6 +127,9 @@ class KeptMediaLiveStateTest {
             }
         }
         composeRule.waitUntil(5_000) {
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
             presentation?.attachments?.singleOrNull()?.statusLabel == "Download failed. Open the original to retry"
         }
         composeRule.onNodeWithText("Video · Download failed. Open the original to retry").assertIsDisplayed()
