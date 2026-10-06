@@ -2162,10 +2162,10 @@ internal class ConversationDictationController internal constructor(
                             } else {
                                 recognitionSession?.retryCallerAudio() == true
                             }
-                        clearRecognitionGeneration(cancel = false)
                         val callerAudioPending =
                             retainedCallerAudio || runCatching(platform::callerAudioHasPending).getOrDefault(false)
                         if (callerAudioPending && failure.canRetryRetainedCallerAudio) {
+                            clearRecognitionGeneration(cancel = false)
                             retryRetainedCallerAudioOrFail(sessionId, target, failure)
                         } else {
                             failOrRetainTranscript(sessionId, target, failure)
@@ -2210,7 +2210,14 @@ internal class ConversationDictationController internal constructor(
                     } else if (rejectedCallerAudioChangedOrResolved) {
                         clearRejectedCallerAudioRetries()
                     }
-                    clearRecognitionGeneration(cancel = false)
+                    // Terminal failure cleanup must register the real capture-closure callback
+                    // before the recognizer is cleared; a missing generation cannot prove closure.
+                    if (error.isEmptyRecognition ||
+                        error == ConversationDictationFailure.PermissionDenied ||
+                        error == ConversationDictationFailure.ProviderDisconnected
+                    ) {
+                        clearRecognitionGeneration(cancel = false)
+                    }
                     when {
                         advancedPastConfirmedSilence ->
                             advancePastConfirmedSilentCallerAudio(

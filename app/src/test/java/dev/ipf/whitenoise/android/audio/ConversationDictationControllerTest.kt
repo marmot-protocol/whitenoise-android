@@ -354,7 +354,11 @@ class ConversationDictationControllerTest {
 
         assertEquals("Keep must remain a reply", fixture.drafts.getValue(key()).text)
         assertEquals(1, fixture.writes)
-        assertEquals(REPLY_MESSAGE_ID, fixture.controller.state.target?.replyToMessageIdHex)
+        assertEquals(
+            REPLY_MESSAGE_ID,
+            fixture.controller.state.target
+                ?.replyToMessageIdHex,
+        )
     }
 
     @Test
@@ -400,7 +404,11 @@ class ConversationDictationControllerTest {
 
         assertEquals("Keep must remain standalone", fixture.drafts.getValue(key()).text)
         assertEquals(1, fixture.writes)
-        assertEquals(null, fixture.controller.state.target?.replyToMessageIdHex)
+        assertEquals(
+            null,
+            fixture.controller.state.target
+                ?.replyToMessageIdHex,
+        )
     }
 
     @Test
@@ -3295,14 +3303,22 @@ class ConversationDictationControllerTest {
 
     /** A first foreground return releases the saved-text card only after real provider capture closure. */
     @Test
-    fun recoveredForegroundFailureReleasesItsLeaseAfterDelayedNativeClosure() {
+    fun recoveredForegroundFailureReleasesItsLeaseAfterDelayedNativeClosure() =
+        checkRecoveredFailureWaitsForNativeClosure(finishRequested = true)
+
+    /** A fatal recognition error also retains the actual closure callback before the finish gesture. */
+    @Test
+    fun recoveredRecognitionFailureReleasesItsLeaseAfterDelayedNativeClosure() =
+        checkRecoveredFailureWaitsForNativeClosure(finishRequested = false)
+
+    private fun checkRecoveredFailureWaitsForNativeClosure(finishRequested: Boolean) {
         val f = fixture(draft = TextFieldValue(""), platform = FakePlatform(deferCaptureCompletion = true))
         f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
         f.platform.session.completeCapture()
         f.platform.listener.onResult("body")
         f.scheduler.runDelay(500L)
         f.platform.listener.onBeginningOfSpeech()
-        f.controller.send()
+        if (finishRequested) f.controller.send()
         val closingCapture = f.platform.session
         f.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
         assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
