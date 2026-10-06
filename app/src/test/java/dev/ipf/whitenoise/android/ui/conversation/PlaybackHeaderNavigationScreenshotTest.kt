@@ -93,7 +93,10 @@ class PlaybackHeaderNavigationScreenshotTest {
     }
 
     /** Uses the actual Back button and player body action to change the rendered destination. */
-    private fun roundTrip(playerTag: String, listSnapshot: String) {
+    private fun roundTrip(
+        playerTag: String,
+        listSnapshot: String,
+    ) {
         val conversationHeader = headerBounds()
         rule.onNodeWithContentDescription(context.getString(dev.ipf.whitenoise.android.R.string.back)).performClick()
         val listHeader = headerBounds()
@@ -109,7 +112,10 @@ class PlaybackHeaderNavigationScreenshotTest {
     }
 
     /** A player must occupy its own region below the stable header and above screen content. */
-    private fun assertHeaderBeforePlayer(expected: androidx.compose.ui.unit.DpRect, playerTag: String) {
+    private fun assertHeaderBeforePlayer(
+        expected: androidx.compose.ui.unit.DpRect,
+        playerTag: String,
+    ) {
         assertEquals(expected, headerBounds())
         val player = rule.onNodeWithTag(playerTag).getUnclippedBoundsInRoot()
         val content = rule.onNodeWithTag("playback.content").getUnclippedBoundsInRoot()
@@ -126,7 +132,10 @@ class PlaybackHeaderNavigationScreenshotTest {
     }
 
     /** Mounts production conversation/header and chat-list/body frames with inert native navigation. */
-    private fun render(dark: Boolean = false, rtl: Boolean = false) {
+    private fun render(
+        dark: Boolean = false,
+        rtl: Boolean = false,
+    ) {
         val focus = FocusRequester()
         rule.setContent {
             CompositionLocalProvider(
@@ -218,15 +227,21 @@ class PlaybackHeaderNavigationScreenshotTest {
     private fun publishVoice() {
         val field = VoicePlaybackController::class.java.getDeclaredField("_state").apply { isAccessible = true }
         val state = field.get(VoicePlaybackController) as MutableStateFlow<VoicePlaybackController.PlaybackState>
-        state.value = VoicePlaybackController.PlaybackState(
-            key = "voice",
-            ready = true,
-            isPlaying = true,
-            durationMs = 45_000,
-            sessionId = 11,
-            source =
-                VoicePlaybackSource(ChatRowPortFixtures.ACCOUNT_REF, chat.group.groupIdHex, "message", "Review group"),
-        )
+        state.value =
+            VoicePlaybackController.PlaybackState(
+                key = "voice",
+                ready = true,
+                isPlaying = true,
+                durationMs = 45_000,
+                sessionId = 11,
+                source =
+                    VoicePlaybackSource(
+                        ChatRowPortFixtures.ACCOUNT_REF,
+                        chat.group.groupIdHex,
+                        "message",
+                        "Review group",
+                    ),
+            )
     }
 
     /** Retires fixture controllers and process-wide voice playback even after a failed assertion. */

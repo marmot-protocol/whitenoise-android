@@ -466,6 +466,7 @@ class VoicePlaybackControllerFocusTest {
 
     // Hit the private focus path directly; public playback needs MediaPlayer file
     // setup and would obscure the focus bookkeeping this regression protects.
+
     /** Invokes the production controller's private focus boundary against Robolectric's AudioManager. */
     private fun requestFocus(): Boolean {
         val method = VoicePlaybackController::class.java.getDeclaredMethod("requestFocus")
@@ -524,8 +525,9 @@ class VoicePlaybackControllerFocusTest {
     }
 
     /** Returns the installed focus listener so tests follow the real callback path. */
-    private fun audioFocusListener(): AudioManager.OnAudioFocusChangeListener =
-        audioFocusOwnerField("focusListener") as AudioManager.OnAudioFocusChangeListener
+    private fun audioFocusListener(): AudioManager.OnAudioFocusChangeListener {
+        return audioFocusOwnerField("focusListener") as AudioManager.OnAudioFocusChangeListener
+    }
 
     /** Seeds only the test owner's focus fixture fields and leaves controller transition code intact. */
     private fun setAudioFocusOwnerField(
