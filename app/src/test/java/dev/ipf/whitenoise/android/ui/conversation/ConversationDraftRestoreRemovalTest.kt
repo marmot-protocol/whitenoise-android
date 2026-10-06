@@ -174,8 +174,16 @@ class ConversationDraftRestoreRemovalTest {
         id: String,
         name: String,
         mediaType: String,
-    ): MessageDraftAttachmentFfi =
-        MessageDraftAttachmentFfi(id, name, mediaType, byteArrayOf(1, 2, 3), null, null, null, emptyList())
+    ): MessageDraftAttachmentFfi = MessageDraftAttachmentFfi(
+        id,
+        name,
+        mediaType,
+        byteArrayOf(1, 2, 3),
+        null,
+        null,
+        null,
+        emptyList(),
+    )
 
     private fun newPhotoUri(context: Context): Uri {
         val image = File(context.cacheDir, "new-photo.png")
@@ -227,10 +235,7 @@ class ConversationDraftRestoreRemovalTest {
                 val context = ApplicationProvider.getApplicationContext<Context>()
                 val group = conversationTimelineTestGroup()
                 val attachment =
-                    MessageDraftAttachmentFfi(
-                        "native-photo", "photo.jpg", "image/jpeg", byteArrayOf(1, 2),
-                        null, null, null, emptyList(),
-                    )
+                    nativeAttachment("native-photo", "photo.jpg", "image/jpeg")
                 val gateway =
                     RestoreGateway(
                         MessageDraftFfi(group.groupIdHex, "caption", null, listOf(attachment), 1L, 1L),
@@ -242,8 +247,11 @@ class ConversationDraftRestoreRemovalTest {
                     )
                 val owner =
                     ConversationMediaDraftState(
-                        app, ConversationController(appState = app, initialGroup = group), context,
-                        backgroundScope, PhotoEditorMessages("", "", "", ""),
+                        app,
+                        ConversationController(appState = app, initialGroup = group),
+                        context,
+                        backgroundScope,
+                        PhotoEditorMessages("", "", "", ""),
                     )
                 owner.updateInputs(
                     savedNativeSlots(requireNotNull(gateway.current).mediaAttachments),
@@ -252,7 +260,8 @@ class ConversationDraftRestoreRemovalTest {
                 )
                 val restored = requireNotNull(owner.restorePersistedAttachments())
                 val pendingClear = requireNotNull(app.captureDraftForSend("account", group.groupIdHex))
-                owner.forgetAcceptedAttachments(restored.mediaSlots.map { it.id }.toSet(), emptySet())
+                val acceptedSlotIds = restored.mediaSlots.mapTo(mutableSetOf()) { it.id }
+                owner.forgetAcceptedAttachments(acceptedSlotIds, emptySet())
                 owner.updateInputs(emptyList(), emptyList(), "account")
                 app.loadDraft("account", group.groupIdHex)
                 val other = requireNotNull(app.captureDraftForSend("account", "bb".repeat(16)))
