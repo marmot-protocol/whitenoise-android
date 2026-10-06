@@ -2393,4 +2393,12 @@
     <string name="nostr_event_image_failed">Couldn’t load this image. Try again.</string>
     <string name="nostr_event_type_image">Image</string>
     <string name="nostr_event_expand">View full event</string>
+    <string name="floating_attachment_resolving">Checking availability</string>
+    <string name="floating_attachment_available">Available on this device</string>
+    <string name="floating_attachment_remote">Open the original to view</string>
+    <string name="floating_attachment_failed">Download failed. Open the original to retry</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">+%1$d more attachment</item>
+        <item quantity="other">+%1$d more attachments</item>
+    </plurals>
 </resources>

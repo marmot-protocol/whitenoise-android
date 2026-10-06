@@ -1270,6 +1270,10 @@ class WhiteNoiseAppState private constructor(
     private val mediaCacheRevisionState = MutableStateFlow(0L)
     internal val mediaCacheRevision: StateFlow<Long> = mediaCacheRevisionState.asStateFlow()
 
+    /** Decoded-thumbnail membership changes independently of plaintext availability. */
+    private val mediaThumbnailRevisionState = MutableStateFlow(0L)
+    internal val mediaThumbnailRevision: StateFlow<Long> = mediaThumbnailRevisionState.asStateFlow()
+
     /** Publishes one observable revision for an L1 or encrypted-L2 cache mutation. */
     private fun bumpMediaCacheRevision() {
         mediaCacheRevisionState.update { it + 1L }
@@ -1348,13 +1352,16 @@ class WhiteNoiseAppState private constructor(
         thumbnail: android.graphics.Bitmap,
     ) {
         assertMainThread { "cacheMediaThumbnail" }
-        mediaThumbnailCache.put(cacheKey, thumbnail)
+        val previous = mediaThumbnailCache.put(cacheKey, thumbnail)
+        if (mediaThumbnailCache.get(cacheKey) === thumbnail || previous != null) {
+            mediaThumbnailRevisionState.update { it + 1L }
+        }
     }
 
     internal fun removeMediaMemoryCacheEntry(cacheKey: String) {
         assertMainThread { "removeMediaMemoryCacheEntry" }
         mediaPlaintextCache.remove(cacheKey)
-        mediaThumbnailCache.remove(cacheKey)
+        if (mediaThumbnailCache.remove(cacheKey) != null) mediaThumbnailRevisionState.update { it + 1L }
         bumpMediaCacheRevision()
     }
 
@@ -6007,6 +6014,7 @@ class WhiteNoiseAppState private constructor(
         pendingSendDiagnostics.clear()
         mediaPlaintextCache.clear()
         mediaThumbnailCache.clear()
+        mediaThumbnailRevisionState.update { it + 1L }
         bumpMediaCacheRevision()
         MediaInventory.clear()
         mediaUploadSessionLifetime.advance()
