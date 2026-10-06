@@ -640,6 +640,10 @@ android {
     }
     packaging {
         jniLibs {
+            // Preserve JNA's prebuilt bytes: independent release builds have
+            // packaged both stripped and unstripped copies of this dependency.
+            // Its loadable code is identical, but the ELF metadata differs.
+            keepDebugSymbols += "**/libjnidispatch.so"
             excludes +=
                 setOf(
                     "lib/armeabi/libjnidispatch.so",
