@@ -194,8 +194,20 @@ class PinnedConversationShortcutsTest {
         assertTrue(owner.refresh(ACCOUNT, mapOf(visibleGroup to PinnedConversationPresentation("Current"))))
         assertEquals(2, platform.updates.size)
         assertEquals(listOf(visible.shortcutId, visible.shortcutId), platform.updates.flatten().map { it.id })
-        assertEquals("Current", platform.updates.first().single().longLabel)
-        assertEquals(context.getString(R.string.app_name), platform.updates.last().single().longLabel)
+        assertEquals(
+            "Current",
+            platform.updates
+                .first()
+                .single()
+                .longLabel,
+        )
+        assertEquals(
+            context.getString(R.string.app_name),
+            platform.updates
+                .last()
+                .single()
+                .longLabel,
+        )
         assertTrue(tokens.isValid(retained))
         assertTrue(platform.disabled.isEmpty())
     }
@@ -211,36 +223,47 @@ class PinnedConversationShortcutsTest {
         tokens.revokeGroup(ACCOUNT, GROUP)
 
         assertTrue(owner.refresh(ACCOUNT, emptyMap()))
-        assertEquals(context.getString(R.string.app_name), platform.updates.single().single().longLabel)
+        assertEquals(
+            context.getString(R.string.app_name),
+            platform.updates
+                .single()
+                .single()
+                .longLabel,
+        )
         assertEquals(listOf(cap.shortcutId), platform.disabled)
         assertFalse(tokens.isValid(cap))
     }
 
     /** A missed projection must still enforce a disabled-preview transition without relying on global scrubbing. */
     @Test
-    fun omittedPinIsScrubbedWhenPreviewsAreDisabled() =
-        runBlocking { assertOmittedPinPrivacyTransition(reenable = false) }
+    fun omittedPinIsScrubbedWhenPreviewsAreDisabled() = assertOmittedPinScrubbed(reenable = false)
 
     /** Re-enabling previews cannot reauthorize retained metadata stamped before the intervening opt-out. */
     @Test
-    fun omittedPinIsScrubbedAfterPreviewsAreDisabledAndReenabled() =
-        runBlocking { assertOmittedPinPrivacyTransition(reenable = true) }
+    fun omittedPinIsScrubbedAfterPreviewsAreDisabledAndReenabled() = assertOmittedPinScrubbed(reenable = true)
 
     /** Creates a genuine rich pin, changes the preview epoch without scrubbing inventory, then refreshes no rows. */
-    private suspend fun assertOmittedPinPrivacyTransition(reenable: Boolean) {
-        val platform = Platform(context)
-        val owner = PinnedConversationShortcuts(context, platform)
-        val cap = capability
-        owner.request(cap, "Private", null) { true }
-        platform.approve(platform.requests.last())
-        assertTrue(NotificationPreviewPreferences.setEnabled(context, false) { true })
-        if (reenable) assertTrue(NotificationPreviewPreferences.setEnabled(context, true) { true })
+    private fun assertOmittedPinScrubbed(reenable: Boolean) =
+        runBlocking {
+            val platform = Platform(context)
+            val owner = PinnedConversationShortcuts(context, platform)
+            val cap = capability
+            owner.request(cap, "Private", null) { true }
+            platform.approve(platform.requests.last())
+            assertTrue(NotificationPreviewPreferences.setEnabled(context, false) { true })
+            if (reenable) assertTrue(NotificationPreviewPreferences.setEnabled(context, true) { true })
 
-        assertTrue(owner.refresh(ACCOUNT, emptyMap()))
-        assertEquals(context.getString(R.string.app_name), platform.updates.single().single().longLabel)
-        assertTrue(platform.disabled.isEmpty())
-        assertTrue(tokens.isValid(cap))
-    }
+            assertTrue(owner.refresh(ACCOUNT, emptyMap()))
+            assertEquals(
+                context.getString(R.string.app_name),
+                platform.updates
+                    .single()
+                    .single()
+                    .longLabel,
+            )
+            assertTrue(platform.disabled.isEmpty())
+            assertTrue(tokens.isValid(cap))
+        }
 
     /** Previous-process provenance cannot authorize keeping a rich label absent from the current projection. */
     @Test
@@ -250,10 +273,19 @@ class PinnedConversationShortcutsTest {
         val cap = capability
         owner.request(cap, "Private", null) { true }
         platform.approve(platform.requests.last())
-        platform.inventory.single().extras!!.putString(NotificationPreviewPreferences.EXTRA_SESSION, "previous-process")
+        platform.inventory
+            .single()
+            .extras!!
+            .putString(NotificationPreviewPreferences.EXTRA_SESSION, "previous-process")
 
         assertTrue(owner.refresh(ACCOUNT, emptyMap()))
-        assertEquals(context.getString(R.string.app_name), platform.updates.single().single().longLabel)
+        assertEquals(
+            context.getString(R.string.app_name),
+            platform.updates
+                .single()
+                .single()
+                .longLabel,
+        )
         assertTrue(tokens.isValid(cap))
     }
 
@@ -369,7 +401,13 @@ class PinnedConversationShortcutsTest {
         assertTrue(platform.disabled.isEmpty())
         platform.afterInventoryRead = null
         assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to PinnedConversationPresentation("Current"))))
-        assertEquals("Current", platform.updates.single().single().longLabel)
+        assertEquals(
+            "Current",
+            platform.updates
+                .single()
+                .single()
+                .longLabel,
+        )
     }
 
     /** An action revoked during a launcher read must not issue a late pin request from the IO coroutine. */
