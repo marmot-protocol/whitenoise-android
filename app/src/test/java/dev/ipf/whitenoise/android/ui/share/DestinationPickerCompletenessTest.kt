@@ -6,8 +6,11 @@ import dev.ipf.whitenoise.android.state.AccountSwitchLocalSnapshot
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentedRow
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancel
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -20,14 +23,25 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class DestinationPickerCompletenessTest {
     @get:Rule val composeRule = createComposeRule()
+    private val states = mutableListOf<WhiteNoiseAppState>()
+    private val controllers = mutableListOf<ChatsController>()
+    private val gates = mutableListOf<CompletableDeferred<Unit>>()
+
+    /** A failed assertion must not leave a roster read or controller scope alive for the next fixture. */
+    @After
+    fun releaseFixtureOwners() {
+        controllers.forEach { it.onCleared() }
+        gates.forEach { it.cancel() }
+        states.forEach { it.mutationsScope.cancel() }
+    }
 
     /** A cold off-window participant is unknown until its bounded account-owned roster read resolves. */
     @Test
     @Suppress("LongMethod") // One mounted picker is observed before and after the deferred roster lands.
     fun offWindowParticipantFolderConvergesAfterRosterHydration() {
-        val state = emptyAppState()
-        val roster = CompletableDeferred<Unit>()
-        val updatedRoster = CompletableDeferred<Unit>()
+        val state = emptyAppState().also(states::add)
+        val roster = CompletableDeferred<Unit>().also(gates::add)
+        val updatedRoster = CompletableDeferred<Unit>().also(gates::add)
         val reads = mutableListOf<Pair<String, String>>()
         state.liveSubscriptionOverrides.chatList =
             ChatListLiveSubscriptions(
@@ -54,6 +68,7 @@ class DestinationPickerCompletenessTest {
                     listOf(member(ACCOUNT_HEX, true), member(if (reads.size == 1) PEER_B else PEER_A, false))
                 },
             )
+        controllers += controller
         state.attachChatsController(controller)
         val store = state.chatFolderPreferences
         store.clearAllForAccount(ACCOUNT_REF)
@@ -134,7 +149,7 @@ class DestinationPickerCompletenessTest {
     /** A failed retry keeps previously chosen off-window destinations without claiming a complete folder. */
     @Test
     fun failedRetryRetainsSameAccountTargetsAndReportsIncomplete() {
-        val state = emptyAppState()
+        val state = emptyAppState().also(states::add)
         var failRead = false
         var reads = 0
         state.liveSubscriptionOverrides.chatList =
@@ -149,6 +164,7 @@ class DestinationPickerCompletenessTest {
             )
         val controller = ChatsController(state, ACCOUNT_REF) { _, _ -> emptyList() }
         controller.applyLocalDirectChat(GROUP_A, ACCOUNT_HEX, PEER_A)
+        controllers += controller
         state.attachChatsController(controller)
         var source: ShareChatPickerDataSource? = null
         composeRule.setContent {
@@ -170,13 +186,13 @@ class DestinationPickerCompletenessTest {
         }
     }
 
-    /** Account reads and roster invalidation require both Android main-loop time and Compose frame progress. */
+    /** Flushes Android callbacks and Compose snapshot changes before reading picker state published by SideEffect. */
     private fun awaitPicker(condition: () -> Boolean) {
         composeRule.waitUntil(5_000) {
             org.robolectric.Shadows
                 .shadowOf(android.os.Looper.getMainLooper())
                 .idleFor(java.time.Duration.ofMillis(16))
-            condition()
+            composeRule.runOnIdle(condition)
         }
     }
 }
