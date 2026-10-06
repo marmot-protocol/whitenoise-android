@@ -7647,6 +7647,14 @@
         ]
       },
       {
+        "surface": "rememberLocalVCardContact",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "fun rememberLocalVCardContact(",
+        "test_ids": [
+          "MED-029"
+        ]
+      },
+      {
         "surface": "ContactFieldRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
         "anchor": "fun ContactFieldRow(",

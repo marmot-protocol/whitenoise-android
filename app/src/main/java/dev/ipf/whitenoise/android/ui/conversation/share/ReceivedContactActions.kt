@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation.share
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -12,7 +14,9 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
+import dev.ipf.whitenoise.android.ui.conversation.media.localAttachmentBytes
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeMediaFile
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentToDownloads
 import kotlinx.coroutines.CancellationException
@@ -21,6 +25,35 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class ReceivedContactAction { View, Add, Save }
+
+/**
+ * Reads a raw `.vcf` attachment's contact from bytes this device already holds,
+ * so a file sent without the name/phone caption still draws the contact card.
+ * Never starts a download: the file card's Documents policy owns fetching, and
+ * each cache revision re-reads until the bytes land.
+ */
+@Composable
+internal fun rememberLocalVCardContact(
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+    messageIdHex: String,
+    attachment: IndexedValue<MediaAttachmentReferenceFfi>?,
+    mine: Boolean,
+): SharedContact? {
+    var contact by remember(controller, messageIdHex, attachment) { mutableStateOf<SharedContact?>(null) }
+    val cacheRevision by appState.mediaCacheRevision.collectAsState()
+    LaunchedEffect(controller, messageIdHex, attachment, cacheRevision) {
+        if (attachment == null || contact != null) {
+            return@LaunchedEffect
+        }
+        val bytes =
+            runCatchingCancellable {
+                localAttachmentBytes(controller, messageIdHex, attachment.index, mine)
+            }.getOrNull() ?: return@LaunchedEffect
+        contact = withContext(Dispatchers.Default) { parseSingleVCard(bytes) }
+    }
+    return contact
+}
 
 /** The card owns one exact encrypted VCF and starts its download only after an explicit action. */
 @Composable
