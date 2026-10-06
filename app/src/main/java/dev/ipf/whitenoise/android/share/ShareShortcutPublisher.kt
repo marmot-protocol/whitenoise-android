@@ -68,6 +68,7 @@ internal fun buildShareShortcutIntent(context: Context): Intent =
         flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
     }
 
+/** Builds an account-routed recent-chat target with the captured preview policy and local conversation icon. */
 internal fun buildShareShortcut(
     context: Context,
     target: ShareShortcutTarget,

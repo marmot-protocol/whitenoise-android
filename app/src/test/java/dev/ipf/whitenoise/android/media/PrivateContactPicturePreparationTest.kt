@@ -23,6 +23,7 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class PrivateContactPicturePreparationTest {
+    /** The saved square uses the selected crop and remains within the private image size bound. */
     @Test fun cropSelectsTheChosenSquareAndBoundsTheSavedPng() =
         runBlocking {
             val image = Bitmap.createBitmap(1600, 800, Bitmap.Config.ARGB_8888)
@@ -48,6 +49,7 @@ class PrivateContactPicturePreparationTest {
             decoded.recycle()
         }
 
+    /** Decoded orientation affects pixels while saved PNG metadata cannot retain the source GPS location. */
     @Test fun orientationIsAppliedAndExifLocationDoesNotReachTheSavedFile() =
         runBlocking {
             val image = Bitmap.createBitmap(80, 40, Bitmap.Config.ARGB_8888)
@@ -80,6 +82,7 @@ class PrivateContactPicturePreparationTest {
             assertTrue(file.delete())
         }
 
+    /** Unsupported or oversized picker bytes cannot become a commit-ready image draft. */
     @Test fun unsupportedAndOversizedInputCannotProduceASavedDraft() =
         runBlocking {
             assertTrue(

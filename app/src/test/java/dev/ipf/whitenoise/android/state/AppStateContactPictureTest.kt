@@ -22,6 +22,7 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class AppStateContactPictureTest {
+    /** Self identities and obsolete editor owners cannot write nickname, notes or picture state. */
     @Test fun selfAndExpiredEditorsCannotWritePrivateFields() =
         runBlocking {
             val app = app()
@@ -34,6 +35,7 @@ class AppStateContactPictureTest {
             assertNull(app.contactPictureStore.reference("a", "contact"))
         }
 
+    /** An account switch revokes old private pixels while public profile/export identity remains unchanged. */
     @Test fun switchingAccountsImmediatelyRevokesOldPixelsAndPublicIdentityStaysPublic() =
         runBlocking {
             val app = app()
@@ -65,8 +67,10 @@ class AppStateContactPictureTest {
             )
         }
 
+    /** Creates a small synthetic normalized replacement without relying on external media. */
     private fun picture(color: Int) = ContactPictureChange.Replace(contactPicturePng(color))
 
+    /** Builds two signed-in owners with discarded drafts and no native identity side effects. */
     private fun app() =
         WhiteNoiseAppState(
             context = RuntimeEnvironment.getApplication(),
@@ -86,6 +90,7 @@ class AppStateContactPictureTest {
             activeAccountRef = "a",
         )
 
+    /** Provides distinct local/self identities so private-contact exclusion can be tested. */
     private fun account(label: String) =
         AccountSummaryFfi(
             label = label,

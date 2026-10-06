@@ -24,6 +24,7 @@ import java.io.File
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class PrivateContactAvatarLoaderTest {
+    /** Private bytes win locally; an unreadable file falls back publicly without sending its handle to MDK. */
     @Test fun privatePrecedenceAndPublishedFallbackNeverFetchThePrivateHandle() =
         runBlocking {
             val context: Context = RuntimeEnvironment.getApplication()
@@ -54,6 +55,7 @@ class PrivateContactAvatarLoaderTest {
             AvatarImageLoader.resetProfileImageFetcherForTests()
         }
 
+    /** The same contact under different owners has distinct cache identities, and clearing A cannot revoke B. */
     @Test fun distinctAccountHandlesCannotBorrowCachedPrivatePixels() =
         runBlocking {
             val context: Context = RuntimeEnvironment.getApplication()

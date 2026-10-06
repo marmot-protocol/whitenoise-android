@@ -73,6 +73,7 @@ internal data class AgentOperationSenderPresentation(
     val avatarUrl: String?,
 )
 
+/** Renders the native operation with the viewer's actor presentation without changing its operation data. */
 @Composable
 internal fun AgentOperationTimelineRow(
     item: TimelineMessage,

@@ -42,8 +42,10 @@ class PrivateContactAvatarSurfaceTest {
     /** Missing or unreadable private bytes retain current native public pixels but never the old account's. */
     @Test fun missingPrivatePictureUsesCurrentPublicPixels() = assertPublicFallback(corrupt = false)
 
+    /** A corrupt local selection may use current public pixels without borrowing a retired owner's image. */
     @Test fun corruptPrivatePictureUsesCurrentPublicPixels() = assertPublicFallback(corrupt = true)
 
+    /** Renders the real sender slot after deleting or corrupting its private bytes, then revokes its owner. */
     private fun assertPublicFallback(corrupt: Boolean) {
         val context = RuntimeEnvironment.getApplication()
         val root = context.noBackupFilesDir.resolve("fallback-pictures")
@@ -66,6 +68,7 @@ class PrivateContactAvatarSurfaceTest {
             }
         }
 
+        /** Samples the centre of the actual rendered avatar surface rather than its source bitmap. */
         fun pixel(): Int {
             val bitmap = composeRule.onNodeWithTag("sender-slot").captureToImage().asAndroidBitmap()
             return bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
@@ -80,6 +83,7 @@ class PrivateContactAvatarSurfaceTest {
         assertNotEquals(Color.RED, pixel())
     }
 
+    /** Both avatar surfaces prefer current private pixels and drop every captured image after owner invalidation. */
     @Test fun privateImagePrecedesCapturedPixelsAndOldOwnerDisappearsOnNextFrame() {
         val context = RuntimeEnvironment.getApplication()
         val store =
@@ -105,6 +109,7 @@ class PrivateContactAvatarSurfaceTest {
             }
         }
 
+        /** Samples the centre of the actual rendered avatar surface rather than its source bitmap. */
         fun pixel(tag: String = "identity"): Int {
             val image = composeRule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
             return image.getPixel(image.width / 2, image.height / 2)

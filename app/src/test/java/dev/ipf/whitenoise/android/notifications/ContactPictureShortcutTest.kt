@@ -78,18 +78,22 @@ class ContactPictureShortcutTest {
         assertPreviewRefresh(previousSession = true)
     }
 
+    /** A first private choice may refresh a proven legacy shortcut only before any preview-policy transition. */
     @Test fun firstPictureAcceptsUnstampedLegacyShortcutBeforeAnyPrivacyTransition() {
         assertPreviewRefresh(legacy = true)
     }
 
+    /** Saving a private choice cannot undo a shortcut's explicit redaction. */
     @Test fun explicitRedactionCannotBeReversedBySavingAPicture() {
         assertPreviewRefresh(hidden = true, expectPrivate = false)
     }
 
+    /** Re-enabling previews cannot authorize a shortcut captured under the previous privacy epoch. */
     @Test fun privacyOptOutAndBackInCannotRevivePreviousEpoch() {
         assertPreviewRefresh(staleEpoch = true, expectPrivate = false)
     }
 
+    /** Runs the production icon-refresh path against a controlled preview epoch and captured launcher writes. */
     private fun assertPreviewRefresh(
         previousSession: Boolean = false,
         legacy: Boolean = false,
@@ -147,6 +151,7 @@ class ContactPictureShortcutTest {
         }
     }
 
+    /** Replacing or clearing one contact picture refreshes only that owner's published shortcut pixels. */
     @Test fun replacementAndClearRefreshPublishedShortcutsWithoutCrossingAccounts() {
         val context = RuntimeEnvironment.getApplication()
         val preview = NotificationPreviewPreferences.capture(context)

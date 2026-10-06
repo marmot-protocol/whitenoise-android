@@ -31,16 +31,22 @@ import org.robolectric.annotation.GraphicsMode
 class ContactPictureEditorScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Records the prepared private-picture editor in the light theme. */
     @Test fun light() = screen("light")
 
+    /** Records editor controls and crop preview with dark-theme contrast. */
     @Test fun dark() = screen("dark", dark = true)
 
+    /** Records the editor against the AMOLED surface tokens. */
     @Test fun amoled() = screen("amoled", dark = true, amoled = true)
 
+    /** Records editor reachability under RTL and twice the default text scale. */
     @Test fun largeRtl() = screen("large_rtl", scale = 2f, rtl = true)
 
+    /** Records the initial editor state without a saved private selection. */
     @Test fun noPrivatePicture() = screen("empty", picture = false)
 
+    /** Crop, Clear and Save expose distinct labeled actions rather than implicit storage mutations. */
     @Test fun cropClearAndSaveAreExplicitAccessibleActions() {
         var picked = 0
         var cropped = 0
@@ -68,6 +74,7 @@ class ContactPictureEditorScreenTest {
         assertEquals(listOf(1, 1, 1, 1), listOf(picked, cropped, cleared, saved))
     }
 
+    /** Preparation disables conflicting editor mutations and Save until a bounded draft is ready. */
     @Test fun busyPreparationDisablesMutationsAndSave() {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -85,6 +92,7 @@ class ContactPictureEditorScreenTest {
         composeRule.onNodeWithTag("person_profile.private_save").assertIsNotEnabled()
     }
 
+    /** Mounts the editor with controlled theme and draft state for the committed screenshot fixture. */
     private fun screen(
         name: String,
         dark: Boolean = false,

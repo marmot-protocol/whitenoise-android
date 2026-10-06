@@ -82,6 +82,7 @@ internal fun selectedMemberAvatarUrl(
     localAvatarUrl: String?,
 ): String? = localAvatarUrl ?: ProfileSanitizer.protocolImageUrl(member.searchProfile?.picture)
 
+/** Summarizes selected contacts through the current viewer's local labels and pictures. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun SelectedMemberSummary(
@@ -151,6 +152,7 @@ internal fun SelectedMemberSummary(
     }
 }
 
+/** Shows the captured selected identities with explicit removal and continue callbacks. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Suppress("FunctionNaming", "LongMethod")

@@ -95,6 +95,7 @@ object AvatarImageLoader {
         }
     }
 
+    /** Intercepts private display handles before the MDK public-profile image acquisition boundary. */
     suspend fun load(url: String): ImageBitmap? =
         if (PrivateContactAvatarLoader.isPrivate(url)) {
             PrivateContactAvatarLoader.load(url)

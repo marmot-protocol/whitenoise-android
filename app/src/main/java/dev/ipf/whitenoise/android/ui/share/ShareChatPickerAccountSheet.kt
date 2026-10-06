@@ -97,6 +97,7 @@ internal fun ShareChatPickerAccountSheetContent(
     }
 }
 
+/** Shows a sending identity's public profile and selected radio state, keeping own-account avatars public. */
 @Composable
 private fun ShareChatPickerAccountItem(
     appState: WhiteNoiseAppState,

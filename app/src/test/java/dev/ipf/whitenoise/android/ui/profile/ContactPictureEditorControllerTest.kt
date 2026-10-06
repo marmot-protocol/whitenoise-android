@@ -31,6 +31,7 @@ class ContactPictureEditorControllerTest {
             File(context.noBackupFilesDir, "editor"),
         )
 
+    /** Clear remains an editor draft until Save; cancellation cannot modify the stored selection. */
     @Test fun clearDoesNotTouchStorageUntilSaveAndCancellationDropsTheDraft() =
         runTest {
             store.save("a", "contact", "", "", ContactPictureChange.Replace(contactPicturePng(Color.RED))) { true }
@@ -50,6 +51,7 @@ class ContactPictureEditorControllerTest {
             assertEquals(initial, store.reference("a", "contact"))
         }
 
+    /** An editor revoked while Save is queued cannot commit or publish success afterward. */
     @Test fun expiredOwnerCannotCommitAQueuedSaveOrPublishSuccess() =
         runTest {
             var current = true
@@ -65,6 +67,7 @@ class ContactPictureEditorControllerTest {
             assertFalse(store.hasChoice("a", "contact"))
         }
 
+    /** Save commits its captured fields once, while failure leaves the same draft available for retry. */
     @Test fun successfulSaveUsesTheCapturedDraftAndFailedSaveKeepsItAvailable() =
         runTest {
             val controller = ContactPictureEditorController(store, null, this) { true }

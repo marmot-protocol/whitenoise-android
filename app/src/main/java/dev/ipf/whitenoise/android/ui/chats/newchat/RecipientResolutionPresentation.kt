@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
+/** Combines the resolved identity with the current viewer's local picture while preserving unresolved/loading distinctions. */
 internal fun resolvedRecipientResolution(
     input: String,
     resolving: Boolean,
