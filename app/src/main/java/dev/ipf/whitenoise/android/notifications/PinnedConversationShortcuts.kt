@@ -98,8 +98,13 @@ internal class PinnedConversationShortcuts(
                 when {
                     !platform.supported() -> ConversationPinResult.UNSUPPORTED
                     !stillCurrent() || !tokens.isValid(capability) -> ConversationPinResult.UNAVAILABLE
-                    platform.shortcuts().any { it.id == capability.shortcutId && it.isPinned && it.isEnabled } ->
+                    platform.shortcuts().any { it.id == capability.shortcutId && it.isPinned && it.isEnabled } -> {
+                        val current = build(capability, title, avatarUrl, avatar)
+                        if (!runCatching { platform.update(listOf(current)) }.getOrDefault(false)) {
+                            platform.update(listOf(genericNotificationShortcut(context, current)))
+                        }
                         ConversationPinResult.ALREADY_PINNED
+                    }
                     else -> {
                         val callback =
                             PendingIntent

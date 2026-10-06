@@ -6313,8 +6313,9 @@ class WhiteNoiseAppState private constructor(
         val draftsSaved = draftWriter.flushAccount(signedOutRef)
         // MDK 0.9.15 handles local and external signers through the same call.
         val engineResult =
-            runCatchingCancellable {
-                marmotIo { signOut(signedOutRef, deleteKeyPackages) }
+            withRevokedPinnedTarget(signedOutRef) {
+                // Credential persistence failures must not enter the native-error fail-open path.
+                runCatchingCancellable { marmotIo { signOut(signedOutRef, deleteKeyPackages) } }
             }
         val engineOutcome = engineResult.getOrNull()
         if (engineOutcome?.localCleanup?.completed == false) {
@@ -6404,7 +6405,7 @@ class WhiteNoiseAppState private constructor(
             val restartNotifications = prepareForDestructiveAccountWipe(wipedRef)
             val wipeResult =
                 nativePushSyncMutex.withSerializedNativePushWipe {
-                    runCatching { marmotIo { signOutAndWipe(wipedRef) } }
+                    runCatching { withRevokedPinnedTarget(wipedRef) { marmotIo { signOutAndWipe(wipedRef) } } }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
                                 pushTokenStore.clearPendingDisable(wipedRef)

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.PinnedConversationNavigation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
+import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -26,3 +27,10 @@ internal suspend fun WhiteNoiseAppState.removePinnedConversationShortcuts(
         PinnedConversationShortcuts(appContext).removeGroup(accountRef, groupIdHex)
     }
 }
+
+/** Persist credential revocation before a native deletion, reset or account sign-out can become durable. */
+internal suspend fun <T> WhiteNoiseAppState.withRevokedPinnedTarget(
+    accountRef: String,
+    groupIdHex: String? = null,
+    remove: suspend () -> T,
+): T = PinnedConversationTokens.create(appContext).withRemovalRevoked(accountRef, groupIdHex, remove)

@@ -1454,19 +1454,18 @@ internal fun MainShell(
         }
     }
 
-    LaunchedEffect(
-        chatsController,
-        chatsController.boundAccountRef,
-        chatsController.isLoading,
-        chatsController.items,
-        appState.activeAccountRef,
-    ) {
-        val chatListReady =
-            chatsController.boundAccountRef == appState.activeAccountRef &&
-                !chatsController.isLoading
-        if (!chatListReady) return@LaunchedEffect
-        appState.publishShareShortcuts(chatsController.forwardTargets())
-    }
+    ConversationShortcutRefreshEffect(
+        owner = chatsController,
+        accountRef = appState.activeAccountRef,
+        ready = chatsController.boundAccountRef == appState.activeAccountRef && !chatsController.isLoading,
+        targetRevision = chatsController.forwardTargetsRevision,
+        profileRevision = appState.profileRevisionForCompose,
+        publish = {
+            if (chatsController.boundAccountRef == appState.activeAccountRef && !chatsController.isLoading) {
+                appState.publishShareShortcuts(chatsController.forwardTargets())
+            }
+        },
+    )
 
     LaunchedEffect(appState.appLockScreenVisible) {
         if (appState.appLockScreenVisible) {

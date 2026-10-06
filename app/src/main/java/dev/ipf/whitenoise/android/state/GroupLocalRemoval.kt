@@ -44,12 +44,16 @@ internal suspend fun WhiteNoiseAppState.deleteGroupLocalWithClientCleanup(
     conversationDictation.onTargetRemoved(account, groupIdHex)
     evictGroupMediaCaches(account, groupIdHex)
     deleteDraftBeforeGroupRemoval(account, groupIdHex)
-    marmotIo { deleteGroupLocal(account, groupIdHex) }
+    withRevokedPinnedTarget(
+        accountRef = account,
+        groupIdHex = groupIdHex,
+    ) { marmotIo { deleteGroupLocal(account, groupIdHex) } }
+    removePinnedConversationShortcuts(account, groupIdHex)
     removeComposerExpansionForGroup(account, groupIdHex)
     dismissConversationNotifications(account, groupIdHex)
 }
 
-/** The chat-list's recoverable local wipe must not change Android-owned state before commit. */
+/** The recoverable wipe preserves client data until commit; launcher authority is revoked before the native attempt. */
 internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
     account: String,
     groupIdHex: String,
@@ -75,7 +79,12 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
                     present = { nativeGroupPresent(account, groupIdHex) },
                     prepare = { prepareLocalGroupDeleteCleanup(account, groupIdHex) },
                     stage = { withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.stage(it) } },
-                    delete = { marmotIo { deleteGroupLocal(account, groupIdHex) } },
+                    delete = {
+                        withRevokedPinnedTarget(
+                            accountRef = account,
+                            groupIdHex = groupIdHex,
+                        ) { marmotIo { deleteGroupLocal(account, groupIdHex) } }
+                    },
                 ),
             )
         onNativeCommitted()
@@ -255,7 +264,7 @@ internal suspend fun WhiteNoiseAppState.forgetGroupLocalWithClientCleanup(
     conversationDictation.onTargetRemoved(account, groupIdHex)
     evictGroupMediaCaches(account, groupIdHex)
     deleteDraftBeforeGroupRemoval(account, groupIdHex)
-    val reset = marmotIo { forgetGroupLocal(account, groupIdHex) }
+    val reset = withRevokedPinnedTarget(account, groupIdHex) { marmotIo { forgetGroupLocal(account, groupIdHex) } }
     removePinnedConversationShortcuts(account, groupIdHex)
     removeComposerExpansionForGroup(account, groupIdHex)
     dismissConversationNotifications(account, groupIdHex)

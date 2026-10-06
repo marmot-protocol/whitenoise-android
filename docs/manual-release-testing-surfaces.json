@@ -12766,6 +12766,14 @@
         "test_ids": [
           "SYS-012"
         ]
+      },
+      {
+        "surface": "ConversationShortcutRefreshEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ConversationShortcutRefreshEffect.kt",
+        "anchor": "fun ConversationShortcutRefreshEffect(",
+        "test_ids": [
+          "SYS-012"
+        ]
       }
     ],
     "settings_controls": [

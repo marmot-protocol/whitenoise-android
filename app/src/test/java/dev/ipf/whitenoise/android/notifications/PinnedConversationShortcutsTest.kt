@@ -62,6 +62,18 @@ class PinnedConversationShortcutsTest {
             PinnedConversationShortcuts(context, platform).request(capability, "Friends", null) { true },
         )
         assertEquals(2, platform.requests.size)
+        assertEquals(
+            ConversationPinResult.ALREADY_PINNED,
+            PinnedConversationShortcuts(context, platform).request(capability, "Renamed", null) { true },
+        )
+        assertEquals(
+            "Renamed",
+            platform.updates
+                .last()
+                .single()
+                .longLabel,
+        )
+        assertEquals(2, platform.requests.size)
     }
 
     /** A pending approval arriving after deletion disables its old ID without touching the recreated pin. */

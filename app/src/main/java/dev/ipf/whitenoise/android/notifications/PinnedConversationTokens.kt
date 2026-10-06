@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.Context
 import android.content.SharedPreferences
 import dev.ipf.whitenoise.android.state.StalenessGuard
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -45,6 +48,7 @@ internal class PinnedConversationTokens(
             val group = groupIdHex.lowercase(Locale.ROOT).takeIf(groupPattern::matches) ?: return@synchronized null
             val accountKey = accountKey(account)
             val groupKey = groupKey(account, group)
+            if (removals.containsKey(accountKey) || removals.containsKey(groupKey)) return@synchronized null
             val accountToken = preferences.getString(accountKey, null)?.takeIf(::validToken) ?: newToken()
             val groupToken = preferences.getString(groupKey, null)?.takeIf(::validToken) ?: newToken()
             check(
@@ -97,9 +101,51 @@ internal class PinnedConversationTokens(
             check(editor.commit()) { "Unable to revoke launcher credentials" }
         }
 
+    /**
+     * Revoke durably before a native removal can commit, and block new credentials while it runs.
+     * A failed removal conservatively invalidates old pins; it never restores their authority.
+     */
+    suspend fun <T> withRemovalRevoked(
+        accountRef: String,
+        groupIdHex: String? = null,
+        remove: suspend () -> T,
+    ): T {
+        val key = groupIdHex?.let { groupKey(accountRef, it.lowercase(Locale.ROOT)) } ?: accountKey(accountRef)
+        var started = false
+        try {
+            withContext(Dispatchers.IO) {
+                synchronized(lock) {
+                    revokeTarget(accountRef, groupIdHex)
+                    removals[key] = (removals[key] ?: 0) + 1
+                    started = true
+                }
+            }
+            return remove()
+        } finally {
+            if (started) {
+                withContext(NonCancellable + Dispatchers.IO) {
+                    synchronized(lock) {
+                        revokeTarget(accountRef, groupIdHex)
+                        val remaining = checkNotNull(removals[key]) - 1
+                        if (remaining == 0) removals.remove(key) else removals[key] = remaining
+                    }
+                }
+            }
+        }
+    }
+
+    /** Caller holds the shared credential lock, keeping issuance and account/group revocation serialized. */
+    private fun revokeTarget(
+        accountRef: String,
+        groupIdHex: String?,
+    ) {
+        if (groupIdHex == null) revokeAccount(accountRef) else revokeGroup(accountRef, groupIdHex)
+    }
+
     companion object {
         private val lock = Any()
         private val revocations = StalenessGuard()
+        private val removals = mutableMapOf<String, Int>()
         private val random = SecureRandom()
         private val groupPattern = Regex("[0-9a-f]{64}")
         private const val TOKEN_BYTES = 32

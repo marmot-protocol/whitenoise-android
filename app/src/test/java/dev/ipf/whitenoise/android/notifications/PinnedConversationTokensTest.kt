@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -73,6 +76,67 @@ class PinnedConversationTokensTest {
         assertFalse(store.isValid(current))
         assertTrue(store.isValid(store.issue("personal", group)!!))
     }
+
+    /** Native work observes durable revocation and cannot race fresh issuance, even through another store instance. */
+    @Test
+    fun removalRevokesBeforeNativeWorkAndBlocksConcurrentIssuance() =
+        runBlocking {
+            for (groupScope in listOf(group, null)) {
+                val old = store.issue("personal", group)!!
+                val unrelated = store.issue("work", group)!!
+                store.withRemovalRevoked("personal", groupScope) {
+                    val recreated = PinnedConversationTokens(preferences)
+                    assertFalse(recreated.isValid(old))
+                    assertNull(recreated.issue("personal", group))
+                    assertTrue(recreated.isValid(unrelated))
+                }
+                val replacement = store.issue("personal", group)!!
+                assertNotEquals(old.shortcutId, replacement.shortcutId)
+                assertFalse(store.isValid(old))
+            }
+        }
+
+    /** Cancellation after revocation does not restore old authority or leave the issuance lease permanently held. */
+    @Test
+    fun cancelledRemovalKeepsOldPinsRevokedAndAllowsAnExplicitNewRequest() =
+        runBlocking {
+            val old = store.issue("personal", group)!!
+            try {
+                store.withRemovalRevoked("personal", group) { throw CancellationException("native interrupted") }
+            } catch (_: CancellationException) {
+                assertFalse(PinnedConversationTokens(preferences).isValid(old))
+            }
+            assertNotEquals(old.shortcutId, store.issue("personal", group)!!.shortcutId)
+        }
+
+    /** A failed durable credential write must not enter the native removal operation. */
+    @Test
+    fun failedRevocationPreventsNativeRemoval() =
+        runBlocking {
+            val old = store.issue("personal", group)!!
+            val failedPreferences =
+                object : SharedPreferences by preferences {
+                    override fun edit(): SharedPreferences.Editor {
+                        val original = preferences.edit()
+                        return object : SharedPreferences.Editor by original {
+                            override fun remove(key: String?): SharedPreferences.Editor = this
+
+                            override fun commit(): Boolean = false
+                        }
+                    }
+                }
+            var nativeCalls = 0
+            val failed =
+                runCatching {
+                    PinnedConversationTokens(failedPreferences).withRemovalRevoked(
+                        accountRef = "personal",
+                        groupIdHex = group,
+                    ) { nativeCalls += 1 }
+                }
+            assertTrue(failed.isFailure)
+            assertEquals(0, nativeCalls)
+            assertTrue(store.isValid(old))
+        }
 
     /** Possessing a valid pin for one account/group does not authorize modifying its destination. */
     @Test
