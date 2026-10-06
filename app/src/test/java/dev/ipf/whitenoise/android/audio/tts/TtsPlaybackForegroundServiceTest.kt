@@ -8,6 +8,10 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Looper
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentCandidate
+import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentFormat
+import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentPreview
+import dev.ipf.whitenoise.android.ui.conversation.media.textAttachmentTtsEntry
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -113,6 +117,68 @@ class TtsPlaybackForegroundServiceTest {
         assertTrue("generic title expected, got '$text'", text.isNotBlank())
         assertFalse("notification must not leak message content", text.contains("One"))
         controller.destroy()
+    }
+
+    /** Notification controls retain an attachment's queue and cursor while exposing no document text or filename. */
+    @Test
+    fun attachmentSessionRetainsItsCursorThroughBackgroundNotificationControls() {
+        val harness = installHost()
+        val preview =
+            TextAttachmentPreview(
+                TextAttachmentCandidate(
+                    "private-notes.txt",
+                    "text/plain",
+                    TextAttachmentFormat.PlainText,
+                ),
+                "First private sentence. Second private sentence.",
+            )
+        val entry = textAttachmentTtsEntry(preview, "alice", "Alice", "message", 0)
+        assertTrue(harness.controller.speak(listOf(entry), Locale.US))
+        harness.controller.seekToSentence(entry.messageIdHex, 1, entry.projectionId)
+        val session = harness.controller.state.value.sessionId
+        val lifecycle = Robolectric.buildService(TtsPlaybackForegroundService::class.java).create()
+        val service = lifecycle.get()
+        val context = RuntimeEnvironment.getApplication()
+        service.onStartCommand(Intent(context, service::class.java), 0, 1)
+        service.onStartCommand(
+            Intent(context, service::class.java).setAction(TtsPlaybackForegroundService.ACTION_PAUSE),
+            0,
+            2,
+        )
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(harness.controller.state.value is TtsState.Paused)
+        assertEquals(
+            1,
+            harness.controller.state.value.passage
+                ?.sentenceIndex,
+        )
+        val notification = requireNotNull(shadowOf(service as Service).lastForegroundNotification)
+        val visibleFields =
+            listOf(
+                notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE),
+                notification.extras.getCharSequence(android.app.Notification.EXTRA_TEXT),
+                notification.extras.getCharSequence(android.app.Notification.EXTRA_SUB_TEXT),
+                notification.tickerText,
+            )
+        visibleFields.forEach { value ->
+            val visible = value?.toString().orEmpty()
+            assertFalse("notification must not leak the filename", visible.contains("private-notes.txt"))
+            assertFalse("notification must not leak document text", visible.contains("private sentence"))
+        }
+        service.onStartCommand(
+            Intent(context, service::class.java).setAction(TtsPlaybackForegroundService.ACTION_PLAY),
+            0,
+            3,
+        )
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(session, harness.controller.state.value.sessionId)
+        assertEquals(
+            1,
+            harness.controller.state.value.passage
+                ?.sentenceIndex,
+        )
+        assertTrue(harness.controller.state.value is TtsState.Speaking)
+        lifecycle.destroy()
     }
 
     @Test
