@@ -592,7 +592,7 @@ private fun SettingsHomeScreen(
                     title = appState.displayName(account.accountIdHex),
                     subtitle = appState.shortNpub(account.accountIdHex),
                     seed = account.accountIdHex,
-                    pictureUrl = appState.contactAvatarSource(account.accountIdHex),
+                    pictureUrl = appState.avatarUrl(account.accountIdHex),
                 )
             },
         profileReadiness = readiness,

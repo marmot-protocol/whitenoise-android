@@ -2278,5 +2278,5 @@
     <string name="contact_picture_reposition">Repositionner / recadrer</string>
     <string name="contact_picture_clear">Supprimer la photo privée</string>
     <string name="contact_picture_local_only">Uniquement pour ce compte sur cet appareil. Jamais partagée ni envoyée.</string>
-    <string name="contact_picture_failed">Impossible d’enregistrer cette photo ou ces coordonnées. Votre sélection précédente est inchangée. Réessayez.</string>
+    <string name="contact_picture_failed">Impossible d’utiliser cette photo ou d’enregistrer les modifications. Votre sélection précédente est inchangée. Réessayez.</string>
 </resources>

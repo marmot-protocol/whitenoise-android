@@ -2278,5 +2278,5 @@
     <string name="contact_picture_reposition">Reposicionar / recortar</string>
     <string name="contact_picture_clear">Remover imagem privada</string>
     <string name="contact_picture_local_only">Apenas para esta conta neste dispositivo. Nunca é partilhada nem enviada.</string>
-    <string name="contact_picture_failed">Não foi possível guardar esta imagem ou os dados do contacto. A seleção anterior não foi alterada. Tente novamente.</string>
+    <string name="contact_picture_failed">Não foi possível usar esta imagem ou guardar as alterações. A seleção anterior não foi alterada. Tente novamente.</string>
 </resources>

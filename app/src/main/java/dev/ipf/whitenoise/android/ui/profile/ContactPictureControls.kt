@@ -20,13 +20,15 @@ internal fun ContactPictureControls(
     state: ContactPictureEditorState,
     source: String?,
     title: String,
+    seed: String,
     onPick: () -> Unit,
     onReposition: () -> Unit,
     onClear: () -> Unit,
 ) {
     Column {
         Text(stringResource(R.string.contact_private_picture), style = MaterialTheme.typography.titleSmall)
-        Avatar(title, source.orEmpty(), 64.dp, source.takeIf { state.preview == null }, state.preview)
+        // The contact identity seeds the monogram colour exactly as every other surface does.
+        Avatar(title, seed, 64.dp, source.takeIf { state.preview == null }, state.preview)
         TextButton(onPick, enabled = !state.busy, modifier = Modifier.testTag("contact_picture.pick")) {
             val label = if (state.hasPicture) R.string.contact_picture_replace else R.string.contact_picture_pick
             Text(stringResource(label))

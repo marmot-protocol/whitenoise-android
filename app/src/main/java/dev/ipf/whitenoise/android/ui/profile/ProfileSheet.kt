@@ -661,12 +661,13 @@ internal fun ProfileSheet(
             appState.requestProfileGroupMembers(pendingGroupIds)
         }
     }
-    if (showContactEditorDialog && hex != null && !targetIsSelf) {
+    val editorAccount = accountAtOpen?.takeIf { showContactEditorDialog && hex != null && !targetIsSelf }
+    if (editorAccount != null) {
         val entry = contactEditorEntry
         key(entry) {
             ContactPrivateDetailsRoot(
                 appState = appState,
-                account = accountAtOpen ?: return,
+                account = editorAccount,
                 contact = hex!!,
                 profileName = title,
                 nickname = contactNickname.orEmpty(),
@@ -1223,6 +1224,7 @@ internal fun ContactPrivateDetailsDialog(
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
     pictureState: ContactPictureEditorState? = null,
     pictureSource: String? = null,
+    pictureSeed: String? = null,
     onPickPicture: () -> Unit = {},
     onRepositionPicture: () -> Unit = {},
     onClearPicture: () -> Unit = {},
@@ -1262,6 +1264,7 @@ internal fun ContactPrivateDetailsDialog(
                             state,
                             pictureSource,
                             profileName,
+                            pictureSeed ?: profileName,
                             onPickPicture,
                             onRepositionPicture,
                             onClearPicture,

@@ -127,7 +127,7 @@ private fun ShareChatPickerAccountItem(
                 title = accountTitle,
                 seed = account.accountIdHex,
                 size = 44.dp,
-                pictureUrl = appState.contactAvatarSource(account.accountIdHex),
+                pictureUrl = appState.avatarUrl(account.accountIdHex),
             )
         },
         headlineContent = {

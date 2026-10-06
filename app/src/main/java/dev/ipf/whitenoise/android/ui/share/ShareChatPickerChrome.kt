@@ -125,7 +125,7 @@ internal fun ChatPickerSendingAccountRow(
                 title = accountTitle,
                 seed = account.accountIdHex,
                 size = if (compact) 32.dp else 40.dp,
-                pictureUrl = appState.contactAvatarSource(account.accountIdHex),
+                pictureUrl = appState.avatarUrl(account.accountIdHex),
             )
             ShareChatPickerAccountIdentity(
                 appState = appState,

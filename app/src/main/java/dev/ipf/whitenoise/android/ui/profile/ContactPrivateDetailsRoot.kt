@@ -63,6 +63,7 @@ internal fun ContactPrivateDetailsRoot(
         },
         securePolicy = securePolicy,
         pictureState = state,
+        pictureSeed = contact,
         pictureSource =
             if (state.hasPicture) {
                 appState.contactAvatarSource(contact, account)
