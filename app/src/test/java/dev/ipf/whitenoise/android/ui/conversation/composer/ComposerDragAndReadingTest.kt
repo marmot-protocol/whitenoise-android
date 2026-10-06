@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -356,6 +357,7 @@ class ComposerDragAndReadingTest {
             WhiteNoiseTheme {
                 Surface(Modifier.width(300.dp).height(192.dp)) {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue =
                             if (owner == 0) {
                                 TextFieldValue(longDraft, TextRange(longDraft.length))
@@ -429,6 +431,7 @@ class ComposerDragAndReadingTest {
             WhiteNoiseTheme {
                 Surface(Modifier.width(300.dp).height(192.dp)) {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue = value,
                         composerFocus = remember { FocusRequester() },
                         emojiPickerOpen = false,
@@ -493,6 +496,7 @@ class ComposerDragAndReadingTest {
                 Surface(Modifier.width(240.dp).height(240.dp)) {
                     Box(contentAlignment = Alignment.BottomCenter) {
                         ComposerPill(
+                            actionColors = accountActionColors(appState = null),
                             textFieldValue = value,
                             composerFocus = remember { FocusRequester() },
                             emojiPickerOpen = false,
@@ -548,6 +552,7 @@ class ComposerDragAndReadingTest {
             WhiteNoiseTheme {
                 Surface(Modifier.width(300.dp).height(240.dp)) {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue = TextFieldValue("Synthetic caption"),
                         composerFocus = remember { FocusRequester() },
                         emojiPickerOpen = false,
