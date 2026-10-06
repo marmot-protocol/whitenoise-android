@@ -2239,4 +2239,12 @@
     <string name="gestures_read_unread">已讀 / 未讀</string>
     <string name="gestures_mute_unmute">靜音 / 取消靜音</string>
     <string name="gestures_pin_unpin">置頂 / 取消置頂</string>
+
+    <string name="contact_private_picture">私人圖片</string>
+    <string name="contact_picture_pick">選擇照片</string>
+    <string name="contact_picture_replace">更換照片</string>
+    <string name="contact_picture_reposition">調整位置 / 裁剪</string>
+    <string name="contact_picture_clear">清除私人圖片</string>
+    <string name="contact_picture_local_only">僅用於此裝置上的此帳號。絕不分享或上傳。</string>
+    <string name="contact_picture_failed">無法使用此圖片或儲存變更。先前的選擇未改變，請重試。</string>
 </resources>

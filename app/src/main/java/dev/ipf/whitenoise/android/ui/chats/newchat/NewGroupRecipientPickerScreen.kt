@@ -118,7 +118,7 @@ private fun NewGroupRecipientAccountScreen(
             candidate.searchProfile != null -> resultLabel
             else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
         },
-        appState.avatarUrl(candidate.accountIdHex)
+        appState.contactAvatarSource(candidate.accountIdHex)
             ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
     )
 

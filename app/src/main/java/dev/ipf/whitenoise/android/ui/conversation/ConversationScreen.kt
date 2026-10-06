@@ -4375,7 +4375,7 @@ internal fun ConversationScreen(
             mine = infoMine,
             senderDisplayName = appState.displayName(infoRecord.sender),
             senderNpub = appState.npubForDisplay(infoRecord.sender),
-            senderAvatarUrl = appState.avatarUrl(infoRecord.sender),
+            senderAvatarUrl = appState.contactAvatarSource(infoRecord.sender),
             reactions = controller.reactions[infoRecord.messageIdHex].orEmpty(),
             recipients = messageDetailsRecipients(controller, appState, infoMine),
             attachmentLabels = infoAttachmentLabels,

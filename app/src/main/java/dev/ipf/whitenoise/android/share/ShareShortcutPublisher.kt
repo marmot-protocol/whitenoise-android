@@ -36,6 +36,7 @@ data class ShareShortcutTarget(
     val title: String,
     val avatarUrl: String? = null,
     val avatarBitmap: Bitmap? = null,
+    val localContactAvatar: Boolean = false,
 )
 
 internal fun selectShareShortcutTargets(
@@ -66,6 +67,7 @@ internal fun buildShareShortcutIntent(context: Context): Intent =
         flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
     }
 
+/** Builds an account-routed recent-chat target with the captured preview policy and local conversation icon. */
 internal fun buildShareShortcut(
     context: Context,
     target: ShareShortcutTarget,
@@ -83,7 +85,7 @@ internal fun buildShareShortcut(
             notificationConversationIcon(
                 title = title,
                 seed = shortcutId,
-                avatarBitmap = null,
+                avatarBitmap = target.avatarBitmap.takeIf { target.localContactAvatar },
             ),
         ).setIntent(buildShareShortcutIntent(context))
         .setRank(rank)
@@ -163,6 +165,7 @@ class ShareShortcutPublisher(
     private val setDynamicShortcuts: (List<ShortcutInfoCompat>) -> Unit = { shortcuts ->
         ShortcutManagerCompat.setDynamicShortcuts(context, shortcuts)
     },
+    private val avatarOverride: (String, ChatListItem) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
     private val existingShortcuts: () -> List<ShortcutInfoCompat> = {
         ShortcutManagerCompat.getShortcuts(
             context,
@@ -176,6 +179,7 @@ class ShareShortcutPublisher(
      * downgrading them, and applies the ranked list in one [setDynamicShortcuts]
      * call so recency is not reversed by per-item pushes.
      */
+    @Suppress("LongMethod") // Selection and final privacy-gated publication form one platform operation.
     fun publish(
         accountRef: String,
         chats: List<ChatListItem>,
@@ -185,7 +189,13 @@ class ShareShortcutPublisher(
         val previewToken = NotificationPreviewPreferences.capture(context)
         val maxShortcuts = maxShortcutCount().coerceAtLeast(0)
         val limit = min(MAX_SHARE_SHORTCUTS, maxShortcuts)
-        val targets = selectShareShortcutTargets(accountRef, chats, limit, displayTitle)
+        val chatsByGroup = chats.associateBy { it.group.groupIdHex }
+        val targets =
+            selectShareShortcutTargets(accountRef, chats, limit, displayTitle).map { target ->
+                val item = chatsByGroup[target.groupIdHex] ?: return@map target
+                val (changed, bitmap) = avatarOverride(accountRef, item)
+                if (changed) target.copy(avatarBitmap = bitmap, avatarUrl = null, localContactAvatar = true) else target
+            }
         val existing = existingShortcuts()
         val existingById = existing.associateBy { it.id }
         val shortcuts =
@@ -214,12 +224,44 @@ class ShareShortcutPublisher(
             setDynamicShortcuts(
                 shortcuts.map { shortcut ->
                     if (shortcutPreviewAllowed(context, shortcut)) {
-                        shortcut
+                        val item =
+                            chats.firstOrNull {
+                                conversationShortcutId(accountRef, it.group.groupIdHex) == shortcut.id
+                            }
+                        val peer =
+                            item?.let {
+                                dev.ipf.whitenoise.android.core.GroupProjector.avatarAccount(
+                                    it.group,
+                                    it.presentationOtherMemberAccount,
+                                    it.presentationMemberCount,
+                                )
+                            }
+                        val current = item?.let { avatarOverride(accountRef, it) }
+                        if (peer != null) stampPeerShortcut(shortcut, peer, item)
+                        if (peer != null && current?.first == true) {
+                            dev.ipf.whitenoise.android.notifications
+                                .withContactPictureIcon(context, shortcut, peer, current.second)
+                        } else {
+                            shortcut
+                        }
                     } else {
                         genericNotificationShortcut(context, shortcut)
                     }
                 },
             )
         }
+    }
+
+    /** Preserve contact ownership before the first override, without borrowing group-owned icons. */
+    private fun stampPeerShortcut(
+        shortcut: ShortcutInfoCompat,
+        peer: String,
+        item: ChatListItem,
+    ) {
+        val ownsConversationIcon =
+            !dev.ipf.whitenoise.android.core.GroupProjector
+                .ownsGroupPicture(item)
+        dev.ipf.whitenoise.android.notifications
+            .stampContactPictureShortcut(shortcut, peer, ownsConversationIcon)
     }
 }

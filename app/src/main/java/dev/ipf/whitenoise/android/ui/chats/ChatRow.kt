@@ -59,8 +59,9 @@ import dev.ipf.whitenoise.android.core.SnippetHighlight
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.isPeerSourced
 import dev.ipf.whitenoise.android.state.messagePreviewForRetention
-import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
+import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
@@ -335,10 +336,13 @@ internal fun ChatRow(
                     // Only the account the projector names (the peer of an unnamed pair, an inviter)
                     // lends its picture; MDK's selected avatar for a named group is ignored, as the
                     // conversation header does.
-                    fallbackPictureUrl = avatarAccount?.let { item.selectedAvatarUrl ?: appState.avatarUrl(it) },
+                    fallbackPictureUrl =
+                        avatarAccount?.let {
+                            appState.privateContactAvatarSource(it) ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
+                        },
                     firstFrameAvatar = item.firstFrameAvatar,
                     durableAvatar = item.selectedAvatarAsset,
-                    durableAvatarIsPersonPicture = item.selectedAvatarIsPersonPicture,
+                    durableAvatarIsPersonPicture = item.selectedPresentation?.avatarSource?.isPeerSourced() == true,
                 )
                 if (pinned) {
                     Surface(

@@ -1,0 +1,290 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+  "legacy_sha256": "bfe8bf9aa29af4258ea84fed752b02fb817c0d36b9b2729ce06ada3a1ed78b42",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "private_contact_policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun contactAvatarSource(",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "private_contact_cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "suspend fun clearContactPrivateDetailsForAccount(",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ConversationDictationAcceptedSend",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun sendDictationTranscriptIfOriginUnchanged(",
+        "test_ids": [
+          "CON-017",
+          "DIC-002"
+        ]
+      }
+    ],
+    "notification_content_contracts": [
+      {
+        "surface": "Reply draft restore failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_reply_draft_restore_failed",
+        "test_ids": [
+          "NTF-032"
+        ]
+      },
+      {
+        "surface": "Draft save failure before sign-out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_draft_save_failed",
+        "test_ids": [
+          "ACC-013",
+          "NTF-032"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:error_couldnt_verify_relay_hosts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.error_couldnt_verify_relay_hosts",
+        "test_ids": [
+          "ACC-018"
+        ]
+      },
+      {
+        "surface": "setting:error_invalid_relay_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.error_invalid_relay_url",
+        "test_ids": [
+          "SYS-002"
+        ]
+      },
+      {
+        "surface": "setting:error_remove_invalid_relay_urls_first",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.error_remove_invalid_relay_urls_first",
+        "test_ids": [
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:no_active_account_period",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.no_active_account_period",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:no_relay_projection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.no_relay_projection",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "setting:toast_relay_list_updated",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_relay_list_updated",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "setting:toast_relay_update_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_relay_update_failed",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_export_audit_logs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_export_audit_logs",
+        "test_ids": [
+          "SEC-007",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010",
+          "SEC-012",
+          "SEC-013"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Prepared attachment speech account-switch ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun speakAloudPrepared(",
+        "test_ids": [
+          "MED-010",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "Queued share source retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "fun untrackInFlightMediaUpload(",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Private share account wipe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": ".leases.releaseAccount(account)",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "automatic-attachment-permission-commit-order",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal fun refreshNativeAttachmentPermissions()",
+        "test_ids": [
+          "SET-010",
+          "MED-022"
+        ]
+      },
+      {
+        "surface": "Account teardown notification lifecycle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun stopNotificationListenerForAccountTeardown()",
+        "test_ids": [
+          "ACC-014",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "Empty native and dictation diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_no_audit_logs_to_export",
+        "test_ids": [
+          "SEC-009"
+        ]
+      },
+      {
+        "surface": "App-lock terminal cancellation fallback message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.app_lock_auth_cancelled",
+        "test_ids": [
+          "SEC-002",
+          "SEC-004"
+        ]
+      },
+      {
+        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "class WhiteNoiseAppState",
+        "test_ids": [
+          "NTF-006",
+          "NTF-007",
+          "NTF-008",
+          "NTF-010",
+          "NTF-011"
+        ]
+      },
+      {
+        "surface": "Sign Up ownership: internal fun beginProfileSignUp()",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal fun beginProfileSignUp()",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Sign Up ownership: internal fun dismissProfileSignUp()",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal fun dismissProfileSignUp()",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Runtime-owned deferred activation refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private suspend fun refreshActivatedAccount(",
+        "test_ids": [
+          "INT-003"
+        ]
+      },
+      {
+        "surface": "Dictation reply-aware durable send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "replyToMessageIdHex",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Completed non-reply dictation delivery after the conversation screen detaches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun sendDictationTranscriptIfOriginUnchanged(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_login_amber",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_login_amber",
+        "test_ids": [
+          "ONB-012"
+        ]
+      },
+      {
+        "surface": "Startup and account-switch snapshots carry MDK's stored per-row presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "prewarmFirstFrameDurableAvatars(accountRef, presentedRows)",
+        "test_ids": [
+          "CHL-023",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "Single notification delivery mode and safe cutover",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "internal suspend fun setNotificationDeliveryMode(",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Notification permission feedback for delivery-mode activation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_notification_permission_needed",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002",
+          "NTF-022"
+        ]
+      },
+      {
+        "surface": "Notification rendering repair failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "R.string.toast_couldnt_enable_notifications",
+        "test_ids": [
+          "NTF-001",
+          "NTF-002",
+          "NTF-022"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

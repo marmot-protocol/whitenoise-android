@@ -2269,4 +2269,12 @@
     <string name="gestures_read_unread">Okundu / okunmadı</string>
     <string name="gestures_mute_unmute">Sessize al / sesi aç</string>
     <string name="gestures_pin_unpin">Sabitle / sabitlemeyi kaldır</string>
+
+    <string name="contact_private_picture">Özel resim</string>
+    <string name="contact_picture_pick">Fotoğraf seç</string>
+    <string name="contact_picture_replace">Fotoğrafı değiştir</string>
+    <string name="contact_picture_reposition">Konumlandır / kırp</string>
+    <string name="contact_picture_clear">Özel resmi kaldır</string>
+    <string name="contact_picture_local_only">Yalnızca bu cihazdaki bu hesap için. Asla paylaşılmaz veya yüklenmez.</string>
+    <string name="contact_picture_failed">Bu resim kullanılamadı veya değişiklikler kaydedilemedi. Önceki seçiminiz değişmedi. Tekrar deneyin.</string>
 </resources>

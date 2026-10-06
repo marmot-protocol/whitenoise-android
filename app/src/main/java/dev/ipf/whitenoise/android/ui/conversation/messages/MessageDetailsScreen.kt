@@ -91,7 +91,7 @@ internal fun messageDetailsRecipients(
             MessageDetailsRecipient(
                 title = appState.displayName(member.memberIdHex),
                 seed = member.memberIdHex,
-                avatarUrl = appState.avatarUrl(member.memberIdHex),
+                avatarUrl = appState.contactAvatarSource(member.memberIdHex),
             )
         }
 }

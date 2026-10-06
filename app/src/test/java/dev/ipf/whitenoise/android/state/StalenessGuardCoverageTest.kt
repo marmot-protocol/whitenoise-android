@@ -224,6 +224,8 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:loginWithAmber" to "authoritative identity command result",
                 // Durable per-account clears are idempotent and fenced against later contact writes.
                 "AppState.kt:clearContactPrivateDetailsForAccount" to "idempotent account-private clear",
+                // Commits check editor/account ownership under the cleanup lock; refreshes reread current pixels.
+                "AppState.kt:saveContactPrivateDetails" to "serialized private command with current-state refresh",
                 // Sign-out completion is an accepted destructive command whose engine result is authoritative.
                 "AppState.kt:signOutActiveAccount" to "authoritative destructive command result",
                 // The wipe owns a cancellation-safe lifecycle bracket and serialized native-push teardown.

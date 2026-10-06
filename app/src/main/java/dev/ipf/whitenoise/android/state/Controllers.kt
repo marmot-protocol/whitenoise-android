@@ -6707,7 +6707,7 @@ class ConversationController(
      * chat-list row instead of showing a blank/initials placeholder (#837).
      */
     val avatarUrl: String?
-        get() = group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) }
+        get() = group.avatarUrl ?: avatarAccount?.let { appState.contactAvatarSource(it, boundAccountRef) }
 
     // Deduped case-insensitively, mirroring the projector's classification —
     // a hex-casing-drifted duplicate must not inflate the visible headcount.
@@ -11799,7 +11799,12 @@ class ConversationController(
 
     fun memberSubtitle(member: AppGroupMemberRecordFfi): String = appState.shortNpub(member.memberIdHex)
 
-    fun memberAvatarUrl(member: AppGroupMemberRecordFfi): String? = appState.avatarUrl(member.memberIdHex)
+    /** Applies account-private member pictures while preserving the native profile URL as fallback. */
+    fun memberAvatarUrl(member: AppGroupMemberRecordFfi): String? =
+        appState.contactAvatarSource(
+            member.memberIdHex,
+            boundAccountRef,
+        )
 
     suspend fun groupMlsState(): AppGroupMlsStateFfi? {
         val account = conversationAccountRef ?: return null

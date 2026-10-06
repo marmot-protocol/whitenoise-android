@@ -1241,6 +1241,7 @@ private fun rememberRelativeTimestamp(recordedAt: ULong): String {
     return remember(context, recordedAt) { relativeTimestamp(context, recordedAt) }
 }
 
+/** Displays a media sender through the active viewer's local contact-picture choice. */
 @Composable
 private fun SenderAvatar(
     sender: String,
@@ -1250,7 +1251,7 @@ private fun SenderAvatar(
         title = appState.displayName(sender),
         seed = sender,
         size = 36.dp,
-        pictureUrl = appState.avatarUrl(sender),
+        pictureUrl = appState.contactAvatarSource(sender),
     )
 }
 

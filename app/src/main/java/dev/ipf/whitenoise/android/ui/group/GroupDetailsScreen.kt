@@ -1260,7 +1260,7 @@ internal fun GroupDetailsScreen(
                                         IdentityFormatter.short(inviteNpub),
                                     ),
                                 avatarSeed = invite,
-                                avatarUrl = appState.avatarUrl(invite),
+                                avatarUrl = appState.contactAvatarSource(invite),
                                 onClick =
                                     if (inviteNpub.isBlank()) {
                                         {}

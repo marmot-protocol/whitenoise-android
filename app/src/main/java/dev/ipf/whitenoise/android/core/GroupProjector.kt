@@ -2,7 +2,10 @@ package dev.ipf.whitenoise.android.core
 
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
+import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.isPeerSourced
 
 data class GroupTitleCopy(
     val inviteFromFormat: String,
@@ -136,6 +139,27 @@ object GroupProjector {
         group: AppGroupRecordFfi,
         memberCount: Int,
     ): Boolean = group.pendingConfirmation || (isUnnamed(group.name) && memberCount <= DIRECT_CHAT_MEMBER_COUNT)
+
+    /**
+     * Whether the conversation presents an image of its own. A peer-sourced selection, or a conversation
+     * with no selected asset, avatar URL or image hash, borrows a member's picture instead; only then may a
+     * viewer's private contact picture stand in for it. Every surface shares this one rule.
+     */
+    fun ownsGroupPicture(
+        group: AppGroupRecordFfi,
+        selectedAsset: AvatarAssetFfi?,
+        peerSourced: Boolean,
+    ): Boolean =
+        !peerSourced &&
+            (selectedAsset != null || !group.avatarUrl.isNullOrBlank() || !group.imageHashHex.isNullOrBlank())
+
+    /** [ownsGroupPicture] over a chat-list row's selected presentation and asset. */
+    fun ownsGroupPicture(item: ChatListItem): Boolean =
+        ownsGroupPicture(
+            item.group,
+            item.selectedAvatarAsset,
+            item.selectedPresentation?.avatarSource?.isPeerSourced() == true,
+        )
 
     fun otherMemberAccount(
         members: List<AppGroupMemberRecordFfi>,
