@@ -373,11 +373,62 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).none { it.id == shortcutId })
         }
 
+    /** A failed pre-native credential write returns a visible incomplete result and permits a later retry. */
+    @Test
+    fun credentialRevocationFailureRetainsSessionAndReturnsAnIncompleteResult() =
+        runBlocking {
+            var failWrites = true
+            val owner = CredentialFailureContext(context) { failWrites }
+            val state = appState(owner)
+            retainComposerExpansion(state)
+            val phaseBefore = state.phase
+
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(0, signOutCalls.get())
+            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+            assertFalse(state.accounts.single().signedOut)
+            assertEquals(phaseBefore, state.phase)
+            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertTrue(owner.failedWrites > 0)
+
+            failWrites = false
+            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            assertEquals(1, signOutCalls.get())
+            assertNull(state.activeAccountRef)
+        }
+
+    /** A post-admission exception must propagate instead of being reported as an unattempted sign-out. */
+    @Test
+    fun signOutFailureAfterNativeAdmissionStillPropagates() =
+        runBlocking {
+            val state = appState()
+            val original = context.getSharedPreferences("sign-out-push-corruption", Context.MODE_PRIVATE)
+            val corruptAfterSignOut =
+                object : SharedPreferences by original {
+                    override fun getStringSet(
+                        key: String?,
+                        defValues: MutableSet<String>?,
+                    ): MutableSet<String>? {
+                        check(!engineSignedOut) { "scripted encrypted push value corruption" }
+                        return original.getStringSet(key, defValues)
+                    }
+                }
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("pushTokenStore")
+                .apply { isAccessible = true }
+                .set(state, PushTokenStore(corruptAfterSignOut))
+
+            assertTrue(runCatching { state.signOutActiveAccount() }.isFailure)
+            assertEquals(1, signOutCalls.get())
+            assertTrue(engineSignedOut)
+            assertTrue(state.accounts.single().signedOut)
+        }
+
     /** A completed native sign-out cannot be interrupted by a second credential write during platform cleanup. */
     @Test
     fun signOutPublishesCompletionWhenPostNativeCredentialWritesWouldFail() =
         runBlocking {
-            val owner = PostNativeCredentialFailureContext(context) { engineSignedOut }
+            val owner = CredentialFailureContext(context) { engineSignedOut }
             val state = appState(owner)
             beforeListAccounts = {
                 assertTrue(state.accounts.single().signedOut)
@@ -388,14 +439,14 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(state.accounts.single().signedOut)
             assertNull(state.activeAccountRef)
             assertTrue(state.phase is AppPhase.Onboarding)
-            assertEquals(0, owner.postNativeWrites)
+            assertEquals(0, owner.failedWrites)
         }
 
     /** Wipe removes Android ownership and launcher presentation without another fallible credential flush. */
     @Test
     fun wipePublishesCompletionWhenPostNativeCredentialWritesWouldFail() =
         runBlocking {
-            val owner = PostNativeCredentialFailureContext(context) { engineWiped }
+            val owner = CredentialFailureContext(context) { engineWiped }
             val state = appState(owner)
             beforeListAccounts = {
                 assertTrue(state.accounts.isEmpty())
@@ -406,7 +457,7 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(state.accounts.isEmpty())
             assertNull(state.activeAccountRef)
             assertTrue(state.phase is AppPhase.Onboarding)
-            assertEquals(0, owner.postNativeWrites)
+            assertEquals(0, owner.failedWrites)
         }
 
     /** Corrupt push values after a successful native wipe cannot restore the removed account's pin eligibility. */
@@ -434,12 +485,12 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(state.accounts.isEmpty())
         }
 
-    /** Injects failure only after native removal, preserving the required pre-native durable revocation. */
-    private class PostNativeCredentialFailureContext(
+    /** Fails only credential commits at the scripted boundary while keeping other stores operational. */
+    private class CredentialFailureContext(
         base: Context,
-        private val nativeCompleted: () -> Boolean,
+        private val shouldFail: () -> Boolean,
     ) : ContextWrapper(base) {
-        var postNativeWrites = 0
+        var failedWrites = 0
             private set
 
         override fun getApplicationContext(): Context = this
@@ -459,8 +510,8 @@ class ExternalSignerSignOutLifecycleTest {
                         override fun clear(): SharedPreferences.Editor = apply { editor.clear() }
 
                         override fun commit(): Boolean {
-                            if (nativeCompleted()) {
-                                postNativeWrites++
+                            if (shouldFail()) {
+                                failedWrites++
                                 return false
                             }
                             return editor.commit()

@@ -6347,14 +6347,24 @@ class WhiteNoiseAppState private constructor(
     /**
      * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
      * the established local fail-open behavior; a structured unfinished-local
-     * outcome retains the active session. Returns null when no account is active.
+     * outcome retains the active session. Credential revocation failure returns an incomplete result before
+     * native admission; errors after admission retain their established propagation.
+     * Returns null when no account is active.
      */
     @Suppress("ReturnCount") // No account, retained engine session, or completed local sign-out.
     suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
         val signedOutRef = activeAccountRef ?: return null
         val draftsSaved = draftWriter.flushAccount(signedOutRef)
-        return withRevokedPinnedTarget(signedOutRef) {
-            finishRevokedAccountSignOut(signedOutRef, deleteKeyPackages, draftsSaved)
+        var admitted = false
+        return runCatchingCancellable {
+            withRevokedPinnedTarget(signedOutRef) {
+                admitted = true
+                finishRevokedAccountSignOut(signedOutRef, deleteKeyPackages, draftsSaved)
+            }
+        }.getOrElse { failure ->
+            if (admitted) throw failure
+            appStateDebug(failure) { "account sign-out credential revocation failed before native work" }
+            SignOutCompletion.AccountCleanupIncomplete
         }
     }
 

@@ -150,7 +150,8 @@ internal class PinnedConversationShortcuts(
         }
 
     /**
-     * Current labels come only from source projections; obsolete refreshes cannot publish after waiting for the lock.
+     * Current labels come from source projections; omitted valid pins retain only current-privacy presentations.
+     * Obsolete refreshes cannot publish after waiting for the lock.
      */
     fun refresh(
         accountRef: String,
@@ -163,12 +164,14 @@ internal class PinnedConversationShortcuts(
             if (pinned.isEmpty()) return@synchronized true
             val revoked = mutableListOf<String>()
             val prepared =
-                pinned.map { original ->
+                pinned.mapNotNull { original ->
                     val capability = checkNotNull(pinCapability(original))
                     val presentation = presentations[capability.groupIdHex]
                     if (!tokens.isValid(capability)) {
                         revoked += original.id
                         genericNotificationShortcut(context, original)
+                    } else if (presentation == null && shortcutPreviewAllowed(context, original)) {
+                        null
                     } else if (presentation == null) {
                         genericNotificationShortcut(context, original)
                     } else {
@@ -176,8 +179,12 @@ internal class PinnedConversationShortcuts(
                             .getOrElse { genericNotificationShortcut(context, original) }
                     }
                 }
-            val generic = pinned.map { genericNotificationShortcut(context, it) }
+            val generic = prepared.map { genericNotificationShortcut(context, it) }
             if (!isCurrent()) return@synchronized false
+            if (prepared.isEmpty()) {
+                platform.disable(revoked)
+                return@synchronized true
+            }
             val updated =
                 runCatching { platform.update(prepared) }.getOrDefault(false) ||
                     (isCurrent() && runCatching { platform.update(generic) }.getOrDefault(false))

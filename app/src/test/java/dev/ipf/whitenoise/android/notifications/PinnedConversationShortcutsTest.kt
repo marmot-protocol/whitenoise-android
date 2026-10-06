@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.IntentSender
 import android.content.pm.ShortcutManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -156,9 +157,9 @@ class PinnedConversationShortcutsTest {
         assertTrue(tokens.isValid(requireNotNull(PinnedConversationNavigation.capability(generic.intent))))
     }
 
-    /** A projection miss redacts only the requested account; switching accounts does not retarget existing pins. */
+    /** A bounded projection miss retains current authorized metadata without retargeting another account. */
     @Test
-    fun missingProjectionIsGenericAndOtherAccountsAreUntouched() {
+    fun missingProjectionPreservesCurrentPinsAndOtherAccountsAreUntouched() {
         val platform = Platform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val first = capability
@@ -168,10 +169,108 @@ class PinnedConversationShortcutsTest {
         owner.request(second, "Second", null) { true }
         platform.approve(platform.requests.last())
         assertTrue(owner.refresh(ACCOUNT, emptyMap()))
-        val updated = platform.updates.single().single()
-        assertEquals(first.shortcutId, updated.id)
-        assertEquals(context.getString(R.string.app_name), updated.longLabel)
+        assertTrue(platform.updates.isEmpty())
+        assertEquals("First", platform.inventory.single { it.id == first.shortcutId }.longLabel)
+        assertEquals("Second", platform.inventory.single { it.id == second.shortcutId }.longLabel)
+        assertTrue(platform.disabled.isEmpty())
+        assertTrue(tokens.isValid(first))
         assertTrue(tokens.isValid(second))
+    }
+
+    /** A failed rich update cannot scrub a valid omitted pin through the generic fallback batch. */
+    @Test
+    fun mixedProjectionFailureUpdatesOnlyThePreparedSubset() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        val retained = capability
+        val visibleGroup = "cd".repeat(32)
+        val visible = requireNotNull(tokens.issue(ACCOUNT, visibleGroup))
+        owner.request(retained, "Retained", null) { true }
+        platform.approve(platform.requests.last())
+        owner.request(visible, "Old label", null) { true }
+        platform.approve(platform.requests.last())
+        platform.failNextUpdate = true
+
+        assertTrue(owner.refresh(ACCOUNT, mapOf(visibleGroup to PinnedConversationPresentation("Current"))))
+        assertEquals(2, platform.updates.size)
+        assertEquals(listOf(visible.shortcutId, visible.shortcutId), platform.updates.flatten().map { it.id })
+        assertEquals("Current", platform.updates.first().single().longLabel)
+        assertEquals(context.getString(R.string.app_name), platform.updates.last().single().longLabel)
+        assertTrue(tokens.isValid(retained))
+        assertTrue(platform.disabled.isEmpty())
+    }
+
+    /** Omission does not preserve an authority that was durably revoked before the refresh. */
+    @Test
+    fun revokedOmittedPinIsScrubbedAndDisabled() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        val cap = capability
+        owner.request(cap, "Removed", null) { true }
+        platform.approve(platform.requests.last())
+        tokens.revokeGroup(ACCOUNT, GROUP)
+
+        assertTrue(owner.refresh(ACCOUNT, emptyMap()))
+        assertEquals(context.getString(R.string.app_name), platform.updates.single().single().longLabel)
+        assertEquals(listOf(cap.shortcutId), platform.disabled)
+        assertFalse(tokens.isValid(cap))
+    }
+
+    /** A missed projection must still enforce a disabled-preview transition without relying on global scrubbing. */
+    @Test
+    fun omittedPinIsScrubbedWhenPreviewsAreDisabled() =
+        runBlocking { assertOmittedPinPrivacyTransition(reenable = false) }
+
+    /** Re-enabling previews cannot reauthorize retained metadata stamped before the intervening opt-out. */
+    @Test
+    fun omittedPinIsScrubbedAfterPreviewsAreDisabledAndReenabled() =
+        runBlocking { assertOmittedPinPrivacyTransition(reenable = true) }
+
+    /** Creates a genuine rich pin, changes the preview epoch without scrubbing inventory, then refreshes no rows. */
+    private suspend fun assertOmittedPinPrivacyTransition(reenable: Boolean) {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        val cap = capability
+        owner.request(cap, "Private", null) { true }
+        platform.approve(platform.requests.last())
+        assertTrue(NotificationPreviewPreferences.setEnabled(context, false) { true })
+        if (reenable) assertTrue(NotificationPreviewPreferences.setEnabled(context, true) { true })
+
+        assertTrue(owner.refresh(ACCOUNT, emptyMap()))
+        assertEquals(context.getString(R.string.app_name), platform.updates.single().single().longLabel)
+        assertTrue(platform.disabled.isEmpty())
+        assertTrue(tokens.isValid(cap))
+    }
+
+    /** Previous-process provenance cannot authorize keeping a rich label absent from the current projection. */
+    @Test
+    fun omittedPinWithPriorSessionProvenanceIsScrubbed() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        val cap = capability
+        owner.request(cap, "Private", null) { true }
+        platform.approve(platform.requests.last())
+        platform.inventory.single().extras!!.putString(NotificationPreviewPreferences.EXTRA_SESSION, "previous-process")
+
+        assertTrue(owner.refresh(ACCOUNT, emptyMap()))
+        assertEquals(context.getString(R.string.app_name), platform.updates.single().single().longLabel)
+        assertTrue(tokens.isValid(cap))
+    }
+
+    /** An available projection with no avatar is a real clear, so it must replace the old bitmap. */
+    @Test
+    fun availableProjectionWithoutAvatarClearsThePreviousPixels() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        val cap = capability
+        val picture = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        owner.request(cap, "Picture", null, picture) { true }
+        platform.approve(platform.requests.last())
+
+        assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to PinnedConversationPresentation("Current", null))))
+        val updated = platform.updates.single().single()
+        assertEquals("Current", updated.longLabel)
+        assertNotEquals(Color.MAGENTA, (updated.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
     }
 
     /** Opted-out publication reveals neither a title nor avatar while keeping an exact account/group intent. */
