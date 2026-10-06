@@ -33,8 +33,7 @@ class AgentSetupGuidanceScreenshotTest {
     fun claudeDark() = capture("claude", "ai_agents_claude_setup_dark", dark = true)
 
     @Test
-    fun claudeLargeRtl() =
-        capture("claude", "ai_agents_claude_setup_large_rtl", dark = false, largeRtl = true)
+    fun claudeLargeRtl() = capture("claude", "ai_agents_claude_setup_large_rtl", dark = false, largeRtl = true)
 
     @Test
     fun hermesProfileGuidance() = capture("hermes", "ai_agents_hermes_profile_setup_light", dark = false)
