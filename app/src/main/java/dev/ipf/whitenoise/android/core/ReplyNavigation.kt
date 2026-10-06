@@ -24,6 +24,15 @@ object ReplyNavigation {
         return -((viewportHeightPx - itemHeight).coerceAtLeast(0) / 2)
     }
 
+    /** Physical reading top in a reversed list, including its measured content padding. */
+    fun readingStartScrollOffset(
+        viewportEndOffsetPx: Int,
+        itemHeightPx: Int?,
+    ): Int {
+        if (viewportEndOffsetPx <= 0 || itemHeightPx == null || itemHeightPx <= 0) return 0
+        return itemHeightPx - viewportEndOffsetPx
+    }
+
     // Pick the best available height for the target row before the animated
     // scroll starts (#999). A live visible measurement is freshest; a cached
     // per-message measurement preserves exact centering for off-screen rows

@@ -71,7 +71,12 @@ class ComposerVoiceReviewResizeTest {
             swipe(center, center - Offset(0f, 30f), durationMillis = 320)
         }
         rule.waitForIdle()
-        assertEquals(96f, rule.onNodeWithTag("voice-review-composer").fetchSemanticsNode().boundsInRoot.height, 1f)
+        val collapsedHeight =
+            rule
+                .onNodeWithTag("voice-review-composer")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertEquals(96f, collapsedHeight, 1f)
         try {
             offerTake(review)
             val panel =
