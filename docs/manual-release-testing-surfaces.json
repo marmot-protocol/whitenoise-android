@@ -4514,6 +4514,12 @@
         "test_ids": ["CON-007", "CON-013", "CON-017"]
       },
       {
+        "surface": "ComposerResizeStripHeight",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerResizeInput.kt",
+        "anchor": "internal val ComposerResizeStripHeight = 12.dp",
+        "test_ids": ["CON-013", "CON-017"]
+      },
+      {
         "surface": "ComposerResizeGestureStrip",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "fun ComposerResizeGestureStrip(",

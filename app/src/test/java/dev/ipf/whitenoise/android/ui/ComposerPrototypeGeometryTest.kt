@@ -69,7 +69,7 @@ class ComposerPrototypeGeometryTest {
 
         assertEquals(16f, surface.left, 1f)
         assertEquals(328f, surface.width, 1f)
-        assertEquals(72f, surface.height, 1f)
+        assertEquals(60f, surface.height, 1f)
         assertTrue(add.center.x < emoji.center.x && emoji.center.x < send.center.x)
         assertEquals(add.center.y, emoji.center.y, 1f)
         assertEquals(emoji.center.y, send.center.y, 1f)
@@ -86,7 +86,7 @@ class ComposerPrototypeGeometryTest {
         render(state, dark = true)
         val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
         val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode()
-        assertEquals(96f, surface.height, 1f)
+        assertEquals(84f, surface.height, 1f)
         assertEquals(surface.left + 14f, editor.boundsInRoot.left, 1f)
         assertEquals(surface.right - 14f, editor.boundsInRoot.right, 1f)
         assertTrue(editor.boundsInRoot.bottom < actionBounds(R.string.send).center.y)
@@ -164,7 +164,7 @@ class ComposerPrototypeGeometryTest {
                 .boundsInRoot
         assertEquals(surface.top, resize.top, 1f)
         assertEquals(48f, resize.height, 1f)
-        assertEquals(120f, surface.height, 1f)
+        assertEquals(108f, surface.height, 1f)
     }
 
     /** Narrow large text rtl preserves draft and mirrors control order. */

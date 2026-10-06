@@ -156,7 +156,8 @@ internal const val COMPOSER_DRAFT_TOP_TAG = "composer-draft-top"
 private val CompactEditorStartInset = 72.dp
 private val EditingEditorStartInset = 14.dp
 private val ExpandedEditorEndInset = 14.dp
-private val CompactEditorTopInset = 24.dp
+private val CompactEditorTopInset = ComposerResizeStripHeight
+private val ComposerOutlineThickness = 1.dp
 
 // The drag strip's visible grip: Material's drag-handle proportions, drawn in the outline colour so it
 // reads as chrome rather than content.
@@ -594,8 +595,7 @@ internal fun ComposerPill(
         rememberUpdatedState(
             when {
                 accessoryContent != null -> 0.dp
-                multilineControlsSuppressed -> 12.dp
-                else -> 24.dp
+                else -> ComposerResizeStripHeight
             },
         )
     val pasteFromClipboard: () -> Unit = {
@@ -963,7 +963,6 @@ internal fun ComposerPill(
         modifier =
             modifier
                 .composerResizeGestures(
-                    compact = multilineControlsSuppressed,
                     enabled = inputContentVisible,
                     ownerKey = scrollOwnerKey,
                     callbacks =
@@ -1024,7 +1023,7 @@ internal fun ComposerPill(
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = BorderStroke(ComposerOutlineThickness, MaterialTheme.colorScheme.outlineVariant),
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -1106,7 +1105,7 @@ internal fun ComposerPill(
                                         if (multilineControlsSuppressed || accessoryContent != null) {
                                             12.dp
                                         } else {
-                                            interpolateDp(36.dp, CompactEditorTopInset, editingProgress.value)
+                                            interpolateDp(24.dp, CompactEditorTopInset, editingProgress.value)
                                         }
                                     },
                                     end = {
@@ -1490,7 +1489,6 @@ internal fun ComposerPill(
         if (inputContentVisible) {
             // Visual chrome has no pointer interceptor: the parent observes border drags.
             ComposerResizeGestureStrip(
-                compact = multilineControlsSuppressed,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
@@ -1509,19 +1507,20 @@ private fun Modifier.boundedComposerAccessory(): Modifier =
 @Composable
 @Suppress("FunctionNaming")
 private fun ComposerResizeGestureStrip(
-    compact: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(if (compact) 12.dp else 24.dp)
+                .height(ComposerResizeStripHeight)
                 .testTag(COMPOSER_RESIZE_GESTURE_TAG),
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.TopCenter,
     ) {
         Box(
             Modifier
+                // Center the grip on the border stroke, rather than inside the editor's top inset.
+                .offset(y = (ComposerOutlineThickness - ComposerResizeHandleThickness) / 2)
                 .size(width = ComposerResizeHandleWidth, height = ComposerResizeHandleThickness)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.outlineVariant)

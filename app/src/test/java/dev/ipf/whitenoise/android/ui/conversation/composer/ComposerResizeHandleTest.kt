@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
@@ -47,13 +48,15 @@ class ComposerResizeHandleTest {
         assertEquals("the grip is 4dp thick", 4f, handle.height, 1f)
     }
 
-    /** The grip sits centred on the strip, where a reader looks for a resize affordance. */
+    /** The grip is centred horizontally and directly over the outline's one-pixel stroke. */
     @Test
     fun theResizeHandleIsCentredOnTheStrip() {
         render(ComposerExpansionMode.Manual, draft = "Line one\nLine two\nLine three")
         val strip = composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).fetchSemanticsNode().boundsInRoot
         val handle = composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).fetchSemanticsNode().boundsInRoot
+        val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
         assertEquals("the grip is centred", strip.center.x, handle.center.x, 1f)
+        assertEquals("the grip covers the outline", surface.top + 0.5f, handle.center.y, 0.5f)
     }
 
     /**
@@ -115,7 +118,7 @@ class ComposerResizeHandleTest {
                 Surface {
                     var value by remember { mutableStateOf(TextFieldValue(draft, TextRange(draft.length))) }
                     val focusRequester = remember { FocusRequester() }
-                    Box(Modifier.width(300.dp).height(140.dp)) {
+                    Box(Modifier.width(300.dp).height(148.dp).padding(top = 4.dp)) {
                         ComposerPill(
                             textFieldValue = value,
                             composerFocus = focusRequester,

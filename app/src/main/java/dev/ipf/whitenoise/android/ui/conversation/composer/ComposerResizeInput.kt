@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.sign
 
+internal val ComposerResizeStripHeight = 12.dp
+
 /** An ancestor observes the border while descendants retain their complete tap targets. */
 internal suspend fun PointerInputScope.detectComposerResizeFromTop(
     topHeightPx: () -> Float,
@@ -72,12 +74,10 @@ internal data class ComposerResizeCallbacks(
 
 @Composable
 internal fun Modifier.composerResizeGestures(
-    compact: Boolean,
     enabled: Boolean,
     ownerKey: Any?,
     callbacks: ComposerResizeCallbacks,
 ): Modifier {
-    val latestCompact by rememberUpdatedState(compact)
     val latestCallbacks by rememberUpdatedState(callbacks)
     var gestureCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     return this
@@ -86,7 +86,7 @@ internal fun Modifier.composerResizeGestures(
             if (!enabled) return@pointerInput
             val velocityTracker = VelocityTracker()
             detectComposerResizeFromTop(
-                topHeightPx = { (if (latestCompact) 12.dp else 24.dp).toPx() },
+                topHeightPx = { ComposerResizeStripHeight.toPx() },
                 onStarted = {
                     velocityTracker.resetTracking()
                     latestCallbacks.started()

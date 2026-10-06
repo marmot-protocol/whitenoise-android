@@ -474,7 +474,7 @@ class ComposerDragAndReadingTest {
                                 extraHeight = it
                                 extra = it
                             },
-                            modifier = Modifier.height(96.dp + extraHeight),
+                            modifier = Modifier.height(84.dp + extraHeight),
                         )
                     }
                 }

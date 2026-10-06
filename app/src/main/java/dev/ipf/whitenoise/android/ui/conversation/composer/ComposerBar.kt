@@ -97,9 +97,9 @@ import kotlinx.coroutines.flow.filter
 import kotlin.math.roundToInt
 
 // One measured editor line, dedicated grip, bottom tools, and outer padding.
-private val ComposerManualChromeHeight = 84.dp
+private val ComposerManualChromeHeight = 72.dp
 private val ComposerManualCompactChromeHeight = 36.dp
-private val ComposerAutomaticEmptyChromeHeight = 60.dp
+private val ComposerAutomaticEmptyChromeHeight = 48.dp
 
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
 private val ComposerSettleDeadband = 24.dp
