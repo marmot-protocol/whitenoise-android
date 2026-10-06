@@ -44,8 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import kotlinx.coroutines.launch
 
