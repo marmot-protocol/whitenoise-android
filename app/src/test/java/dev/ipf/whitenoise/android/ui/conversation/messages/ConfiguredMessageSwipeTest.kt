@@ -29,6 +29,7 @@ class ConfiguredMessageSwipeTest {
     private val readOnly = mutableStateOf(false)
     private val selecting = mutableStateOf(false)
 
+    /** Removes persisted gesture choices so every pointer fixture begins with the platform defaults. */
     @Before fun reset() {
         context
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -37,6 +38,7 @@ class ConfiguredMessageSwipeTest {
             .commit()
     }
 
+    /** A default completed right swipe replies to the original message identity exactly once. */
     @Test fun defaultRightRepliesExactlyToTheOriginalMessage() {
         render()
         drag(100f)
@@ -50,12 +52,14 @@ class ConfiguredMessageSwipeTest {
         assertEquals(SWIPE_TEST_MESSAGE_ID, surface.controller.replyingTo?.messageIdHex)
     }
 
+    /** An optimistic send failure preserves the same message Reply capability. */
     @Test fun failedOptimisticMessageStillReplies() {
         render(optimistic = dev.ipf.whitenoise.android.state.MessageStatus.Failed)
         drag(100f)
         assertEquals(SWIPE_TEST_MESSAGE_ID, surface.controller.replyingTo?.messageIdHex)
     }
 
+    /** Removing an optimistic target while the finger is held revokes its pending Reply action. */
     @Test fun removedOptimisticMessageCannotCommitAHeldSwipe() {
         render(optimistic = dev.ipf.whitenoise.android.state.MessageStatus.Pending)
         row().performTouchInput {
@@ -69,6 +73,7 @@ class ConfiguredMessageSwipeTest {
         assertNull(surface.controller.replyingTo)
     }
 
+    /** An unconfigured opposite swipe leaves the message and reply selection unchanged. */
     @Test fun defaultLeftIsInactive() {
         render()
         drag(-100f)
@@ -76,6 +81,7 @@ class ConfiguredMessageSwipeTest {
         row().assertExists()
     }
 
+    /** Disabling both bindings prevents even an armed reply glyph or release action. */
     @Test fun bothDisabledKeepTheBubbleAtRest() {
         render(SwipeAction.Off, SwipeAction.Off)
         row().performTouchInput {
@@ -87,6 +93,7 @@ class ConfiguredMessageSwipeTest {
         assertNull(surface.controller.replyingTo)
     }
 
+    /** Independent physical bindings invoke the existing Reply and Forward surfaces without mixing actions. */
     @Test fun leftReplyAndRightForwardOpenTheirExistingActions() {
         render(SwipeAction.Reply, SwipeAction.Forward)
         drag(-100f)
@@ -97,6 +104,7 @@ class ConfiguredMessageSwipeTest {
         assertNull(surface.controller.replyingTo)
     }
 
+    /** An explicit physical-right binding retains that direction under RTL layout. */
     @Test fun explicitPhysicalRightStillRepliesInRtl() {
         render(SwipeAction.Off, SwipeAction.Reply, rtl = true)
         drag(100f)
@@ -121,12 +129,14 @@ class ConfiguredMessageSwipeTest {
         assertEquals(SWIPE_TEST_MESSAGE_ID, surface.controller.replyingTo?.messageIdHex)
     }
 
+    /** The default Start-to-End reply gesture follows RTL when no physical override is saved. */
     @Test fun rtlDefaultRepliesLeft() {
         render(rtl = true)
         drag(-100f)
         assertEquals(SWIPE_TEST_MESSAGE_ID, surface.controller.replyingTo?.messageIdHex)
     }
 
+    /** Under-threshold, vertical, cancelled and reversed drags cannot commit a Reply. */
     @Test fun shortVerticalCancelledAndReversedDragsNeverReply() {
         render(SwipeAction.Reply, SwipeAction.Reply)
         drag(30f)
@@ -149,6 +159,7 @@ class ConfiguredMessageSwipeTest {
         assertNull(surface.controller.replyingTo)
     }
 
+    /** An account change invalidates a held gesture before release can act on its former owner. */
     @Test fun accountChangeRevokesHeldDragBeforeCommit() {
         render()
         row().performTouchInput {
@@ -165,6 +176,7 @@ class ConfiguredMessageSwipeTest {
         assertNull(surface.controller.replyingTo)
     }
 
+    /** Changing the configured binding revokes a gesture armed under the previous choice. */
     @Test fun settingChangeRevokesHeldDrag() {
         render()
         row().performTouchInput {
@@ -176,6 +188,7 @@ class ConfiguredMessageSwipeTest {
         assertNull(surface.controller.replyingTo)
     }
 
+    /** A removed native timeline target cannot accept a previously armed release. */
     @Test fun removedTargetCannotCommitAnAlreadyArmedDrag() {
         render()
         row().performTouchInput {
@@ -210,6 +223,7 @@ class ConfiguredMessageSwipeTest {
         assertNull(surface.controller.replyingTo)
     }
 
+    /** Mounts the production bubble with a controlled message owner, binding pair and optional optimistic state. */
     private fun render(
         left: SwipeAction = SwipeAction.Default,
         right: SwipeAction = SwipeAction.Default,
@@ -231,8 +245,10 @@ class ConfiguredMessageSwipeTest {
         rule.waitForIdle()
     }
 
+    /** Selects the original production message row rather than a glyph or picker overlay. */
     private fun row() = rule.onNodeWithTag(SWIPE_TEST_HOST_TAG)
 
+    /** Completes one physical horizontal pointer gesture against the original message row. */
     private fun drag(distance: Float) {
         row().performTouchInput {
             down(center)

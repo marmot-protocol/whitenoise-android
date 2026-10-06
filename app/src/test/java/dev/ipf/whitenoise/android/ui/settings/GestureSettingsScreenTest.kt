@@ -32,14 +32,19 @@ import org.robolectric.annotation.GraphicsMode
 class GestureSettingsScreenTest {
     @get:Rule val rule = createComposeRule()
 
+    /** Records the default gesture choices in the light theme. */
     @Test fun light() = screen("light")
 
+    /** Records the same default choices with dark-theme surface and text contrast. */
     @Test fun dark() = screen("dark", dark = true)
 
+    /** Records default choices against the AMOLED surface tokens. */
     @Test fun amoled() = screen("amoled", dark = true, amoled = true)
 
+    /** Records mirrored layout and scroll reachability at twice the default text scale. */
     @Test fun largeRtl() = screen("large_rtl", scale = 2f, rtl = true)
 
+    /** Records independently configured message and chat bindings rather than only their defaults. */
     @Test fun configured() =
         screen(
             "configured",
@@ -52,6 +57,7 @@ class GestureSettingsScreenTest {
                 ),
         )
 
+    /** Every binding opens its selector and Reset invokes only the explicit reset action. */
     @Test fun allFourChoicesAreReachableAndResetIsExplicit() {
         val changes = mutableListOf<Pair<SwipeBinding, SwipeAction>>()
         var resets = 0
@@ -70,6 +76,7 @@ class GestureSettingsScreenTest {
         assertEquals(1, resets)
     }
 
+    /** Mounts the stateless settings screen under controlled theme, direction, text scale and binding state. */
     private fun screen(
         name: String,
         dark: Boolean = false,
