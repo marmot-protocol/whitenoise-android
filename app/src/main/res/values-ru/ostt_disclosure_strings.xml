@@ -1,5 +1,5 @@
 <resources>
     <string name="dictation_disclosure_offline_title">Распознавание речи без интернета</string>
     <string name="dictation_disclosure_offline_message">Offline Speech to Text обрабатывает вашу речь на этом устройстве. White Noise хранит полученный текст только до того, как вы вставите или отправите его. Автоматическая отправка выключена, пока вы не включите её в настройках диктовки.</string>
-    <string name="dictation_settings_explainer_offline">Offline Speech to Text обрабатывает диктовку на этом устройстве. White Noise хранит полученный текст только до того, как вы вставите или отправите его.</string>
+    <string name="dictation_settings_explainer_offline">Offline Speech to Text обрабатывает диктовку на этом устройстве. Восстановленный текст остаётся в исходном черновике.</string>
 </resources>

@@ -1,5 +1,5 @@
 <resources>
     <string name="dictation_disclosure_offline_title">離線語音辨識</string>
     <string name="dictation_disclosure_offline_message">Offline Speech to Text 會在此裝置上處理你的語音。White Noise 只會在你貼上或傳送前保留傳回的文字。除非你在聽寫設定中開啟，否則自動傳送會保持關閉。</string>
-    <string name="dictation_settings_explainer_offline">Offline Speech to Text 會在此裝置上處理聽寫。White Noise 只會在你貼上或傳送前保留傳回的文字。</string>
+    <string name="dictation_settings_explainer_offline">Offline Speech to Text 會在此裝置上處理聽寫。復原的文字會保留在原始草稿中。</string>
 </resources>

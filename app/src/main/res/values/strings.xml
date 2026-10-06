@@ -1613,8 +1613,8 @@
     <string name="dictation_settings_title">Dictation</string>
     <string name="dictation_pause_other_audio_title">Pause other audio</string>
     <string name="dictation_pause_other_audio_subtitle">Pause music and podcasts during dictation; they can resume when recording stops. White Noise speech and voice messages always pause for safety.</string>
-    <string name="dictation_settings_explainer">The speech service installed on this device processes the audio and may send it to its provider. White Noise keeps the text it returns only until you paste or send it.</string>
-    <string name="dictation_settings_explainer_offline">Offline Speech to Text processes dictation on this device. White Noise keeps the text it returns only until you paste or send it.</string>
+    <string name="dictation_settings_explainer">The speech service installed on this device processes the audio and may send it to its provider. Recovered text stays in the original draft.</string>
+    <string name="dictation_settings_explainer_offline">Offline Speech to Text processes dictation on this device. Recovered text stays in the original draft.</string>
     <string name="dictation_ostt_recommendation_title">Get Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Recommended transcription app for private, on-device dictation. Available from Zapstore, not Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Couldn’t open the Offline Speech to Text page on Zapstore.</string>
@@ -1626,7 +1626,7 @@
     <string name="dictation_result_paste_description">Review or edit the text before sending</string>
     <string name="dictation_result_send">Send message</string>
     <string name="dictation_result_send_description">Sends only if the chat and draft haven’t changed</string>
-    <string name="dictation_send_safety_note">If the chat or draft changes before sending, the dictation stays unsent. Retry Send or choose Paste to review it.</string>
+    <string name="dictation_send_safety_note">If sending is blocked, available recognized text is recovered to the original draft. Review it before sending again.</string>
     <string name="voice_message_play">Play voice message</string>
     <string name="voice_message_pause">Pause voice message</string>
     <string name="voice_message_speed">Playback speed %1$s</string>

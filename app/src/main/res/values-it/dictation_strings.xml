@@ -6,7 +6,7 @@
     <string name="notification_channel_dictation">Dettatura</string>
     <string name="notification_channel_dictation_description">Gestisce una sessione di dettatura attiva nel compositore</string>
     <string name="dictation_settings_title">Dettatura</string>
-    <string name="dictation_settings_explainer">Il servizio vocale installato su questo dispositivo elabora l’audio e può inviarlo al proprio fornitore. White Noise conserva il testo restituito solo finché non lo incolli o lo invii.</string>
+    <string name="dictation_settings_explainer">Il servizio vocale installato su questo dispositivo elabora l’audio e può inviarlo al proprio fornitore. Il testo recuperato rimane nella bozza originale.</string>
     <string name="dictation_ostt_recommendation_title">Ottieni Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">App di trascrizione consigliata per la dettatura privata sul dispositivo. Disponibile su Zapstore, non su Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Impossibile aprire la pagina di Offline Speech to Text su Zapstore.</string>
@@ -18,7 +18,7 @@
     <string name="dictation_result_paste_description">Controlla o modifica il testo prima di inviarlo</string>
     <string name="dictation_result_send">Invia messaggio</string>
     <string name="dictation_result_send_description">Invia solo se la chat e la bozza non sono cambiate</string>
-    <string name="dictation_send_safety_note">Se la chat o la bozza cambia prima dell’invio, la dettatura resta non inviata. Riprova l’invio o scegli Incolla per controllare il testo.</string>
+    <string name="dictation_send_safety_note">Se l’invio è bloccato, il testo riconosciuto disponibile viene recuperato nella bozza originale. Controllalo prima di inviarlo di nuovo.</string>
     <string name="dictation_send_blocked">Non inviato</string>
     <string name="dictation_retry_send">Riprova invio</string>
     <string name="dictation_recovery_title">La dettatura richiede attenzione</string>

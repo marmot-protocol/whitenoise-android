@@ -110,13 +110,12 @@ internal class ConversationDictationDraftRecoveryTest {
     }
 
     @Test
-    fun replayWordingChangesDoNotRepeatAnAcknowledgedPrefixAfterEditing() {
+    fun replayWordingChangesDoNotRepeatARepresentedPrefixAfterEditing() {
         val f = Fixture()
         f.recovery.recover(
             1,
             f.target,
             "first second",
-            options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first"),
         )
         f.edit("Draft first second edited")
         assertTrue(
@@ -124,7 +123,6 @@ internal class ConversationDictationDraftRecoveryTest {
                 1,
                 f.target,
                 "First, SECOND third",
-                options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "First, SECOND third"),
             ),
         )
         assertEquals("Draft first second edited third", f.draft.value.text)
@@ -136,13 +134,12 @@ internal class ConversationDictationDraftRecoveryTest {
     }
 
     @Test
-    fun aDifferentUnacknowledgedResultIsNotBlindlyAppendedAfterEditing() {
+    fun aDifferentUnrepresentedResultIsNotBlindlyAppendedAfterEditing() {
         val f = Fixture()
         f.recovery.recover(
             1,
             f.target,
             "first preview",
-            options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first"),
         )
         f.edit("Draft first preview edited")
         assertFalse(
@@ -150,7 +147,6 @@ internal class ConversationDictationDraftRecoveryTest {
                 1,
                 f.target,
                 "first corrected result",
-                options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = "first corrected result"),
             ),
         )
         assertEquals("Draft first preview edited", f.draft.value.text)
@@ -164,7 +160,6 @@ internal class ConversationDictationDraftRecoveryTest {
             1,
             f.target,
             "blue sky",
-            options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = ""),
         )
         f.edit("Draft blue sky edited")
         assertFalse(f.recovery.recover(1, f.target, "green fields"))

@@ -541,6 +541,51 @@ class ConversationDictationNotificationRestorationTest : ConversationDictationNo
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class ConversationDictationNotificationSuppressionTest : ConversationDictationNotificationTestFixture() {
+    /** Rejected notification Send keeps a control-free recovery card until the composer is opened. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun rejectedBackgroundSendKeepsItsOpenAppCardAfterDraftRecovery() =
+        runTest {
+            val harness = Harness(this)
+            harness.acceptSend = false
+            ConversationDictationForegroundService.hostResolver = { harness }
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            val manager = service.getSystemService(NotificationManager::class.java)
+            try {
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                harness.conversationDictation.onAppBackgrounded()
+                service.onStartCommand(
+                    actionCommand(service, harness, ConversationDictationForegroundService.ACTION_SEND),
+                    0,
+                    2,
+                )
+                harness.platform.listener.onResult("recognized")
+                runCurrent()
+                Snapshot.sendApplyNotifications()
+                shadowOf(Looper.getMainLooper()).idle()
+                val failed = harness.conversationDictation.state as ConversationDictationState.Failed
+                assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+                assertTrue(failed.draftRecovered)
+                assertEquals("recognized", harness.draft.text)
+                assertTrue(harness.sent.isEmpty())
+                assertTrue(harness.conversationDictation.hasDurableSession)
+                assertFalse(harness.conversationDictation.foregroundMicrophoneRequired)
+                val card = manager.activeNotifications.single().notification
+                assertEquals(
+                    service.getString(R.string.dictation_recovery_title),
+                    card.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
+                )
+                assertEquals(service.getString(R.string.dictation_recovery_open), card.actions.single().title)
+                harness.conversationDictation.onAppForegrounded()
+                runCurrent()
+                assertFalse(harness.conversationDictation.hasDurableSession)
+                assertEquals("recognized", harness.draft.text)
+            } finally {
+                lifecycle.destroy()
+            }
+        }
+
     /** A rejected narrowing cannot rely on a blocked ordinary channel to retire microphone controls. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -638,7 +683,6 @@ class ConversationDictationNotificationSuppressionTest : ConversationDictationNo
                 }
             }
         }
-
 }
 
 abstract class ConversationDictationNotificationTestFixture {
@@ -655,6 +699,7 @@ abstract class ConversationDictationNotificationTestFixture {
         val platform = FakePlatform()
         var draft = TextFieldValue("")
         var revision = 0L
+        var acceptSend = true
         val sent = mutableListOf<String>()
         override val conversationDictation =
             ConversationDictationController(
@@ -681,7 +726,7 @@ abstract class ConversationDictationNotificationTestFixture {
                 },
                 silenceDeliveryMode = { preference },
                 sendTranscriptIfOriginUnchanged = { request ->
-                    request.beginDispatch().also { if (it) sent += request.payload }
+                    (acceptSend && request.beginDispatch()).also { if (it) sent += request.payload }
                 },
             )
 
@@ -788,4 +833,5 @@ abstract class ConversationDictationNotificationTestFixture {
         val defaultRemover = NotificationStreamForegroundService.foregroundRemover
         val defaultResolver = ConversationDictationForegroundService.hostResolver
         val defaultForegroundPromoter = ConversationDictationForegroundService.foregroundPromoter
-    } }
+    }
+}

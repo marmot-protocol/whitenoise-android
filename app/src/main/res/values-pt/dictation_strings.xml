@@ -6,7 +6,7 @@
     <string name="notification_channel_dictation">Ditado</string>
     <string name="notification_channel_dictation_description">Controla uma sessão de ditado ativa no compositor</string>
     <string name="dictation_settings_title">Ditado</string>
-    <string name="dictation_settings_explainer">O serviço de voz instalado neste dispositivo processa o áudio e pode enviá-lo ao provedor dele. O White Noise mantém o texto devolvido apenas até você colar ou enviar.</string>
+    <string name="dictation_settings_explainer">O serviço de voz instalado neste dispositivo processa o áudio e pode enviá-lo ao provedor dele. O texto recuperado permanece no rascunho original.</string>
     <string name="dictation_ostt_recommendation_title">Obter Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Aplicativo de transcrição recomendado para ditado privado no dispositivo. Disponível na Zapstore, não no Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Não foi possível abrir a página do Offline Speech to Text na Zapstore.</string>
@@ -18,7 +18,7 @@
     <string name="dictation_result_paste_description">Rever ou editar o texto antes de enviar</string>
     <string name="dictation_result_send">Enviar mensagem</string>
     <string name="dictation_result_send_description">Envia apenas se a conversa e o rascunho não tiverem mudado</string>
-    <string name="dictation_send_safety_note">Se a conversa ou o rascunho mudar antes do envio, o ditado ficará por enviar. Tente enviar novamente ou escolha Colar para rever o texto.</string>
+    <string name="dictation_send_safety_note">Se o envio for bloqueado, o texto reconhecido disponível será recuperado no rascunho original. Revise-o antes de enviar novamente.</string>
     <string name="dictation_send_blocked">Não enviado</string>
     <string name="dictation_retry_send">Tentar enviar novamente</string>
     <string name="dictation_recovery_title">O ditado precisa de atenção</string>

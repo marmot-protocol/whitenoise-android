@@ -1817,7 +1817,7 @@ class ConversationDictationControllerTest {
         assertEquals(0, sends)
         assertEquals(1, fixture.writes)
         assertFalse(fixture.controller.ownsMicrophone)
-        assertFalse(fixture.controller.hasDurableSession)
+        assertTrue(fixture.controller.hasDurableSession)
     }
 
     @Test
@@ -3166,7 +3166,7 @@ class ConversationDictationControllerTest {
                 advanceUntilIdle()
                 assertTrue(fixture.controller.state is ConversationDictationState.Idle)
                 assertEquals(1, sends)
-                assertEquals(1, expired)
+                assertEquals(0, expired)
                 assertEquals(1, fixture.writes)
                 assertEquals("retained body", fixture.drafts.getValue(key()).text)
             }
@@ -6183,7 +6183,7 @@ class ConversationDictationControllerTest {
             advanceUntilIdle()
             assertEquals("Draft recognized", f.drafts.getValue(key()).text)
             assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
-            assertFalse(f.controller.hasDurableSession)
+            assertTrue(f.controller.hasDurableSession)
             accept = true
             f.controller.retry()
             advanceUntilIdle()

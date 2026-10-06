@@ -43,7 +43,9 @@ internal fun ConversationDictationFailureAction(
     val recoveredSendAvailable =
         !state.draftRecovered || controller.canRetryRetainedAudio || controller.canRetryRecoveredSend
     IconButton(
-        enabled = !retrySend || recoveredSendAvailable,
+        enabled =
+            !retrySend || recoveredSendAvailable ||
+                (state.recognitionIncomplete && recovery != ConversationDictationRecovery.Retry),
         onClick =
             when {
                 retrySend && state.recognitionIncomplete -> ({ confirmPartialSend = true })

@@ -15,7 +15,6 @@ internal class ConversationDictationDraftRecovery(
         val session: Long,
         val target: ConversationDictationTarget,
         val transcript: String,
-        val acknowledgedPrefix: String,
         val draft: ConversationDictationDraftSnapshot,
         val sendEligible: Boolean,
         val base: TextFieldValue,
@@ -54,7 +53,6 @@ internal class ConversationDictationDraftRecovery(
     data class Options(
         val restoreCapturedPrefix: Boolean = false,
         val ownedEmptyRevision: Long? = null,
-        val acknowledgedPrefix: String? = null,
     )
 
     private data class Insertion(
@@ -149,7 +147,6 @@ internal class ConversationDictationDraftRecovery(
             session,
             target,
             text,
-            options.acknowledgedPrefix ?: previous?.acknowledgedPrefix ?: text,
             ConversationDictationDraftSnapshot(written.value, written.revision),
             sendEligible,
             written.insertion.base,
