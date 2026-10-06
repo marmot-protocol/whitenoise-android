@@ -28,6 +28,37 @@ class WhiteNoiseAppStatePreferencesTest {
         preferences.edit().clear().commit()
     }
 
+    /** Unset choices follow the legacy reply direction, while explicit physical bindings survive recreation. */
+    @Test fun swipePreferencesRetainPhysicalBindingsAndResetDefaults() {
+        val first = SwipePreferences(preferences)
+        assertEquals(SwipeAction.Reply, first.state.resolved(SwipeBinding.MessageRight, false))
+        assertEquals(SwipeAction.Reply, first.state.resolved(SwipeBinding.MessageLeft, true))
+        assertEquals(SwipeAction.Off, first.state.chatLeft)
+        first.set(SwipeBinding.MessageLeft, SwipeAction.Reply)
+        first.set(SwipeBinding.MessageRight, SwipeAction.Forward)
+        first.set(SwipeBinding.ChatLeft, SwipeAction.MuteUnmute)
+        val recreated = SwipePreferences(preferences)
+        assertEquals(SwipeAction.Reply, recreated.state.resolved(SwipeBinding.MessageLeft, false))
+        assertEquals(SwipeAction.Forward, recreated.state.resolved(SwipeBinding.MessageRight, true))
+        assertEquals(SwipeAction.MuteUnmute, recreated.state.chatLeft)
+        recreated.reset()
+        assertEquals(SwipePreferenceState(), SwipePreferences(preferences).state)
+    }
+
+    /** Unknown versions and wrong-domain choices cannot silently enable a chat command. */
+    @Test fun unknownSwipeValuesFallBackIndependently() {
+        preferences
+            .edit()
+            .putString("swipe_action_MessageLeft", "future")
+            .putString("swipe_action_ChatRight", "Reply")
+            .putString("swipe_action_ChatLeft", "PinUnpin")
+            .commit()
+        val state = SwipePreferences(preferences).state
+        assertEquals(SwipeAction.Default, state.messageLeft)
+        assertEquals(SwipeAction.Off, state.chatRight)
+        assertEquals(SwipeAction.PinUnpin, state.chatLeft)
+    }
+
     @Test
     fun allowChatScreenshotsDefaultsOn() {
         assertTrue(ChatScreenshotPreferences.readAllowChatScreenshots(preferences))

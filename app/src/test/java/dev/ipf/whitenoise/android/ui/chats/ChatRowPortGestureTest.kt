@@ -1,18 +1,27 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.state.SwipeAction
+import dev.ipf.whitenoise.android.state.SwipePreferenceState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -21,9 +30,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Native ListItem and the real ChatListRow must share one tap/hold/range owner without fall-through. */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ChatRowPortGestureTest {
     @get:Rule val composeRule = createComposeRule()
@@ -32,6 +43,8 @@ class ChatRowPortGestureTest {
     private val selecting = mutableStateOf(false)
     private val rangeActive = mutableStateOf(false)
     private val visible = mutableStateOf(true)
+    private val swipeSettings = mutableStateOf(SwipePreferenceState())
+    private val swipes = mutableListOf<SwipeAction>()
 
     /** A physical tap opens exactly once, through the native ListItem callback. */
     @Test fun tapOpensOnce() {
@@ -122,44 +135,180 @@ class ChatRowPortGestureTest {
         assertEquals(0, events.opens)
     }
 
+    /** Both default directions preserve the existing non-swipe chat row. */
+    @Test fun defaultsNeverRevealOrCommitChatActions() {
+        render()
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(110f, 0f))
+        }
+        composeRule.onNodeWithTag("chat.swipe.cue").assertDoesNotExist()
+        row().performTouchInput {
+            up()
+            down(center)
+            moveBy(Offset(-110f, 0f))
+            up()
+        }
+        assertTrue(swipes.isEmpty())
+    }
+
+    /** Each physical side invokes only its selected opt-in action once. */
+    @Test fun configuredChatDirectionsDispatchOnce() {
+        swipeSettings.value = SwipePreferenceState(chatLeft = SwipeAction.ReadUnread, chatRight = SwipeAction.PinUnpin)
+        render()
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(-110f, 0f))
+            up()
+        }
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(110f, 0f))
+            up()
+        }
+        assertEquals(listOf(SwipeAction.ReadUnread, SwipeAction.PinUnpin), swipes)
+        assertEquals(0, events.opens)
+        assertEquals(0, events.actions)
+    }
+
+    /** Off, short movement, scrolling and pointer cancellation are all non-actions. */
+    @Test fun disabledAndCancelledChatDirectionsNeverCommit() {
+        swipeSettings.value = SwipePreferenceState(chatRight = SwipeAction.MuteUnmute)
+        render()
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(-110f, 0f))
+            up()
+        }
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(30f, 0f))
+            up()
+        }
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(20f, 100f))
+            up()
+        }
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(110f, 0f))
+            cancel()
+        }
+        assertTrue(swipes.isEmpty())
+    }
+
+    /** Changing settings while armed cannot reinterpret a gesture as a different command. */
+    @Test fun changedBindingRevokesArmedChatGesture() {
+        swipeSettings.value = SwipePreferenceState(chatRight = SwipeAction.PinUnpin)
+        render()
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(110f, 0f))
+        }
+        composeRule.runOnIdle { swipeSettings.value = SwipePreferenceState(chatRight = SwipeAction.MuteUnmute) }
+        row().performTouchInput { up() }
+        assertTrue(swipes.isEmpty())
+    }
+
+    /** Beginning selection retires the horizontal stream even when the row stays composed. */
+    @Test fun selectionRevokesArmedChatGesture() {
+        swipeSettings.value = SwipePreferenceState(chatRight = SwipeAction.PinUnpin)
+        render()
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(110f, 0f))
+        }
+        composeRule.runOnIdle { selecting.value = true }
+        row().performTouchInput { up() }
+        assertTrue(swipes.isEmpty())
+    }
+
+    /** Dark-theme read cue stays separate from the translated, interactive row. */
+    @Test fun readCueDark() = captureCue("read_dark", SwipeAction.ReadUnread, -1, dark = true)
+
+    /** AMOLED mute uses an identifiable icon and accessible action name. */
+    @Test fun muteCueAmoled() = captureCue("mute_amoled", SwipeAction.MuteUnmute, 1, dark = true, amoled = true)
+
+    /** Physical direction remains stable with large RTL labels. */
+    @Test fun pinCueLargeRtl() = captureCue("pin_large_rtl", SwipeAction.PinUnpin, -1, rtl = true)
+
+    /** Holds a real row's opted-in action below the release threshold for deterministic cue inspection. */
+    private fun captureCue(
+        name: String,
+        action: SwipeAction,
+        direction: Int,
+        dark: Boolean = false,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+    ) {
+        swipeSettings.value = SwipePreferenceState(chatLeft = action, chatRight = action)
+        render(dark = dark, amoled = amoled, rtl = rtl)
+        row().performTouchInput {
+            down(center)
+            moveBy(Offset(90f * direction, 0f))
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_swipe_$name.png")
+        row().performTouchInput { cancel() }
+        assertTrue(swipes.isEmpty())
+    }
+
     /** Uses real row state and callbacks, with no native IO or synthetic gesture-only Box substitute. */
-    private fun render(enabled: Boolean = true) {
+    private fun render(
+        enabled: Boolean = true,
+        dark: Boolean = false,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+    ) {
         val state = ChatRowPortFixtures.state(context)
         val item = ChatRowPortFixtures.item()
         composeRule.setContent {
-            WhiteNoiseTheme {
-                Column(Modifier.fillMaxWidth()) {
-                    if (visible.value) {
-                        ChatListRow(
-                            item = item,
-                            appState = state,
-                            isMuted = false,
-                            interactionsEnabled = enabled,
-                            selectionMode = selecting.value,
-                            selected = selecting.value,
-                            onOpen = { events.opens++ },
-                            onOpenProfile = { error("Named group has no DM avatar action") },
-                            onOpenActions = { events.actions++ },
-                            onDragSelectionStart = {
-                                events.starts++
-                                selecting.value = true
-                                rangeActive.value = true
-                            },
-                            onDragSelection = {
-                                events.moves++
-                                true
-                            },
-                            onDragSelectionEnd = {
-                                events.ends++
-                                rangeActive.value = false
-                            },
-                            onDragSelectionCancel = {
-                                events.cancels++
-                                rangeActive.value = false
-                            },
-                            rangeDragActive = rangeActive.value,
-                            onToggleSelection = { events.toggles++ },
-                        )
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
+                    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
+                        if (visible.value) {
+                            ChatSwipeActions(
+                                owner = state,
+                                settings = swipeSettings.value,
+                                enabled = enabled && !selecting.value && !rangeActive.value,
+                                leftAllowed = chatSwipeAllowed(swipeSettings.value.chatLeft, item, null),
+                                rightAllowed = chatSwipeAllowed(swipeSettings.value.chatRight, item, null),
+                                onCommit = { swipes.add(it) },
+                            ) {
+                                ChatListRow(
+                                    item = item,
+                                    appState = state,
+                                    isMuted = false,
+                                    interactionsEnabled = enabled,
+                                    selectionMode = selecting.value,
+                                    selected = selecting.value,
+                                    onOpen = { events.opens++ },
+                                    onOpenProfile = { error("Named group has no DM avatar action") },
+                                    onOpenActions = { events.actions++ },
+                                    onDragSelectionStart = {
+                                        events.starts++
+                                        selecting.value = true
+                                        rangeActive.value = true
+                                    },
+                                    onDragSelection = {
+                                        events.moves++
+                                        true
+                                    },
+                                    onDragSelectionEnd = {
+                                        events.ends++
+                                        rangeActive.value = false
+                                    },
+                                    onDragSelectionCancel = {
+                                        events.cancels++
+                                        rangeActive.value = false
+                                    },
+                                    rangeDragActive = rangeActive.value,
+                                    onToggleSelection = { events.toggles++ },
+                                )
+                            }
+                        }
                     }
                 }
             }

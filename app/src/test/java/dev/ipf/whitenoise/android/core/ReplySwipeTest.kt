@@ -6,6 +6,34 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReplySwipeTest {
+    /** Disabled direction never takes ownership, even after a later reversal into an enabled side. */
+    @Test fun directionalIntentRejectsDisabledStartsAndVerticalScroll() {
+        val disabled =
+            dev.ipf.whitenoise.android.ui.common
+                .DirectionalSwipeIntent(8f, false, true)
+        org.junit.Assert.assertFalse(disabled.move(-30f, 0f))
+        org.junit.Assert.assertFalse(disabled.move(130f, 0f))
+        assertTrue(disabled.cancelled)
+        val vertical =
+            dev.ipf.whitenoise.android.ui.common
+                .DirectionalSwipeIntent(8f, true, true)
+        org.junit.Assert.assertFalse(vertical.move(5f, 20f))
+        org.junit.Assert.assertFalse(vertical.move(100f, 0f))
+    }
+
+    /** Reversing within the original side retains ownership; crossing the origin cancels permanently. */
+    @Test fun directionalIntentDisarmsAndCancelsReversal() {
+        val swipe =
+            dev.ipf.whitenoise.android.ui.common
+                .DirectionalSwipeIntent(8f, true, true)
+        org.junit.Assert.assertTrue(swipe.move(100f, 1f))
+        assertEquals(1, swipe.direction)
+        org.junit.Assert.assertTrue(swipe.move(-70f, 0f))
+        assertEquals(30f, swipe.x)
+        org.junit.Assert.assertFalse(swipe.move(-80f, 0f))
+        assertTrue(swipe.cancelled)
+    }
+
     @Test
     fun rightwardMostlyHorizontalSwipePastThresholdTriggersReply() {
         assertTrue(ReplySwipe.shouldTriggerReply(totalX = 72f, totalY = 12f, threshold = 64f))

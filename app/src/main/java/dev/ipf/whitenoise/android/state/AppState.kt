@@ -1177,6 +1177,7 @@ class WhiteNoiseAppState private constructor(
     internal val localGroupDeleteCleanupMutex = Mutex()
     internal val defaultDisappearingMessagesPreferences =
         DefaultDisappearingMessagesPreferences(appContext, preferences)
+    internal val swipePreferences = SwipePreferences(preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()

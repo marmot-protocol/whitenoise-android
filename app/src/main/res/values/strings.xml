@@ -2417,4 +2417,16 @@
     <string name="destination_filter_label">Filter chats</string>
     <string name="forward_select_by_folder">Select by folder</string>
     <string name="destination_filter_incomplete">Some chats may be missing. Retry or choose All chats.</string>
+    <string name="gestures_title">Swipe actions</string>
+    <string name="gestures_physical_hint">Left and right describe finger movement. Explicit choices stay the same when you change language. Default follows the reply direction for your language. Chat swipes are off by default.</string>
+    <string name="gestures_messages">Messages</string>
+    <string name="gestures_left">Swipe left</string>
+    <string name="gestures_right">Swipe right</string>
+    <string name="gestures_default">Default</string>
+    <string name="gestures_default_summary">Default: %1$s</string>
+    <string name="gestures_off">Off</string>
+    <string name="gestures_react">React</string>
+    <string name="gestures_read_unread">Read / unread</string>
+    <string name="gestures_mute_unmute">Mute / unmute</string>
+    <string name="gestures_pin_unpin">Pin / unpin</string>
 </resources>

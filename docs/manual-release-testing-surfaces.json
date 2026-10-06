@@ -788,6 +788,196 @@
         "test_ids": ["FLD-001", "SYS-004"]
       },
       {
+        "surface": "GestureSettingsPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "fun GestureSettingsPreview(",
+        "test_ids": ["SET-032"]
+      },
+      {
+        "surface": "ChatSwipeActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "fun ChatSwipeActions(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "GestureSettingsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "fun GestureSettingsContent(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "GestureSettingsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "fun GestureSettingsScreen(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.forward",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.forward",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_default",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_default_summary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_default_summary",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_left",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_left",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_messages",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_mute_unmute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_mute_unmute",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_off",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_physical_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_physical_hint",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_pin_unpin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_pin_unpin",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_react",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_react",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_read_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_read_unread",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_right",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_right",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.gestures_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.gestures_title",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.reply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.reply",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.reset_to_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+        "anchor": "R.string.reset_to_default",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "gestures_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.gestures_title",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "DirectionalSwipeIntent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DirectionalSwipe.kt",
+        "anchor": "class DirectionalSwipeIntent(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "directionalSwipe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DirectionalSwipe.kt",
+        "anchor": "fun Modifier.directionalSwipe(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "SwipePreferences",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/SwipePreferences.kt",
+        "anchor": "class SwipePreferences(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
         "surface": "rememberShareChatPickerActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "fun rememberShareChatPickerActions(",

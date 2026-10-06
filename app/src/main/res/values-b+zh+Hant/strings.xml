@@ -2227,4 +2227,16 @@
     <string name="destination_filter_label">篩選聊天</string>
     <string name="forward_select_by_folder">按資料夾選取</string>
     <string name="destination_filter_incomplete">部分聊天可能缺漏。請重試或選擇所有聊天。</string>
+    <string name="gestures_title">滑動操作</string>
+    <string name="gestures_physical_hint">左和右是指手指移動方向。變更語言後，明確選擇的操作保持不變。預設設定遵循目前語言的回覆方向。聊天滑動操作預設關閉。</string>
+    <string name="gestures_messages">訊息</string>
+    <string name="gestures_left">向左滑動</string>
+    <string name="gestures_right">向右滑動</string>
+    <string name="gestures_default">預設</string>
+    <string name="gestures_default_summary">預設：%1$s</string>
+    <string name="gestures_off">關閉</string>
+    <string name="gestures_react">回應</string>
+    <string name="gestures_read_unread">已讀 / 未讀</string>
+    <string name="gestures_mute_unmute">靜音 / 取消靜音</string>
+    <string name="gestures_pin_unpin">置頂 / 取消置頂</string>
 </resources>

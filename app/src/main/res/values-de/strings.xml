@@ -2276,4 +2276,16 @@
     <string name="destination_filter_label">Chats filtern</string>
     <string name="forward_select_by_folder">Nach Ordner auswählen</string>
     <string name="destination_filter_incomplete">Einige Chats fehlen möglicherweise. Erneut versuchen oder alle Chats wählen.</string>
+    <string name="gestures_title">Wischaktionen</string>
+    <string name="gestures_physical_hint">Links und rechts beschreiben die Fingerbewegung. Eigene Einstellungen bleiben bei einem Sprachwechsel gleich. Standard folgt der Antwortrichtung deiner Sprache. Wischaktionen für Chats sind standardmäßig aus.</string>
+    <string name="gestures_messages">Nachrichten</string>
+    <string name="gestures_left">Nach links wischen</string>
+    <string name="gestures_right">Nach rechts wischen</string>
+    <string name="gestures_default">Standard</string>
+    <string name="gestures_default_summary">Standard: %1$s</string>
+    <string name="gestures_off">Aus</string>
+    <string name="gestures_react">Reagieren</string>
+    <string name="gestures_read_unread">Gelesen / ungelesen</string>
+    <string name="gestures_mute_unmute">Stumm / Ton an</string>
+    <string name="gestures_pin_unpin">Anheften / lösen</string>
 </resources>

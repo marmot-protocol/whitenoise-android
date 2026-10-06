@@ -2329,4 +2329,16 @@
     <string name="destination_filter_label">Фильтр чатов</string>
     <string name="forward_select_by_folder">Выбрать по папке</string>
     <string name="destination_filter_incomplete">Некоторые чаты могут отсутствовать. Повторите попытку или выберите все чаты.</string>
+    <string name="gestures_title">Действия по смахиванию</string>
+    <string name="gestures_physical_hint">Влево и вправо — направления движения пальца. Выбранные действия не меняются при смене языка. По умолчанию направление ответа зависит от языка. Жесты для чатов по умолчанию отключены.</string>
+    <string name="gestures_messages">Сообщения</string>
+    <string name="gestures_left">Смахнуть влево</string>
+    <string name="gestures_right">Смахнуть вправо</string>
+    <string name="gestures_default">По умолчанию</string>
+    <string name="gestures_default_summary">По умолчанию: %1$s</string>
+    <string name="gestures_off">Выкл.</string>
+    <string name="gestures_react">Реакция</string>
+    <string name="gestures_read_unread">Прочитано / не прочитано</string>
+    <string name="gestures_mute_unmute">Выключить / включить звук</string>
+    <string name="gestures_pin_unpin">Закрепить / открепить</string>
 </resources>
