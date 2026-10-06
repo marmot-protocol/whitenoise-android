@@ -34,11 +34,13 @@ class ReplySwipeTest {
         assertTrue(swipe.cancelled)
     }
 
+    /** A sufficiently horizontal rightward gesture retains the legacy reply threshold. */
     @Test
     fun rightwardMostlyHorizontalSwipePastThresholdTriggersReply() {
         assertTrue(ReplySwipe.shouldTriggerReply(totalX = 72f, totalY = 12f, threshold = 64f))
     }
 
+    /** Wrong-direction, short and vertical gestures preserve scrolling instead of issuing reply. */
     @Test
     fun leftwardShortOrMostlyVerticalSwipesDoNotTriggerReply() {
         assertFalse(ReplySwipe.shouldTriggerReply(totalX = -90f, totalY = 0f, threshold = 64f))
@@ -46,6 +48,7 @@ class ReplySwipeTest {
         assertFalse(ReplySwipe.shouldTriggerReply(totalX = 72f, totalY = 80f, threshold = 64f))
     }
 
+    /** Visual reply displacement clamps to its limit and ignores leftward movement. */
     @Test
     fun visualOffsetOnlyFollowsRightwardDragWithinLimit() {
         assertEquals(0f, ReplySwipe.visualOffset(totalX = -20f, maxOffset = 80f))
@@ -53,6 +56,7 @@ class ReplySwipeTest {
         assertEquals(80f, ReplySwipe.visualOffset(totalX = 120f, maxOffset = 80f))
     }
 
+    /** Accumulating diagonal deltas retains vertical intent, preventing a false reply trigger. */
     @Test
     fun gestureAccumulatorPreservesVerticalMovementForTheReplyDecision() {
         val gesture =
@@ -66,6 +70,7 @@ class ReplySwipeTest {
         assertFalse(gesture.shouldTriggerReply(threshold = 64f))
     }
 
+    /** Accumulated horizontal motion both renders the offset and commits the reply threshold. */
     @Test
     fun gestureAccumulatorTriggersReplyForMostlyHorizontalRightwardMovement() {
         val gesture =
