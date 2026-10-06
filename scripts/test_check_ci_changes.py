@@ -92,7 +92,7 @@ class SupplementalCampaignTest(unittest.TestCase):
     def test_build_security_packaging_and_unknown_inputs_run_campaigns(self):
         full = ['app/build.gradle.kts', 'gradle/libs.versions.toml', 'gradlew',
                 '.github/workflows/android-ci.yml', 'scripts/check_ci_changes.py',
-                'app/src/main/AndroidManifest.xml', 'app/src/main/assets/help.md',
+                'app/src/main/AndroidManifest.xml', 'app/src/main/assets/help.md', 'app/src/main/assets/java/Hidden.kt',
                 'app/src/main/marmotkit/MARMOT_VERSION', 'app/src/main/jniLibs/lib.so',
                 'docs/composer-dictation-device-matrix.md', 'unknown.md',
                 '../README.md', 'app/src/main/java/../Hidden.kt',

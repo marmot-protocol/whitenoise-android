@@ -95,7 +95,8 @@ def supplemental_campaigns_diff(raw):
         ordinary = documentation_path(path)
         if path.startswith('app/src/'):
             # Manifests, assets, native artifacts and generated inputs stay full.
-            ordinary |= ('/java/' in path and path.endswith(('.kt', '.java')))
+            ordinary |= (len(parts) > 4 and parts[3] == 'java' and
+                         path.endswith(('.kt', '.java')))
             ordinary |= (path.startswith('app/src/main/res/') and
                          path.endswith(('.xml', '.png', '.webp', '.jpg', '.jpeg')))
             ordinary |= path.startswith('app/src/test/snapshots/') and path.endswith('.png')

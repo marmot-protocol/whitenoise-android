@@ -21,7 +21,7 @@ on:
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant CI.
 concurrency:
-  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  group: android-ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -348,7 +348,7 @@ jobs:
 
       # Release-mode Compose compiler output identifies unstable classes and
       # restartable/skippable composables using the same optimizations users
-      # receive. Keep it opt-in locally; publish it on every CI build.
+      # receive. Keep it opt-in locally; publish it on full campaign runs.
       # Compiler reports are not cached task outputs, so this compile must execute.
       - name: Compile Compose metrics and stability reports
         run: ./gradlew :app:compileStagingZapstoreReleaseKotlin -Pwhitenoise.enableComposeCompilerReports=true --no-build-cache --profile --no-daemon --stacktrace

@@ -100,7 +100,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn('continue-on-error:', step)
 
     def test_compose_reports_run_independently_without_leaving_a_duplicate(self):
-        """The measured Compose compile is parallel but remains a required gate."""
+        """A full campaign measures Compose independently without duplicate compilation."""
         compile_step = self.named_step(
             self.compose_compiler,
             'Compile Compose metrics and stability reports',
@@ -418,6 +418,7 @@ class AndroidCiGateTest(unittest.TestCase):
             events = workflow.split('\non:\n', 1)[1].split('\nconcurrency:', 1)[0]
             self.assertIn('  schedule:\n', events)
             self.assertIn('  workflow_dispatch:', events)
+            self.assertIn('${{ github.event_name }}-${{ github.ref }}', workflow)
             self.assertIn('  pull_request:\n    branches: [master]', events)
         # A readiness-only trigger or draft guard would create a second CI phase.
         for path in WORKFLOW.parent.glob('*.yml'):

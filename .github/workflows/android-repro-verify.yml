@@ -16,7 +16,7 @@ on:
     - cron: '17 3 * * *'
 
 concurrency:
-  group: android-repro-verify-${{ github.workflow }}-${{ github.ref }}
+  group: android-repro-verify-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
