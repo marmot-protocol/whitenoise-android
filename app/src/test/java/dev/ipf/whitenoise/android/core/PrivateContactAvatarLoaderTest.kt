@@ -100,7 +100,10 @@ class PrivateContactAvatarLoaderTest {
             assertFalse(PrivateContactAvatarLoader.belongsToAccount(sourceA, "b"))
             assertNull(PrivateContactAvatarLoader.peek(sourceA, "b"))
             assertNull(PrivateContactAvatarLoader.load(sourceA, "b"))
-            assertEquals(Color.BLUE, checkNotNull(PrivateContactAvatarLoader.load(sourceB, "b")).asAndroidBitmap().getPixel(0, 0))
+            assertEquals(
+                Color.BLUE,
+                checkNotNull(PrivateContactAvatarLoader.load(sourceB, "b")).asAndroidBitmap().getPixel(0, 0),
+            )
             assertNull(AvatarImageLoader.peek(sourceB))
             assertNull(AvatarImageLoader.load(sourceB))
             store.clearAccount("b")

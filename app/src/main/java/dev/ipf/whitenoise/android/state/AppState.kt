@@ -6203,7 +6203,10 @@ class WhiteNoiseAppState private constructor(
     // Durable (commit-backed) but off the main thread: the writes must land
     // before sign-out/wipe completes, and the blocking flush must not stall
     // the UI. The revision bump stays on the caller's (main) context.
-    /** Commits private-field and picture removal off main before account teardown completes, then invalidates display revisions. */
+    /**
+     * Commits private-field and picture removal off main before account teardown completes, then invalidates
+     * display revisions.
+     */
     private suspend fun clearContactPrivateDetailsForAccount(accountRef: String) {
         val normalized = accountRef.trim()
         if (normalized.isEmpty()) return
@@ -10140,7 +10143,9 @@ class WhiteNoiseAppState private constructor(
         contactNicknameRevision
         val publicUrl = avatarUrl(accountIdHex)
         val account = contactNicknameAccountRefForAccess(accountRef, accounts, accountIdHex) ?: return publicUrl
-        if (isContactRefBeingCleared(account) || accounts.none { it.label == account && !it.signedOut }) return publicUrl
+        if (isContactRefBeingCleared(account) || accounts.none { it.label == account && !it.signedOut }) {
+            return publicUrl
+        }
         val picture = contactPictureStore.reference(account, accountIdHex) ?: return publicUrl
         return dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
             .source(picture, publicUrl)

@@ -13,7 +13,10 @@ internal data class ConversationMentionPickerState(
     val candidates: List<MentionComposer.Candidate>,
 )
 
-/** Remembers authoritative group-member candidates using the viewer's contact presentation and optional profile prefetch. */
+/**
+ * Remembers authoritative group-member candidates using the viewer's contact presentation and optional profile
+ * prefetch.
+ */
 @Composable
 internal fun rememberConversationMentionPickerState(
     controller: ConversationController,

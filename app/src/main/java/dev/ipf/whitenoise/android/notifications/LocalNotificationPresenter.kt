@@ -2187,7 +2187,10 @@ class LocalNotificationPresenter(
             }
         }
 
-    /** Revalidates account-private icon overrides at the serialized shortcut write while retaining route and preview ownership. */
+    /**
+     * Revalidates account-private icon overrides at the serialized shortcut write while retaining route and
+     * preview ownership.
+     */
     @Suppress("LongMethod") // One serialized platform write retains its alert, routing and privacy snapshot.
     private fun publishConversationShortcut(
         update: NotificationUpdateFfi,

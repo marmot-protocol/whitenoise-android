@@ -39,18 +39,29 @@ class PrivateContactDestinationAvatarTest {
     private val contact = "40".repeat(32)
 
     /** A cached active-account picture cannot appear in another account's rows with no override. */
-    @Test fun activeAccountOnlyPictureCannotLeakIntoDestinationRows() = assertPickerOwners(hasA = true, hasB = false)
+    @Test
+    fun activeAccountOnlyPictureCannotLeakIntoDestinationRows() = assertPickerOwners(hasA = true, hasB = false)
 
     /** A destination account can display its own picture while the globally active account remains unchanged. */
-    @Test fun destinationAccountOnlyPictureAppearsInBothRows() = assertPickerOwners(hasA = false, hasB = true)
+    @Test
+    fun destinationAccountOnlyPictureAppearsInBothRows() = assertPickerOwners(hasA = false, hasB = true)
 
     /** Distinct records for the same contact always select the destination account's pixels. */
-    @Test fun bothAccountsWithPicturesStillDisplayOnlyTheDestinationOwner() = assertPickerOwners(hasA = true, hasB = true)
+    @Test
+    fun bothAccountsWithPicturesStillDisplayOnlyTheDestinationOwner() =
+        assertPickerOwners(hasA = true, hasB = true)
 
     /** The shared group renderer rejects a mismatched private handle even if a caller supplies one. */
-    @Test fun groupAvatarRejectsAnActiveAccountHandleForAnotherOwner() {
+    @Test
+    fun groupAvatarRejectsAnActiveAccountHandleForAnotherOwner() {
         val appState = emptyAppState(accounts = accounts(), activeAccountRef = "a")
-        appState.contactPictureStore.save("a", contact, "", "", ContactPictureChange.Replace(contactPicturePng(Color.RED))) {
+        appState.contactPictureStore.save(
+            "a",
+            contact,
+            "",
+            "",
+            ContactPictureChange.Replace(contactPicturePng(Color.RED)),
+        ) {
             true
         }
         val source = checkNotNull(appState.contactAvatarSource(contact, "a"))
@@ -67,13 +78,21 @@ class PrivateContactDestinationAvatarTest {
     }
 
     /** A captured handle loses display authority when its selected local account is signed out. */
-    @Test fun signedOutDestinationRejectsItsCapturedPrivateHandle() {
+    @Test
+    fun signedOutDestinationRejectsItsCapturedPrivateHandle() {
         val owners = accounts().map { if (it.label == "b") it.copy(signedOut = true) else it }
         val appState = emptyAppState(accounts = owners, activeAccountRef = "a")
-        appState.contactPictureStore.save("b", contact, "", "", ContactPictureChange.Replace(contactPicturePng(Color.BLUE))) {
+        appState.contactPictureStore.save(
+            "b",
+            contact,
+            "",
+            "",
+            ContactPictureChange.Replace(contactPicturePng(Color.BLUE)),
+        ) {
             true
         }
-        val source = PrivateContactAvatarLoader.source(checkNotNull(appState.contactPictureStore.reference("b", contact)), null)
+        val source =
+            PrivateContactAvatarLoader.source(checkNotNull(appState.contactPictureStore.reference("b", contact)), null)
         runBlocking { PrivateContactAvatarLoader.load(source, "b") }
         rule.setContent {
             WhiteNoiseTheme {
@@ -88,7 +107,8 @@ class PrivateContactDestinationAvatarTest {
     }
 
     /** Retires only this Robolectric fixture's process-local image caches. */
-    @After fun clearPixels() = AvatarImageLoader.clear()
+    @After
+    fun clearPixels() = AvatarImageLoader.clear()
 
     /** Builds the actual forward/share row composables with the same peer and a different selected owner. */
     private fun assertPickerOwners(hasA: Boolean, hasB: Boolean) {
@@ -96,7 +116,13 @@ class PrivateContactDestinationAvatarTest {
         val appState = emptyAppState(accounts = accounts(), activeAccountRef = "a")
         listOf("a" to hasA, "b" to hasB).filter { it.second }.forEach { (account, _) ->
             val color = if (account == "a") Color.RED else Color.BLUE
-            appState.contactPictureStore.save(account, contact, "", "", ContactPictureChange.Replace(contactPicturePng(color))) {
+            appState.contactPictureStore.save(
+                account,
+                contact,
+                "",
+                "",
+                ContactPictureChange.Replace(contactPicturePng(color)),
+            ) {
                 true
             }
         }
