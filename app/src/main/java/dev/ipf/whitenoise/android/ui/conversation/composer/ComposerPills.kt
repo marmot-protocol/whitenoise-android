@@ -132,6 +132,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
+import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
@@ -378,6 +379,9 @@ internal fun ComposerPill(
     hasContactShare: Boolean = false,
     highlightMentionChips: Boolean = false,
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
+    // Mention chips share the send button's colours: the exact account accent with readable content.
+    // Required so a caller cannot silently fall back to the default accent.
+    actionColors: AccountActionColors,
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
     onImeSend: () -> Unit = {},
     onPasteImageUris: ((List<Uri>) -> Unit)? = null,
@@ -495,14 +499,16 @@ internal fun ComposerPill(
     // #414/#442: paint stored `@npub1…` chip runs as friendly visible labels
     // (`@alice` when the profile is resolved, short `@npub1…` otherwise)
     // while keeping the backing TextFieldValue canonical for send/markdown.
-    val chipColor = MaterialTheme.colorScheme.primary
+    // A filled chip with black-or-white content reads on any accent, including ones that vanish as text.
+    val chipColor = actionColors.container
+    val chipContentColor = actionColors.content
     val mentionCandidateLookup =
         remember(highlightMentionChips, mentionCandidates) {
             if (highlightMentionChips) MentionComposer.candidatesByNpub(mentionCandidates) else emptyMap()
         }
     val mentionComposition = textFieldValue.composition
     val mentionVisualTransformation =
-        remember(highlightMentionChips, chipColor, mentionCandidateLookup, mentionComposition) {
+        remember(highlightMentionChips, chipColor, chipContentColor, mentionCandidateLookup, mentionComposition) {
             if (!highlightMentionChips) {
                 VisualTransformation.None
             } else {
@@ -544,9 +550,9 @@ internal fun ComposerPill(
                                     if (spanEnd > spanStart) {
                                         addStyle(
                                             SpanStyle(
-                                                color = chipColor,
+                                                color = chipContentColor,
                                                 fontWeight = FontWeight.Medium,
-                                                background = chipColor.copy(alpha = 0.12f),
+                                                background = chipColor,
                                             ),
                                             spanStart,
                                             spanEnd,
