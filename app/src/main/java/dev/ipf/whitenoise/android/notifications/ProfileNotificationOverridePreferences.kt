@@ -31,24 +31,25 @@ internal class ProfileNotificationOverridePreferences(
     fun get(
         accountRef: String?,
         author: String?,
-    ): ProfileNotificationOverride {
-        val key = key(accountRef, author) ?: return ProfileNotificationOverride()
-        val fields = preferences.getString(key, null)?.split('|').orEmpty()
-        return ProfileNotificationOverride(
-            mode =
-                ProfileNotificationMode.entries.firstOrNull { it.name == fields.getOrNull(0) }
-                    ?: ProfileNotificationMode.DEFAULT,
-            vibration =
-                ConversationVibrationPattern.entries.firstOrNull { it.name == fields.getOrNull(1) }
-                    ?: ConversationVibrationPattern.SYSTEM_DEFAULT,
-        )
-    }
+    ): ProfileNotificationOverride =
+        synchronized(mutationLock) {
+            val key = key(accountRef, author) ?: return@synchronized ProfileNotificationOverride()
+            val fields = preferences.getString(key, null)?.split('|').orEmpty()
+            ProfileNotificationOverride(
+                mode =
+                    ProfileNotificationMode.entries.firstOrNull { it.name == fields.getOrNull(0) }
+                        ?: ProfileNotificationMode.DEFAULT,
+                vibration =
+                    ConversationVibrationPattern.entries.firstOrNull { it.name == fields.getOrNull(1) }
+                        ?: ConversationVibrationPattern.SYSTEM_DEFAULT,
+            )
+        }
 
     /** A stored choice may have dormant channels whose mutable labels still need to follow a rename. */
     fun hasChoice(
         accountRef: String,
         author: String,
-    ): Boolean = key(accountRef, author)?.let(preferences::contains) == true
+    ): Boolean = synchronized(mutationLock) { key(accountRef, author)?.let(preferences::contains) == true }
 
     /** Commit off-main before reporting success; a failed save must not pretend routing changed durably. */
     fun set(
@@ -60,7 +61,9 @@ internal class ProfileNotificationOverridePreferences(
         synchronized(mutationLock) {
             if (!canWrite()) return@synchronized false
             val key = key(accountRef, author) ?: return@synchronized false
+            val previous = preferences.getString(key, null)
             val saved = preferences.edit().putString(key, "${selection.mode.name}|${selection.vibration.name}").commit()
+            if (!saved) restoreInMemory(mapOf(key to previous))
             if (saved) revision.value += 1
             saved
         }
@@ -69,14 +72,29 @@ internal class ProfileNotificationOverridePreferences(
     fun clearAccount(accountRef: String): Boolean =
         synchronized(mutationLock) {
             val prefix = accountPrefix(accountRef)
+            val previous =
+                preferences.all.keys
+                    .filter { it.startsWith(prefix) }
+                    .associateWith { preferences.getString(it, null) }
             val editor = preferences.edit()
-            preferences.all.keys
-                .filter { it.startsWith(prefix) }
-                .forEach(editor::remove)
+            previous.keys.forEach(editor::remove)
             val saved = editor.commit()
+            if (!saved) restoreInMemory(previous)
             if (saved) revision.value += 1
             saved
         }
+
+    /**
+     * Android mutates its memory map before commit reports a failed disk write. Roll it back while
+     * readers hold the same lock; even a failed rollback flush still restores the old in-memory policy.
+     */
+    private fun restoreInMemory(previous: Map<String, String?>) {
+        val editor = preferences.edit()
+        previous.forEach { (key, value) ->
+            if (value == null) editor.remove(key) else editor.putString(key, value)
+        }
+        editor.commit()
+    }
 
     /** Only another author's actual incoming message participates in person-specific alert policy. */
     fun isMuted(update: NotificationUpdateFfi): Boolean {

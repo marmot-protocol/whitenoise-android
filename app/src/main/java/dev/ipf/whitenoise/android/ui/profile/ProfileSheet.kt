@@ -1069,7 +1069,7 @@ internal fun ProfileSheet(
                             accountAtOpen,
                             author,
                             displayTitle,
-                            ownerIsCurrent = owner::canAct,
+                            ownerIsCurrent = { owner.canAct() && page == ProfileSheetPage.NOTIFICATIONS },
                             onBack = { page = ProfileSheetPage.PROFILE },
                         )
                     }

@@ -16,6 +16,52 @@ class ProfileNotificationOverridePreferencesTest {
     private val alice = "a".repeat(64)
     private val bob = "b".repeat(64)
 
+    /** Failed disk writes mutate SharedPreferences memory first; all adapters must retain the prior mute. */
+    @Test fun failedSaveAndCleanupRestoreRoutingAcrossAdapters() {
+        val delegate = context.getSharedPreferences("failing-profile-policy", android.content.Context.MODE_PRIVATE)
+        val stable = ProfileNotificationOverridePreferences(context, delegate)
+        val author = "a".repeat(64)
+        stable.set("personal", author, ProfileNotificationOverride(ProfileNotificationMode.MUTED))
+        val failing =
+            ProfileNotificationOverridePreferences(
+                context,
+                object : android.content.SharedPreferences by delegate {
+                    override fun edit(): android.content.SharedPreferences.Editor = FailingEditor(delegate.edit())
+                },
+            )
+        assertFalse(failing.set("personal", author, ProfileNotificationOverride(ProfileNotificationMode.DEFAULT)))
+        assertEquals(ProfileNotificationMode.MUTED, stable.get("personal", author).mode)
+        assertEquals(ProfileNotificationMode.MUTED, failing.get("personal", author).mode)
+        assertFalse(failing.clearAccount("personal"))
+        assertEquals(ProfileNotificationMode.MUTED, stable.get("personal", author).mode)
+        assertFalse(failing.set("other", author, ProfileNotificationOverride(ProfileNotificationMode.CUSTOM)))
+        assertEquals(ProfileNotificationMode.DEFAULT, stable.get("other", author).mode)
+        assertFalse(stable.hasChoice("other", author))
+    }
+
+    /** Emulates Android's memory-first commit and an unavailable disk, including failed rollback flushes. */
+    private class FailingEditor(
+        private val delegate: android.content.SharedPreferences.Editor,
+    ) : android.content.SharedPreferences.Editor by delegate {
+        override fun putString(
+            key: String?,
+            value: String?,
+        ): android.content.SharedPreferences.Editor {
+            delegate.putString(key, value)
+            return this
+        }
+
+        override fun remove(key: String?): android.content.SharedPreferences.Editor {
+            delegate.remove(key)
+            return this
+        }
+
+        override fun commit(): Boolean {
+            delegate.commit()
+            return false
+        }
+    }
+
     @Test fun restartAndCrossInstanceReadsPreserveOnlyTheSelectedAuthorAndAccount() {
         val background = ProfileNotificationOverridePreferences(context)
         val ui = ProfileNotificationOverridePreferences(context)

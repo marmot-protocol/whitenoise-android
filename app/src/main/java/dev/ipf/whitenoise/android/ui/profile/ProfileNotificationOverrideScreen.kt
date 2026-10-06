@@ -41,12 +41,21 @@ internal fun ProfileNotificationOverrideRoot(
     title: String,
     ownerIsCurrent: () -> Boolean,
     onBack: () -> Unit,
+    ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val controller =
         remember(preferences, account, author) {
-            ProfileNotificationOverrideController(context, preferences, account, author, scope, ownerIsCurrent)
+            ProfileNotificationOverrideController(
+                context,
+                preferences,
+                account,
+                author,
+                scope,
+                ownerIsCurrent,
+                ioDispatcher,
+            )
         }
     val state by controller.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
