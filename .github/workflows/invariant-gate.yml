@@ -18,7 +18,7 @@ name: Invariant gate
 on:
   pull_request:
     branches: [master]
-    types: [opened, edited, reopened, synchronize, ready_for_review]
+    types: [opened, edited, reopened, synchronize]
 
 concurrency:
   group: invariant-gate-${{ github.event.pull_request.number }}
