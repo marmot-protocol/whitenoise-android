@@ -1,6 +1,8 @@
 const START = '<!-- pr-screenshots:start -->'
 const END = '<!-- pr-screenshots:end -->'
 const SNAPSHOT_PREFIX = 'app/src/test/snapshots/'
+const MAX_INLINE_SNAPSHOTS = 12
+const MAX_BASELINE_NAMES_LENGTH = 24_000
 // Opt-out for purely behavioral changes to UI sources, where nothing renders
 // differently and a screenshot baseline would be noise. The declaration is
 // deliberate prose in the PR description, so reviewers see and can challenge it.
@@ -61,7 +63,18 @@ function renderSection(pr, files) {
       `Generated from the committed Roborazzi baselines at head \`${pr.head.sha}\`. This section updates automatically when new commits are pushed.`,
       '',
     )
-    for (const file of snapshots) {
+    if (snapshots.length > MAX_INLINE_SNAPSHOTS) {
+      const gallery = `https://github.com/${pr.head.repo.full_name}/tree/${pr.head.sha}/${SNAPSHOT_PREFIX.slice(0, -1)}`
+      const names = snapshots.map(file => `- ${escapeCell(file.filename.slice(SNAPSHOT_PREFIX.length))} (${file.status})`).join('\n')
+      lines.push(
+        `Showing ${MAX_INLINE_SNAPSHOTS} of ${snapshots.length} changed baselines below. [Browse all current baselines](${gallery}); the pull request's Files changed tab contains every comparison.`,
+        '',
+        '<details>', '<summary>All changed baseline names</summary>', '',
+        names.length <= MAX_BASELINE_NAMES_LENGTH ? names : 'The complete list exceeds the description budget; see the Files changed tab for every baseline.',
+        '', '</details>', '',
+      )
+    }
+    for (const file of snapshots.slice(0, MAX_INLINE_SNAPSHOTS)) {
       const title = escapeCell(file.filename.slice(SNAPSHOT_PREFIX.length))
       const before = repoFileUrl(pr.base.repo.full_name, pr.base.sha, file.previous_filename || file.filename)
       const after = repoFileUrl(pr.head.repo.full_name, pr.head.sha, file.filename)
