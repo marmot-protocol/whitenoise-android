@@ -2275,5 +2275,5 @@
     <string name="destination_filter_selected">Auswahl prüfen (%1$d)</string>
     <string name="destination_filter_label">Chats filtern</string>
     <string name="forward_select_by_folder">Nach Ordner auswählen</string>
-    <string name="destination_filter_incomplete">Noch keine passenden Chats geladen. Erneut versuchen oder alle Chats wählen.</string>
+    <string name="destination_filter_incomplete">Einige Chats fehlen möglicherweise. Erneut versuchen oder alle Chats wählen.</string>
 </resources>

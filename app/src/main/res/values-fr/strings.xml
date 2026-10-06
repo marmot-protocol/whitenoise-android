@@ -2258,5 +2258,5 @@
     <string name="destination_filter_selected">Voir la sélection (%1$d)</string>
     <string name="destination_filter_label">Filtrer les discussions</string>
     <string name="forward_select_by_folder">Sélectionner par dossier</string>
-    <string name="destination_filter_incomplete">Aucune discussion correspondante chargée. Réessayez ou choisissez Toutes les discussions.</string>
+    <string name="destination_filter_incomplete">Certaines discussions peuvent manquer. Réessayez ou choisissez Toutes les discussions.</string>
 </resources>

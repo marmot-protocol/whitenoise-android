@@ -2258,5 +2258,5 @@
     <string name="destination_filter_selected">Revisar selección (%1$d)</string>
     <string name="destination_filter_label">Filtrar chats</string>
     <string name="forward_select_by_folder">Seleccionar por carpeta</string>
-    <string name="destination_filter_incomplete">Aún no se han cargado chats coincidentes. Reintenta o elige Todos los chats.</string>
+    <string name="destination_filter_incomplete">Es posible que falten algunos chats. Reintenta o elige Todos los chats.</string>
 </resources>

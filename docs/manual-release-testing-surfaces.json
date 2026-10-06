@@ -735,6 +735,16 @@
         "anchor": "fun reconcileSuccessfulTextSend(",
         "test_ids": ["MSG-004"]
       },
+      {"surface": "Compact sending account accessibility label", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt", "anchor": "R.string.share_sending_as_value", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.forward_search_chats", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt", "anchor": "R.string.forward_search_chats", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.forward_start_failed", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt", "anchor": "R.string.forward_start_failed", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_incomplete", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFilterIncomplete.kt", "anchor": "R.string.destination_filter_incomplete", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.retry", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFilterIncomplete.kt", "anchor": "R.string.retry", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_all", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "R.string.destination_filter_all", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_label", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "R.string.destination_filter_label", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_selected", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "R.string.destination_filter_selected", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: fun destinationFolderInputsComplete(", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "fun destinationFolderInputsComplete(", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.share_search_chats", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt", "anchor": "R.string.share_search_chats", "test_ids": ["FLD-001", "SYS-004"]},
       {
         "surface": "ForwardEmptyTargets",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",

@@ -2256,5 +2256,5 @@
     <string name="destination_filter_selected">Seçilenleri incele (%1$d)</string>
     <string name="destination_filter_label">Sohbetleri filtrele</string>
     <string name="forward_select_by_folder">Klasöre göre seç</string>
-    <string name="destination_filter_incomplete">Eşleşen sohbetler henüz yüklenmedi. Tekrar deneyin veya Tüm sohbetler seçeneğini seçin.</string>
+    <string name="destination_filter_incomplete">Bazı sohbetler eksik olabilir. Tekrar deneyin veya Tüm sohbetler seçeneğini seçin.</string>
 </resources>

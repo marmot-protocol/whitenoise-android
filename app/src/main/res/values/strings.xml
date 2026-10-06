@@ -2416,5 +2416,5 @@
     <string name="destination_filter_selected">Review selected (%1$d)</string>
     <string name="destination_filter_label">Filter chats</string>
     <string name="forward_select_by_folder">Select by folder</string>
-    <string name="destination_filter_incomplete">No matching chats are loaded yet. Retry or choose All chats.</string>
+    <string name="destination_filter_incomplete">Some chats may be missing. Retry or choose All chats.</string>
 </resources>

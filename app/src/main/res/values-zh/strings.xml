@@ -2225,5 +2225,5 @@
     <string name="destination_filter_selected">查看已选（%1$d）</string>
     <string name="destination_filter_label">筛选聊天</string>
     <string name="forward_select_by_folder">按文件夹选择</string>
-    <string name="destination_filter_incomplete">尚未加载匹配的聊天。请重试或选择所有聊天。</string>
+    <string name="destination_filter_incomplete">部分聊天可能缺失。请重试或选择所有聊天。</string>
 </resources>

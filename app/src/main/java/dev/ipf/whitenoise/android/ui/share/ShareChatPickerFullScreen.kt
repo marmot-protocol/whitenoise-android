@@ -257,6 +257,15 @@ private fun ShareChatPickerContent(
             pickerState.selectedAccountIdHex,
             pickerState.memberSnapshotsRevision,
         )
+    val folderComplete =
+        pickerState.targetsComplete &&
+            destinationFolderInputsComplete(
+                pickerState.appState,
+                pickerState.targets,
+                pickerState.selectedAccountRef,
+                filter.folderId,
+                folders,
+            )
     val filteredTargets =
         pickerState.filtered(presentedTargets).filter {
             filter.accepts(it.item.group.groupIdHex, folders, pickerState.selected)
@@ -318,6 +327,7 @@ private fun ShareChatPickerContent(
                 pickerState = pickerState,
                 filteredTargets = filteredTargets,
                 browsingFiltered = filter.folderId != null || filter.reviewingSelected,
+                targetsComplete = folderComplete,
                 modifier = Modifier.weight(1f),
                 listState = listState,
             )
@@ -331,6 +341,7 @@ private fun ShareChatPickerTargetList(
     pickerState: ShareChatPickerState,
     filteredTargets: List<ShareChatPickerTargetPresentation>,
     browsingFiltered: Boolean,
+    targetsComplete: Boolean,
     modifier: Modifier,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
@@ -352,12 +363,15 @@ private fun ShareChatPickerTargetList(
                     InlineErrorBanner(error = failure, onRetry = pickerState::retryLoad)
                 }
             }
+            if (browsingFiltered && !targetsComplete && filteredTargets.isNotEmpty()) {
+                item { DestinationFilterIncomplete(pickerState::retryLoad) }
+            }
             if (browsingFiltered && pickerState.isLoading && filteredTargets.isEmpty()) {
                 item { LoadingScreen() }
             } else if (filteredTargets.isEmpty()) {
                 if (!browsingFiltered || pickerState.error == null) {
                     item {
-                        if (browsingFiltered && !pickerState.targetsComplete) {
+                        if (browsingFiltered && !targetsComplete) {
                             DestinationFilterIncomplete(pickerState::retryLoad)
                             return@item
                         }

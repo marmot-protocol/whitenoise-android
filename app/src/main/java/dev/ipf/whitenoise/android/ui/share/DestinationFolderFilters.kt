@@ -22,12 +22,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.FolderTruth
+import dev.ipf.whitenoise.android.core.smartFolderMatches
 import dev.ipf.whitenoise.android.state.ChatFolder
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatFolderPill
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.messages.destinationFolderMembershipRows
+import dev.ipf.whitenoise.android.ui.conversation.messages.forwardTargetDisplayTitle
 import dev.ipf.whitenoise.android.ui.settings.chatFolderDisplayName
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
@@ -55,6 +59,37 @@ internal fun rememberDestinationFolderRows(
     ) {
         destinationFolderMembershipRows(appState, targets, copy, accountRef, accountIdHex)
     }
+}
+
+/** Row-read success does not establish participant membership or other unavailable smart-rule facts. */
+@Composable
+@Suppress("ReturnCount") // Missing/manual/unsupported rules do not require automatic membership facts.
+internal fun destinationFolderInputsComplete(
+    appState: WhiteNoiseAppState,
+    targets: List<ChatListItem>,
+    accountRef: String?,
+    folderId: String?,
+    rows: List<Pair<ChatFolder, List<String>>>,
+): Boolean {
+    val copy = rememberGroupTitleCopy()
+    if (accountRef == null || folderId == null) return true
+    val rule = appState.chatFolderPreferences.folderRule(accountRef, folderId) ?: return true
+    val matched =
+        rows
+            .firstOrNull { it.first.id == folderId }
+            ?.second
+            .orEmpty()
+            .toHashSet()
+    val unresolved = targets.filterNot { it.group.groupIdHex in matched }
+    val payload = rule.smartFilter
+    if (payload != null) {
+        val filter = SmartFolderCodec.decode(payload)?.takeIf(SmartFolderCodec::valid) ?: return true
+        return unresolved.none { item ->
+            smartFolderMatches(filter, item) { forwardTargetDisplayTitle(it, appState, accountRef, copy) } ==
+                FolderTruth.UNKNOWN
+        }
+    }
+    return rule.includeMemberPubkeys.isEmpty() || unresolved.none { it.memberSnapshot == null }
 }
 
 /** A fixed All escape hatch plus bounded, scrollable filter pills; bulk-selection controls remain separate. */

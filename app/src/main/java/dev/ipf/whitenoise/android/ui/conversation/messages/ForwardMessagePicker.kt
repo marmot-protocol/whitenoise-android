@@ -86,6 +86,7 @@ import dev.ipf.whitenoise.android.ui.share.DestinationFilterIncomplete
 import dev.ipf.whitenoise.android.ui.share.DestinationFolderFilterState
 import dev.ipf.whitenoise.android.ui.share.DestinationPickerSearch
 import dev.ipf.whitenoise.android.ui.share.ShareChatPickerAccountSheet
+import dev.ipf.whitenoise.android.ui.share.destinationFolderInputsComplete
 import dev.ipf.whitenoise.android.ui.share.rememberDestinationFolderRows
 import dev.ipf.whitenoise.android.ui.share.rememberShareChatPickerDataSource
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -310,6 +311,15 @@ internal fun ForwardMessagePickerContent(
             destination.selectedAccountIdHex,
             memberRevision,
         )
+    val folderComplete =
+        dataSource.targetsComplete &&
+            destinationFolderInputsComplete(
+                appState,
+                targets,
+                destination.selectedAccountRef,
+                filter.folderId,
+                folderRows,
+            )
     val filteredTargets =
         remember(titledTargets, query, folderRows, filter.folderId, filter.reviewingSelected, selected) {
             val needle = query.trim()
@@ -379,12 +389,13 @@ internal fun ForwardMessagePickerContent(
         },
     ) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
-            val horizontalFilters = maxHeight < 480.dp && maxWidth >= 600.dp
+            val compactHeight = maxHeight < 480.dp
+            val horizontalFilters = compactHeight && maxWidth >= 600.dp
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(if (horizontalFilters) 8.dp else 12.dp),
+                verticalArrangement = Arrangement.spacedBy(if (compactHeight) 8.dp else 12.dp),
             ) {
-                if (horizontalFilters) {
+                if (compactHeight) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = Dimens.spaceLg),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -449,7 +460,7 @@ internal fun ForwardMessagePickerContent(
                     filteredTargets = filteredTargets,
                     visibleFolderRows = visibleFolderRows,
                     targetLoading = targetLoading,
-                    targetsComplete = dataSource.targetsComplete,
+                    targetsComplete = folderComplete,
                     browsingFiltered = filter.folderId != null || filter.reviewingSelected,
                     targetError = targetError,
                     retryLoad = dataSource.retryLoad,
@@ -515,7 +526,7 @@ private fun ForwardSelectionSummary(
 
 /** Keeps folder bulk actions in one compact region above ordinary, individually selectable destinations. */
 @Composable
-@Suppress("LongParameterList", "LongMethod")
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod") // Explicit loaded, partial and failed states.
 private fun ForwardTargetList(
     appState: WhiteNoiseAppState,
     targets: List<ChatListItem>,
@@ -569,6 +580,9 @@ private fun ForwardTargetList(
                     item(key = "forward-picker-load-error") {
                         InlineErrorBanner(error = failure, onRetry = retryLoad)
                     }
+                }
+                if (browsingFiltered && !targetsComplete && filteredTargets.isNotEmpty()) {
+                    item { DestinationFilterIncomplete(retryLoad) }
                 }
                 if (browsingFiltered && filteredTargets.isEmpty()) {
                     item {

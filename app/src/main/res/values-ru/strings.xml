@@ -2328,5 +2328,5 @@
     <string name="destination_filter_selected">Проверить выбранные (%1$d)</string>
     <string name="destination_filter_label">Фильтр чатов</string>
     <string name="forward_select_by_folder">Выбрать по папке</string>
-    <string name="destination_filter_incomplete">Подходящие чаты ещё не загружены. Повторите попытку или выберите все чаты.</string>
+    <string name="destination_filter_incomplete">Некоторые чаты могут отсутствовать. Повторите попытку или выберите все чаты.</string>
 </resources>

@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.share.SharePayload
+import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
@@ -121,9 +122,9 @@ internal fun rememberShareChatPickerDataSource(
         accountController != null ->
             ShareChatPickerDataSource(
                 controller = accountController,
-                targets = mergeForwardTargets(accountController.forwardTargets(), accountWideTargets.items),
+                targets = mergeForwardTargets(accountController.forwardTargets(), accountWideTargets.items()),
                 isLoading = accountController.isLoading,
-                targetsComplete = accountWideTargets.complete,
+                targetsComplete = accountWideTargets.complete && accountWideTargets.snapshot?.isCurrent == true,
                 error = accountController.error,
                 memberSnapshotsRevision = accountController.memberSnapshotsRevision,
                 targetsRevision = accountController.forwardTargetsRevision,
@@ -135,9 +136,9 @@ internal fun rememberShareChatPickerDataSource(
         else ->
             ShareChatPickerDataSource(
                 controller = null,
-                targets = mergeForwardTargets(appState.forwardTargets(), accountWideTargets.items),
+                targets = mergeForwardTargets(appState.forwardTargets(), accountWideTargets.items()),
                 isLoading = appState.forwardTargetsLoading,
-                targetsComplete = accountWideTargets.complete,
+                targetsComplete = accountWideTargets.complete && accountWideTargets.snapshot?.isCurrent == true,
                 error = appState.forwardTargetsError,
                 memberSnapshotsRevision = appState.forwardTargetMembersRevision,
                 targetsRevision = appState.forwardTargetsRevision,
@@ -182,13 +183,29 @@ private fun rememberAccountWideForwardTargets(
             } else {
                 appState.loadAccountWideForwardTargets()
             }
-        targets.value = AccountWidePickerTargets(loaded ?: targets.value.items, loaded != null)
+        targets.value = AccountWidePickerTargets(loaded ?: targets.value.snapshot, loaded != null)
+    }
+    val revision = accountController?.memberSnapshotsRevision ?: appState.forwardTargetMembersRevision
+    val snapshot = targets.value.snapshot
+    val missingMembers =
+        remember(snapshot, revision) {
+            snapshot
+                ?.items()
+                .orEmpty()
+                .filter { it.memberSnapshot == null }
+                .mapTo(hashSetOf()) { it.group.groupIdHex }
+        }
+    LaunchedEffect(snapshot, missingMembers, retryRevision) {
+        snapshot?.resolveMembers(missingMembers)
     }
     return targets.value
 }
 
 /** Transient picker projection and whether its latest account-wide read completed successfully. */
 private data class AccountWidePickerTargets(
-    val items: List<ChatListItem>? = null,
+    val snapshot: AccountWideForwardTargets? = null,
     val complete: Boolean = false,
-)
+) {
+    /** Reprojects the native snapshot after observed member and target revisions, without another row read. */
+    fun items(): List<ChatListItem>? = snapshot?.items()
+}

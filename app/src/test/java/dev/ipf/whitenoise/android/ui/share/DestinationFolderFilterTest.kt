@@ -100,7 +100,7 @@ class DestinationFolderFilterTest {
         composeRule.onNodeWithText("Alice").assertDoesNotExist()
         composeRule.onNodeWithText("Bob").assertDoesNotExist()
         composeRule.onNodeWithTag("destination.filter.all").assertIsDisplayed()
-        composeRule.onNodeWithText("No matching chats are loaded yet. Retry or choose All chats.").assertIsDisplayed()
+        composeRule.onNodeWithText("Some chats may be missing. Retry or choose All chats.").assertIsDisplayed()
         composeRule.onNodeWithText("Retry").assertIsDisplayed()
         composeRule.runOnIdle {
             state.chatFolderPreferences.setChatInFolder(ACCOUNT_REF, folder.id, GROUP_A, true)

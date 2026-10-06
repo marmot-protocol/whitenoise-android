@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -143,8 +145,10 @@ internal fun ShareChatPickerAccountIdentity(
 ) {
     Column(modifier) {
         if (compact) {
+            val sendingAs = stringResource(R.string.share_sending_as_value, accountTitle)
             EmojiLabel(
-                text = stringResource(R.string.share_sending_as_value, accountTitle),
+                text = accountTitle,
+                modifier = Modifier.semantics { contentDescription = sendingAs },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
