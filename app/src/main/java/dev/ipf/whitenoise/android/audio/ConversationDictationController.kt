@@ -2926,15 +2926,7 @@ internal class ConversationDictationController internal constructor(
         retainedTranscript: String? = null,
     ) {
         if (state.sessionId != sessionId) return
-        val failure =
-            if (!retainedTranscript.isNullOrBlank() &&
-                requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish &&
-                reason != ConversationDictationFailure.DeliveryUnknown
-            ) {
-                ConversationDictationFailure.SendBlocked
-            } else {
-                reason
-            }
+        val failure = completedTranscriptFailure(reason, retainedTranscript)
         conversationDictationDiagnostic("event=session_failed failure=${failure.name}")
         val recovered = recoverRecognizedDraft(sessionId, target, retainedTranscript)
         if (state.sessionId != sessionId) return
@@ -2972,6 +2964,20 @@ internal class ConversationDictationController internal constructor(
                 }
             }
     }
+
+    /** Send failures retain the explicit send choice while uncertain delivery keeps its separate warning. */
+    private fun completedTranscriptFailure(
+        reason: ConversationDictationFailure,
+        retainedTranscript: String?,
+    ): ConversationDictationFailure =
+        if (!retainedTranscript.isNullOrBlank() &&
+            requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish &&
+            reason != ConversationDictationFailure.DeliveryUnknown
+        ) {
+            ConversationDictationFailure.SendBlocked
+        } else {
+            reason
+        }
 
     /** Releases recognition and microphone ownership, optionally retaining the durable service lease. */
     private fun clearRecognitionSession(
@@ -3128,18 +3134,7 @@ internal class ConversationDictationController internal constructor(
             return
         }
         if (draftRecovery.owns(sessionId, target)) {
-            val recovered =
-                draftRecovery.recover(
-                    sessionId,
-                    target,
-                    transcript,
-                    options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = transcript),
-                )
-            if (recovered) {
-                complete(target)
-            } else {
-                fail(sessionId, target, ConversationDictationFailure.Unknown, retainedTranscript = transcript)
-            }
+            completeRecoveredPaste(sessionId, target, transcript)
             return
         }
         repeat(DICTATION_DRAFT_WRITE_ATTEMPTS) {
@@ -3192,6 +3187,26 @@ internal class ConversationDictationController internal constructor(
         }
         conversationDictationDiagnostic("event=paste_write outcome=append reason=write_retries_exhausted")
         appendTranscriptAtEndOrFail(sessionId, target, transcript)
+    }
+
+    /** An already recovered insertion is replaced once and completes only after its fenced write succeeds. */
+    private fun completeRecoveredPaste(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+    ) {
+        val recovered =
+            draftRecovery.recover(
+                sessionId,
+                target,
+                transcript,
+                options = ConversationDictationDraftRecovery.Options(acknowledgedPrefix = transcript),
+            )
+        if (recovered) {
+            complete(target)
+        } else {
+            fail(sessionId, target, ConversationDictationFailure.Unknown, retainedTranscript = transcript)
+        }
     }
 
     /** Resolves Paste automatically against the latest draft instead of exposing a pen fallback. */
@@ -3513,34 +3528,44 @@ internal class ConversationDictationController internal constructor(
                 }
             if (pendingTargetValidation !== request) return@launch
             pendingTargetValidation = null
-            conversationDictationDiagnostic("event=target_validation phase=delivery result=${validation.name}")
-            if (state.sessionId != sessionId || state !is ConversationDictationState.Processing) return@launch
-            val localValidation = completedTargetValidation(target)
-            if (validation == ConversationDictationTargetValidation.DefinitelyRemoved ||
-                completedTargetValidation(target, includeReply = false) ==
-                ConversationDictationTargetValidation.DefinitelyRemoved
-            ) {
-                draftTargetRemoved = true
-            }
-            if (
-                validation != ConversationDictationTargetValidation.Available ||
-                localValidation != ConversationDictationTargetValidation.Available
-            ) {
-                if (validation == ConversationDictationTargetValidation.Available) {
-                    conversationDictationDiagnostic(
-                        "event=target_validation phase=delivery result=${localValidation.name} source=local",
-                    )
-                }
-                fail(
-                    sessionId,
-                    target,
-                    ConversationDictationFailure.Unknown,
-                    retainedTranscript = transcript,
-                )
-                return@launch
-            }
-            deliverTranscript(sessionId, target, transcript)
+            finishValidatedTranscript(sessionId, target, transcript, validation)
         }
+    }
+
+    /** A finished membership probe must still match the session and immutable send origin. */
+    private fun finishValidatedTranscript(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+        validation: ConversationDictationTargetValidation,
+    ) {
+        conversationDictationDiagnostic("event=target_validation phase=delivery result=${validation.name}")
+        if (state.sessionId != sessionId || state !is ConversationDictationState.Processing) return
+        val localValidation = completedTargetValidation(target)
+        if (validation == ConversationDictationTargetValidation.DefinitelyRemoved ||
+            completedTargetValidation(target, includeReply = false) ==
+            ConversationDictationTargetValidation.DefinitelyRemoved
+        ) {
+            draftTargetRemoved = true
+        }
+        if (
+            validation != ConversationDictationTargetValidation.Available ||
+            localValidation != ConversationDictationTargetValidation.Available
+        ) {
+            if (validation == ConversationDictationTargetValidation.Available) {
+                conversationDictationDiagnostic(
+                    "event=target_validation phase=delivery result=${localValidation.name} source=local",
+                )
+            }
+            fail(
+                sessionId,
+                target,
+                ConversationDictationFailure.Unknown,
+                retainedTranscript = transcript,
+            )
+            return
+        }
+        deliverTranscript(sessionId, target, transcript)
     }
 
     /** An explicit in-app Paste is local-only, so a transient MDK membership read must not block it. */

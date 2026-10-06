@@ -74,46 +74,89 @@ internal class ConversationDictationDraftRecovery(
     ): Boolean {
         val text = transcript.trim()
         if (text.isEmpty()) return false
+        var result = RecoveryAttempt.Retry
         repeat(DICTATION_DRAFT_WRITE_ATTEMPTS) {
+            if (result == RecoveryAttempt.Retry) result = recoverAttempt(session, target, text, options)
+        }
+        return result == RecoveryAttempt.Recovered
+    }
+
+    private enum class RecoveryAttempt {
+        Recovered,
+        Retry,
+        Unavailable,
+    }
+
+    private data class RecoveryWrite(
+        val previous: Receipt?,
+        val current: ConversationDictationDraftSnapshot,
+        val insertion: Insertion,
+        val value: TextFieldValue,
+        val revision: Long,
+    )
+
+    private fun recoverAttempt(
+        session: Long,
+        target: ConversationDictationTarget,
+        text: String,
+        options: Options,
+    ): RecoveryAttempt =
+        run {
             val previous = receipt?.takeIf { it.session == session && it.target == target }
-            val current = runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull() ?: return false
-            if (previous?.transcript == text && previous.emptiedRevision == null) return true
-            val unchanged = previous?.draft?.let { sameDraft(it, current) } == true
-            val insertion = planInsertion(previous, current, text, options) ?: return false
+            val current =
+                runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull()
+                    ?: return@run RecoveryAttempt.Unavailable
+            if (previous?.transcript == text && previous.emptiedRevision == null) return@run RecoveryAttempt.Recovered
+            val insertion = planInsertion(previous, current, text, options) ?: return@run RecoveryAttempt.Unavailable
             val value = insertionValue(target, text, insertion)
             val revision =
-                runCatching { write(target.accountRef, target.groupIdHex, current.revision, value) }
-                    .getOrNull() ?: return@repeat
-            val originalUnchanged =
-                sameDraft(
-                    ConversationDictationDraftSnapshot(target.capturedDraft, target.capturedDraftRevision),
-                    current,
-                )
-            val ownsEmpty =
-                (previous?.emptiedRevision ?: options.ownedEmptyRevision) == current.revision &&
-                    current.value.text.isEmpty()
-            val sendEligible =
-                if (previous == null) {
-                    originalUnchanged || ownsEmpty
-                } else {
-                    (unchanged || ownsEmpty) && previous.sendEligible
-                }
+                runCatching { write(target.accountRef, target.groupIdHex, current.revision, value) }.getOrNull()
+                    ?: return@run RecoveryAttempt.Retry
             receipt =
-                Receipt(
+                recoveryReceipt(
                     session,
                     target,
                     text,
-                    options.acknowledgedPrefix ?: previous?.acknowledgedPrefix ?: text,
-                    ConversationDictationDraftSnapshot(value, revision),
-                    sendEligible,
-                    insertion.base,
-                    insertion.baseTranscript,
-                    insertion.appendOnly,
-                    insertion.appendPayload,
+                    options,
+                    RecoveryWrite(previous, current, insertion, value, revision),
                 )
-            return true
+            RecoveryAttempt.Recovered
         }
-        return false
+
+    private fun recoveryReceipt(
+        session: Long,
+        target: ConversationDictationTarget,
+        text: String,
+        options: Options,
+        written: RecoveryWrite,
+    ): Receipt {
+        val previous = written.previous
+        val current = written.current
+        val originalUnchanged =
+            sameDictationRecoveryDraft(
+                ConversationDictationDraftSnapshot(target.capturedDraft, target.capturedDraftRevision),
+                current,
+            )
+        val ownsEmpty =
+            (previous?.emptiedRevision ?: options.ownedEmptyRevision) == current.revision && current.value.text.isEmpty()
+        val sendEligible =
+            if (previous == null) {
+                originalUnchanged || ownsEmpty
+            } else {
+                (sameDictationRecoveryDraft(previous.draft, current) || ownsEmpty) && previous.sendEligible
+            }
+        return Receipt(
+            session,
+            target,
+            text,
+            options.acknowledgedPrefix ?: previous?.acknowledgedPrefix ?: text,
+            ConversationDictationDraftSnapshot(written.value, written.revision),
+            sendEligible,
+            written.insertion.base,
+            written.insertion.baseTranscript,
+            written.insertion.appendOnly,
+            written.insertion.appendPayload,
+        )
     }
 
     private fun planInsertion(
@@ -122,7 +165,7 @@ internal class ConversationDictationDraftRecovery(
         text: String,
         options: Options,
     ): Insertion? {
-        return if (previous != null && sameDraft(previous.draft, current)) {
+        return if (previous != null && sameDictationRecoveryDraft(previous.draft, current)) {
             representedPrefixLength(previous.baseTranscript, text)?.let { prefixLength ->
                 Insertion(
                     previous.base,
@@ -178,18 +221,13 @@ internal class ConversationDictationDraftRecovery(
             target
         } else {
             val current = runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull()
-            if (saved.sendEligible && current != null && sameDraft(saved.draft, current)) {
+            if (saved.sendEligible && current != null && sameDictationRecoveryDraft(saved.draft, current)) {
                 target.copy(capturedDraft = current.value, capturedDraftRevision = current.revision)
             } else {
                 null
             }
         }
     }
-
-    private fun sameDraft(
-        a: ConversationDictationDraftSnapshot,
-        b: ConversationDictationDraftSnapshot,
-    ): Boolean = a.revision == b.revision && a.value.text == b.value.text
 
     /** The base's entire represented transcript must survive before any suffix can be appended. */
     private fun representedPrefixLength(
@@ -223,3 +261,8 @@ internal class ConversationDictationDraftRecovery(
         return result
     }
 }
+
+private fun sameDictationRecoveryDraft(
+    a: ConversationDictationDraftSnapshot,
+    b: ConversationDictationDraftSnapshot,
+): Boolean = a.revision == b.revision && a.value.text == b.value.text

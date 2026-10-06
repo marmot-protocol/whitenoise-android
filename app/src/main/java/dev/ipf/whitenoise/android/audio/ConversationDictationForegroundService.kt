@@ -176,26 +176,18 @@ internal class ConversationDictationForegroundService(
             true
         } catch (_: SecurityException) {
             conversationDictationDiagnostic("event=foreground_service_promotion_rejected type=SecurityException")
-            cancelRejectedPromotion(controller, sessionToken, startId)
+            controller.onDurableServiceStartFailed(sessionToken)
+            service.foreground.releaseDictation(startId)
             false
         } catch (error: RuntimeException) {
             if (!error.isForegroundServiceStartRejection()) throw error
             conversationDictationDiagnostic(
                 "event=foreground_service_promotion_rejected type=${error.javaClass.simpleName}",
             )
-            cancelRejectedPromotion(controller, sessionToken, startId)
+            controller.onDurableServiceStartFailed(sessionToken)
+            service.foreground.releaseDictation(startId)
             false
         }
-
-    /** Releases controller ownership and stops this service after foreground promotion is rejected. */
-    private fun cancelRejectedPromotion(
-        controller: ConversationDictationController,
-        sessionToken: String,
-        startId: Int,
-    ) {
-        controller.onDurableServiceStartFailed(sessionToken)
-        service.foreground.releaseDictation(startId)
-    }
 
     /** Fails capture closed when Android removes the service that authorized background microphone use. */
     fun onDestroy() {

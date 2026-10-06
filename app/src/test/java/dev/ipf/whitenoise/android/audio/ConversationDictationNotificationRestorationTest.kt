@@ -39,163 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
-class ConversationDictationNotificationRestorationTest {
-    @Before
-    fun modelAndroidForegroundIdentityReplacement() {
-        NotificationStreamForegroundService.foregroundPublisher = modelForegroundIdReplacement(defaultPublisher)
-    }
-
-    /** A rejected narrowing cannot rely on a blocked ordinary channel to retire microphone controls. */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun rejectedIdentitySwitchUsesAControlFreeCardOnTheAuthorizedChannel() =
-        runTest {
-            val harness = Harness(this)
-            ConversationDictationForegroundService.hostResolver = { harness }
-            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
-            val service = lifecycle.get()
-            val manager = service.getSystemService(NotificationManager::class.java)
-            try {
-                service.onStartCommand(startIntent(service, harness), 0, 1)
-                service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
-                val ordinary =
-                    NotificationChannel(
-                        BackgroundConnectionNotification.CHANNEL_ID,
-                        service.getString(R.string.notification_channel_background_connection),
-                        NotificationManager.IMPORTANCE_NONE,
-                    )
-                manager.createNotificationChannel(ordinary)
-                NotificationStreamForegroundService.foregroundPublisher =
-                    modelForegroundIdReplacement { owner, notification, type ->
-                        if (notification.channelId == BackgroundConnectionNotification.CHANNEL_ID) {
-                            throw SecurityException("narrowing rejected")
-                        }
-                        defaultPublisher(owner, notification, type)
-                    }
-                harness.conversationDictation.paste()
-                harness.platform.listener.onResult("recognized")
-                runCurrent()
-                Snapshot.sendApplyNotifications()
-                shadowOf(Looper.getMainLooper()).idle()
-                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-                val remaining = manager.activeNotifications.single().notification
-                assertEquals(ConversationDictationForegroundService.CHANNEL_ID, remaining.channelId)
-                assertTrue(remaining.actions.isNullOrEmpty())
-                assertNull(remaining.contentView)
-                assertTrue(service.foreground.connectionServiceType != 0)
-                assertFalse(shadowOf(service as Service).isForegroundStopped)
-            } finally {
-                lifecycle.destroy()
-            }
-        }
-
-    /** Android cancels the previous foreground ID even if the replacement card is suppressed. */
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun aRejectedOrdinaryCardCannotKeepCompletedDictationControls() =
-        runTest {
-            notificationActions.forEach { action ->
-                val harness = Harness(this)
-                ConversationDictationForegroundService.hostResolver = { harness }
-                val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
-                val service = lifecycle.get()
-                val manager = service.getSystemService(NotificationManager::class.java)
-                var associatedId = 0
-                NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
-                    val before = manager.activeNotifications.associate { it.id to it.notification }
-                    val nextId = NotificationStreamForegroundService.foregroundNotificationId(notification)
-                    defaultPublisher(owner, notification, type)
-                    if (notification.channelId == BackgroundConnectionNotification.CHANNEL_ID) {
-                        // A disabled channel/rate rejection leaves an existing key untouched.
-                        manager.cancel(nextId)
-                        before[nextId]?.let { manager.notify(nextId, it) }
-                    }
-                    // This is ActiveServices' system cancellation, not an app cancelling a live FGS.
-                    if (associatedId != 0 && associatedId != nextId) manager.cancel(associatedId)
-                    associatedId = nextId
-                }
-                try {
-                    service.onStartCommand(startIntent(service, harness), 0, 1)
-                    service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
-                    assertTrue(
-                        manager.activeNotifications.any {
-                            it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
-                        },
-                    )
-                    service.onStartCommand(actionCommand(service, harness, action), 0, 2)
-                    if (action != ConversationDictationForegroundService.ACTION_CANCEL) {
-                        harness.platform.listener.onResult("recognized")
-                    }
-                    runCurrent()
-                    Snapshot.sendApplyNotifications()
-                    shadowOf(Looper.getMainLooper()).idle()
-                    assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
-                    assertFalse(
-                        manager.activeNotifications.any {
-                            it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
-                        },
-                    )
-                    assertTrue(service.foreground.connectionServiceType != 0)
-                    assertFalse(shadowOf(service as Service).isForegroundStopped)
-                } finally {
-                    lifecycle.destroy()
-                }
-            }
-        }
-
-    private class Harness(
-        scope: CoroutineScope? = null,
-        preference: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
-        autoReady: Boolean = true,
-    ) : ConversationDictationServiceHost {
-        val platform = FakePlatform()
-        var draft = TextFieldValue("")
-        var revision = 0L
-        val sent = mutableListOf<String>()
-        override val conversationDictation =
-            ConversationDictationController(
-                platform = platform,
-                readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
-                writeDraft = { _, _, expected, value ->
-                    if (expected != revision) {
-                        null
-                    } else {
-                        draft = value
-                        revision += 1
-                        revision
-                    }
-                },
-                disclosureAccepted = { true },
-                markDisclosureAccepted = {},
-                targetValidationScope = scope,
-                startDurableSession = { _, ready ->
-                    if (autoReady) ready()
-                    true
-                },
-                stopDurableSession = {
-                    ConversationDictationForegroundService.stop(RuntimeEnvironment.getApplication())
-                },
-                silenceDeliveryMode = { preference },
-                sendTranscriptIfOriginUnchanged = { request ->
-                    request.beginDispatch().also { if (it) sent += request.payload }
-                },
-            )
-
-        init {
-            conversationDictation.requestStart("account", "group", TextFieldValue(""))
-        }
-    }
-
-    /** Restores process-wide service seams so each Robolectric case starts isolated. */
-    @After
-    fun restoreResolver() {
-        ConversationDictationForegroundService.hostResolver = defaultResolver
-        ConversationDictationForegroundService.foregroundPromoter = defaultForegroundPromoter
-        NotificationStreamForegroundService.foregroundPublisher = defaultPublisher
-        NotificationStreamForegroundService.foregroundRemover = defaultRemover
-        NotificationStreamForegroundService.pendingDictationOwner = defaultPendingOwner
-    }
-
+class ConversationDictationNotificationRestorationTest : ConversationDictationNotificationTestFixture() {
     /** Expiry as the first channel user must preserve the foreground card's badge-free settings. */
     @Test
     fun expiryCreatesTheSharedBadgeFreeDictationChannel() {
@@ -692,8 +536,171 @@ class ConversationDictationNotificationRestorationTest {
         assertCompletedPresentation(service.getSystemService(NotificationManager::class.java), true)
         lifecycle.destroy()
     }
+}
 
-    private fun assertCompletedPresentation(
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class ConversationDictationNotificationSuppressionTest : ConversationDictationNotificationTestFixture() {
+    /** A rejected narrowing cannot rely on a blocked ordinary channel to retire microphone controls. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun rejectedIdentitySwitchUsesAControlFreeCardOnTheAuthorizedChannel() =
+        runTest {
+            val harness = Harness(this)
+            ConversationDictationForegroundService.hostResolver = { harness }
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            val manager = service.getSystemService(NotificationManager::class.java)
+            try {
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+                val ordinary =
+                    NotificationChannel(
+                        BackgroundConnectionNotification.CHANNEL_ID,
+                        service.getString(R.string.notification_channel_background_connection),
+                        NotificationManager.IMPORTANCE_NONE,
+                    )
+                manager.createNotificationChannel(ordinary)
+                NotificationStreamForegroundService.foregroundPublisher =
+                    modelForegroundIdReplacement { owner, notification, type ->
+                        if (notification.channelId == BackgroundConnectionNotification.CHANNEL_ID) {
+                            throw SecurityException("narrowing rejected")
+                        }
+                        defaultPublisher(owner, notification, type)
+                    }
+                harness.conversationDictation.paste()
+                harness.platform.listener.onResult("recognized")
+                runCurrent()
+                Snapshot.sendApplyNotifications()
+                shadowOf(Looper.getMainLooper()).idle()
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+                val remaining = manager.activeNotifications.single().notification
+                assertEquals(ConversationDictationForegroundService.CHANNEL_ID, remaining.channelId)
+                assertTrue(remaining.actions.isNullOrEmpty())
+                assertNull(remaining.contentView)
+                assertTrue(service.foreground.connectionServiceType != 0)
+                assertFalse(shadowOf(service as Service).isForegroundStopped)
+            } finally {
+                lifecycle.destroy()
+            }
+        }
+
+    /** Android cancels the previous foreground ID even if the replacement card is suppressed. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun aRejectedOrdinaryCardCannotKeepCompletedDictationControls() =
+        runTest {
+            notificationActions.forEach { action ->
+                val harness = Harness(this)
+                ConversationDictationForegroundService.hostResolver = { harness }
+                val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+                val service = lifecycle.get()
+                val manager = service.getSystemService(NotificationManager::class.java)
+                var associatedId = 0
+                NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
+                    val before = manager.activeNotifications.associate { it.id to it.notification }
+                    val nextId = NotificationStreamForegroundService.foregroundNotificationId(notification)
+                    defaultPublisher(owner, notification, type)
+                    if (notification.channelId == BackgroundConnectionNotification.CHANNEL_ID) {
+                        // A disabled channel/rate rejection leaves an existing key untouched.
+                        manager.cancel(nextId)
+                        before[nextId]?.let { manager.notify(nextId, it) }
+                    }
+                    // This is ActiveServices' system cancellation, not an app cancelling a live FGS.
+                    if (associatedId != 0 && associatedId != nextId) manager.cancel(associatedId)
+                    associatedId = nextId
+                }
+                try {
+                    service.onStartCommand(startIntent(service, harness), 0, 1)
+                    service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
+                    assertTrue(
+                        manager.activeNotifications.any {
+                            it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+                        },
+                    )
+                    service.onStartCommand(actionCommand(service, harness, action), 0, 2)
+                    if (action != ConversationDictationForegroundService.ACTION_CANCEL) {
+                        harness.platform.listener.onResult("recognized")
+                    }
+                    runCurrent()
+                    Snapshot.sendApplyNotifications()
+                    shadowOf(Looper.getMainLooper()).idle()
+                    assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+                    assertFalse(
+                        manager.activeNotifications.any {
+                            it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+                        },
+                    )
+                    assertTrue(service.foreground.connectionServiceType != 0)
+                    assertFalse(shadowOf(service as Service).isForegroundStopped)
+                } finally {
+                    lifecycle.destroy()
+                }
+            }
+        }
+
+}
+
+abstract class ConversationDictationNotificationTestFixture {
+    @Before
+    fun modelAndroidForegroundIdentityReplacement() {
+        NotificationStreamForegroundService.foregroundPublisher = modelForegroundIdReplacement(defaultPublisher)
+    }
+
+    protected class Harness(
+        scope: CoroutineScope? = null,
+        preference: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
+        autoReady: Boolean = true,
+    ) : ConversationDictationServiceHost {
+        val platform = FakePlatform()
+        var draft = TextFieldValue("")
+        var revision = 0L
+        val sent = mutableListOf<String>()
+        override val conversationDictation =
+            ConversationDictationController(
+                platform = platform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
+                writeDraft = { _, _, expected, value ->
+                    if (expected != revision) {
+                        null
+                    } else {
+                        draft = value
+                        revision += 1
+                        revision
+                    }
+                },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+                targetValidationScope = scope,
+                startDurableSession = { _, ready ->
+                    if (autoReady) ready()
+                    true
+                },
+                stopDurableSession = {
+                    ConversationDictationForegroundService.stop(RuntimeEnvironment.getApplication())
+                },
+                silenceDeliveryMode = { preference },
+                sendTranscriptIfOriginUnchanged = { request ->
+                    request.beginDispatch().also { if (it) sent += request.payload }
+                },
+            )
+
+        init {
+            conversationDictation.requestStart("account", "group", TextFieldValue(""))
+        }
+    }
+
+    /** Restores process-wide service seams so each Robolectric case starts isolated. */
+    @After
+    fun restoreResolver() {
+        ConversationDictationForegroundService.hostResolver = defaultResolver
+        ConversationDictationForegroundService.foregroundPromoter = defaultForegroundPromoter
+        NotificationStreamForegroundService.foregroundPublisher = defaultPublisher
+        NotificationStreamForegroundService.foregroundRemover = defaultRemover
+        NotificationStreamForegroundService.pendingDictationOwner = defaultPendingOwner
+    }
+
+    protected fun assertCompletedPresentation(
         manager: NotificationManager,
         connected: Boolean,
     ) {
@@ -710,7 +717,7 @@ class ConversationDictationNotificationRestorationTest {
         }
     }
 
-    private fun actionCommand(
+    protected fun actionCommand(
         service: NotificationStreamForegroundService,
         harness: Harness,
         action: String,
@@ -723,12 +730,12 @@ class ConversationDictationNotificationRestorationTest {
         ).savedIntent
 
     /** Installs a fresh process-owner harness into the service resolver seam. */
-    private fun installHost(): Harness =
+    protected fun installHost(): Harness =
         Harness().also { installed ->
             ConversationDictationForegroundService.hostResolver = { installed }
         }
 
-    private fun startIntent(
+    protected fun startIntent(
         service: Service,
         harness: Harness,
     ): Intent =
@@ -738,7 +745,7 @@ class ConversationDictationNotificationRestorationTest {
                 requireNotNull(harness.conversationDictation.notificationSessionToken),
             )
 
-    private class FakePlatform : ConversationDictationPlatform {
+    protected class FakePlatform : ConversationDictationPlatform {
         var sessionsCreated = 0
         var pendingCallerAudio = false
 
@@ -769,7 +776,7 @@ class ConversationDictationNotificationRestorationTest {
         }
     }
 
-    private companion object {
+    protected companion object {
         val notificationActions =
             listOf(
                 ConversationDictationForegroundService.ACTION_CANCEL,
@@ -781,5 +788,4 @@ class ConversationDictationNotificationRestorationTest {
         val defaultRemover = NotificationStreamForegroundService.foregroundRemover
         val defaultResolver = ConversationDictationForegroundService.hostResolver
         val defaultForegroundPromoter = ConversationDictationForegroundService.foregroundPromoter
-    }
-}
+    } }
