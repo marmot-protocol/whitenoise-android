@@ -273,6 +273,24 @@ class NotificationConversationOpenCoverageTest {
         )
     }
 
+    /** The Activity holds a pin tap while the App Lock decision loads and re-parses it once the decision exists. */
+    @Test
+    fun pinnedShortcutTapIsHeldInTheActivityUntilTheLockDecisionExists() {
+        val source = mainActivitySource()
+        val hold = source.indexOf("if (pinTapGate.hold(intent)) {")
+        val parse = source.indexOf("val pinTarget = pinTapGate.target(this, intent)")
+        assertTrue("the tap must be held before any target is parsed", hold >= 0 && hold < parse)
+        assertTrue(source.substring(hold).substringBefore("}").contains("return"))
+        assertTrue(source.contains("pinTapGate.replayWhenDecided(lifecycleScope, ::consumeIntent)"))
+    }
+
+    private fun mainActivitySource(): String =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/MainActivity.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt"),
+        ).first(File::exists)
+            .readText()
+
     private fun mainShellSource(): String =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt"),

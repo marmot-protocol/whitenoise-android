@@ -28,6 +28,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.lifecycleScope
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
@@ -39,7 +40,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
-import dev.ipf.whitenoise.android.notifications.PinnedConversationNavigation
+import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapGate
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.share.ShareRequest
@@ -52,10 +53,8 @@ import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
 import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.HostPerformanceRuntimeOwner
-import dev.ipf.whitenoise.android.state.PinnedShortcutLockDecision
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.pinnedShortcutLockDecision
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
@@ -83,6 +82,9 @@ class MainActivity : AppCompatActivity() {
             notificationInboundState.requestId = value
         }
     private var inboundAppUpdateTap by mutableIntStateOf(0)
+
+    /** Holds pin taps while the App Lock decision loads and parses them under the decided state. */
+    private val pinTapGate by lazy { PinnedShortcutTapGate(appState) }
     private lateinit var appUnlockPrompt: BiometricPrompt
     private val appUnlockCryptoGate by lazy(::AppUnlockCryptoGate)
     private var attachedAppUnlockSessionId: Long? = null
@@ -173,6 +175,7 @@ class MainActivity : AppCompatActivity() {
             intent = intent,
             retainPendingShareOnRecreation = savedInstanceState != null,
         )
+        pinTapGate.replayWhenDecided(lifecycleScope, ::consumeIntent)
         installAppUnlockPrompt()
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
@@ -387,16 +390,12 @@ class MainActivity : AppCompatActivity() {
             setIntent(Intent(this, MainActivity::class.java))
             return
         }
-        if (intent?.action == PinnedConversationNavigation.ACTION_OPEN) appState.maybeShowAppLockForForeground()
-        // A pending lock evaluation keeps the capability: MainShell waits for the decision before routing,
-        // and a lock that then shows still fails closed there.
-        val pinTarget =
-            PinnedConversationNavigation.target(
-                this,
-                intent,
-                appState.activeAccountRef,
-                appState.pinnedShortcutLockDecision() == PinnedShortcutLockDecision.LOCKED,
-            )
+        // A pin tap held for the App Lock decision replaces the stored intent so recreation cannot replay it.
+        if (pinTapGate.hold(intent)) {
+            setIntent(Intent(this, MainActivity::class.java))
+            return
+        }
+        val pinTarget = pinTapGate.target(this, intent)
         val retainNotification = retainPendingShareOnRecreation && inboundNotificationTarget != null
         val parsedTarget =
             if (retainNotification) {
