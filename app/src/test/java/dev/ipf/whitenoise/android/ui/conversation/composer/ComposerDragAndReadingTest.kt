@@ -247,6 +247,20 @@ class ComposerDragAndReadingTest {
     }
 
     @Test
+    fun jumpToTopPreservesAnExistingSelectedRange() {
+        val selection = TextRange(longDraft.length - 12, longDraft.length - 6)
+        render(longDraft, selection = selection)
+        val original = observed
+        assertEquals(selection, original.selection)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed().performClick()
+        composeRule.waitForIdle()
+        assertEquals(0f, scroll(), 1f)
+        assertEquals(original, observed)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
+        assertEquals("draft navigation must never submit", 0, sends)
+    }
+
+    @Test
     fun readingFlickContinuesAfterReleaseWithoutMovingTheCaret() {
         render(longDraft)
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
@@ -617,8 +631,9 @@ class ComposerDragAndReadingTest {
         editing: Boolean = false,
         mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
         surfaceHeight: Int = 600,
+        selection: TextRange = TextRange(draft.length),
     ) {
-        observed = TextFieldValue(draft, TextRange(draft.length))
+        observed = TextFieldValue(draft, selection)
         sends = 0
         cancels = 0
         composeRule.setContent {

@@ -106,3 +106,10 @@
 *.ComposerDragAndReadingTest.narrowLargeRtlDraftRetainsUsableMinimumAndTopAction
 *.ComposerDragAndReadingTest.narrowEditedDraftKeepsNavigationAndCancelUsable
 *.GroupDetailsEditNavigationTest.newGroupStartsWithAllAndCanChooseOnlyMentions
+
+# Per-profile Android notification controls and collapsed profile entry.
+*.ProfileNotificationOverrideScreenTest.profileRowLight
+*.ProfileNotificationOverrideScreenTest.defaultScreenLight
+*.ProfileNotificationOverrideScreenTest.customScreenDark
+*.ProfileNotificationOverrideScreenTest.customScreenAmoled
+*.ProfileNotificationOverrideScreenTest.customScreenLargeRtl

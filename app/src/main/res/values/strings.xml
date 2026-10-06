@@ -2393,4 +2393,23 @@
     <string name="nostr_event_image_failed">Couldn’t load this image. Try again.</string>
     <string name="nostr_event_type_image">Image</string>
     <string name="nostr_event_expand">View full event</string>
+    <string name="floating_attachment_resolving">Checking availability</string>
+    <string name="floating_attachment_available">Available on this device</string>
+    <string name="floating_attachment_remote">Open the original to view</string>
+    <string name="floating_attachment_failed">Download failed. Open the original to retry</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">+%1$d more attachment</item>
+        <item quantity="other">+%1$d more attachments</item>
+    </plurals>
+    <string name="profile_notifications_default">Default</string>
+    <string name="profile_notifications_muted">Muted</string>
+    <string name="profile_notifications_custom">Custom Android settings</string>
+    <string name="profile_notifications_custom_vibration">Custom vibration</string>
+    <string name="profile_notifications_use_defaults">Use defaults</string>
+    <string name="profile_notifications_mute">Mute notifications from this person</string>
+    <string name="profile_notifications_system">Sound &amp; system behavior</string>
+    <string name="profile_notifications_android_vibration">Set by Android</string>
+    <string name="profile_notification_scope_detail">Applies to messages from this person in every conversation for this account. Delivery and unread counts are unchanged.</string>
+    <string name="profile_notification_precedence">Chat mute and mentions-only rules apply first. This person’s mute or custom Android settings apply next. Use defaults restores chat and global settings. Existing notifications keep their original channel.</string>
+    <string name="profile_notification_channel_name">%1$s · Messages across chats</string>
 </resources>
