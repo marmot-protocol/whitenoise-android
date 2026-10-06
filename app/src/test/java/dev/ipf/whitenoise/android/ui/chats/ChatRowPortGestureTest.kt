@@ -258,10 +258,26 @@ class ChatRowPortGestureTest {
         )
 
     /** A read chat offers Mark unread in light theme. */
-    @Test fun unreadCueLight() = captureCue("unread_light", SwipeAction.ReadUnread, 1, R.string.chat_row_action_mark_unread)
+    @Test fun unreadCueLight() {
+        captureCue(
+            "unread_light",
+            SwipeAction.ReadUnread,
+            1,
+            R.string.chat_row_action_mark_unread,
+        )
+    }
 
     /** An unmuted chat offers Mute in AMOLED. */
-    @Test fun muteCueAmoled() = captureCue("mute_amoled", SwipeAction.MuteUnmute, 1, R.string.chat_row_action_mute, dark = true, amoled = true)
+    @Test fun muteCueAmoled() {
+        captureCue(
+            "mute_amoled",
+            SwipeAction.MuteUnmute,
+            1,
+            R.string.chat_row_action_mute,
+            dark = true,
+            amoled = true,
+        )
+    }
 
     /** A muted chat offers Unmute in dark theme. */
     @Test fun unmuteCueDark() =
@@ -275,7 +291,15 @@ class ChatRowPortGestureTest {
         )
 
     /** An unpinned chat offers Pin with physical direction preserved at large RTL text. */
-    @Test fun pinCueLargeRtl() = captureCue("pin_large_rtl", SwipeAction.PinUnpin, -1, R.string.chat_row_action_pin, rtl = true)
+    @Test fun pinCueLargeRtl() {
+        captureCue(
+            "pin_large_rtl",
+            SwipeAction.PinUnpin,
+            -1,
+            R.string.chat_row_action_pin,
+            rtl = true,
+        )
+    }
 
     /** A pinned chat offers Unpin in light theme. */
     @Test fun unpinCueLight() =
