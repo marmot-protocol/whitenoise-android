@@ -483,7 +483,8 @@ jobs:
 
   tests:
     name: Unit tests and coverage (${{ matrix.flavor }})
-    runs-on: ubuntu-latest
+    # Set ANDROID_GRADLE_RUNNER for the paid pilot; clear it to restore standard runners.
+    runs-on: ${{ vars.ANDROID_GRADLE_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 40
     env:
       ORG_GRADLE_PROJECT_ciTestForks: '3'

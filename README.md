@@ -106,6 +106,27 @@ MarmotKit cache retains one writer: Play unit tests. GitHub's ephemeral runner
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
+### Larger-runner pilot
+
+The full unit/coverage matrix and PR preview APK matrix use the repository Actions
+variable `ANDROID_GRADLE_RUNNER`. With the variable unset or empty, they retain
+the standard `ubuntu-latest` runners. Set it to `ubuntu-24.04-8core` to use the
+GitHub-hosted Ubuntu 24.04 x64 pool in the `ci-fast` runner group: 8 CPUs, 32 GB
+memory, 300 GB SSD, and at most five simultaneous machines. The group permits
+only this repository. Other validation jobs retain standard runners.
+
+The pilot has a repository-scoped $100 monthly budget for the
+`actions_linux_8_core` billing SKU, with further usage stopped at the limit.
+Larger runners are paid even for this public repository; the current rate is
+[$0.022 per active minute](https://docs.github.com/en/billing/reference/actions-runner-pricing).
+To roll back, delete or empty `ANDROID_GRADLE_RUNNER`, then rerun affected
+workflows. This is also necessary if the paid budget is exhausted: the variable
+selects a runner, and does not automatically fall back when that pool is unavailable.
+
+Compare creation-to-start delay, job execution time, workflow wall time, Gradle
+profiles, and billed minutes with the same source on standard runners. The pool
+adds capacity; a shorter queue or more CPUs alone does not prove faster completion.
+
 Two security workflows run separately from the main Gradle validation so their
 permissions and results stay explicit:
 
