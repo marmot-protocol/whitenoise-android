@@ -11183,6 +11183,12 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHistoryBoundary.kt",
         "anchor": "R.string.conversation_history_retention_description",
         "test_ids": ["CON-023"]
+      },
+      {
+        "surface": "Restored attachment shelf after native send cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
+        "anchor": "restorePersistedAttachments(",
+        "test_ids": ["MED-003", "MED-009"]
       }
     ],
     "settings_controls": [
