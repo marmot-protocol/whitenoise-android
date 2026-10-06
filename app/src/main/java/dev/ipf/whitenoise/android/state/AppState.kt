@@ -2406,13 +2406,14 @@ class WhiteNoiseAppState private constructor(
             expansionRetention = composerExpansionStateRetention,
             scope = mutationsScope,
             onDraftPresentationChanged = { accountRef, groupIdHex, nativeDraftConsumed ->
-                draftHydrationRevision += 1
                 if (nativeDraftConsumed) {
                     synchronized(conversationStateLock) {
                         val key = retainConversationState(accountRef, groupIdHex)
                         nativeComposerCleanupSequence += 1
                         nativeComposerCleanupRevisions[key] = nativeComposerCleanupSequence
                     }
+                } else {
+                    draftHydrationRevision += 1
                 }
             },
             onCleanupFailure = { groupIdHex, cause ->

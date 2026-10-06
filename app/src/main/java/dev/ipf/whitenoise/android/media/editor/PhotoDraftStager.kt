@@ -23,6 +23,7 @@ internal data class DraftBackedPhoto(
     val sourceInfo: PhotoEditorSourceInfo,
     val recipe: PhotoEditRecipe,
     val quality: MediaQuality,
+    val restoredFromNative: Boolean = false,
 ) {
     fun pendingAttachment(): PendingAttachment =
         PendingAttachment(
@@ -339,6 +340,7 @@ internal class PhotoDraftStager(
             sourceInfo = inspected.source,
             recipe = session.recipe,
             quality = MediaQuality.fromPreference(session.qualityPreference),
+            restoredFromNative = true,
         )
     }
 
@@ -361,6 +363,7 @@ internal class PhotoDraftStager(
                 DraftPreparedPhoto(
                     attachment = existing,
                     attachmentDigest = existing.editorDigest(),
+                    restoredFromNative = true,
                 ),
             )
     }

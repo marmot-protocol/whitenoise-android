@@ -3186,6 +3186,8 @@ internal fun ConversationScreen(
             )
         pendingMediaSlots = merged.mediaSlots
         pendingDocumentUris = merged.documentUris
+        mediaDraftState.updateInputs(merged.mediaSlots, merged.documentUris, capturedAccount)
+        mediaDraftState.prepareMissingAttachments()
     }
 
     val pollVotesHost = remember(controller) { PollVotesHostState() }

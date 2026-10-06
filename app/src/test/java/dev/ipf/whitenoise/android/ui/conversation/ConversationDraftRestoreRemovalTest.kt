@@ -89,6 +89,9 @@ class ConversationDraftRestoreRemovalTest {
                         PendingMediaSlot("saved-picker", Uri.parse("content://picker/saved")),
                     )
                 owner.updateInputs(savedSlots, listOf(Uri.parse("content://picker/document")), "account")
+                // Matches the screen: its preparation effect takes the owner mutex first.
+                owner.prepareMissingAttachments()
+                advanceUntilIdle()
                 val restored = requireNotNull(owner.restorePersistedAttachments())
                 assertEquals(2, restored.mediaSlots.size)
                 val newerPick =
@@ -96,10 +99,12 @@ class ConversationDraftRestoreRemovalTest {
                         "new-picker-occurrence",
                         newPhotoUri(context),
                     )
+                val shareRevision = app.inboundShareRevision
                 val pendingClear = requireNotNull(app.captureDraftForSend("account", group.groupIdHex))
                 app.clearDraftAfterSuccessfulSend(pendingClear)
                 advanceUntilIdle()
                 assertNull(gateway.current)
+                assertEquals(shareRevision, app.inboundShareRevision)
 
                 // A picker change before SideEffect must reject publication without committing it.
                 assertNull(owner.restorePersistedAttachments { false })
@@ -153,6 +158,46 @@ class ConversationDraftRestoreRemovalTest {
             )
         assertEquals(setOf(restoredUri), nativeDocuments.keys)
     }
+
+    /** The real snapshot-state getter detects a picker update before SideEffect updates the owner. */
+    @Test
+    fun liveComposerInputsRejectLateRestorationAndRetryWithoutLosingBytes() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
+            Dispatchers.setMain(dispatcher)
+            try {
+                val context = ApplicationProvider.getApplicationContext<Context>()
+                val group = conversationTimelineTestGroup()
+                val photo = nativeAttachment("saved-photo", "saved.jpg", "image/jpeg")
+                val gateway = RestoreGateway(MessageDraftFfi(group.groupIdHex, "", null, listOf(photo), 1L, 1L))
+                val repository = MessageDraftRepository(gateway, EditorSessionStore(EmptyStrings), dispatcher)
+                val app = appForRestore(context, repository)
+                val owner =
+                    ConversationMediaDraftState(
+                        app,
+                        ConversationController(appState = app, initialGroup = group),
+                        context,
+                        backgroundScope,
+                        PhotoEditorMessages("", "", "", ""),
+                    )
+                val visibleSlots = mutableStateOf(savedNativeSlots(listOf(photo)))
+                val captured = visibleSlots.value
+                val newerPick = PendingMediaSlot("new-pick", Uri.parse("content://picker/new"))
+                owner.updateInputs(captured, emptyList(), "account")
+                gateway.beforeReadReturns = { visibleSlots.value = captured + newerPick }
+
+                assertNull(owner.restorePersistedAttachments { visibleSlots.value == captured })
+                assertEquals(captured + newerPick, visibleSlots.value)
+                assertTrue(owner.preparedAttachments().isEmpty())
+                val latest = visibleSlots.value
+                owner.updateInputs(latest, emptyList(), "account")
+                val restored = requireNotNull(owner.restorePersistedAttachments { visibleSlots.value == latest })
+                assertEquals(latest, restored.mediaSlots)
+                assertEquals(setOf("saved-photo"), owner.preparedAttachments().keys)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
 
     /** Covers native-id and saved picker-id photos plus a saved picker document. */
     private fun cleanupAttachments(groupIdHex: String): List<MessageDraftAttachmentFfi> =

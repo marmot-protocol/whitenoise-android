@@ -180,6 +180,8 @@ internal class ConversationMediaDraftState(
         currentSlots.forEach { slot ->
             if (slot.id !in trackedSlotIds) preparePhoto(slot)
         }
+        // Saved document grants may still work; restore their native ownership before staging.
+        if (restoredDraftRevision == null) return
         currentDocumentUris.forEach { uri ->
             val documentId =
                 stagedDocumentAttachmentId(
@@ -416,7 +418,7 @@ internal class ConversationMediaDraftState(
             val nativeIds = attachments.mapTo(mutableSetOf()) { it.id }
             // Only bytes restored from native state are reconciled away. Freshly
             // prepared picker occurrences survive an older send's cleanup.
-            val removedPhotos = restoredPhotosMissingFrom(currentSlots, preparedPhotos, nativeIds)
+            val removedPhotos = restoredPhotosMissingFrom(currentSlots, preparedPhotos, backedPhotos, nativeIds)
             val removedDocuments =
                 restoredDocumentsMissingFrom(currentDocumentUris, preparedDocuments, nativeIds)
             val retainedSlots = currentSlots.filterNot { it.id in removedPhotos }
@@ -459,6 +461,8 @@ internal class ConversationMediaDraftState(
                 preparedDocuments.filterKeys { it !in removedDocuments } +
                 nativeDocumentsNeedingRestoration(reconciliation.documentsByUriString, preparedDocuments)
                     .mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
+            activeEditor?.takeIf { it.slot.id in removedPhotos }?.let(::dismissEditor)
+            backedPhotos = backedPhotos.filterKeys { it !in removedPhotos }
             nonEditableDescriptions = nonEditableDescriptions.filterKeys { it !in removedPhotos }
             restoredPhotos.forEach { (slotId, attachment) ->
                 if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
@@ -625,14 +629,10 @@ internal class ConversationMediaDraftState(
         pending: PendingAttachment,
     ): DraftPreparedPhoto? {
         val attachment = pending.toMessageDraftAttachment(attachmentId)
+        val admission =
+            appState.messageDraftRepository.addAttachment(accountRef, controller.group.groupIdHex, attachment)
         val committed =
-            when (
-                appState.messageDraftRepository.addAttachment(
-                    accountRef,
-                    controller.group.groupIdHex,
-                    attachment,
-                )
-            ) {
+            when (admission) {
                 is MessageDraftMutationResult.Success -> attachment
                 MessageDraftMutationResult.DuplicateAttachment ->
                     appState.messageDraftRepository
@@ -642,7 +642,14 @@ internal class ConversationMediaDraftState(
                         ?.firstOrNull { it.id == attachmentId }
                 else -> null
             } ?: return null
-        return DraftPreparedPhoto(committed, committed.editorDigest())
+        return DraftPreparedPhoto(
+            committed,
+            committed.editorDigest(),
+            restoredFromNative =
+                admission == MessageDraftMutationResult.DuplicateAttachment &&
+                    committed.isComposerVisual() &&
+                    !committed.isComposerDocument(),
+        )
     }
 
     private suspend fun handleStagedPhoto(
@@ -865,14 +872,16 @@ private fun MessageDraftAttachmentFfi.asRestoredPhoto(): DraftPreparedPhoto =
         restoredFromNative = true,
     )
 
-private fun restoredPhotosMissingFrom(
+internal fun restoredPhotosMissingFrom(
     slots: List<PendingMediaSlot>,
     prepared: Map<String, DraftPreparedPhoto>,
+    backed: Map<String, DraftBackedPhoto>,
     nativeIds: Set<String>,
 ): Set<String> =
     slots
         .filter { slot ->
-            prepared[slot.id]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
+            prepared[slot.id]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true ||
+                backed[slot.id]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
         }.mapTo(mutableSetOf()) { it.id }
 
 private fun restoredDocumentsMissingFrom(
