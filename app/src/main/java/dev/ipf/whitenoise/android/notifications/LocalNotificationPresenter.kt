@@ -1051,7 +1051,7 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationTag,
                                             notificationContent.notificationId,
                                         )
-                                        if (carried.isNullOrEmpty()) {
+                                        if (carried.isNullOrEmpty() && emojiArtifact == null) {
                                             false
                                         } else {
                                             if (!isPostStillAllowed() || !showGenerationAllowsPost()) {
@@ -1065,7 +1065,7 @@ class LocalNotificationPresenter(
                                                     carriedHistory = null,
                                                     sender = messaging.sender,
                                                     newMessageTimestampMs = presentationTimestampMs,
-                                                    emojiArtwork = emojiArtifact?.uri,
+                                                    emojiArtwork = null,
                                                 ),
                                             )
                                             val cleanNotification =

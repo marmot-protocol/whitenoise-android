@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationCompat.MessagingStyle
 import androidx.core.content.FileProvider
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
 import dev.ipf.marmotkit.NotificationTriggerFfi
@@ -104,6 +105,45 @@ class NotificationEmojiArtworkTest {
             assertNotNull(messages.first().dataUri)
             assertEquals(":wn:", messages.last().text.toString())
         }
+
+    @Test
+    fun imagePostFailureFallsBackToTextWithoutHistory() = verifyImagePostFailureFallback(withHistory = false)
+
+    @Test
+    fun imagePostFailureFallsBackToTextWithHistory() = verifyImagePostFailureFallback(withHistory = true)
+
+    private fun verifyImagePostFailureFallback(withHistory: Boolean) {
+        runBlocking {
+            var rejectedImages = 0
+            val presenter =
+                LocalNotificationPresenter(
+                    context,
+                    groupReconciliation = {},
+                    enrichmentLauncher = {},
+                    emojiArtworkTimeoutMs = 5_000L,
+                    notificationPoster = { compat, tag, id, notification ->
+                        val style = MessagingStyle.extractMessagingStyleFromNotification(notification)
+                        if (style?.messages.orEmpty().any { it.dataUri != null }) {
+                            rejectedImages++
+                            throw IllegalArgumentException("Fixture rejects image payloads")
+                        }
+                        compat.notify(tag, id, notification)
+                    },
+                )
+            presenter.ensureChannels()
+            if (withHistory) {
+                assertTrue(presenter.show(messageUpdate("Earlier text", '1'), shortNpub = { "npub1fixture" }))
+            }
+            assertTrue(presenter.show(messageUpdate(":wn:", '2'), shortNpub = { "npub1fixture" }))
+            assertEquals(1, rejectedImages)
+            val messages = styleOf(manager.activeNotifications.single().notification).messages
+            assertEquals(1, messages.size)
+            assertNull(messages.single().dataUri)
+            assertEquals(":wn:", messages.single().text.toString())
+            pruneNotificationEmojiArtwork(context, manager.activeNotifications)
+            assertTrue(artifacts().isEmpty())
+        }
+    }
 
     @Test
     fun carriedHistorySurvivesPruningBetweenReadAndPost() =
