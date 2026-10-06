@@ -11,6 +11,11 @@ checkout revision. Use that artifact when testing a candidate. Keep run results
 separate, recording the commit, APK SHA-256, variant and tester; canonical boxes
 must stay unchecked. Generated files under `build/` are never committed.
 
+On a PR, the guide reflects GitHub's synthetic merge checkout, including the
+base branch. Its revision file also records the PR head and base. Match these
+to the candidate before testing; the artifact name alone is not a preview APK
+head. On master, the recorded checkout is the candidate source commit.
+
 ## Update an existing scenario and its source coverage
 
 From the repository root, extract the affected inputs once:
@@ -30,6 +35,9 @@ places it at its existing position; permanent IDs never change. To add a new
 scenario, append an unused ID above the prefix's previous maximum, use
 `<!-- legacy-sha256: none -->`, and use the existing prefix's checklist section.
 Coordinate simultaneous new IDs; duplicate IDs are errors.
+When a prefix spans several checklist sections, add a new ID to the shared
+guide in its intended section first. Existing IDs in those sections can still
+be extracted and edited independently; the assembler never guesses a section.
 
 A source file contains `source`, `legacy_sha256`, `categories`, and optionally
 `discovery_exceptions`. Its categories completely replace the legacy entries
@@ -37,12 +45,20 @@ for that source. Preserve all relevant entries, including those unaffected by
 your change. Every entry must belong to that exact source; other sources and
 global discovery exceptions remain unchanged. Updating an anchor or adding a
 scenario mapping belongs here.
+For an existing source file without any inventory entries, extraction creates
+an empty mapping with the correct legacy hash. Add the source's actual coverage
+entries before validating the production change.
 
 The hashes bind replacements to the legacy definitions they were extracted
 from. If an older PR later edits those definitions, CI fails with the owning
 fragment path. Reconcile the old and new instructions, then update the hash
 from the reconciled legacy input. Never blindly refresh it: this is a real
 same-scenario conflict, and silently preferring one version would lose coverage.
+This can be a semantic conflict even when Git merges the files cleanly. Require
+successful validation against current master immediately before merging. Do not
+merge a stale hash, skip a cancelled validation run, or automatically union the
+two definitions. New fragments should make real coverage changes; this tooling
+change deliberately creates no no-op replacements for in-flight scenarios.
 
 ## Validate the effective coverage
 

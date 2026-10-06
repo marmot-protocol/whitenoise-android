@@ -40,7 +40,7 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
   generated aggregates are CI artifacts and must not be committed.
   Never reuse/renumber IDs; keep boxes unchecked. Run
   `python3 scripts/check_manual_test_guide.py` and
-  `python3 -m unittest scripts/test_check_manual_test_guide.py`.
+  `python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py`.
 - For rendering changes, follow [Screenshot tests](README.md#screenshot-tests): cover
   relevant themes, RTL, font scales and UI states, regenerate/commit PNG baselines,
   and verify both distributions. The PR's **Visual changes** must show current-head

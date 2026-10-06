@@ -11,21 +11,20 @@ from pathlib import Path
 
 try:
     from manual_test_fragments import (
-        CASE_DIR, SURFACE_DIR, DEFINITION_RE, FragmentError, definitions,
+        CASE_DIR, SURFACE_DIR, GUIDE_PATH, INVENTORY_PATH, ID_RE, DEFINITION_RE, FragmentError, definitions,
         extract_case, extract_source, load_guide, load_inventory, source_inventory,
     )
 except ModuleNotFoundError:
     from scripts.manual_test_fragments import (
-        CASE_DIR, SURFACE_DIR, DEFINITION_RE, FragmentError, definitions,
+        CASE_DIR, SURFACE_DIR, GUIDE_PATH, INVENTORY_PATH, ID_RE, DEFINITION_RE, FragmentError, definitions,
         extract_case, extract_source, load_guide, load_inventory, source_inventory,
     )
 
 ROOT = Path(__file__).resolve().parents[1]
-GUIDE = ROOT / "docs/manual-release-testing.md"
-INVENTORY = ROOT / "docs/manual-release-testing-surfaces.json"
+GUIDE = ROOT / GUIDE_PATH
+INVENTORY = ROOT / INVENTORY_PATH
 README = ROOT / "README.md"
 AGENTS = ROOT / "AGENTS.md"
-ID_RE = re.compile(r"[A-Z]{3,4}-\d{3}")
 CANDIDATE_RE = re.compile(r"^(?:\d+\.|[-*])\s*\[[^]]*]\s*\*\*|\*\*[A-Z]{3,4}-\d{3}")
 ANNOTATION_RE = re.compile(r"@[A-Za-z_][A-Za-z0-9_.]*")
 IDENTIFIER_RE = re.compile(r"(?:[A-Za-z_][A-Za-z0-9_]*|`[^`\n]+`)")
@@ -61,6 +60,8 @@ REQUIRED_HEADINGS = [
 
 
 def finding(path: Path, line: int, key: str, message: str) -> str:
+    if path == GUIDE:
+        key = f"assembled guide {key}"
     return f"{path.relative_to(ROOT)}:{line}: {key}: {message}"
 
 
@@ -615,8 +616,6 @@ def validate_history(base: str, active: set[str], retired: set[str], errors: lis
             errors.append(finding(GUIDE, 0, test_id, "new ID must append above the previous prefix maximum"))
 
 
-GUIDE_PATH = "docs/manual-release-testing.md"
-INVENTORY_PATH = "docs/manual-release-testing-surfaces.json"
 USER_FACING_SOURCE_PREFIXES = (
     # Conservatively gate every Android source-set file. User-visible behavior
     # can enter through Kotlin, manifests, resources, or flavor/debug/staging

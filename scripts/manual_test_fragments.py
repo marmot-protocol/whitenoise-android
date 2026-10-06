@@ -122,11 +122,12 @@ def read_tree(root: Path, revision: str | None, path: str) -> str:
 
 
 def fragment_paths(root: Path, directory: str, revision: str | None = None) -> list[str]:
+    extension = ".md" if directory == CASE_DIR else ".json"
     if revision is None:
         folder = root / directory
         if folder.is_symlink():
             raise FragmentError(f"{directory}: symlink inputs are not allowed")
-        return sorted(str(p.relative_to(root)) for p in folder.rglob("*") if p.is_file() or p.is_symlink())
+        return sorted(str(p.relative_to(root)) for p in folder.rglob(f"*{extension}") if p.is_file() or p.is_symlink())
     result = subprocess.run(
         ["git", "ls-tree", "-rz", "--full-tree", revision, "--", directory],
         cwd=root, capture_output=True, timeout=30,
@@ -138,6 +139,8 @@ def fragment_paths(root: Path, directory: str, revision: str | None = None) -> l
         if not record:
             continue
         metadata, path = record.split(b"\t", 1)
+        if not path.decode("utf-8").endswith(extension):
+            continue
         if metadata.split()[0] != b"100644":
             raise FragmentError("fragment must be a non-executable regular file")
         paths.append(path.decode("utf-8"))
@@ -146,6 +149,13 @@ def fragment_paths(root: Path, directory: str, revision: str | None = None) -> l
 
 def assemble_guide(text: str, fragments: dict[str, str]) -> str:
     legacy = definitions(text)
+    prefix_sections = {}
+    section = None
+    for line in text.splitlines():
+        if line.startswith("#"):
+            section = line if line.startswith("### ") else None
+        if match := DEFINITION_RE.fullmatch(line):
+            prefix_sections.setdefault(match["id"].split("-", 1)[0], set()).add(section)
     replacements = {}
     for path, fragment in sorted(fragments.items()):
         test_id = Path(path).stem
@@ -162,6 +172,8 @@ def assemble_guide(text: str, fragments: dict[str, str]) -> str:
             raise FragmentError(f"{path}: legacy definition changed; reconcile the fragment")
         if test_id in re.findall(r"^\| ([A-Z]{3,4}-\d{3}) \|", text, re.M):
             raise FragmentError(f"{path}: cannot override a retired ID")
+        if test_id not in legacy and len(prefix_sections.get(test_id.split("-", 1)[0], set())) > 1:
+            raise FragmentError(f"{path}: prefix spans multiple sections; add this new ID to the shared guide in its intended section")
         replacements[test_id] = lines[2]
 
     # Appended cases stay inside their existing registered checklist section.
@@ -270,7 +282,7 @@ def extract_source(root: Path, source: str) -> None:
         raise FragmentError("invalid source path")
     legacy = decode_inventory(read_tree(root, None, INVENTORY_PATH))
     effective = source_inventory(load_inventory(root), source)
-    if not effective["categories"]:
-        raise FragmentError(f"unknown inventory source: {source}")
+    if not (root / source).is_file():
+        raise FragmentError(f"source does not exist: {source}")
     fragment = {"source": source, "legacy_sha256": source_digest(legacy, source), **effective}
     write_new(root, f"{SURFACE_DIR}/{source}.json", json.dumps(fragment, indent=2, ensure_ascii=False) + "\n")

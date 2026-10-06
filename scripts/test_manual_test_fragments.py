@@ -266,6 +266,43 @@ class FragmentTest(unittest.TestCase):
             json.dumps(fragments.load_inventory(other), indent=2),
         )
 
+    def test_ambiguous_new_case_section_fails_but_existing_overrides_work(self):
+        self.write(fragments.GUIDE_PATH, guide(FIRST + "\n### Other messages\n" + SECOND))
+        fragments.extract_case(self.root, "MSG-002")
+        self.assertEqual(checker.parse_guide(fragments.load_guide(self.root))[2], [])
+        third = SECOND.replace("MSG-002", "MSG-003")
+        self.write(f"{fragments.CASE_DIR}/MSG-003.md", f"<!-- legacy-sha256: none -->\n\n{third}\n")
+        with self.assertRaisesRegex(fragments.FragmentError, "prefix spans multiple sections"):
+            fragments.load_guide(self.root)
+
+    def test_stray_files_are_ignored_consistently_in_working_and_git_trees(self):
+        self.seed()
+        self.write(f"{fragments.CASE_DIR}/.DS_Store", "untracked metadata")
+        self.write(f"{fragments.CASE_DIR}/MSG-001.md~", "editor backup")
+        self.write(f"{fragments.SURFACE_DIR}/backup.json~", "editor backup")
+        before = fragments.load_guide(self.root)
+        before_inventory = fragments.load_inventory(self.root)
+        base = self.init_git()
+        self.assertEqual(fragments.load_guide(self.root, revision=base), before)
+        self.assertEqual(fragments.load_inventory(self.root, revision=base), before_inventory)
+
+    def test_new_source_can_extract_empty_mapping_then_own_a_new_case(self):
+        base = self.init_git()
+        source = "app/src/main/java/New.kt"
+        self.write(source, "fun FooScreen() {}")
+        fragments.extract_source(self.root, source)
+        path = self.surface_path(source)
+        data = json.loads(path.read_text())
+        self.assertEqual(data["categories"], {})
+        data["categories"]["composable_surfaces"] = [self.entry(source, ["MSG-002"])]
+        path.write_text(json.dumps(data))
+        self.write(f"{fragments.CASE_DIR}/MSG-002.md", f"<!-- legacy-sha256: none -->\n\n{SECOND}\n")
+        changed = {source, f"{fragments.CASE_DIR}/MSG-002.md", f"{fragments.SURFACE_DIR}/{source}.json"}
+        with mock.patch.object(checker, "ROOT", self.root):
+            errors = []
+            checker.validate_fragment_maintenance(base, changed, errors)
+            self.assertEqual(errors, [])
+
     def test_two_independent_changes_merge_without_a_shared_aggregate_edit(self):
         self.write(fragments.GUIDE_PATH, guide(FIRST + "\n" + SECOND.replace("1.", "2.", 1)))
         self.inventory["categories"]["composable_surfaces"][1]["test_ids"] = ["MSG-002"]

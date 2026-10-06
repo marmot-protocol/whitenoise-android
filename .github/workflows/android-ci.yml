@@ -83,9 +83,13 @@ jobs:
           fi
 
       - name: Assemble the source-bound manual testing guide
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           python3 scripts/check_manual_test_guide.py --output-dir build/manual-release-testing
           git rev-parse HEAD > build/manual-release-testing/source-revision.txt
+          printf 'pr_head=%s\npr_base=%s\n' "$PR_HEAD_SHA" "$PR_BASE_SHA" >> build/manual-release-testing/source-revision.txt
 
       - name: Retain the assembled manual testing guide
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -93,7 +97,7 @@ jobs:
           name: manual-release-testing-${{ github.sha }}
           path: build/manual-release-testing/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
       - name: Test PR screenshot renderer
         run: node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
