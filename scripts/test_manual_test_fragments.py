@@ -303,6 +303,73 @@ class FragmentTest(unittest.TestCase):
             checker.validate_fragment_maintenance(base, changed, errors)
             self.assertEqual(errors, [])
 
+    def test_stale_historical_hash_does_not_block_the_repair_pr(self):
+        self.seed()
+        self.init_git()
+        changed = FIRST.replace("Send hello", "Send goodbye")
+        self.write(fragments.GUIDE_PATH, guide(changed))
+        base = self.commit("legacy change with a stale override")
+        with self.assertRaisesRegex(fragments.FragmentError, "legacy definition changed"):
+            fragments.load_guide(self.root)
+        self.case_path().write_text(f"<!-- legacy-sha256: {fragments.digest(changed)} -->\n\n{changed}\n")
+        with mock.patch.object(checker, "ROOT", self.root):
+            self.assertEqual(checker.parse_revision_guide(base), ({"MSG-001"}, set()))
+        self.assertIn("Send goodbye", fragments.load_guide(self.root))
+
+    def test_historical_mapping_freshness_does_not_block_current_reconciliation(self):
+        self.seed()
+        self.init_git()
+        self.inventory["categories"]["composable_surfaces"][0]["test_ids"].append("MSG-002")
+        self.write(fragments.INVENTORY_PATH, json.dumps(self.inventory))
+        base = self.commit("legacy mapping with a stale source override")
+        with self.assertRaisesRegex(fragments.FragmentError, "legacy source mapping changed"):
+            fragments.load_inventory(self.root)
+        old = fragments.load_inventory(self.root, revision=base, check_legacy_hash=False)
+        self.assertEqual(fragments.source_inventory(old, SOURCE)["categories"]["composable_surfaces"][0]["test_ids"], ["MSG-001"])
+        path = self.surface_path()
+        data = json.loads(path.read_text())
+        data["legacy_sha256"] = fragments.source_digest(self.inventory, SOURCE)
+        data["categories"]["composable_surfaces"][0]["test_ids"].append("MSG-002")
+        path.write_text(json.dumps(data))
+        self.assertEqual(fragments.load_inventory(self.root), self.inventory)
+
+    def test_full_changed_surface_contract_requires_both_inputs(self):
+        base = self.init_git()
+        self.seed()
+        self.surface_path().unlink()
+        self.write(SOURCE, "fun FooScreen() { /* changed production behavior */ }")
+        self.case_path().write_text(self.case_path().read_text().replace("Send hello", "Send hello twice"))
+        with (
+            mock.patch.object(checker, "ROOT", self.root),
+            mock.patch.object(checker, "GUIDE", self.root / fragments.GUIDE_PATH),
+            mock.patch.object(checker, "INVENTORY", self.root / fragments.INVENTORY_PATH),
+        ):
+            # Include newly added fragments in the real git diff, as CI does.
+            self.git("add", ".")
+            errors = []
+            checker.validate_changed_surface_contract(base, errors)
+            self.assertEqual(len(errors), 1)
+            self.assertIn(fragments.INVENTORY_PATH, errors[0])
+
+    def test_full_changed_surface_contract_accepts_mixed_legacy_and_fragment_inputs(self):
+        base = self.init_git()
+        fragments.extract_source(self.root, SOURCE)
+        self.write(SOURCE, "fun FooScreen() { /* changed production behavior */ }")
+        self.write(fragments.GUIDE_PATH, guide(FIRST + "\n" + SECOND.replace("1.", "2.", 1)))
+        path = self.surface_path()
+        data = json.loads(path.read_text())
+        data["categories"]["composable_surfaces"][0]["test_ids"].append("MSG-002")
+        path.write_text(json.dumps(data))
+        self.git("add", ".")
+        with (
+            mock.patch.object(checker, "ROOT", self.root),
+            mock.patch.object(checker, "GUIDE", self.root / fragments.GUIDE_PATH),
+            mock.patch.object(checker, "INVENTORY", self.root / fragments.INVENTORY_PATH),
+        ):
+            errors = []
+            checker.validate_changed_surface_contract(base, errors)
+            self.assertEqual(errors, [])
+
     def test_two_independent_changes_merge_without_a_shared_aggregate_edit(self):
         self.write(fragments.GUIDE_PATH, guide(FIRST + "\n" + SECOND.replace("1.", "2.", 1)))
         self.inventory["categories"]["composable_surfaces"][1]["test_ids"] = ["MSG-002"]

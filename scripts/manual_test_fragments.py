@@ -147,7 +147,7 @@ def fragment_paths(root: Path, directory: str, revision: str | None = None) -> l
     return sorted(paths)
 
 
-def assemble_guide(text: str, fragments: dict[str, str]) -> str:
+def assemble_guide(text: str, fragments: dict[str, str], *, check_legacy_hash: bool = True) -> str:
     legacy = definitions(text)
     prefix_sections = {}
     section = None
@@ -168,7 +168,7 @@ def assemble_guide(text: str, fragments: dict[str, str]) -> str:
         if not match or match["id"] != test_id or match[1] != "1":
             raise FragmentError(f"{path}: expected exactly one matching unchecked scenario with ordinal 1")
         expected = digest(legacy[test_id]) if test_id in legacy else "none"
-        if header[1] != expected:
+        if check_legacy_hash and header[1] != expected:
             raise FragmentError(f"{path}: legacy definition changed; reconcile the fragment")
         if test_id in re.findall(r"^\| ([A-Z]{3,4}-\d{3}) \|", text, re.M):
             raise FragmentError(f"{path}: cannot override a retired ID")
@@ -209,7 +209,7 @@ def assemble_guide(text: str, fragments: dict[str, str]) -> str:
     return "\n".join(result) + "\n"
 
 
-def assemble_inventory(data: dict, fragments: dict[str, str]) -> dict:
+def assemble_inventory(data: dict, fragments: dict[str, str], *, check_legacy_hash: bool = True) -> dict:
     # Copy only after validating raw entries: an overlay must not erase duplicates.
     result = json.loads(json.dumps(data))
     for path, text in sorted(fragments.items()):
@@ -219,8 +219,10 @@ def assemble_inventory(data: dict, fragments: dict[str, str]) -> dict:
             raise FragmentError(f"{path}: source must match its canonical fragment filename")
         if set(fragment) - {"source", "legacy_sha256", "categories", "discovery_exceptions"}:
             raise FragmentError(f"{path}: unknown fragment fields")
-        if fragment.get("legacy_sha256") != source_digest(data, source):
+        if check_legacy_hash and fragment.get("legacy_sha256") != source_digest(data, source):
             raise FragmentError(f"{path}: legacy source mapping changed; reconcile the fragment")
+        if not isinstance(fragment.get("legacy_sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", fragment["legacy_sha256"]):
+            raise FragmentError(f"{path}: invalid legacy source hash")
         entries = [e for group in fragment["categories"].values() for e in group]
         entries += fragment.get("discovery_exceptions", [])
         if any(e.get("source") != source for e in entries):
@@ -246,15 +248,22 @@ def assemble_inventory(data: dict, fragments: dict[str, str]) -> dict:
     return result
 
 
-def load_guide(root: Path, guide_path: str = GUIDE_PATH, revision: str | None = None) -> str:
+def load_guide(
+    root: Path, guide_path: str = GUIDE_PATH, revision: str | None = None, *, check_legacy_hash: bool = True,
+) -> str:
     paths = fragment_paths(root, CASE_DIR, revision)
-    return assemble_guide(read_tree(root, revision, guide_path), {p: read_tree(root, revision, p) for p in paths})
+    return assemble_guide(
+        read_tree(root, revision, guide_path), {p: read_tree(root, revision, p) for p in paths},
+        check_legacy_hash=check_legacy_hash,
+    )
 
 
-def load_inventory(root: Path, inventory_path: str = INVENTORY_PATH, revision: str | None = None) -> dict:
+def load_inventory(
+    root: Path, inventory_path: str = INVENTORY_PATH, revision: str | None = None, *, check_legacy_hash: bool = True,
+) -> dict:
     paths = fragment_paths(root, SURFACE_DIR, revision)
     data = decode_inventory(read_tree(root, revision, inventory_path))
-    return assemble_inventory(data, {p: read_tree(root, revision, p) for p in paths})
+    return assemble_inventory(data, {p: read_tree(root, revision, p) for p in paths}, check_legacy_hash=check_legacy_hash)
 
 
 def write_new(root: Path, path: str, text: str) -> None:

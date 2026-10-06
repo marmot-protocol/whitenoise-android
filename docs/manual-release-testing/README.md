@@ -38,6 +38,8 @@ Coordinate simultaneous new IDs; duplicate IDs are errors.
 When a prefix spans several checklist sections, add a new ID to the shared
 guide in its intended section first. Existing IDs in those sections can still
 be extracted and edited independently; the assembler never guesses a section.
+New definitions are appended before the section's next heading, after any
+trailing notes; their IDs and the existing scenario positions are unchanged.
 
 A source file contains `source`, `legacy_sha256`, `categories`, and optionally
 `discovery_exceptions`. Its categories completely replace the legacy entries
@@ -59,6 +61,9 @@ successful validation against current master immediately before merging. Do not
 merge a stale hash, skip a cancelled validation run, or automatically union the
 two definitions. New fragments should make real coverage changes; this tooling
 change deliberately creates no no-op replacements for in-flight scenarios.
+Historical ID checks tolerate a stale legacy hash in the base revision so a PR
+can repair it. Current inputs still require reconciled hashes; malformed or
+unreadable history is an error.
 
 ## Validate the effective coverage
 

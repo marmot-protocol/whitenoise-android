@@ -589,7 +589,9 @@ def validate_inventory(active: set[str], errors: list[str]) -> None:
 
 
 def parse_revision_guide(revision: str) -> tuple[set[str], set[str]]:
-    active, retired, errors = parse_guide(load_guide(ROOT, revision=revision))
+    # History preserves IDs, not old override freshness. A stale base hash must
+    # not block the PR that reconciles it. Current-tree assembly remains strict.
+    active, retired, errors = parse_guide(load_guide(ROOT, revision=revision, check_legacy_hash=False))
     if errors:
         raise FragmentError(f"invalid historical guide at {revision}: {errors[0]}")
     return active, retired
@@ -695,7 +697,7 @@ def validate_fragment_maintenance(base: str, changed: set[str], errors: list[str
         return
     try:
         current_inventory = load_inventory(ROOT)
-        old_inventory = load_inventory(ROOT, revision=base)
+        old_inventory = load_inventory(ROOT, revision=base, check_legacy_hash=False)
         affected_ids = set()
         changed_mappings = set()
         for source in sources:
@@ -712,7 +714,7 @@ def validate_fragment_maintenance(base: str, changed: set[str], errors: list[str
         ):
             errors.append(finding(INVENTORY, 0, "maintenance", "fragment must change effective coverage for a changed production source"))
         if GUIDE_PATH not in changed:
-            old_cases = definitions(load_guide(ROOT, revision=base))
+            old_cases = definitions(load_guide(ROOT, revision=base, check_legacy_hash=False))
             current_cases = definitions(load_guide(ROOT))
             if not any(
                 f"{CASE_DIR}/{test_id}.md" in changed and old_cases.get(test_id) != current_cases.get(test_id)
