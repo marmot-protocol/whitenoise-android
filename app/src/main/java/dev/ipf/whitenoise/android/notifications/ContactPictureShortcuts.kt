@@ -36,10 +36,28 @@ internal fun refreshContactPictureShortcuts(
     currentAvatar: () -> Bitmap?,
     isCurrent: () -> Boolean,
     platform: ContactPictureShortcutPlatform = ContactPictureShortcutPlatform(context),
+    legacyConversationId: String? = null,
+    legacyConversationIcon: Boolean = true,
 ) = synchronized(UserEventNotificationGroup.mutationLock) {
     if (!isCurrent()) return@synchronized
     val shortcuts = platform.read()
     val accountScope = conversationShortcutAccountScope(account)
+    if (legacyConversationId != null) {
+        val legacyId = conversationShortcutId(account, legacyConversationId)
+        shortcuts
+            .filter { it.id == legacyId && it.extras?.getString(CONTACT_ICON_SCOPE) == null }
+            .filter { it.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA) == accountScope }
+            .filter { legacyShortcutRouteMatches(context, it, account, legacyConversationId) }
+            .forEach {
+                val person =
+                    androidx.core.app.Person
+                        .Builder()
+                        .setKey(contact)
+                        .setName(it.longLabel ?: it.shortLabel)
+                        .build()
+                stampContactPictureShortcut(it, contact, legacyConversationIcon, person)
+            }
+    }
     val matches =
         shortcuts.filter {
             it.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA) == accountScope &&
@@ -114,3 +132,30 @@ internal open class ContactPictureShortcutPlatform(
         ShortcutManagerCompat.updateShortcuts(context, shortcuts)
     }
 }
+
+/** Existing canonical DM lookup can prove a legacy ID, but cannot turn an unrelated intent into that identity. */
+private fun legacyShortcutRouteMatches(
+    context: Context,
+    shortcut: ShortcutInfoCompat,
+    account: String,
+    group: String,
+): Boolean {
+    val intent = shortcut.intent
+    val component = android.content.ComponentName(context, dev.ipf.whitenoise.android.MainActivity::class.java)
+    if (intent.component != component) return false
+    return when (intent.action) {
+        android.content.Intent.ACTION_VIEW -> true
+        NotificationNavigation.ACTION_OPEN -> {
+            val target = NotificationNavigation.parseTarget(intent)
+            target?.accountRef == account && target.groupIdHex == group
+        }
+        else -> false
+    }
+}
+
+/** Cheap platform metadata inspection avoids native lookup when all entries already carry ownership. */
+internal fun ContactPictureShortcutPlatform.hasLegacyContactShortcuts(account: String): Boolean =
+    read().any {
+        it.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA) == conversationShortcutAccountScope(account) &&
+            it.extras?.getString(CONTACT_ICON_SCOPE) == null
+    }

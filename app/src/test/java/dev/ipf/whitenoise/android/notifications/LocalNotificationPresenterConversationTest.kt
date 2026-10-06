@@ -86,6 +86,41 @@ class LocalNotificationPresenterConversationTest {
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
     }
 
+    /** Ordinary public publication records its contact before a first private Save refreshes an old cached entry. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun firstPrivatePictureRefreshesAnOrdinaryPublishedShortcut() =
+        runBlocking {
+            presenter =
+                LocalNotificationPresenter(
+                    context = context,
+                    groupReconciliation = {},
+                    contactAvatarOverride = { _, _ -> false to null },
+                    shortcutPublisher = { publishedShortcut = it },
+                )
+            presenter.ensureChannels()
+            presenter.show(update(false).copy(isDm = true), previewTextOverride = "Original", shortNpub = { "Maya" })
+            var cached = checkNotNull(publishedShortcut)
+            val platform =
+                object : ContactPictureShortcutPlatform(context) {
+                    override fun read() = listOf(cached)
+
+                    override fun update(shortcuts: List<ShortcutInfoCompat>) {
+                        cached = shortcuts.single()
+                    }
+                }
+            val red = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+            refreshContactPictureShortcuts(
+                context,
+                "account-a",
+                DEFAULT_NOTIFICATION_SENDER_ID,
+                { red },
+                { true },
+                platform,
+            )
+            assertEquals(Color.RED, checkNotNull(cached.icon?.loadDrawable(context)).toBitmap().getPixel(0, 0))
+        }
+
     /** The final card/shortcut write uses current private pixels, and a silent clear replaces captured history. */
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)

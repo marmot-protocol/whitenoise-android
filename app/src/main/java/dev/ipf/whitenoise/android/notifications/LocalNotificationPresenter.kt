@@ -2238,18 +2238,18 @@ class LocalNotificationPresenter(
                 if (isPublishAllowed()) {
                     pruneConversationShortcutsBeforePublish(shortcutId)
                     val (currentChoice, pixels) = contactAvatarOverride(update.accountRef, update.sender.accountIdHex)
-                    if (currentChoice) {
-                        val preview = NotificationPreviewPreferences.capture(context)
-                        shortcut.extras?.let { stampShortcutPreview(preview, it) }
-                        stampContactPictureShortcut(
-                            shortcut,
-                            update.sender.accountIdHex,
-                            update.isDm,
-                            ownedSender,
-                        )
-                    }
+                    val preview = NotificationPreviewPreferences.capture(context)
+                    shortcut.extras?.let { stampShortcutPreview(preview, it) }
+                    stampContactPictureShortcut(
+                        shortcut,
+                        update.sender.accountIdHex,
+                        update.isDm,
+                        ownedSender,
+                    )
                     val currentShortcut =
-                        if (currentChoice) {
+                        if (!shortcutPreviewAllowed(context, shortcut)) {
+                            genericNotificationShortcut(context, shortcut)
+                        } else if (currentChoice) {
                             withContactPictureIcon(
                                 context,
                                 shortcut,

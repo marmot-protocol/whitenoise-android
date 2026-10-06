@@ -19,6 +19,60 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class ContactPictureShortcutTest {
+    /** A native canonical DM answer upgrades a bare legacy shortcut outside the recent share list. */
+    @Test fun firstPrivateSelectionAdoptsOnlyTheProvenLegacyAccountAndConversation() {
+        val context = RuntimeEnvironment.getApplication()
+        val preview = NotificationPreviewPreferences.capture(context)
+        val original =
+            checkNotNull(
+                buildShareShortcut(
+                    context,
+                    ShareShortcutTarget("a", "canonical", "Maya"),
+                    previewToken = preview,
+                ),
+            )
+        val other =
+            checkNotNull(
+                buildShareShortcut(
+                    context,
+                    ShareShortcutTarget("b", "canonical", "Maya"),
+                    previewToken = preview,
+                ),
+            )
+        var published = listOf(original, other)
+        val red = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+        val platform =
+            object : ContactPictureShortcutPlatform(context) {
+                override fun read() = published
+
+                override fun update(shortcuts: List<androidx.core.content.pm.ShortcutInfoCompat>) {
+                    val changes = shortcuts.associateBy { it.id }
+                    published = published.map { changes[it.id] ?: it }
+                }
+            }
+        refreshContactPictureShortcuts(
+            context,
+            "a",
+            "contact",
+            { red },
+            { true },
+            platform,
+            legacyConversationId = "wrong",
+        )
+        assertNotEquals(Color.RED, checkNotNull(published[0].icon?.loadDrawable(context)).toBitmap().getPixel(0, 0))
+        refreshContactPictureShortcuts(
+            context,
+            "a",
+            "contact",
+            { red },
+            { true },
+            platform,
+            legacyConversationId = "canonical",
+        )
+        assertEquals(Color.RED, checkNotNull(published[0].icon?.loadDrawable(context)).toBitmap().getPixel(0, 0))
+        assertNotEquals(Color.RED, checkNotNull(published[1].icon?.loadDrawable(context)).toBitmap().getPixel(0, 0))
+    }
+
     @Test fun replacementAndClearRefreshPublishedShortcutsWithoutCrossingAccounts() {
         val context = RuntimeEnvironment.getApplication()
         val preview = NotificationPreviewPreferences.capture(context)

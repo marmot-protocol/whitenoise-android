@@ -144,7 +144,10 @@ internal fun rememberConversationGroupAvatar(
     val asset = conversationGroupAvatarAsset(controller, item)
     val selected = controller.window.header?.selected ?: item?.selectedPresentation
     val peerPicture = selected?.avatarSource?.isPeerSourced() == true
-    val peer = selected?.peerId?.takeIf { peerPicture } ?: controller.avatarAccount
+    val lendsPeer =
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .lendsPeerAvatar(controller.group, controller.memberCount)
+    val peer = (selected?.peerId?.takeIf { peerPicture } ?: controller.avatarAccount).takeIf { lendsPeer }
     val privatePicture =
         peer
             ?.let { appState.contactAvatarSource(it, controller.boundAccountRef) }

@@ -96,7 +96,7 @@ internal fun PollVotesSheet(
         PollVotesContent(
             rows = rows,
             displayName = appState::displayName,
-            avatarUrl = appState::avatarUrl,
+            avatarUrl = { appState.contactAvatarSource(it, owner.accountRef) },
             // Reading the mirror's observable list subscribes the sheet to live block changes.
             isBlocked = { id -> blockedUsers.users.isNotEmpty() && blockedUsers.isBlocked(id) },
             phase = pager.phase,

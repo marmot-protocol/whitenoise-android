@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.ui
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -17,6 +19,7 @@ import dev.ipf.whitenoise.android.state.ContactPictureChange
 import dev.ipf.whitenoise.android.state.ContactPictureStore
 import dev.ipf.whitenoise.android.state.contactPicturePng
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderAvatarSlot
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -52,15 +55,21 @@ class PrivateContactAvatarSurfaceTest {
         val public = BitmapFactory.decodeByteArray(publicBytes, 0, publicBytes.size).asImageBitmap()
         composeRule.setContent {
             WhiteNoiseTheme {
-                Box(Modifier.testTag("identity")) { Avatar("Maya", "contact", 64.dp, source, public) }
+                Column {
+                    Box(Modifier.testTag("identity")) { Avatar("Maya", "contact", 64.dp, source, public) }
+                    Row(Modifier.testTag("sender-slot")) {
+                        MessageSenderAvatarSlot(true, "Maya", "contact", source, true, false, {}, public)
+                    }
+                }
             }
         }
 
-        fun pixel(): Int {
-            val image = composeRule.onNodeWithTag("identity").captureToImage().asAndroidBitmap()
+        fun pixel(tag: String = "identity"): Int {
+            val image = composeRule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
             return image.getPixel(image.width / 2, image.height / 2)
         }
         assertEquals(Color.RED, pixel())
+        assertEquals("The real sender wrapper must preserve private precedence", Color.RED, pixel("sender-slot"))
         assertEquals(Color.RED, checkNotNull(privateImage).asAndroidBitmap().getPixel(0, 0))
         composeRule.runOnIdle {
             account = "b"
@@ -69,5 +78,7 @@ class PrivateContactAvatarSurfaceTest {
         composeRule.waitForIdle()
         assertNotEquals(Color.RED, pixel())
         assertNotEquals(Color.BLUE, pixel())
+        assertNotEquals(Color.RED, pixel("sender-slot"))
+        assertNotEquals(Color.BLUE, pixel("sender-slot"))
     }
 }

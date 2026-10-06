@@ -25,6 +25,7 @@ import dev.ipf.whitenoise.android.notifications.preferredConversationShortcutTit
 import dev.ipf.whitenoise.android.notifications.shortcutPreviewAllowed
 import dev.ipf.whitenoise.android.notifications.stampShortcutPreview
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.isPeerSourced
 import kotlin.math.min
 
 internal const val MAX_SHARE_SHORTCUTS = 8
@@ -235,9 +236,8 @@ class ShareShortcutPublisher(
                                 )
                             }
                         val current = item?.let { avatarOverride(accountRef, it) }
+                        if (peer != null) stampPeerShortcut(shortcut, peer, item)
                         if (peer != null && current?.first == true) {
-                            dev.ipf.whitenoise.android.notifications
-                                .stampContactPictureShortcut(shortcut, peer, true)
                             dev.ipf.whitenoise.android.notifications
                                 .withContactPictureIcon(context, shortcut, peer, current.second)
                         } else {
@@ -249,5 +249,22 @@ class ShareShortcutPublisher(
                 },
             )
         }
+    }
+
+    /** Preserve contact ownership before the first override, without borrowing group-owned icons. */
+    private fun stampPeerShortcut(
+        shortcut: ShortcutInfoCompat,
+        peer: String,
+        item: ChatListItem,
+    ) {
+        val ownsConversationIcon =
+            item.selectedPresentation?.avatarSource?.isPeerSourced() == true ||
+                (
+                    item.selectedAvatarAsset == null &&
+                        item.group.avatarUrl.isNullOrBlank() &&
+                        item.group.imageHashHex.isNullOrBlank()
+                )
+        dev.ipf.whitenoise.android.notifications
+            .stampContactPictureShortcut(shortcut, peer, ownsConversationIcon)
     }
 }

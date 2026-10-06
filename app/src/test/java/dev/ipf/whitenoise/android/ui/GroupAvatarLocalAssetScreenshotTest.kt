@@ -1140,8 +1140,55 @@ class PrivateContactGroupAvatarTest {
         GroupAvatarImageLoader.clear()
     }
 
+    /** A native peer selection must not turn a named group into a contact avatar in details or the actual header. */
+    @Test fun namedGroupKeepsItsIdentityWhenNativeSelectionUsesPeerPixels() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        val production =
+            productionSurfaceFixture(
+                fixture,
+                false,
+                group(),
+                selectedPicture(PresentationSourceFfi.PEER_PROFILE),
+            )
+        fixture.state.contactPictureStore.save(
+            ACCOUNT_REF,
+            "peer",
+            "",
+            "",
+            dev.ipf.whitenoise.android.state.ContactPictureChange.Replace(
+                dev.ipf.whitenoise.android.state
+                    .contactPicturePng(Color.RED),
+            ),
+        ) { true }
+        val source = checkNotNull(fixture.state.contactAvatarSource("peer"))
+        val privateImage = kotlinx.coroutines.runBlocking { AvatarImageLoader.load(source) }
+        var detail: ImageBitmap? = null
+        try {
+            composeRule.setContent {
+                val presentation = rememberConversationGroupAvatar(fixture.state, production.controller)
+                SideEffect { detail = presentation.image }
+                dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme {
+                    ProductionAvatarSurface(1, fixture.state, production.item, production.controller)
+                }
+            }
+            composeRule.waitForIdle()
+            assertNotNull(privateImage)
+            org.junit.Assert.assertNotSame(privateImage, detail)
+            val pixels =
+                composeRule
+                    .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)
+                    .captureToImage()
+                    .asAndroidBitmap()
+            org.junit.Assert.assertNotEquals(Color.RED, pixels.getPixel(pixels.width / 2, pixels.height / 2))
+        } finally {
+            production.controller.onCleared()
+            production.chats.onCleared()
+        }
+    }
+
     /** Private pixels override a native peer selection in both real row and conversation resolvers. */
     @Test
+    @Suppress("LongMethod") // One real avatar traverses the row, actual header and group-owned transition.
     fun privateContactPictureOverridesPeerRowsAndHeadersButKeepsGroupOwnedPixels() {
         val fixture = AvatarLocalFixture { emptyList() }
         val source = group().copy(name = "", avatarUrl = null)
@@ -1187,12 +1234,20 @@ class PrivateContactGroupAvatarTest {
                     header = headerImage.image
                     ownGroup = groupImage.image
                 }
-                Text("Private contact identity")
+                dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme {
+                    ProductionAvatarSurface(1, fixture.state, production.item, production.controller)
+                }
             }
             composeRule.waitForIdle()
             assertNotNull(privateImage)
             assertSame(privateImage, row)
             assertSame(privateImage, header)
+            val pixels =
+                composeRule
+                    .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)
+                    .captureToImage()
+                    .asAndroidBitmap()
+            assertEquals(Color.RED, pixels.getPixel(pixels.width / 2, pixels.height / 2))
             org.junit.Assert.assertNotSame(privateImage, ownGroup)
             assertNotNull(ownGroup)
             assertEquals(0, fixture.legacyDownloads.get())

@@ -150,6 +150,20 @@ internal fun ConversationTopBar(
                     ?.avatarSource
                     ?.isPeerSourced() == true
             }
+    val avatarSource =
+        if (freezeRoutePresentation || controller.window.header == null) {
+            currentRow?.selectedPresentation
+        } else {
+            controller.window.header?.selected
+        }
+    val peerEligible =
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .lendsPeerAvatar(presentedGroup, presentedMemberCount)
+    val privatePeer =
+        (presentedAvatarAccount ?: avatarSource?.peerId?.takeIf { avatarSource.avatarSource.isPeerSourced() })
+            ?.takeIf { peerEligible }
+            ?.let { appState.contactAvatarSource(it, controller.boundAccountRef) }
+            ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
     val hasExplicitSelection = controller.window.header != null || liveRow?.selectedAvatarAsset != null
     val explicitSelectionMissing = hasExplicitSelection && selectedAsset == null
     val avatarGroup =
@@ -213,13 +227,15 @@ internal fun ConversationTopBar(
                                     seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
                                     size = if (compactHeight) 28.dp else 40.dp,
                                     fallbackPictureUrl =
-                                        presentedAvatarAccount
+                                        privatePeer ?: presentedAvatarAccount
                                             ?.takeUnless { explicitSelectionMissing }
                                             ?.let(appState::avatarUrl),
                                     firstFrameAvatar = firstFrameAvatar,
                                     accountRef = controller.boundAccountRef,
                                     durableAvatar = selectedAsset,
-                                    durableAvatarIsPersonPicture = selectedAssetIsPersonPicture,
+                                    durableAvatarIsPersonPicture =
+                                        selectedAssetIsPersonPicture ||
+                                            avatarSource?.avatarSource?.isPeerSourced() == true,
                                 )
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {

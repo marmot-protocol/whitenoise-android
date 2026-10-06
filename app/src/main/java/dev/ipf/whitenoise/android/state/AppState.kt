@@ -146,6 +146,7 @@ import dev.ipf.whitenoise.android.notifications.PushWakeDiagnostics
 import dev.ipf.whitenoise.android.notifications.PushWakeEvent
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
 import dev.ipf.whitenoise.android.notifications.normalizeNotificationReaction
 import dev.ipf.whitenoise.android.notifications.notificationReactionOutcome
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
@@ -6208,9 +6209,7 @@ class WhiteNoiseAppState private constructor(
         synchronized(contactClearGuard) { contactRefsBeingCleared.add(normalized) }
         val nicknamesCleared =
             withContext(Dispatchers.IO) {
-                val cleared = ContactNicknamePreferences.clearAllForAccount(preferences, normalized)
-                ContactNotesPreferences.clearAllForAccount(preferences, normalized)
-                check(contactPictureStore.clearAccount(normalized))
+                val cleared = clearContactPrivateDetails(preferences, normalized, contactPictureStore)
                 AvatarImageLoader.clearStoredAvatars()
                 // Folder state is account-private UI organization; it must not
                 // survive the account it belongs to.
@@ -10171,7 +10170,7 @@ class WhiteNoiseAppState private constructor(
             warmPrivateContactAvatar(account, contact)
             contactNicknameRevision += 1
             bumpProfileAccountRevision(contact)
-            refreshPrivateContactPresentation(account, contact)
+            refreshPrivateContactPresentation(account, contact, adoptLegacy = true)
         }
         return saved
     }
@@ -10180,10 +10179,20 @@ class WhiteNoiseAppState private constructor(
     private suspend fun refreshPrivateContactPresentation(
         account: String,
         contact: String,
+        adoptLegacy: Boolean = false,
     ) {
         notificationNicknameRefresh.refresh(account, contact)
         withContext(Dispatchers.IO) {
             runCatchingCancellable {
+                val platform =
+                    dev.ipf.whitenoise.android.notifications
+                        .ContactPictureShortcutPlatform(appContext)
+                val legacy =
+                    if (adoptLegacy && platform.hasLegacyContactShortcuts(account)) {
+                        withTimeoutOrNull(1_500L) { legacyPrivatePictureConversation(account, contact) }
+                    } else {
+                        null
+                    }
                 dev.ipf.whitenoise.android.notifications.refreshContactPictureShortcuts(
                     appContext,
                     account,
@@ -10193,9 +10202,38 @@ class WhiteNoiseAppState private constructor(
                         val signedIn = accounts.any { it.label == account && !it.signedOut }
                         signedIn && !isContactRefBeingCleared(account)
                     },
+                    platform = platform,
+                    legacyConversationId = legacy?.first,
+                    legacyConversationIcon = legacy?.second ?: false,
                 )
             }
         }
+    }
+
+    /** At most two local native reads adopt the canonical DM without scanning or caching the account's chats. */
+    @Suppress("ReturnCount") // Fail closed at each unavailable or mismatched native ownership boundary.
+    private suspend fun legacyPrivatePictureConversation(
+        account: String,
+        contact: String,
+    ): Pair<String, Boolean>? {
+        val existing = marmotIo { existingDirectConversation(account, contact) }?.takeIf { it.reusable } ?: return null
+        val row = marmotIo { presentedChatListRow(account, existing.groupIdHex) } ?: return null
+        val item = chatListItemFromProjection(row.row, row.presentation, row.avatarAsset)
+        val peer =
+            GroupProjector.avatarAccount(
+                item.group,
+                item.presentationOtherMemberAccount,
+                item.presentationMemberCount,
+            )
+        if (peer != contact || row.row.groupIdHex != existing.groupIdHex) return null
+        val contactIcon =
+            row.presentation.avatarSource.isPeerSourced() ||
+                (
+                    row.avatarAsset == null &&
+                        item.group.avatarUrl.isNullOrBlank() &&
+                        item.group.imageHashHex.isNullOrBlank()
+                )
+        return existing.groupIdHex to contactIcon
     }
 
     fun avatarUrl(accountIdHex: String): String? {

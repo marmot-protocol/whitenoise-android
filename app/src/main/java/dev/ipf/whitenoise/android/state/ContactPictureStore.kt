@@ -224,3 +224,16 @@ internal class ContactPictureStore(
                 .joinToString("") { "%02x".format(it) }
     }
 }
+
+/** Account teardown cannot interleave any of the three private fields with an admitted asynchronous Save. */
+internal fun clearContactPrivateDetails(
+    preferences: SharedPreferences,
+    account: String,
+    pictures: ContactPictureStore,
+): Boolean =
+    synchronized(ContactPictureStore.lock) {
+        val nicknamesChanged = ContactNicknamePreferences.clearAllForAccount(preferences, account)
+        ContactNotesPreferences.clearAllForAccount(preferences, account)
+        check(pictures.clearAccount(account))
+        nicknamesChanged
+    }

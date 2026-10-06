@@ -145,6 +145,64 @@ class ContactPictureStoreTest {
         assertEquals(ref, store.reference("a", "contact"))
     }
 
+    /** A Save already past admission must finish before teardown removes nickname, notes and picture together. */
+    @Test fun cleanupWaitsForAnAdmittedSaveAndRemovesAllThreeFields() {
+        val ready = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val checks =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        val executor =
+            java.util.concurrent.Executors
+                .newFixedThreadPool(2)
+        try {
+            val save =
+                executor.submit<Boolean> {
+                    store.save(
+                        "a",
+                        "contact",
+                        "Late name",
+                        "Late note",
+                        ContactPictureChange.Replace(contactPicturePng(Color.RED)),
+                    ) {
+                        if (checks.incrementAndGet() == 2) {
+                            ready.countDown()
+                            check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                        }
+                        true
+                    }
+                }
+            assertTrue(ready.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            val cleanupStarted = java.util.concurrent.CountDownLatch(1)
+            val cleanupThread =
+                java.util.concurrent.atomic
+                    .AtomicReference<Thread>()
+            val cleanup =
+                executor.submit<Boolean> {
+                    cleanupThread.set(Thread.currentThread())
+                    cleanupStarted.countDown()
+                    clearContactPrivateDetails(preferences, "a", store)
+                }
+            assertTrue(cleanupStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            val deadline =
+                System.nanoTime() +
+                    java.util.concurrent.TimeUnit.SECONDS
+                        .toNanos(5)
+            while (cleanupThread.get().state != Thread.State.BLOCKED && System.nanoTime() < deadline) Thread.yield()
+            assertEquals(Thread.State.BLOCKED, cleanupThread.get().state)
+            release.countDown()
+            assertTrue(save.get(5, java.util.concurrent.TimeUnit.SECONDS))
+            cleanup.get(5, java.util.concurrent.TimeUnit.SECONDS)
+            assertNull(store.reference("a", "contact"))
+            assertNull(ContactNicknamePreferences.readNickname(preferences, "a", "contact"))
+            assertNull(ContactNotesPreferences.readNotes(preferences, "a", "contact"))
+            assertEquals(0, root.walkTopDown().count(File::isFile))
+        } finally {
+            release.countDown()
+            executor.shutdownNow()
+        }
+    }
+
     private fun save(
         account: String,
         contact: String,
