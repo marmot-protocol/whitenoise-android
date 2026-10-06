@@ -37,6 +37,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -317,7 +318,7 @@ class NotificationStartupOrderingTest {
             assertLateCorrectionRejectedAtFinalWrite(
                 accounts = listOf(signingAccount("account-a", "self")),
             ) { fixture ->
-                fixture.appState.setConversationNotifyForMode("group-a", ChatNotifyMode.MENTIONS_ONLY)
+                fixture.appState.setConversationNotifyForMode(fixture.update.groupIdHex, ChatNotifyMode.MENTIONS_ONLY)
             }
         }
 
@@ -738,7 +739,7 @@ class NotificationStartupOrderingTest {
         context
             .getSystemService(NotificationManager::class.java)
             .activeNotifications
-            .single { it.tag == "account-a|group-a" }
+            .single { it.tag == notificationCardKey.tag && it.id == notificationCardKey.id }
             .notification
 
     private fun NotificationBootstrapTestFixture.activeMessagingStyle(): NotificationCompat.MessagingStyle =
@@ -800,11 +801,14 @@ class NotificationStartupOrderingTest {
         val correctionFinished = CountDownLatch(1)
         val writes = AtomicInteger(0)
         val correctionClaimed = AtomicBoolean(false)
+        val fixtureIdentity = UUID.randomUUID().toString().replace("-", "").padEnd(64, '0')
         val fixture =
             NotificationBootstrapTestFixture(
                 context = context,
                 notificationUsersHaveDisplayNames = true,
                 previewText = "**resolved after fallback**",
+                messageIdHex = fixtureIdentity,
+                groupIdHex = fixtureIdentity,
                 accounts = accounts,
                 onDisplayName = { _, _ ->
                     releaseFirstRead.await(5, TimeUnit.SECONDS)
@@ -819,7 +823,13 @@ class NotificationStartupOrderingTest {
                     notificationTag: String,
                     notificationId: Int,
                 ) {
-                    if (op != ConversationCardOp.SHOW_NOTIFY) return
+                    if (
+                        op != ConversationCardOp.SHOW_NOTIFY ||
+                        notificationTag != fixture.notificationCardKey.tag ||
+                        notificationId != fixture.notificationCardKey.id
+                    ) {
+                        return
+                    }
                     if (
                         barrier == ConversationCardBarrier.BEFORE_WRITE &&
                         writes.get() == 1 &&
@@ -836,7 +846,10 @@ class NotificationStartupOrderingTest {
                     notificationTag: String,
                     notificationId: Int,
                 ) {
-                    if (op == ConversationCardOp.SHOW_NOTIFY && correctionClaimed.get()) {
+                    val ownsCard =
+                        notificationTag == fixture.notificationCardKey.tag &&
+                            notificationId == fixture.notificationCardKey.id
+                    if (op == ConversationCardOp.SHOW_NOTIFY && ownsCard && correctionClaimed.get()) {
                         correctionFinished.countDown()
                     }
                 }
@@ -846,6 +859,10 @@ class NotificationStartupOrderingTest {
             fixture.awaitNotificationPosted()
             awaitWrites(writes, expected = 1)
             assertEquals(1, writes.get())
+            assertEquals(
+                "**resolved after fallback**",
+                fixture.activeMessagingStyle().messages.single().text.toString(),
+            )
 
             releaseFirstRead.countDown()
             awaitLatch(correctionBeforeWrite)
@@ -875,7 +892,7 @@ class NotificationStartupOrderingTest {
                     preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
                 )
             }
-            fixture.appState.setConversationNotifyForMode("group-a", ChatNotifyMode.ALL)
+            fixture.appState.setConversationNotifyForMode(fixture.update.groupIdHex, ChatNotifyMode.ALL)
             fixture.close()
         }
     }

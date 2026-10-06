@@ -44,9 +44,7 @@ internal fun rememberGroupAvatarPresentation(
 ): GroupAvatarPresentation {
     val ownedFallback =
         fallbackPictureUrl?.takeUnless { source ->
-            PrivateContactAvatarLoader.isPrivate(source) &&
-                (!appState.accounts.any { it.label == accountRef && !it.signedOut } ||
-                    !PrivateContactAvatarLoader.belongsToAccount(source, accountRef))
+            PrivateContactAvatarLoader.isPrivate(source) && !appState.ownsPrivateAvatarSource(source, accountRef)
         }
     val groupOwnsPicture =
         !durableAvatarIsPersonPicture &&
@@ -104,6 +102,11 @@ internal fun rememberGroupAvatarPresentation(
         pictureUrl = legacyUrl ?: ownedFallback?.takeIf { encryptedImage == null },
     )
 }
+
+/** A private picture can be displayed only for its own known, signed-in local account. */
+private fun WhiteNoiseAppState.ownsPrivateAvatarSource(source: String, accountRef: String?): Boolean =
+    accounts.any { it.label == accountRef && !it.signedOut } &&
+        PrivateContactAvatarLoader.belongsToAccount(source, accountRef)
 
 /** The public-URL compatibility seed may be unscoped; retained private seeds may not be retired. */
 private fun ChatListAvatarSeed.matchesAvatarPresentationOwner(accountRef: String?): Boolean {
