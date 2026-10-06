@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.share.outboundShareIntent
 import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
@@ -349,7 +350,7 @@ private fun ShareProfileContent(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Avatar(title = profile.name, seed = profile.seed, size = avatarSize, pictureUrl = profile.pictureUrl)
-            Text(
+            EmojiLabel(
                 text = profile.name,
                 modifier = Modifier.padding(top = WhiteNoiseSpacing.FormField),
                 style = MaterialTheme.typography.headlineSmall,

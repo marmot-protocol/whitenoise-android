@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.state.canRemoveRelay
 import dev.ipf.whitenoise.android.state.publishMissingRelayLists
 import dev.ipf.whitenoise.android.state.relayUrlValidationResult
 import dev.ipf.whitenoise.android.state.restoreDefaultAccountRelays
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
@@ -447,7 +448,7 @@ private fun RelayDetailsScreen(
     if (removeDialog) {
         WhiteNoiseAlertDialog(
             onDismissRequest = { removeDialog = false },
-            title = { Text(stringResource(R.string.remove_named_relay, relay.name)) },
+            title = { EmojiLabel(stringResource(R.string.remove_named_relay, relay.name)) },
             text = { Text(stringResource(R.string.relay_remove_detail)) },
             confirmButton = {
                 TextButton(

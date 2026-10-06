@@ -48,6 +48,7 @@ import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.isPeerSourced
 import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
@@ -222,7 +223,7 @@ internal fun ConversationTopBar(
                                 )
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {
-                                Text(
+                                EmojiLabel(
                                     presentedTitle,
                                     style = MaterialTheme.typography.titleMedium,
                                     maxLines = 1,

@@ -59,6 +59,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.GlobalAttachmentSource
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.mediaCacheKey
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -216,7 +217,7 @@ private fun GlobalAttachmentCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
+            EmojiLabel(
                 text = stringResource(R.string.library_source, item.chatTitle, rememberedRelativeTime(item.timelineAt)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

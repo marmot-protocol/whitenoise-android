@@ -115,6 +115,7 @@ class ComposerCompactResizeTargetsTest {
         assertEquals(0, resizeStarts)
     }
 
+    /** Places the compact editor below a focusable transcript to exercise shared input boundaries. */
     private fun render(
         onAction: () -> Unit,
         onResize: () -> Unit,

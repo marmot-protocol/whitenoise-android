@@ -39,8 +39,8 @@ internal sealed interface EmojiArt {
 internal val LocalCustomEmoji = compositionLocalOf { CustomEmojiSet.Empty }
 
 /**
- * Shortcodes the surrounding message and its reactions define through NIP-30 `emoji` tags, and the
- * message attachments that carry them, which render inline instead of as files.
+ * Shortcodes the exact surrounding message defines through NIP-30 `emoji` tags, and the message
+ * attachments that carry them. Other messages, reactions and identity labels need their own source.
  */
 @Immutable
 internal class ReceivedEmoji(
@@ -124,11 +124,19 @@ internal object EmojiShortcodes {
         }
     }
 
+    /** Nonliteral shortcodes for non-Compose presentation; reuse the same code/link exclusions. */
+    fun presentationShortcodes(text: String): List<String> =
+        annotate(AnnotatedString(text))
+            .getStringAnnotations(0, text.length)
+            .filter { it.tag == inlineContentTag }
+            .map { it.item }
+            .distinct()
+
     /** Inline artwork for every shortcode defined here, with user files taking precedence. */
     @Composable
-    fun content(): Map<String, InlineTextContent> {
+    fun content(receivedEmoji: ReceivedEmoji = LocalReceivedEmoji.current): Map<String, InlineTextContent> {
         val custom = LocalCustomEmoji.current
-        val received = LocalReceivedEmoji.current.art
+        val received = receivedEmoji.art
         return remember(custom, received) {
             val codes = builtins + received.keys + custom.entries.map { it.shortcode }
             codes.associateWith { shortcode ->
