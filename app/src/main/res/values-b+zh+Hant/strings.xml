@@ -2204,4 +2204,11 @@
     <string name="nostr_event_image_failed">無法載入此圖片，請再試一次。</string>
     <string name="nostr_event_type_image">圖片</string>
     <string name="nostr_event_expand">檢視完整事件</string>
+    <string name="floating_attachment_resolving">正在檢查可用性</string>
+    <string name="floating_attachment_available">可在此裝置上使用</string>
+    <string name="floating_attachment_remote">開啟原訊息查看</string>
+    <string name="floating_attachment_failed">下載失敗。開啟原訊息重試</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="other">還有 %1$d 個附件</item>
+    </plurals>
 </resources>

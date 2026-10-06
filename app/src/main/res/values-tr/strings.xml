@@ -2233,4 +2233,12 @@
     <string name="nostr_event_image_failed">Bu görsel yüklenemedi. Tekrar deneyin.</string>
     <string name="nostr_event_type_image">Görsel</string>
     <string name="nostr_event_expand">Etkinliğin tamamını göster</string>
+    <string name="floating_attachment_resolving">Kullanılabilirlik kontrol ediliyor</string>
+    <string name="floating_attachment_available">Bu cihazda kullanılabilir</string>
+    <string name="floating_attachment_remote">Görüntülemek için özgün mesajı açın</string>
+    <string name="floating_attachment_failed">İndirme başarısız. Yeniden denemek için özgün mesajı açın</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">%1$d ek daha</item>
+        <item quantity="other">%1$d ek daha</item>
+    </plurals>
 </resources>
