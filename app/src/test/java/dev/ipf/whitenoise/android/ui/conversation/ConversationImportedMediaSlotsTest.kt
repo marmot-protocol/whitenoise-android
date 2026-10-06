@@ -168,8 +168,8 @@ class ConversationImportedMediaSlotsTest {
         val owns: (Uri) -> Boolean = { it.authority == "private-share" }
         val reconciled = RestoredConversationAttachments(listOf(fresh), emptyList())
         val merged =
-            mergeRestoredComposerAttachments(
-                listOf(sent, fresh, imported).filter { owns(it.uri) },
+            mergeReconciledComposerAttachments(
+                listOf(sent, fresh, imported),
                 emptyList(),
                 reconciled,
                 owns,
