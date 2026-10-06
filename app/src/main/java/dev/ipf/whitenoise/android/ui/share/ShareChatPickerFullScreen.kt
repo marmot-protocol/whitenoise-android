@@ -714,7 +714,7 @@ private fun ShareTargetRow(
             appState,
             item,
             ownerAccountRef,
-            avatarAccount?.let { appState.avatarUrl(it) },
+            avatarAccount?.let { appState.contactAvatarSource(it) },
         )
     val memberIds =
         remember(item, selectedAccountIdHex) {

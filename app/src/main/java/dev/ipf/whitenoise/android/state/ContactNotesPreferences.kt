@@ -23,10 +23,11 @@ internal object ContactNotesPreferences {
         preferences: SharedPreferences,
         accountRef: String?,
         contactPubkeyHex: String,
-    ): String? {
-        val key = preferenceKey(accountRef, contactPubkeyHex) ?: return null
-        return normalizedNotes(preferences.getString(key, null))
-    }
+    ): String? =
+        synchronized(ContactPictureStore.lock) {
+            val key = preferenceKey(accountRef, contactPubkeyHex) ?: return@synchronized null
+            normalizedNotes(preferences.getString(key, null))
+        }
 
     fun writeNotes(
         preferences: SharedPreferences,

@@ -275,7 +275,7 @@ private fun ChatFolderEditSession(
                     id = candidate.accountIdHex.lowercase(Locale.ROOT),
                     title = candidate.displayName,
                     avatarSeed = candidate.accountIdHex,
-                    avatarUrl = appState.avatarUrl(candidate.accountIdHex),
+                    avatarUrl = appState.contactAvatarSource(candidate.accountIdHex),
                 )
             }
         }

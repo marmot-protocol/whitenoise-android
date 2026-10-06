@@ -21,6 +21,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
@@ -34,6 +35,7 @@ import kotlin.coroutines.resumeWithException
  * mode or clearing the active session after an unfinished engine teardown.
  */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34])
 class ExternalSignerSignOutLifecycleTest {
     private val context: Application = RuntimeEnvironment.getApplication()
@@ -120,6 +122,31 @@ class ExternalSignerSignOutLifecycleTest {
         ShortcutManagerCompat.removeAllDynamicShortcuts(context)
     }
 
+    /** Seed distinct private records beside the existing lifecycle fixture's account state. */
+    private fun retainContactPictures(state: WhiteNoiseAppState) {
+        listOf(ACCOUNT_REF, OTHER_ACCOUNT_REF).forEach { account ->
+            state.contactPictureStore.save(
+                account,
+                "private-contact",
+                "",
+                "",
+                ContactPictureChange.Replace(contactPicturePng(android.graphics.Color.RED)),
+            ) { true }
+        }
+    }
+
+    /** Recreate the store to prove cleanup is durable and the other account's file remains readable. */
+    private fun assertContactPicturesRemovedOnlyForThisAccount(state: WhiteNoiseAppState) {
+        val recreated =
+            ContactPictureStore(
+                context.getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE),
+                context.noBackupFilesDir.resolve("contact-pictures"),
+            )
+        assertNull(recreated.reference(ACCOUNT_REF, "private-contact"))
+        val retained = checkNotNull(state.contactPictureStore.reference(OTHER_ACCOUNT_REF, "private-contact"))
+        assertTrue(checkNotNull(recreated.read(retained)).isNotEmpty())
+    }
+
     private fun appState(context: android.content.Context = this.context): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -139,6 +166,7 @@ class ExternalSignerSignOutLifecycleTest {
     fun successfulExternalSignerSignOutUsesTheNormalCompletionPath() =
         runBlocking {
             val appState = appState()
+            retainContactPictures(appState)
             retainComposerExpansion(appState)
 
             val completion = appState.signOutActiveAccount(deleteKeyPackages = true)
@@ -152,6 +180,7 @@ class ExternalSignerSignOutLifecycleTest {
                 appState.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
             )
             assertNull(appState.activeAccountRef)
+            assertContactPicturesRemovedOnlyForThisAccount(appState)
             assertTrue(appState.phase is AppPhase.Onboarding)
         }
 
@@ -309,6 +338,7 @@ class ExternalSignerSignOutLifecycleTest {
         runBlocking {
             val shortcutId = publishConversationShortcut()
             val appState = appState()
+            retainContactPictures(appState)
             retainComposerExpansion(appState)
 
             val outcome = appState.signOutAndWipeActiveAccount()
@@ -323,6 +353,7 @@ class ExternalSignerSignOutLifecycleTest {
                 appState.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
             )
             assertNull(appState.activeAccountRef)
+            assertContactPicturesRemovedOnlyForThisAccount(appState)
             assertTrue(appState.phase is AppPhase.Onboarding)
             assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).none { it.id == shortcutId })
         }

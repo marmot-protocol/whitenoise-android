@@ -123,7 +123,7 @@ internal fun SelectedMemberSummary(
                             title = selectedMemberDisplayName(member, appState),
                             seed = member.accountIdHex,
                             size = 32.dp,
-                            pictureUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
+                            pictureUrl = selectedMemberPicture(member, appState),
                         )
                     }
                 }
@@ -222,7 +222,7 @@ internal fun SelectedMembersReviewScreen(
                     title = memberName,
                     subtitle = appState.shortNpub(member.accountIdHex).takeIf { it.isNotBlank() },
                     avatarSeed = member.accountIdHex,
-                    avatarUrl = selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
+                    avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
                     trailing = {
                         FilledTonalIconButton(
                             onClick = { onRemove(member) },
@@ -242,3 +242,9 @@ internal fun SelectedMembersReviewScreen(
 }
 
 internal const val SELECTED_MEMBERS_CONFIRM_TAG = "selected_members_confirm"
+
+/** Active-account private picture wins before the search result's published avatar. */
+private fun selectedMemberPicture(
+    member: RecipientSearch.Candidate,
+    appState: WhiteNoiseAppState,
+): String? = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex))

@@ -60,15 +60,18 @@ internal fun Avatar(
     // is intentional: produceState keys restart the load coroutine, but the
     // state holder itself must also be recreated to re-seed from the new cache
     // key instead of displaying the old bitmap transiently.
-    val loadedUrlImage by key(seed, pictureUrl, picture) {
+    val privateSource =
+        dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+            .isPrivate(pictureUrl)
+    val loadedUrlImage by key(seed, pictureUrl, picture, AvatarImageLoader.currentCacheLifetime()) {
         rememberRecoverableAvatar(
             initialImage = AvatarImageLoader.peek(pictureUrl),
-            enabled = pictureUrl != null && picture == null,
+            enabled = pictureUrl != null && (picture == null || privateSource),
         ) {
             AvatarImageLoader.load(checkNotNull(pictureUrl))
         }
     }
-    val image = picture ?: loadedUrlImage
+    val image = if (privateSource) loadedUrlImage else picture ?: loadedUrlImage
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
         contentAlignment = Alignment.Center,
@@ -80,7 +83,14 @@ internal fun Avatar(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
-            val animatedKey = if (picture == null) pictureUrl else animationKey
+            val animatedKey =
+                if (privateSource) {
+                    null
+                } else if (picture == null) {
+                    pictureUrl
+                } else {
+                    animationKey
+                }
             if (animatedKey != null) {
                 val maxEdgePx = with(LocalDensity.current) { size.roundToPx() }
                 AnimatedProfileAvatarOverlay(animatedKey, image, Modifier.fillMaxSize(), maxEdgePx)

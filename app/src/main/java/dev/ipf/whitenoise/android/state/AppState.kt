@@ -1172,6 +1172,12 @@ class WhiteNoiseAppState private constructor(
     /** Emoji images already uploaded for the current epoch, so sends and retries never upload one twice. */
     internal val emojiUploads = EmojiUploadCache()
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val contactPictureStore =
+        ContactPictureStore(preferences, appContext.noBackupFilesDir.resolve("contact-pictures"))
+            .also {
+                dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+                    .attach(it) { activeAccountRef }
+            }
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
     internal val localGroupDeleteCleanupMutex = Mutex()
@@ -1487,7 +1493,11 @@ class WhiteNoiseAppState private constructor(
     internal val conversationVibrationPreferences = ConversationVibrationPreferences(appContext)
     internal val conversationNotificationRouting by lazy { ConversationNotificationRouting(appContext) }
     internal val notificationPreviewSettings by lazy { NotificationPreviewSettings.forContext(appContext) }
-    private val localNotificationPresenter = LocalNotificationPresenter(appContext)
+    private val localNotificationPresenter =
+        LocalNotificationPresenter(
+            appContext,
+            contactAvatarOverride = ::contactAvatarOverride,
+        )
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
     private val appUpdateRepository = AppUpdateRepository(appContext)
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
@@ -2328,7 +2338,19 @@ class WhiteNoiseAppState private constructor(
             shareStaging = shareStaging,
             resolveMime = { context, uri -> shareResolveMime(context, uri) },
         )
-    private val shareShortcutPublisher = ShareShortcutPublisher(appContext)
+    private val shareShortcutPublisher =
+        ShareShortcutPublisher(appContext, avatarOverride = { account, item ->
+            val peerImage = item.selectedPresentation?.avatarSource?.isPeerSourced() == true
+            val noGroupImage =
+                item.selectedAvatarAsset == null &&
+                    item.group.avatarUrl.isNullOrBlank() &&
+                    item.group.imageHashHex.isNullOrBlank()
+            val peer =
+                GroupProjector
+                    .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+                    ?.takeIf { peerImage || noGroupImage }
+            peer?.let { contactAvatarOverride(account, it) } ?: (false to null)
+        })
 
     /**
      * `SupervisorJob` isolates siblings but does not swallow exceptions — an
@@ -6188,6 +6210,8 @@ class WhiteNoiseAppState private constructor(
             withContext(Dispatchers.IO) {
                 val cleared = ContactNicknamePreferences.clearAllForAccount(preferences, normalized)
                 ContactNotesPreferences.clearAllForAccount(preferences, normalized)
+                check(contactPictureStore.clearAccount(normalized))
+                AvatarImageLoader.clearStoredAvatars()
                 // Folder state is account-private UI organization; it must not
                 // survive the account it belongs to.
                 chatFolderPreferences.clearAllForAccount(normalized)
@@ -10073,6 +10097,107 @@ class WhiteNoiseAppState private constructor(
         return profile
     }
 
+    /** Pure cache snapshot used at the final Android write, including a cleared private choice. */
+    @Suppress("ReturnCount") // Reject ineligible or revoked owners before accessing private pixels.
+    private fun contactAvatarOverride(
+        account: String,
+        contact: String,
+    ): Pair<Boolean, android.graphics.Bitmap?> {
+        if (isContactRefBeingCleared(account)) return true to null
+        if (contactNicknameAccountRefForAccess(account, accounts, contact) == null ||
+            !contactPictureStore.hasChoice(account, contact)
+        ) {
+            return false to null
+        }
+        if (appLockScreenVisible) return true to null
+        val private = contactPictureStore.reference(account, contact)?.cacheKey?.let(AvatarImageLoader::cachedImage)
+        val published = synchronized(profilePresentationLock) { profilePresentations[contact]?.avatarUrl }
+        return true to (private?.asAndroidBitmap() ?: AvatarImageLoader.peekBitmap(published))
+    }
+
+    /** Bounded local file decode shares the first-post deadline; it can never acquire a public URL. */
+    private suspend fun warmPrivateContactAvatar(
+        account: String,
+        contact: String,
+    ) {
+        val eligible = contactNicknameAccountRefForAccess(account, accounts, contact) != null
+        if (!eligible || isContactRefBeingCleared(account)) return
+        val ref = contactPictureStore.reference(account, contact) ?: return
+        val lifetime = AvatarImageLoader.currentCacheLifetime()
+        runCatchingCancellable {
+            AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
+                withContext(Dispatchers.IO) { contactPictureStore.read(ref) }
+            }
+        }
+    }
+
+    /** Display-only private avatar handle; public profile and export callers keep using [avatarUrl]. */
+    @Suppress("ReturnCount") // Every ineligible/private-missing state preserves the public identity fallback.
+    fun contactAvatarSource(
+        accountIdHex: String,
+        accountRef: String? = activeAccountRef,
+    ): String? {
+        contactNicknameRevision
+        val publicUrl = avatarUrl(accountIdHex)
+        val account = contactNicknameAccountRefForAccess(accountRef, accounts, accountIdHex) ?: return publicUrl
+        if (isContactRefBeingCleared(account)) return publicUrl
+        val picture = contactPictureStore.reference(account, accountIdHex) ?: return publicUrl
+        return dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+            .source(picture, publicUrl)
+    }
+
+    /** Commits one captured editor atomically and invalidates every account-owned identity presentation. */
+    internal suspend fun saveContactPrivateDetails(
+        account: String,
+        contact: String,
+        nickname: String,
+        notes: String,
+        picture: ContactPictureChange,
+        ownerIsCurrent: () -> Boolean,
+    ): Boolean {
+        val saved =
+            withContext(Dispatchers.IO) {
+                contactPictureStore.save(account, contact, nickname, notes, picture) {
+                    ownerIsCurrent() &&
+                        activeAccountRef == account &&
+                        !signOutInProgress &&
+                        !wipeInProgress &&
+                        !isContactRefBeingCleared(account) &&
+                        !isLocalAccount(contact)
+                }
+            }
+        if (saved) {
+            AvatarImageLoader.clearStoredAvatars()
+            warmPrivateContactAvatar(account, contact)
+            contactNicknameRevision += 1
+            bumpProfileAccountRevision(contact)
+            refreshPrivateContactPresentation(account, contact)
+        }
+        return saved
+    }
+
+    /** Reconciles existing platform pixels from the current cache without starting a public image fetch. */
+    private suspend fun refreshPrivateContactPresentation(
+        account: String,
+        contact: String,
+    ) {
+        notificationNicknameRefresh.refresh(account, contact)
+        withContext(Dispatchers.IO) {
+            runCatchingCancellable {
+                dev.ipf.whitenoise.android.notifications.refreshContactPictureShortcuts(
+                    appContext,
+                    account,
+                    contact,
+                    currentAvatar = { contactAvatarOverride(account, contact).second },
+                    isCurrent = {
+                        val signedIn = accounts.any { it.label == account && !it.signedOut }
+                        signedIn && !isContactRefBeingCleared(account)
+                    },
+                )
+            }
+        }
+    }
+
     fun avatarUrl(accountIdHex: String): String? {
         val avatar = profilePresentation(accountIdHex).avatarUrl
         if (avatar == null) requestProfile(accountIdHex)
@@ -11216,6 +11341,7 @@ class WhiteNoiseAppState private constructor(
         val result =
             if (shouldPost && !appLockScreenVisible) {
                 notificationFirstPostContentCoordinator.resolve(stage) {
+                    warmPrivateContactAvatar(update.accountRef, update.sender.accountIdHex)
                     notificationContentResolution.firstPost.resolve(update, localOnly = true)
                 }
             } else {
@@ -11614,6 +11740,10 @@ class WhiteNoiseAppState private constructor(
             bumpProfileAccountRevision(accountIdHex)
             scheduleInviteNotificationIdentityRefresh(accountIdHex, presentation)
             refreshProfileNotificationChannelLabels(accountIdHex, presentation.displayName)
+            val viewers = accounts.filter { !it.signedOut && contactPictureStore.hasChoice(it.label, accountIdHex) }
+            viewers.forEach { account ->
+                mutationsScope.launch { refreshPrivateContactPresentation(account.label, accountIdHex) }
+            }
         }
     }
 
@@ -11652,6 +11782,7 @@ class WhiteNoiseAppState private constructor(
             // Wipe pre-encryption cache entries promptly after upgrade without doing
             // directory I/O in this main-thread constructor.
             mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+            mutationsScope.launch(Dispatchers.IO) { contactPictureStore.cleanOrphans() }
             // Load the persisted per-chat channel scopes before the settings UI
             // can request them, without blocking the main-thread constructor.
             mutationsScope.launch(Dispatchers.IO) { conversationNotificationRouting }

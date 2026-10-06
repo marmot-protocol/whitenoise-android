@@ -423,7 +423,7 @@ internal fun MainShell(
                 targetAccountRef = targetAccountRef,
                 targetTitle = appState.accountDisplayNameCached(target.accountIdHex),
                 targetSeed = target.accountIdHex,
-                targetPictureUrl = appState.avatarUrl(target.accountIdHex),
+                targetPictureUrl = appState.contactAvatarSource(target.accountIdHex),
                 motion =
                     if (ValueAnimator.areAnimatorsEnabled()) {
                         QuickAccountSwitchMotion.Animated
@@ -1413,6 +1413,7 @@ internal fun MainShell(
         chatsController.isLoading,
         chatsController.items,
         appState.activeAccountRef,
+        appState.profileRevisionForCompose,
     ) {
         val chatListReady =
             chatsController.boundAccountRef == appState.activeAccountRef &&

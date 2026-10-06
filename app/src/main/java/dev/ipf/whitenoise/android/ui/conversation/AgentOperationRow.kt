@@ -102,7 +102,7 @@ internal fun AgentOperationTimelineRow(
                 AgentOperationSenderPresentation(
                     name = senderName,
                     seed = record.sender,
-                    avatarUrl = appState.avatarUrl(record.sender),
+                    avatarUrl = appState.contactAvatarSource(record.sender),
                 )
             } else {
                 null

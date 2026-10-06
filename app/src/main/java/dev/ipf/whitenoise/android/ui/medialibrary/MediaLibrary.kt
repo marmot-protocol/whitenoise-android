@@ -1250,7 +1250,7 @@ private fun SenderAvatar(
         title = appState.displayName(sender),
         seed = sender,
         size = 36.dp,
-        pictureUrl = appState.avatarUrl(sender),
+        pictureUrl = appState.contactAvatarSource(sender),
     )
 }
 

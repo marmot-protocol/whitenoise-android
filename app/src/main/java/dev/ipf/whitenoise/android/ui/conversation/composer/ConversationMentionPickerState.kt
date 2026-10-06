@@ -48,7 +48,7 @@ internal fun rememberConversationMentionPickerState(
                             npub = mentionNpub,
                             displayName = appState.contactDisplayNameCached(member.memberIdHex),
                             nip05 = appState.userProfile(member.memberIdHex)?.nip05,
-                            avatarUrl = appState.avatarUrl(member.memberIdHex),
+                            avatarUrl = appState.contactAvatarSource(member.memberIdHex),
                         )
                     }
             }

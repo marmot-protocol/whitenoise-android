@@ -25,9 +25,13 @@ object ProfileSanitizer {
     /**
      * Normalize a URL received from protocol state without classifying it.
      * MDK is the sole owner of scheme, authority, host, port, redirect, DNS,
-     * and size policy when [AvatarImageLoader] fetches these URLs.
+     * and size policy when [AvatarImageLoader] fetches these URLs. Android-only
+     * private display handles are never protocol URLs and cannot cross this boundary.
      */
-    fun protocolImageUrl(raw: String?): String? = raw?.trim()?.takeIf(String::isNotEmpty)
+    fun protocolImageUrl(raw: String?): String? {
+        val value = raw?.trim()?.takeIf(String::isNotEmpty)
+        return value?.takeUnless(PrivateContactAvatarLoader::isPrivate)
+    }
 
     /**
      * Validate an Android-owned, user-initiated HTTPS image URL before a

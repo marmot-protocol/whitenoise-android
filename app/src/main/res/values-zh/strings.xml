@@ -2238,4 +2238,12 @@
     <string name="gestures_read_unread">已读 / 未读</string>
     <string name="gestures_mute_unmute">静音 / 取消静音</string>
     <string name="gestures_pin_unpin">置顶 / 取消置顶</string>
+
+    <string name="contact_private_picture">私密图片</string>
+    <string name="contact_picture_pick">选择照片</string>
+    <string name="contact_picture_replace">更换照片</string>
+    <string name="contact_picture_reposition">调整位置 / 裁剪</string>
+    <string name="contact_picture_clear">清除私密图片</string>
+    <string name="contact_picture_local_only">仅用于此设备上的此账号。绝不会分享或上传。</string>
+    <string name="contact_picture_failed">无法保存此图片或联系人信息。之前的选择未改变，请重试。</string>
 </resources>

@@ -703,7 +703,7 @@ private fun ForwardTargetRow(
             appState,
             item,
             ownerAccountRef,
-            avatarAccount?.let { appState.avatarUrl(it) },
+            avatarAccount?.let { appState.contactAvatarSource(it) },
         )
     val membersPreview =
         remember(item, ownerAccountRef, ownerAccountIdHex, appState.profileRevisionForCompose) {

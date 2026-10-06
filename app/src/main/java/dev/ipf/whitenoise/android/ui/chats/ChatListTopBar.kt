@@ -196,7 +196,7 @@ internal fun ChatListTopBar(
                                     active?.let { appState.accountDisplayNameCached(it.accountIdHex) }
                                         ?: stringResource(R.string.app_name),
                                 seed = active?.accountIdHex ?: "whitenoise",
-                                pictureUrl = active?.let { appState.avatarUrl(it.accountIdHex) },
+                                pictureUrl = active?.let { appState.contactAvatarSource(it.accountIdHex) },
                                 size = 40.dp,
                                 touchTargetSize = 48.dp,
                                 actionDescription =

@@ -112,7 +112,7 @@ internal fun ShareConnectScreen(
             name = appState.displayName(accountIdHex),
             npub = npub,
             seed = accountIdHex,
-            pictureUrl = appState.avatarUrl(accountIdHex),
+            pictureUrl = appState.contactAvatarSource(accountIdHex),
             nostrAddress = appState.userProfileCached(accountIdHex)?.nip05.orEmpty(),
         )
     val link = remember(npub) { ProfileLink.parse(npub) }

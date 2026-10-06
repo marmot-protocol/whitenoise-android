@@ -94,7 +94,13 @@ internal fun globalSearchFilterOptions(
                     id = canonicalChatListGroupId(item.group.groupIdHex),
                     title = chatListItemDisplayTitle(item, appState, titleCopy),
                     avatarSeed = item.selectedAvatarSeed ?: peer ?: item.group.groupIdHex,
-                    avatarUrl = peer?.let { item.selectedAvatarUrl ?: appState.avatarUrl(it) },
+                    avatarUrl =
+                        peer?.let {
+                            appState.contactAvatarSource(it)?.takeIf(
+                                dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate,
+                            )
+                                ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
+                        },
                 )
             },
         senders =
@@ -109,7 +115,7 @@ internal fun globalSearchFilterOptions(
                         id = hex,
                         title = appState.chatMemberTitle(hex),
                         avatarSeed = hex,
-                        avatarUrl = appState.avatarUrl(hex),
+                        avatarUrl = appState.contactAvatarSource(hex),
                     )
                 }.sortedBy { it.title.lowercase(Locale.ROOT) },
     )

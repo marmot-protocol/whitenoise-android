@@ -25,10 +25,11 @@ internal object ContactNicknamePreferences {
         preferences: SharedPreferences,
         accountRef: String?,
         contactPubkeyHex: String,
-    ): String? {
-        val key = preferenceKey(accountRef, contactPubkeyHex) ?: return null
-        return ProfileSanitizer.displayName(preferences.getString(key, null))
-    }
+    ): String? =
+        synchronized(ContactPictureStore.lock) {
+            val key = preferenceKey(accountRef, contactPubkeyHex) ?: return@synchronized null
+            ProfileSanitizer.displayName(preferences.getString(key, null))
+        }
 
     fun writeNickname(
         preferences: SharedPreferences,

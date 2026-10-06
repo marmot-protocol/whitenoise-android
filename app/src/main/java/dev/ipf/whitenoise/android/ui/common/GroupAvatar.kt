@@ -20,9 +20,9 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
+import dev.ipf.whitenoise.android.state.isPeerSourced
 import dev.ipf.whitenoise.android.state.isRenderable
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
-import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
 
 /**
  * All group surfaces consume the selected MDK asset; legacy acquisition is only a compatibility path.
@@ -30,7 +30,8 @@ import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
  * may animate under the shared profile-avatar policy.
  */
 @Composable
-@Suppress("LongParameterList")
+// Ordered private, durable and legacy presentation fallbacks.
+@Suppress("LongParameterList", "ReturnCount", "CyclomaticComplexMethod")
 internal fun rememberGroupAvatarPresentation(
     appState: WhiteNoiseAppState,
     group: AppGroupRecordFfi,
@@ -40,6 +41,23 @@ internal fun rememberGroupAvatarPresentation(
     firstFrameAvatar: ChatListAvatarSeed? = null,
     durableAvatarIsPersonPicture: Boolean = false,
 ): GroupAvatarPresentation {
+    val groupOwnsPicture =
+        !durableAvatarIsPersonPicture &&
+            (durableAvatar != null || !group.avatarUrl.isNullOrBlank() || !group.imageHashHex.isNullOrBlank())
+    val privateSource =
+        fallbackPictureUrl
+            ?.takeUnless { groupOwnsPicture }
+            ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
+    val privateImage by key(appState, accountRef, privateSource, AvatarImageLoader.currentCacheLifetime()) {
+        rememberRecoverableAvatar(
+            initialImage = AvatarImageLoader.peek(privateSource),
+            enabled = privateSource != null,
+        ) {
+            AvatarImageLoader.load(checkNotNull(privateSource))
+        }
+    }
+    // A missing/corrupt local image may still use this account's native public-avatar selection.
+    if (privateSource != null && privateImage != null) return GroupAvatarPresentation(privateImage, privateSource)
     val ownedSeed = firstFrameAvatar?.takeIf { it.matchesAvatarPresentationOwner(accountRef) }
     val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef)
     if (durableAvatar != null) {
@@ -106,9 +124,14 @@ internal fun rememberChatListGroupAvatar(
         group = item.group,
         durableAvatar = item.selectedAvatarAsset,
         accountRef = accountRef,
-        fallbackPictureUrl = fallbackPictureUrl,
+        fallbackPictureUrl =
+            dev.ipf.whitenoise.android.core.GroupProjector
+                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+                ?.let { appState.contactAvatarSource(it, accountRef) }
+                ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
+                ?: fallbackPictureUrl,
         firstFrameAvatar = item.firstFrameAvatar,
-        durableAvatarIsPersonPicture = item.selectedAvatarIsPersonPicture,
+        durableAvatarIsPersonPicture = item.selectedPresentation?.avatarSource?.isPeerSourced() == true,
     )
 
 /** Details, editing and full-picture presentation share the conversation's account and current asset. */
@@ -119,12 +142,20 @@ internal fun rememberConversationGroupAvatar(
 ): GroupAvatarPresentation {
     val item = appState.currentGroupAvatarItem(controller.boundAccountRef, controller.group.groupIdHex)
     val asset = conversationGroupAvatarAsset(controller, item)
+    val selected = controller.window.header?.selected ?: item?.selectedPresentation
+    val peerPicture = selected?.avatarSource?.isPeerSourced() == true
+    val peer = selected?.peerId?.takeIf { peerPicture } ?: controller.avatarAccount
+    val privatePicture =
+        peer
+            ?.let { appState.contactAvatarSource(it, controller.boundAccountRef) }
+            ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val originalBytes =
         remember(appState, controller, asset, controller.boundAccountRef, appState.runtimeGeneration, lifetime) {
             appState.retainedAvatarBytesReader(asset, controller.boundAccountRef)
         }
-    if (asset == null && (controller.window.header != null || item?.selectedAvatarAsset != null)) {
+    val selectedByNative = controller.window.header != null || item?.selectedAvatarAsset != null
+    if (privatePicture == null && asset == null && selectedByNative) {
         // An explicit placeholder, removal or identity mismatch must not resurrect older group bytes.
         return GroupAvatarPresentation(null, null)
     }
@@ -133,14 +164,23 @@ internal fun rememberConversationGroupAvatar(
             it.group.avatarUrl == controller.group.avatarUrl &&
                 it.group.imageHashHex == controller.group.imageHashHex
         }
-    return rememberGroupAvatarPresentation(
-        appState,
-        controller.group,
-        asset,
-        controller.boundAccountRef,
-        controller.avatarUrl,
-        matchingItem?.firstFrameAvatar,
-    ).copy(readOriginalBytes = originalBytes)
+    val presentation =
+        rememberGroupAvatarPresentation(
+            appState,
+            controller.group,
+            asset,
+            controller.boundAccountRef,
+            privatePicture ?: controller.avatarUrl,
+            matchingItem?.firstFrameAvatar,
+            durableAvatarIsPersonPicture = peerPicture,
+        )
+    return presentation.copy(
+        readOriginalBytes =
+            originalBytes.takeUnless {
+                dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+                    .isPrivate(presentation.pictureUrl)
+            },
+    )
 }
 
 /** Reads current MDK selection without initiating any acquisition or borrowing another account's row. */

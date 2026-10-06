@@ -1,0 +1,73 @@
+package dev.ipf.whitenoise.android.ui
+
+import android.graphics.BitmapFactory
+import android.graphics.Color
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+import dev.ipf.whitenoise.android.state.ContactPictureChange
+import dev.ipf.whitenoise.android.state.ContactPictureStore
+import dev.ipf.whitenoise.android.state.contactPicturePng
+import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/** Profile/member/reply avatar rendering cannot revive a captured private bitmap after account invalidation. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+class PrivateContactAvatarSurfaceTest {
+    @get:Rule val composeRule = createComposeRule()
+
+    @Test fun privateImagePrecedesCapturedPixelsAndOldOwnerDisappearsOnNextFrame() {
+        val context = RuntimeEnvironment.getApplication()
+        val store =
+            ContactPictureStore(
+                context.getSharedPreferences("surface-pictures", 0),
+                context.noBackupFilesDir.resolve("surface-pictures"),
+            )
+        var account = "a"
+        PrivateContactAvatarLoader.attach(store) { account }
+        store.save("a", "contact", "", "", ContactPictureChange.Replace(contactPicturePng(Color.RED))) { true }
+        val source = PrivateContactAvatarLoader.source(checkNotNull(store.reference("a", "contact")), null)
+        val privateImage = runBlocking { AvatarImageLoader.load(source) }
+        val publicBytes = contactPicturePng(Color.BLUE)
+        val public = BitmapFactory.decodeByteArray(publicBytes, 0, publicBytes.size).asImageBitmap()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.testTag("identity")) { Avatar("Maya", "contact", 64.dp, source, public) }
+            }
+        }
+
+        fun pixel(): Int {
+            val image = composeRule.onNodeWithTag("identity").captureToImage().asAndroidBitmap()
+            return image.getPixel(image.width / 2, image.height / 2)
+        }
+        assertEquals(Color.RED, pixel())
+        assertEquals(Color.RED, checkNotNull(privateImage).asAndroidBitmap().getPixel(0, 0))
+        composeRule.runOnIdle {
+            account = "b"
+            AvatarImageLoader.clearStoredAvatars()
+        }
+        composeRule.waitForIdle()
+        assertNotEquals(Color.RED, pixel())
+        assertNotEquals(Color.BLUE, pixel())
+    }
+}

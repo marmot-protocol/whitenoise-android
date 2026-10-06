@@ -666,7 +666,7 @@ private fun NewMessageAccountScreen(
                         appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
                     },
                 avatarUrl =
-                    appState.avatarUrl(candidate.accountIdHex)
+                    appState.contactAvatarSource(candidate.accountIdHex)
                         ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
             )
         }
