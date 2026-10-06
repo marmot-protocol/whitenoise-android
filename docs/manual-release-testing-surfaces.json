@@ -23,7 +23,7 @@
         ]
       },
       {
-        "surface": "Referenced event local emoji: NostrEventReaderEmoji.kt",
+        "surface": "NostrEventReaderBlock",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventReaderEmoji.kt",
         "anchor": "fun NostrEventReaderBlock(",
         "test_ids": [
