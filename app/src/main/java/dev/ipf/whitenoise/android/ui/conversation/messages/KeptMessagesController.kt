@@ -103,7 +103,12 @@ internal fun rememberKeptMessageEntries(
     resolve: (KeptMessageKey) -> TimelineMessage?,
 ): List<KeptMessageEntry> {
     val keys = controller.keys(accountRef)
-    val entries = keys.mapNotNull { key -> resolve(key)?.let { KeptMessageEntry(key, it) } }
+    val entries =
+        keys.mapNotNull { key ->
+            resolve(key)
+                ?.takeIf { it.projected?.deleted != true && it.projected?.invalidationStatus == null }
+                ?.let { KeptMessageEntry(key, it) }
+        }
     val stale = entries.size != keys.size
     // Pruning is a write, so it lands after composition rather than inside it.
     SideEffect {

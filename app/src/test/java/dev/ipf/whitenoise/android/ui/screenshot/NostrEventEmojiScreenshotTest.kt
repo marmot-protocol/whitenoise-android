@@ -57,8 +57,12 @@ class NostrEventEmojiScreenshotTest {
     @Test fun eventArtworkDark() = capture(dark = true, rtl = false, parsed = true, name = "nostr_event_emoji_dark")
 
     @Test
-    fun eventFallbackArtworkLargeRtl() =
-        capture(dark = true, rtl = true, parsed = false, name = "nostr_event_emoji_fallback_large_rtl")
+    fun eventFallbackArtworkLargeRtl() = capture(
+        dark = true,
+        rtl = true,
+        parsed = false,
+        name = "nostr_event_emoji_fallback_large_rtl",
+    )
 
     private fun capture(
         dark: Boolean,

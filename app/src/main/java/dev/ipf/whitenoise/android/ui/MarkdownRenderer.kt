@@ -32,6 +32,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -405,13 +406,7 @@ private fun MarkdownBodyText(
             highlightResolver?.invoke(leafId, text.text)
         }
 
-    DisposableEffect(reporter, linkReporter, sentenceLayoutReporter, leafId, text) {
-        onDispose {
-            reporter?.invoke(leafId, null, null)
-            linkReporter?.invoke(leafId, text, null, null)
-            sentenceLayoutReporter?.invoke(leafId, text.text, null, null)
-        }
-    }
+    rememberMarkdownLayoutDisposal(leafId, text, reporter, linkReporter, sentenceLayoutReporter)
 
     fun reportIfReady() {
         val measuredLayout = tracker.layoutResult ?: return
@@ -427,6 +422,7 @@ private fun MarkdownBodyText(
     }
 
     val speechActions = ttsSentenceAccessibilityActions(leafId, text.text, LocalTtsSentenceActions.current)
+    LaunchedEffect(sentenceLayoutReporter) { reportIfReady() }
     val accessibilityModifier =
         Modifier.semantics {
             customActions = speechActions +
@@ -463,6 +459,26 @@ private fun MarkdownBodyText(
             reportIfReady()
         },
     )
+}
+
+/** Each layout consumer keeps its own lifetime; sentence progress must not clear hit testing. */
+@Composable
+private fun rememberMarkdownLayoutDisposal(
+    leafId: String,
+    text: AnnotatedString,
+    reporter: SelectableTextLayoutReporter?,
+    linkReporter: MarkdownLinkTextLayoutReporter?,
+    sentenceReporter: TtsSentenceLayoutReporter?,
+) {
+    DisposableEffect(reporter, leafId, text) {
+        onDispose { reporter?.invoke(leafId, null, null) }
+    }
+    DisposableEffect(linkReporter, leafId, text) {
+        onDispose { linkReporter?.invoke(leafId, text, null, null) }
+    }
+    DisposableEffect(sentenceReporter, leafId, text) {
+        onDispose { sentenceReporter?.invoke(leafId, text.text, null, null) }
+    }
 }
 
 internal fun markdownLinkDestinationAt(
