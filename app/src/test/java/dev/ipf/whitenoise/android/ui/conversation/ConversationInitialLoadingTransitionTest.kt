@@ -25,6 +25,7 @@ class ConversationInitialLoadingTransitionTest {
         rule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
         rule.runOnIdle { transitioning.value = false }
         rule.mainClock.advanceTimeByFrame()
+        rule.runOnIdle { }
         rule.mainClock.advanceTimeBy(100L)
         rule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
         rule.mainClock.advanceTimeBy(100L)
@@ -37,6 +38,7 @@ class ConversationInitialLoadingTransitionTest {
         rule.mainClock.advanceTimeBy(1_000L)
         rule.runOnIdle { transitioning.value = false }
         rule.mainClock.advanceTimeByFrame()
+        rule.runOnIdle { }
         rule.mainClock.advanceTimeBy(64L)
         rule.runOnIdle { loading.value = false }
         rule.mainClock.advanceTimeBy(1_000L)
@@ -55,6 +57,7 @@ class ConversationInitialLoadingTransitionTest {
         rule.mainClock.advanceTimeBy(1_000L)
         rule.runOnIdle { transitioning.value = false }
         rule.mainClock.advanceTimeByFrame()
+        rule.runOnIdle { }
         rule.mainClock.advanceTimeBy(64L)
         rule.onNodeWithTag(CONVERSATION_INITIAL_LOADING_TEST_TAG).assertDoesNotExist()
         rule.mainClock.advanceTimeBy(200L)
