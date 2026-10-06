@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.buildVCard
 import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
+import dev.ipf.whitenoise.android.ui.conversation.share.isBareLocationShare
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
@@ -95,7 +96,16 @@ class ShareFormattingTest {
         )
         assertNull(parseSharedLocationFromText("just a normal message, no coordinates"))
         assertNull(parseSharedLocationFromText("https://maps.google.com/maps?q=999,999"))
-        assertNull(parseSharedLocationFromText("Meet me here: https://maps.google.com/maps?q=11.871263,8.534887"))
+    }
+
+    /** A maps link inside prose still draws the card, but the prose stays visible. */
+    @Test
+    fun locationInsideProseParsesWithoutOwningTheBody() {
+        val body = "Meet me here: https://maps.google.com/maps?q=11.871263,8.534887 at noon"
+        assertEquals(11.871263, parseSharedLocationFromText(body)?.latitude)
+        assertEquals(8.534887, parseSharedLocationFromText(body)?.longitude)
+        assertFalse(isBareLocationShare(body))
+        assertTrue(isBareLocationShare(" Location: https://maps.google.com/maps?q=11.871263,8.534887\n"))
     }
 
     @Test
