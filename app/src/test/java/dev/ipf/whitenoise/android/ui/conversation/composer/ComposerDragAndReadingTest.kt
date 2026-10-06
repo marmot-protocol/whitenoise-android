@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -347,6 +348,7 @@ class ComposerDragAndReadingTest {
         assertEquals(original, observed)
     }
 
+    /** A fresh draft must not inherit reading controls from the previous scrolled owner. */
     @Test
     fun changingOwnerToAnUnscrolledDraftHidesThePreviousTopAction() {
         lateinit var changeOwner: () -> Unit
@@ -356,6 +358,7 @@ class ComposerDragAndReadingTest {
             WhiteNoiseTheme {
                 Surface(Modifier.width(300.dp).height(192.dp)) {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue =
                             if (owner == 0) {
                                 TextFieldValue(longDraft, TextRange(longDraft.length))
@@ -419,6 +422,7 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
     }
 
+    /** Owner changes cancel old reading momentum even when draft text and selection are identical. */
     @Test
     fun changingDraftOwnerStopsMomentumEvenForIdenticalTextAndSelection() {
         lateinit var changeOwner: () -> Unit
@@ -429,6 +433,7 @@ class ComposerDragAndReadingTest {
             WhiteNoiseTheme {
                 Surface(Modifier.width(300.dp).height(192.dp)) {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue = value,
                         composerFocus = remember { FocusRequester() },
                         emojiPickerOpen = false,
@@ -482,6 +487,7 @@ class ComposerDragAndReadingTest {
         assertEquals(0, sends)
     }
 
+    /** Wrapped reading controls reserve a complete editor line while all accessory actions remain clickable. */
     @Test
     fun navigationWrapsWithoutHidingActiveControlsOrTheEditor() {
         var extra = 0.dp
@@ -493,6 +499,7 @@ class ComposerDragAndReadingTest {
                 Surface(Modifier.width(240.dp).height(240.dp)) {
                     Box(contentAlignment = Alignment.BottomCenter) {
                         ComposerPill(
+                            actionColors = accountActionColors(appState = null),
                             textFieldValue = value,
                             composerFocus = remember { FocusRequester() },
                             emojiPickerOpen = false,
@@ -541,6 +548,7 @@ class ComposerDragAndReadingTest {
         assertEquals("all active controls remain actionable", 3, pressed)
     }
 
+    /** The resize grip stays outside accessory bounds so attachment and reply actions remain reachable. */
     @Test
     fun resizeStripLeavesAccessoryActionsIndependent() {
         var dismissed = 0
@@ -548,6 +556,7 @@ class ComposerDragAndReadingTest {
             WhiteNoiseTheme {
                 Surface(Modifier.width(300.dp).height(240.dp)) {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue = TextFieldValue("Synthetic caption"),
                         composerFocus = remember { FocusRequester() },
                         emojiPickerOpen = false,

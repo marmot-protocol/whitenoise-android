@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -114,6 +115,7 @@ class ComposerCompactResizeTargetsTest {
         assertEquals(0, resizeStarts)
     }
 
+    /** Places the compact editor below a focusable transcript to exercise shared input boundaries. */
     private fun render(
         onAction: () -> Unit,
         onResize: () -> Unit,
@@ -134,6 +136,7 @@ class ComposerCompactResizeTargetsTest {
                                 .testTag("synthetic-transcript"),
                         )
                         ComposerPill(
+                            actionColors = accountActionColors(appState = null),
                             modifier = Modifier.height(48.dp).focusRequester(composerEntryFocus),
                             textFieldValue = TextFieldValue(draft, TextRange(draft.length)),
                             composerFocus = remember { FocusRequester() },
