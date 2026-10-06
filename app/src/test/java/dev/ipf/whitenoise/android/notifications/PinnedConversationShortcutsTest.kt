@@ -319,7 +319,9 @@ class PinnedConversationShortcutsTest {
         assertNotEquals(Color.MAGENTA, icon.bitmap.getPixel(0, 0))
     }
 
-    /** Ordinary projection refresh preserves the private override and stamps ownership for off-window reconciliation. */
+    /**
+     * Ordinary projection refresh preserves the private override and stamps ownership for off-window reconciliation.
+     */
     @Test
     fun privatePictureRefreshAndOffWindowClearUseCurrentOwnedPixels() {
         val platform = Platform(context)
