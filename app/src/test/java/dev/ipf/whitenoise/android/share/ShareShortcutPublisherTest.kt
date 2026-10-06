@@ -162,7 +162,9 @@ class ShareShortcutPublisherTest {
         assertTrue(published.isEmpty())
     }
 
-    /** A refresh captured while native removal is suspended cannot publish even before its final generation advances. */
+    /**
+     * A refresh captured while native removal is suspended cannot publish before its final generation advances.
+     */
     @Test
     fun publicationDuringRemovalCannotRestoreShortcuts() =
         runBlocking {
