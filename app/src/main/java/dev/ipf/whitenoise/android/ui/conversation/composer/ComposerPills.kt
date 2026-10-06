@@ -25,7 +25,6 @@ import androidx.compose.foundation.content.contentReceiver
 import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.ScrollableDefaults
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -593,6 +592,10 @@ internal fun ComposerPill(
     // visual transformation instead of values captured when a handler started.
     val latestTextFieldValue by rememberUpdatedState(textFieldValue)
     val latestTransformedText by rememberUpdatedState(transformedText)
+    val latestReadingTopInset by
+        rememberUpdatedState(
+            if (accessoryContent != null) 0.dp else if (multilineControlsSuppressed) 12.dp else 24.dp,
+        )
     val pasteFromClipboard: () -> Unit = {
         val pastedText = clipboardManager?.primaryClipPlainText(context)
         if (!pastedText.isNullOrEmpty()) {
@@ -957,7 +960,22 @@ internal fun ComposerPill(
     Box(
         modifier =
             modifier
-                .focusProperties {
+                .composerResizeGestures(
+                    compact = multilineControlsSuppressed,
+                    enabled = inputContentVisible,
+                    ownerKey = scrollOwnerKey,
+                    callbacks =
+                        ComposerResizeCallbacks(
+                            started = {
+                                editorScrollJob?.cancel()
+                                latestOnHeightDragStarted()
+                            },
+                            dragged = { latestOnHeightDrag(it) },
+                            stopped = { latestOnHeightDragStopped() },
+                            settled = onHeightDragSettled,
+                            cancelled = onHeightDragCancelled,
+                        ),
+                ).focusProperties {
                     onEnter = {
                         // Android can restore default focus after clearFocus. With the tools below
                         // the editor, its spatial search otherwise reopens that editor immediately.
@@ -980,6 +998,27 @@ internal fun ComposerPill(
                     },
                 ),
     ) {
+        // Keep the full resize target beneath interactive descendants for explore-by-touch.
+        if (inputContentVisible) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
+                        .semantics {
+                            contentDescription = resizeComposerDescription
+                            customActions =
+                                listOf(
+                                    CustomAccessibilityAction(toggleDescription) {
+                                        latestOnExpansionToggle()
+                                        true
+                                    },
+                                )
+                        },
+            )
+        }
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(24.dp),
@@ -1029,6 +1068,7 @@ internal fun ComposerPill(
                                 .pointerInput(inputContentVisible, scrollOwnerKey) {
                                     if (!inputContentVisible) return@pointerInput
                                     composerEditorReadingScrollGestures(
+                                        acceptsTouchDown = { position -> position.y >= latestReadingTopInset.toPx() },
                                         onScrollInterrupted = { editorScrollJob?.cancel() },
                                         onFling = { velocity ->
                                             editorScrollJob =
@@ -1446,37 +1486,9 @@ internal fun ComposerPill(
         }
 
         if (inputContentVisible) {
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
-                        .semantics {
-                            contentDescription = resizeComposerDescription
-                            customActions =
-                                listOf(
-                                    CustomAccessibilityAction(toggleDescription) {
-                                        latestOnExpansionToggle()
-                                        true
-                                    },
-                                )
-                        },
-            )
-            // This existing padding contains no editor or accessory content. A
-            // border-only pointer owner leaves reading drags and selection to
-            // BasicTextField; a separate semantics leaf exposes the accessible action.
+            // Visual chrome has no pointer interceptor: the parent observes border drags.
             ComposerResizeGestureStrip(
                 compact = multilineControlsSuppressed,
-                onHeightDragStarted = {
-                    editorScrollJob?.cancel()
-                    latestOnHeightDragStarted()
-                },
-                onHeightDrag = { latestOnHeightDrag(it) },
-                onHeightDragStopped = { latestOnHeightDragStopped() },
-                onHeightDragSettled = onHeightDragSettled,
-                onHeightDragCancelled = onHeightDragCancelled,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
@@ -1491,62 +1503,68 @@ private fun Modifier.boundedComposerAccessory(): Modifier =
         layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
     }
 
-/** Resizes from the existing top border without covering editable or accessory content. */
+/** Observes the border as a parent, so compact controls keep every pixel of their tap targets. */
+private data class ComposerResizeCallbacks(
+    val started: () -> Unit,
+    val dragged: (Float) -> Unit,
+    val stopped: () -> Unit,
+    val settled: ((Float) -> Unit)?,
+    val cancelled: (() -> Unit)?,
+)
+
 @Composable
-@Suppress("FunctionNaming", "LongMethod")
+private fun Modifier.composerResizeGestures(
+    compact: Boolean,
+    enabled: Boolean,
+    ownerKey: Any?,
+    callbacks: ComposerResizeCallbacks,
+): Modifier {
+    val latestCompact by rememberUpdatedState(compact)
+    val latestCallbacks by rememberUpdatedState(callbacks)
+    var gestureCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    return this
+        .onGloballyPositioned { gestureCoordinates = it }
+        .pointerInput(ownerKey, enabled) {
+            if (!enabled) return@pointerInput
+            val velocityTracker = VelocityTracker()
+            detectComposerResizeFromTop(
+                topHeightPx = { (if (latestCompact) 12.dp else 24.dp).toPx() },
+                onStarted = {
+                    velocityTracker.resetTracking()
+                    latestCallbacks.started()
+                },
+                onDragged = { change, dragAmount ->
+                    val rootPosition = gestureCoordinates?.localToRoot(change.position) ?: change.position
+                    velocityTracker.addPosition(change.uptimeMillis, rootPosition)
+                    latestCallbacks.dragged(dragAmount)
+                },
+                onStopped = { completed ->
+                    if (!completed) {
+                        (latestCallbacks.cancelled ?: latestCallbacks.stopped)()
+                    } else {
+                        val settle = latestCallbacks.settled
+                        if (settle != null) settle(velocityTracker.calculateVelocity().y) else latestCallbacks.stopped()
+                    }
+                },
+            )
+        }
+}
+
+/** The grip marks the parent-owned drag region without intercepting child controls. */
+@Composable
+@Suppress("FunctionNaming")
 private fun ComposerResizeGestureStrip(
     compact: Boolean,
-    onHeightDragStarted: () -> Unit,
-    onHeightDrag: (Float) -> Unit,
-    onHeightDragStopped: () -> Unit,
-    onHeightDragSettled: ((Float) -> Unit)?,
-    onHeightDragCancelled: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    val latestOnHeightDragStarted by rememberUpdatedState(onHeightDragStarted)
-    val latestOnHeightDrag by rememberUpdatedState(onHeightDrag)
-    val latestOnHeightDragStopped by rememberUpdatedState(onHeightDragStopped)
-    val latestOnHeightDragSettled by rememberUpdatedState(onHeightDragSettled)
-    val latestOnHeightDragCancelled by rememberUpdatedState(onHeightDragCancelled)
-    var gestureCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
                 .height(if (compact) 12.dp else 24.dp)
-                .testTag(COMPOSER_RESIZE_GESTURE_TAG)
-                .onGloballyPositioned { gestureCoordinates = it }
-                .pointerInput(Unit) {
-                    val velocityTracker = VelocityTracker()
-                    detectVerticalDragGestures(
-                        onDragStart = {
-                            velocityTracker.resetTracking()
-                            latestOnHeightDragStarted()
-                        },
-                        onVerticalDrag = { change, dragAmount ->
-                            val rootPosition = gestureCoordinates?.localToRoot(change.position) ?: change.position
-                            velocityTracker.addPosition(change.uptimeMillis, rootPosition)
-                            change.consume()
-                            latestOnHeightDrag(dragAmount)
-                        },
-                        onDragEnd = {
-                            val settle = latestOnHeightDragSettled
-                            if (settle != null) {
-                                settle(velocityTracker.calculateVelocity().y)
-                            } else {
-                                latestOnHeightDragStopped()
-                            }
-                        },
-                        onDragCancel = {
-                            val cancel = latestOnHeightDragCancelled
-                            if (cancel != null) cancel() else latestOnHeightDragStopped()
-                        },
-                    )
-                },
+                .testTag(COMPOSER_RESIZE_GESTURE_TAG),
         contentAlignment = Alignment.Center,
     ) {
-        // Keep the same grip at both endpoints so a collapsed draft can always grow again.
         Box(
             Modifier
                 .size(width = ComposerResizeHandleWidth, height = ComposerResizeHandleThickness)

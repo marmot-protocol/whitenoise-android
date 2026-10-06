@@ -136,6 +136,7 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
     onReadingScroll: () -> Unit,
     onScrollInterrupted: () -> Unit = {},
     onFling: (Float) -> Unit = {},
+    acceptsTouchDown: (Offset) -> Boolean = { true },
 ) {
     val touchSlop = viewConfiguration.touchSlop
     val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
@@ -175,7 +176,7 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
                         // platform convention (wheel/trackpad scrolling arrives
                         // as Scroll events above), so they pass through to the
                         // text field untouched.
-                        if (change.type == PointerType.Touch) {
+                        if (change.type == PointerType.Touch && acceptsTouchDown(change.position)) {
                             velocityTracker.resetTracking()
                             velocityTracker.addPosition(change.uptimeMillis, change.position)
                             trackedPointer = change.id
