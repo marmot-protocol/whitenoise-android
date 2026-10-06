@@ -271,13 +271,13 @@ class LocalGroupDeleteControllerTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             try {
                 val fixture = fixture("deleteGroupLocal")
-                val request =
+                val captured =
                     PendingLocalChatDelete.capture(
                         listOf("already-deleted", GROUP).map { chatListItemFromProjection(chatRow(it)) },
                         fixture.controller,
                         fixture.state,
                     )
-                        .remaining(1)
+                val request = captured.remaining(1)
                 val notice =
                     fixture.state.localDeleteBatchRetryNotice(fixture.controller, request.groupIds) {
                         request.isCurrent(fixture.state, fixture.controller)
