@@ -70,7 +70,10 @@ internal fun PinConversationAction(
             val runtime = appState.runtimeGeneration
             val requestGeneration = PinnedConversationTokens.captureRequest()
 
-            /** A pin request belongs only to the still-mounted account, conversation and runtime captured by its tap. */
+            /**
+             * A pin request belongs only to the still-mounted account, conversation and runtime
+             * captured by its tap.
+             */
             fun stillCurrent(): Boolean = pinActionStillCurrent(appState, controller, account, group, runtime)
             scope.launch {
                 try {

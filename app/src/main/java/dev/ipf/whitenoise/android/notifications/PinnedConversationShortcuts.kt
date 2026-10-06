@@ -100,7 +100,9 @@ internal class PinnedConversationShortcuts(
                     !stillCurrent() || !tokens.isValid(capability) -> ConversationPinResult.UNAVAILABLE
                     platform.shortcuts().any { it.id == capability.shortcutId && it.isPinned && it.isEnabled } -> {
                         val current = build(capability, title, avatarUrl, avatar)
-                        if (!stillCurrent() || !tokens.isValid(capability)) return@synchronized ConversationPinResult.UNAVAILABLE
+                        if (!stillCurrent() || !tokens.isValid(capability)) {
+                            return@synchronized ConversationPinResult.UNAVAILABLE
+                        }
                         if (!runCatching { platform.update(listOf(current)) }.getOrDefault(false)) {
                             platform.update(listOf(genericNotificationShortcut(context, current)))
                         }
@@ -116,7 +118,9 @@ internal class PinnedConversationShortcuts(
                                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                                 ).intentSender
                         val current = build(capability, title, avatarUrl, avatar)
-                        if (!stillCurrent() || !tokens.isValid(capability)) return@synchronized ConversationPinResult.UNAVAILABLE
+                        if (!stillCurrent() || !tokens.isValid(capability)) {
+                            return@synchronized ConversationPinResult.UNAVAILABLE
+                        }
                         val accepted = platform.request(current, callback)
                         if (accepted) ConversationPinResult.REQUESTED else ConversationPinResult.FAILED
                     }
@@ -145,7 +149,9 @@ internal class PinnedConversationShortcuts(
             platform.shortcuts().any { it.isPinned && pinCapability(it)?.accountRef == accountRef }
         }
 
-    /** Current labels come only from source projections; obsolete refreshes cannot publish after waiting for the lock. */
+    /**
+     * Current labels come only from source projections; obsolete refreshes cannot publish after waiting for the lock.
+     */
     fun refresh(
         accountRef: String,
         presentations: Map<String, PinnedConversationPresentation>,

@@ -312,7 +312,9 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(phaseBefore, appState.phase)
         }
 
-    /** Verifies thrown native sign-out retains the established local fallback without changing the completion contract. */
+    /**
+     * Verifies thrown native sign-out retains the established local fallback without changing the completion contract.
+     */
     @Test
     fun transientEngineFailureRetainsTheExistingLocalSignOutFallback() =
         runBlocking {

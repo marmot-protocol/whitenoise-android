@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewToken
+import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountExtras
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
@@ -193,7 +194,9 @@ class ShareShortcutPublisher(
         isCurrent: () -> Boolean,
         displayTitle: (ChatListItem) -> String,
     ) {
+        val publicationGeneration = PinnedConversationTokens.captureRequest()
         if (accountRef.isBlank() || !isCurrent()) return
+        if (!PinnedConversationTokens.isPublicationCurrent(publicationGeneration)) return
         val previewToken = NotificationPreviewPreferences.capture(context)
         val maxShortcuts = maxShortcutCount().coerceAtLeast(0)
         val limit = min(MAX_SHARE_SHORTCUTS, maxShortcuts)
@@ -230,6 +233,7 @@ class ShareShortcutPublisher(
             }
         synchronized(UserEventNotificationGroup.mutationLock) {
             if (!isCurrent()) return@synchronized
+            if (!PinnedConversationTokens.isPublicationCurrent(publicationGeneration)) return@synchronized
             setDynamicShortcuts(
                 shortcuts.map { shortcut ->
                     if (shortcutPreviewAllowed(context, shortcut)) {

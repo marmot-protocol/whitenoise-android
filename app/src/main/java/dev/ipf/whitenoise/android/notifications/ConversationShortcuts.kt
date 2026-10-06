@@ -102,29 +102,31 @@ internal fun clearRevokedConversationShortcutsForAccount(
     accountRef: String,
     includeUnscopedLegacy: Boolean,
 ) {
-    val plan =
-        accountConversationShortcutCleanupPlan(
-            shortcuts =
-                runCatching {
-                    ShortcutManagerCompat.getShortcuts(
-                        context,
-                        ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
-                            ShortcutManagerCompat.FLAG_MATCH_CACHED or
-                            ShortcutManagerCompat.FLAG_MATCH_PINNED,
-                    )
-                }.getOrElse {
-                    ShortcutManagerCompat.getDynamicShortcuts(context)
-                },
-            accountRef = accountRef,
-            includeUnscopedLegacy = includeUnscopedLegacy,
-        )
-    if (plan.disabledIds.isNotEmpty()) {
-        runCatching { ShortcutManagerCompat.disableShortcuts(context, plan.disabledIds, "") }
-    }
-    if (plan.dynamicIds.isNotEmpty()) {
-        runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, plan.dynamicIds) }
-    }
-    if (plan.longLivedIds.isNotEmpty()) {
-        runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(context, plan.longLivedIds) }
+    synchronized(UserEventNotificationGroup.mutationLock) {
+        val plan =
+            accountConversationShortcutCleanupPlan(
+                shortcuts =
+                    runCatching {
+                        ShortcutManagerCompat.getShortcuts(
+                            context,
+                            ShortcutManagerCompat.FLAG_MATCH_DYNAMIC or
+                                ShortcutManagerCompat.FLAG_MATCH_CACHED or
+                                ShortcutManagerCompat.FLAG_MATCH_PINNED,
+                        )
+                    }.getOrElse {
+                        ShortcutManagerCompat.getDynamicShortcuts(context)
+                    },
+                accountRef = accountRef,
+                includeUnscopedLegacy = includeUnscopedLegacy,
+            )
+        if (plan.disabledIds.isNotEmpty()) {
+            runCatching { ShortcutManagerCompat.disableShortcuts(context, plan.disabledIds, "") }
+        }
+        if (plan.dynamicIds.isNotEmpty()) {
+            runCatching { ShortcutManagerCompat.removeDynamicShortcuts(context, plan.dynamicIds) }
+        }
+        if (plan.longLivedIds.isNotEmpty()) {
+            runCatching { ShortcutManagerCompat.removeLongLivedShortcuts(context, plan.longLivedIds) }
+        }
     }
 }

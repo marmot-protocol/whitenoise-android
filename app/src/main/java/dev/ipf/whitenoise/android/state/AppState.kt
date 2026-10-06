@@ -3685,6 +3685,8 @@ class WhiteNoiseAppState private constructor(
     fun publishShareShortcuts(chats: List<ChatListItem>) {
         val accountRef = activeAccountRef ?: return
         val runtime = runtimeGeneration
+        val publicationGeneration =
+            dev.ipf.whitenoise.android.notifications.PinnedConversationTokens.captureRequest()
         val titleCopy = notificationGroupTitleCopy(appContext)
         val shareTitles =
             chats
@@ -3699,7 +3701,14 @@ class WhiteNoiseAppState private constructor(
                         shareShortcutPublisher.publish(
                             accountRef,
                             chats,
-                            { isActive && activeAccountRef == accountRef && runtimeGeneration == runtime },
+                            {
+                                val ownsRuntime =
+                                    isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
+                                val ownsPublication =
+                                    dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
+                                        .isPublicationCurrent(publicationGeneration)
+                                ownsRuntime && ownsPublication
+                            },
                         ) { item -> shareTitles[item.group.groupIdHex].orEmpty() }
                     }
                     val shortcuts =
@@ -3707,7 +3716,13 @@ class WhiteNoiseAppState private constructor(
                             dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts(appContext)
                         }
                     val hasPins = withContext(Dispatchers.IO) { shortcuts.hasPinnedConversations(accountRef) }
-                    if (!hasPins || !isActive || activeAccountRef != accountRef || runtimeGeneration != runtime) {
+                    val ownsRuntime = isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
+                    val ownsPublication =
+                        withContext(Dispatchers.IO) {
+                            dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
+                                .isPublicationCurrent(publicationGeneration)
+                        }
+                    if (!hasPins || !ownsRuntime || !ownsPublication) {
                         return@runCatchingCancellable
                     }
                     val presentations =

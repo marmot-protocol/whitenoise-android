@@ -987,7 +987,10 @@ internal fun MainShell(
                 // inbound target) while its switch is still landing, so the
                 // switch stays current either while the target is still armed
                 // or after this exact request committed an early open (#586).
-                /** Allows only this notification request and runtime to finish its account switch, including its own early open. */
+                /**
+                 * Allows only this notification request and runtime to finish its account switch,
+                 * including its own early open.
+                 */
                 fun switchStillCurrent(): Boolean =
                     currentInboundNotificationRequestId == routingRequestId &&
                         appState.pinnedShortcutTargetIsCurrent(target) &&

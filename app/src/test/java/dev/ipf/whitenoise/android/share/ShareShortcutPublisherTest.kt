@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHARE_TARGET_CATEGORY
 import dev.ipf.whitenoise.android.notifications.CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA
 import dev.ipf.whitenoise.android.notifications.NotificationPreviewPreferences
+import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.conversationShortcutAccountScope
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
 import dev.ipf.whitenoise.android.state.ChatListItem
@@ -116,6 +117,69 @@ class ShareShortcutPublisherTest {
         publisher.publish("acct", listOf(chat("g1", pending = false)), { current }) { it.group.name }
         assertTrue(published.isEmpty())
     }
+
+    /** An account or group removal after label preparation must prevent recreating its Direct Share entry. */
+    @Test
+    fun revokedPublicationCannotRestoreShortcutsAfterCleanup() {
+        val context = RuntimeEnvironment.getApplication()
+        val tokens = PinnedConversationTokens.create(context)
+        listOf(false, true).forEach { removeAccount ->
+            val published = mutableListOf<List<ShortcutInfoCompat>>()
+            val publisher =
+                ShareShortcutPublisher(
+                    context = context,
+                    maxShortcutCount = { 8 },
+                    setDynamicShortcuts = { published += it },
+                    existingShortcuts = {
+                        if (removeAccount) tokens.revokeAccount("acct") else tokens.revokeGroup("acct", "g1")
+                        emptyList()
+                    },
+                )
+            publisher.publish("acct", listOf(chat("g1", pending = false)), { true }) { it.group.name }
+            assertTrue(published.isEmpty())
+        }
+    }
+
+    /** A coroutine queued before removal must retain its capture even if the publisher starts after cleanup. */
+    @Test
+    fun queuedRefreshAfterRemovalCannotRestoreShortcuts() {
+        val context = RuntimeEnvironment.getApplication()
+        val publicationGeneration = PinnedConversationTokens.captureRequest()
+        PinnedConversationTokens.create(context).revokeGroup("acct", "g1")
+        val published = mutableListOf<List<ShortcutInfoCompat>>()
+        val publisher =
+            ShareShortcutPublisher(
+                context = context,
+                maxShortcutCount = { 8 },
+                setDynamicShortcuts = { published += it },
+                existingShortcuts = { emptyList() },
+            )
+        publisher.publish(
+            "acct",
+            listOf(chat("g1", pending = false)),
+            { PinnedConversationTokens.isPublicationCurrent(publicationGeneration) },
+        ) { it.group.name }
+        assertTrue(published.isEmpty())
+    }
+
+    /** A refresh captured while native removal is suspended cannot publish even before its final generation advances. */
+    @Test
+    fun publicationDuringRemovalCannotRestoreShortcuts() =
+        runBlocking {
+            val context = RuntimeEnvironment.getApplication()
+            val published = mutableListOf<List<ShortcutInfoCompat>>()
+            val publisher =
+                ShareShortcutPublisher(
+                    context = context,
+                    maxShortcutCount = { 8 },
+                    setDynamicShortcuts = { published += it },
+                    existingShortcuts = { emptyList() },
+                )
+            PinnedConversationTokens.create(context).withRemovalRevoked("acct", "g1") {
+                publisher.publish("acct", listOf(chat("g1", pending = false)), { true }) { it.group.name }
+            }
+            assertTrue(published.isEmpty())
+        }
 
     @Test
     fun publish_usesSetDynamicShortcutsInRankOrder() {
