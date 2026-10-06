@@ -10,8 +10,11 @@ import dev.ipf.marmotkit.AttachmentLocalAssetFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -227,6 +230,19 @@ class KeptMediaLiveStateTest {
                     false,
                 )
             }
+        }
+        // Timeline seeding also queues unrelated profile warming. Quiesce that fixture actor before
+        // installing the strict attachment proxy, leaving media and controller observation live.
+        val profiles =
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("profileScope")
+                .apply { isAccessible = true }
+                .get(surface.appState) as CoroutineScope
+        val profileJob = profiles.coroutineContext.job
+        profileJob.cancel()
+        composeRule.waitUntil(5_000) {
+            org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+            profileJob.isCompleted
         }
         return surface.copy(item = surface.controller.timeline.single())
     }
