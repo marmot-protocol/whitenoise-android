@@ -213,7 +213,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         val handoff =
             source.requiredSection(
                 start = "// Folder editor handoff:",
-                end = "\n    Scaffold(",
+                end = "\n\n    // Consent belongs to the unobstructed Chats list",
             )
 
         assertTrue("folder editor handoff must exist", handoffStart >= 0)

@@ -120,10 +120,10 @@ internal fun NostrEventReaderDialog(
             onPlayVideo = { playing = true },
             preparation = prepared,
         )
-    }
-    if (playing) {
-        card.mediaUrl?.let { url ->
-            NostrVideoPlayerDialog(mediaUrl = url, mediaMimeType = card.mediaMimeType, onDismiss = { playing = false })
+        if (playing) {
+            card.mediaUrl?.let { url ->
+                NostrVideoPlayerDialog(mediaUrl = url, mediaMimeType = card.mediaMimeType, onDismiss = { playing = false })
+            }
         }
     }
 }
