@@ -408,6 +408,7 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /** Stable presentation keys ignore media hydration while canonical IDs still identify durable anchors. */
     @Test
     fun conversationHistoryReanchorIgnoresSameRowHydration() {
         val screenFile = conversationScreenSource()
@@ -426,7 +427,7 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "startup materialization and same-row media hydration must not restart durable history anchoring",
             "val renderedTimelineAnchorKeys = remember(renderedTimeline)" in source &&
-                "renderedTimeline.map { it.id to it.record.messageIdHex }" in source &&
+                "renderedTimeline.map { it.presentationId to it.record.messageIdHex }" in source &&
                 "ConversationViewportRestorationEffects(" in source &&
                 "ConversationViewportStructureEffect(" in source &&
                 "coordinator.commitInitialAnchor(" in owner &&

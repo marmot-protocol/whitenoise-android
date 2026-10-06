@@ -709,6 +709,8 @@ data class TimelineMessage(
      * duration and deadline.
      */
     val retentionAtSendSeconds: ULong? = null,
+    /** Transient row identity retained across an exact local-send handoff; actions still use [record]. */
+    val presentationId: String = id,
 )
 
 /**
@@ -5941,6 +5943,8 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher? = null,
+    private val mediaThumbnailDecoder: suspend (PendingAttachment) -> android.graphics.Bitmap? =
+        ::decodeMediaThumbnailOffMain,
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
         { account, groupIdHex, archived ->
@@ -6370,6 +6374,9 @@ class ConversationController(
 
     var timeline by mutableStateOf(initialTimeline)
         private set
+
+    /** UI identity aliases only, bounded to this controller's retained timeline window. */
+    private val timelinePresentationIds = mutableMapOf<String, String>()
 
     /** Recovery generation represented by the latest authoritative timeline. */
     var recoveryProjectionGeneration by mutableLongStateOf(0L)
@@ -8902,11 +8909,11 @@ class ConversationController(
                     optimisticMessageIdHex = tempId,
                     confirmedMessageIdHex = confirmedId,
                 )
-                optimisticMessages.remove(key)
-                messageById.remove(tempId)
                 // INVARIANT: the discard re-check must run BEFORE any cache mutation
                 // below, so a mid-flight discard never seeds the just-sent bytes.
                 if (discardedDuringRetry.remove(key)) {
+                    optimisticMessages.remove(key)
+                    messageById.remove(tempId)
                     // User discarded after publish committed; drop the local
                     // optimistic + bytes. The published event may still echo back
                     // via projection (publish already succeeded — not retractable).
@@ -8951,13 +8958,17 @@ class ConversationController(
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
-                        val decoded = decodeMediaThumbnailOffMain(attachment)
+                        val decoded = mediaThumbnailDecoder(attachment)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)
                         }
                     }
                 }
+                // Keep the pending row available to exact native reconciliation across thumbnail suspension.
+                // Removing it earlier lets a concurrent echo publish a new presentation identity.
+                optimisticMessages.remove(key)
+                messageById.remove(tempId)
                 retainedMediaUploads.remove(key)
                 activeUploadKeys.remove(key)
                 // Bridge the gap until the published event echoes back via the
@@ -8995,6 +9006,7 @@ class ConversationController(
                                 MessageStatus.Sent,
                                 timelineOrder = order,
                                 retentionAtSendSeconds = retentionAtSendSeconds,
+                                presentationId = key,
                             )
                         // Register the bridge through the same tracked preserve path
                         // as text sends so orphan cleanup can release its overrides
@@ -12741,6 +12753,7 @@ class ConversationController(
         optimisticId: String,
     ) {
         val optimistic = optimisticMessages["msg:$optimisticId"] ?: return
+        timelinePresentationIds[projectedId] = optimistic.presentationId
         durableStreamPositionOverrideIds.remove(projectedId)
         durableStreamDisplayParentByMessageId.remove(projectedId)
         preservedTimelinePositionOverrideIds.add(projectedId)
@@ -13086,6 +13099,7 @@ class ConversationController(
                     },
             displayAfterMessageIdHex = durableStreamDisplayParentByMessageId[record.messageIdHex],
             retentionAtSendSeconds = retentionAtSendSeconds.takeIf { actionRecord.retentionSeconds == null },
+            presentationId = timelinePresentationIds[record.messageIdHex] ?: projectedItemId(record),
         )
     }
 
@@ -13240,6 +13254,7 @@ class ConversationController(
             orderTimelineMessagesForDisplay(
                 (visible + streamDebugTimelineItems.values).map { it.withOptimisticEditStatus() },
             )
+        timelinePresentationIds.keys.retainAll(timeline.mapTo(HashSet()) { it.record.messageIdHex })
         // The optimistic→confirmed handoff snapshot is intentionally preserved;
         // do not report it as the stale-override symptom this detector targets.
         logTimelineInversionsForDebug(timeline, optimisticSendPositionPreserves.snapshot())

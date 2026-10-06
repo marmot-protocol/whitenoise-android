@@ -73,6 +73,7 @@ internal fun reconcileSuccessfulTextSend(
     acceptedPendingTextOptimisticIdsByMessageId: MutableMap<String, String>? = null,
 ): SuccessfulTextSendReconciliation {
     val retentionAtSendSeconds = optimisticMessages[optimisticKey]?.retentionAtSendSeconds
+    val presentationId = optimisticPresentationId(optimisticMessages, optimisticKey)
     val hasConfirmedId = summaryMessageIds.isNotEmpty()
     val confirmedId = summaryMessageIds.firstOrNull() ?: tempId
     // The authoritative projection can beat the accepted-pending FFI return.
@@ -119,6 +120,7 @@ internal fun reconcileSuccessfulTextSend(
                 MessageStatus.Sent,
                 timelineOrder = timelineOrder,
                 retentionAtSendSeconds = retentionAtSendSeconds,
+                presentationId = presentationId,
             )
     }
     return SuccessfulTextSendReconciliation(
@@ -140,3 +142,9 @@ private fun rememberAcceptedPendingTextOptimisticId(
         acceptedPendingTextOptimisticIdsByMessageId?.set(confirmedId, tempId)
     }
 }
+
+/** Keeps the mounted row identity, or the original optimistic key if the echo already removed it. */
+private fun optimisticPresentationId(
+    optimisticMessages: Map<String, TimelineMessage>,
+    optimisticKey: String,
+): String = optimisticMessages[optimisticKey]?.presentationId ?: optimisticKey
