@@ -65,8 +65,39 @@ internal fun refreshContactPictureShortcuts(
         }
     if (matches.isNotEmpty()) {
         val bitmap = currentAvatar()
-        platform.update(matches.map { withContactPictureIcon(context, it, contact, bitmap) })
+        platform.update(
+            matches.map {
+                if (retainContactPicturePreview(context, it)) {
+                    withContactPictureIcon(context, it, contact, bitmap)
+                } else {
+                    genericNotificationShortcut(context, it)
+                }
+            },
+        )
     }
+}
+
+/** Matches live-card retention: a process restart preserves visibility, a privacy transition never does. */
+private fun retainContactPicturePreview(
+    context: Context,
+    shortcut: ShortcutInfoCompat,
+): Boolean {
+    val token = NotificationPreviewPreferences.capture(context)
+    val extras = shortcut.extras ?: return false
+    val legacy =
+        token.revision == 0L &&
+            !extras.containsKey(NotificationPreviewPreferences.EXTRA_SESSION) &&
+            !extras.containsKey(NotificationPreviewPreferences.EXTRA_REVISION) &&
+            !extras.containsKey(NotificationPreviewPreferences.EXTRA_ALLOWED)
+    val currentEpoch =
+        extras.getBoolean(NotificationPreviewPreferences.EXTRA_ALLOWED) &&
+            extras.getLong(NotificationPreviewPreferences.EXTRA_REVISION, -1L) == token.revision
+    val allowed =
+        token.allowed &&
+            !extras.getBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN) &&
+            (legacy || currentEpoch)
+    if (allowed) stampShortcutPreview(token, extras)
+    return allowed
 }
 
 /** Public builder copy retains routing, privacy, rank and conversation metadata while changing owned pixels. */

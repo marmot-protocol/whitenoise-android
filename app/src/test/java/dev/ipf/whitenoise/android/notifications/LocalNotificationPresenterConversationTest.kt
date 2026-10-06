@@ -100,6 +100,12 @@ class LocalNotificationPresenterConversationTest {
                 )
             presenter.ensureChannels()
             presenter.show(update(false).copy(isDm = true), previewTextOverride = "Original", shortNpub = { "Maya" })
+            val posted = checkNotNull(manager.activeNotifications.firstOrNull()).notification
+            assertEquals(
+                conversationShortcutAccountScope("account-a"),
+                posted.extras.getString("dev.ipf.whitenoise.android.notify.contact_picture_account_scope"),
+            )
+            assertFalse(posted.extras.containsKey("dev.ipf.whitenoise.android.notify.contact_picture_account"))
             var cached = checkNotNull(publishedShortcut)
             val platform =
                 object : ContactPictureShortcutPlatform(context) {
@@ -133,7 +139,7 @@ class LocalNotificationPresenterConversationTest {
                     context = context,
                     groupReconciliation = {},
                     contactAvatarOverride = { account, contact ->
-                        assertEquals("account-a", account)
+                        assertEquals(conversationShortcutAccountScope("account-a"), account)
                         assertEquals(DEFAULT_NOTIFICATION_SENDER_ID, contact)
                         true to pixels
                     },

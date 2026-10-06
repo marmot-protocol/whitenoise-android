@@ -144,6 +144,7 @@ class LocalNotificationPresenter(
         notificationEmojiArtwork(context, text, source)
     },
     private val emojiArtworkTimeoutMs: Long = NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS,
+    // First argument is opaque account scope, never the local account label stored in a system payload.
     private val contactAvatarOverride: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
     // Kept last so callers may still pass it as a trailing lambda.
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
@@ -252,7 +253,7 @@ class LocalNotificationPresenter(
                                 NotificationCompat
                                     .Builder(context, renamed)
                                     .addExtras(
-                                        Bundle().apply { putString(CONTACT_PICTURE_ACCOUNT_EXTRA, accountRef) },
+                                        contactPictureAccountExtras(accountRef),
                                     ).build(),
                                 recordedAtMs = dismissalTime(live),
                                 mustBeLive = true,
@@ -823,7 +824,7 @@ class LocalNotificationPresenter(
                         stampConversationCardMessageId(builder, update.messageIdHex)
                     }
 
-                    builder.addExtras(Bundle().apply { putString(CONTACT_PICTURE_ACCOUNT_EXTRA, update.accountRef) })
+                    builder.addExtras(contactPictureAccountExtras(update.accountRef))
                     var messagingPost: MessagingPostContext? = null
                     when (val style = decision.style) {
                         // Reactions get their own self-contained card (own tag/id on the
@@ -1566,13 +1567,28 @@ class LocalNotificationPresenter(
             .setSilent(!replaceCurrentMessage)
     }
 
+    /** Platform metadata carries only the existing opaque ownership scope, never a local account label. */
+    private fun contactPictureAccountExtras(account: String): Bundle =
+        Bundle().apply {
+            putString(CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA, conversationShortcutAccountScope(account))
+        }
+
+    /** The same scoped callback serves initial publication and later platform-card reconciliation. */
+    private fun currentContactAvatar(
+        account: String,
+        contact: String,
+    ): Pair<Boolean, Bitmap?> {
+        val scope = conversationShortcutAccountScope(account) ?: return false to null
+        return contactAvatarOverride(scope, contact)
+    }
+
     /** Refresh private Person pixels at the final write so a concurrent clear cannot revive an older snapshot. */
     @Suppress("ReturnCount") // Missing or redacted payloads must exit before reading private identity.
     private fun withCurrentContactAvatars(notification: Notification): Notification {
         if (notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) return notification
         val account =
             notification.extras?.getString(
-                CONTACT_PICTURE_ACCOUNT_EXTRA,
+                CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA,
             ) ?: return notification
         var style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
         if (style != null) {
@@ -2186,7 +2202,7 @@ class LocalNotificationPresenter(
         isPublishAllowed: () -> Boolean,
     ) {
         runCatching {
-            val (override, currentAvatar) = contactAvatarOverride(update.accountRef, update.sender.accountIdHex)
+            val (override, currentAvatar) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
             val ownedConversationAvatar = if (override && update.isDm) currentAvatar else conversationAvatarBitmap
             val ownedSenderAvatar = if (override) currentAvatar else senderAvatarBitmap
             val ownedSender = if (override) contactAvatarPerson(sender, currentAvatar) else sender
@@ -2237,7 +2253,7 @@ class LocalNotificationPresenter(
             synchronized(UserEventNotificationGroup.mutationLock) {
                 if (isPublishAllowed()) {
                     pruneConversationShortcutsBeforePublish(shortcutId)
-                    val (currentChoice, pixels) = contactAvatarOverride(update.accountRef, update.sender.accountIdHex)
+                    val (currentChoice, pixels) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
                     val preview = NotificationPreviewPreferences.capture(context)
                     shortcut.extras?.let { stampShortcutPreview(preview, it) }
                     stampContactPictureShortcut(
@@ -2570,4 +2586,5 @@ private inline fun notificationDebug(message: () -> String) {
     if (BuildConfig.DEBUG) Log.i("DMLocalNotify", message())
 }
 
-private const val CONTACT_PICTURE_ACCOUNT_EXTRA = "dev.ipf.whitenoise.android.notify.contact_picture_account"
+private const val CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA =
+    "dev.ipf.whitenoise.android.notify.contact_picture_account_scope"

@@ -161,8 +161,12 @@ internal fun ConversationTopBar(
             .lendsPeerAvatar(presentedGroup, presentedMemberCount)
     val privatePeer =
         (presentedAvatarAccount ?: avatarSource?.peerId?.takeIf { avatarSource.avatarSource.isPeerSourced() })
-            ?.takeIf { peerEligible }
-            ?.let { appState.contactAvatarSource(it, controller.boundAccountRef) }
+            ?.takeIf {
+                peerEligible &&
+                    avatarSource?.avatarSource != dev.ipf.marmotkit.PresentationSourceFfi.GROUP &&
+                    presentedGroup.avatarUrl.isNullOrBlank() &&
+                    presentedGroup.imageHashHex.isNullOrBlank()
+            }?.let { appState.contactAvatarSource(it, controller.boundAccountRef) }
             ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
     val hasExplicitSelection = controller.window.header != null || liveRow?.selectedAvatarAsset != null
     val explicitSelectionMissing = hasExplicitSelection && selectedAsset == null

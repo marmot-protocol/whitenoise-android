@@ -73,6 +73,80 @@ class ContactPictureShortcutTest {
         assertNotEquals(Color.RED, checkNotNull(published[1].icon?.loadDrawable(context)).toBitmap().getPixel(0, 0))
     }
 
+    /** Cached OS entries may outlive the publishing process without outliving their privacy epoch. */
+    @Test fun refreshAcceptsPreviousSessionWithinSamePrivacyEpoch() {
+        assertPreviewRefresh(previousSession = true)
+    }
+
+    @Test fun firstPictureAcceptsUnstampedLegacyShortcutBeforeAnyPrivacyTransition() {
+        assertPreviewRefresh(legacy = true)
+    }
+
+    @Test fun explicitRedactionCannotBeReversedBySavingAPicture() {
+        assertPreviewRefresh(hidden = true, expectPrivate = false)
+    }
+
+    @Test fun privacyOptOutAndBackInCannotRevivePreviousEpoch() {
+        assertPreviewRefresh(staleEpoch = true, expectPrivate = false)
+    }
+
+    private fun assertPreviewRefresh(
+        previousSession: Boolean = false,
+        legacy: Boolean = false,
+        hidden: Boolean = false,
+        staleEpoch: Boolean = false,
+        expectPrivate: Boolean = true,
+    ) {
+        val context = RuntimeEnvironment.getApplication()
+        val preview = NotificationPreviewPreferences.capture(context)
+        var shortcut =
+            checkNotNull(
+                buildShareShortcut(context, ShareShortcutTarget("a", "canonical", "Maya"), previewToken = preview),
+            )
+        val extras = checkNotNull(shortcut.extras)
+        if (legacy) {
+            extras.remove(NotificationPreviewPreferences.EXTRA_SESSION)
+            extras.remove(NotificationPreviewPreferences.EXTRA_REVISION)
+            extras.remove(NotificationPreviewPreferences.EXTRA_ALLOWED)
+        } else {
+            stampContactPictureShortcut(shortcut, "contact", true)
+        }
+        if (previousSession) extras.putString(NotificationPreviewPreferences.EXTRA_SESSION, "old-process")
+        if (hidden) extras.putBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN, true)
+        if (staleEpoch) {
+            kotlinx.coroutines.runBlocking {
+                NotificationPreviewPreferences.setEnabled(context, false) { true }
+                NotificationPreviewPreferences.setEnabled(context, true) { true }
+            }
+        }
+        val red = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+        val platform =
+            object : ContactPictureShortcutPlatform(context) {
+                override fun read() = listOf(shortcut)
+
+                override fun update(shortcuts: List<androidx.core.content.pm.ShortcutInfoCompat>) {
+                    shortcut = shortcuts.single()
+                }
+            }
+        refreshContactPictureShortcuts(
+            context,
+            "a",
+            "contact",
+            { red },
+            { true },
+            platform,
+            legacyConversationId = "canonical",
+        )
+        val pixel = checkNotNull(shortcut.icon?.loadDrawable(context)).toBitmap().getPixel(0, 0)
+        if (expectPrivate) {
+            assertEquals(Color.RED, pixel)
+            assertEquals(true, shortcutPreviewAllowed(context, shortcut))
+        } else {
+            assertNotEquals(Color.RED, pixel)
+            assertEquals(context.getString(dev.ipf.whitenoise.android.R.string.app_name), shortcut.shortLabel)
+        }
+    }
+
     @Test fun replacementAndClearRefreshPublishedShortcutsWithoutCrossingAccounts() {
         val context = RuntimeEnvironment.getApplication()
         val preview = NotificationPreviewPreferences.capture(context)

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 
 private val AvatarPalette =
     listOf(
@@ -60,9 +61,7 @@ internal fun Avatar(
     // is intentional: produceState keys restart the load coroutine, but the
     // state holder itself must also be recreated to re-seed from the new cache
     // key instead of displaying the old bitmap transiently.
-    val privateSource =
-        dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
-            .isPrivate(pictureUrl)
+    val privateSource = PrivateContactAvatarLoader.isPrivate(pictureUrl)
     val loadedUrlImage by key(seed, pictureUrl, picture, AvatarImageLoader.currentCacheLifetime()) {
         rememberRecoverableAvatar(
             initialImage = AvatarImageLoader.peek(pictureUrl),
@@ -71,7 +70,15 @@ internal fun Avatar(
             AvatarImageLoader.load(checkNotNull(pictureUrl))
         }
     }
-    val image = if (privateSource) loadedUrlImage else picture ?: loadedUrlImage
+    val privateOwnerCurrent =
+        !privateSource ||
+            PrivateContactAvatarLoader.belongsToActiveAccount(checkNotNull(pictureUrl))
+    val image =
+        when {
+            !privateOwnerCurrent -> null
+            privateSource -> loadedUrlImage ?: picture
+            else -> picture ?: loadedUrlImage
+        }
     Box(
         modifier = Modifier.size(size).clip(CircleShape).background(color),
         contentAlignment = Alignment.Center,

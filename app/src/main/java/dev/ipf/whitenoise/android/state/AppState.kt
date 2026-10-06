@@ -1497,7 +1497,7 @@ class WhiteNoiseAppState private constructor(
     private val localNotificationPresenter =
         LocalNotificationPresenter(
             appContext,
-            contactAvatarOverride = ::contactAvatarOverride,
+            contactAvatarOverride = ::contactAvatarOverrideForScope,
         )
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
     private val appUpdateRepository = AppUpdateRepository(appContext)
@@ -10143,6 +10143,20 @@ class WhiteNoiseAppState private constructor(
         val picture = contactPictureStore.reference(account, accountIdHex) ?: return publicUrl
         return dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
             .source(picture, publicUrl)
+    }
+
+    /** Resolves platform-owned opaque metadata only against currently signed-in local identities. */
+    private fun contactAvatarOverrideForScope(
+        scope: String,
+        contact: String,
+    ): Pair<Boolean, android.graphics.Bitmap?> {
+        val owner =
+            accounts.firstOrNull {
+                !it.signedOut &&
+                    dev.ipf.whitenoise.android.notifications
+                        .conversationShortcutAccountScope(it.label) == scope
+            } ?: return false to null
+        return contactAvatarOverride(owner.label, contact)
     }
 
     /** Commits one captured editor atomically and invalidates every account-owned identity presentation. */

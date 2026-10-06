@@ -39,6 +39,47 @@ import org.robolectric.annotation.GraphicsMode
 class PrivateContactAvatarSurfaceTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Missing or unreadable private bytes retain current native public pixels but never the old account's. */
+    @Test fun missingPrivatePictureUsesCurrentPublicPixels() = assertPublicFallback(corrupt = false)
+
+    @Test fun corruptPrivatePictureUsesCurrentPublicPixels() = assertPublicFallback(corrupt = true)
+
+    private fun assertPublicFallback(corrupt: Boolean) {
+        val context = RuntimeEnvironment.getApplication()
+        val root = context.noBackupFilesDir.resolve("fallback-pictures")
+        val store = ContactPictureStore(context.getSharedPreferences("fallback-pictures", 0), root)
+        var account = "a"
+        PrivateContactAvatarLoader.attach(store) { account }
+        store.save("a", "contact", "", "", ContactPictureChange.Replace(contactPicturePng(Color.RED))) { true }
+        val reference = checkNotNull(store.reference("a", "contact"))
+        val file = root.resolve(reference.owner).resolve(reference.fileName)
+        if (corrupt) file.writeText("unreadable image") else check(file.delete())
+        AvatarImageLoader.clearStoredAvatars()
+        val source = PrivateContactAvatarLoader.source(reference, null)
+        val bytes = contactPicturePng(Color.BLUE)
+        val public = BitmapFactory.decodeByteArray(bytes, 0, bytes.size).asImageBitmap()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Row(Modifier.testTag("sender-slot")) {
+                    MessageSenderAvatarSlot(true, "Maya", "contact", source, true, false, {}, public)
+                }
+            }
+        }
+
+        fun pixel(): Int {
+            val bitmap = composeRule.onNodeWithTag("sender-slot").captureToImage().asAndroidBitmap()
+            return bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
+        }
+        assertEquals(Color.BLUE, pixel())
+        composeRule.runOnIdle {
+            account = "b"
+            AvatarImageLoader.clearStoredAvatars()
+        }
+        composeRule.waitForIdle()
+        assertNotEquals(Color.BLUE, pixel())
+        assertNotEquals(Color.RED, pixel())
+    }
+
     @Test fun privateImagePrecedesCapturedPixelsAndOldOwnerDisappearsOnNextFrame() {
         val context = RuntimeEnvironment.getApplication()
         val store =
