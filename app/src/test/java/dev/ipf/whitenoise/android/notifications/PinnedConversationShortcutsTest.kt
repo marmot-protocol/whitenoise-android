@@ -21,6 +21,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.util.concurrent.atomic.AtomicLong
 import javax.crypto.spec.SecretKeySpec
 
 /** Platform responses are scripted; actual shortcut objects and private credential storage are exercised. */
@@ -363,7 +364,7 @@ class PinnedConversationShortcutsTest {
         val owner = PinnedConversationShortcuts(context, platform)
         owner.request(capability, "Original", null) { true }
         platform.approve(platform.requests.single())
-        val revision = java.util.concurrent.atomic.AtomicLong(1)
+        val revision = AtomicLong(1)
         platform.afterInventoryRead = {
             platform.afterInventoryRead = null
             revision.incrementAndGet()

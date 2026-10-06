@@ -135,7 +135,9 @@ private suspend fun currentPinCapability(
     }
     return if (available && stillCurrent()) {
         withContext(Dispatchers.IO) {
-            PinnedConversationTokens.create(context).issue(checkNotNull(account), group, requestGeneration)
+            PinnedConversationTokens
+                .create(context)
+                .issue(checkNotNull(account), group, requestGeneration)
                 ?.let { it to checkNotNull(currentRow) }
         }
     } else {

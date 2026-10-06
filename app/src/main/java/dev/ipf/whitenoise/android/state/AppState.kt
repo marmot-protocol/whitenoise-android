@@ -137,6 +137,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelinePage
 import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelineRecord
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PUSH_WAKE_MAX_ATTEMPTS
+import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
@@ -2367,7 +2368,7 @@ class WhiteNoiseAppState private constructor(
         })
     private var shareShortcutPublishJob: Job? = null
     private var pinnedShortcutRefreshJob: Job? = null
-    private val pinnedShortcutPresentationRevision = java.util.concurrent.atomic.AtomicLong()
+    private val pinnedShortcutPresentationRevision = AtomicLong()
 
     /**
      * `SupervisorJob` isolates siblings but does not swallow exceptions — an
@@ -3763,11 +3764,11 @@ class WhiteNoiseAppState private constructor(
         account: String,
         item: ChatListItem,
         title: String,
-    ): dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation {
+    ): PinnedConversationPresentation {
         val peer =
             GroupProjector.avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
                 ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
-        return dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation(
+        return PinnedConversationPresentation(
             title = title,
             contact = peer,
             currentAvatar = {
@@ -3806,7 +3807,9 @@ class WhiteNoiseAppState private constructor(
             }
         withContext(Dispatchers.IO) {
             shortcuts.refresh(accountRef, presentations) {
-                isActive && activeAccountRef == accountRef && runtimeGeneration == runtime &&
+                isActive &&
+                    activeAccountRef == accountRef &&
+                    runtimeGeneration == runtime &&
                     pinnedShortcutPresentationRevision.get() == presentationRevision
             }
         }
