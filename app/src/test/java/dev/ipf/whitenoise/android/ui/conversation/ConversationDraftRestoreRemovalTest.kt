@@ -124,7 +124,11 @@ class ConversationDraftRestoreRemovalTest {
     private fun cleanupAttachments(groupIdHex: String): List<MessageDraftAttachmentFfi> =
         listOf(
             nativeAttachment("native-photo-1", "photo-1.jpg", "image/jpeg"),
-            nativeAttachment(stagedPhotoAttachmentId("account", groupIdHex, "saved-picker"), "photo-2.jpg", "image/jpeg"),
+            nativeAttachment(
+                stagedPhotoAttachmentId("account", groupIdHex, "saved-picker"),
+                "photo-2.jpg",
+                "image/jpeg",
+            ),
             nativeAttachment(
                 stagedDocumentAttachmentId("account", groupIdHex, "content://picker/document"),
                 "document.pdf",
