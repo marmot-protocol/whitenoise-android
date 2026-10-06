@@ -133,12 +133,64 @@ class ComposerExpansionTest {
         val settle = { height: Float ->
             settleComposerHeight(middle.copy(manualHeightPx = height), 200f, 140f, 600f, 20f)
         }
+        assertEquals(ComposerExpansionMode.Manual, settle(160f).mode)
+        assertEquals(140f, settle(160f).manualHeightPx)
+        assertEquals(161f, settle(161f).manualHeightPx)
+        assertEquals(ComposerExpansionMode.Automatic, settle(180f).mode)
         assertEquals(ComposerExpansionMode.Automatic, settle(220f).mode)
         assertEquals(ComposerExpansionMode.Manual, settle(221f).mode)
         assertEquals(221f, settle(221f).manualHeightPx)
         assertEquals(ComposerExpansionMode.FullScreen, settle(580f).mode)
         assertEquals(ComposerExpansionMode.Manual, settle(579f).mode)
         assertEquals(579f, settle(579f).manualHeightPx)
+    }
+
+    @Test
+    fun shrinkingAnAlreadyCompactAutomaticRowDoesNotGrowItOrDisableAutomatic() {
+        val automatic = ComposerExpansionState()
+        assertEquals(automatic, dragComposerHeight(automatic, 120f, 84f, 108f, 600f))
+        assertEquals(automatic, settleComposerHeight(automatic, 84f, 108f, 600f, 24f))
+    }
+
+    @Test
+    fun oneLinePixelRoundingPreservesAutomaticGrowthAndCollapse() {
+        for ((automatic, minimum) in listOf(284f to 283.5f, 298f to 297f, 319f to 317.5f)) {
+            val state = ComposerExpansionState()
+            assertEquals(state, dragComposerHeight(state, 120f, automatic, minimum, 1_600f))
+            val collapsed = ComposerExpansionState(ComposerExpansionMode.Manual, minimum)
+            assertEquals(state, settleComposerHeight(collapsed, automatic, minimum, 1_600f, 60f))
+        }
+        // A genuinely taller draft still retains its smaller manual viewport.
+        val taller = ComposerExpansionState(ComposerExpansionMode.Manual, 283.5f)
+        assertEquals(taller, settleComposerHeight(taller, 345f, 283.5f, 1_600f, 60f))
+    }
+
+    @Test
+    fun overlappingLandingZonesChooseTheCloserDestination() {
+        val settle = { height: Float ->
+            settleComposerHeight(ComposerExpansionState(ComposerExpansionMode.Manual, height), 132f, 108f, 600f, 24f)
+        }
+        assertEquals(ComposerExpansionMode.Automatic, settle(132f).mode)
+        assertEquals(ComposerExpansionMode.Automatic, settle(121f).mode)
+        assertEquals(ComposerExpansionMode.Manual, settle(119f).mode)
+        assertEquals(108f, settle(108f).manualHeightPx)
+    }
+
+    @Test
+    fun compactGrowthStartsAtTheCurrentHeightWithoutJumpingToTheManualFloor() {
+        val grown = dragComposerHeight(ComposerExpansionState(), -1f, 84f, 108f, 600f)
+        assertEquals(85f, grown.manualHeightPx)
+        assertEquals(ComposerExpansionMode.Automatic, settleComposerHeight(grown, 84f, 108f, 600f, 24f).mode)
+    }
+
+    @Test
+    fun compactGapSettlesAtItsCloserDestinationAndAnEquivalentSingleLineRestoresAutomatic() {
+        val nearManual = ComposerExpansionState(ComposerExpansionMode.Manual, 105f)
+        assertEquals(108f, settleComposerHeight(nearManual, 84f, 108f, 600f, 24f).manualHeightPx)
+        assertEquals(
+            ComposerExpansionMode.Automatic,
+            settleComposerHeight(nearManual.copy(manualHeightPx = 108f), 108f, 108f, 600f, 24f).mode,
+        )
     }
 
     /** The resize handle remains the only gesture that explicitly leaves full-screen mode. */

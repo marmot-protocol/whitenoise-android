@@ -16,14 +16,17 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import dev.ipf.whitenoise.android.state.AppFont
 import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
 import dev.ipf.whitenoise.android.state.contrastRatio
+import dev.ipf.whitenoise.android.state.readableTextArgb
 import dev.ipf.whitenoise.android.state.resolveActionColorArgb
 
 private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
+private const val ACCENT_BLEND_STEPS = 16
 
 /** Bubble defaults use the active base palette without inheriting the account action accent. */
 internal val LocalMessageBubbleBaseColorScheme = staticCompositionLocalOf<ColorScheme?> { null }
@@ -208,13 +211,17 @@ private fun ColorScheme.withAccountAccent(
         } ?: return this
     val accent = Color(resolvedAccent.container)
     val onAccent = Color(resolvedAccent.content)
+    // Material draws `primary` as text and icons on surfaces (text buttons, radios, links, mentions), while
+    // the containers stay the exact picked colour behind their own readable content.
+    val textAccent = readableAccent(accent, onSurface, surfaceRoleArgbs())
+    val onTextAccent = readableTextArgb(textAccent.toOpaqueArgb())?.let { Color(it) } ?: onAccent
     val safeInversePrimary =
         accent.takeIf {
             contrastRatio(it.toOpaqueArgb(), inverseSurface.toOpaqueArgb()) >= WCAG_AA_NORMAL_TEXT_CONTRAST
         } ?: inversePrimary
     return copy(
-        primary = accent,
-        onPrimary = onAccent,
+        primary = textAccent,
+        onPrimary = onTextAccent,
         primaryContainer = accent,
         onPrimaryContainer = onAccent,
         inversePrimary = safeInversePrimary,
@@ -234,6 +241,54 @@ internal fun ColorScheme.withActionColor(accentArgb: Long?): ColorScheme = withA
 
 /** Opaque ARGB value of a colour. */
 private fun Color.toOpaqueArgb(): Long = toArgb().toLong() and OPAQUE_ARGB_MASK
+
+/** Every surface role the accent can sit on as text, an icon or a selection mark. */
+private fun ColorScheme.surfaceRoleArgbs(): List<Long> =
+    listOf(
+        background,
+        surface,
+        surfaceVariant,
+        surfaceBright,
+        surfaceDim,
+        surfaceContainerLowest,
+        surfaceContainerLow,
+        surfaceContainer,
+        surfaceContainerHigh,
+        surfaceContainerHighest,
+    ).map { it.toOpaqueArgb() }
+
+/**
+ * The accent as text on [surfaceArgbs]: unchanged when it already reaches 4.5:1 on every one, otherwise mixed
+ * toward the surfaces' own [text] colour just far enough. The mix keeps the hue, so #1D4ED8 on the dark surfaces
+ * becomes a light blue and amber on the light surfaces becomes a dark amber.
+ */
+private fun readableAccent(
+    accent: Color,
+    text: Color,
+    surfaceArgbs: List<Long>,
+): Color {
+    fun readable(color: Color): Boolean {
+        val argb = color.toOpaqueArgb()
+        return surfaceArgbs.all { contrastRatio(argb, it) >= WCAG_AA_NORMAL_TEXT_CONTRAST }
+    }
+
+    if (readable(accent)) {
+        return accent
+    }
+
+    // Contrast only grows along the mix: the surfaces sit near the opposite end from their text colour.
+    var low = 0f
+    var high = 1f
+    repeat(ACCENT_BLEND_STEPS) {
+        val mid = (low + high) / 2
+        if (readable(lerp(accent, text, mid))) {
+            high = mid
+        } else {
+            low = mid
+        }
+    }
+    return lerp(accent, text, high)
+}
 
 /** App theme: monochrome scheme, optional AMOLED and account accent, font and shapes. */
 @Composable

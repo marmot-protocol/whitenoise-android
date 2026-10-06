@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -27,7 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The composer's resize affordance is visible when there is something to resize. */
+/** The composer's persistent resize affordance remains available across draft sizes. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ComposerResizeHandleTest {
@@ -47,13 +49,15 @@ class ComposerResizeHandleTest {
         assertEquals("the grip is 4dp thick", 4f, handle.height, 1f)
     }
 
-    /** The grip sits centred on the strip, where a reader looks for a resize affordance. */
+    /** The grip is centred horizontally and directly over the outline's one-pixel stroke. */
     @Test
     fun theResizeHandleIsCentredOnTheStrip() {
         render(ComposerExpansionMode.Manual, draft = "Line one\nLine two\nLine three")
         val strip = composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).fetchSemanticsNode().boundsInRoot
         val handle = composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).fetchSemanticsNode().boundsInRoot
+        val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
         assertEquals("the grip is centred", strip.center.x, handle.center.x, 1f)
+        assertEquals("the grip covers the outline", surface.top + 0.5f, handle.center.y, 0.5f)
     }
 
     /**
@@ -78,13 +82,13 @@ class ComposerResizeHandleTest {
     }
 
     /**
-     * The one-line composer has nothing to resize, so it draws no grip. The draft is non-empty because
+     * The one-line composer can still grow, so it keeps the visible grip. The draft is non-empty because
      * that is what a real one-line composer holds, and non-empty text is itself an editing request.
      */
     @Test
-    fun oneLineComposerDrawsNoResizeHandle() {
+    fun oneLineComposerKeepsTheResizeHandle() {
         render(ComposerExpansionMode.Automatic, draft = "Line one")
-        composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG).assertIsDisplayed()
     }
 
     /**
@@ -115,8 +119,9 @@ class ComposerResizeHandleTest {
                 Surface {
                     var value by remember { mutableStateOf(TextFieldValue(draft, TextRange(draft.length))) }
                     val focusRequester = remember { FocusRequester() }
-                    Box(Modifier.width(300.dp).height(140.dp)) {
+                    Box(Modifier.width(300.dp).height(148.dp).padding(top = 4.dp)) {
                         ComposerPill(
+                            actionColors = accountActionColors(appState = null),
                             textFieldValue = value,
                             composerFocus = focusRequester,
                             emojiPickerOpen = false,

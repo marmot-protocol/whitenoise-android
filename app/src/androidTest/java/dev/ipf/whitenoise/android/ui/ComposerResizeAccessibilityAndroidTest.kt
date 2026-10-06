@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -38,6 +39,7 @@ class ComposerResizeAccessibilityAndroidTest {
                 Surface {
                     Box(Modifier.width(320.dp).height(280.dp)) {
                         ComposerPill(
+                            actionColors = accountActionColors(appState = null),
                             textFieldValue = TextFieldValue(LONG_DRAFT),
                             composerFocus = remember { FocusRequester() },
                             emojiPickerOpen = false,

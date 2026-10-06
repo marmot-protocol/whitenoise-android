@@ -10,6 +10,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
@@ -133,9 +134,13 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
     // events are never consumed away from ancestor scroll containers.
     scrollBy: (Float) -> Boolean,
     onReadingScroll: () -> Unit,
+    onScrollInterrupted: () -> Unit = {},
+    onFling: (Float) -> Unit = {},
+    acceptsTouchDown: (Offset) -> Boolean = { true },
 ) {
     val touchSlop = viewConfiguration.touchSlop
     val longPressTimeoutMillis = viewConfiguration.longPressTimeoutMillis
+    val velocityTracker = VelocityTracker()
     awaitPointerEventScope {
         var trackedPointer: PointerId? = null
         var trackedDownAtMillis = 0L
@@ -150,6 +155,7 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
                     event.changes.forEach { change ->
                         val tick = change.scrollDelta.y
                         if (tick != 0f) {
+                            onScrollInterrupted()
                             // Density-scaled so a wheel tick travels the same
                             // visual distance as in every other scrollable.
                             // Consume and arm only when the editor actually
@@ -163,13 +169,16 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
                     }
                 PointerEventType.Press -> {
                     if (trackedPointer == null) {
+                        onScrollInterrupted()
                         val change = event.changes.first()
                         // Only finger drags are ambiguous between reading and
                         // selection. Mouse and stylus drags are drag-select by
                         // platform convention (wheel/trackpad scrolling arrives
                         // as Scroll events above), so they pass through to the
                         // text field untouched.
-                        if (change.type == PointerType.Touch) {
+                        if (change.type == PointerType.Touch && acceptsTouchDown(change.position)) {
+                            velocityTracker.resetTracking()
+                            velocityTracker.addPosition(change.uptimeMillis, change.position)
                             trackedPointer = change.id
                             trackedDownAtMillis = change.uptimeMillis
                             accumulatedX = 0f
@@ -182,6 +191,7 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
                 PointerEventType.Move -> {
                     val change = event.changes.firstOrNull { it.id == trackedPointer && it.pressed }
                     if (change != null && !yieldedToSelection) {
+                        velocityTracker.addPosition(change.uptimeMillis, change.position)
                         val frameDeltaY = change.position.y - change.previousPosition.y
                         if (!owningDrag) {
                             accumulatedX += change.position.x - change.previousPosition.x
@@ -190,9 +200,15 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
                                 change.uptimeMillis - trackedDownAtMillis > longPressTimeoutMillis ->
                                     yieldedToSelection = true
                                 abs(accumulatedY) > touchSlop && abs(accumulatedY) > abs(accumulatedX) -> {
-                                    owningDrag = true
-                                    onReadingScroll()
-                                    scrollBy(-accumulatedY)
+                                    if (scrollBy(-accumulatedY)) {
+                                        owningDrag = true
+                                        onReadingScroll()
+                                    } else {
+                                        // Rejected movement belongs to the ancestor, not a future
+                                        // reversal. Start fresh so reading responds at either edge.
+                                        accumulatedX = 0f
+                                        accumulatedY = 0f
+                                    }
                                 }
                             }
                         } else {
@@ -202,10 +218,18 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
                         if (owningDrag) change.consume()
                     }
                 }
-                PointerEventType.Release ->
-                    if (event.changes.any { it.id == trackedPointer && !it.pressed }) {
+                PointerEventType.Release -> {
+                    val released = event.changes.firstOrNull { it.id == trackedPointer && !it.pressed }
+                    if (released != null) {
+                        if (owningDrag && !released.isConsumed) {
+                            velocityTracker.addPosition(released.uptimeMillis, released.position)
+                            onFling(-velocityTracker.calculateVelocity().y)
+                        } else if (owningDrag) {
+                            onScrollInterrupted()
+                        }
                         trackedPointer = null
                     }
+                }
                 else -> Unit
             }
         }

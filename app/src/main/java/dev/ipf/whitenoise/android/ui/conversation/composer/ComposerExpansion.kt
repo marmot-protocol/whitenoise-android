@@ -8,6 +8,9 @@ import kotlin.math.abs
 
 internal const val COMPOSER_EXPANSION_ANIMATION_MILLIS = 220
 
+// Independent padding and editor measurements round to pixels at different boundaries.
+private const val COMPOSER_HEIGHT_ROUNDING_TOLERANCE_PX = 2f
+
 internal enum class ComposerExpansionMode {
     Automatic,
     Manual,
@@ -108,15 +111,21 @@ internal fun dragComposerHeight(
 ): ComposerExpansionState {
     val maximum = normalizedMaximumHeight(maximumHeightPx)
     val minimum = normalizedMinimumHeight(minimumManualHeightPx, maximum)
+    val dragMinimum = minOf(minimum, normalizedMinimumHeight(automaticHeightPx, maximum))
+    // An already compact automatic row cannot shrink further; do not grow it just to enter Manual.
+    val alreadyCompact = automaticHeightPx <= minimum + COMPOSER_HEIGHT_ROUNDING_TOLERANCE_PX
+    if (state.mode == ComposerExpansionMode.Automatic && alreadyCompact && dragDeltaYPx >= 0f) {
+        return state
+    }
     val nextHeight =
         (
             composerHeightPx(
                 state = state,
                 automaticHeightPx = automaticHeightPx,
-                minimumManualHeightPx = minimum,
+                minimumManualHeightPx = dragMinimum,
                 maximumHeightPx = maximum,
             ) - dragDeltaYPx
-        ).coerceIn(minimum, maximum)
+        ).coerceIn(dragMinimum, maximum)
     return ComposerExpansionState(
         mode = ComposerExpansionMode.Manual,
         manualHeightPx = nextHeight,
@@ -125,7 +134,7 @@ internal fun dragComposerHeight(
 
 /**
  * Preserve the exact release height except near either endpoint, where a small
- * deadband makes the automatic and full-screen destinations easy to land on.
+ * deadband makes the minimum, automatic content height and full-screen destinations easy to land on.
  */
 internal fun settleComposerHeight(
     state: ComposerExpansionState,
@@ -141,14 +150,20 @@ internal fun settleComposerHeight(
         composerHeightPx(
             state = state,
             automaticHeightPx = automatic,
-            minimumManualHeightPx = minimum,
+            minimumManualHeightPx = minOf(minimum, automatic),
             maximumHeightPx = maximum,
         )
+    val equivalentMinimum = abs(automatic - minimum) <= COMPOSER_HEIGHT_ROUNDING_TOLERANCE_PX
     return when {
+        state.mode == ComposerExpansionMode.Automatic -> ComposerExpansionState()
+        equivalentMinimum && abs(height - automatic) <= deadbandPx -> ComposerExpansionState()
+        abs(height - automatic) <= deadbandPx && abs(height - automatic) < abs(height - minimum) ->
+            ComposerExpansionState()
+        abs(height - minimum) <= deadbandPx -> ComposerExpansionState(ComposerExpansionMode.Manual, minimum)
         abs(height - automatic) <= deadbandPx -> ComposerExpansionState()
         abs(maximum - height) <= deadbandPx ->
             ComposerExpansionState(mode = ComposerExpansionMode.FullScreen)
-        else -> ComposerExpansionState(ComposerExpansionMode.Manual, height)
+        else -> ComposerExpansionState(ComposerExpansionMode.Manual, height.coerceAtLeast(minimum))
     }
 }
 
