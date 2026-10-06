@@ -3303,22 +3303,14 @@ class ConversationDictationControllerTest {
 
     /** A first foreground return releases the saved-text card only after real provider capture closure. */
     @Test
-    fun recoveredForegroundFailureReleasesItsLeaseAfterDelayedNativeClosure() =
-        checkRecoveredFailureWaitsForNativeClosure(finishRequested = true)
-
-    /** A fatal recognition error also retains the actual closure callback before the finish gesture. */
-    @Test
-    fun recoveredRecognitionFailureReleasesItsLeaseAfterDelayedNativeClosure() =
-        checkRecoveredFailureWaitsForNativeClosure(finishRequested = false)
-
-    private fun checkRecoveredFailureWaitsForNativeClosure(finishRequested: Boolean) {
+    fun recoveredForegroundFailureReleasesItsLeaseAfterDelayedNativeClosure() {
         val f = fixture(draft = TextFieldValue(""), platform = FakePlatform(deferCaptureCompletion = true))
         f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
         f.platform.session.completeCapture()
         f.platform.listener.onResult("body")
         f.scheduler.runDelay(500L)
         f.platform.listener.onBeginningOfSpeech()
-        if (finishRequested) f.controller.send()
+        f.controller.send()
         val closingCapture = f.platform.session
         f.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
         assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
@@ -3332,6 +3324,25 @@ class ConversationDictationControllerTest {
         assertEquals("body", f.drafts.getValue(key()).text)
         assertEquals(1, f.writes)
         assertTrue(f.controller.state is ConversationDictationState.Failed)
+    }
+
+    /** A terminal error before any finish gesture still waits for the recognizer's real close callback. */
+    @Test
+    fun recognitionFailureBeforeFinishWaitsForDelayedNativeClosure() {
+        val f = fixture(draft = TextFieldValue(""), platform = FakePlatform(deferCaptureCompletion = true))
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        val closingCapture = f.platform.session
+
+        f.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+
+        assertTrue(f.controller.state is ConversationDictationState.Failed)
+        assertTrue(closingCapture.cancelled)
+        assertTrue(closingCapture.destroyed)
+        assertTrue(f.controller.foregroundMicrophoneRequired)
+        closingCapture.completeCapture()
+        assertFalse(f.controller.foregroundMicrophoneRequired)
+        assertEquals("", f.drafts.getValue(key()).text)
+        assertEquals(0, f.writes)
     }
 
     /** Returning before closure preserves the watchdog and only then reattaches non-microphone recovery. */

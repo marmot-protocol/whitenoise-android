@@ -3744,8 +3744,8 @@ internal class ConversationDictationController internal constructor(
 
     private companion object {
         const val PREFERENCES_NAME = CONVERSATION_DICTATION_PREFERENCES_NAME
-        const val DISCLOSURE_ACCEPTED_KEY = "composer_dictation_external_provider_disclosed"
-        const val OFFLINE_DISCLOSURE_ACCEPTED_KEY = "composer_dictation_offline_provider_disclosed"
+        const val DISCLOSURE_ACCEPTED_KEY = "composer_dictation_external_provider_disclosed_v2"
+        const val OFFLINE_DISCLOSURE_ACCEPTED_KEY = "composer_dictation_offline_provider_disclosed_v2"
         const val STARTING_TIMEOUT_MILLIS = 10_000L
         const val FOREGROUND_READINESS_TIMEOUT_MILLIS = 3_000L
         const val RETAINED_RECOVERY_TIMEOUT_MILLIS = 30L * 60L * 1_000L

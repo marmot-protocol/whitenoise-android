@@ -1062,6 +1062,18 @@
         "test_ids": ["DIC-001"]
       },
       {
+        "surface": "Updated draft-recovery disclosure acceptance after upgrade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "DISCLOSURE_ACCEPTED_KEY",
+        "test_ids": ["DIC-001"]
+      },
+      {
+        "surface": "Updated offline draft-recovery disclosure acceptance after upgrade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "OFFLINE_DISCLOSURE_ACCEPTED_KEY",
+        "test_ids": ["DIC-001"]
+      },
+      {
         "surface": "Offline dictation settings explainer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_settings_explainer_offline",
