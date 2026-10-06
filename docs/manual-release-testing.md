@@ -1,5 +1,11 @@
 # White Noise Android manual release testing
 
+This file remains the compatible base checklist. Feature-specific updates can
+live in [small scenario and source files](manual-release-testing/README.md).
+For a tested candidate, use the combined `manual-release-testing-<commit>` CI
+artifact: it includes those updates and records the checkout's source revision.
+The checked-in base alone may not contain the latest overridden scenarios.
+
 ## Quick checklist for human testers
 
 Start here for a short everyday-use pass. The [detailed checklist](#full-release-checklist) below covers edge cases and remains required for release approval.
