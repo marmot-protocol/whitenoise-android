@@ -91,8 +91,6 @@ import androidx.compose.ui.input.key.onPreInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -1502,53 +1500,6 @@ private fun Modifier.boundedComposerAccessory(): Modifier =
         val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = limit))
         layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
     }
-
-/** Observes the border as a parent, so compact controls keep every pixel of their tap targets. */
-private data class ComposerResizeCallbacks(
-    val started: () -> Unit,
-    val dragged: (Float) -> Unit,
-    val stopped: () -> Unit,
-    val settled: ((Float) -> Unit)?,
-    val cancelled: (() -> Unit)?,
-)
-
-@Composable
-private fun Modifier.composerResizeGestures(
-    compact: Boolean,
-    enabled: Boolean,
-    ownerKey: Any?,
-    callbacks: ComposerResizeCallbacks,
-): Modifier {
-    val latestCompact by rememberUpdatedState(compact)
-    val latestCallbacks by rememberUpdatedState(callbacks)
-    var gestureCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
-    return this
-        .onGloballyPositioned { gestureCoordinates = it }
-        .pointerInput(ownerKey, enabled) {
-            if (!enabled) return@pointerInput
-            val velocityTracker = VelocityTracker()
-            detectComposerResizeFromTop(
-                topHeightPx = { (if (latestCompact) 12.dp else 24.dp).toPx() },
-                onStarted = {
-                    velocityTracker.resetTracking()
-                    latestCallbacks.started()
-                },
-                onDragged = { change, dragAmount ->
-                    val rootPosition = gestureCoordinates?.localToRoot(change.position) ?: change.position
-                    velocityTracker.addPosition(change.uptimeMillis, rootPosition)
-                    latestCallbacks.dragged(dragAmount)
-                },
-                onStopped = { completed ->
-                    if (!completed) {
-                        (latestCallbacks.cancelled ?: latestCallbacks.stopped)()
-                    } else {
-                        val settle = latestCallbacks.settled
-                        if (settle != null) settle(velocityTracker.calculateVelocity().y) else latestCallbacks.stopped()
-                    }
-                },
-            )
-        }
-}
 
 /** The grip marks the parent-owned drag region without intercepting child controls. */
 @Composable

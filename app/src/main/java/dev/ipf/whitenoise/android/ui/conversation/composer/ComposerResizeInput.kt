@@ -2,10 +2,22 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.sign
 
@@ -25,10 +37,10 @@ internal suspend fun PointerInputScope.detectComposerResizeFromTop(
         try {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
-                val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                if (!change.pressed) {
-                    completed = !change.isConsumed
-                    break
+                val change = event.changes.firstOrNull { it.id == down.id }
+                if (change == null || !change.pressed) {
+                    completed = change?.isConsumed == false
+                    return@awaitEachGesture
                 }
                 val delta = change.positionChangeIgnoreConsumed().y
                 accumulatedY += delta
@@ -47,4 +59,51 @@ internal suspend fun PointerInputScope.detectComposerResizeFromTop(
             if (ownsDrag) onStopped(completed)
         }
     }
+}
+
+/** Observes the border as a parent, so compact controls keep every pixel of their tap targets. */
+internal data class ComposerResizeCallbacks(
+    val started: () -> Unit,
+    val dragged: (Float) -> Unit,
+    val stopped: () -> Unit,
+    val settled: ((Float) -> Unit)?,
+    val cancelled: (() -> Unit)?,
+)
+
+@Composable
+internal fun Modifier.composerResizeGestures(
+    compact: Boolean,
+    enabled: Boolean,
+    ownerKey: Any?,
+    callbacks: ComposerResizeCallbacks,
+): Modifier {
+    val latestCompact by rememberUpdatedState(compact)
+    val latestCallbacks by rememberUpdatedState(callbacks)
+    var gestureCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    return this
+        .onGloballyPositioned { gestureCoordinates = it }
+        .pointerInput(ownerKey, enabled) {
+            if (!enabled) return@pointerInput
+            val velocityTracker = VelocityTracker()
+            detectComposerResizeFromTop(
+                topHeightPx = { (if (latestCompact) 12.dp else 24.dp).toPx() },
+                onStarted = {
+                    velocityTracker.resetTracking()
+                    latestCallbacks.started()
+                },
+                onDragged = { change, dragAmount ->
+                    val rootPosition = gestureCoordinates?.localToRoot(change.position) ?: change.position
+                    velocityTracker.addPosition(change.uptimeMillis, rootPosition)
+                    latestCallbacks.dragged(dragAmount)
+                },
+                onStopped = { completed ->
+                    if (!completed) {
+                        (latestCallbacks.cancelled ?: latestCallbacks.stopped)()
+                    } else {
+                        val settle = latestCallbacks.settled
+                        if (settle != null) settle(velocityTracker.calculateVelocity().y) else latestCallbacks.stopped()
+                    }
+                },
+            )
+        }
 }

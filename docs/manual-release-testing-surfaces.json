@@ -4509,7 +4509,7 @@
       },
       {
         "surface": "Modifier.composerResizeGestures",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerResizeInput.kt",
         "anchor": "fun Modifier.composerResizeGestures(",
         "test_ids": ["CON-007", "CON-013", "CON-017"]
       },
