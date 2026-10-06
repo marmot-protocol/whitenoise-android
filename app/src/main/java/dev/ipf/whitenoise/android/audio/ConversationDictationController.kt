@@ -3163,15 +3163,7 @@ internal class ConversationDictationController internal constructor(
                     )
             ) {
                 is ConversationDictationMerge.Applied -> {
-                    val accepted =
-                        runCatching {
-                            writeDraft(
-                                target.accountRef,
-                                target.groupIdHex,
-                                current.revision,
-                                merge.value,
-                            )
-                        }.getOrNull()
+                    val accepted = writeMergedDraft(target, current, merge.value)
                     if (accepted != null) {
                         conversationDictationDiagnostic("event=paste_write outcome=accepted")
                         complete(target)
@@ -3189,6 +3181,12 @@ internal class ConversationDictationController internal constructor(
         conversationDictationDiagnostic("event=paste_write outcome=append reason=write_retries_exhausted")
         appendTranscriptAtEndOrFail(sessionId, target, transcript)
     }
+
+    private fun writeMergedDraft(
+        target: ConversationDictationTarget,
+        current: ConversationDictationDraftSnapshot,
+        value: TextFieldValue,
+    ): Long? = runCatching { writeDraft(target.accountRef, target.groupIdHex, current.revision, value) }.getOrNull()
 
     /** An already recovered insertion is replaced once and completes only after its fenced write succeeds. */
     private fun completeRecoveredPaste(

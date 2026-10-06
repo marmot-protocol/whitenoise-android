@@ -136,7 +136,8 @@ internal class ConversationDictationDraftRecovery(
                 current,
             )
         val ownsEmpty =
-            (previous?.emptiedRevision ?: options.ownedEmptyRevision) == current.revision && current.value.text.isEmpty()
+            (previous?.emptiedRevision ?: options.ownedEmptyRevision) == current.revision &&
+                current.value.text.isEmpty()
         val sendEligible =
             if (previous == null) {
                 originalUnchanged || ownsEmpty

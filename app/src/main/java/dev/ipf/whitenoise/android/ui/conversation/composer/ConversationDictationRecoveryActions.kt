@@ -46,15 +46,7 @@ internal fun ConversationDictationFailureAction(
         enabled =
             !retrySend || recoveredSendAvailable ||
                 (state.recognitionIncomplete && recovery != ConversationDictationRecovery.Retry),
-        onClick =
-            when {
-                retrySend && state.recognitionIncomplete -> ({ confirmPartialSend = true })
-                retrySend -> controller::retry
-                recovery == ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
-                recovery == ConversationDictationRecovery.SpeechProviderSetup ->
-                    ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
-                else -> controller::retry
-            },
+        onClick = dictationFailureAction(state, controller, recovery, context) { confirmPartialSend = true },
         modifier = Modifier.size(48.dp),
     ) {
         Icon(
@@ -72,6 +64,22 @@ internal fun ConversationDictationFailureAction(
         ConversationDictationSendConfirmation(state, controller, recovery, onDismiss = { confirmPartialSend = false })
     }
 }
+
+private fun dictationFailureAction(
+    state: ConversationDictationState.Failed,
+    controller: ConversationDictationController,
+    recovery: ConversationDictationRecovery,
+    context: Context,
+    confirmPartialSend: () -> Unit,
+): () -> Unit =
+    when {
+        state.reason == ConversationDictationFailure.SendBlocked && state.recognitionIncomplete -> confirmPartialSend
+        state.reason == ConversationDictationFailure.SendBlocked -> controller::retry
+        recovery == ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
+        recovery == ConversationDictationRecovery.SpeechProviderSetup ->
+            ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
+        else -> controller::retry
+    }
 
 private fun dictationFailureActionLabel(
     retrySend: Boolean,
