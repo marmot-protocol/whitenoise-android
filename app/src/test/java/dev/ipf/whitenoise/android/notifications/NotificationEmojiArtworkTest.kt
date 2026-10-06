@@ -245,9 +245,9 @@ class NotificationEmojiArtworkTest {
             }
         }
 
-    /** Optional image cleanup must not enqueue summary retries for a plain-text failed child. */
+    /** Plain-text cards keep only the mandatory before/after mutation reconciliation requests. */
     @Test
-    fun plainTextPostsOnlyRequestMandatorySuccessfulWriteReconciliation() =
+    fun plainTextPostsOnlyRequestMandatoryMutationReconciliation() =
         runBlocking {
             var reconciliations = 0
             var rejectChild = true
@@ -264,11 +264,13 @@ class NotificationEmojiArtworkTest {
                 )
             presenter.ensureChannels()
             assertFalse(presenter.show(messageUpdate("plain body", 'a'), shortNpub = { "npub1fixture" }))
-            assertEquals(0, reconciliations)
+            // Failed post and cancellation each publish before/after mutation fences.
+            assertEquals(4, reconciliations)
             assertTrue(manager.activeNotifications.isEmpty())
             rejectChild = false
             assertTrue(presenter.show(messageUpdate("plain body", 'b'), shortNpub = { "npub1fixture" }))
-            assertEquals(1, reconciliations)
+            // A successful post adds its two mandatory fences, without optional cleanup.
+            assertEquals(6, reconciliations)
             assertEquals(1, manager.activeNotifications.size)
             assertTrue(artifacts().isEmpty())
         }
