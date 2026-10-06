@@ -85,8 +85,9 @@ class FragmentTest(unittest.TestCase):
 
     def test_all_real_inputs_preserve_effective_content_when_extracted(self):
         repository = Path(__file__).resolve().parents[1]
-        text = (repository / fragments.GUIDE_PATH).read_text()
-        data = fragments.decode_inventory((repository / fragments.INVENTORY_PATH).read_text())
+        # Include existing source/case overrides before checking extraction of the complete real inputs.
+        text = fragments.load_guide(repository)
+        data = fragments.load_inventory(repository)
         cases = {
             f"{fragments.CASE_DIR}/{test_id}.md": f"<!-- legacy-sha256: {fragments.digest(line)} -->\n\n{line}\n"
             for test_id, line in fragments.definitions(text).items()

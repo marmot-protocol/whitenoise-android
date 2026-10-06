@@ -33,6 +33,7 @@ internal enum class SettingsDetail {
     TextToSpeech,
     Dictation,
     ChatFolders,
+    Gestures,
     Help,
     BugReport,
     About,

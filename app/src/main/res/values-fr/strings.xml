@@ -2259,4 +2259,16 @@
     <string name="destination_filter_label">Filtrer les discussions</string>
     <string name="forward_select_by_folder">Sélectionner par dossier</string>
     <string name="destination_filter_incomplete">Certaines discussions peuvent manquer. Réessayez ou choisissez Toutes les discussions.</string>
+    <string name="gestures_title">Actions de balayage</string>
+    <string name="gestures_physical_hint">Gauche et droite indiquent le mouvement du doigt. Vos choix restent identiques après un changement de langue. Le réglage par défaut suit le sens de réponse de la langue. Les gestes des discussions sont désactivés par défaut.</string>
+    <string name="gestures_messages">Messages du chat</string>
+    <string name="gestures_left">Balayer à gauche</string>
+    <string name="gestures_right">Balayer à droite</string>
+    <string name="gestures_default">Par défaut</string>
+    <string name="gestures_default_summary">Par défaut : %1$s</string>
+    <string name="gestures_off">Désactivé</string>
+    <string name="gestures_react">Réagir</string>
+    <string name="gestures_read_unread">Lu / non lu</string>
+    <string name="gestures_mute_unmute">Couper / activer le son</string>
+    <string name="gestures_pin_unpin">Épingler / désépingler</string>
 </resources>

@@ -2259,4 +2259,16 @@
     <string name="destination_filter_label">Filtrar conversas</string>
     <string name="forward_select_by_folder">Selecionar por pasta</string>
     <string name="destination_filter_incomplete">Algumas conversas podem estar em falta. Tente novamente ou escolha Todas as conversas.</string>
+    <string name="gestures_title">Ações de deslizar</string>
+    <string name="gestures_physical_hint">Esquerda e direita indicam o movimento do dedo. As escolhas explícitas permanecem iguais ao mudar de idioma. A opção padrão segue a direção de resposta do idioma. Os gestos nas conversas estão desativados por padrão.</string>
+    <string name="gestures_messages">Mensagens</string>
+    <string name="gestures_left">Deslizar à esquerda</string>
+    <string name="gestures_right">Deslizar à direita</string>
+    <string name="gestures_default">Padrão</string>
+    <string name="gestures_default_summary">Padrão: %1$s</string>
+    <string name="gestures_off">Desativado</string>
+    <string name="gestures_react">Reagir</string>
+    <string name="gestures_read_unread">Lida / não lida</string>
+    <string name="gestures_mute_unmute">Silenciar / ativar som</string>
+    <string name="gestures_pin_unpin">Fixar / desafixar</string>
 </resources>

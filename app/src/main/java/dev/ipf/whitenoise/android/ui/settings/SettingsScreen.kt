@@ -130,6 +130,13 @@ internal enum class SettingsHomeRow(
         "appearance",
         SettingsDetail.Appearance,
     ),
+    Gestures(
+        SettingsHomeSection.AppPreferences,
+        R.string.gestures_title,
+        R.drawable.ic_settings_front_hand,
+        "gestures",
+        SettingsDetail.Gestures,
+    ),
     ChatFolders(
         SettingsHomeSection.AppPreferences,
         R.string.chat_folders_title,
@@ -495,6 +502,7 @@ private fun SettingsDetailRoute(
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Gestures -> GestureSettingsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Help ->
             HelpScreen(

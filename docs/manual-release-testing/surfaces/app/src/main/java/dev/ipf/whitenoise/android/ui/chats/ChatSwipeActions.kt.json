@@ -1,0 +1,73 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BoxScope.ChatSwipeCue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "fun BoxScope.ChatSwipeCue(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "ChatSwipeActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "fun ChatSwipeActions(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_mark_read",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_mark_read",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_mark_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_mark_unread",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_mute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_mute",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_pin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_pin",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_unmute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_unmute",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_unpin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_unpin",
+        "test_ids": [
+          "SET-032"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

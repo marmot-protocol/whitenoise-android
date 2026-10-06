@@ -94,6 +94,7 @@ import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
+import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
@@ -1330,74 +1331,114 @@ internal fun ChatsScreen(
                         }
                     }
                 }
-                ChatListRow(
-                    item = item,
-                    appState = appState,
-                    accountRef = controller.boundAccountRef,
+                val swipeSettings = appState.swipePreferences.state
+                val swipeEnabled =
+                    chatListInteractionsEnabled &&
+                        !selectionMode &&
+                        dragAnchorChatId == null &&
+                        actionSheetChatId == null
+                ChatSwipeActions(
+                    owner = listOf(controller, rowId, menuAccount, menuRuntime, item.actions, item.projection),
+                    settings = swipeSettings,
+                    enabled = swipeEnabled,
+                    leftAllowed = chatSwipeAllowed(swipeSettings.chatLeft, item, appState.activeAccount?.accountIdHex),
+                    rightAllowed =
+                        chatSwipeAllowed(swipeSettings.chatRight, item, appState.activeAccount?.accountIdHex),
+                    hasUnread = item.effectiveHasUnread(appState.activeAccount?.accountIdHex),
                     isMuted = item.engineMuted(),
-                    interactionsEnabled = chatListInteractionsEnabled,
-                    selectionMode = selectionMode,
-                    selected = rowId in selectedChatIds,
-                    menuHighlighted = actionSheetChatId == rowId,
-                    onActionsHeldChange = { held ->
-                        if (held && menuActionsCurrent()) {
-                            heldMenuToken[0] = actionMenuOwner.open(held = true)
-                            heldMenuToken[1] = heldMenuToken[0]
-                            actionSheetChatId = rowId
-                        } else {
-                            actionMenuOwner.release(heldMenuToken[0])
-                            heldMenuToken[0] = null
+                    isPinned = item.pinned(),
+                    onCommit = { action ->
+                        val current = controller.chatItemForGroup(item.group.groupIdHex)
+                        val gestureCurrent =
+                            menuActionsCurrent() && !selectionMode && appState.swipePreferences.state == swipeSettings
+                        val targetVisible =
+                            rowId in visibleChatIds && current?.group?.groupIdHex !in leavingAndDeleting
+                        if (current != null && gestureCurrent && targetVisible) {
+                            if (!chatSwipeAllowed(action, current, appState.activeAccount?.accountIdHex)) {
+                                return@ChatSwipeActions
+                            }
+                            when (action) {
+                                SwipeAction.ReadUnread ->
+                                    markChatRead(
+                                        current,
+                                        unread = !current.effectiveHasUnread(appState.activeAccount?.accountIdHex),
+                                    )
+                                SwipeAction.MuteUnmute -> toggleChatMute(current, current.engineMuted())
+                                SwipeAction.PinUnpin -> toggleChatPin(current)
+                                else -> Unit
+                            }
                         }
                     },
-                    bodyMatch = bodyMatch,
-                    onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
-                    onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
-                    onOpenActions = {
-                        if (menuActionsCurrent()) {
-                            val continuingHold =
-                                actionMenuOwner.isCurrent(heldMenuToken[0]) &&
-                                    actionSheetChatId == rowId
-                            if (!continuingHold) actionMenuOwner.open(held = false)
-                            actionSheetChatId = rowId
-                        }
-                    },
-                    onDragSelectionStart = { pointerWindowY ->
-                        if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                            actionSheetChatId = null
-                            actionMenuOwner.dismiss(heldMenuToken[1])
-                            dragAnchorChatId = rowId
-                            dragPointerWindowY = pointerWindowY
-                        }
-                    },
-                    onDragSelection = { pointerWindowY ->
-                        if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                            dragPointerWindowY = pointerWindowY
-                            updateChatDragSelection(pointerWindowY)
-                        } else {
-                            false
-                        }
-                    },
-                    onDragSelectionEnd = {
-                        if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                            finishChatDrag(clearSelection = false)
-                        }
-                        heldMenuToken[1] = null
-                    },
-                    onDragSelectionCancel = {
-                        if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
-                            actionSheetChatId = null
-                            actionMenuOwner.dismiss(heldMenuToken[1])
-                            finishChatDrag(clearSelection = true)
-                        }
-                        heldMenuToken[1] = null
-                    },
-                    rangeDragActive = dragAnchorChatId == rowId,
-                    onToggleSelection = {
-                        val updated = toggleChatListSelection(selectedChatIds, rowId)
-                        selectedChatIds.clear()
-                        selectedChatIds.addAll(updated)
-                    },
-                )
+                ) {
+                    ChatListRow(
+                        item = item,
+                        appState = appState,
+                        accountRef = controller.boundAccountRef,
+                        isMuted = item.engineMuted(),
+                        interactionsEnabled = chatListInteractionsEnabled,
+                        selectionMode = selectionMode,
+                        selected = rowId in selectedChatIds,
+                        menuHighlighted = actionSheetChatId == rowId,
+                        onActionsHeldChange = { held ->
+                            if (held && menuActionsCurrent()) {
+                                heldMenuToken[0] = actionMenuOwner.open(held = true)
+                                heldMenuToken[1] = heldMenuToken[0]
+                                actionSheetChatId = rowId
+                            } else {
+                                actionMenuOwner.release(heldMenuToken[0])
+                                heldMenuToken[0] = null
+                            }
+                        },
+                        bodyMatch = bodyMatch,
+                        onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
+                        onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
+                        onOpenActions = {
+                            if (menuActionsCurrent()) {
+                                val continuingHold =
+                                    actionMenuOwner.isCurrent(heldMenuToken[0]) &&
+                                        actionSheetChatId == rowId
+                                if (!continuingHold) actionMenuOwner.open(held = false)
+                                actionSheetChatId = rowId
+                            }
+                        },
+                        onDragSelectionStart = { pointerWindowY ->
+                            if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
+                                actionSheetChatId = null
+                                actionMenuOwner.dismiss(heldMenuToken[1])
+                                dragAnchorChatId = rowId
+                                dragPointerWindowY = pointerWindowY
+                            }
+                        },
+                        onDragSelection = { pointerWindowY ->
+                            if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
+                                dragPointerWindowY = pointerWindowY
+                                updateChatDragSelection(pointerWindowY)
+                            } else {
+                                false
+                            }
+                        },
+                        onDragSelectionEnd = {
+                            if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
+                                finishChatDrag(clearSelection = false)
+                            }
+                            heldMenuToken[1] = null
+                        },
+                        onDragSelectionCancel = {
+                            if (menuActionsCurrent() && actionMenuOwner.isLatest(heldMenuToken[1])) {
+                                actionSheetChatId = null
+                                actionMenuOwner.dismiss(heldMenuToken[1])
+                                finishChatDrag(clearSelection = true)
+                            }
+                            heldMenuToken[1] = null
+                        },
+                        rangeDragActive = dragAnchorChatId == rowId,
+                        onToggleSelection = {
+                            val updated = toggleChatListSelection(selectedChatIds, rowId)
+                            selectedChatIds.clear()
+                            selectedChatIds.addAll(updated)
+                        },
+                    )
+                }
                 Box(Modifier.matchParentSize().padding(horizontal = 8.dp)) {
                     val hasUnread = item.effectiveHasUnread(appState.activeAccount?.accountIdHex)
                     val muted = item.engineMuted()
