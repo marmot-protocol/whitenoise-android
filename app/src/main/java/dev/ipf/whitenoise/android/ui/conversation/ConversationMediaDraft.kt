@@ -870,8 +870,7 @@ private fun restoredPhotosMissingFrom(
     return slots
         .filter { slot ->
             prepared[slot.id]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
-        }
-        .mapTo(mutableSetOf()) { it.id }
+        }.mapTo(mutableSetOf()) { it.id }
 }
 
 private fun restoredDocumentsMissingFrom(
@@ -882,8 +881,7 @@ private fun restoredDocumentsMissingFrom(
     return documents
         .filter { uri ->
             prepared[uri]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
-        }
-        .toSet()
+        }.toSet()
 }
 
 /** Retains one caption acceptance generation across preview recompositions and staged-media edits. */
