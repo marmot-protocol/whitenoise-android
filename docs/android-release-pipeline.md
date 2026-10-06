@@ -9,6 +9,13 @@ Product delivery and qualification remain tracked in
 GitHub/artifact work in #2126, Play in #2127, Zapstore in #2128, qualification in
 #2184, and final public receipts in #2387.
 
+Before distributing a release candidate, require a successful **Android
+Reproducible Release Verify** tag/manual run for that exact candidate SHA.
+An earlier nightly result or a source-only PR's intentionally deferred reproduction
+check is insufficient. Retain the run link and source SHA alongside the release
+manifest. This is an operator gate in addition to the automated signing and
+artifact checks below; it does not claim those workflows enforce it automatically.
+
 ## Distribution boundaries
 
 | Manual workflow | Effect | Approval boundary |

@@ -75,8 +75,8 @@ test('keeps a large gallery publishable while retaining every changed baseline n
   }))
   const section = renderSection(pr, files)
   assert.ok(section.length < 50_000)
-  assert.equal((section.match(/!\[After:/g) || []).length, 12)
-  assert.match(section, /Showing 12 of 500 changed baselines/)
+  assert.equal((section.match(/!\[After:/g) || []).length, 4)
+  assert.match(section, /Showing 4 of 500 changed baselines/)
   assert.match(section, /contributor\/fork\/tree\/head-sha\/app\/src\/test\/snapshots/)
   for (const file of files) {
     assert.ok(section.includes(`- ${file.filename.slice('app/src/test/snapshots/'.length)} (modified)`))
@@ -89,7 +89,7 @@ test('bounds the name list for thousands of long baseline paths', () => {
     status: 'modified',
   })))
   assert.ok(section.length < 50_000)
-  assert.match(section, /Showing 12 of 3000 changed baselines/)
+  assert.match(section, /Showing 4 of 3000 changed baselines/)
   assert.match(section, /Files changed tab for every baseline/)
   assert.match(section, /contributor\/fork\/tree\/head-sha\/app\/src\/test\/snapshots/)
 })
