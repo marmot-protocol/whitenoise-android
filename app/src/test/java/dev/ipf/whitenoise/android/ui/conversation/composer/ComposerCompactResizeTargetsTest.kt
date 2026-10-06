@@ -10,10 +10,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -51,15 +50,15 @@ class ComposerCompactResizeTargetsTest {
     val composeRule = createComposeRule()
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-    private lateinit var focusManager: FocusManager
+    private lateinit var composerEntryFocus: FocusRequester
 
     @Test
     fun downwardGroupEntryUsesToolsAndExplicitEditorFocusStillWorks() {
         render(onAction = {}, onResize = {}, onDelta = {})
         composeRule.onNodeWithTag("synthetic-transcript").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         composeRule.onNodeWithTag("synthetic-transcript").assertIsFocused()
-        // An onEnter redirect cancels the original search; assert the actual target, not its Boolean.
-        composeRule.runOnIdle { focusManager.moveFocus(FocusDirection.Down) }
+        // Enter the group with a direction rather than relying on a synthetic spatial-search rectangle.
+        composeRule.runOnIdle { composerEntryFocus.requestFocus(FocusDirection.Down) }
         composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker)).assertIsFocused()
         composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         composeRule.onNode(hasSetTextAction()).assertIsFocused()
@@ -114,13 +113,19 @@ class ComposerCompactResizeTargetsTest {
     ) {
         val draft = (1..40).joinToString("\n") { "Synthetic compact line $it" }
         composeRule.setContent {
-            focusManager = LocalFocusManager.current
+            composerEntryFocus = remember { FocusRequester() }
             WhiteNoiseTheme {
                 Surface(Modifier.width(360.dp).height(96.dp)) {
                     Column {
-                        Box(Modifier.fillMaxWidth().height(48.dp).focusable().testTag("synthetic-transcript"))
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .focusable()
+                                .testTag("synthetic-transcript"),
+                        )
                         ComposerPill(
-                            modifier = Modifier.height(48.dp),
+                            modifier = Modifier.height(48.dp).focusRequester(composerEntryFocus),
                             textFieldValue = TextFieldValue(draft, TextRange(draft.length)),
                             composerFocus = remember { FocusRequester() },
                             emojiPickerOpen = false,
@@ -145,6 +150,9 @@ class ComposerCompactResizeTargetsTest {
     }
 
     private fun scroll() =
-        composeRule.onNode(hasSetTextAction()).fetchSemanticsNode()
-            .config[SemanticsProperties.VerticalScrollAxisRange].value()
+        composeRule
+            .onNode(hasSetTextAction())
+            .fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange]
+            .value()
 }

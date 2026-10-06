@@ -27,7 +27,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The composer's resize affordance is visible when there is something to resize. */
+/** The composer's persistent resize affordance remains available across draft sizes. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ComposerResizeHandleTest {

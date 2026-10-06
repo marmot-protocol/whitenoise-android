@@ -147,7 +147,7 @@ class ComposerPrototypeGeometryTest {
         composeRule.runOnIdle { assertFalse("the one-shot collapse is released once applied", state.collapsedBySend) }
     }
 
-    /** Full width two line draft does not reserve the multiline resize header. */
+    /** Two-line drafts keep the persistent grip and fit their measured text above the tools. */
     @Test
     fun fullWidthTwoLineDraftDoesNotReserveTheMultilineResizeHeader() {
         render(ComposerTextState(TextFieldValue("This full width draft should use two lines and no resize handle.")))

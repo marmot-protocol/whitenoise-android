@@ -175,7 +175,7 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         composeRule.runOnUiThread { check(action.action()) }
     }
 
-    /** Re-entry restores the accessible surface and border drag target without a visible handle. */
+    /** Re-entry restores the accessible surface and persistent border drag target. */
     private fun awaitResizeHandleAfterReentry() {
         val description = context.getString(R.string.composer_resize)
         composeRule.waitUntil(timeoutMillis = 5_000) {
