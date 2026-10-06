@@ -2252,4 +2252,9 @@
     <string name="profile_notification_scope_detail">Bu hesaptaki tüm sohbetlerde bu kişinin mesajlarına uygulanır. Teslimat ve okunmamış mesaj sayısı değişmez.</string>
     <string name="profile_notification_precedence">Önce sohbeti sessize alma ve yalnızca bahsetmeler kuralları uygulanır. Ardından bu kişinin sessize alma veya özel Android ayarları gelir. Varsayılanları kullanmak sohbet ve genel ayarları geri getirir. Mevcut bildirimler özgün kanallarını korur.</string>
     <string name="profile_notification_channel_name">%1$s · Tüm sohbetlerdeki mesajlar</string>
+    <string name="destination_filter_all">Tüm sohbetler</string>
+    <string name="destination_filter_selected">Seçilenleri incele (%1$d)</string>
+    <string name="destination_filter_label">Sohbetleri filtrele</string>
+    <string name="forward_select_by_folder">Klasöre göre seç</string>
+    <string name="destination_filter_incomplete">Bazı sohbetler eksik olabilir. Tekrar deneyin veya Tüm sohbetler seçeneğini seçin.</string>
 </resources>

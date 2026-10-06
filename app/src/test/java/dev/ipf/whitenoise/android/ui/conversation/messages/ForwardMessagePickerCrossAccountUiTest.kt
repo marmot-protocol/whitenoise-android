@@ -4,13 +4,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -170,6 +173,18 @@ class ForwardMessagePickerCrossAccountUiTest {
     @Test
     fun chatSelectionsAreClearedByADestinationAccountChangeAndConfirmCarriesTheDestination() {
         val appState = twoAccountAppState()
+        appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
+        val folder =
+            requireNotNull(
+                appState.chatFolderPreferences.commitFolderDraft(
+                    ACCOUNT_REF,
+                    null,
+                    "Personal only",
+                    "",
+                    setOf(GROUP_UNDER_A),
+                    null,
+                ),
+            )
         val (factory, _) = accountBControllerFactory()
         val forwards = mutableListOf<Pair<String, List<String>>>()
         var lastState: Triple<String?, List<String>, Map<String, String>>? = null
@@ -192,9 +207,13 @@ class ForwardMessagePickerCrossAccountUiTest {
         assertEquals(listOf(GROUP_UNDER_A), lastState?.second)
         assertEquals(mapOf(GROUP_UNDER_A to "Person A"), lastState?.third)
 
+        val filterTag = "destination.filter.${folder.id}"
+        composeRule.onNodeWithTag("destination.filters").performScrollToNode(hasTestTag(filterTag))
+        composeRule.onNodeWithTag(filterTag).performClick().assertIsSelected()
         composeRule.onNodeWithTag(FORWARD_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG).performClick()
         composeRule.onNodeWithText(ACCOUNT_B_REF).performClick()
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("destination.filter.all").assertIsSelected()
         assertEquals(ACCOUNT_B_REF, lastState?.first)
         assertTrue(lastState!!.second.isEmpty())
 

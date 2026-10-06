@@ -2271,4 +2271,9 @@
     <string name="profile_notification_scope_detail">Gilt für Nachrichten dieser Person in allen Unterhaltungen dieses Kontos. Zustellung und Anzahl ungelesener Nachrichten bleiben unverändert.</string>
     <string name="profile_notification_precedence">Zuerst gelten die Chat-Regeln für Stummschaltung und Erwähnungen. Danach folgen Stummschaltung oder eigene Android-Einstellungen dieser Person. Standard stellt die Chat- und globalen Einstellungen wieder her. Bestehende Benachrichtigungen behalten ihren ursprünglichen Kanal.</string>
     <string name="profile_notification_channel_name">%1$s · Nachrichten in allen Chats</string>
+    <string name="destination_filter_all">Alle Chats</string>
+    <string name="destination_filter_selected">Auswahl prüfen (%1$d)</string>
+    <string name="destination_filter_label">Chats filtern</string>
+    <string name="forward_select_by_folder">Nach Ordner auswählen</string>
+    <string name="destination_filter_incomplete">Einige Chats fehlen möglicherweise. Erneut versuchen oder alle Chats wählen.</string>
 </resources>
