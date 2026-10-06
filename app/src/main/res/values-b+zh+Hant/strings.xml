@@ -2200,4 +2200,8 @@
     <string name="profile_readiness_added">已新增</string>
     <string name="profile_readiness_recommended">建議填寫</string>
     <string name="profile_readiness_field_optional">選填</string>
+    <string name="nostr_event_view_image">檢視圖片</string>
+    <string name="nostr_event_image_failed">無法載入此圖片，請再試一次。</string>
+    <string name="nostr_event_type_image">圖片</string>
+    <string name="nostr_event_expand">檢視完整事件</string>
 </resources>

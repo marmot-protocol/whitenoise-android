@@ -9,6 +9,128 @@
         "test_ids": ["CON-028"]
       },
       {
+        "surface": "NostrEventReaderContext",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "fun NostrEventReaderContext(",
+        "test_ids": [
+          "RDR-002",
+          "RDR-003",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_expand",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
+        "anchor": "R.string.nostr_event_expand",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_expand",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "R.string.nostr_event_expand",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_type_generic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
+        "anchor": "R.string.nostr_event_type_generic",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "R.string.nostr_event_open",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_read_note",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "R.string.nostr_event_read_note",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_play_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "R.string.nostr_event_play_video",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "NostrEventImagePane",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
+        "anchor": "fun NostrEventImagePane(",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "NostrFullscreenImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
+        "anchor": "fun NostrFullscreenImage(",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_type_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardFormatting.kt",
+        "anchor": "R.string.nostr_event_type_image",
+        "test_ids": [
+          "RDR-002"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_view_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
+        "anchor": "R.string.nostr_event_view_image",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_image_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
+        "anchor": "R.string.nostr_event_image_failed",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_type_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
+        "anchor": "R.string.nostr_event_type_image",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventImageViewer.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
         "surface": "Scoped local-delete batch retry after navigation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/LocalChatDeleteBatch.kt",
         "anchor": "internal fun WhiteNoiseAppState.localDeleteBatchRetryNotice(",

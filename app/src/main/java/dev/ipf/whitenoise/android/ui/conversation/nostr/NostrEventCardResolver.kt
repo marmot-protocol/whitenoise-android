@@ -52,6 +52,7 @@ internal data class NostrEventCardModel(
     val readerBody: String? = null,
     val mediaUrl: String? = null,
     val mediaMimeType: String? = null,
+    val imageUrls: List<String> = emptyList(),
     val authorMetadata: NostrEventAuthorMetadata? = null,
 )
 
