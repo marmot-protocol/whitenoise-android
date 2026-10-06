@@ -105,10 +105,11 @@ class SignUpProfileDraftSubmissionTest {
         }
     }
 
-    /** Submitting without a name publishes, and shows, a generated pseudonym instead of a nameless profile. */
+    /** A blank name publishes, shows, and on Retry reuses one generated pseudonym instead of a nameless profile. */
     @Test fun blankNameSubmitPublishesPseudonym() {
         var owner = SignUpOwner(1, null)
         val publications = mutableListOf<UserProfileMetadataFfi>()
+        val pseudonyms = ArrayDeque(listOf("Quiet Otter", "Brave Fox"))
         composeRule.setContent {
             val scope = rememberCoroutineScope()
             val controller =
@@ -127,18 +128,19 @@ class SignUpProfileDraftSubmissionTest {
                         upload = { _, _ -> error("No photo selected") },
                         publish = { _, value ->
                             publications += value
-                            true
+                            publications.size > 1
                         },
                         finish = { _, _ -> true },
                     )
                 }
-            WhiteNoiseTheme { SignUpScreen(controller, { true }, { "Quiet Otter" }, {}) }
+            WhiteNoiseTheme { SignUpScreen(controller, { true }, { pseudonyms.removeFirst() }, {}) }
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("   ")
         composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
+        composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
         composeRule.runOnIdle {
-            assertEquals("Quiet Otter", publications.single().name)
-            assertEquals("Quiet Otter", publications.single().displayName)
+            assertEquals(listOf("Quiet Otter", "Quiet Otter"), publications.map { it.name })
+            assertEquals(listOf("Quiet Otter", "Quiet Otter"), publications.map { it.displayName })
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
     }
