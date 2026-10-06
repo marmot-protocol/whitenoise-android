@@ -370,6 +370,49 @@ class FragmentTest(unittest.TestCase):
             self.assertEqual(checker.parse_revision_guide(base), ({"MSG-001"}, set()))
         self.assertIn("Send goodbye", fragments.load_guide(self.root))
 
+    def test_invalid_base_content_does_not_block_repair_or_lose_permanent_ids(self):
+        malformed = SECOND.replace("[ ]", "[x]").replace("**Expected:**", "Outcome:")
+        self.write(fragments.GUIDE_PATH, guide(FIRST.replace("1.", "9.", 1) + "\n" + malformed) + "Unknown reference `MSG-999`\n")
+        base = self.init_git()
+        self.write(fragments.GUIDE_PATH, guide(FIRST + "\n" + SECOND.replace("1.", "2.", 1)))
+        with (
+            mock.patch.object(checker, "ROOT", self.root),
+            mock.patch.object(checker, "GUIDE", self.root / fragments.GUIDE_PATH),
+            mock.patch.object(checker, "REQUIRED_HEADINGS", [*checker.REQUIRED_HEADINGS, "## A new current rule"]),
+        ):
+            self.assertEqual(checker.parse_revision_guide(base), ({"MSG-001", "MSG-002"}, set()))
+            errors = []
+            checker.validate_history(base, {"MSG-001", "MSG-002"}, set(), errors)
+            self.assertEqual(errors, [])
+            checker.validate_history(base, set(), set(), errors)
+            self.assertTrue(any("removed without retirement" in error for error in errors))
+
+    def test_history_preserves_fragment_ids_when_legacy_section_edits_break_assembly(self):
+        self.write(fragments.GUIDE_PATH, guide(FIRST + "\n### Other messages\n" + SECOND))
+        third = SECOND.replace("MSG-002", "MSG-003")
+        self.write(f"{fragments.CASE_DIR}/MSG-003.md", f"<!-- legacy-sha256: none -->\n\n{third}\n")
+        base = self.init_git()
+        with self.assertRaisesRegex(fragments.FragmentError, "prefix spans multiple sections"):
+            fragments.load_guide(self.root)
+        self.write(fragments.GUIDE_PATH, guide(FIRST + "\n" + SECOND.replace("1.", "2.", 1)))
+        self.assertIn("MSG-003", fragments.load_guide(self.root))
+        with (
+            mock.patch.object(checker, "ROOT", self.root),
+            mock.patch.object(checker, "GUIDE", self.root / fragments.GUIDE_PATH),
+        ):
+            errors = []
+            checker.validate_history(base, {"MSG-001", "MSG-002", "MSG-003"}, set(), errors)
+            self.assertEqual(errors, [])
+            checker.validate_history(base, {"MSG-001", "MSG-002"}, set(), errors)
+            self.assertTrue(any("MSG-003" in error and "removed without retirement" in error for error in errors))
+
+    def test_malformed_historical_fragment_still_fails_closed(self):
+        self.write(f"{fragments.CASE_DIR}/MSG-001.md", "invalid identity")
+        base = self.init_git()
+        with mock.patch.object(checker, "ROOT", self.root):
+            with self.assertRaises(fragments.FragmentError):
+                checker.parse_revision_guide(base)
+
     def test_historical_mapping_freshness_does_not_block_current_reconciliation(self):
         self.seed()
         self.init_git()

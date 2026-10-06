@@ -62,8 +62,11 @@ merge a stale hash, skip a cancelled validation run, or automatically union the
 two definitions. New fragments should make real coverage changes; this tooling
 change deliberately creates no no-op replacements for in-flight scenarios.
 Historical ID checks tolerate a stale legacy hash in the base revision so a PR
-can repair it. Current inputs still require reconciled hashes; malformed or
-unreadable history is an error.
+can repair it. They read every legacy and fragment definition independently of
+the base's formatting, references or section placement, preserving all prior
+IDs even when an unvalidated merge broke assembly. Current inputs still require
+valid structure and reconciled hashes; unreadable history or malformed fragment
+identities are errors.
 
 ## Validate the effective coverage
 
@@ -80,6 +83,9 @@ changed in the PR. Extracting unchanged inputs or editing unrelated fragments
 does not satisfy that requirement. The original shared-file route remains
 compatible. Deleting a fragment must still preserve coverage and retire any
 removed permanent ID.
+If only scenario wording changes and the source's mappings remain identical,
+use the legacy or mixed route; the fragment-only route requires an effective
+mapping change rather than a no-op extraction.
 
 Both case files and inventory files are validated on every PR. A daily drift
 check could provide an additional safeguard, but coverage must not wait until

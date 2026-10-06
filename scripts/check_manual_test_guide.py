@@ -13,11 +13,13 @@ try:
     from manual_test_fragments import (
         CASE_DIR, SURFACE_DIR, GUIDE_PATH, INVENTORY_PATH, ID_RE, DEFINITION_RE, FragmentError, definitions,
         extract_case, extract_source, load_guide, load_inventory, source_inventory, source_digest,
+        historical_definitions, read_tree,
     )
 except ModuleNotFoundError:
     from scripts.manual_test_fragments import (
         CASE_DIR, SURFACE_DIR, GUIDE_PATH, INVENTORY_PATH, ID_RE, DEFINITION_RE, FragmentError, definitions,
         extract_case, extract_source, load_guide, load_inventory, source_inventory, source_digest,
+        historical_definitions, read_tree,
     )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -589,11 +591,16 @@ def validate_inventory(active: set[str], errors: list[str]) -> None:
 
 
 def parse_revision_guide(revision: str) -> tuple[set[str], set[str]]:
-    # History preserves IDs, not old override freshness. A stale base hash must
-    # not block the PR that reconciles it. Current-tree assembly remains strict.
-    active, retired, errors = parse_guide(load_guide(ROOT, revision=revision, check_legacy_hash=False))
-    if errors:
-        raise FragmentError(f"invalid historical guide at {revision}: {errors[0]}")
+    # Preserve IDs without requiring the broken base to satisfy current rules.
+    # Unreadable history and malformed fragment identities still fail closed.
+    active = set(historical_definitions(ROOT, revision))
+    lines = read_tree(ROOT, revision, GUIDE_PATH).splitlines()
+    start, end = section_bounds(lines, "## Retired IDs")
+    retired = set()
+    if start >= 0:
+        for line in lines[start + 1:end]:
+            if match := re.match(r"^\|\s*([A-Z]{3,4}-\d{3})\s*\|", line):
+                retired.add(match[1])
     return active, retired
 
 
@@ -714,7 +721,7 @@ def validate_fragment_maintenance(base: str, changed: set[str], errors: list[str
         ):
             errors.append(finding(INVENTORY, 0, "maintenance", "fragment must change effective coverage for a changed production source"))
         if GUIDE_PATH not in changed:
-            old_cases = definitions(load_guide(ROOT, revision=base, check_legacy_hash=False))
+            old_cases = historical_definitions(ROOT, base)
             current_cases = definitions(load_guide(ROOT))
             if not any(
                 f"{CASE_DIR}/{test_id}.md" in changed and old_cases.get(test_id) != current_cases.get(test_id)

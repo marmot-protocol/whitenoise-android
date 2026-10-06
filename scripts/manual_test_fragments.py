@@ -17,6 +17,7 @@ DEFINITION_RE = re.compile(
     r"(?P<body>.+?) → \*\*Expected:\*\* (?P<expected>.+)$"
 )
 HEADER_RE = re.compile(r"<!-- legacy-sha256: ([0-9a-f]{64}|none) -->")
+HISTORICAL_DEFINITION_RE = re.compile(r"^\d+\.\s*\[[^]]*]\s*\*\*(?P<id>[A-Z]{3,4}-\d{3})\s+—")
 
 
 class FragmentError(ValueError):
@@ -147,6 +148,33 @@ def fragment_paths(root: Path, directory: str, revision: str | None = None) -> l
     return sorted(paths)
 
 
+def parse_case_fragment(path: str, fragment: str) -> tuple[str, str, str]:
+    """Read identities without imposing the current guide's section rules."""
+    test_id = Path(path).stem
+    lines = fragment.strip().splitlines()
+    if path != f"{CASE_DIR}/{test_id}.md" or not ID_RE.fullmatch(test_id):
+        raise FragmentError(f"{path}: expected a permanent-ID .md filename")
+    if len(lines) != 3 or lines[1] or not (header := HEADER_RE.fullmatch(lines[0])):
+        raise FragmentError(f"{path}: expected legacy hash, blank line and one unchecked scenario")
+    match = DEFINITION_RE.fullmatch(lines[2])
+    if not match or match["id"] != test_id or match[1] != "1":
+        raise FragmentError(f"{path}: expected exactly one matching unchecked scenario with ordinal 1")
+    return test_id, header[1], lines[2]
+
+
+def historical_definitions(root: Path, revision: str) -> dict[str, str]:
+    """Keep readable historical IDs even when a repair changes guide rules."""
+    text = read_tree(root, revision, GUIDE_PATH)
+    result = {
+        match["id"]: canonical_definition(line)
+        for line in text.splitlines() if (match := HISTORICAL_DEFINITION_RE.match(line))
+    }
+    for path in fragment_paths(root, CASE_DIR, revision):
+        test_id, _, line = parse_case_fragment(path, read_tree(root, revision, path))
+        result[test_id] = line
+    return result
+
+
 def assemble_guide(text: str, fragments: dict[str, str], *, check_legacy_hash: bool = True) -> str:
     legacy = definitions(text)
     prefix_sections = {}
@@ -158,23 +186,15 @@ def assemble_guide(text: str, fragments: dict[str, str], *, check_legacy_hash: b
             prefix_sections.setdefault(match["id"].split("-", 1)[0], set()).add(section)
     replacements = {}
     for path, fragment in sorted(fragments.items()):
-        test_id = Path(path).stem
-        lines = fragment.strip().splitlines()
-        if path != f"{CASE_DIR}/{test_id}.md" or not ID_RE.fullmatch(test_id):
-            raise FragmentError(f"{path}: expected a permanent-ID .md filename")
-        if len(lines) != 3 or lines[1] or not (header := HEADER_RE.fullmatch(lines[0])):
-            raise FragmentError(f"{path}: expected legacy hash, blank line and one unchecked scenario")
-        match = DEFINITION_RE.fullmatch(lines[2])
-        if not match or match["id"] != test_id or match[1] != "1":
-            raise FragmentError(f"{path}: expected exactly one matching unchecked scenario with ordinal 1")
+        test_id, hash_value, line = parse_case_fragment(path, fragment)
         expected = digest(legacy[test_id]) if test_id in legacy else "none"
-        if check_legacy_hash and header[1] != expected:
+        if check_legacy_hash and hash_value != expected:
             raise FragmentError(f"{path}: legacy definition changed; reconcile the fragment")
         if test_id in re.findall(r"^\| ([A-Z]{3,4}-\d{3}) \|", text, re.M):
             raise FragmentError(f"{path}: cannot override a retired ID")
         if test_id not in legacy and len(prefix_sections.get(test_id.split("-", 1)[0], set())) > 1:
             raise FragmentError(f"{path}: prefix spans multiple sections; add this new ID to the shared guide in its intended section")
-        replacements[test_id] = lines[2]
+        replacements[test_id] = line
 
     # Appended cases stay inside their existing registered checklist section.
     lines = text.splitlines()
