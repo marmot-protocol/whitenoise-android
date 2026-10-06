@@ -6,6 +6,8 @@ import android.animation.ValueAnimator
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.updateTransition
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Settings
@@ -26,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -67,11 +70,12 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentOpenChatSelectionMatches
-import dev.ipf.whitenoise.android.state.currentTtsConversationDestination
+import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.newAttachmentOpenNavigationGeneration
 import dev.ipf.whitenoise.android.state.nextNavAccountRef
-import dev.ipf.whitenoise.android.state.observeTtsConversationDestination
+import dev.ipf.whitenoise.android.state.observePlaybackConversationDestination
+import dev.ipf.whitenoise.android.state.observePlaybackTransportVisible
 import dev.ipf.whitenoise.android.state.reconcileProvisionalOpenChat
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.requestQuickAccountSwitchTo
@@ -534,14 +538,14 @@ internal fun MainShell(
     var pendingTtsAccountSwitchOwnership by remember {
         mutableStateOf<TtsDestinationAccountSwitchOwnership?>(null)
     }
-    val observedTtsDestination = appState.observeTtsConversationDestination()
+    val observedTtsDestination = appState.observePlaybackConversationDestination()
     var nextTtsDestinationRequestId by remember { mutableLongStateOf(0L) }
     val supersedePendingTtsDestinationNavigation: () -> Unit = {
         pendingTtsDestinationNavigation = null
         pendingTtsAccountSwitchOwnership = null
     }
     val requestTtsDestinationOpen: () -> Unit = {
-        val destination = appState.currentTtsConversationDestination()
+        val destination = appState.currentPlaybackConversationDestination()
         if (destination == null) {
             appState.present(R.string.tts_source_unavailable)
         } else {
@@ -1585,6 +1589,7 @@ internal fun MainShell(
     LaunchedEffect(
         pendingTtsDestinationNavigation,
         observedTtsDestination,
+        appState.runtimeGeneration,
         appState.activeAccountRef,
         appState.accounts,
         chatsController,
@@ -1596,7 +1601,13 @@ internal fun MainShell(
     ) {
         val request = pendingTtsDestinationNavigation ?: return@LaunchedEffect
         val currentDestination = observedTtsDestination
-        val allChats = chatsController.items + chatsController.archivedItems
+        val routingRuntime = appState.runtimeGeneration
+        val allChats =
+            if (chatsController.boundAccountRef == request.accountRef) {
+                chatsController.items + chatsController.archivedItems
+            } else {
+                emptyList()
+            }
         val chatListReady =
             chatsController.boundAccountRef == request.accountRef &&
                 !chatsController.isLoading
@@ -1604,7 +1615,7 @@ internal fun MainShell(
             resolveTtsDestinationNavigation(
                 request = request,
                 currentDestination = currentDestination,
-                knownAccountRefs = appState.accounts.mapTo(mutableSetOf()) { it.label },
+                knownAccountRefs = appState.accounts.filterNot { it.signedOut }.mapTo(mutableSetOf()) { it.label },
                 activeAccountRef = appState.activeAccountRef,
                 availableGroupIds = allChats.mapTo(mutableSetOf()) { it.group.groupIdHex },
             )
@@ -1625,7 +1636,8 @@ internal fun MainShell(
 
         fun openDestination(item: ChatListItem) {
             if (!pendingTtsDestinationNavigation.ownsCompletion(request.requestId)) return
-            val latest = appState.currentTtsConversationDestination()
+            if (appState.runtimeGeneration != routingRuntime || appState.activeAccountRef != request.accountRef) return
+            val latest = appState.currentPlaybackConversationDestination()
             val valid =
                 latest?.takeIf {
                     it.sessionId == request.sessionId &&
@@ -1635,15 +1647,18 @@ internal fun MainShell(
                     failUnavailable()
                     return
                 }
+            appState.clearPresentedProfile()
+            profileGroupForegroundState.close()
+            clearSharePickerRequest()
             sectionName = MainSection.Chats.name
             settingsDetailName = null
             supersedePendingGroupCreateOpen()
             chatListReturnHeadSnap = resetChatListReturnHeadSnap()
             selectedChatOpenContext =
                 ConversationOpenContext(
-                    focusMessageId = valid.passage.messageIdHex,
+                    focusMessageId = valid.messageIdHex,
                     focusMessageRequestId = request.requestId,
-                    ttsFocusSessionId = valid.sessionId,
+                    ttsFocusSessionId = valid.ttsFocusSessionId,
                 )
             selectedChatJustCreated = false
             selectedChatOpenedAsDmHint = false
@@ -1688,7 +1703,10 @@ internal fun MainShell(
                 allChats
                     .firstOrNull { it.group.groupIdHex.equals(step.groupIdHex, ignoreCase = true) }
                     ?.let(::openDestination)
-                    ?: chatsController.chatItemForGroup(step.groupIdHex)?.let(::openDestination)
+                    ?: chatsController
+                        .takeIf { it.boundAccountRef == request.accountRef }
+                        ?.chatItemForGroup(step.groupIdHex)
+                        ?.let(::openDestination)
                     ?: failUnavailable()
             }
 
@@ -2114,13 +2132,29 @@ internal fun MainShell(
         remember(appState) {
             appState.activeForwardOperation.map { it != null }.distinctUntilChanged()
         }.collectAsState(initial = false)
+    val playbackVisible = appState.observePlaybackTransportVisible()
+    val playbackInChatList = section == MainSection.Chats && selectedChat == null && pendingConversationOpen == null
+    val playbackInShell = playbackVisible && !playbackInChatList && !appState.appLockScreenVisible && navAccountStable
     MainShellNoticeLayout(
         notice = appState.transientNotice,
         dictationController = appState.conversationDictation,
         dictationComposerRoute = dictationComposerRoute,
         appLockScreenVisible = appState.appLockScreenVisible,
-        persistentTopContent = { ForwardOperationStatusHost(appState) },
-        persistentTopContentConsumesStatusBars = forwardOperationVisible,
+        persistentTopContent = {
+            ForwardOperationStatusHost(appState)
+            if (playbackInShell) {
+                Box(if (forwardOperationVisible) Modifier else Modifier.statusBarsPadding()) {
+                    dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar(
+                        appState,
+                        onBodyClick = requestTtsDestinationOpen,
+                    )
+                }
+            }
+        },
+        persistentTopContentConsumesStatusBars = forwardOperationVisible || playbackInShell,
+        playbackHost =
+            dev.ipf.whitenoise.android.ui.conversation
+                .ShellPlaybackHost(appState, requestTtsDestinationOpen),
     ) { dictationControlOwner ->
         if (!navAccountStable && !quickSwitchOwnsTargetFrame) {
             // Account invalidation is a privacy boundary, not an ordinary Back
@@ -2296,7 +2330,6 @@ internal fun MainShell(
                                     transitionRunning = routeTransition.isRunning,
                                 ),
                             restoredScrollSnapshot = conversationScrollSnapshots[scrollKey],
-                            onTtsTransportBodyClick = requestTtsDestinationOpen,
                             onSaveScrollSnapshot = { snapshot ->
                                 if (snapshot == null) {
                                     conversationScrollSnapshots.remove(scrollKey)
@@ -2377,6 +2410,7 @@ internal fun MainShell(
                                     selectedFolderId = selectedChatListFolderId,
                                     onSelectFolder = { selectedChatListFolderId = it },
                                     onTtsTransportBodyClick = requestTtsDestinationOpen,
+                                    showPlaybackTransport = playbackInChatList,
                                     onQuickSwitchAccount = { requestQuickAccountSwitch(it) },
                                     onQuickSwitchToAccount = { targetLabel ->
                                         appState.requestQuickAccountSwitchTo(

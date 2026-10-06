@@ -49,7 +49,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -67,6 +66,10 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.core.HostSafety
+import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Parses a verified event body and presents it without starting another event-resolution layer. */
@@ -86,7 +89,7 @@ internal fun NostrEventReaderDialog(
     val eventUri = authoredReference?.let(::nostrEventUri)
     val prepared = rememberNostrReaderPreparation(card, parseMarkdown)
     var playing by remember(card.eventIdHex) { mutableStateOf(false) }
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
@@ -320,7 +323,7 @@ internal fun NostrVideoPlayerDialog(
 ) {
     var playbackFailed by remember(mediaUrl) { mutableStateOf(false) }
     val player = rememberNostrVideoPlayer(mediaUrl, mediaMimeType) { playbackFailed = true }
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(

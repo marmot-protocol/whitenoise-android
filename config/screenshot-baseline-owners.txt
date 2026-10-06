@@ -123,9 +123,14 @@
 *.ChatRowPortGestureTest.unreadCueLight
 *.ChatRowPortGestureTest.unmuteCueDark
 *.ChatRowPortGestureTest.unpinCueLight
-
 *.ContactPictureEditorScreenTest.light
 *.ContactPictureEditorScreenTest.dark
 *.ContactPictureEditorScreenTest.amoled
 *.ContactPictureEditorScreenTest.largeRtl
 *.ContactPictureEditorScreenTest.noPrivatePicture
+
+*.VoiceTransportBarTest.light
+*.VoiceTransportBarTest.dark
+*.VoiceTransportBarTest.amoled
+*.VoiceTransportBarTest.largeRtl
+*.VoiceTransportBarTest.paused

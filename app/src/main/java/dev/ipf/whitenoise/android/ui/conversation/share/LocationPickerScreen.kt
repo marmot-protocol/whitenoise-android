@@ -42,12 +42,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapListener
@@ -76,7 +76,7 @@ internal fun LocationPickerScreen(
     onDismiss: () -> Unit,
     onPick: (SharedLocation) -> Unit,
 ) {
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(

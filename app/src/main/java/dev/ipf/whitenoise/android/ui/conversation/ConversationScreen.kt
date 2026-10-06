@@ -154,6 +154,7 @@ import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
+import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
@@ -612,7 +613,6 @@ internal fun ConversationScreen(
     // history (issue #1107). Null when none was saved or they left near-bottom.
     restoredScrollSnapshot: ConversationScrollSnapshot? = null,
     onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
-    onTtsTransportBodyClick: (() -> Unit)? = null,
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
@@ -2091,6 +2091,12 @@ internal fun ConversationScreen(
                                     voicePlaybackKey(nextMsg.record.messageIdHex, idx, ref.sourceEpoch),
                                     file,
                                     ownerKey = ownerKey,
+                                    source =
+                                        controller.voicePlaybackSource(
+                                            appState,
+                                            nextMsg.record.messageIdHex,
+                                            groupTitleCopy,
+                                        ) ?: return@launch,
                                 )
                         }
                     }
@@ -3486,7 +3492,6 @@ internal fun ConversationScreen(
                 openDetailsDescription = openDetailsDescription,
                 onOpenDetails = { showDetails = true },
                 onBack = exitConversation,
-                onTtsTransportBodyClick = onTtsTransportBodyClick,
                 compactHeight = compactHeightConversation,
             )
         },

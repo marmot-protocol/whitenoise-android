@@ -2,11 +2,14 @@ package dev.ipf.whitenoise.android.audio.tts
 
 /** Latest safe navigation target for one active conversation-backed TTS session. */
 internal data class TtsConversationDestination(
-    val accountRef: String,
-    val groupIdHex: String,
-    val sessionId: Long,
+    override val accountRef: String,
+    override val groupIdHex: String,
+    override val sessionId: Long,
     val passage: TtsPassage,
-)
+) : dev.ipf.whitenoise.android.audio.PlaybackConversationDestination {
+    override val messageIdHex: String get() = passage.messageIdHex
+    override val ttsFocusSessionId: Long get() = sessionId
+}
 
 /**
  * Joins independently updated owner and playback state only when they still

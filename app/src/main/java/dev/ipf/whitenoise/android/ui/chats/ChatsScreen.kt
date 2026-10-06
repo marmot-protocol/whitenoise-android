@@ -123,7 +123,7 @@ import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
-import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -191,6 +191,7 @@ internal fun ChatsScreen(
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
     onTtsTransportBodyClick: (() -> Unit)? = null,
+    showPlaybackTransport: Boolean = true,
     onGroupCreateSubmitted: () -> Long = { 0L },
     onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ ->
         onOpenGroup(item, null, false, null)
@@ -1730,10 +1731,12 @@ internal fun ChatsScreen(
             ChatListBodyFrame(
                 modifier = Modifier.fillMaxSize(),
                 ttsTransport = {
-                    TtsTransportBar(
-                        appState = appState,
-                        onBodyClick = onTtsTransportBodyClick,
-                    )
+                    if (showPlaybackTransport) {
+                        PlaybackTransportBar(
+                            appState = appState,
+                            onBodyClick = onTtsTransportBodyClick,
+                        )
+                    }
                 },
                 notice = {
                     historyNotices?.takeIf { showHistoryNotice }?.let { owner ->

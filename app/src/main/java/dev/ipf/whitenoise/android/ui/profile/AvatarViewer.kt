@@ -61,7 +61,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
@@ -83,6 +82,7 @@ import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
 import kotlinx.coroutines.Dispatchers
@@ -175,7 +175,7 @@ internal fun AvatarFullScreenViewer(
         if (imageState is AvatarViewerImageState.Failed) onDismiss()
     }
 
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(

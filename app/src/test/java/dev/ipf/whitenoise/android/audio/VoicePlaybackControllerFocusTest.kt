@@ -55,6 +55,58 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(1, mediaPlayer.startCount)
     }
 
+    /** Persistent controls resume the retained player and keep exact source ownership across pause. */
+    @Test fun shellPauseResumeRetainsPlayerAndSource() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        val source = VoicePlaybackSource("personal", "chat", "message", "Maya")
+        setPlaybackState(VoicePlaybackController.state.value.copy(source = source, sessionId = 42, ready = true))
+        assertTrue(VoicePlaybackController.setSessionPlaying(42, false))
+        assertFalse(player.playing)
+        assertTrue(VoicePlaybackController.setSessionPlaying(42, true))
+        assertEquals(1, player.startCount)
+        assertEquals(source, VoicePlaybackController.state.value.source)
+        assertEquals(player.positionMs, VoicePlaybackController.state.value.positionMs)
+    }
+
+    /** A stale rendered strip cannot pause, resume or stop its successor. */
+    @Test fun replacedShellSessionRejectsEveryOldControl() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 43, ready = true))
+        assertFalse(VoicePlaybackController.setSessionPlaying(42, false))
+        assertFalse(VoicePlaybackController.setSessionPlaying(42, true))
+        VoicePlaybackController.stopSession(42)
+        assertTrue(player.playing)
+        assertFalse(player.released)
+        VoicePlaybackController.stopSession(43)
+        assertTrue(player.released)
+        assertNull(VoicePlaybackController.state.value.source)
+    }
+
+    /** Equal attachment keys under another account must prepare new bytes instead of resuming the old player. */
+    @Test fun sameKeyDifferentAccountDoesNotResumeCapturedAudio() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        val source = VoicePlaybackSource("personal", "chat", "message", "Maya")
+        setPlaybackState(VoicePlaybackController.state.value.copy(source = source, sessionId = 42, ready = true))
+        val result =
+            runBlocking {
+                VoicePlaybackController.play(
+                    "voice-key",
+                    File("missing-voice-note.amr"),
+                    source = source.copy(accountRef = "work"),
+                )
+            }
+        assertEquals(VoicePlaybackController.PlaybackStartResult.PrepareFailed, result)
+        assertEquals(0, player.startCount)
+        assertTrue(player.released)
+        assertNull(VoicePlaybackController.state.value.source)
+    }
+
     @After
     fun tearDown() {
         VoicePlaybackController.stop()

@@ -57,7 +57,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
@@ -68,6 +67,7 @@ import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
 import dev.ipf.whitenoise.android.ui.conversation.messages.RenderedTextHit
 import dev.ipf.whitenoise.android.ui.conversation.messages.preparedHitFromRenderedHit
@@ -205,7 +205,7 @@ internal fun TextAttachmentReaderDialog(
         if (actions.isCurrent()) state = loaded
     }
 
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
@@ -240,7 +240,11 @@ internal fun TextAttachmentReaderDialog(
             onOpenExternal = { scope.launch { onOpenExternal() } },
             mentionDisplayName = appState::mentionDisplayName,
             onNostrProfileTap = appState::presentProfile,
-            transport = { TtsTransportBar(appState) },
+            transport = {
+                if (dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost.current == null) {
+                    TtsTransportBar(appState)
+                }
+            },
             playback = playback,
             onReadFromTop = { preview -> start(preview) },
         )

@@ -66,7 +66,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.EditorPoint
@@ -80,6 +79,7 @@ import dev.ipf.whitenoise.android.media.editor.PhotoEditorSourceInfo
 import dev.ipf.whitenoise.android.media.editor.PhotoStrokeMode
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import kotlin.math.hypot
 import kotlin.math.min
 
@@ -94,10 +94,11 @@ internal fun PhotoEditorDialog(
     frameIndex: Int = 0,
     frameCount: Int = 1,
 ) {
-    Dialog(
+    PlaybackDialog(
         // Back is handled by [PhotoEditorScreen] so a dirty recipe always goes
         // through the discard confirmation instead of bypassing it here.
         onDismissRequest = {},
+        onSourceDismiss = null,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
         PhotoEditorScreen(

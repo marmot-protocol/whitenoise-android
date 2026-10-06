@@ -107,6 +107,36 @@ class TtsDestinationNavigationTest {
         assertFalse(ownership.ownsAccountChange("account-c", "account-a", request))
     }
 
+    /** Voice return shares exact account/group validation while retaining its independent player token. */
+    @Test fun voiceDestinationUsesCurrentMessageAndRejectsReplacedPlayer() {
+        val source =
+            dev.ipf.whitenoise.android.audio
+                .VoicePlaybackSource("account-a", "group-a", "voice-message", "Maya")
+        val voice =
+            dev.ipf.whitenoise.android.audio
+                .VoiceConversationDestination(source, 7)
+        val voiceRequest = request.copy(sessionId = voice.sessionId)
+
+        fun route(
+            current: dev.ipf.whitenoise.android.audio.PlaybackConversationDestination?,
+            active: String,
+        ) = resolveTtsDestinationNavigation(
+            voiceRequest,
+            current,
+            setOf("account-a", "account-b"),
+            active,
+            setOf("group-a"),
+        )
+        assertEquals(TtsDestinationNavigationStep.SwitchAccount("account-a"), route(voice, "account-b"))
+        assertEquals(
+            TtsDestinationNavigationStep.OpenConversation("group-a", "voice-message", -7, request.requestId),
+            route(voice, "account-a"),
+        )
+        assertEquals(TtsDestinationNavigationStep.Cancelled, route(voice.copy(playerSessionId = 8), "account-a"))
+        assertEquals(TtsDestinationNavigationStep.Cancelled, route(destination.copy(sessionId = 7), "account-a"))
+        assertEquals(TtsDestinationNavigationStep.Cancelled, route(null, "account-a"))
+    }
+
     private fun resolve(
         current: TtsConversationDestination? = destination,
         knownAccounts: Set<String> = setOf("account-a"),

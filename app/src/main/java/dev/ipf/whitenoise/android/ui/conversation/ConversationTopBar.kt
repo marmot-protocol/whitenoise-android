@@ -84,7 +84,6 @@ internal fun ConversationTopBar(
     openDetailsDescription: String,
     onOpenDetails: () -> Unit,
     onBack: () -> Unit,
-    onTtsTransportBodyClick: (() -> Unit)? = null,
     // Compact-height windows (landscape with the IME open) trade top-bar
     // height back to the transcript and composer while keeping Back, the
     // conversation identity and the details action reachable.
@@ -342,10 +341,6 @@ internal fun ConversationTopBar(
                 )
             }
         }
-        TtsTransportBar(
-            appState = appState,
-            onBodyClick = onTtsTransportBodyClick,
-        )
     }
 }
 

@@ -64,6 +64,9 @@ object VoicePlaybackController {
         val positionMs: Int = 0,
         val durationMs: Int = 0,
         val speed: Float = 1f,
+        val source: VoicePlaybackSource? = null,
+        val sessionId: Long = 0L,
+        val ready: Boolean = false,
     )
 
     enum class PlaybackStartResult {
@@ -102,6 +105,7 @@ object VoicePlaybackController {
 
     private var player: MediaPlayer? = null
     private var currentKey: String? = null
+    private var nextSessionId = 0L
     private var currentOwnerKey: String? = null
     private var tickerJob: Job? = null
     private var currentSpeed: Float = 1f
@@ -222,13 +226,15 @@ object VoicePlaybackController {
         key: String,
         file: File,
         ownerKey: String? = null,
-    ): PlaybackStartResult = playSerializer.withSerializedPlayback { playLocked(key, file, ownerKey) }
+        source: VoicePlaybackSource? = null,
+    ): PlaybackStartResult = playSerializer.withSerializedPlayback { playLocked(key, file, ownerKey, source) }
 
     /** Prepares one player and publishes it only while this request remains newest. */
     private suspend fun playLocked(
         key: String,
         file: File,
         ownerKey: String?,
+        source: VoicePlaybackSource?,
     ): PlaybackStartResult {
         val playGeneration = nextPlaybackGeneration()
         // A user tap after transient loss must not wait forever for an OEM to
@@ -236,7 +242,7 @@ object VoicePlaybackController {
         // below performs a fresh arbitration and can still deny us cleanly.
         if (resumeOnAudioFocusGain) abandonFocus()
         clearAudioFocusInterruption(restoreVolume = true)
-        if (currentKey == key && player != null) {
+        if (currentKey == key && player != null && _state.value.source == source) {
             // User-paused playback abandons focus, so reacquire it before
             // resuming. A user retry after transient loss also arrives here
             // after dropping its retained request above.
@@ -257,7 +263,8 @@ object VoicePlaybackController {
             return PlaybackStartResult.Resumed
         }
         releasePlayerInternal()
-        _state.value = PlaybackState(key = key, isPlaying = false, speed = currentSpeed)
+        val sessionId = ++nextSessionId
+        _state.value = PlaybackState(key = key, speed = currentSpeed, source = source, sessionId = sessionId)
         val mp =
             withContext(Dispatchers.IO) {
                 runCatching {
@@ -353,6 +360,9 @@ object VoicePlaybackController {
                 positionMs = 0,
                 durationMs = reportedDurationMs,
                 speed = currentSpeed,
+                source = source,
+                sessionId = sessionId,
+                ready = true,
             )
         startTicker()
         return PlaybackStartResult.Started
@@ -478,6 +488,38 @@ object VoicePlaybackController {
         Log.w(TAG, message)
         releasePlayerInternal()
         _state.value = PlaybackState()
+    }
+
+    /** Shell controls act only on the exact player they displayed, without reopening its media file. */
+    fun setSessionPlaying(
+        sessionId: Long,
+        playing: Boolean,
+    ): Boolean {
+        val current = _state.value
+        val active = player
+        if (sessionId != current.sessionId || !current.ready || active == null) return false
+        return if (playing) {
+            resumeCurrentSession(active)
+        } else {
+            pause()
+            _state.value.ready
+        }
+    }
+
+    /** Resumes the retained player only after recovering audio focus. */
+    private fun resumeCurrentSession(active: MediaPlayer): Boolean {
+        nextPlaybackGeneration()
+        if (resumeOnAudioFocusGain) abandonFocus()
+        clearAudioFocusInterruption(restoreVolume = true)
+        if (!requestFocus() || !startCurrentPlayer(active)) return false
+        _state.value = _state.value.copy(isPlaying = true)
+        startTicker()
+        return true
+    }
+
+    /** A queued Stop for an old strip cannot stop a newer voice note. */
+    fun stopSession(sessionId: Long) {
+        if (_state.value.sessionId == sessionId) stop()
     }
 
     /** Pause the active player (no-op if nothing is active). */

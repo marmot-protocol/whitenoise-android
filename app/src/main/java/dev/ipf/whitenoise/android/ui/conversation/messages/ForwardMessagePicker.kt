@@ -56,7 +56,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.text.BidiFormatter
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -81,6 +80,7 @@ import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.share.ChatPickerSendingAccountRow
 import dev.ipf.whitenoise.android.ui.share.DestinationFilterIncomplete
 import dev.ipf.whitenoise.android.ui.share.DestinationFolderFilterState
@@ -136,7 +136,7 @@ internal fun ForwardMessagePickerFullScreen(
             onDismiss()
         }
     }
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = dismissPicker,
         properties =
             DialogProperties(
