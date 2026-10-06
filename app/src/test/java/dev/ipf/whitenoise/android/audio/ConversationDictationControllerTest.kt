@@ -334,7 +334,7 @@ class ConversationDictationControllerTest {
         }
 
     @Test
-    fun changedReplyIdentityPreventsPasteFromBecomingStandaloneText() {
+    fun changedReplyIdentityRecoversTextWithoutChangingReplyOrigin() {
         var replyAvailable = true
         val fixture =
             fixture(
@@ -352,8 +352,9 @@ class ConversationDictationControllerTest {
         fixture.controller.paste()
         fixture.platform.listener.onResult("must remain a reply")
 
-        assertEquals("Keep", fixture.drafts.getValue(key()).text)
-        assertEquals(0, fixture.writes)
+        assertEquals("Keep must remain a reply", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertEquals(REPLY_MESSAGE_ID, fixture.controller.state.target?.replyToMessageIdHex)
     }
 
     @Test
@@ -384,7 +385,7 @@ class ConversationDictationControllerTest {
     }
 
     @Test
-    fun nonReplyPasteDoesNotRetargetIntoAMountedReplyComposer() {
+    fun nonReplyPasteRecoversTextWithoutRetargetingItsSend() {
         var replyMatches = true
         val fixture =
             fixture(
@@ -397,8 +398,9 @@ class ConversationDictationControllerTest {
         fixture.controller.paste()
         fixture.platform.listener.onResult("must remain standalone")
 
-        assertEquals("Keep", fixture.drafts.getValue(key()).text)
-        assertEquals(0, fixture.writes)
+        assertEquals("Keep must remain standalone", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertEquals(null, fixture.controller.state.target?.replyToMessageIdHex)
     }
 
     @Test
@@ -6282,6 +6284,44 @@ class ConversationDictationControllerTest {
             val failed = f.controller.state as ConversationDictationState.Failed
             assertEquals(ConversationDictationFailure.DeliveryUnknown, failed.reason)
             assertEquals("recognized", failed.retainedTranscript)
+        }
+
+    /** Losing a reply blocks dispatch but cannot hide recognized text from the existing conversation. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun unavailableReplyRecoversTextWithoutAllowingSend() =
+        runTest {
+            var replyAvailable = true
+            var sends = 0
+            val f =
+                fixture(
+                    draft = TextFieldValue("Draft", TextRange(5)),
+                    targetReplyAvailable = { replyAvailable },
+                    targetValidator = { _, _ -> ConversationDictationTargetValidation.Available },
+                    targetValidationScope = this,
+                    sendTranscriptIfOriginUnchanged = {
+                        sends += 1
+                        true
+                    },
+                )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()), REPLY_MESSAGE_ID)
+            advanceUntilIdle()
+            f.controller.send()
+            replyAvailable = false
+            f.platform.listener.onResult("recognized")
+            advanceUntilIdle()
+            val failed = f.controller.state as ConversationDictationState.Failed
+            assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+            assertEquals(REPLY_MESSAGE_ID, failed.target.replyToMessageIdHex)
+            assertTrue(failed.draftRecovered)
+            assertEquals("Draft recognized", f.drafts.getValue(key()).text)
+            assertEquals(1, f.writes)
+            f.controller.onAppForegrounded()
+            f.controller.retry()
+            advanceUntilIdle()
+            assertEquals("Draft recognized", f.drafts.getValue(key()).text)
+            assertEquals(1, f.writes)
+            assertEquals(0, sends)
         }
 
     /** An authoritative removal rejects recovery even while the local origin still looks available. */

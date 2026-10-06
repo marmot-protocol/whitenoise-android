@@ -880,9 +880,14 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** A completed transcript treats a failed local check as indeterminate, never as permission to erase text. */
-    private fun completedTargetValidation(target: ConversationDictationTarget): ConversationDictationTargetValidation =
+    private fun completedTargetValidation(
+        target: ConversationDictationTarget,
+        includeReply: Boolean = true,
+    ): ConversationDictationTargetValidation =
         try {
-            if (targetAvailable(target)) {
+            val available =
+                if (includeReply) targetAvailable(target) else targetAvailable(target.accountRef, target.groupIdHex)
+            if (available) {
                 ConversationDictationTargetValidation.Available
             } else {
                 ConversationDictationTargetValidation.DefinitelyRemoved
@@ -3341,7 +3346,7 @@ internal class ConversationDictationController internal constructor(
         draftRecovery.updateDispatch(sessionId, target, restoredRevision = claim.restoredRevision)
         val failedTarget = if (hadRecovery) target else claim.recoveredTarget(target)
         if (!draftTargetRemoved &&
-            completedTargetValidation(target.copy(replyToMessageIdHex = null)) !=
+            completedTargetValidation(target, includeReply = false) !=
             ConversationDictationTargetValidation.DefinitelyRemoved
         ) {
             draftRecovery.recover(
@@ -3512,7 +3517,8 @@ internal class ConversationDictationController internal constructor(
             if (state.sessionId != sessionId || state !is ConversationDictationState.Processing) return@launch
             val localValidation = completedTargetValidation(target)
             if (validation == ConversationDictationTargetValidation.DefinitelyRemoved ||
-                localValidation == ConversationDictationTargetValidation.DefinitelyRemoved
+                completedTargetValidation(target, includeReply = false) ==
+                ConversationDictationTargetValidation.DefinitelyRemoved
             ) {
                 draftTargetRemoved = true
             }
@@ -3577,7 +3583,7 @@ internal class ConversationDictationController internal constructor(
     ): Boolean {
         if (transcript.isNullOrBlank() || draftTargetRemoved || state.sessionId != sessionId) return false
         val available =
-            completedTargetValidation(target.copy(replyToMessageIdHex = null)) !=
+            completedTargetValidation(target, includeReply = false) !=
                 ConversationDictationTargetValidation.DefinitelyRemoved
         val recovered =
             available &&
