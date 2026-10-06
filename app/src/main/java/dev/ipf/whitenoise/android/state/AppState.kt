@@ -3771,11 +3771,12 @@ class WhiteNoiseAppState private constructor(
             title = title,
             contact = peer,
             currentAvatar = {
-                val privateOverride = peer?.let { contactAvatarOverride(account, it) }
-                if (privateOverride?.first == true) {
-                    privateOverride.second
+                val available = accounts.any { it.label == account && !it.signedOut }
+                if (!available || appLockScreenVisible || isContactRefBeingCleared(account)) {
+                    null
                 } else {
-                    firstFrameGroupAvatarSeed(item, account, ::avatarUrl)?.image?.asAndroidBitmap()
+                    peer?.let { contactAvatarOverride(account, it).second }
+                        ?: firstFrameGroupAvatarSeed(item, account, ::avatarUrl)?.image?.asAndroidBitmap()
                 }
             },
         )

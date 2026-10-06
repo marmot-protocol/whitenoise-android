@@ -3,8 +3,17 @@ package dev.ipf.whitenoise.android.state
 import android.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.AvatarAvailabilityFfi
+import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.PresentationResolutionFfi
+import dev.ipf.marmotkit.PresentationSourceFfi
+import dev.ipf.marmotkit.PresentationTextFfi
+import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+import dev.ipf.whitenoise.android.notifications.setAppLockScreenVisibleForTest
 import dev.ipf.whitenoise.android.ui.share.group
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -99,6 +108,50 @@ class AppStateContactPictureTest {
             assertNull(groupPin.contact)
             assertNull(groupPin.currentAvatar?.invoke())
             assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
+            assertNull(captured.currentAvatar?.invoke())
+        }
+
+    /** Clearing a private choice uses cached native public pixels without reviving private or locked-account pixels. */
+    @Test fun clearedPrivatePinKeepsItsCurrentNativePublicFallback() =
+        runBlocking {
+            val app = app()
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", picture(Color.RED)) { true })
+            val asset =
+                AvatarAssetFfi(
+                    "peer",
+                    "public-picture",
+                    AvatarAvailabilityFfi.READY,
+                    AvatarAcquisitionStateFfi.IDLE,
+                    1uL,
+                    1_024uL,
+                )
+            val item =
+                ChatListItem(
+                    group("dm"),
+                    null,
+                    "contact",
+                    2,
+                    null,
+                    selectedAvatarAsset = asset,
+                    selectedPresentation =
+                        ConversationPresentationFfi(
+                            title = PresentationTextFfi.Literal("Peer"),
+                            avatar = SelectedAvatarFfi.RemoteImage("https://peer.example/avatar", "peer"),
+                            titleSource = PresentationSourceFfi.PEER_PROFILE,
+                            avatarSource = PresentationSourceFfi.PEER_PROFILE,
+                            peerId = "contact",
+                            resolution = PresentationResolutionFfi.CACHED,
+                        ),
+                )
+            val captured = app.pinnedConversationPresentation("a", item, "Local")
+            assertEquals(Color.RED, checkNotNull(captured.currentAvatar?.invoke()).getPixel(0, 0))
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
+            AvatarImageLoader.loadStored(checkNotNull(asset.cacheKey("a")), AvatarImageLoader.currentCacheLifetime()) {
+                contactPicturePng(Color.GREEN)
+            }
+            assertEquals(Color.GREEN, checkNotNull(captured.currentAvatar?.invoke()).getPixel(0, 0))
+            assertEquals("contact", captured.contact)
+            app.setAppLockScreenVisibleForTest(true)
             assertNull(captured.currentAvatar?.invoke())
         }
 
