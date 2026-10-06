@@ -16,6 +16,21 @@ import org.junit.Test
 
 class ReplyNavigationTest {
     @Test
+    fun readingStartUsesSignedOffsetsForShortAndOversizedReversedRows() {
+        assertEquals(-420, ReplyNavigation.readingStartScrollOffset(500, 80))
+        assertEquals(0, ReplyNavigation.readingStartScrollOffset(500, 500))
+        assertEquals(300, ReplyNavigation.readingStartScrollOffset(500, 800))
+        assertEquals(-300, ReplyNavigation.readingStartScrollOffset(380, 80))
+    }
+
+    @Test
+    fun readingStartDoesNotGuessWhenGeometryIsUnavailable() {
+        assertEquals(0, ReplyNavigation.readingStartScrollOffset(0, 800))
+        assertEquals(0, ReplyNavigation.readingStartScrollOffset(500, null))
+        assertEquals(0, ReplyNavigation.readingStartScrollOffset(500, 0))
+    }
+
+    @Test
     fun typedReplyPreviewIdWinsOverLegacyQuoteTag() {
         assertEquals(
             "typed-parent",

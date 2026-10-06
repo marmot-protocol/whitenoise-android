@@ -251,6 +251,12 @@
         ]
       },
       {
+        "surface": "Unread mention reading-start navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionNavigation.kt",
+        "anchor": "jumpToMentionReadingStart(",
+        "test_ids": ["CON-028"]
+      },
+      {
         "surface": "NostrEventReaderContext",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
         "anchor": "fun NostrEventReaderContext(",
@@ -14409,7 +14415,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
         "anchor": "R.string.conversation_jump_to_mention",
         "test_ids": [
-          "MED-008"
+          "CON-028"
         ]
       },
       {
