@@ -49,6 +49,15 @@ internal class PinnedShortcutTapGate(
         held = null
     }
 
+    /** Mirrors accepted inbound routing without discarding a pin for a harmless dataless launcher intent. */
+    fun supersedeForRoute(
+        hasTarget: Boolean,
+        hasShare: Boolean,
+        profileData: String?,
+    ) {
+        if (hasTarget || hasShare || profileData != null) supersede()
+    }
+
     /** Parses a pin tap under the decided lock state; a showing lock downgrades it to the app root. */
     fun target(
         context: Context,

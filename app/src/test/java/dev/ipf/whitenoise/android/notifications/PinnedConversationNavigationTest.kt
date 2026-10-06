@@ -69,9 +69,15 @@ class PinnedConversationNavigationTest {
         val first = PinnedConversationNavigation.intent(context, requireNotNull(tokens.issue("account-a", GROUP)))
         assertTrue(gate.hold(first))
         assertFalse(gate.hold(Intent(Intent.ACTION_MAIN)))
-        gate.supersede()
-        decision = PinnedShortcutLockDecision.OPEN
-        assertNull(gate.release())
+        gate.supersedeForRoute(false, false, null)
+        val routes = listOf(Triple(true, false, null), Triple(false, true, null), Triple(false, false, "whitenoise:peer"))
+        for ((target, share, data) in routes) {
+            decision = PinnedShortcutLockDecision.WAIT
+            assertTrue(gate.hold(first))
+            gate.supersedeForRoute(target, share, data)
+            decision = PinnedShortcutLockDecision.OPEN
+            assertNull(gate.release())
+        }
         decision = PinnedShortcutLockDecision.WAIT
         assertTrue(gate.hold(first))
         val newest = PinnedConversationNavigation.intent(context, requireNotNull(tokens.issue("account-b", GROUP)))

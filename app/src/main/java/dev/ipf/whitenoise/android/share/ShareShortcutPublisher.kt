@@ -234,36 +234,42 @@ class ShareShortcutPublisher(
         synchronized(UserEventNotificationGroup.mutationLock) {
             if (!isCurrent()) return@synchronized
             if (!PinnedConversationTokens.isPublicationCurrent(publicationGeneration)) return@synchronized
-            setDynamicShortcuts(
-                shortcuts.map { shortcut ->
-                    if (shortcutPreviewAllowed(context, shortcut)) {
-                        val item =
-                            chats.firstOrNull {
-                                conversationShortcutId(accountRef, it.group.groupIdHex) == shortcut.id
-                            }
-                        val peer =
-                            item?.let {
-                                dev.ipf.whitenoise.android.core.GroupProjector.avatarAccount(
-                                    it.group,
-                                    it.presentationOtherMemberAccount,
-                                    it.presentationMemberCount,
-                                )
-                            }
-                        val current = item?.let { avatarOverride(accountRef, it) }
-                        if (peer != null) stampPeerShortcut(shortcut, peer, item)
-                        if (peer != null && current?.first == true) {
-                            dev.ipf.whitenoise.android.notifications
-                                .withContactPictureIcon(context, shortcut, peer, current.second)
-                        } else {
-                            shortcut
-                        }
-                    } else {
-                        genericNotificationShortcut(context, shortcut)
-                    }
-                },
-            )
+            setDynamicShortcuts(currentPublicationShortcuts(accountRef, chats, shortcuts))
         }
     }
+
+    /** Resolves final privacy and private-contact pixels only inside the caller's publication lock. */
+    private fun currentPublicationShortcuts(
+        accountRef: String,
+        chats: List<ChatListItem>,
+        shortcuts: List<ShortcutInfoCompat>,
+    ): List<ShortcutInfoCompat> =
+        shortcuts.map { shortcut ->
+            if (shortcutPreviewAllowed(context, shortcut)) {
+                val item =
+                    chats.firstOrNull {
+                        conversationShortcutId(accountRef, it.group.groupIdHex) == shortcut.id
+                    }
+                val peer =
+                    item?.let {
+                        dev.ipf.whitenoise.android.core.GroupProjector.avatarAccount(
+                            it.group,
+                            it.presentationOtherMemberAccount,
+                            it.presentationMemberCount,
+                        )
+                    }
+                val current = item?.let { avatarOverride(accountRef, it) }
+                if (peer != null) stampPeerShortcut(shortcut, peer, item)
+                if (peer != null && current?.first == true) {
+                    dev.ipf.whitenoise.android.notifications
+                        .withContactPictureIcon(context, shortcut, peer, current.second)
+                } else {
+                    shortcut
+                }
+            } else {
+                genericNotificationShortcut(context, shortcut)
+            }
+        }
 
     /** Preserve contact ownership before the first override, without borrowing group-owned icons. */
     private fun stampPeerShortcut(

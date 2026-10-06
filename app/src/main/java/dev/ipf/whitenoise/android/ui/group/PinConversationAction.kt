@@ -87,7 +87,8 @@ internal fun PinConversationAction(
                             ConversationPinResult.UNAVAILABLE
                         } else {
                             val (capability, item) = request
-                            val presentation = appState.pinnedConversationPresentation(checkNotNull(account), item, latestTitle)
+                            val presentation =
+                                appState.pinnedConversationPresentation(checkNotNull(account), item, latestTitle)
                             withContext(Dispatchers.IO) {
                                 shortcuts.request(capability, presentation.title, null, presentation = presentation) {
                                     isActive && stillCurrent()

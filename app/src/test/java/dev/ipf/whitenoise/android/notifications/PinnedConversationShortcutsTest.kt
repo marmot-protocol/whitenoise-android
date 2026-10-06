@@ -330,7 +330,10 @@ class PinnedConversationShortcutsTest {
         platform.approve(platform.requests.single())
         assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
         val refreshed = platform.updates.single().single()
-        assertEquals(Color.MAGENTA, (refreshed.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
+        assertEquals(
+            Color.MAGENTA,
+            (refreshed.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0),
+        )
         assertTrue(owner.refresh(ACCOUNT, emptyMap()))
         val reconciled = mutableListOf<ShortcutInfoCompat>()
         refreshContactPictureShortcuts(
@@ -362,9 +365,11 @@ class PinnedConversationShortcutsTest {
         platform.afterInventoryRead = {
             platform.afterInventoryRead = null
             revision.incrementAndGet()
-            assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to PinnedConversationPresentation("Renamed"))) { revision.get() == 2L })
+            val newer = mapOf(GROUP to PinnedConversationPresentation("Renamed"))
+            assertTrue(owner.refresh(ACCOUNT, newer) { revision.get() == 2L })
         }
-        assertFalse(owner.refresh(ACCOUNT, mapOf(GROUP to PinnedConversationPresentation("Old avatar snapshot"))) { revision.get() == 1L })
+        val older = mapOf(GROUP to PinnedConversationPresentation("Old avatar snapshot"))
+        assertFalse(owner.refresh(ACCOUNT, older) { revision.get() == 1L })
         assertEquals("Renamed", platform.updates.single().single().longLabel)
     }
 

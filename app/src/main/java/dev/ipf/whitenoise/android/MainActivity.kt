@@ -416,11 +416,12 @@ class MainActivity : AppCompatActivity() {
             } else {
                 parseShareRequest(intent)
             }
+        val profileData = intent?.dataString.takeUnless { retainNotification }
         val routing =
             routeInboundIntent(
                 parsedTarget = parsedTarget,
                 shareRequest = parsedShare,
-                dataString = intent?.dataString.takeUnless { retainNotification },
+                dataString = profileData,
                 current =
                     InboundIntentRouting(
                         notificationTarget = inboundNotificationTarget,
@@ -429,11 +430,7 @@ class MainActivity : AppCompatActivity() {
                         notificationRequestId = inboundNotificationRequestId,
                     ),
             )
-        if (parsedTarget != null || parsedShare != null ||
-            (intent?.dataString != null && routing.profilePayload != null)
-        ) {
-            pinTapGate.supersede()
-        }
+        pinTapGate.supersedeForRoute(parsedTarget != null, parsedShare != null, profileData)
         if (parsedTarget != null) {
             foregroundConversationDismissal.onNotificationRouteObserved()
             NotificationRouteTrace.startRequest(routing.notificationRequestId)

@@ -3797,11 +3797,8 @@ class WhiteNoiseAppState private constructor(
             currentCoroutineContext().isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
         val ownsPublication =
             withContext(Dispatchers.IO) { PinnedConversationTokens.isPublicationCurrent(publicationGeneration) }
-        if (!hasPins || !ownsRuntime || !ownsPublication ||
-            pinnedShortcutPresentationRevision.get() != presentationRevision
-        ) {
-            return
-        }
+        if (!hasPins || !ownsRuntime || !ownsPublication) return
+        if (pinnedShortcutPresentationRevision.get() != presentationRevision) return
         val presentations =
             chats.associate { item ->
                 item.group.groupIdHex.lowercase(Locale.ROOT) to
