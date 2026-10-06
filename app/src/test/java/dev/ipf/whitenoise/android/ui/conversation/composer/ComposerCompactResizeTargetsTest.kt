@@ -13,6 +13,9 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -51,10 +54,15 @@ class ComposerCompactResizeTargetsTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private lateinit var composerEntryFocus: FocusRequester
+    private lateinit var inputModeManager: InputModeManager
 
     @Test
     fun downwardGroupEntryUsesToolsAndExplicitEditorFocusStillWorks() {
         render(onAction = {}, onResize = {}, onDelta = {})
+        // Material buttons use SystemDefined focusability and reject keyboard focus in Touch mode.
+        composeRule.runOnIdle { assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard)) }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertEquals(InputMode.Keyboard, inputModeManager.inputMode) }
         composeRule.onNodeWithTag("synthetic-transcript").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         composeRule.onNodeWithTag("synthetic-transcript").assertIsFocused()
         // Enter the group with a direction rather than relying on a synthetic spatial-search rectangle.
@@ -114,6 +122,7 @@ class ComposerCompactResizeTargetsTest {
         val draft = (1..40).joinToString("\n") { "Synthetic compact line $it" }
         composeRule.setContent {
             composerEntryFocus = remember { FocusRequester() }
+            inputModeManager = LocalInputModeManager.current
             WhiteNoiseTheme {
                 Surface(Modifier.width(360.dp).height(96.dp)) {
                     Column {
