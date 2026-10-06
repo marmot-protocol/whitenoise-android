@@ -3766,7 +3766,8 @@ class WhiteNoiseAppState private constructor(
         title: String,
     ): PinnedConversationPresentation {
         val peer =
-            GroupProjector.avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+            GroupProjector
+                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
                 ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
         return PinnedConversationPresentation(
             title = title,
