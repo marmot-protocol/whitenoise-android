@@ -27,6 +27,7 @@ class DestinationPickerCompletenessTest {
     fun offWindowParticipantFolderConvergesAfterRosterHydration() {
         val state = emptyAppState()
         val roster = CompletableDeferred<Unit>()
+        val updatedRoster = CompletableDeferred<Unit>()
         val reads = mutableListOf<Pair<String, String>>()
         state.liveSubscriptionOverrides.chatList =
             ChatListLiveSubscriptions(
@@ -43,14 +44,14 @@ class DestinationPickerCompletenessTest {
                         ACCOUNT_REF,
                         ACCOUNT_HEX,
                         emptyList(),
-                        emptyList(),
+                        listOf(group(GROUP_B)),
                         emptyList(),
                         emptyList(),
                     ),
                 memberSnapshotLoader = { account, group ->
                     reads += account to group
-                    roster.await()
-                    listOf(member(ACCOUNT_HEX, true), member(PEER_B, false))
+                    if (reads.size == 1) roster.await() else updatedRoster.await()
+                    listOf(member(ACCOUNT_HEX, true), member(if (reads.size == 1) PEER_B else PEER_A, false))
                 },
             )
         state.attachChatsController(controller)
@@ -111,6 +112,31 @@ class DestinationPickerCompletenessTest {
         composeRule.runOnIdle {
             assertEquals(listOf(ACCOUNT_REF to GROUP_B), reads)
             assertFalse(controller.containsGroup(GROUP_B))
+            // This follows the same fold/invalidation path as a live group update after hydration ended.
+            controller.applyLocalGroupUpdate(group(GROUP_B))
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idleFor(java.time.Duration.ofMillis(100))
+        }
+        composeRule.waitUntil(5_000) {
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
+            reads.size == 2 && !complete
+        }
+        composeRule.runOnIdle { updatedRoster.complete(Unit) }
+        composeRule.waitUntil(5_000) {
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
+            complete && matches.isEmpty()
+        }
+        composeRule.runOnIdle {
+            assertEquals(listOf(ACCOUNT_REF to GROUP_B, ACCOUNT_REF to GROUP_B), reads)
+            assertFalse(controller.containsGroup(GROUP_B))
+            val members = source!!.targets.single { it.group.groupIdHex == GROUP_B }.memberSnapshot!!
+            assertTrue(PEER_A in members.foldedMemberIds)
+            assertFalse(PEER_B in members.foldedMemberIds)
         }
     }
 

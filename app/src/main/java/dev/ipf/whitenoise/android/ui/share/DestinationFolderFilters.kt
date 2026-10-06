@@ -89,7 +89,9 @@ internal fun destinationFolderInputsComplete(
                 FolderTruth.UNKNOWN
         }
     }
-    return rule.includeMemberPubkeys.isEmpty() || unresolved.none { it.memberSnapshot == null }
+    val manualIds = appState.chatFolderPreferences.membershipFor(accountRef, folderId)
+    return rule.includeMemberPubkeys.isEmpty() ||
+        targets.none { it.memberSnapshot == null && it.group.groupIdHex !in manualIds }
 }
 
 /** A fixed All escape hatch plus bounded, scrollable filter pills; bulk-selection controls remain separate. */

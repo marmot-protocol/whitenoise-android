@@ -186,9 +186,10 @@ private fun rememberAccountWideForwardTargets(
         targets.value = AccountWidePickerTargets(loaded ?: targets.value.snapshot, loaded != null)
     }
     val revision = accountController?.memberSnapshotsRevision ?: appState.forwardTargetMembersRevision
+    val targetRevision = accountController?.forwardTargetsRevision ?: appState.forwardTargetsRevision
     val snapshot = targets.value.snapshot
     val missingMembers =
-        remember(snapshot, revision) {
+        remember(snapshot, revision, targetRevision) {
             snapshot
                 ?.items()
                 .orEmpty()
