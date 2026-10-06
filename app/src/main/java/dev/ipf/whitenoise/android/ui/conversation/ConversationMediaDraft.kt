@@ -450,16 +450,17 @@ internal class ConversationMediaDraftState(
             // The caller applies the result on the main thread without another suspension.
             if (!canPublish()) return@withLock null
             restoredDraftRevision = version
+            val restoredPhotos =
+                nativePhotosNeedingRestoration(reconciliation.mediaBySlotId, backedPhotos.keys, preparedPhotos)
             preparedPhotos =
                 preparedPhotos.filterKeys { it !in removedPhotos } +
-                    reconciliation.mediaBySlotId.mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
+                    restoredPhotos.mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
             preparedDocuments =
                 preparedDocuments.filterKeys { it !in removedDocuments } +
-                    reconciliation.documentsByUriString
-                        .mapKeys { (uri, _) -> Uri.parse(uri) }
+                    nativeDocumentsNeedingRestoration(reconciliation.documentsByUriString, preparedDocuments)
                         .mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
             nonEditableDescriptions = nonEditableDescriptions.filterKeys { it !in removedPhotos }
-            reconciliation.mediaBySlotId.forEach { (slotId, attachment) ->
+            restoredPhotos.forEach { (slotId, attachment) ->
                 if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
                     nonEditableDescriptions += slotId to messages.sourceUnavailable
                 }
@@ -836,6 +837,21 @@ private fun preparedPhotoQualities(
             hdDimensions = dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.High)),
         )
     }
+
+/** A native refresh cannot replace locally editable bytes or relabel freshly prepared picks. */
+internal fun nativePhotosNeedingRestoration(
+    nativeBySlot: Map<String, MessageDraftAttachmentFfi>,
+    backedSlotIds: Set<String>,
+    prepared: Map<String, DraftPreparedPhoto>,
+): Map<String, MessageDraftAttachmentFfi> =
+    nativeBySlot.filterKeys { it !in backedSlotIds && prepared[it]?.restoredFromNative != false }
+
+/** Documents prepared by this composer retain their local lifetime across native refreshes. */
+internal fun nativeDocumentsNeedingRestoration(
+    nativeByUri: Map<String, MessageDraftAttachmentFfi>,
+    prepared: Map<Uri, DraftPreparedPhoto>,
+): Map<Uri, MessageDraftAttachmentFfi> =
+    nativeByUri.mapKeys { (uri, _) -> Uri.parse(uri) }.filterKeys { prepared[it]?.restoredFromNative != false }
 
 private fun MessageDraftAttachmentFfi.asRestoredPhoto(): DraftPreparedPhoto =
     DraftPreparedPhoto(this, editorDigest(), restoredFromNative = true)

@@ -55,6 +55,26 @@ class ConversationImportedMediaSlotsTest {
         assertEquals(listOf(oldDocument, newDocument, privateDocument), merged.documentUris)
     }
 
+    /** Native consumption removes its old entries without moving a private source past a later pick. */
+    @Test
+    fun authoritativeRefreshPreservesMixedOrderAndCannotResurrectConsumedSources() {
+        val imported = PendingMediaSlot("private", Uri.parse("content://private-share/photo"))
+        val consumed = PendingMediaSlot("consumed", Uri.parse("content://native/consumed"))
+        val picked = PendingMediaSlot("picked", Uri.parse("content://picker/photo"))
+        val privateDocument = Uri.parse("content://private-share/document")
+        val consumedDocument = Uri.parse("content://native/consumed-document")
+        val pickedDocument = Uri.parse("content://picker/document")
+        val merged =
+            mergeReconciledComposerAttachments(
+                listOf(imported, consumed, picked),
+                listOf(privateDocument, consumedDocument, pickedDocument),
+                RestoredConversationAttachments(listOf(picked), listOf(pickedDocument)),
+                owns,
+            )
+        assertEquals(listOf(imported, picked), merged.mediaSlots)
+        assertEquals(listOf(privateDocument, pickedDocument), merged.documentUris)
+    }
+
     /** Restores mixed content with a media URI on the document shelf and preserves its existing edited slot. */
     @Test
     fun mixedShelfRefreshPreservesAnExistingEditedMediaOccurrence() {

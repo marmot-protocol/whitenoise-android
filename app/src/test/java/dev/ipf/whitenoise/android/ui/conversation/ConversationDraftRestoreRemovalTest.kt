@@ -20,6 +20,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
+import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
@@ -118,6 +119,36 @@ class ConversationDraftRestoreRemovalTest {
             }
         }
         captureReconciledShelf(finalShelf)
+    }
+
+    /** Native refresh must not shadow editable backing or relabel a freshly staged local source. */
+    @Test
+    fun cleanupProjectionKeepsFreshEditableAndPreparedSourcesLocallyOwned() {
+        val group = conversationTimelineTestGroup()
+        val editable =
+            nativeAttachment(stagedPhotoAttachmentId("account", group.groupIdHex, "editable"), "edited.png", "image/png")
+        val fresh =
+            nativeAttachment(stagedPhotoAttachmentId("account", group.groupIdHex, "fresh"), "fresh.png", "image/png")
+        val restored = nativeAttachment("restored", "old.png", "image/png")
+        val freshPrepared = DraftPreparedPhoto(fresh, "local-digest")
+        val nativePhotos =
+            nativePhotosNeedingRestoration(
+                mapOf("editable" to editable, "fresh" to fresh, "restored" to restored),
+                setOf("editable"),
+                mapOf("fresh" to freshPrepared, "restored" to DraftPreparedPhoto(restored, "old-digest", true)),
+            )
+        assertEquals(setOf("restored"), nativePhotos.keys)
+        assertTrue(!freshPrepared.restoredFromNative)
+
+        val freshUri = Uri.parse("content://picker/fresh-document")
+        val restoredUri = Uri.parse("content://picker/restored-document")
+        val document = nativeAttachment("document", "document.pdf", "application/pdf")
+        val nativeDocuments =
+            nativeDocumentsNeedingRestoration(
+                mapOf(freshUri.toString() to document, restoredUri.toString() to document),
+                mapOf(freshUri to DraftPreparedPhoto(document, "fresh-digest")),
+            )
+        assertEquals(setOf(restoredUri), nativeDocuments.keys)
     }
 
     /** Covers native-id and saved picker-id photos plus a saved picker document. */

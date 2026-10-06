@@ -3177,11 +3177,9 @@ internal fun ConversationScreen(
                     controller.boundAccountRef == capturedAccount
             } ?: return@LaunchedEffect
         val merged =
-            // Native reconciliation already includes fresh local picks. Preserve only the
-            // independently owned imported shelf here so consumed native slots stay removed.
-            mergeRestoredComposerAttachments(
-                pendingMediaSlots.filter { importedShareFiles.owns(it.uri) },
-                pendingDocumentUris.filter(importedShareFiles::owns),
+            mergeReconciledComposerAttachments(
+                pendingMediaSlots,
+                pendingDocumentUris,
                 restored,
                 importedShareFiles::owns,
             )
