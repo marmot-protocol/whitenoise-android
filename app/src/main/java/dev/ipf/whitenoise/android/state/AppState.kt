@@ -1536,6 +1536,8 @@ class WhiteNoiseAppState private constructor(
     // Manual speech deliberately has no auto-read session key, but it still
     // owns decrypted text that must stop when its account is removed.
     private var ttsSpeechAccountRef: String? = null
+    internal val attachmentSpeechDestination =
+        MutableStateFlow<dev.ipf.whitenoise.android.audio.AttachmentSpeechDestination?>(null)
 
     /** Reader controls may only address speech owned by the current local account. */
     internal fun ownsCurrentAccountSpeech(): Boolean = ttsSpeechAccountRef?.let { it == activeAccountRef } == true
@@ -1563,6 +1565,7 @@ class WhiteNoiseAppState private constructor(
             ttsSpeechAccountRef = activeAccountRef
             ttsAutoReadSessionKey = null
             ttsHistorySession.onSessionCleared()
+            attachmentSpeechDestination.value = null
             // The session now exists, so the mediaPlayback service must too:
             // it mirrors the controller, keeps playback alive across app
             // switches, and stops itself when the controller goes terminal.
@@ -1596,6 +1599,7 @@ class WhiteNoiseAppState private constructor(
      * Prepares reader text off the controller lock, preserving caller/account ownership through playback commit.
      * Account-switch generation prevents an A-B-A return from reviving old work. Cleanup is session-scoped so
      * a revoked or cancelled request cannot clear a replacement queue's ownership.
+     * Accepting a new queue also revokes prior history/attachment source ownership.
      */
     suspend fun speakAloudPrepared(
         entries: List<TtsSpeakableEntry>,
@@ -1641,6 +1645,7 @@ class WhiteNoiseAppState private constructor(
                     ttsSpeechAccountRef = null
                     ttsAutoReadSessionKey = null
                     ttsHistorySession.onSessionCleared()
+                    attachmentSpeechDestination.value = null
                 }
             }
         }
@@ -1760,12 +1765,14 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Stops an owned conversation auto-read queue and revokes its account/history navigation ownership. */
     internal fun stopOwnedTtsAutoReadSession() {
         if (ttsAutoReadSessionKey == null) return
         ttsController.stop()
         ttsSpeechAccountRef = null
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
+        attachmentSpeechDestination.value = null
     }
 
     /** Account removal ends any owned speech so its decrypted text stops being spoken. */
@@ -1776,6 +1783,7 @@ class WhiteNoiseAppState private constructor(
         ttsSpeechAccountRef = null
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
+        attachmentSpeechDestination.value = null
     }
 
     /** Live continuation for auto-read: extends an active read-aloud queue. */
@@ -1790,11 +1798,13 @@ class WhiteNoiseAppState private constructor(
         return ttsController.appendSpeech(entry, locale)
     }
 
+    /** Stops the active speech queue and immediately revokes every transient source-navigation credential. */
     fun stopSpeaking() {
         ttsController.stop()
         ttsSpeechAccountRef = null
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
+        attachmentSpeechDestination.value = null
     }
 
     fun setTtsRateOverride(rate: Float?) {

@@ -154,6 +154,7 @@ import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
+import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactPickerScreen
@@ -612,9 +613,9 @@ internal fun ConversationScreen(
     // history (issue #1107). Null when none was saved or they left near-bottom.
     restoredScrollSnapshot: ConversationScrollSnapshot? = null,
     onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
-    onTtsTransportBodyClick: (() -> Unit)? = null,
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
+    playbackTransport: @Composable () -> Unit = {},
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
 ) {
     androidx.compose.runtime.LaunchedEffect(
@@ -2091,6 +2092,12 @@ internal fun ConversationScreen(
                                     voicePlaybackKey(nextMsg.record.messageIdHex, idx, ref.sourceEpoch),
                                     file,
                                     ownerKey = ownerKey,
+                                    source =
+                                        controller.voicePlaybackSource(
+                                            appState,
+                                            nextMsg.record.messageIdHex,
+                                            groupTitleCopy,
+                                        ) ?: return@launch,
                                 )
                         }
                     }
@@ -3445,49 +3452,53 @@ internal fun ConversationScreen(
         // as one cluster (#895, #1109).
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
-            ConversationTopBar(
-                selectionMode = selectionMode,
-                selectedCount = batchSelectionUi.actionItems.size,
-                onCloseSelection = {
-                    if (!batchDeleteInFlight) {
-                        batchDeleteRetryState = null
-                        selectedMessages.clear()
-                    }
+            ConversationHeaderFrame(
+                header = {
+                    ConversationTopBar(
+                        selectionMode = selectionMode,
+                        selectedCount = batchSelectionUi.actionItems.size,
+                        onCloseSelection = {
+                            if (!batchDeleteInFlight) {
+                                batchDeleteRetryState = null
+                                selectedMessages.clear()
+                            }
+                        },
+                        searchOpen = navigationState.searchOpen,
+                        searchQuery = navigationState.searchQuery,
+                        onSearchQueryChange = {
+                            navigationState.searchJob?.cancel()
+                            navigationState.searchJob = null
+                            navigationState.navigateReplyJob?.cancel()
+                            navigationState.targetNavigation.cancel()
+                            navigationState.targetHighlight.clear()
+                            navigationState.searchQuery = it
+                            navigationState.searchPinnedMatchId = null
+                        },
+                        onClearSearch = {
+                            navigationState.searchJob?.cancel()
+                            navigationState.searchJob = null
+                            navigationState.navigateReplyJob?.cancel()
+                            navigationState.targetNavigation.cancel()
+                            navigationState.targetHighlight.clear()
+                            navigationState.searchQuery = ""
+                            navigationState.searchPinnedMatchId = null
+                        },
+                        onCloseSearch = ::closeSearch,
+                        onSearchAction = { navigateToSearchMatch(forward = true) },
+                        searchFocusRequester = navigationState.searchFocusRequester,
+                        appState = appState,
+                        controller = controller,
+                        groupTitleCopy = groupTitleCopy,
+                        openedAsDmHint = openedAsDmHint,
+                        firstFrameAvatar = chat.firstFrameAvatar,
+                        freezeRoutePresentation = freezeRoutePresentation,
+                        openDetailsDescription = openDetailsDescription,
+                        onOpenDetails = { showDetails = true },
+                        onBack = exitConversation,
+                        compactHeight = compactHeightConversation,
+                    )
                 },
-                searchOpen = navigationState.searchOpen,
-                searchQuery = navigationState.searchQuery,
-                onSearchQueryChange = {
-                    navigationState.searchJob?.cancel()
-                    navigationState.searchJob = null
-                    navigationState.navigateReplyJob?.cancel()
-                    navigationState.targetNavigation.cancel()
-                    navigationState.targetHighlight.clear()
-                    navigationState.searchQuery = it
-                    navigationState.searchPinnedMatchId = null
-                },
-                onClearSearch = {
-                    navigationState.searchJob?.cancel()
-                    navigationState.searchJob = null
-                    navigationState.navigateReplyJob?.cancel()
-                    navigationState.targetNavigation.cancel()
-                    navigationState.targetHighlight.clear()
-                    navigationState.searchQuery = ""
-                    navigationState.searchPinnedMatchId = null
-                },
-                onCloseSearch = ::closeSearch,
-                onSearchAction = { navigateToSearchMatch(forward = true) },
-                searchFocusRequester = navigationState.searchFocusRequester,
-                appState = appState,
-                controller = controller,
-                groupTitleCopy = groupTitleCopy,
-                openedAsDmHint = openedAsDmHint,
-                firstFrameAvatar = chat.firstFrameAvatar,
-                freezeRoutePresentation = freezeRoutePresentation,
-                openDetailsDescription = openDetailsDescription,
-                onOpenDetails = { showDetails = true },
-                onBack = exitConversation,
-                onTtsTransportBodyClick = onTtsTransportBodyClick,
-                compactHeight = compactHeightConversation,
+                playbackTransport = playbackTransport,
             )
         },
         bottomBar = {
@@ -3855,9 +3866,13 @@ internal fun ConversationScreen(
                         ConversationInitialLoadingOverlay(
                             visible = true,
                             graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
+                            routeTransitionInProgress = routeTransitionInProgress,
                         )
                     renderedTimeline.isEmpty() && controller.isLoading ->
-                        ConversationInitialLoadingOverlay(visible = true)
+                        ConversationInitialLoadingOverlay(
+                            visible = true,
+                            routeTransitionInProgress = routeTransitionInProgress,
+                        )
                     renderedTimeline.isEmpty() &&
                         (
                             controller.groupRecoveryReadFailed ||
@@ -4182,6 +4197,7 @@ internal fun ConversationScreen(
                                         !transcriptPresentationNeedsRetry &&
                                         !seededTailAlignmentRecoveryVisible,
                                 graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
+                                routeTransitionInProgress = routeTransitionInProgress,
                             )
                             ConversationSeededTailAlignmentRecovery(
                                 visible = seededTailAlignmentRecoveryVisible,

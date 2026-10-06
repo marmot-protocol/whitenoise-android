@@ -76,7 +76,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -125,6 +124,7 @@ import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
@@ -960,7 +960,11 @@ internal fun ProfileSheet(
         )
     }
 
-    Dialog(
+    PlaybackDialog(
+        onSourceDismiss =
+            ({ owner.leave { currentDismiss() } }).takeUnless {
+                creatingChat || addingToGroups || promotingAdmin
+            },
         onDismissRequest = {
             if (!creatingChat && !addingToGroups && !promotingAdmin) owner.leave { currentDismiss() }
         },

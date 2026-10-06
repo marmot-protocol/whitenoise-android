@@ -32,13 +32,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.os.ConfigurationCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EditVersion
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import java.time.DateTimeException
@@ -73,7 +73,7 @@ internal fun EditHistoryDialog(
         remember(original, originalTimestamp, versions, editState.count) {
             editHistoryRows(original, originalTimestamp, versions, editState.count)
         }
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {

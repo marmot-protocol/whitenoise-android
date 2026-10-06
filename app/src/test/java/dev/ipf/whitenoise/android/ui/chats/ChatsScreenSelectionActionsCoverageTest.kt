@@ -202,6 +202,10 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /**
+     * Folder editing preserves the chat-list state and returns before the list Scaffold, including its playback
+     * wrapper.
+     */
     @Test
     fun folderEditorHandoffPreservesChatListState() {
         val source = chatsScreenSource().readText()
@@ -209,7 +213,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         val handoff =
             source.requiredSection(
                 start = "// Folder editor handoff:",
-                end = "\n    Scaffold(",
+                end = "\n\n    // Consent belongs to the unobstructed Chats list",
             )
 
         assertTrue("folder editor handoff must exist", handoffStart >= 0)
@@ -248,7 +252,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "the editor call must be followed by an unconditional return before the scaffold",
-            "ChatFolderEditScreen(" in handoff && "        )\n        return\n    }" in handoff,
+            "ChatFolderEditScreen(" in handoff &&
+                Regex("""\n\s*return\s*\n\s*}\s*$""").containsMatchIn(handoff),
         )
     }
 

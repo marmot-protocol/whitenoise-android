@@ -78,6 +78,7 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
@@ -756,6 +757,9 @@ private fun VoiceLibraryRow(
     appState: WhiteNoiseAppState,
     onJumpToMessage: (String) -> Unit,
 ) {
+    val playbackTitleCopy =
+        dev.ipf.whitenoise.android.ui.common
+            .rememberGroupTitleCopy()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pillKey =
@@ -823,7 +827,13 @@ private fun VoiceLibraryRow(
                                 }.also { loading = false }
                                     .getOrNull() ?: return@launch
                             localFile = file
-                            VoicePlaybackController.play(pillKey, file)
+                            val source =
+                                controller.voicePlaybackSource(
+                                    appState,
+                                    row.messageIdHex,
+                                    playbackTitleCopy,
+                                ) ?: return@launch
+                            VoicePlaybackController.play(pillKey, file, source = source)
                         }
                     },
         ) {

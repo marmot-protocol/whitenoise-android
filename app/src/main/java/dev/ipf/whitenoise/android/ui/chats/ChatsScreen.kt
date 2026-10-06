@@ -123,7 +123,7 @@ import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
-import dev.ipf.whitenoise.android.ui.conversation.TtsTransportBar
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -191,6 +191,7 @@ internal fun ChatsScreen(
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
     onTtsTransportBodyClick: (() -> Unit)? = null,
+    showPlaybackTransport: Boolean = true,
     onGroupCreateSubmitted: () -> Long = { 0L },
     onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ ->
         onOpenGroup(item, null, false, null)
@@ -1235,22 +1236,30 @@ internal fun ChatsScreen(
     }
 
     if (showNewChatFlow) {
-        NewChatFlowHost(
-            appState = appState,
-            onOpenConversation = { item, justCreated ->
-                showNewChatFlow = false
-                openGroupFromVisibleList(item, null, justCreated)
-            },
-            onClose = {
+        dev.ipf.whitenoise.android.ui.conversation.PlaybackFlowContent(
+            enabled = showPlaybackTransport,
+            onSourceLeave = {
                 showNewChatFlow = false
                 onGroupCreateFlowSuperseded()
             },
-            onGroupCreateSubmitted = onGroupCreateSubmitted,
-            onGroupCreateCompletedOpen = { item, requestToken ->
-                showNewChatFlow = false
-                onGroupCreateCompletedOpen(item, requestToken)
-            },
-        )
+        ) {
+            NewChatFlowHost(
+                appState = appState,
+                onOpenConversation = { item, justCreated ->
+                    showNewChatFlow = false
+                    openGroupFromVisibleList(item, null, justCreated)
+                },
+                onClose = {
+                    showNewChatFlow = false
+                    onGroupCreateFlowSuperseded()
+                },
+                onGroupCreateSubmitted = onGroupCreateSubmitted,
+                onGroupCreateCompletedOpen = { item, requestToken ->
+                    showNewChatFlow = false
+                    onGroupCreateCompletedOpen(item, requestToken)
+                },
+            )
+        }
         return
     }
 
@@ -1259,23 +1268,36 @@ internal fun ChatsScreen(
     // new-chat flow so filter/search/list state survives close/save.
     val folderManagerAvailable = folderManagerAccount != null && !appState.signOutInProgress && !appState.wipeInProgress
     if (folderManagerOpen && folderManagerAvailable) {
-        ChatFoldersScreen(appState, onBack = { folderManagerOpen = false })
+        dev.ipf.whitenoise.android.ui.conversation.PlaybackFlowContent(
+            enabled = showPlaybackTransport,
+            onSourceLeave = { folderManagerOpen = false },
+        ) {
+            ChatFoldersScreen(appState, onBack = { folderManagerOpen = false })
+        }
         return
     }
     val folderEditorTargets = folderHandoff.editorChatIds
     val folderEditorAccountRef = appState.activeAccountRef
     val folderEditId = folderHandoff.editingFolderId
     if (folderEditorAccountRef != null && (folderEditorTargets != null || folderEditId != null)) {
-        ChatFolderEditScreen(
-            appState = appState,
-            accountRef = folderEditorAccountRef,
-            folderId = folderEditId,
-            onClose = {
+        dev.ipf.whitenoise.android.ui.conversation.PlaybackFlowContent(
+            enabled = showPlaybackTransport,
+            onSourceLeave = {
                 folderHandoff.editorChatIds = null
                 folderHandoff.editingFolderId = null
             },
-            initialManualChatIds = folderEditorTargets.orEmpty(),
-        )
+        ) {
+            ChatFolderEditScreen(
+                appState = appState,
+                accountRef = folderEditorAccountRef,
+                folderId = folderEditId,
+                onClose = {
+                    folderHandoff.editorChatIds = null
+                    folderHandoff.editingFolderId = null
+                },
+                initialManualChatIds = folderEditorTargets.orEmpty(),
+            )
+        }
         return
     }
 
@@ -1730,10 +1752,12 @@ internal fun ChatsScreen(
             ChatListBodyFrame(
                 modifier = Modifier.fillMaxSize(),
                 ttsTransport = {
-                    TtsTransportBar(
-                        appState = appState,
-                        onBodyClick = onTtsTransportBodyClick,
-                    )
+                    if (showPlaybackTransport) {
+                        PlaybackTransportBar(
+                            appState = appState,
+                            onBodyClick = onTtsTransportBodyClick,
+                        )
+                    }
                 },
                 notice = {
                     historyNotices?.takeIf { showHistoryNotice }?.let { owner ->

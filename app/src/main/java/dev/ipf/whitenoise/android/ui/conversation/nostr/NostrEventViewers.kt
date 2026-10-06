@@ -49,7 +49,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -67,6 +66,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import kotlinx.coroutines.launch
 
 /** Parses a verified event body and presents it without starting another event-resolution layer. */
@@ -86,7 +86,7 @@ internal fun NostrEventReaderDialog(
     val eventUri = authoredReference?.let(::nostrEventUri)
     val prepared = rememberNostrReaderPreparation(card, parseMarkdown)
     var playing by remember(card.eventIdHex) { mutableStateOf(false) }
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
@@ -120,10 +120,14 @@ internal fun NostrEventReaderDialog(
             onPlayVideo = { playing = true },
             preparation = prepared,
         )
-    }
-    if (playing) {
-        card.mediaUrl?.let { url ->
-            NostrVideoPlayerDialog(mediaUrl = url, mediaMimeType = card.mediaMimeType, onDismiss = { playing = false })
+        if (playing) {
+            card.mediaUrl?.let { url ->
+                NostrVideoPlayerDialog(
+                    mediaUrl = url,
+                    mediaMimeType = card.mediaMimeType,
+                    onDismiss = { playing = false },
+                )
+            }
         }
     }
 }
@@ -312,6 +316,7 @@ private fun openNostrEvent(
 
 internal const val NOSTR_EVENT_READER_REFERENCE_TAG = "nostr-event-reader-reference"
 
+/** Hosts the referenced video in its own window and uses normal dismissal when returning to a playback source. */
 @Composable
 internal fun NostrVideoPlayerDialog(
     mediaUrl: String,
@@ -320,7 +325,7 @@ internal fun NostrVideoPlayerDialog(
 ) {
     var playbackFailed by remember(mediaUrl) { mutableStateOf(false) }
     val player = rememberNostrVideoPlayer(mediaUrl, mediaMimeType) { playbackFailed = true }
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
