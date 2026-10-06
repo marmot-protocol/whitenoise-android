@@ -59,8 +59,7 @@ class MediaPreviewThemeTest {
     @Test
     fun lightPreviewOnlyHasThemedPrototypeActions() {
         render(previewOnly = true)
-        rule.onNodeWithContentDescription(text(R.string.photo_editor_edit_action)).assertIsDisplayed().performClick()
-        assertEquals(listOf(0), edited)
+        rule.onNodeWithContentDescription(text(R.string.photo_editor_edit_action)).assertIsDisplayed()
         rule.onNodeWithContentDescription(text(R.string.cancel_media_changes)).assertIsDisplayed()
         rule.onNodeWithText(text(R.string.done)).assertIsDisplayed()
         rule.onNodeWithContentDescription(text(R.string.send)).assertDoesNotExist()
@@ -68,7 +67,10 @@ class MediaPreviewThemeTest {
         // Output quality now belongs to the photo editor, not to this screen.
         rule.onNodeWithText(text(R.string.photo_editor_quality)).assertDoesNotExist()
         assertShellColors()
+        // Capture the static chrome before the real pointer tap starts its platform ripple.
         capture("media_preview_themed_light")
+        rule.onNodeWithContentDescription(text(R.string.photo_editor_edit_action)).performClick()
+        assertEquals(listOf(0), edited)
     }
 
     /** Caption and failure retry still belong to the native preview when that optional capability is requested. */

@@ -104,7 +104,10 @@ internal fun rememberGroupAvatarPresentation(
 }
 
 /** A private picture can be displayed only for its own known, signed-in local account. */
-private fun WhiteNoiseAppState.ownsPrivateAvatarSource(source: String, accountRef: String?): Boolean =
+private fun WhiteNoiseAppState.ownsPrivateAvatarSource(
+    source: String,
+    accountRef: String?,
+): Boolean =
     accounts.any { it.label == accountRef && !it.signedOut } &&
         PrivateContactAvatarLoader.belongsToAccount(source, accountRef)
 

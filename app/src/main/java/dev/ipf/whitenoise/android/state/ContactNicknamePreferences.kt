@@ -86,6 +86,7 @@ internal object ContactNicknamePreferences {
     // Key by the Marmot account ref/label rather than account hex: writes use
     // WhiteNoiseAppState.activeAccountRef, notification updates carry
     // update.accountRef, and sign-out/wipe cleanup receives the same ref.
+
     /** Length-prefixes the account label so prefix-based cleanup cannot match another account. */
     private fun accountKeyPrefix(accountRef: String): String = "$KeyPrefix${accountRef.length}:$accountRef:"
 }

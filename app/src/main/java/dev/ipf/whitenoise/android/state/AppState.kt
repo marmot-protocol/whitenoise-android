@@ -6203,6 +6203,7 @@ class WhiteNoiseAppState private constructor(
     // Durable (commit-backed) but off the main thread: the writes must land
     // before sign-out/wipe completes, and the blocking flush must not stall
     // the UI. The revision bump stays on the caller's (main) context.
+
     /**
      * Commits private-field and picture removal off main before account teardown completes, then invalidates
      * display revisions.
