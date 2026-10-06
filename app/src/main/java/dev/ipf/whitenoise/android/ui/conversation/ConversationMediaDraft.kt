@@ -454,11 +454,11 @@ internal class ConversationMediaDraftState(
                 nativePhotosNeedingRestoration(reconciliation.mediaBySlotId, backedPhotos.keys, preparedPhotos)
             preparedPhotos =
                 preparedPhotos.filterKeys { it !in removedPhotos } +
-                    restoredPhotos.mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
+                restoredPhotos.mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
             preparedDocuments =
                 preparedDocuments.filterKeys { it !in removedDocuments } +
-                    nativeDocumentsNeedingRestoration(reconciliation.documentsByUriString, preparedDocuments)
-                        .mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
+                nativeDocumentsNeedingRestoration(reconciliation.documentsByUriString, preparedDocuments)
+                    .mapValues { (_, attachment) -> attachment.asRestoredPhoto() }
             nonEditableDescriptions = nonEditableDescriptions.filterKeys { it !in removedPhotos }
             restoredPhotos.forEach { (slotId, attachment) ->
                 if (attachment.mediaType.startsWith("image/", ignoreCase = true)) {
@@ -802,7 +802,8 @@ private fun restorationIsCurrent(
     inputsRevision: Long,
 ): Boolean =
     ownerFence.isCurrent(version.owner) &&
-        cleanupRevision == version.nativeRevision && inputsRevision == version.inputsRevision
+        cleanupRevision == version.nativeRevision &&
+        inputsRevision == version.inputsRevision
 
 private fun preparedPhotoPreviews(
     backedPhotos: Map<String, DraftBackedPhoto>,
@@ -843,36 +844,47 @@ internal fun nativePhotosNeedingRestoration(
     nativeBySlot: Map<String, MessageDraftAttachmentFfi>,
     backedSlotIds: Set<String>,
     prepared: Map<String, DraftPreparedPhoto>,
-): Map<String, MessageDraftAttachmentFfi> =
-    nativeBySlot.filterKeys { it !in backedSlotIds && prepared[it]?.restoredFromNative != false }
+): Map<String, MessageDraftAttachmentFfi> {
+    return nativeBySlot.filterKeys { it !in backedSlotIds && prepared[it]?.restoredFromNative != false }
+}
 
 /** Documents prepared by this composer retain their local lifetime across native refreshes. */
 internal fun nativeDocumentsNeedingRestoration(
     nativeByUri: Map<String, MessageDraftAttachmentFfi>,
     prepared: Map<Uri, DraftPreparedPhoto>,
-): Map<Uri, MessageDraftAttachmentFfi> =
-    nativeByUri.mapKeys { (uri, _) -> Uri.parse(uri) }.filterKeys { prepared[it]?.restoredFromNative != false }
+): Map<Uri, MessageDraftAttachmentFfi> {
+    return nativeByUri
+        .mapKeys { (uri, _) -> Uri.parse(uri) }
+        .filterKeys { prepared[it]?.restoredFromNative != false }
+}
 
-private fun MessageDraftAttachmentFfi.asRestoredPhoto(): DraftPreparedPhoto =
-    DraftPreparedPhoto(this, editorDigest(), restoredFromNative = true)
+private fun MessageDraftAttachmentFfi.asRestoredPhoto(): DraftPreparedPhoto {
+    return DraftPreparedPhoto(this, editorDigest(), restoredFromNative = true)
+}
 
 private fun restoredPhotosMissingFrom(
     slots: List<PendingMediaSlot>,
     prepared: Map<String, DraftPreparedPhoto>,
     nativeIds: Set<String>,
-): Set<String> =
-    slots.filter { slot ->
-        prepared[slot.id]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
-    }.mapTo(mutableSetOf()) { it.id }
+): Set<String> {
+    return slots
+        .filter { slot ->
+            prepared[slot.id]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
+        }
+        .mapTo(mutableSetOf()) { it.id }
+}
 
 private fun restoredDocumentsMissingFrom(
     documents: List<Uri>,
     prepared: Map<Uri, DraftPreparedPhoto>,
     nativeIds: Set<String>,
-): Set<Uri> =
-    documents.filter { uri ->
-        prepared[uri]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
-    }.toSet()
+): Set<Uri> {
+    return documents
+        .filter { uri ->
+            prepared[uri]?.let { it.restoredFromNative && it.attachment.id !in nativeIds } == true
+        }
+        .toSet()
+}
 
 /** Retains one caption acceptance generation across preview recompositions and staged-media edits. */
 @Composable

@@ -2248,6 +2248,7 @@ class WhiteNoiseAppState private constructor(
 
     // Transient view invalidation, bounded with the existing retained conversation state.
     private val nativeComposerCleanupRevisions = mutableStateMapOf<String, Long>()
+
     // Never reuse a stamp after conversation eviction or account-cache cleanup.
     private var nativeComposerCleanupSequence = 0L
 

@@ -3173,7 +3173,8 @@ internal fun ConversationScreen(
         mediaDraftState.updateInputs(capturedSlots, capturedDocuments, capturedAccount)
         val restored =
             mediaDraftState.restorePersistedAttachments {
-                pendingMediaSlots == capturedSlots && pendingDocumentUris == capturedDocuments &&
+                pendingMediaSlots == capturedSlots &&
+                    pendingDocumentUris == capturedDocuments &&
                     controller.boundAccountRef == capturedAccount
             } ?: return@LaunchedEffect
         val merged =
