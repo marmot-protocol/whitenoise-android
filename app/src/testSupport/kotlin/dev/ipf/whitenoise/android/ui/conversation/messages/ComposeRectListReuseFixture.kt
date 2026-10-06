@@ -90,6 +90,7 @@ abstract class ComposeRectListReuseFixture {
     }
 
     /** Keeps outer dimensions constant while the pooled descendant changes width and baseline. */
+    @Suppress("FunctionNaming") // Compose UI functions use PascalCase, including shared test fixtures.
     @Composable
     private fun ReusedItem(index: Int, itemPx: Int, rowAlignment: Boolean) {
         val leaf: @Composable () -> Unit = {
@@ -125,6 +126,7 @@ abstract class ComposeRectListReuseFixture {
     }
 
     /** Reads inherited baselines while measuring, matching the upstream regression's wrapper. */
+    @Suppress("FunctionNaming") // Compose UI functions use PascalCase, including shared test fixtures.
     @Composable
     private fun BaselineQueryingLayout(content: @Composable () -> Unit) {
         Layout(content = { Box { content() } }) { measurables, constraints ->
