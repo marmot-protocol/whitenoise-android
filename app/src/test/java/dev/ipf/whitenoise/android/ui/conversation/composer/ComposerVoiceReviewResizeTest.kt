@@ -40,7 +40,9 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ComposerVoiceReviewResizeTest {
     @get:Rule val rule = createComposeRule()
+
     @get:Rule val files = TemporaryFolder()
+
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     private lateinit var review: VoiceRecordingReview
@@ -72,7 +74,11 @@ class ComposerVoiceReviewResizeTest {
         assertEquals(96f, rule.onNodeWithTag("voice-review-composer").fetchSemanticsNode().boundsInRoot.height, 1f)
         try {
             offerTake(review)
-            val panel = rule.onNodeWithTag("conversation.voice.review").fetchSemanticsNode().boundsInRoot
+            val panel =
+                rule
+                    .onNodeWithTag("conversation.voice.review")
+                    .fetchSemanticsNode()
+                    .boundsInRoot
             assertEquals("review must exercise the compact layout below 96dp", 84f, panel.height, 1f)
             val actionBounds =
                 listOf(R.string.voice_message_play, R.string.discard, R.string.voice_record_again, R.string.send).map {

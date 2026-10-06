@@ -23,4 +23,7 @@ private fun String.takeCodePoints(maxCodePoints: Int): String {
 
 private const val MAX_FIELD_CODE_POINTS = 160
 private const val MAX_EXCERPT_CODE_POINTS = 420
-private const val MAX_READER_BODY_CODE_POINTS = 64 * 1_024
+
+// A complete relay frame is capped at 256K UTF-16 chars by NostrRelayQueryClient.
+// The event body and tags together fit below this code-point display budget.
+private const val MAX_READER_BODY_CODE_POINTS = 256 * 1_024
