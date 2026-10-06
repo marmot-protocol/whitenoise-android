@@ -2323,7 +2323,9 @@ internal fun MainShell(
                             controller = content.controller,
                             surfaceState = content.surfaceState,
                             playbackTransport = {
-                                if (navAccountStable && selectedChat?.id == chat.id && !appState.appLockScreenVisible) {
+                                // Match released read-aloud: retain this screen's chrome until its Back
+                                // animation disposes it. Route deselection must not collapse the outgoing header.
+                                if (navAccountStable && !appState.appLockScreenVisible) {
                                     dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar(
                                         appState,
                                         onBodyClick = guardedPlaybackSourceOpen,

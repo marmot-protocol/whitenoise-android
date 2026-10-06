@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -63,6 +64,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowBiometricManager
+import java.io.File
 import java.util.Locale
 
 /** Exercises the real selector and account/lock revocation, rather than only a stateless strip fixture. */
@@ -391,6 +393,14 @@ class PlaybackTransportOwnershipTest {
         assertEquals(1, engine.spoken.size)
         assertNull(appState.attachmentSpeechDestination.value)
         appState.stopSpeaking()
+    }
+
+    /** MainShell must retain ordinary outgoing chrome while preserving account and lock privacy gates. */
+    @Test fun backDoesNotDeselectTheRetainedConversationPlayer() {
+        val source = File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt").readText()
+        val slot = source.substringAfter("playbackTransport = {").substringBefore("dictationControlsVisible =")
+        assertTrue(slot.contains("navAccountStable && !appState.appLockScreenVisible"))
+        assertFalse(slot.contains("selectedChat"))
     }
 
     /** Releases the process-wide player so a failed ownership assertion cannot leak a session into another fixture. */
