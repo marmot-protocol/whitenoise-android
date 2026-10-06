@@ -1853,7 +1853,7 @@
     <string name="discard">Verwerfen</string>
     <string name="open_app_settings">App-Einstellungen öffnen</string>
     <string name="dictation_disclosure_title">Externe Spracherkennung</string>
-    <string name="dictation_disclosure_message">Der auf diesem Gerät installierte Sprachdienst verarbeitet, was du sagst, und sendet die Audiodaten möglicherweise an seinen Anbieter. White Noise behält den zurückgegebenen Text nur, bis du ihn einfügst oder sendest. Automatisches Senden ist aus, solange du es nicht in den Diktateinstellungen aktivierst.</string>
+    <string name="dictation_disclosure_message">Der auf diesem Gerät installierte Sprachdienst verarbeitet, was du sagst, und sendet die Audiodaten möglicherweise an seinen Anbieter. Nach einem Fehler kann erkannter Text automatisch im ursprünglichen Entwurf gespeichert werden. Automatisches Senden ist aus, solange du es nicht in den Diktateinstellungen aktivierst.</string>
     <string name="dictation_continue">Weiter</string>
     <string name="dictation_notification_title">Diktat aktiv</string>
     <string name="dictation_notification_text">Abbrechen, Einfügen oder Senden auswählen</string>
@@ -1861,7 +1861,7 @@
     <string name="notification_channel_dictation">Diktat</string>
     <string name="notification_channel_dictation_description">Steuert eine aktive Diktatsitzung im Nachrichtenfeld</string>
     <string name="dictation_settings_title">Diktat</string>
-    <string name="dictation_settings_explainer">Der auf diesem Gerät installierte Sprachdienst verarbeitet die Audiodaten und sendet sie möglicherweise an seinen Anbieter. White Noise behält den zurückgegebenen Text nur, bis du ihn einfügst oder sendest.</string>
+    <string name="dictation_settings_explainer">Der auf diesem Gerät installierte Sprachdienst verarbeitet die Audiodaten und sendet sie möglicherweise an seinen Anbieter. Wiederhergestellter Text bleibt im ursprünglichen Entwurf.</string>
     <string name="dictation_ostt_recommendation_title">Offline Speech to Text installieren</string>
     <string name="dictation_ostt_recommendation_summary">Empfohlene Transkriptions-App für privates Diktieren auf dem Gerät. Erhältlich bei Zapstore, nicht bei Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Die Seite von Offline Speech to Text auf Zapstore konnte nicht geöffnet werden.</string>
@@ -1873,7 +1873,7 @@
     <string name="dictation_result_paste_description">Text vor dem Senden prüfen oder bearbeiten</string>
     <string name="dictation_result_send">Nachricht senden</string>
     <string name="dictation_result_send_description">Sendet nur, wenn Chat und Entwurf unverändert sind</string>
-    <string name="dictation_send_safety_note">Ändert sich der Chat oder Entwurf vor dem Senden, bleibt das Diktat ungesendet. Versuche das Senden erneut oder wähle Einfügen, um es zu prüfen.</string>
+    <string name="dictation_send_safety_note">Wenn das Senden blockiert wird, wird verfügbarer erkannter Text im ursprünglichen Entwurf wiederhergestellt. Prüfe ihn, bevor du erneut sendest.</string>
     <string name="dictation_microphone_muted">Mikrofonzugriff ist deaktiviert</string>
     <string name="dictation_microphone_muted_help">Aktiviere den Mikrofonzugriff in den Android-Datenschutzeinstellungen oder den Schnelleinstellungen und versuche das Diktieren erneut.</string>
     <!-- Imported-account preflight (#2519). -->

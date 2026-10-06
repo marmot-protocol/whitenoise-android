@@ -1544,6 +1544,18 @@
         "test_ids": ["DIC-001"]
       },
       {
+        "surface": "Updated draft-recovery disclosure acceptance after upgrade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "DISCLOSURE_ACCEPTED_KEY",
+        "test_ids": ["DIC-001"]
+      },
+      {
+        "surface": "Updated offline draft-recovery disclosure acceptance after upgrade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "OFFLINE_DISCLOSURE_ACCEPTED_KEY",
+        "test_ids": ["DIC-001"]
+      },
+      {
         "surface": "Offline dictation settings explainer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_settings_explainer_offline",
@@ -12239,12 +12251,6 @@
         "surface": "string:notification_channel_dictation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
         "anchor": "R.string.notification_channel_dictation",
-        "test_ids": ["DIC-002"]
-      },
-      {
-        "surface": "string:paste",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
-        "anchor": "R.string.paste",
         "test_ids": ["DIC-002"]
       },
       {
@@ -32323,6 +32329,12 @@
         "test_ids": [
           "FLD-004"
         ]
+      },
+      {
+        "surface": "Automatic dictation draft recovery and retry fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+        "anchor": "internal class ConversationDictationDraftRecovery(",
+        "test_ids": ["DIC-002"]
       },
       {
         "surface": "Inbound share recovery: cancel",

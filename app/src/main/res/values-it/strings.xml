@@ -1855,7 +1855,7 @@
     <string name="discard">Elimina</string>
     <string name="open_app_settings">Apri le impostazioni dell’app</string>
     <string name="dictation_disclosure_title">Riconoscimento vocale esterno</string>
-    <string name="dictation_disclosure_message">Il servizio vocale installato su questo dispositivo elabora ciò che dici e può inviare l’audio al proprio fornitore. White Noise conserva il testo restituito solo finché non lo incolli o lo invii. L’invio automatico è disattivato, a meno che tu non lo attivi nelle impostazioni di Dettatura.</string>
+    <string name="dictation_disclosure_message">Il servizio vocale installato su questo dispositivo elabora ciò che dici e può inviare l’audio al proprio fornitore. Dopo un errore, il testo riconosciuto può essere salvato automaticamente nella bozza originale. L’invio automatico è disattivato, a meno che tu non lo attivi nelle impostazioni di Dettatura.</string>
     <string name="dictation_continue">Continua</string>
     <string name="dictation_microphone_muted">L’accesso al microfono è disattivato</string>
     <string name="dictation_microphone_muted_help">Attiva l’accesso al microfono nelle impostazioni sulla privacy di Android o nelle Impostazioni rapide, poi riprova la dettatura.</string>

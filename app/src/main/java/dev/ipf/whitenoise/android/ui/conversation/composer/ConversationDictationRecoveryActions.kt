@@ -40,16 +40,14 @@ internal fun ConversationDictationFailureAction(
     val recovery = dictationFailureRecovery(state.cause ?: state.reason)
     val retrySend = state.reason == ConversationDictationFailure.SendBlocked
     var confirmPartialSend by remember(state) { mutableStateOf(false) }
+    val recoveredSendAvailable =
+        !state.draftRecovered || controller.canRetryRetainedAudio || controller.canRetryRecoveredSend
     IconButton(
-        onClick =
-            when {
-                retrySend && state.recognitionIncomplete -> ({ confirmPartialSend = true })
-                retrySend -> controller::retry
-                recovery == ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
-                recovery == ConversationDictationRecovery.SpeechProviderSetup ->
-                    ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
-                else -> controller::retry
-            },
+        enabled =
+            !retrySend ||
+                recoveredSendAvailable ||
+                (state.recognitionIncomplete && recovery != ConversationDictationRecovery.Retry),
+        onClick = dictationFailureAction(state, controller, recovery, context) { confirmPartialSend = true },
         modifier = Modifier.size(48.dp),
     ) {
         Icon(
@@ -67,6 +65,22 @@ internal fun ConversationDictationFailureAction(
         ConversationDictationSendConfirmation(state, controller, recovery, onDismiss = { confirmPartialSend = false })
     }
 }
+
+private fun dictationFailureAction(
+    state: ConversationDictationState.Failed,
+    controller: ConversationDictationController,
+    recovery: ConversationDictationRecovery,
+    context: Context,
+    confirmPartialSend: () -> Unit,
+): () -> Unit =
+    when {
+        state.reason == ConversationDictationFailure.SendBlocked && state.recognitionIncomplete -> confirmPartialSend
+        state.reason == ConversationDictationFailure.SendBlocked -> controller::retry
+        recovery == ConversationDictationRecovery.AppSettings -> ({ openDictationAppSettings(context) })
+        recovery == ConversationDictationRecovery.SpeechProviderSetup ->
+            ({ openSpeechProviderSetup(context, controller.speechProviderPackage) })
+        else -> controller::retry
+    }
 
 private fun dictationFailureActionLabel(
     retrySend: Boolean,
@@ -94,10 +108,7 @@ private fun ConversationDictationSendConfirmation(
             onDismiss()
             if (controller.state === state) controller.sendRecognizedText()
         },
-        onPaste = {
-            onDismiss()
-            if (controller.state === state) controller.paste()
-        },
+        sendEnabled = controller.canRetryRecoveredSend,
         onOpenSettings = confirmationRecoveryAction(state, controller, recovery, context, onDismiss),
         settingsLabel =
             stringResource(
@@ -139,7 +150,7 @@ private fun confirmationRecoveryAction(
 internal fun ConversationDictationPartialSendDialog(
     onDismiss: () -> Unit,
     onSend: () -> Unit,
-    onPaste: () -> Unit,
+    sendEnabled: Boolean = true,
     onOpenSettings: (() -> Unit)? = null,
     settingsLabel: String = "",
 ) {
@@ -159,10 +170,9 @@ internal fun ConversationDictationPartialSendDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onSend) { Text(stringResource(R.string.dictation_send_recognized_text)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onPaste) { Text(stringResource(R.string.paste)) }
+            TextButton(onClick = onSend, enabled = sendEnabled) {
+                Text(stringResource(R.string.dictation_send_recognized_text))
+            }
         },
     )
 }
