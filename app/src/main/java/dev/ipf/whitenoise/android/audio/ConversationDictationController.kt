@@ -1465,7 +1465,8 @@ internal class ConversationDictationController internal constructor(
             state = failed.copy(draftRecovered = true)
         }
         if ((state as? ConversationDictationState.Failed)?.draftRecovered == true &&
-            !foregroundMicrophoneRequired && !runCatching(platform::callerAudioHasPending).getOrDefault(true)
+            !foregroundMicrophoneRequired &&
+            !runCatching(platform::callerAudioHasPending).getOrDefault(true)
         ) {
             // The foreground composer now shows the failure; until this return keep its Open-app card.
             releaseDurableSessionLease()

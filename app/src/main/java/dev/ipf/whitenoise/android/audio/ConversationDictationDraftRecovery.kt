@@ -162,8 +162,8 @@ internal class ConversationDictationDraftRecovery(
         current: ConversationDictationDraftSnapshot,
         text: String,
         options: Options,
-    ): Insertion? {
-        return if (previous != null && sameDictationRecoveryDraft(previous.draft, current)) {
+    ): Insertion? =
+        if (previous != null && sameDictationRecoveryDraft(previous.draft, current)) {
             representedPrefixLength(previous.baseTranscript, text)?.let { prefixLength ->
                 Insertion(
                     previous.base,
@@ -181,7 +181,6 @@ internal class ConversationDictationDraftRecovery(
                 Insertion(current.value, prefixLength, represented, previous != null, restoringPayload)
             }
         }
-    }
 
     private fun insertionValue(
         target: ConversationDictationTarget,
@@ -235,7 +234,8 @@ internal class ConversationDictationDraftRecovery(
         val before = words(previous)
         val after = words(current)
         val represented =
-            before.isNotEmpty() && after.size >= before.size &&
+            before.isNotEmpty() &&
+                after.size >= before.size &&
                 before.indices.all { before[it].first == after[it].first }
         return when {
             previous.isEmpty() -> 0

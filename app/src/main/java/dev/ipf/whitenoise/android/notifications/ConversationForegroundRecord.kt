@@ -55,7 +55,8 @@ internal class ConversationForegroundRecord(
         val notificationId = NotificationStreamForegroundService.foregroundNotificationId(notification)
         val keepsExistingType =
             publishedServiceType == type ||
-                keepsAuthorizedMicrophone && type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0
+                keepsAuthorizedMicrophone &&
+                type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0
         val canUpdatePresentation = keepsExistingType && notificationId == publishedNotificationId
         val requiresRecordUpdate = acquireMicrophone || replaceRecord
         if (foregroundPromoted && !requiresRecordUpdate && canUpdatePresentation) {
@@ -88,7 +89,8 @@ internal class ConversationForegroundRecord(
         val presentation =
             if (NotificationStreamForegroundService.foregroundNotificationId(notification) != publishedNotificationId) {
                 // A rejected identity switch must clear controls on the still-authorized channel.
-                Notification.Builder.recoverBuilder(service, notification)
+                Notification.Builder
+                    .recoverBuilder(service, notification)
                     .setChannelId(ConversationDictationForegroundService.CHANNEL_ID)
                     .build()
             } else {

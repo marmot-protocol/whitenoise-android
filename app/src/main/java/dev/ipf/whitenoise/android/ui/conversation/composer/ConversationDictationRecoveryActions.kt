@@ -44,7 +44,8 @@ internal fun ConversationDictationFailureAction(
         !state.draftRecovered || controller.canRetryRetainedAudio || controller.canRetryRecoveredSend
     IconButton(
         enabled =
-            !retrySend || recoveredSendAvailable ||
+            !retrySend ||
+                recoveredSendAvailable ||
                 (state.recognitionIncomplete && recovery != ConversationDictationRecovery.Retry),
         onClick = dictationFailureAction(state, controller, recovery, context) { confirmPartialSend = true },
         modifier = Modifier.size(48.dp),
