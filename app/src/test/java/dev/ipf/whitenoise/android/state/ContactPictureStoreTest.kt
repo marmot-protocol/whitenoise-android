@@ -147,6 +147,8 @@ class ContactPictureStoreTest {
 
     /** A Save already past admission must finish before teardown removes nickname, notes and picture together. */
     @Test fun cleanupWaitsForAnAdmittedSaveAndRemovesAllThreeFields() {
+        // Resolve Robolectric's instrumented helper before worker scheduling enters the timed section.
+        clearContactPrivateDetails(preferences, "unused", store)
         val ready = java.util.concurrent.CountDownLatch(1)
         val release = java.util.concurrent.CountDownLatch(1)
         val checks =
@@ -167,7 +169,7 @@ class ContactPictureStoreTest {
                     ) {
                         if (checks.incrementAndGet() == 2) {
                             ready.countDown()
-                            check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                            check(release.await(30, java.util.concurrent.TimeUnit.SECONDS))
                         }
                         true
                     }
