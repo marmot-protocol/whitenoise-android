@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
@@ -44,9 +45,11 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
             "8ddde80690da97cd840c6f8f59c608701f9e42c245f12f0eabc1434db57e0273";
     private static final String COMMIT = "fd550bed793b66378c83091532e29c18fdef44cc";
     private static final String PACKAGE = "androidx/compose/ui/node/";
-    private static final Set<String> SOURCE_FILES = Set.of(
-            "LayoutNodeAlignmentLines.kt", "LayoutNodeLayoutDelegate.kt",
-            "LookaheadPassDelegate.kt", "MeasurePassDelegate.kt");
+    private static final Map<String, String> PATCHED_SOURCES = Map.of(
+            "LayoutNodeAlignmentLines.kt", "43317a0e99b5fde36f2f9bda4033ed1940fda75042f73aabee490ca0f32c0dee",
+            "LayoutNodeLayoutDelegate.kt", "fd01bf142d2d877e35913b8a603e48869809c9bc1f1242f66136b6327e849078",
+            "LookaheadPassDelegate.kt", "35ba4d7eb1e9e51d808b20760b57192d6a497e7258e746c7ef033890836cb512",
+            "MeasurePassDelegate.kt", "17eb1756c29038076c96a1f09a095fc1afcd1ce47038811c3dd12d6dbcbfec50");
 
     /** Immutable build inputs; the compiler's classpath deliberately resolves unpatched artifacts. */
     public interface Parameters extends TransformParameters {
@@ -84,19 +87,16 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
             Files.createDirectories(sourceRoot);
             Map<String, byte[]> sources = readZip(Files.readAllBytes(sourceJar));
             List<String> sourcePaths = new ArrayList<>();
-            for (String name : SOURCE_FILES.stream().sorted().toList()) {
+            for (String name : PATCHED_SOURCES.keySet().stream().sorted().toList()) {
                 Path source = sourceRoot.resolve(name);
                 Files.write(source, required(sources, "commonMain/" + PACKAGE + name));
                 sourcePaths.add(source.toString());
             }
-            getExecOperations().exec(spec -> {
-                spec.setWorkingDir(work);
-                spec.commandLine("git", "apply", "--check", getParameters().getPatch().get().getAsFile());
-            }).assertNormalExitValue();
-            getExecOperations().exec(spec -> {
-                spec.setWorkingDir(work);
-                spec.commandLine("git", "apply", getParameters().getPatch().get().getAsFile());
-            }).assertNormalExitValue();
+            applyPatch(work, true);
+            applyPatch(work, false);
+            for (var expected : PATCHED_SOURCES.entrySet()) {
+                verifyHash(sourceRoot.resolve(expected.getKey()), expected.getValue());
+            }
 
             Map<String, byte[]> aar = readZip(Files.readAllBytes(input.toPath()));
             Path original = work.resolve("ui-original.jar");
@@ -163,6 +163,21 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
         }
     }
 
+    /** Prevents an enclosing checkout or inherited Git variables from changing patch semantics. */
+    private void applyPatch(Path work, boolean checkOnly) {
+        getExecOperations().exec(spec -> {
+            Map<String, Object> environment = new HashMap<>(spec.getEnvironment());
+            environment.keySet().removeIf(name -> name.startsWith("GIT_"));
+            environment.put("GIT_CEILING_DIRECTORIES", work.getParent().toString());
+            spec.setEnvironment(environment);
+            spec.setWorkingDir(work);
+            List<String> command = new ArrayList<>(List.of("git", "apply"));
+            if (checkOnly) command.add("--check");
+            command.add(getParameters().getPatch().get().getAsFile().toString());
+            spec.commandLine(command);
+        }).assertNormalExitValue();
+    }
+
     /** Rejects changed Google artifacts rather than silently patching an unreviewed version. */
     private static void verifyHash(Path file, String expected) throws Exception {
         String actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
@@ -212,7 +227,7 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
     private static boolean isPatchedClass(String name, byte[] bytes) {
         if (!name.startsWith(PACKAGE) || !name.endsWith(".class")) return false;
         String source = classNode(bytes).sourceFile;
-        return source != null && SOURCE_FILES.contains(source);
+        return source != null && PATCHED_SOURCES.containsKey(source);
     }
 
     /** Parses declarations without executing dependency bytecode. */

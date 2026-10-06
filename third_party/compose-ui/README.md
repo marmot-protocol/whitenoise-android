@@ -31,7 +31,9 @@ explicitly pinned Kotlin compiler/Compose compiler plugin. The transform:
    - Its `sources` JAR:
      `8ddde80690da97cd840c6f8f59c608701f9e42c245f12f0eabc1434db57e0273`.
 2. Extracts only the four affected sources and applies the upstream patch with
-   `git apply --check` followed by `git apply` (no fuzzy patching).
+   `git apply --check` followed by `git apply`, with Git discovery isolated from
+   enclosing checkouts. All four resulting source hashes must match the reviewed
+   patched sources before compilation; a successful Git exit alone is insufficient.
 3. Compiles them against the original UI artifact and its resolved dependencies,
    using Kotlin/Compose compiler 2.4.20, language/API 2.1, JVM 11 and module name
    `ui`. The original jar is a friend module for its internal APIs. Compose
