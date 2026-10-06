@@ -2,16 +2,16 @@ import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.Usage
-import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 // Temporary source backport for #2647. See third_party/compose-ui/README.md for removal.
 val patched = Attribute.of("dev.ipf.whitenoise.compose-rectlist-patched", Boolean::class.javaObjectType)
+val kotlinPlatform = Attribute.of("org.jetbrains.kotlin.platform.type", String::class.java)
 
 val originalCompose = configurations.create("composeRectListOriginal") {
     isCanBeConsumed = false
     attributes {
         attribute(patched, false)
-        attribute(KotlinPlatformType.attribute, KotlinPlatformType.androidJvm)
+        attribute(kotlinPlatform, "androidJvm")
         attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
         attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
     }
