@@ -89,6 +89,8 @@ internal fun PersonProfileContent(
     onBlock: () -> Unit = {},
     memberMute: ProfileMemberMuteRowState? = null,
     onMemberMute: () -> Unit = {},
+    notificationSummary: String? = null,
+    onNotifications: () -> Unit = {},
     sharedAvatars: @Composable () -> Unit = {},
     error: @Composable () -> Unit = {},
     adminActions: @Composable () -> Unit = {},
@@ -162,6 +164,19 @@ internal fun PersonProfileContent(
                                     enabled = !busy,
                                     leading = sharedAvatars,
                                     modifier = Modifier.testTag("person_profile.groups"),
+                                )
+                            }
+                        }
+                        if (notificationSummary != null) {
+                            row("notifications") { row ->
+                                SettingsLink(
+                                    row,
+                                    stringResource(R.string.notifications),
+                                    onNotifications,
+                                    value = notificationSummary,
+                                    enabled = !busy,
+                                    leading = { Icon(painterResource(R.drawable.ic_settings_notifications), null) },
+                                    modifier = Modifier.testTag("person_profile.notifications"),
                                 )
                             }
                         }

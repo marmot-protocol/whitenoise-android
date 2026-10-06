@@ -4,8 +4,21 @@ import android.content.Context
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPolicy
+import dev.ipf.whitenoise.android.notifications.ProfileNotificationMode
+import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
 
 private val memberMuteLock = Any()
+private var profileNotificationHolder: Pair<Context, ProfileNotificationOverridePreferences>? = null
+
+/** One account-scoped Android alert store observed by the profile UI and notification policy. */
+internal val WhiteNoiseAppState.profileNotificationOverrides: ProfileNotificationOverridePreferences
+    get() =
+        synchronized(memberMuteLock) {
+            profileNotificationHolder?.takeIf { it.first === appContext }?.second
+                ?: ProfileNotificationOverridePreferences(appContext).also {
+                    profileNotificationHolder = appContext to it
+                }
+        }
 
 private var memberMuteHolder: Pair<Context, MemberMutePreferences>? = null
 
@@ -54,6 +67,9 @@ internal fun WhiteNoiseAppState.shouldPostNotification(
         engineMuted = engineMuted,
         senderMutedInGroup = memberMutePreferences::isMuted,
         categoryEnabled = conversationAlertPreferences::choice,
+        profileMuted = { account, author ->
+            profileNotificationOverrides.get(account, author).mode == ProfileNotificationMode.MUTED
+        },
     )
 
 /** Whether [memberIdHex] is silenced for [accountRef] inside [groupIdHex]. */
@@ -77,4 +93,32 @@ internal fun WhiteNoiseAppState.setMemberMutedInGroup(
 internal fun WhiteNoiseAppState.retainMemberMutesForAccounts(accountRefs: Collection<String>) {
     memberMutePreferences.retainAccounts(accountRefs)
     conversationAlertPreferences.retainAccounts(accountRefs)
+}
+
+/** Public-profile rename updates only existing Android channel labels for currently signed-in local owners. */
+internal fun WhiteNoiseAppState.refreshProfileNotificationChannelLabels(
+    author: String,
+    publicName: String?,
+) {
+    val generation = runtimeGeneration
+    accounts.filter { it.isSignedInSigningAccount() }.forEach { account ->
+        if (profileNotificationOverrides.hasChoice(account.label, author)) {
+            val name = contactNicknameFor(account.label, author) ?: publicName
+            launchMutation {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    dev.ipf.whitenoise.android.notifications.ProfileNotificationChannels(appContext).refreshExisting(
+                        account.label,
+                        author,
+                        name,
+                        isCurrent = {
+                            runtimeGeneration == generation &&
+                                !signOutInProgress &&
+                                !wipeInProgress &&
+                                accounts.any { it.label == account.label && it.isSignedInSigningAccount() }
+                        },
+                    )
+                }
+            }
+        }
+    }
 }

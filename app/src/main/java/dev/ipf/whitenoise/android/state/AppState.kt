@@ -6167,6 +6167,7 @@ class WhiteNoiseAppState private constructor(
         includeUnscopedLegacy: Boolean,
     ) {
         withContext(Dispatchers.IO) {
+            check(profileNotificationOverrides.clearAccount(accountRef)) { "Unable to clear profile alert preferences" }
             localNotificationPresenter.clearConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
         }
     }
@@ -11559,6 +11560,7 @@ class WhiteNoiseAppState private constructor(
             profileRevision += 1
             bumpProfileAccountRevision(accountIdHex)
             scheduleInviteNotificationIdentityRefresh(accountIdHex, presentation)
+            refreshProfileNotificationChannelLabels(accountIdHex, presentation.displayName)
         }
     }
 
