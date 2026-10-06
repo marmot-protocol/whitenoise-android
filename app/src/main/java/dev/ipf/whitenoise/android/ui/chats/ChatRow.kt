@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isPeerSourced
 import dev.ipf.whitenoise.android.state.messagePreviewForRetention
+import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
@@ -337,10 +338,7 @@ internal fun ChatRow(
                     // conversation header does.
                     fallbackPictureUrl =
                         avatarAccount?.let {
-                            appState.contactAvatarSource(it)?.takeIf(
-                                dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate,
-                            )
-                                ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
+                            appState.privateContactAvatarSource(it) ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
                         },
                     firstFrameAvatar = item.firstFrameAvatar,
                     durableAvatar = item.selectedAvatarAsset,

@@ -2187,6 +2187,21 @@ class LocalNotificationPresenter(
             }
         }
 
+    /** Cached private pixels replace the protocol-sourced bitmaps; when none are cached, the public ones stay. */
+    private fun ownedShortcutAvatars(
+        update: NotificationUpdateFfi,
+        conversationAvatarBitmap: Bitmap?,
+        senderAvatarBitmap: Bitmap?,
+        sender: Person,
+    ): Triple<Bitmap?, Bitmap?, Person> {
+        val (override, currentAvatar) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
+        if (!override) return Triple(conversationAvatarBitmap, senderAvatarBitmap, sender)
+        val senderAvatar = currentAvatar ?: senderAvatarBitmap
+        val conversationAvatar =
+            if (update.isDm) currentAvatar ?: conversationAvatarBitmap else conversationAvatarBitmap
+        return Triple(conversationAvatar, senderAvatar, contactAvatarPerson(sender, senderAvatar))
+    }
+
     /**
      * Revalidates account-private icon overrides at the serialized shortcut write while retaining route and
      * preview ownership.
@@ -2206,10 +2221,8 @@ class LocalNotificationPresenter(
         isPublishAllowed: () -> Boolean,
     ) {
         runCatching {
-            val (override, currentAvatar) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
-            val ownedConversationAvatar = if (override && update.isDm) currentAvatar else conversationAvatarBitmap
-            val ownedSenderAvatar = if (override) currentAvatar else senderAvatarBitmap
-            val ownedSender = if (override) contactAvatarPerson(sender, currentAvatar) else sender
+            val (ownedConversationAvatar, ownedSenderAvatar, ownedSender) =
+                ownedShortcutAvatars(update, conversationAvatarBitmap, senderAvatarBitmap, sender)
             val candidateTitle = content.conversationTitle ?: content.title
             val existingTitle =
                 shortcutSnapshots[shortcutId]?.longLabel
@@ -2260,12 +2273,7 @@ class LocalNotificationPresenter(
                     val (currentChoice, pixels) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
                     val preview = NotificationPreviewPreferences.capture(context)
                     shortcut.extras?.let { stampShortcutPreview(preview, it) }
-                    stampContactPictureShortcut(
-                        shortcut,
-                        update.sender.accountIdHex,
-                        update.isDm,
-                        ownedSender,
-                    )
+                    stampContactPictureShortcut(shortcut, update.sender.accountIdHex, update.isDm)
                     val currentShortcut =
                         if (!shortcutPreviewAllowed(context, shortcut)) {
                             genericNotificationShortcut(context, shortcut)
@@ -2574,6 +2582,7 @@ private val notificationEnrichmentScope =
             CoroutineName("notification-card-enrichment"),
     )
 
+/** Resolves a public avatar URL to notification pixels, bounding the optional rich-card fetch. */
 private suspend fun resolveNotificationAvatarBitmap(url: String?): Bitmap? {
     val normalizedUrl = url?.takeUnless(String::isBlank)
     return normalizedUrl?.let { avatarUrl ->

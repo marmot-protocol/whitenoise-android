@@ -9,22 +9,18 @@ import androidx.core.content.pm.ShortcutManagerCompat
 private const val CONTACT_ICON_SCOPE = "dev.ipf.whitenoise.PRIVATE_CONTACT_ICON_SCOPE"
 private const val CONTACT_CONVERSATION_ICON = "dev.ipf.whitenoise.PRIVATE_CONTACT_CONVERSATION_ICON"
 
-/** Tags only platform-local picture ownership, never a file path, display handle, or picker URI. */
+/**
+ * Tags only platform-local picture ownership, never a file path, display handle, picker URI or Person name:
+ * launcher clones keep extras, so nothing a shortcut's own label does not already show may live there.
+ */
 internal fun stampContactPictureShortcut(
     shortcut: ShortcutInfoCompat,
     contact: String,
     conversationIcon: Boolean,
-    person: androidx.core.app.Person? = null,
 ) {
     shortcut.extras?.apply {
         putString(CONTACT_ICON_SCOPE, conversationShortcutAccountScope(contact))
         putBoolean(CONTACT_CONVERSATION_ICON, conversationIcon)
-        person?.let {
-            putString(CONTACT_ICON_SCOPE + ".name", it.name?.toString())
-            putString(CONTACT_ICON_SCOPE + ".uri", it.uri)
-            putBoolean(CONTACT_ICON_SCOPE + ".bot", it.isBot)
-            putBoolean(CONTACT_ICON_SCOPE + ".important", it.isImportant)
-        }
     }
 }
 
@@ -48,15 +44,7 @@ internal fun refreshContactPictureShortcuts(
             .filter { it.id == legacyId && it.extras?.getString(CONTACT_ICON_SCOPE) == null }
             .filter { it.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA) == accountScope }
             .filter { legacyShortcutRouteMatches(context, it, account, legacyConversationId) }
-            .forEach {
-                val person =
-                    androidx.core.app.Person
-                        .Builder()
-                        .setKey(contact)
-                        .setName(it.longLabel ?: it.shortLabel)
-                        .build()
-                stampContactPictureShortcut(it, contact, legacyConversationIcon, person)
-            }
+            .forEach { stampContactPictureShortcut(it, contact, legacyConversationIcon) }
     }
     val matches =
         shortcuts.filter {
@@ -126,22 +114,18 @@ internal fun withContactPictureIcon(
     if (shortcut.excludedFromSurfaces != 0) builder.setExcludedFromSurfaces(shortcut.excludedFromSurfaces)
     if (shortcut.extras?.getBoolean(CONTACT_CONVERSATION_ICON) == true) {
         builder.setIcon(icon)
-    } else {
-        // Updates omit the icon to retain it in Android; initial publication supplies its known group icon.
-        initialConversationIcon?.let(builder::setIcon)
-    }
-    val extras = shortcut.extras
-    extras?.getString(CONTACT_ICON_SCOPE + ".name")?.let { name ->
+        // A direct conversation names exactly this contact, so its Person is rebuilt from the shortcut's own
+        // label; group shortcuts set no Person here and keep whatever Android already retains for them.
         val person =
             androidx.core.app.Person
                 .Builder()
-                .setName(name)
+                .setName(shortcut.longLabel ?: shortcut.shortLabel)
                 .setKey(contact)
-                .setUri(extras.getString(CONTACT_ICON_SCOPE + ".uri"))
-                .setBot(extras.getBoolean(CONTACT_ICON_SCOPE + ".bot"))
-                .setImportant(extras.getBoolean(CONTACT_ICON_SCOPE + ".important"))
                 .build()
         builder.setPerson(contactAvatarPerson(person, bitmap))
+    } else {
+        // Updates omit the icon to retain it in Android; initial publication supplies its known group icon.
+        initialConversationIcon?.let(builder::setIcon)
     }
     return builder.build()
 }

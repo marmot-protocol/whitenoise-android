@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import java.time.ZoneId
 import java.util.Locale
@@ -96,10 +97,7 @@ internal fun globalSearchFilterOptions(
                     avatarSeed = item.selectedAvatarSeed ?: peer ?: item.group.groupIdHex,
                     avatarUrl =
                         peer?.let {
-                            appState.contactAvatarSource(it)?.takeIf(
-                                dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate,
-                            )
-                                ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
+                            appState.privateContactAvatarSource(it) ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
                         },
                 )
             },

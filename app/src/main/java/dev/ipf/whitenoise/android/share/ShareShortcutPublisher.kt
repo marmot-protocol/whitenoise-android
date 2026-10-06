@@ -25,7 +25,6 @@ import dev.ipf.whitenoise.android.notifications.preferredConversationShortcutTit
 import dev.ipf.whitenoise.android.notifications.shortcutPreviewAllowed
 import dev.ipf.whitenoise.android.notifications.stampShortcutPreview
 import dev.ipf.whitenoise.android.state.ChatListItem
-import dev.ipf.whitenoise.android.state.isPeerSourced
 import kotlin.math.min
 
 internal const val MAX_SHARE_SHORTCUTS = 8
@@ -190,9 +189,10 @@ class ShareShortcutPublisher(
         val previewToken = NotificationPreviewPreferences.capture(context)
         val maxShortcuts = maxShortcutCount().coerceAtLeast(0)
         val limit = min(MAX_SHARE_SHORTCUTS, maxShortcuts)
+        val chatsByGroup = chats.associateBy { it.group.groupIdHex }
         val targets =
             selectShareShortcutTargets(accountRef, chats, limit, displayTitle).map { target ->
-                val item = chats.first { it.group.groupIdHex == target.groupIdHex }
+                val item = chatsByGroup[target.groupIdHex] ?: return@map target
                 val (changed, bitmap) = avatarOverride(accountRef, item)
                 if (changed) target.copy(avatarBitmap = bitmap, avatarUrl = null, localContactAvatar = true) else target
             }
@@ -259,12 +259,8 @@ class ShareShortcutPublisher(
         item: ChatListItem,
     ) {
         val ownsConversationIcon =
-            item.selectedPresentation?.avatarSource?.isPeerSourced() == true ||
-                (
-                    item.selectedAvatarAsset == null &&
-                        item.group.avatarUrl.isNullOrBlank() &&
-                        item.group.imageHashHex.isNullOrBlank()
-                )
+            !dev.ipf.whitenoise.android.core.GroupProjector
+                .ownsGroupPicture(item)
         dev.ipf.whitenoise.android.notifications
             .stampContactPictureShortcut(shortcut, peer, ownsConversationIcon)
     }

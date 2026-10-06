@@ -7,6 +7,8 @@ import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -43,8 +45,10 @@ class ContactPictureShortcutTest {
         val red = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
         val platform =
             object : ContactPictureShortcutPlatform(context) {
+                /** Serves the shortcuts the fake platform currently publishes. */
                 override fun read() = published
 
+                /** Replaces published shortcuts by id and keeps the untouched ones. */
                 override fun update(shortcuts: List<androidx.core.content.pm.ShortcutInfoCompat>) {
                     val changes = shortcuts.associateBy { it.id }
                     published = published.map { changes[it.id] ?: it }
@@ -93,6 +97,28 @@ class ContactPictureShortcutTest {
         assertPreviewRefresh(staleEpoch = true, expectPrivate = false)
     }
 
+    /** A direct shortcut's Person is rebuilt from its own label; extras carry no name and groups set no Person. */
+    @Test fun refreshedPersonsComeFromTheShortcutLabelOnly() {
+        val context = RuntimeEnvironment.getApplication()
+        val preview = NotificationPreviewPreferences.capture(context)
+        val dmTarget = ShareShortcutTarget("a", "dm", "Maya")
+        val dm = checkNotNull(buildShareShortcut(context, dmTarget, previewToken = preview))
+        val groupTarget = ShareShortcutTarget("a", "group", "Hikers")
+        val group = checkNotNull(buildShareShortcut(context, groupTarget, previewToken = preview))
+        stampContactPictureShortcut(dm, "contact", conversationIcon = true)
+        stampContactPictureShortcut(group, "contact", conversationIcon = false)
+        val red = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+        val refreshedDm = withContactPictureIcon(context, dm, "contact", red)
+        val refreshedGroup = withContactPictureIcon(context, group, "contact", red)
+        val dmPerson = checkNotNull(refreshedDm.persons()).single()
+        assertEquals("Maya", dmPerson.name?.toString())
+        assertEquals("contact", dmPerson.key)
+        assertNull(refreshedGroup.persons())
+        listOf(dm, group, refreshedDm, refreshedGroup).forEach { shortcut ->
+            assertTrue(checkNotNull(shortcut.extras).keySet().none { it.endsWith(".name") || it.endsWith(".uri") })
+        }
+    }
+
     /** Runs the production icon-refresh path against a controlled preview epoch and captured launcher writes. */
     private fun assertPreviewRefresh(
         previousSession: Boolean = false,
@@ -126,8 +152,10 @@ class ContactPictureShortcutTest {
         val red = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
         val platform =
             object : ContactPictureShortcutPlatform(context) {
+                /** Serves the single published shortcut. */
                 override fun read() = listOf(shortcut)
 
+                /** Stores the single rewritten shortcut. */
                 override fun update(shortcuts: List<androidx.core.content.pm.ShortcutInfoCompat>) {
                     shortcut = shortcuts.single()
                 }
@@ -165,8 +193,10 @@ class ContactPictureShortcutTest {
         var published = listOf(first, other).map { withContactPictureIcon(context, it, "contact", red) }
         val platform =
             object : ContactPictureShortcutPlatform(context) {
+                /** Serves the shortcuts the fake platform currently publishes. */
                 override fun read() = published
 
+                /** Replaces published shortcuts by id and keeps the untouched ones. */
                 override fun update(shortcuts: List<androidx.core.content.pm.ShortcutInfoCompat>) {
                     val changed = shortcuts.associateBy { it.id }
                     published = published.map { changed[it.id] ?: it }
@@ -174,6 +204,7 @@ class ContactPictureShortcutTest {
             }
         refreshContactPictureShortcuts(context, "a", "contact", { blue }, { true }, platform)
 
+        /** Reads the top-left pixel of one published shortcut icon. */
         fun pixel(id: String): Int =
             checkNotNull(published.single { it.id == id }.icon?.loadDrawable(context))
                 .toBitmap()
@@ -193,4 +224,12 @@ class ContactPictureShortcutTest {
             refreshed.extras?.getString(CONVERSATION_SHORTCUT_ACCOUNT_SCOPE_EXTRA),
         )
     }
+
+    /** Reads the compat shortcut's Person array, which androidx keeps package-private, for assertions. */
+    @Suppress("UNCHECKED_CAST")
+    private fun androidx.core.content.pm.ShortcutInfoCompat.persons(): Array<androidx.core.app.Person>? =
+        androidx.core.content.pm.ShortcutInfoCompat::class.java
+            .getDeclaredField("mPersons")
+            .apply { isAccessible = true }
+            .get(this) as Array<androidx.core.app.Person>?
 }

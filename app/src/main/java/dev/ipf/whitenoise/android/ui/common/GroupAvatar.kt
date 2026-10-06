@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.isPeerSourced
 import dev.ipf.whitenoise.android.state.isRenderable
+import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 
 /**
@@ -47,8 +48,8 @@ internal fun rememberGroupAvatarPresentation(
             PrivateContactAvatarLoader.isPrivate(source) && !appState.ownsPrivateAvatarSource(source, accountRef)
         }
     val groupOwnsPicture =
-        !durableAvatarIsPersonPicture &&
-            (durableAvatar != null || !group.avatarUrl.isNullOrBlank() || !group.imageHashHex.isNullOrBlank())
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .ownsGroupPicture(group, durableAvatar, durableAvatarIsPersonPicture)
     val privateSource =
         ownedFallback
             ?.takeUnless { groupOwnsPicture }
@@ -140,8 +141,7 @@ internal fun rememberChatListGroupAvatar(
         fallbackPictureUrl =
             dev.ipf.whitenoise.android.core.GroupProjector
                 .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
-                ?.let { appState.contactAvatarSource(it, accountRef) }
-                ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
+                ?.let { appState.privateContactAvatarSource(it, accountRef) }
                 ?: fallbackPictureUrl,
         firstFrameAvatar = item.firstFrameAvatar,
         durableAvatarIsPersonPicture = item.selectedPresentation?.avatarSource?.isPeerSourced() == true,
@@ -161,10 +161,7 @@ internal fun rememberConversationGroupAvatar(
         dev.ipf.whitenoise.android.core.GroupProjector
             .lendsPeerAvatar(controller.group, controller.memberCount)
     val peer = (selected?.peerId?.takeIf { peerPicture } ?: controller.avatarAccount).takeIf { lendsPeer }
-    val privatePicture =
-        peer
-            ?.let { appState.contactAvatarSource(it, controller.boundAccountRef) }
-            ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
+    val privatePicture = peer?.let { appState.privateContactAvatarSource(it, controller.boundAccountRef) }
     val lifetime = AvatarImageLoader.currentCacheLifetime()
     val originalBytes =
         remember(appState, controller, asset, controller.boundAccountRef, appState.runtimeGeneration, lifetime) {

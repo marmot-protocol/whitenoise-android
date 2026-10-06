@@ -67,6 +67,21 @@ class AppStateContactPictureTest {
             )
         }
 
+    /** A nickname-only Save leaves every decoded avatar in place instead of retiring the whole cache lifetime. */
+    @Test fun nicknameOnlySaveKeepsCachedAvatars() =
+        runBlocking {
+            val app = app()
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "Note", picture(Color.RED)) { true })
+            val source = checkNotNull(app.contactAvatarSource("contact"))
+            val lifetime = AvatarImageLoader.currentCacheLifetime()
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Renamed", "", ContactPictureChange.Keep) { true })
+            assertEquals(lifetime, AvatarImageLoader.currentCacheLifetime())
+            assertEquals(source, app.contactAvatarSource("contact"))
+            assertEquals(Color.RED, checkNotNull(AvatarImageLoader.peek(source)).asAndroidBitmap().getPixel(0, 0))
+            assertEquals("Renamed", app.contactNickname("contact"))
+            assertNull(app.contactNotes("contact"))
+        }
+
     /** Creates a small synthetic normalized replacement without relying on external media. */
     private fun picture(color: Int) = ContactPictureChange.Replace(contactPicturePng(color))
 
@@ -77,8 +92,10 @@ class AppStateContactPictureTest {
             draftStore =
                 DraftStore(
                     object : DraftPersistence {
+                        /** Starts from no persisted drafts. */
                         override fun read(): Map<String, String> = emptyMap()
 
+                        /** Discards draft writes. */
                         override fun write(
                             key: String,
                             value: String?,

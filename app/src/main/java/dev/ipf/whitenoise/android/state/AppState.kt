@@ -2341,15 +2341,10 @@ class WhiteNoiseAppState private constructor(
         )
     private val shareShortcutPublisher =
         ShareShortcutPublisher(appContext, avatarOverride = { account, item ->
-            val peerImage = item.selectedPresentation?.avatarSource?.isPeerSourced() == true
-            val noGroupImage =
-                item.selectedAvatarAsset == null &&
-                    item.group.avatarUrl.isNullOrBlank() &&
-                    item.group.imageHashHex.isNullOrBlank()
             val peer =
                 GroupProjector
                     .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
-                    ?.takeIf { peerImage || noGroupImage }
+                    ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
             peer?.let { contactAvatarOverride(account, it) } ?: (false to null)
         })
 
@@ -10187,11 +10182,15 @@ class WhiteNoiseAppState private constructor(
                 }
             }
         if (saved) {
-            AvatarImageLoader.clearStoredAvatars()
-            warmPrivateContactAvatar(account, contact)
-            contactNicknameRevision += 1
-            bumpProfileAccountRevision(contact)
-            refreshPrivateContactPresentation(account, contact, adoptLegacy = true)
+            // The editor's scope may already be cancelled by a configuration change while the record has landed.
+            withContext(NonCancellable) {
+                // A nickname-only Save changes no pixels, so every cached avatar stays decoded.
+                if (picture !is ContactPictureChange.Keep) AvatarImageLoader.clearStoredAvatars()
+                warmPrivateContactAvatar(account, contact)
+                contactNicknameRevision += 1
+                bumpProfileAccountRevision(contact)
+                mutationsScope.launch { refreshPrivateContactPresentation(account, contact, adoptLegacy = true) }
+            }
         }
         return saved
     }
@@ -10203,6 +10202,8 @@ class WhiteNoiseAppState private constructor(
         adoptLegacy: Boolean = false,
     ) {
         notificationNicknameRefresh.refresh(account, contact)
+        // An evicted private bitmap must not downgrade a current platform icon to its monogram.
+        warmPrivateContactAvatar(account, contact)
         withContext(Dispatchers.IO) {
             runCatchingCancellable {
                 val platform =
@@ -10248,15 +10249,11 @@ class WhiteNoiseAppState private constructor(
             )
         if (peer != contact || row.row.groupIdHex != existing.groupIdHex) return null
         val contactIcon =
-            row.presentation.avatarSource.isPeerSourced() ||
-                (
-                    row.avatarAsset == null &&
-                        item.group.avatarUrl.isNullOrBlank() &&
-                        item.group.imageHashHex.isNullOrBlank()
-                )
+            !GroupProjector.ownsGroupPicture(item.group, row.avatarAsset, row.presentation.avatarSource.isPeerSourced())
         return existing.groupIdHex to contactIcon
     }
 
+    /** Public profile picture URL for display, requesting the profile once when no avatar is known yet. */
     fun avatarUrl(accountIdHex: String): String? {
         val avatar = profilePresentation(accountIdHex).avatarUrl
         if (avatar == null) requestProfile(accountIdHex)
@@ -11806,6 +11803,7 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Drops every cached profile presentation so each surface re-reads identity from the engine. */
     private fun notifyProfilesChanged() {
         assertMainThread { "notifyProfilesChanged" }
         synchronized(profilePresentationLock) {

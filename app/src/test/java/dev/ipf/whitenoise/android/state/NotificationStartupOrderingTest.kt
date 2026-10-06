@@ -735,6 +735,7 @@ class NotificationStartupOrderingTest {
             }
         }
 
+    /** Returns the live platform notification for the fixture's conversation card. */
     private fun NotificationBootstrapTestFixture.activeNotification(): Notification =
         context
             .getSystemService(NotificationManager::class.java)
@@ -829,6 +830,7 @@ class NotificationStartupOrderingTest {
         val fixture = lateCorrectionFixture(accounts, releaseFirstRead)
         ConversationCardPostSynchronizer.testHook =
             object : ConversationCardTestHook {
+                /** Parks the fixture card's second show-notify write before it lands and counts completed writes. */
                 override fun onBarrier(
                     op: ConversationCardOp,
                     barrier: ConversationCardBarrier,
@@ -853,6 +855,7 @@ class NotificationStartupOrderingTest {
                     if (barrier == ConversationCardBarrier.AFTER_WRITE) writes.incrementAndGet()
                 }
 
+                /** Reports that the parked correction has released the card lock. */
                 override fun onLockReleased(
                     op: ConversationCardOp,
                     notificationTag: String,

@@ -109,8 +109,10 @@ class LocalNotificationPresenterConversationTest {
             var cached = checkNotNull(publishedShortcut)
             val platform =
                 object : ContactPictureShortcutPlatform(context) {
+                    /** Serves the cached conversation shortcut. */
                     override fun read() = listOf(cached)
 
+                    /** Stores the single rewritten shortcut. */
                     override fun update(shortcuts: List<ShortcutInfoCompat>) {
                         cached = shortcuts.single()
                     }
@@ -161,6 +163,7 @@ class LocalNotificationPresenterConversationTest {
                 shortNpub = { "Maya" },
             )
 
+            /** Reads the top-left pixel of the sender Person icon on the live card. */
             fun senderPixels(): Int {
                 val card =
                     manager.activeNotifications

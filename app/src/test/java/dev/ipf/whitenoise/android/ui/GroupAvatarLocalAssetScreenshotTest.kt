@@ -1133,6 +1133,7 @@ private val GROUP_ID = "04" + "00".repeat(31)
 class PrivateContactGroupAvatarTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Resets every avatar cache so no test inherits another test's pixels. */
     @Before
     @After
     fun clearPixels() {

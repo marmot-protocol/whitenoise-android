@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.isPeerSourced
+import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
@@ -159,15 +160,14 @@ internal fun ConversationTopBar(
     val peerEligible =
         dev.ipf.whitenoise.android.core.GroupProjector
             .lendsPeerAvatar(presentedGroup, presentedMemberCount)
+    val peerSourced = avatarSource?.avatarSource?.isPeerSourced() == true
     val privatePeer =
-        (presentedAvatarAccount ?: avatarSource?.peerId?.takeIf { avatarSource.avatarSource.isPeerSourced() })
+        (presentedAvatarAccount ?: avatarSource?.peerId?.takeIf { peerSourced })
             ?.takeIf {
                 peerEligible &&
-                    avatarSource?.avatarSource != dev.ipf.marmotkit.PresentationSourceFfi.GROUP &&
-                    presentedGroup.avatarUrl.isNullOrBlank() &&
-                    presentedGroup.imageHashHex.isNullOrBlank()
-            }?.let { appState.contactAvatarSource(it, controller.boundAccountRef) }
-            ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
+                    !dev.ipf.whitenoise.android.core.GroupProjector
+                        .ownsGroupPicture(presentedGroup, selectedAsset, peerSourced)
+            }?.let { appState.privateContactAvatarSource(it, controller.boundAccountRef) }
     val hasExplicitSelection = controller.window.header != null || liveRow?.selectedAvatarAsset != null
     val explicitSelectionMissing = hasExplicitSelection && selectedAsset == null
     val avatarGroup =
