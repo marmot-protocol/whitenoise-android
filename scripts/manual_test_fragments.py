@@ -209,6 +209,25 @@ def assemble_guide(text: str, fragments: dict[str, str], *, check_legacy_hash: b
     return "\n".join(result) + "\n"
 
 
+def replace_source_entries(entries: list[dict], replacement: list[dict], source: str) -> list[dict]:
+    """Keep other sources in place, including interleaved legacy entries."""
+    positions = [index for index, entry in enumerate(entries) if entry.get("source") == source]
+    remaining = iter(replacement)
+    merged = []
+    for index, entry in enumerate(entries):
+        if entry.get("source") != source:
+            merged.append(entry)
+            continue
+        next_entry = next(remaining, None)
+        if next_entry is not None:
+            merged.append(next_entry)
+        if index == positions[-1]:
+            merged.extend(remaining)
+    if not positions:
+        merged.extend(remaining)
+    return merged
+
+
 def assemble_inventory(data: dict, fragments: dict[str, str], *, check_legacy_hash: bool = True) -> dict:
     # Copy only after validating raw entries: an overlay must not erase duplicates.
     result = json.loads(json.dumps(data))
@@ -228,23 +247,13 @@ def assemble_inventory(data: dict, fragments: dict[str, str], *, check_legacy_ha
         if any(e.get("source") != source for e in entries):
             raise FragmentError(f"{path}: every entry must belong to {source}")
         for category in sorted(set(result["categories"]) | set(fragment["categories"])):
-            replacement = fragment["categories"].get(category, [])
-            merged = []
-            inserted = False
-            for entry in result["categories"].get(category, []):
-                if entry.get("source") == source:
-                    if not inserted:
-                        merged.extend(replacement)
-                        inserted = True
-                else:
-                    merged.append(entry)
-            if not inserted:
-                merged.extend(replacement)
-            result["categories"][category] = merged
+            result["categories"][category] = replace_source_entries(
+                result["categories"].get(category, []), fragment["categories"].get(category, []), source,
+            )
         if "discovery_exceptions" in result or fragment.get("discovery_exceptions"):
-            result["discovery_exceptions"] = [
-                e for e in result.get("discovery_exceptions", []) if e.get("source") != source
-            ] + fragment.get("discovery_exceptions", [])
+            result["discovery_exceptions"] = replace_source_entries(
+                result.get("discovery_exceptions", []), fragment.get("discovery_exceptions", []), source,
+            )
     return result
 
 

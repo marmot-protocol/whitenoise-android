@@ -73,6 +73,60 @@ class FragmentTest(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             fragments.extract_case(self.root, "MSG-001")
 
+    def test_interleaved_sources_keep_positions_when_replaced_removed_or_extended(self):
+        first, other, last = self.entry(SOURCE), self.entry(OTHER), {**self.entry(SOURCE), "surface": "Last"}
+        entries = [first, other, last]
+        self.assertEqual(fragments.replace_source_entries(entries, [first, last], SOURCE), entries)
+        self.assertEqual(fragments.replace_source_entries(entries, [first], SOURCE), [first, other])
+        self.assertEqual(fragments.replace_source_entries(entries, [], SOURCE), [other])
+        extra = {**first, "surface": "Extra"}
+        self.assertEqual(fragments.replace_source_entries(entries, [first, last, extra], SOURCE), [first, other, last, extra])
+        self.assertEqual(fragments.replace_source_entries([other], [first], SOURCE), [other, first])
+
+    def test_all_real_inputs_preserve_effective_content_when_extracted(self):
+        repository = Path(__file__).resolve().parents[1]
+        text = (repository / fragments.GUIDE_PATH).read_text()
+        data = fragments.decode_inventory((repository / fragments.INVENTORY_PATH).read_text())
+        cases = {
+            f"{fragments.CASE_DIR}/{test_id}.md": f"<!-- legacy-sha256: {fragments.digest(line)} -->\n\n{line}\n"
+            for test_id, line in fragments.definitions(text).items()
+        }
+        self.assertEqual(fragments.assemble_guide(text, cases), text)
+        sources = {entry["source"] for entries in data["categories"].values() for entry in entries if entry.get("source")}
+        sources.update(entry["source"] for entry in data.get("discovery_exceptions", []) if entry.get("source"))
+        surfaces = {
+            f"{fragments.SURFACE_DIR}/{source}.json": json.dumps({
+                "source": source, "legacy_sha256": fragments.source_digest(data, source),
+                **fragments.source_inventory(data, source),
+            })
+            for source in sorted(sources)
+        }
+        assembled = fragments.assemble_inventory(data, surfaces)
+        self.assertEqual(assembled, data)
+        active, _, errors = checker.parse_guide(text)
+        with mock.patch.object(checker, "load_inventory", return_value=assembled):
+            checker.validate_inventory(active, errors)
+        self.assertEqual(errors, [])
+
+    def test_reordering_mapping_entries_cannot_satisfy_coverage_maintenance(self):
+        self.inventory["categories"]["composable_surfaces"].append({**self.entry(SOURCE), "surface": "Second"})
+        self.write(fragments.INVENTORY_PATH, json.dumps(self.inventory))
+        base = self.init_git()
+        self.seed()
+        self.case_path().write_text(self.case_path().read_text().replace("Send hello", "Send hello twice"))
+        data = json.loads(self.surface_path().read_text())
+        data["categories"]["composable_surfaces"].reverse()
+        self.surface_path().write_text(json.dumps(data))
+        changed = {SOURCE, f"{fragments.CASE_DIR}/MSG-001.md", f"{fragments.SURFACE_DIR}/{SOURCE}.json"}
+        with (
+            mock.patch.object(checker, "ROOT", self.root),
+            mock.patch.object(checker, "GUIDE", self.root / fragments.GUIDE_PATH),
+            mock.patch.object(checker, "INVENTORY", self.root / fragments.INVENTORY_PATH),
+        ):
+            errors = []
+            checker.validate_fragment_maintenance(base, changed, errors)
+        self.assertTrue(any("change effective coverage" in error for error in errors))
+
     def test_case_changes_render_and_new_id_appends_without_renumbering(self):
         self.seed()
         path = self.case_path()

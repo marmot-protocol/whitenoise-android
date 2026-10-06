@@ -12,12 +12,12 @@ from pathlib import Path
 try:
     from manual_test_fragments import (
         CASE_DIR, SURFACE_DIR, GUIDE_PATH, INVENTORY_PATH, ID_RE, DEFINITION_RE, FragmentError, definitions,
-        extract_case, extract_source, load_guide, load_inventory, source_inventory,
+        extract_case, extract_source, load_guide, load_inventory, source_inventory, source_digest,
     )
 except ModuleNotFoundError:
     from scripts.manual_test_fragments import (
         CASE_DIR, SURFACE_DIR, GUIDE_PATH, INVENTORY_PATH, ID_RE, DEFINITION_RE, FragmentError, definitions,
-        extract_case, extract_source, load_guide, load_inventory, source_inventory,
+        extract_case, extract_source, load_guide, load_inventory, source_inventory, source_digest,
     )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -703,7 +703,7 @@ def validate_fragment_maintenance(base: str, changed: set[str], errors: list[str
         for source in sources:
             old = source_inventory(old_inventory, source)
             current = source_inventory(current_inventory, source)
-            if old != current:
+            if source_digest(old_inventory, source) != source_digest(current_inventory, source):
                 changed_mappings.add(source)
             for data in (old, current):
                 for entries in data["categories"].values():
