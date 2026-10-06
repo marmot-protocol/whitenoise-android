@@ -1,0 +1,75 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PlaybackTransportBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "fun PlaybackTransportBar(",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "VoiceTransportBarContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "fun VoiceTransportBarContent(",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "VoiceTransportPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "fun VoiceTransportPreview(",
+        "test_ids": [
+          "MED-028"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.reply_media_voice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "R.string.reply_media_voice",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_return_to_source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "R.string.tts_bar_return_to_source",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "R.string.tts_playback_action_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "R.string.tts_playback_action_stop",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "R.string.voice_message_pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "R.string.voice_message_pause",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "R.string.voice_message_play",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackTransportBar.kt",
+        "anchor": "R.string.voice_message_play",
+        "test_ids": [
+          "MED-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

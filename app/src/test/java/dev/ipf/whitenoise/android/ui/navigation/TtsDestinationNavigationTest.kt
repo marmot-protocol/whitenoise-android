@@ -35,6 +35,7 @@ class TtsDestinationNavigationTest {
         )
     private val request = TtsDestinationNavigationRequest(3L, "account-a", "group-a", 9L)
 
+    /** A missing or replaced playback session cannot navigate a retained source request. */
     @Test
     fun staleOrReplacedSessionCancelsWithoutRouting() {
         assertEquals(TtsDestinationNavigationStep.Cancelled, resolve(current = null))
@@ -48,6 +49,7 @@ class TtsDestinationNavigationTest {
         )
     }
 
+    /** Routing first proves account availability and waits for its owned account switch before opening the chat. */
     @Test
     fun sourceAccountIsValidatedAndSwitchedBeforeChatResolution() {
         assertEquals(
@@ -67,6 +69,7 @@ class TtsDestinationNavigationTest {
         )
     }
 
+    /** Sentence advancement cannot steal or restart an already owned account transition. */
     @Test
     fun passageAdvanceWhileAccountSwitchIsPendingKeepsWaitingForTheOwnedSwitch() {
         assertEquals(
@@ -79,6 +82,7 @@ class TtsDestinationNavigationTest {
         )
     }
 
+    /** Both loaded and direct-load routes use the latest source passage while retaining the request identity. */
     @Test
     fun latestPassageIsUsedForExistingAndDirectlyLoadedConversations() {
         assertEquals(
@@ -102,6 +106,7 @@ class TtsDestinationNavigationTest {
         )
     }
 
+    /** Only the currently retained request ID may apply a delayed navigation completion. */
     @Test
     fun onlyTheCurrentRequestOwnsAnAsyncCompletion() {
         assertTrue(request.ownsCompletion(requestId = 3L))
@@ -110,6 +115,7 @@ class TtsDestinationNavigationTest {
         assertFalse((null as TtsDestinationNavigationRequest?).ownsCompletion(requestId = 3L))
     }
 
+    /** Unrelated account changes and superseded requests cancel routing instead of retargeting it. */
     @Test
     fun onlyTheRequestOwnedAccountTransitionKeepsRoutingAlive() {
         val ownership =

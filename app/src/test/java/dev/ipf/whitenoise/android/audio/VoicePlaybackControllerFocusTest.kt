@@ -151,6 +151,7 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(1, player.startCount)
     }
 
+    /** Stops playback and clears reflected focus ownership so later fixtures cannot inherit a held request. */
     @After
     fun tearDown() {
         VoicePlaybackController.stop()
@@ -161,6 +162,7 @@ class VoicePlaybackControllerFocusTest {
         setAudioFocusOwnerField("onSurrender", null)
     }
 
+    /** Repeated play attempts reuse held focus; explicit abandonment requires a fresh Android request. */
     @Test
     fun requestFocusReusesHeldRequestUntilAbandoned() {
         val context = RuntimeEnvironment.getApplication()
@@ -179,6 +181,7 @@ class VoicePlaybackControllerFocusTest {
         assertSame(firstFocusRequest.audioFocusRequest, shadowAudioManager.lastAbandonedAudioFocusRequest)
     }
 
+    /** Denied focus cannot leave a cached handle that falsely authorizes a later play. */
     @Test
     fun failedFocusRequestIsNotRememberedAsHeldFocus() {
         val context = RuntimeEnvironment.getApplication()
@@ -197,6 +200,7 @@ class VoicePlaybackControllerFocusTest {
         assertNotNull(audioFocusOwnerField("focusRequest"))
     }
 
+    /** A player that fails before assignment is released together with its focus ownership. */
     @Test
     fun startFailureReleasesUnassignedPlayerAndAbandonsFocus() {
         val context = RuntimeEnvironment.getApplication()
@@ -225,6 +229,7 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
     }
 
+    /** Failed resume retires the active player and prevents its old owner from retaining audio focus. */
     @Test
     fun resumeStartFailureReleasesActivePlayerAndAbandonsFocus() {
         val context = RuntimeEnvironment.getApplication()
@@ -263,6 +268,7 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
     }
 
+    /** Temporary interruption retains the same focus handle and resumes only the interrupted player. */
     @Test
     fun transientLossRetainsFocusAndResumesTheInterruptedPlayerOnGain() {
         val context = RuntimeEnvironment.getApplication()
@@ -288,6 +294,7 @@ class VoicePlaybackControllerFocusTest {
         assertFalse(controllerField("resumeOnAudioFocusGain") as Boolean)
     }
 
+    /** An explicit play after a missing focus-gain callback requests fresh authorization. */
     @Test
     fun userPlayAfterMissingTransientGainRequestsFocusAgain() {
         val context = RuntimeEnvironment.getApplication()
@@ -312,6 +319,7 @@ class VoicePlaybackControllerFocusTest {
         assertTrue(shadowAudioManager.lastAudioFocusRequest !== retainedRequest)
     }
 
+    /** A denied explicit play cannot bypass the paused state left by transient interruption. */
     @Test
     fun userPlayAfterTransientLossStaysPausedWhenFreshFocusIsDenied() {
         val context = RuntimeEnvironment.getApplication()
@@ -336,6 +344,7 @@ class VoicePlaybackControllerFocusTest {
         assertNull(audioFocusOwnerField("focusRequest"))
     }
 
+    /** Ducking changes volume without restarting playback; gain restores the original level. */
     @Test
     fun duckableLossLowersVolumeAndGainRestoresItWithoutRestarting() {
         val mediaPlayer = TrackingMediaPlayer()
@@ -355,6 +364,7 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(0, mediaPlayer.startCount)
     }
 
+    /** A volume-control failure pauses the clip while retaining its legitimate gain-resume intent. */
     @Test
     fun failedDuckFallsBackToTransientPause() {
         val mediaPlayer = TrackingMediaPlayer(failVolumeChange = true)
@@ -367,6 +377,7 @@ class VoicePlaybackControllerFocusTest {
         assertTrue(controllerField("resumeOnAudioFocusGain") as Boolean)
     }
 
+    /** A player that cannot pause during focus loss is retired rather than left playing without control. */
     @Test
     fun failedTransientPauseReleasesBrokenPlayerAndFocus() {
         val context = RuntimeEnvironment.getApplication()
@@ -383,6 +394,7 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
     }
 
+    /** A failed explicit pause releases the broken player and abandons its focus request. */
     @Test
     fun failedUserPauseControlsReleaseBrokenPlayerAndFocus() {
         val context = RuntimeEnvironment.getApplication()
@@ -403,6 +415,7 @@ class VoicePlaybackControllerFocusTest {
         }
     }
 
+    /** Even a failing playback-state query during focus loss must release player and focus ownership. */
     @Test
     fun failedFocusLossStateQueriesReleaseBrokenPlayerAndFocus() {
         val context = RuntimeEnvironment.getApplication()
@@ -424,6 +437,7 @@ class VoicePlaybackControllerFocusTest {
         }
     }
 
+    /** A failed gain-volume restoration retires the player instead of leaving an unmanageable active clip. */
     @Test
     fun failedVolumeRestoreReleasesBrokenPlayerAndFocus() {
         val context = RuntimeEnvironment.getApplication()
@@ -452,12 +466,14 @@ class VoicePlaybackControllerFocusTest {
 
     // Hit the private focus path directly; public playback needs MediaPlayer file
     // setup and would obscure the focus bookkeeping this regression protects.
+    /** Invokes the production controller's private focus boundary against Robolectric's AudioManager. */
     private fun requestFocus(): Boolean {
         val method = VoicePlaybackController::class.java.getDeclaredMethod("requestFocus")
         method.isAccessible = true
         return method.invoke(VoicePlaybackController) as Boolean
     }
 
+    /** Exercises production player adoption with the supplied failure-capable test player. */
     private fun startPreparedNewPlayer(mediaPlayer: MediaPlayer): Boolean {
         val method =
             VoicePlaybackController::class.java.getDeclaredMethod(
@@ -468,6 +484,7 @@ class VoicePlaybackControllerFocusTest {
         return method.invoke(VoicePlaybackController, mediaPlayer) as Boolean
     }
 
+    /** Delivers a focus event through the controller's actual private callback. */
     private fun handleAudioFocusChange(change: Int) {
         val method = VoicePlaybackController::class.java.getDeclaredMethod("handleAudioFocusChange", Integer.TYPE)
         method.isAccessible = true
@@ -492,20 +509,24 @@ class VoicePlaybackControllerFocusTest {
         )
     }
 
+    /** Reads private controller ownership for assertions without replacing its transition logic. */
     private fun controllerField(name: String): Any? {
         val field = VoicePlaybackController::class.java.getDeclaredField(name)
         field.isAccessible = true
         return field.get(VoicePlaybackController)
     }
 
+    /** Reads the retained Android-focus owner to distinguish held, denied and abandoned requests. */
     private fun audioFocusOwnerField(name: String): Any? {
         val field = AudioFocusOwner::class.java.getDeclaredField(name)
         field.isAccessible = true
         return field.get(AudioFocusOwner)
     }
 
+    /** Returns the installed focus listener so tests follow the real callback path. */
     private fun audioFocusListener(): AudioManager.OnAudioFocusChangeListener = audioFocusOwnerField("focusListener") as AudioManager.OnAudioFocusChangeListener
 
+    /** Seeds only the test owner's focus fixture fields and leaves controller transition code intact. */
     private fun setAudioFocusOwnerField(
         name: String,
         value: Any?,
@@ -525,6 +546,7 @@ class VoicePlaybackControllerFocusTest {
         stateFlow.value = state
     }
 
+    /** Sets a narrowly named controller fixture field before exercising the production boundary. */
     private fun setControllerField(
         name: String,
         value: Any?,

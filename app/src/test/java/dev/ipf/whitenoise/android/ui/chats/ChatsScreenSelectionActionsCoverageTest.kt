@@ -248,7 +248,8 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "the editor call must be followed by an unconditional return before the scaffold",
-            "ChatFolderEditScreen(" in handoff && "        )\n        return\n    }" in handoff,
+            "ChatFolderEditScreen(" in handoff &&
+                Regex("""\n\s*return\s*\n\s*}\s*$""").containsMatchIn(handoff),
         )
     }
 

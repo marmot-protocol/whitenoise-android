@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackFlowContent.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PlaybackFlowContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PlaybackFlowContent.kt",
+        "anchor": "fun PlaybackFlowContent(",
+        "test_ids": [
+          "MED-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
