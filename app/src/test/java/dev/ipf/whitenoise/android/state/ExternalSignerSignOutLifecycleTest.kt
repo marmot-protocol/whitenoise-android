@@ -192,6 +192,8 @@ class ExternalSignerSignOutLifecycleTest {
     /** Commits fail only for the new alert store; all native/account persistence keeps its real behavior. */
     private fun profileCleanupFailureContext(throws: Boolean): android.content.Context =
         object : android.content.ContextWrapper(context) {
+            private var commitsToFail = if (throws) 1 else 2
+
             override fun getApplicationContext(): android.content.Context = this
 
             override fun getSharedPreferences(
@@ -205,9 +207,17 @@ class ExternalSignerSignOutLifecycleTest {
                         val editor = delegate.edit()
                         return object : android.content.SharedPreferences.Editor by editor {
                             override fun commit(): Boolean {
-                                if (throws) throw IllegalStateException("injected preferences failure")
-                                editor.commit()
-                                return false
+                                org.junit.Assert.assertNotEquals(
+                                    android.os.Looper.getMainLooper(),
+                                    android.os.Looper.myLooper(),
+                                )
+                                if (commitsToFail > 0) {
+                                    commitsToFail -= 1
+                                    if (throws) throw IllegalStateException("injected preferences failure")
+                                    editor.commit()
+                                    return false
+                                }
+                                return editor.commit()
                             }
                         }
                     }

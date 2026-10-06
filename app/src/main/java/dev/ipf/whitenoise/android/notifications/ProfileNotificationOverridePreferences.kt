@@ -84,16 +84,31 @@ internal class ProfileNotificationOverridePreferences(
             saved
         }
 
-    /** Retry obsolete-account cleanup on an authoritative account refresh without blocking the main thread. */
-    fun retainAccounts(accountRefs: Collection<String>) {
+    /**
+     * Commit off-main, preserving retryable choices after a failed flush and rejecting superseded account snapshots.
+     */
+    fun retainAccounts(
+        accountRefs: Collection<String>,
+        canRetain: () -> Boolean = { true },
+    ): Boolean {
         val retained = accountRefs.map(::accountPrefix).toSet()
-        synchronized(mutationLock) {
-            val removed = preferences.all.keys.filter { key -> retained.none(key::startsWith) }
-            if (removed.isEmpty()) return
+        return synchronized(mutationLock) {
+            if (!canRetain()) return@synchronized true
+            val previous =
+                preferences.all.keys
+                    .filter { key -> retained.none(key::startsWith) }
+                    .associateWith { preferences.getString(it, null) }
+            if (previous.isEmpty()) return@synchronized true
             val editor = preferences.edit()
-            removed.forEach(editor::remove)
-            editor.apply()
-            revision.value += 1
+            previous.keys.forEach(editor::remove)
+            val saved =
+                runCatching { editor.commit() }.getOrElse { error ->
+                    runCatching { restoreInMemory(previous) }
+                    throw error
+                }
+            if (!saved) restoreInMemory(previous)
+            if (saved) revision.value += 1
+            saved
         }
     }
 

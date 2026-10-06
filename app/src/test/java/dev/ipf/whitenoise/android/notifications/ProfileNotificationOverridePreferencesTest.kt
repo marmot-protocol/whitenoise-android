@@ -103,10 +103,42 @@ class ProfileNotificationOverridePreferencesTest {
         val choice = ProfileNotificationOverride(ProfileNotificationMode.MUTED)
         store.set("removed", alice, choice)
         store.set("retained", alice, choice)
-        store.retainAccounts(listOf("retained"))
+        assertTrue(store.retainAccounts(listOf("retained")))
         val restarted = ProfileNotificationOverridePreferences(context)
         assertEquals(ProfileNotificationOverride(), restarted.get("removed", alice))
         assertEquals(choice, restarted.get("retained", alice))
+    }
+
+    /** A memory-first disk failure restores deleted choices for a later authoritative retry across adapters. */
+    @Test fun failedRetentionReportsFailureAndRestoresRetryableChoices() {
+        val preferences = context.getSharedPreferences("failed-retention", Context.MODE_PRIVATE)
+        val stable = ProfileNotificationOverridePreferences(context, preferences)
+        val choice = ProfileNotificationOverride(ProfileNotificationMode.MUTED)
+        stable.set("removed", alice, choice)
+        stable.set("retained", bob, choice)
+        val failed =
+            ProfileNotificationOverridePreferences(
+                context,
+                object : android.content.SharedPreferences by preferences {
+                    override fun edit(): android.content.SharedPreferences.Editor = FailingEditor(preferences.edit())
+                },
+            )
+        assertFalse(failed.retainAccounts(listOf("retained")))
+        assertEquals(choice, stable.get("removed", alice))
+        assertEquals(choice, stable.get("retained", bob))
+        assertTrue(stable.retainAccounts(listOf("retained")))
+        val restarted = ProfileNotificationOverridePreferences(context, preferences)
+        assertEquals(ProfileNotificationOverride(), restarted.get("removed", alice))
+        assertEquals(choice, restarted.get("retained", bob))
+    }
+
+    /** A newer account snapshot invalidates queued retention before it can prune newly accepted owners. */
+    @Test fun supersededAccountSnapshotDoesNotPruneChoices() {
+        val store = ProfileNotificationOverridePreferences(context)
+        val choice = ProfileNotificationOverride(ProfileNotificationMode.MUTED)
+        store.set("new-account", alice, choice)
+        assertTrue(store.retainAccounts(emptyList()) { false })
+        assertEquals(choice, store.get("new-account", alice))
     }
 
     /** Invalid public keys and revoked editor owners must not create even an inert preference entry. */

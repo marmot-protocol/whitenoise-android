@@ -124,7 +124,16 @@ internal fun WhiteNoiseAppState.refreshProfileNotificationChannelLabels(
 }
 
 /** A successful refresh retries sign-out/wipe cleanup; failed account reads must never prune other accounts. */
-internal fun WhiteNoiseAppState.retainProfileAlertsForAccounts(accounts: List<dev.ipf.marmotkit.AccountSummaryFfi>) {
-    runCatching { profileNotificationOverrides.retainAccounts(accounts.filterNot { it.signedOut }.map { it.label }) }
-        .onFailure { appStateDebug { "profile alert preference retention failed; retry on the next account refresh" } }
-}
+internal suspend fun WhiteNoiseAppState.retainProfileAlertsForAccounts(
+    accounts: List<dev.ipf.marmotkit.AccountSummaryFfi>,
+    canRetain: () -> Boolean,
+): Boolean =
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val saved =
+            runCatching {
+                val retained = accounts.filterNot { it.signedOut }.map { it.label }
+                profileNotificationOverrides.retainAccounts(retained, canRetain)
+            }.getOrDefault(false)
+        if (!saved) appStateDebug { "profile alert preference retention failed; retry on the next account refresh" }
+        saved
+    }
