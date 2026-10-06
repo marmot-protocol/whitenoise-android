@@ -2,10 +2,13 @@ package dev.ipf.whitenoise.android.ui.share
 
 import android.os.Looper
 import androidx.compose.material3.Surface
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
@@ -53,6 +56,9 @@ class ForwardAttentionFolderReactivityTest {
             renderPicker(appState)
             val chip = composeRule.onNodeWithTag(forwardFolderChipTestTag(folder.id))
             chip.assertExists()
+            val filterTag = "destination.filter.${folder.id}"
+            composeRule.onNodeWithTag("destination.filters").performScrollToNode(hasTestTag(filterTag))
+            composeRule.onNodeWithTag(filterTag).performClick().assertIsSelected()
 
             // Forward folder chips require two eligible targets; losing one must hide the chip.
             val excludedRows =
@@ -77,6 +83,7 @@ class ForwardAttentionFolderReactivityTest {
             excludedRows.forEach { excluded ->
                 publishAndAwaitRevision(controller, excluded)
                 chip.assertDoesNotExist()
+                composeRule.onNodeWithTag(filterTag).assertIsSelected()
                 publishAndAwaitRevision(controller, mentioned)
                 chip.assertExists()
             }
