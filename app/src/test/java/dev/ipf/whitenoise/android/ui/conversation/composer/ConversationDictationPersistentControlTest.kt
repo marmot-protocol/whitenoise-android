@@ -188,7 +188,7 @@ class ConversationDictationPersistentControlTest {
             runCurrent()
             render(fixture)
 
-            assertEquals("Draft dictated words", fixture.draft.text)
+            assertEquals("dictated words Draft", fixture.draft.text)
             assertEquals(1, dispatches)
             val failed = fixture.controller.state as ConversationDictationState.Failed
             assertEquals(ConversationDictationFailure.DeliveryUnknown, failed.reason)

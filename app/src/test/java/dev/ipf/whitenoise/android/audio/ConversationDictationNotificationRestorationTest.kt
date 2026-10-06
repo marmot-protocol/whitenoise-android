@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio
 
 import android.app.Application
 import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
@@ -57,15 +58,20 @@ class ConversationDictationNotificationRestorationTest {
             try {
                 service.onStartCommand(startIntent(service, harness), 0, 1)
                 service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
-                val ordinary = manager.getNotificationChannel(BackgroundConnectionNotification.CHANNEL_ID)
-                ordinary.importance = NotificationManager.IMPORTANCE_NONE
+                val ordinary =
+                    NotificationChannel(
+                        BackgroundConnectionNotification.CHANNEL_ID,
+                        service.getString(R.string.notification_channel_background_connection),
+                        NotificationManager.IMPORTANCE_NONE,
+                    )
                 manager.createNotificationChannel(ordinary)
-                NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
-                    if (notification.channelId == BackgroundConnectionNotification.CHANNEL_ID) {
-                        throw SecurityException("narrowing rejected")
+                NotificationStreamForegroundService.foregroundPublisher =
+                    modelForegroundIdReplacement { owner, notification, type ->
+                        if (notification.channelId == BackgroundConnectionNotification.CHANNEL_ID) {
+                            throw SecurityException("narrowing rejected")
+                        }
+                        defaultPublisher(owner, notification, type)
                     }
-                    defaultPublisher(owner, notification, type)
-                }
                 harness.conversationDictation.paste()
                 harness.platform.listener.onResult("recognized")
                 runCurrent()
@@ -478,10 +484,11 @@ class ConversationDictationNotificationRestorationTest {
     @Test
     fun foregroundTypesTrackActualConnectionAndMicrophoneLeases() {
         val types = mutableListOf<Int>()
-        NotificationStreamForegroundService.foregroundPublisher = { service, notification, type ->
-            types += type
-            defaultPublisher(service, notification, type)
-        }
+        NotificationStreamForegroundService.foregroundPublisher =
+            modelForegroundIdReplacement { service, notification, type ->
+                types += type
+                defaultPublisher(service, notification, type)
+            }
         val harness = installHost()
         val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
@@ -508,13 +515,14 @@ class ConversationDictationNotificationRestorationTest {
         val service = lifecycle.get()
         val types = mutableListOf<Int>()
         var backgrounded = false
-        NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
-            if (backgrounded && type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0) {
-                error("Background microphone reassertion")
+        NotificationStreamForegroundService.foregroundPublisher =
+            modelForegroundIdReplacement { owner, notification, type ->
+                if (backgrounded && type and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0) {
+                    error("Background microphone reassertion")
+                }
+                types += type
+                defaultPublisher(owner, notification, type)
             }
-            types += type
-            defaultPublisher(owner, notification, type)
-        }
         service.foreground.promoteConnection(ForegroundStartTrigger.UserToggle)
         service.onStartCommand(startIntent(service, harness), 0, 1)
         val authorizedCalls = types.size
@@ -597,11 +605,12 @@ class ConversationDictationNotificationRestorationTest {
     fun completedDictationRetriesRejectedNarrowingOnForegroundReturn() {
         val types = mutableListOf<Int>()
         var reject = false
-        NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
-            if (reject) throw SecurityException("narrowing rejected")
-            types += type
-            defaultPublisher(owner, notification, type)
-        }
+        NotificationStreamForegroundService.foregroundPublisher =
+            modelForegroundIdReplacement { owner, notification, type ->
+                if (reject) throw SecurityException("narrowing rejected")
+                types += type
+                defaultPublisher(owner, notification, type)
+            }
         val harness = installHost()
         val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()
@@ -623,10 +632,11 @@ class ConversationDictationNotificationRestorationTest {
     @Test
     fun connectionStartedDuringCaptureRetainsItsAcceptedSpecialUseType() {
         val types = mutableListOf<Int>()
-        NotificationStreamForegroundService.foregroundPublisher = { owner, notification, type ->
-            types += type
-            defaultPublisher(owner, notification, type)
-        }
+        NotificationStreamForegroundService.foregroundPublisher =
+            modelForegroundIdReplacement { owner, notification, type ->
+                types += type
+                defaultPublisher(owner, notification, type)
+            }
         val harness = installHost()
         val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
         val service = lifecycle.get()

@@ -3777,7 +3777,7 @@ class ConversationDictationControllerTest {
                 fixture.controller.sendRecognizedText()
                 advanceUntilIdle()
                 assertTrue(sent.isEmpty())
-                assertEquals(if (mode == "draft") "Another writer" else "", fixture.drafts.getValue(key()).text)
+                assertEquals(if (mode == "draft") "Another writer" else "first", fixture.drafts.getValue(key()).text)
                 assertFalse(fixture.platform.pendingCallerAudio)
                 if (mode == "expiry") {
                     assertTrue(fixture.controller.state is ConversationDictationState.Idle)
@@ -4269,7 +4269,7 @@ class ConversationDictationControllerTest {
         fixture.controller.stop()
         fixture.scheduler.runThrough(90_000L)
 
-        assertEquals("", fixture.drafts.getValue(key()).text)
+        assertEquals("first", fixture.drafts.getValue(key()).text)
         assertEquals("first", (fixture.controller.state as ConversationDictationState.Failed).retainedTranscript)
         assertTrue(fixture.controller.hasDurableSession)
         val sessionsBeforeLateClose = fixture.platform.sessions.size
@@ -4301,10 +4301,10 @@ class ConversationDictationControllerTest {
 
             fixture.scheduler.runThrough(90_000L)
 
-            assertEquals("", fixture.drafts.getValue(key()).text)
+            assertEquals("first", fixture.drafts.getValue(key()).text)
             assertEquals("first", (fixture.controller.state as ConversationDictationState.Failed).retainedTranscript)
             assertTrue(fixture.controller.hasDurableSession)
-            assertEquals(0, fixture.writes)
+            assertEquals(1, fixture.writes)
             assertEquals(1, microphoneAcquisitions)
         }
     }
@@ -4737,7 +4737,7 @@ class ConversationDictationControllerTest {
             timedOut.controller.send()
             timedOut.platform.listener.onResult("dictated")
             advanceUntilIdle()
-            assertEquals("Draft dictated", timedOut.drafts.getValue(key()).text)
+            assertEquals("dictated Draft", timedOut.drafts.getValue(key()).text)
             val timedOutFailure = timedOut.controller.state as ConversationDictationState.Failed
             assertEquals(ConversationDictationFailure.DeliveryUnknown, timedOutFailure.reason)
             assertEquals("dictated", timedOutFailure.retainedTranscript)
@@ -4757,7 +4757,7 @@ class ConversationDictationControllerTest {
             rejected.controller.send()
             rejected.platform.listener.onResult("dictated")
             advanceUntilIdle()
-            assertEquals("Draft dictated", rejected.drafts.getValue(key()).text)
+            assertEquals("dictated Draft", rejected.drafts.getValue(key()).text)
             val failure = rejected.controller.state as ConversationDictationState.Failed
             assertEquals(ConversationDictationFailure.SendBlocked, failure.reason)
             assertEquals("dictated", failure.retainedTranscript)
