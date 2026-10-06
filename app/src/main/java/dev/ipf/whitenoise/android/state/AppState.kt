@@ -2246,6 +2246,18 @@ class WhiteNoiseAppState private constructor(
     // staleness-exempt: observable draft version combined into the composer revision.
     private var draftHydrationRevision by mutableIntStateOf(0)
 
+    // Transient view invalidation, bounded with the existing retained conversation state.
+    private val nativeComposerCleanupRevisions = mutableStateMapOf<String, Long>()
+
+    // Never reuse a stamp after conversation eviction or account-cache cleanup.
+    private var nativeComposerCleanupSequence = 0L
+
+    /** Only committed cleanup of this exact owner may refresh its native-restored media shelf. */
+    internal fun nativeComposerCleanupRevision(
+        accountRef: String?,
+        groupIdHex: String,
+    ): Long = nativeComposerCleanupRevisions[conversationKey(accountRef, groupIdHex)] ?: 0L
+
     /** Changes when content is staged so an already-open chat consumes repeat shares. */
     val inboundShareRevision: Int
         get() = shareStaging.revision + draftHydrationRevision
@@ -2393,7 +2405,17 @@ class WhiteNoiseAppState private constructor(
             draftRepository = messageDraftRepository,
             expansionRetention = composerExpansionStateRetention,
             scope = mutationsScope,
-            onDraftPresentationRestored = { draftHydrationRevision += 1 },
+            onDraftPresentationChanged = { accountRef, groupIdHex, nativeDraftConsumed ->
+                if (nativeDraftConsumed) {
+                    synchronized(conversationStateLock) {
+                        val key = retainConversationState(accountRef, groupIdHex)
+                        nativeComposerCleanupSequence += 1
+                        nativeComposerCleanupRevisions[key] = nativeComposerCleanupSequence
+                    }
+                } else {
+                    draftHydrationRevision += 1
+                }
+            },
             onCleanupFailure = { groupIdHex, cause ->
                 appStateDebug(cause) { "sent draft cleanup failed group=${groupIdHex.take(8)}" }
             },
@@ -3106,6 +3128,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Drops all cached conversation overlays and clears the retained queue to release its source owners. */
     private fun removeConversationState(staleKey: String) {
+        nativeComposerCleanupRevisions.remove(staleKey)
         optimisticMessagesByConversation.remove(staleKey)
         durableAcceptanceCallbacksByConversation.remove(staleKey)?.clear()
         projectedMessageIdsByConversation.remove(staleKey)
@@ -6029,6 +6052,7 @@ class WhiteNoiseAppState private constructor(
             optimisticSendPhasesByConversation.values.forEach { it.clear() }
             optimisticSendPhasesByConversation.clear()
             optimisticCancellationGenerationByConversation.clear()
+            nativeComposerCleanupRevisions.clear()
         }
         // Cancel any in-flight downloads (their Deferred may hold plaintext or
         // a retained-media outcome) and drop both indexes so the next session
@@ -10488,18 +10512,25 @@ class WhiteNoiseAppState private constructor(
         tier: NoticeTier = NoticeTier.ActionableError,
         sendAttempt: SendFailureAttempt? = null,
     ) {
-        val safeReport = diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
-        toast =
+        presentText(
             ToastMessage(
                 title = title,
                 detail = detail,
-                // A Copy affordance is valid only when there is a deliberately
-                // constructed privacy-safe report. Legacy callers that merely
-                // set copyable=true must never copy visible UI text.
-                copyable = copyable && safeReport != null,
+                copyable = copyable,
                 tier = tier,
-                diagnosticReport = safeReport,
+                diagnosticReport = diagnosticReport,
                 sendAttempt = sendAttempt,
+            ),
+        )
+    }
+
+    /** Publishes a scoped UI notice through the same privacy-safe copy gate as ordinary errors. */
+    internal fun presentText(notice: ToastMessage) {
+        val safeReport = notice.diagnosticReport?.trim()?.takeIf(String::isNotEmpty)
+        toast =
+            notice.copy(
+                copyable = notice.copyable && safeReport != null,
+                diagnosticReport = safeReport,
             )
     }
 

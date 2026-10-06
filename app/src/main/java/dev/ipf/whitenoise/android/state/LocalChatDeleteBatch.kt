@@ -38,12 +38,50 @@ internal suspend fun deleteLocalChatsBatch(
 internal fun WhiteNoiseAppState.presentStoppedLocalChatDeleteBatch(
     result: LocalChatDeleteBatchResult,
     failure: Throwable?,
+    notice: LocalDeleteNotice? = null,
 ) {
     if (result.total <= 1) return
     val detail = AppText.Resource(R.string.chat_list_delete_stopped_detail, listOf(result.deleted, result.total))
-    if (failure != null) {
+    if (notice != null) {
+        presentLocalDeleteFailure(R.string.chat_list_delete_stopped, failure, detail, notice)
+    } else if (failure != null) {
         presentFailure(R.string.chat_list_delete_stopped, "CHAT_LOCAL_DELETE", failure, detail)
     } else {
         present(R.string.chat_list_delete_stopped, detail)
+    }
+}
+
+/** An explicit retry retains the originally confirmed targets even after Chats leaves composition. */
+internal fun WhiteNoiseAppState.localDeleteBatchRetryNotice(
+    controller: ChatsController,
+    groupIds: List<String>,
+    isCurrent: () -> Boolean,
+): LocalDeleteNotice =
+    LocalDeleteNotice(requireNotNull(controller.accountRef), groupIds.toSet()) { targets ->
+        val wanted = targets.map { it.lowercase() }.toSet()
+        val remaining = groupIds.filter { it.lowercase() in wanted }
+        launchMutation {
+            retryLocalChatDeleteBatch(controller, remaining, isCurrent)
+        }
+    }
+
+private suspend fun WhiteNoiseAppState.retryLocalChatDeleteBatch(
+    controller: ChatsController,
+    groupIds: List<String>,
+    isCurrent: () -> Boolean,
+) {
+    if (!isCurrent()) return
+    var failure: Throwable? = null
+    val observer = LocalChatDeleteObserver(onFailure = { failure = it })
+    val result =
+        deleteLocalChatsBatch(groupIds, isCurrent) { groupId ->
+            controller.deleteGroupLocalFromChatList(groupId, notify = false, observer = observer)
+        }
+    if (isCurrent() && result.deleted < result.total) {
+        presentStoppedLocalChatDeleteBatch(
+            result,
+            failure,
+            notice = localDeleteBatchRetryNotice(controller, groupIds.drop(result.deleted), isCurrent),
+        )
     }
 }
