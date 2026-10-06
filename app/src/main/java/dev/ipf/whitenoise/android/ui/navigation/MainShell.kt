@@ -872,6 +872,7 @@ internal fun MainShell(
                 exactPreloadReady = exactPreloadState is NotificationMessagePreloadState.Ready,
             )
 
+        /** Revokes any selected conversation and open-time input state before returning a rejected route to Chats. */
         fun fallBackToChatList() {
             sectionName = MainSection.Chats.name
             settingsDetailName = null
@@ -899,6 +900,7 @@ internal fun MainShell(
         }
         if (rejectUnavailablePin()) return@LaunchedEffect
 
+        /** Rechecks pinned-target authority around card dismissal before committing the captured conversation route. */
         suspend fun commitNotificationConversationOpen(chatItem: ChatListItem) {
             if (rejectUnavailablePin()) return
             if (target.replyDraft != null) routingNotification = true
@@ -985,6 +987,7 @@ internal fun MainShell(
                 // inbound target) while its switch is still landing, so the
                 // switch stays current either while the target is still armed
                 // or after this exact request committed an early open (#586).
+                /** Allows only this notification request and runtime to finish its account switch, including its own early open. */
                 fun switchStillCurrent(): Boolean =
                     currentInboundNotificationRequestId == routingRequestId &&
                         appState.pinnedShortcutTargetIsCurrent(target) &&
@@ -1061,6 +1064,7 @@ internal fun MainShell(
 
                 // This effect is keyed on activeAccountRef, so an inline suspend
                 // switch would cancel itself the moment the ref flips.
+                /** Runs the owned preload/activation route outside the effect that account activation will replace. */
                 suspend fun runNotificationAccountSwitchRoute() {
                     if (canPreload) {
                         runInactiveNotificationRouteStage(

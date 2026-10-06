@@ -685,6 +685,7 @@ internal class PartitionedProfileImageCache(
                 value: ImageBitmap,
             ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
 
+            /** Records bounded cache eviction diagnostics and notifies avatar observers when their cached pixels change. */
             override fun entryRemoved(
                 evicted: Boolean,
                 key: String,

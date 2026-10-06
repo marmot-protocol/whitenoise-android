@@ -300,8 +300,10 @@ class PinnedConversationShortcutsTest {
 
         override fun supported(): Boolean = supported
 
+        /** Runs the injected inventory-read race hook before returning the fake launcher inventory. */
         override fun shortcuts(): List<ShortcutInfoCompat> = inventory.also { afterInventoryRead?.invoke() }
 
+        /** Captures launcher requests and their approval callback without implicitly approving a pin. */
         override fun request(
             shortcut: ShortcutInfoCompat,
             callback: IntentSender,
@@ -310,6 +312,7 @@ class PinnedConversationShortcutsTest {
             return accepted
         }
 
+        /** Applies icon/label replacements only to existing fake launcher entries. */
         override fun update(shortcuts: List<ShortcutInfoCompat>): Boolean {
             updates += shortcuts
             if (failNextUpdate) {
@@ -319,6 +322,7 @@ class PinnedConversationShortcutsTest {
             return true
         }
 
+        /** Retains the launcher item while making its revoked identity unavailable to future taps. */
         override fun disable(ids: List<String>) {
             disabled += ids
         }

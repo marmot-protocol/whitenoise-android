@@ -129,6 +129,7 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /** The fenced wipe completion must clear native push state under the same mutex as push synchronization. */
     @Test
     fun destructiveWipeDropsSyncedPushFingerprintUnderNativePushMutex() {
         val entry = appStateFunctionBody("signOutAndWipeActiveAccount")
@@ -209,6 +210,7 @@ class AppStateSendLockCoverageTest {
         }
     }
 
+    /** Refused native wipes must exit before any successful-wipe-only profile or avatar cache eviction. */
     @Test
     fun failedDestructiveWipeBranchesExitBeforeProcessGlobalProfileCachesAreCleared() {
         val body = appStateFunctionBody("finishRevokedAccountWipe")
