@@ -25,7 +25,6 @@ import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
-import dev.ipf.whitenoise.android.media.editor.stagedDocumentAttachmentId
 import dev.ipf.whitenoise.android.media.editor.stagedPhotoAttachmentId
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -126,7 +125,11 @@ class ConversationDraftRestoreRemovalTest {
     fun cleanupProjectionKeepsFreshEditableAndPreparedSourcesLocallyOwned() {
         val group = conversationTimelineTestGroup()
         val editable =
-            nativeAttachment(stagedPhotoAttachmentId("account", group.groupIdHex, "editable"), "edited.png", "image/png")
+            nativeAttachment(
+                stagedPhotoAttachmentId("account", group.groupIdHex, "editable"),
+                "edited.png",
+                "image/png",
+            )
         val fresh =
             nativeAttachment(stagedPhotoAttachmentId("account", group.groupIdHex, "fresh"), "fresh.png", "image/png")
         val restored = nativeAttachment("restored", "old.png", "image/png")
