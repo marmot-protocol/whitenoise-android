@@ -22,9 +22,10 @@ reproducibility and what remains out of scope.
 - The exact MarmotKit Android archive is pinned by immutable URL, source SHA,
   and SHA-256. Each isolated build verifies and extracts that same archive
   through Gradle before compiling its Kotlin and JNI payload.
-- JNA's prebuilt `libjnidispatch.so` is packaged without stripping, preserving
-  the dependency's original bytes. Independent runners previously produced
-  stripped and unstripped copies with identical loadable code but different ELF
+- The prebuilt `libjnidispatch.so` (JNA) and `libmarmot_uniffi.so` (MarmotKit)
+  are packaged without stripping, preserving their dependency bytes.
+  Independent runners previously produced stripped and unstripped copies with
+  identical loadable code but different ELF
   metadata. Other native libraries retain their existing packaging settings.
 - The two resulting APK files must be **byte-identical**.
 - Each APK must be **unsigned** (`apksigner verify` must exit 1 with output
