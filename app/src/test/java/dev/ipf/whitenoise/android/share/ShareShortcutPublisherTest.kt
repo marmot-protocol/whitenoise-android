@@ -98,6 +98,25 @@ class ShareShortcutPublisherTest {
         assertEquals("Unknown", targets.single().title)
     }
 
+    /** A replaced refresh cannot overwrite Direct Share after waiting for the platform's cached inventory. */
+    @Test
+    fun cancelledPublicationCannotWriteAfterInventoryRead() {
+        var current = true
+        val published = mutableListOf<List<ShortcutInfoCompat>>()
+        val publisher =
+            ShareShortcutPublisher(
+                context = RuntimeEnvironment.getApplication(),
+                maxShortcutCount = { 8 },
+                setDynamicShortcuts = { published += it },
+                existingShortcuts = {
+                    current = false
+                    emptyList()
+                },
+            )
+        publisher.publish("acct", listOf(chat("g1", pending = false)), { current }) { it.group.name }
+        assertTrue(published.isEmpty())
+    }
+
     @Test
     fun publish_usesSetDynamicShortcutsInRankOrder() {
         val context = RuntimeEnvironment.getApplication()

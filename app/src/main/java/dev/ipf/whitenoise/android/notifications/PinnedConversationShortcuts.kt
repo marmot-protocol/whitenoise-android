@@ -85,7 +85,7 @@ internal class PinnedConversationShortcuts(
     private val platform: PinnedShortcutPlatform = AndroidPinnedShortcutPlatform(context),
     private val tokens: PinnedConversationTokens = PinnedConversationTokens.create(context),
 ) {
-    /** Runs on the foreground action's thread after off-main credential creation; revalidates ownership at commit. */
+    /** Runs off-main after credential creation; revalidates ownership under the publication lock at commit. */
     fun request(
         capability: PinnedConversationCapability,
         title: String,
@@ -100,6 +100,7 @@ internal class PinnedConversationShortcuts(
                     !stillCurrent() || !tokens.isValid(capability) -> ConversationPinResult.UNAVAILABLE
                     platform.shortcuts().any { it.id == capability.shortcutId && it.isPinned && it.isEnabled } -> {
                         val current = build(capability, title, avatarUrl, avatar)
+                        if (!stillCurrent() || !tokens.isValid(capability)) return@synchronized ConversationPinResult.UNAVAILABLE
                         if (!runCatching { platform.update(listOf(current)) }.getOrDefault(false)) {
                             platform.update(listOf(genericNotificationShortcut(context, current)))
                         }
@@ -114,7 +115,9 @@ internal class PinnedConversationShortcuts(
                                     PinnedConversationNavigation.callbackIntent(context, capability),
                                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                                 ).intentSender
-                        val accepted = platform.request(build(capability, title, avatarUrl, avatar), callback)
+                        val current = build(capability, title, avatarUrl, avatar)
+                        if (!stillCurrent() || !tokens.isValid(capability)) return@synchronized ConversationPinResult.UNAVAILABLE
+                        val accepted = platform.request(current, callback)
                         if (accepted) ConversationPinResult.REQUESTED else ConversationPinResult.FAILED
                     }
                 }
@@ -136,12 +139,20 @@ internal class PinnedConversationShortcuts(
             }
         }
 
-    /** Current labels come only from the caller's source projections; missing or failed preparation is generic. */
+    /** Queries launcher ownership off-main before the caller prepares titles or cached avatar pixels. */
+    fun hasPinnedConversations(accountRef: String): Boolean =
+        synchronized(UserEventNotificationGroup.mutationLock) {
+            platform.shortcuts().any { it.isPinned && pinCapability(it)?.accountRef == accountRef }
+        }
+
+    /** Current labels come only from source projections; obsolete refreshes cannot publish after waiting for the lock. */
     fun refresh(
         accountRef: String,
         presentations: Map<String, PinnedConversationPresentation>,
+        isCurrent: () -> Boolean = { true },
     ): Boolean =
         synchronized(UserEventNotificationGroup.mutationLock) {
+            if (!isCurrent()) return@synchronized false
             val pinned = platform.shortcuts().filter { it.isPinned && pinCapability(it)?.accountRef == accountRef }
             if (pinned.isEmpty()) return@synchronized true
             val revoked = mutableListOf<String>()
@@ -160,9 +171,10 @@ internal class PinnedConversationShortcuts(
                     }
                 }
             val generic = pinned.map { genericNotificationShortcut(context, it) }
+            if (!isCurrent()) return@synchronized false
             val updated =
                 runCatching { platform.update(prepared) }.getOrDefault(false) ||
-                    runCatching { platform.update(generic) }.getOrDefault(false)
+                    (isCurrent() && runCatching { platform.update(generic) }.getOrDefault(false))
             platform.disable(revoked)
             updated
         }

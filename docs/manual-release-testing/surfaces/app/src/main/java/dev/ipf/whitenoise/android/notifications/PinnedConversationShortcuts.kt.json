@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PinnedConversationShortcuts.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Generic pinned shortcut privacy fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PinnedConversationShortcuts.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "SYS-012"
+        ]
+      },
+      {
+        "surface": "Pinned conversation lifecycle: fun request(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PinnedConversationShortcuts.kt",
+        "anchor": "fun request(",
+        "test_ids": [
+          "SYS-012"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

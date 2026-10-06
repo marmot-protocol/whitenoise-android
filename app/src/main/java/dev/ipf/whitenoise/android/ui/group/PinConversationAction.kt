@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -85,19 +86,20 @@ internal fun PinConversationAction(
                         if (capability == null || !stillCurrent()) {
                             ConversationPinResult.UNAVAILABLE
                         } else {
-                            shortcuts.request(
-                                capability,
-                                latestTitle,
-                                latestAvatarUrl,
-                                latestAvatar?.asAndroidBitmap(),
-                                ::stillCurrent,
-                            )
+                            val pinTitle = latestTitle
+                            val pinAvatarUrl = latestAvatarUrl
+                            val pinAvatar = latestAvatar?.asAndroidBitmap()
+                            withContext(Dispatchers.IO) {
+                                shortcuts.request(capability, pinTitle, pinAvatarUrl, pinAvatar) {
+                                    isActive && stillCurrent()
+                                }
+                            }
                         }
-                    appState.present(pinResultMessage(result))
+                    if (stillCurrent()) appState.present(pinResultMessage(result))
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
-                    appState.present(R.string.pinned_shortcut_failed)
+                    if (stillCurrent()) appState.present(R.string.pinned_shortcut_failed)
                 } finally {
                     busy = false
                 }

@@ -184,8 +184,16 @@ class ShareShortcutPublisher(
         accountRef: String,
         chats: List<ChatListItem>,
         displayTitle: (ChatListItem) -> String,
+    ) = publish(accountRef, chats, { true }, displayTitle)
+
+    /** Rechecks a replaceable off-main refresh under the privacy lock before changing Direct Share inventory. */
+    fun publish(
+        accountRef: String,
+        chats: List<ChatListItem>,
+        isCurrent: () -> Boolean,
+        displayTitle: (ChatListItem) -> String,
     ) {
-        if (accountRef.isBlank()) return
+        if (accountRef.isBlank() || !isCurrent()) return
         val previewToken = NotificationPreviewPreferences.capture(context)
         val maxShortcuts = maxShortcutCount().coerceAtLeast(0)
         val limit = min(MAX_SHARE_SHORTCUTS, maxShortcuts)
@@ -221,6 +229,7 @@ class ShareShortcutPublisher(
                 }
             }
         synchronized(UserEventNotificationGroup.mutationLock) {
+            if (!isCurrent()) return@synchronized
             setDynamicShortcuts(
                 shortcuts.map { shortcut ->
                     if (shortcutPreviewAllowed(context, shortcut)) {

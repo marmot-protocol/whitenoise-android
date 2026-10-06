@@ -243,6 +243,48 @@ class PinnedConversationShortcutsTest {
         assertTrue(tokens.isValid(kept))
     }
 
+    /** Pending requests do not trigger expensive refresh preparation; only approved pins owned by this account do. */
+    @Test
+    fun pinPresenceFollowsLauncherApprovalAndAccountOwnership() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        assertFalse(owner.hasPinnedConversations(ACCOUNT))
+        owner.request(capability, "Friends", null) { true }
+        assertFalse(owner.hasPinnedConversations(ACCOUNT))
+        platform.approve(platform.requests.single())
+        assertTrue(owner.hasPinnedConversations(ACCOUNT))
+        assertFalse(owner.hasPinnedConversations("another-account"))
+    }
+
+    /** Cancellation after inventory acquisition prevents an old refresh from publishing over a newer label. */
+    @Test
+    fun staleRefreshAfterInventoryReadCannotPublish() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        owner.request(capability, "Original", null) { true }
+        platform.approve(platform.requests.single())
+        var current = true
+        platform.afterInventoryRead = { current = false }
+        assertFalse(owner.refresh(ACCOUNT, mapOf(GROUP to PinnedConversationPresentation("Obsolete"))) { current })
+        assertTrue(platform.updates.isEmpty())
+        assertTrue(platform.disabled.isEmpty())
+        platform.afterInventoryRead = null
+        assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to PinnedConversationPresentation("Current"))))
+        assertEquals("Current", platform.updates.single().single().longLabel)
+    }
+
+    /** An action revoked during a launcher read must not issue a late pin request from the IO coroutine. */
+    @Test
+    fun obsoleteRequestCannotPublishAfterInventoryRead() {
+        val platform = Platform(context)
+        val owner = PinnedConversationShortcuts(context, platform)
+        var current = true
+        platform.afterInventoryRead = { current = false }
+        assertEquals(ConversationPinResult.UNAVAILABLE, owner.request(capability, "Obsolete", null) { current })
+        assertTrue(platform.requests.isEmpty())
+        assertTrue(platform.updates.isEmpty())
+    }
+
     /** Keeps Android's real pinned flags while scripting approval timing and failed update responses. */
     private class Platform(
         private val context: Context,
@@ -251,13 +293,14 @@ class PinnedConversationShortcutsTest {
         var accepted = true
         var failNextUpdate = false
         var inventory = emptyList<ShortcutInfoCompat>()
+        var afterInventoryRead: (() -> Unit)? = null
         val requests = mutableListOf<ShortcutInfoCompat>()
         val updates = mutableListOf<List<ShortcutInfoCompat>>()
         val disabled = mutableListOf<String>()
 
         override fun supported(): Boolean = supported
 
-        override fun shortcuts(): List<ShortcutInfoCompat> = inventory
+        override fun shortcuts(): List<ShortcutInfoCompat> = inventory.also { afterInventoryRead?.invoke() }
 
         override fun request(
             shortcut: ShortcutInfoCompat,

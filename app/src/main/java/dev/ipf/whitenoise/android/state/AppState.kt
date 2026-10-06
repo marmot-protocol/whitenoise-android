@@ -2357,6 +2357,7 @@ class WhiteNoiseAppState private constructor(
                     ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
             peer?.let { contactAvatarOverride(account, it) } ?: (false to null)
         })
+    private var pinnedShortcutRefreshJob: Job? = null
 
     /**
      * `SupervisorJob` isolates siblings but does not swallow exceptions — an
@@ -3680,24 +3681,50 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
+    /** Publishes Direct Share and replaces any pending pinned-label refresh for the captured account/runtime. */
     fun publishShareShortcuts(chats: List<ChatListItem>) {
         val accountRef = activeAccountRef ?: return
+        val runtime = runtimeGeneration
         val titleCopy = notificationGroupTitleCopy(appContext)
-        shareShortcutPublisher.publish(accountRef, chats) { item ->
-            chatListItemDisplayTitle(item, this, titleCopy)
-        }
-        runCatching {
-            dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts(appContext).refresh(
-                accountRef,
-                chats.associate { item ->
-                    item.group.groupIdHex to
-                        dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation(
-                            chatListItemDisplayTitle(item, this, titleCopy),
-                            firstFrameGroupAvatarSeed(item, accountRef, ::avatarUrl)?.image?.asAndroidBitmap(),
-                        )
-                },
-            )
-        }
+        val shareTitles =
+            chats
+                .filterNot { it.group.pendingConfirmation }
+                .take(dev.ipf.whitenoise.android.share.MAX_SHARE_SHORTCUTS)
+                .associate { item -> item.group.groupIdHex to chatListItemDisplayTitle(item, this, titleCopy) }
+        pinnedShortcutRefreshJob?.cancel()
+        pinnedShortcutRefreshJob =
+            mutationsScope.launch {
+                runCatchingCancellable {
+                    withContext(Dispatchers.IO) {
+                        shareShortcutPublisher.publish(
+                            accountRef,
+                            chats,
+                            { isActive && activeAccountRef == accountRef && runtimeGeneration == runtime },
+                        ) { item -> shareTitles[item.group.groupIdHex].orEmpty() }
+                    }
+                    val shortcuts =
+                        withContext(Dispatchers.IO) {
+                            dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts(appContext)
+                        }
+                    val hasPins = withContext(Dispatchers.IO) { shortcuts.hasPinnedConversations(accountRef) }
+                    if (!hasPins || !isActive || activeAccountRef != accountRef || runtimeGeneration != runtime) {
+                        return@runCatchingCancellable
+                    }
+                    val presentations =
+                        chats.associate { item ->
+                            item.group.groupIdHex.lowercase(Locale.ROOT) to
+                                dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation(
+                                    chatListItemDisplayTitle(item, this@WhiteNoiseAppState, titleCopy),
+                                    firstFrameGroupAvatarSeed(item, accountRef, ::avatarUrl)?.image?.asAndroidBitmap(),
+                                )
+                        }
+                    withContext(Dispatchers.IO) {
+                        shortcuts.refresh(accountRef, presentations) {
+                            isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
+                        }
+                    }
+                }.onFailure { failure -> appStateDebug(failure) { "pinned shortcut presentation refresh failed" } }
+            }
     }
 
     /**

@@ -68,6 +68,7 @@ class ExternalSignerSignOutLifecycleTest {
     private var engineWiped = false
     private var beforeListAccounts: () -> Unit = {}
 
+    /** Builds a signed-in external-signer identity without private key material for the real teardown path. */
     private fun externalSignerAccount(
         signedOut: Boolean = false,
         running: Boolean = !signedOut,
@@ -86,6 +87,7 @@ class ExternalSignerSignOutLifecycleTest {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
+            /** Creates a failed native future so lifecycle tests exercise their production error handling. */
             fun suspendFailure(failure: Throwable): Any {
                 (arguments!!.last() as Continuation<Any?>).resumeWithException(failure)
                 return COROUTINE_SUSPENDED
@@ -124,6 +126,7 @@ class ExternalSignerSignOutLifecycleTest {
             }
         } as MarmotInterface
 
+    /** Removes prior dynamic launcher inventory so each account-cleanup assertion owns its fixture state. */
     @Before
     fun setUp() {
         ShortcutManagerCompat.removeAllDynamicShortcuts(context)
@@ -154,6 +157,7 @@ class ExternalSignerSignOutLifecycleTest {
         assertTrue(checkNotNull(recreated.read(retained)).isNotEmpty())
     }
 
+    /** Installs the scripted native runtime into a real app state using the supplied preference-failure context. */
     private fun appState(ownerContext: Context = context): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ownerContext,
@@ -308,6 +312,7 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(phaseBefore, appState.phase)
         }
 
+    /** Verifies thrown native sign-out retains the established local fallback without changing the completion contract. */
     @Test
     fun transientEngineFailureRetainsTheExistingLocalSignOutFallback() =
         runBlocking {
@@ -322,6 +327,7 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(appState.phase is AppPhase.Onboarding)
         }
 
+    /** A failed account refresh after native completion must not revive the removed active session. */
     @Test
     fun successfulSignOutRefreshFailureStillClearsTheActiveSession() =
         runBlocking {
@@ -495,6 +501,7 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcutId })
         }
 
+    /** Seeds real Android shortcut extras so account-scoped cleanup can be verified through the platform adapter. */
     private fun publishConversationShortcut(): String {
         val shortcut =
             checkNotNull(
