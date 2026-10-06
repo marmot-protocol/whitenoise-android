@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.onboarding
 import android.content.Context
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -102,6 +103,44 @@ class SignUpProfileDraftSubmissionTest {
             assertEquals("Quiet Otter", publications.single().displayName)
             assertEquals("Current text", publications.single().about)
         }
+    }
+
+    /** Submitting without a name publishes, and shows, a generated pseudonym instead of a nameless profile. */
+    @Test fun blankNameSubmitPublishesPseudonym() {
+        var owner = SignUpOwner(1, null)
+        val publications = mutableListOf<UserProfileMetadataFfi>()
+        composeRule.setContent {
+            val scope = rememberCoroutineScope()
+            val controller =
+                remember {
+                    SignUpController(
+                        scope,
+                        { owner },
+                        { true },
+                        create = { _ -> AccountSummaryFfi("new", "11".repeat(32), true, false, false, true) },
+                        hasPendingIdentityReceipt = { false },
+                        qualify = {},
+                        accept = { account, old ->
+                            owner = old.copy(accountRef = account.label)
+                            true
+                        },
+                        upload = { _, _ -> error("No photo selected") },
+                        publish = { _, value ->
+                            publications += value
+                            true
+                        },
+                        finish = { _, _ -> true },
+                    )
+                }
+            WhiteNoiseTheme { SignUpScreen(controller, { true }, { "Quiet Otter" }, {}) }
+        }
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("   ")
+        composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
+        composeRule.runOnIdle {
+            assertEquals("Quiet Otter", publications.single().name)
+            assertEquals("Quiet Otter", publications.single().displayName)
+        }
+        composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
     }
 
     /** The new form remains editable offline; neither its primary action nor Retry creates an identity. */
