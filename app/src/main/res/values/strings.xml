@@ -2389,4 +2389,8 @@
     <string name="profile_readiness_recommended">Recommended</string>
     <string name="profile_readiness_field_optional">Optional</string>
     <string name="profile_readiness_field" translatable="false">%1$s · %2$s</string>
+    <string name="nostr_event_view_image">View image</string>
+    <string name="nostr_event_image_failed">Couldn’t load this image. Try again.</string>
+    <string name="nostr_event_type_image">Image</string>
+    <string name="nostr_event_expand">View full event</string>
 </resources>

@@ -17,14 +17,10 @@ internal fun NostrEvent.toCardModel(): NostrEventCardModel {
         title = cardTitle(cardKind, tagTitle)?.safeField(),
         summary = cardSummary(cardKind, tagSummary).safeExcerpt(),
         metadata = cardMetadata(cardKind, videoMetadata).map(String::safeField),
-        readerBody =
-            content
-                .safeReaderBody()
-                .takeIf {
-                    (cardKind == NostrEventCardKind.Note || cardKind == NostrEventCardKind.Article) && it.isNotBlank()
-                },
+        readerBody = fullReaderBody(cardKind),
         mediaUrl = videoMetadata?.url,
         mediaMimeType = videoMetadata?.mimeType,
+        imageUrls = imageMetadataUrls(),
     )
 }
 
@@ -99,3 +95,18 @@ private const val KIND_LONG_FORM_CONTENT = 30_023
 private const val KIND_SOFTWARE_RELEASE = 30_063
 private const val KIND_VERTICAL_VIDEO = 34_235
 private const val KIND_HORIZONTAL_VIDEO = 34_236
+
+/** Keeps the complete verified content available outside the three-line card preview. */
+private fun NostrEvent.fullReaderBody(cardKind: NostrEventCardKind): String? {
+    val body =
+        content.takeIf(String::isNotBlank)
+            ?: firstTagValue("description")?.takeIf(String::isNotBlank)
+            ?: firstTagValue("summary")?.takeIf(String::isNotBlank)
+    val changelog = if (cardKind == NostrEventCardKind.Release) firstTagValue("changelog") else null
+    return listOfNotNull(body, changelog)
+        .filter(String::isNotBlank)
+        .distinct()
+        .joinToString("\n\n")
+        .safeReaderBody()
+        .takeIf(String::isNotBlank)
+}

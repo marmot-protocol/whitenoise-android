@@ -38,7 +38,7 @@ private fun String?.isPlayableVideoMimeType(): Boolean {
     return startsWith("video/") || this in PLAYLIST_VIDEO_MIME_TYPES
 }
 
-private fun imetaProperties(tag: List<String>): Map<String, List<String>> =
+internal fun imetaProperties(tag: List<String>): Map<String, List<String>> =
     buildMap {
         tag.drop(1).forEach { field ->
             val separator = field.indexOf(' ')
