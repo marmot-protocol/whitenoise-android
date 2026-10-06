@@ -31,6 +31,7 @@ import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsNavigationOutcome
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsSpokenTextSpan
+import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsTextRange
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -331,6 +332,46 @@ class PlaybackTransportOwnershipTest {
         assertEquals(destination, appState.currentPlaybackConversationDestination())
         assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("another", "Maya", "New queue.")), Locale.US))
         assertNull(appState.currentPlaybackConversationDestination())
+        assertNull(appState.attachmentSpeechDestination.value)
+        appState.stopSpeaking()
+    }
+
+    /** A rejected reader preparation cannot stop the newer queue that replaced its source owner. */
+    @Test fun staleAttachmentPreparationCannotStopReplacementSpeech() {
+        val appState = appState()
+        val engine = FakeSessionEngine()
+        appState.ttsController.attachEngine(engine)
+        var current = true
+        var replacementSession = 0L
+        val actions =
+            TextAttachmentNativeActions(
+                sourceIsCurrent = {
+                    if (current && appState.ttsController.state.value is TtsState.Preparing) {
+                        current = false
+                        assertTrue(
+                            appState.speakAloud(
+                                listOf(TtsSpeakableEntry("sender", "Maya", "Replacement queue.")),
+                                Locale.US,
+                            ),
+                        )
+                        replacementSession = appState.ttsController.state.value.sessionId
+                    }
+                    current
+                },
+            ) {}
+        val preview =
+            TextAttachmentPreview(
+                TextAttachmentCandidate("notes.txt", "text/plain", TextAttachmentFormat.PlainText),
+                "Obsolete attachment speech.",
+            )
+        kotlinx.coroutines.runBlocking {
+            appState.speakTextAttachment(preview, "sender", "Maya", "obsolete", 0, actions)
+        }
+        assertTrue(replacementSession > 0L)
+        assertEquals(replacementSession, appState.ttsController.state.value.sessionId)
+        assertTrue(appState.ttsController.state.value is TtsState.Speaking)
+        assertTrue(appState.ownsCurrentAccountSpeech())
+        assertEquals(1, engine.spoken.size)
         assertNull(appState.attachmentSpeechDestination.value)
         appState.stopSpeaking()
     }

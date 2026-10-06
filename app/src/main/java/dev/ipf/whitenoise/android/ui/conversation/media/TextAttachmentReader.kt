@@ -117,20 +117,20 @@ internal suspend fun WhiteNoiseAppState.speakTextAttachment(
                 startRenderedHit = preparedHit,
                 isCurrent = actions::isCurrent,
             )
-    if (!started && actions.isCurrent()) {
-        present(if (entry.text.isBlank()) R.string.tts_bar_error else ttsStartFailureMessage())
-    } else {
-        val speech = ttsController.state.value
-        val source = actions.playbackSource
-        if (source != null && actions.isCurrent() && source.accountRef == activeAccountRef) {
-            attachmentSpeechDestination.value =
-                dev.ipf.whitenoise.android.audio
-                    .AttachmentSpeechDestination(source, speech.sessionId)
-                    .current(speech)
-        } else if (!actions.isCurrent()) {
-            // A replaced reader cannot keep speaking bytes prepared under its former account/route owner.
-            stopSpeaking()
+    if (!started) {
+        if (actions.isCurrent()) {
+            present(if (entry.text.isBlank()) R.string.tts_bar_error else ttsStartFailureMessage())
         }
+        // The prepared-start owner already cleans up its own session; never stop a replacement queue here.
+        return
+    }
+    val speech = ttsController.state.value
+    val source = actions.playbackSource
+    if (source != null && actions.isCurrent() && source.accountRef == activeAccountRef) {
+        attachmentSpeechDestination.value =
+            dev.ipf.whitenoise.android.audio
+                .AttachmentSpeechDestination(source, speech.sessionId)
+                .current(speech)
     }
 }
 

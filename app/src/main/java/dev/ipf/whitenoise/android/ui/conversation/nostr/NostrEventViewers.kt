@@ -66,10 +66,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.ui.EmojiLabel
-import dev.ipf.whitenoise.android.core.HostSafety
-import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Parses a verified event body and presents it without starting another event-resolution layer. */
