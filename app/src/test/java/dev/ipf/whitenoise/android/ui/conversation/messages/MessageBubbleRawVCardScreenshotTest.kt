@@ -38,7 +38,7 @@ import java.util.TimeZone
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h420dp-mdpi")
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h560dp-mdpi")
 @OptIn(ExperimentalCoroutinesApi::class)
 class MessageBubbleRawVCardScreenshotTest : MessageBubbleFileAttachmentFixtures() {
     @get:Rule
@@ -79,15 +79,21 @@ class MessageBubbleRawVCardScreenshotTest : MessageBubbleFileAttachmentFixtures(
         }
     }
 
-    /** The cached file becomes a contact card with its footer; the remote one stays a file card. */
+    /**
+     * The cached file becomes a contact card with its footer, a sender's caption that mentions a number stays
+     * visible beside the card drawn from the file, and the remote file stays a file card.
+     */
     @Test
     fun rawVCardDrawsContactCardOnceItsBytesAreLocal() {
         val cached = fileTimelineMessage(index = 200, fileName = CACHED_FILE, mediaType = "text/x-vcard")
-        val remote = fileTimelineMessage(index = 240, fileName = REMOTE_FILE, mediaType = "text/x-vcard")
+        val captioned =
+            fileTimelineMessage(index = 300, fileName = CAPTIONED_FILE, mediaType = "text/x-vcard", caption = PROSE)
+        val remote = fileTimelineMessage(index = 360, fileName = REMOTE_FILE, mediaType = "text/x-vcard")
         composeRule.setContent {
             WhiteNoiseTheme {
                 Column(Modifier.width(360.dp)) {
                     FileMessage(cached)
+                    FileMessage(captioned)
                     FileMessage(remote)
                 }
             }
@@ -95,22 +101,26 @@ class MessageBubbleRawVCardScreenshotTest : MessageBubbleFileAttachmentFixtures(
         composeRule.onNodeWithText(CACHED_FILE).assertExists()
 
         composeRule.runOnIdle {
-            appState.cacheMediaPlaintext(
-                mediaCacheKey(
-                    requireNotNull(controller.boundAccountRef),
-                    controller.group.groupIdHex,
-                    cached.record.messageIdHex,
-                    0,
-                ),
-                VCARD.toByteArray(),
-            )
+            listOf(cached, captioned).forEach { item ->
+                appState.cacheMediaPlaintext(
+                    mediaCacheKey(
+                        requireNotNull(controller.boundAccountRef),
+                        controller.group.groupIdHex,
+                        item.record.messageIdHex,
+                        0,
+                    ),
+                    VCARD.toByteArray(),
+                )
+            }
         }
 
         // The vCard parses off the main thread, outside Compose's idling resources.
         composeRule.waitUntil(PARSE_TIMEOUT_MS) {
-            composeRule.onAllNodesWithText(CONTACT_NAME).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText(CONTACT_NAME).fetchSemanticsNodes().size == 2
         }
         composeRule.onAllNodesWithText(CACHED_FILE).assertCountEquals(0)
+        composeRule.onAllNodesWithText(CAPTIONED_FILE).assertCountEquals(0)
+        composeRule.onNodeWithText(PROSE, useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText(REMOTE_FILE).assertExists()
         composeRule.onAllNodesWithText(CACHED_TIME, useUnmergedTree = true).assertCountEquals(1)
         composeRule.onRoot().captureRoboImage(SNAPSHOT_PATH)
@@ -158,6 +168,8 @@ class MessageBubbleRawVCardScreenshotTest : MessageBubbleFileAttachmentFixtures(
 }
 
 private const val CACHED_FILE = "ada.vcf"
+private const val CAPTIONED_FILE = "ada-with-note.vcf"
+private const val PROSE = "Please call 555-0100 after six"
 private const val REMOTE_FILE = "not-downloaded.vcf"
 private const val CONTACT_NAME = "Ada Example"
 private const val VCARD = "BEGIN:VCARD\r\nVERSION:2.1\r\nFN:$CONTACT_NAME\r\nTEL;CELL:+1 555 0100\r\nEND:VCARD\r\n"

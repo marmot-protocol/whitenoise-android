@@ -81,6 +81,12 @@ class ReceivedContactIntentsTest {
         assertNull(attachedVCardContact(raw.copy(mediaType = "text/plain", fileName = "notes.txt")))
         val nameOnly = "BEGIN:VCARD\nVERSION:3.0\nFN:Ada\nEND:VCARD\n".toByteArray()
         assertNull(attachedVCardContact(raw.copy(plaintextBytes = nameOnly)))
+
+        // A caption that would parse back to other fields is never generated: the card would lie.
+        val numberInName = "BEGIN:VCARD\nVERSION:3.0\nFN:Ada\\n+1 555 9999\nTEL:+1 555 0100\nEND:VCARD\n"
+        assertNull(attachedVCardContact(raw.copy(plaintextBytes = numberInName.toByteArray())))
+        val shortNumber = "BEGIN:VCARD\nVERSION:3.0\nFN:Emergency\nTEL:911\nEND:VCARD\n"
+        assertNull(attachedVCardContact(raw.copy(plaintextBytes = shortNumber.toByteArray())))
     }
 
     /** Add gives the editor validated fields and the VCF read grant without writing Contacts directly. */

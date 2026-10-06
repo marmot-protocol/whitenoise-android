@@ -18,6 +18,9 @@ internal const val VCARD_MIME_TYPE = "text/vcard"
 /** MIME types contact apps and file providers report for an exported `.vcf`. */
 private val VCARD_SOURCE_MIME_TYPES = setOf(VCARD_MIME_TYPE, "text/x-vcard")
 
+/** A caption line made only of phone-number characters, e.g. `+1 (555) 010-0100`. */
+private val PHONE_LINE = Regex("""\+?[\d\s()./-]+""")
+
 /**
  * The only fields extracted from a picked contact — never the address book.
  * Isolated from the send path so a structured contact card can replace the
@@ -39,8 +42,9 @@ internal fun formatContactShareText(contact: SharedContact): String = listOfNotN
 /**
  * Recovers a contact from a shared-contact message's caption so the bubble can
  * draw a card without fetching the vCard blob. Heuristic by design: a line with
- * `@` is the email, a mostly-digit / `+`-prefixed line is the phone, and the
- * first remaining line is the name.
+ * `@` is the email, a line of only phone characters with six digits or a `+`
+ * prefix is the phone, and the first remaining line is the name. Prose such as
+ * `Please call 555-0100` is not a phone line, so it stays the sender's caption.
  */
 internal fun parseSharedContactFromText(text: String): SharedContact? {
     val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
@@ -48,7 +52,7 @@ internal fun parseSharedContactFromText(text: String): SharedContact? {
     val email = lines.firstOrNull { it.contains('@') && !it.contains(' ') }
     val phone =
         lines.firstOrNull { line ->
-            line != email && (line.startsWith("+") || line.count { it.isDigit() } >= 6) && !line.contains('@')
+            line != email && PHONE_LINE.matches(line) && (line.startsWith("+") || line.count { it.isDigit() } >= 6)
         }
     val name = lines.firstOrNull { it != email && it != phone }
     // A generic caption on an externally-authored .vcf is not enough to prove
@@ -61,14 +65,15 @@ internal fun parseSharedContactFromText(text: String): SharedContact? {
 /**
  * Recovers the contact from a raw `.vcf` the user attached, so the file can go
  * out exactly like a picker share and draw the same card. Null for other files,
- * multi-contact files, and cards whose caption would not parse back as a contact.
+ * multi-contact files, and cards whose generated caption would not parse back to
+ * exactly this contact (a short `TEL`, or a name that looks like a phone number).
  */
 internal fun attachedVCardContact(attachment: PendingAttachment): SharedContact? {
     val vcard =
         attachment.mediaType in VCARD_SOURCE_MIME_TYPES ||
             attachment.fileName.endsWith(".vcf", ignoreCase = true)
     val contact = if (vcard) parseSingleVCard(attachment.plaintextBytes) else null
-    return contact?.takeIf { parseSharedContactFromText(formatContactShareText(it)) != null }
+    return contact?.takeIf { parseSharedContactFromText(formatContactShareText(it)) == it }
 }
 
 private fun vcardEscape(value: String): String =

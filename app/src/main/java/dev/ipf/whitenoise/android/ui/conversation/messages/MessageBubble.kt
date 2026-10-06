@@ -1905,18 +1905,28 @@ internal fun MessageBubble(
                             null
                         }
                     }
-                // A raw .vcf from another client or an older build has no such
-                // caption, so its card draws from the file once it is on this
-                // device; any caption then stays as the sender's own text.
+                // The vCard itself is the authority once its bytes are on this
+                // device, which also covers a raw .vcf sent without the caption.
+                // Reading it never starts a download.
                 val fileContact =
                     rememberLocalVCardContact(
                         controller = controller,
                         appState = appState,
                         messageIdHex = record.messageIdHex,
-                        attachment = vcardAttachment.takeIf { canRenderSharedContent && captionContact == null },
+                        attachment = vcardAttachment.takeIf { canRenderSharedContent },
                         mine = mine,
                     )
-                val sharedContact = captionContact ?: fileContact
+                val sharedContact = fileContact ?: captionContact
+                // The card replaces the caption only when the caption is the
+                // generated name/phone text. A sender's own words, such as
+                // "Please call 555-0100", disagree with the file and stay visible.
+                val captionIsContactText =
+                    captionContact != null &&
+                        (
+                            fileContact == null ||
+                                captionContact.phone == fileContact.phone &&
+                                captionContact.email == fileContact.email
+                        )
                 // A caption is the message's last line, so it carries the time and
                 // delivery state the way a text bubble does; the file card keeps the
                 // footer only when there is no caption to carry it. A contact card
@@ -2026,7 +2036,7 @@ internal fun MessageBubble(
                         deleted = deleted,
                         persistedFailure = persistedFailure,
                         structuredShareOwnsBody =
-                            captionContact != null ||
+                            captionIsContactText ||
                                 sharedLocation != null ||
                                 sharedUser != null ||
                                 remoteGiphyMedia != null,

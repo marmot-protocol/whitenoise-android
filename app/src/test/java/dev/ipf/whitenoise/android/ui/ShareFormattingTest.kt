@@ -108,6 +108,14 @@ class ShareFormattingTest {
         assertNull(parseSharedContactFromText("See the attached details"))
     }
 
+    /** Sender prose that mentions a number stays a caption; only a bare number line is a phone. */
+    @Test
+    fun captionProseWithANumberIsNotContactText() {
+        assertNull(parseSharedContactFromText("Please call 555-0100 tomorrow"))
+        assertNull(parseSharedContactFromText("Ada\nRoom 4012345, ask at the desk"))
+        assertEquals("+1 (555) 010-0100", parseSharedContactFromText("Ada\n+1 (555) 010-0100")?.phone)
+    }
+
     private val sampleNpub = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
 
     /** Pins the sender's canonical wire format to one identity reference and no inferred label. */
