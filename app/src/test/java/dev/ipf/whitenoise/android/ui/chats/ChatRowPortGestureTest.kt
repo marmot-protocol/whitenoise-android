@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -20,6 +21,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SwipePreferenceState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -243,30 +246,69 @@ class ChatRowPortGestureTest {
         assertTrue(swipes.isEmpty())
     }
 
-    /** Dark-theme read cue stays separate from the translated, interactive row. */
-    @Test fun readCueDark() = captureCue("read_dark", SwipeAction.ReadUnread, -1, dark = true)
+    /** An unread chat offers Mark read in dark theme. */
+    @Test fun readCueDark() =
+        captureCue(
+            "read_dark",
+            SwipeAction.ReadUnread,
+            -1,
+            R.string.chat_row_action_mark_read,
+            dark = true,
+            item = ChatRowPortFixtures.item(unread = true),
+        )
 
-    /** AMOLED mute uses an identifiable icon and accessible action name. */
-    @Test fun muteCueAmoled() = captureCue("mute_amoled", SwipeAction.MuteUnmute, 1, dark = true, amoled = true)
+    /** A read chat offers Mark unread in light theme. */
+    @Test fun unreadCueLight() =
+        captureCue("unread_light", SwipeAction.ReadUnread, 1, R.string.chat_row_action_mark_unread)
 
-    /** Physical direction remains stable with large RTL labels. */
-    @Test fun pinCueLargeRtl() = captureCue("pin_large_rtl", SwipeAction.PinUnpin, -1, rtl = true)
+    /** An unmuted chat offers Mute in AMOLED. */
+    @Test fun muteCueAmoled() =
+        captureCue("mute_amoled", SwipeAction.MuteUnmute, 1, R.string.chat_row_action_mute, dark = true, amoled = true)
+
+    /** A muted chat offers Unmute in dark theme. */
+    @Test fun unmuteCueDark() =
+        captureCue(
+            "unmute_dark",
+            SwipeAction.MuteUnmute,
+            -1,
+            R.string.chat_row_action_unmute,
+            dark = true,
+            item = ChatRowPortFixtures.item(muted = true),
+        )
+
+    /** An unpinned chat offers Pin with physical direction preserved at large RTL text. */
+    @Test fun pinCueLargeRtl() =
+        captureCue("pin_large_rtl", SwipeAction.PinUnpin, -1, R.string.chat_row_action_pin, rtl = true)
+
+    /** A pinned chat offers Unpin in light theme. */
+    @Test fun unpinCueLight() =
+        captureCue(
+            "unpin_light",
+            SwipeAction.PinUnpin,
+            1,
+            R.string.chat_row_action_unpin,
+            item = ChatRowPortFixtures.item(pinned = true),
+        )
 
     /** Holds a real row's opted-in action below the release threshold for deterministic cue inspection. */
+    @Suppress("LongParameterList")
     private fun captureCue(
         name: String,
         action: SwipeAction,
         direction: Int,
+        expectedLabel: Int,
         dark: Boolean = false,
         amoled: Boolean = false,
         rtl: Boolean = false,
+        item: ChatListItem = ChatRowPortFixtures.item(),
     ) {
         swipeSettings.value = SwipePreferenceState(chatLeft = action, chatRight = action)
-        render(dark = dark, amoled = amoled, rtl = rtl)
+        render(dark = dark, amoled = amoled, rtl = rtl, item = item)
         row().performTouchInput {
             down(center)
             moveBy(Offset(90f * direction, 0f))
         }
+        composeRule.onNodeWithTag("chat.swipe.cue").assertContentDescriptionEquals(context.getString(expectedLabel))
         composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_swipe_$name.png")
         row().performTouchInput { cancel() }
         assertTrue(swipes.isEmpty())
@@ -278,9 +320,9 @@ class ChatRowPortGestureTest {
         dark: Boolean = false,
         amoled: Boolean = false,
         rtl: Boolean = false,
+        item: ChatListItem = ChatRowPortFixtures.item(),
     ) {
         val state = ChatRowPortFixtures.state(context)
-        val item = ChatRowPortFixtures.item()
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
@@ -294,12 +336,15 @@ class ChatRowPortGestureTest {
                                 enabled = enabled && !selecting.value && !rangeActive.value && !heldMenu.value,
                                 leftAllowed = chatSwipeAllowed(swipeSettings.value.chatLeft, item, null),
                                 rightAllowed = chatSwipeAllowed(swipeSettings.value.chatRight, item, null),
+                                hasUnread = item.effectiveHasUnread(null),
+                                isMuted = item.engineMuted(),
+                                isPinned = item.pinned(),
                                 onCommit = { swipes.add(it) },
                             ) {
                                 ChatListRow(
                                     item = item,
                                     appState = state,
-                                    isMuted = false,
+                                    isMuted = item.engineMuted(),
                                     interactionsEnabled = enabled,
                                     selectionMode = selecting.value,
                                     selected = selecting.value,

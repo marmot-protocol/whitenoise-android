@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -30,7 +31,6 @@ import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SwipePreferenceState
 import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberMessageReplySwipeState
-import dev.ipf.whitenoise.android.ui.settings.actionTitle
 import kotlin.math.roundToInt
 
 /** Mirrors the existing context-menu capabilities and intentionally offers no destructive or archive command. */
@@ -64,6 +64,9 @@ internal fun ChatSwipeActions(
     enabled: Boolean,
     leftAllowed: Boolean,
     rightAllowed: Boolean,
+    hasUnread: Boolean,
+    isMuted: Boolean,
+    isPinned: Boolean,
     onCommit: (SwipeAction) -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -113,29 +116,48 @@ internal fun ChatSwipeActions(
         ),
     ) {
         if (!state.atRest && action != SwipeAction.Off) {
-            ChatSwipeCue(action, direction)
+            ChatSwipeCue(action, direction, hasUnread, isMuted, isPinned)
         }
         Box(Modifier.absoluteOffset { IntOffset((state.displayedDistance * direction).roundToInt(), 0) }) { content() }
     }
 }
 
-/** A compact action cue stays behind its translating row with the physical direction preserved in RTL. */
+/** Shows the next command using the same icons and localized labels as the chat context menu. */
 @Composable
 @Suppress("FunctionNaming")
 private fun BoxScope.ChatSwipeCue(
     action: SwipeAction,
     direction: Int,
+    hasUnread: Boolean,
+    isMuted: Boolean,
+    isPinned: Boolean,
 ) {
+    val (icon, label) =
+        when (action) {
+            SwipeAction.ReadUnread ->
+                if (hasUnread) {
+                    R.drawable.ic_check to R.string.chat_row_action_mark_read
+                } else {
+                    R.drawable.ic_mark_unread to R.string.chat_row_action_mark_unread
+                }
+            SwipeAction.MuteUnmute ->
+                if (isMuted) {
+                    R.drawable.ic_settings_notifications to R.string.chat_row_action_unmute
+                } else {
+                    R.drawable.ic_notifications_off to R.string.chat_row_action_mute
+                }
+            SwipeAction.PinUnpin ->
+                if (isPinned) {
+                    R.drawable.ic_unpin to R.string.chat_row_action_unpin
+                } else {
+                    R.drawable.ic_push_pin to R.string.chat_row_action_pin
+                }
+            else -> return
+        }
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Icon(
-        painterResource(
-            when (action) {
-                SwipeAction.ReadUnread -> R.drawable.ic_mark_unread
-                SwipeAction.MuteUnmute -> R.drawable.ic_volume_up
-                else -> R.drawable.ic_push_pin
-            },
-        ),
-        contentDescription = actionTitle(action),
+        painterResource(icon),
+        contentDescription = stringResource(label),
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier =
             Modifier

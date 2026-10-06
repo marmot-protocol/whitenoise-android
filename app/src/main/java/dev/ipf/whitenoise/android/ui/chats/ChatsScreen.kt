@@ -1344,6 +1344,9 @@ internal fun ChatsScreen(
                     leftAllowed = chatSwipeAllowed(swipeSettings.chatLeft, item, appState.activeAccount?.accountIdHex),
                     rightAllowed =
                         chatSwipeAllowed(swipeSettings.chatRight, item, appState.activeAccount?.accountIdHex),
+                    hasUnread = item.effectiveHasUnread(appState.activeAccount?.accountIdHex),
+                    isMuted = item.engineMuted(),
+                    isPinned = item.pinned(),
                     onCommit = { action ->
                         val current = controller.chatItemForGroup(item.group.groupIdHex)
                         val gestureCurrent =

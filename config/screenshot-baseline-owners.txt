@@ -120,3 +120,6 @@
 *.ChatRowPortGestureTest.readCueDark
 *.ChatRowPortGestureTest.muteCueAmoled
 *.ChatRowPortGestureTest.pinCueLargeRtl
+*.ChatRowPortGestureTest.unreadCueLight
+*.ChatRowPortGestureTest.unmuteCueDark
+*.ChatRowPortGestureTest.unpinCueLight

@@ -18,6 +18,54 @@
         "test_ids": [
           "SET-032"
         ]
+      },
+      {
+        "surface": "R.string.chat_row_action_mark_read",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_mark_read",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_mark_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_mark_unread",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_mute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_mute",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_pin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_pin",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_unmute",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_unmute",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_action_unpin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatSwipeActions.kt",
+        "anchor": "R.string.chat_row_action_unpin",
+        "test_ids": [
+          "SET-032"
+        ]
       }
     ]
   },
