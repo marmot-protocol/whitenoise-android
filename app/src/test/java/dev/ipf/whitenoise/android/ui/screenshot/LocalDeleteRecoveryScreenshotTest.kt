@@ -12,7 +12,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
@@ -20,7 +19,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.unit.Density
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -59,10 +58,14 @@ class LocalDeleteRecoveryScreenshotTest {
     fun retryLargeRtl() = capture(Notice.Retry, "retry_large_rtl", largeRtl = true)
 
     @Test
-    fun cleanupLight() = capture(Notice.Cleanup, "cleanup_light", dark = false)
+    @Config(qualifiers = "de-w320dp-h780dp-mdpi")
+    fun retryGermanLargeRtl() = capture(Notice.Retry, "retry_german_large_rtl", largeRtl = true)
 
     @Test
-    fun cleanupLargeRtl() = capture(Notice.Cleanup, "cleanup_large_rtl", largeRtl = true)
+    fun detailsLight() = capture(Notice.Retry, "details_light", dark = false, showDetails = true)
+
+    @Test
+    fun detailsLargeRtl() = capture(Notice.Retry, "details_large_rtl", largeRtl = true, showDetails = true)
 
     @Test
     fun stoppedLight() = capture(Notice.Stopped, "stopped_light", dark = false)
@@ -76,6 +79,7 @@ class LocalDeleteRecoveryScreenshotTest {
         dark: Boolean = true,
         amoled: Boolean = false,
         largeRtl: Boolean = false,
+        showDetails: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val detail =
@@ -84,28 +88,27 @@ class LocalDeleteRecoveryScreenshotTest {
             } else {
                 context.getString(notice.detail)
             }
-        val message = context.getString(notice.title) + "\n" + detail
+        val message = context.getString(notice.title)
+        val report = "operation=CHAT_LOCAL_DELETE\nphase=native_delete;attempt=3;exhausted=1;presence=present"
         composeRule.setContent {
             val hostState = remember { SnackbarHostState() }
-            val density = LocalDensity.current
             LaunchedEffect(hostState) {
                 hostState.showSnackbar(
                     ToastSnackbarVisuals(
                         message = message,
                         copyable = true,
-                        copyText =
-                            "operation=CHAT_LOCAL_DELETE\n" +
-                                "phase=native_delete;attempt=3;exhausted=1;presence=present",
+                        copyText = report,
+                        details = detail + "\n\n" + report,
+                        actionLabel = context.getString(R.string.retry),
                     ),
                 )
             }
             CompositionLocalProvider(
-                LocalDensity provides Density(density.density, if (largeRtl) 2f else 1f),
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 LocalSnackbarBottomInset provides remember { mutableStateOf(0.dp) },
                 LocalSnackbarContentInset provides remember { mutableStateOf(0.dp) },
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
                     Surface(Modifier.width(if (largeRtl) 320.dp else 360.dp)) {
                         Box(Modifier.fillMaxSize()) {
                             WhiteNoiseSnackbarHost(
@@ -118,9 +121,22 @@ class LocalDeleteRecoveryScreenshotTest {
             }
         }
         composeRule.onNodeWithText(message).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.copy)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.retry)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.details)).assertIsDisplayed()
+        composeRule.onNodeWithText(detail + "\n\n" + report).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(context.getString(R.string.dismiss)).assertIsDisplayed()
-        composeRule.onNodeWithTag("local-delete-notice").captureRoboImage("src/test/snapshots/local_delete_$suffix.png")
+        if (showDetails) {
+            composeRule.onNodeWithText(context.getString(R.string.details)).performClick()
+            composeRule.onNodeWithText(detail + "\n\n" + report).assertIsDisplayed()
+            composeRule.onNodeWithText(context.getString(R.string.copy)).assertIsDisplayed()
+            composeRule.onNodeWithTag("local-delete-details").captureRoboImage(
+                "src/test/snapshots/local_delete_$suffix.png",
+            )
+        } else {
+            composeRule.onNodeWithTag("local-delete-notice").captureRoboImage(
+                "src/test/snapshots/local_delete_$suffix.png",
+            )
+        }
     }
 
     private enum class Notice(
@@ -128,7 +144,6 @@ class LocalDeleteRecoveryScreenshotTest {
         val detail: Int,
     ) {
         Retry(R.string.toast_couldnt_delete_chat, R.string.local_delete_retry_detail),
-        Cleanup(R.string.toast_chat_deleted_local, R.string.local_delete_cleanup_pending),
         Stopped(R.string.chat_list_delete_stopped, R.string.chat_list_delete_stopped_detail),
     }
 }

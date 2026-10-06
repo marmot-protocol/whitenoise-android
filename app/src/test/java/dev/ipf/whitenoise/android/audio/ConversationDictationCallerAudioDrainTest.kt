@@ -81,7 +81,10 @@ class ConversationDictationCallerAudioDrainTest {
         override fun start(): Unit = error("Draining must not restart microphone capture")
 
         /** Exposes no live samples because this fixture represents a recorder that is already stopped. */
-        override fun read(target: ShortArray): Int = 0
+        override fun read(
+            target: ShortArray,
+            waitForSamples: Boolean,
+        ): Int = 0
 
         /** Requires no native cleanup for the already-stopped fixture. */
         override fun stop() = Unit
