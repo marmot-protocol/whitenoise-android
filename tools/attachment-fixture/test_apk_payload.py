@@ -93,7 +93,7 @@ class SigningCommandTest(unittest.TestCase):
     def test_align_then_sign_then_verify_in_order_without_any_device_command(self):
         """zipalign precedes apksigner sign, verify follows, and no command names adb."""
         run = mock.Mock(return_value=mock.Mock(stdout=""))
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory(prefix="fixture-adb-") as directory:
             unsigned = Path(directory) / "unsigned.apk"
             unsigned.write_bytes(b"zip")
             output = Path(directory) / "signed.apk"
@@ -106,7 +106,7 @@ class SigningCommandTest(unittest.TestCase):
         self.assertIn("--min-sdk-version", commands[1])
         self.assertEqual(commands[0][-1], commands[1][-1])
         self.assertEqual(["verify", "--min-sdk-version", payload.MIN_SDK], commands[2][1:4])
-        self.assertFalse(any("adb" in part for command in commands for part in command))
+        self.assertFalse(any(Path(command[0]).name in {"adb", "adb.exe"} for command in commands))
 
     def test_the_signing_password_never_reaches_a_command_line_or_a_failure_message(self):
         """apksigner reads the password from the environment, so a failed signing command cannot print it."""
