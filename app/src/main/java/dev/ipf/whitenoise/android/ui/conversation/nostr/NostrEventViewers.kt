@@ -17,8 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
@@ -66,16 +66,8 @@ import androidx.media3.ui.PlayerView
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
-import dev.ipf.whitenoise.android.core.HostSafety
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import okhttp3.Dns
-import okhttp3.HttpUrl
-import okhttp3.OkHttpClient
-import java.io.IOException
-import java.net.InetAddress
-import java.net.UnknownHostException
 
 /** Parses a verified event body and presents it without starting another event-resolution layer. */
 @Composable
@@ -92,19 +84,8 @@ internal fun NostrEventReaderDialog(
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val eventUri = authoredReference?.let(::nostrEventUri)
-    var document by remember(card.eventIdHex) { mutableStateOf<MarkdownDocumentFfi?>(null) }
-    var parsing by remember(card.eventIdHex) { mutableStateOf(true) }
-    LaunchedEffect(card.eventIdHex, card.readerBody) {
-        document =
-            try {
-                parseMarkdown(card.readerBody.orEmpty())
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                null
-            }
-        parsing = false
-    }
+    val prepared = rememberNostrReaderPreparation(card, parseMarkdown)
+    var playing by remember(card.eventIdHex) { mutableStateOf(false) }
     Dialog(
         onDismissRequest = onDismiss,
         properties =
@@ -118,8 +99,8 @@ internal fun NostrEventReaderDialog(
         NostrEventReaderScreen(
             card = card,
             authoredReference = authoredReference,
-            document = document,
-            parsing = parsing,
+            document = prepared.document,
+            parsing = prepared.parsing,
             authorDisplayName = authorDisplayName,
             mentionDisplayName = mentionDisplayName,
             onNostrProfileTap = onNostrProfileTap,
@@ -136,7 +117,14 @@ internal fun NostrEventReaderDialog(
                     { openNostrEvent(context, uri) }
                 },
             onDismiss = onDismiss,
+            onPlayVideo = { playing = true },
+            preparation = prepared,
         )
+    }
+    if (playing) {
+        card.mediaUrl?.let { url ->
+            NostrVideoPlayerDialog(mediaUrl = url, mediaMimeType = card.mediaMimeType, onDismiss = { playing = false })
+        }
     }
 }
 
@@ -154,6 +142,8 @@ internal fun NostrEventReaderScreen(
     onOpenExternal: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    onPlayVideo: (() -> Unit)? = null,
+    preparation: NostrReaderPreparation? = null,
 ) {
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -176,6 +166,8 @@ internal fun NostrEventReaderScreen(
                 authorDisplayName = authorDisplayName,
                 mentionDisplayName = mentionDisplayName,
                 onNostrProfileTap = onNostrProfileTap,
+                onPlayVideo = onPlayVideo,
+                preparation = preparation,
             )
         }
     }
@@ -227,61 +219,88 @@ private fun NostrEventReaderBody(
     authorDisplayName: (String) -> String,
     mentionDisplayName: (String) -> String?,
     onNostrProfileTap: (String) -> Unit,
+    onPlayVideo: (() -> Unit)?,
+    preparation: NostrReaderPreparation?,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 18.dp),
+    val blocks =
+        preparation?.blocks ?: remember(document) {
+            document?.takeIf(::nostrReaderCanFormat)?.let(::nostrReaderBlocks).orEmpty()
+        }
+    val textChunks =
+        preparation?.textChunks ?: remember(card.readerBody, card.summary) {
+            nostrReaderTextChunks(card.readerBody ?: card.summary.orEmpty())
+        }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().testTag(NOSTR_EVENT_READER_BODY_TAG),
+        contentPadding =
+            androidx.compose.foundation.layout
+                .PaddingValues(horizontal = 20.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item("event-context") {
+            NostrEventReaderContext(card, authoredReference, authorDisplayName, onPlayVideo)
+        }
+        itemsIndexed(card.imageUrls.take(MAX_READER_IMAGES), key = { _, url -> "image:$url" }) { _, url ->
+            NostrEventImagePane(url = url)
+        }
+        if (parsing) {
+            item("parsing") { CircularProgressIndicator(Modifier.testTag(NOSTR_EVENT_READER_LOADING_TAG)) }
+        } else if (blocks.isNotEmpty()) {
+            itemsIndexed(blocks, key = { index, _ -> "body:$index" }) { _, block ->
+                MarkdownMessageBody(
+                    document =
+                        MarkdownDocumentFfi(
+                            blocks = listOf(block),
+                            truncated = false,
+                            blankLinesBefore = byteArrayOf(),
+                        ),
+                    mentionDisplayName = mentionDisplayName,
+                    onNostrProfileTap = onNostrProfileTap,
+                    useDecorativeBackgrounds = true,
+                )
+            }
+        } else {
+            itemsIndexed(textChunks) { _, chunk ->
+                Text(chunk, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
+}
+
+/** Keeps the signed event context and explicit media actions above the complete body. */
+@Composable
+private fun NostrEventReaderContext(
+    card: NostrEventCardModel,
+    authoredReference: String?,
+    authorDisplayName: (String) -> String,
+    onPlayVideo: (() -> Unit)?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         card.title?.takeIf(String::isNotBlank)?.let { title ->
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         }
         Text(
-            text = eventByline(card, authorDisplayName),
+            eventByline(card, authorDisplayName),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         authoredReference?.takeIf(String::isNotBlank)?.let { reference ->
             Text(
-                text = reference,
+                reference,
                 modifier = Modifier.fillMaxWidth().testTag(NOSTR_EVENT_READER_REFERENCE_TAG),
                 style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        when {
-            parsing ->
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
-            document != null && document.blocks.isNotEmpty() ->
-                MarkdownMessageBody(
-                    document = document,
-                    mentionDisplayName = mentionDisplayName,
-                    onNostrProfileTap = onNostrProfileTap,
-                    useDecorativeBackgrounds = true,
-                )
-            else ->
-                Text(
-                    text = card.readerBody ?: card.summary.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+        card.metadata.forEach { detail -> Text(detail, style = MaterialTheme.typography.bodyMedium) }
+        if (card.mediaUrl != null && onPlayVideo != null) {
+            TextButton(onClick = onPlayVideo) { Text(stringResource(R.string.nostr_event_play_video)) }
         }
     }
 }
 
-/** Normalizes a parser-authored event reference into the URI used by copy/open fallback actions. */
+/** Normalizes a parser-authored reference for copy and external-open actions. */
 private fun nostrEventUri(authoredReference: String): String =
     if (authoredReference.startsWith("nostr:", ignoreCase = true)) authoredReference else "nostr:$authoredReference"
 
@@ -443,39 +462,8 @@ private val nostrVideoAudioAttributes =
         .setUsage(C.USAGE_MEDIA)
         .build()
 
-/** Rejects internal-network destinations for the initial request and every redirect. */
-private val nostrMediaHttpClient: OkHttpClient by lazy {
-    OkHttpClient
-        .Builder()
-        .dns(PublicMediaDns)
-        .followSslRedirects(false)
-        .addNetworkInterceptor { chain ->
-            val url = chain.request().url
-            if (!url.isSafeMediaDestination()) {
-                throw IOException("Unsafe media destination")
-            }
-            chain.proceed(chain.request())
-        }.build()
-}
-
-private fun HttpUrl.isSafeMediaDestination(): Boolean =
-    when {
-        !isHttps -> false
-        port != HTTPS_PORT -> false
-        encodedUsername.isNotEmpty() || encodedPassword.isNotEmpty() -> false
-        else -> !HostSafety.isPrivateOrLoopbackHost(host)
-    }
-
-private object PublicMediaDns : Dns {
-    override fun lookup(hostname: String): List<InetAddress> {
-        if (HostSafety.isPrivateOrLoopbackHost(hostname)) throw UnknownHostException(hostname)
-        val addresses = Dns.SYSTEM.lookup(hostname)
-        if (addresses.isEmpty() || addresses.any(HostSafety::isPrivateOrLoopbackAddress)) {
-            throw UnknownHostException(hostname)
-        }
-        return addresses
-    }
-}
-
-private const val HTTPS_PORT = 443
 private const val VIDEO_CONTROLS_TIMEOUT_MILLIS = 2_500
+
+internal const val NOSTR_EVENT_READER_BODY_TAG = "nostr-event-reader-body"
+
+internal const val NOSTR_EVENT_READER_LOADING_TAG = "nostr-event-reader-loading"

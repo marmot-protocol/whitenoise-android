@@ -27,6 +27,23 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 class AvatarImageLoaderTest {
     @Test
+    fun explicitBannerRetryRecoversBeforeTheFailureCooldownExpires() =
+        runBlocking {
+            val calls = AtomicInteger()
+            val url = "https://profiles.example/explicit-banner-retry.png"
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                if (calls.incrementAndGet() == 1) error("temporary image failure")
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            assertNull(AvatarImageLoader.loadBanner(url, 1440))
+            assertNull(AvatarImageLoader.loadBanner(url, 1440))
+            assertEquals(1, calls.get())
+            assertNotNull(AvatarImageLoader.retryBanner(url, 1440))
+            assertNotNull(AvatarImageLoader.loadBanner(url, 1440))
+            assertEquals(2, calls.get())
+        }
+
+    @Test
     fun cacheGuardSurvivesDiscardedComposeSnapshot() {
         val before = AvatarImageLoader.currentCacheLifetime()
         val snapshot = Snapshot.takeMutableSnapshot()

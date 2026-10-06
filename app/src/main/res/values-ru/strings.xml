@@ -2299,4 +2299,8 @@
     <string name="profile_readiness_added">Добавлено</string>
     <string name="profile_readiness_recommended">Рекомендуется</string>
     <string name="profile_readiness_field_optional">Необязательно</string>
+    <string name="nostr_event_view_image">Показать изображение</string>
+    <string name="nostr_event_image_failed">Не удалось загрузить изображение. Попробуйте ещё раз.</string>
+    <string name="nostr_event_type_image">Изображение</string>
+    <string name="nostr_event_expand">Посмотреть событие целиком</string>
 </resources>
