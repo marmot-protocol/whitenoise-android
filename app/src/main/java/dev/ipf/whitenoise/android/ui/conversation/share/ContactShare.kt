@@ -8,11 +8,15 @@ import android.net.Uri
 import android.provider.ContactsContract
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContract
+import dev.ipf.whitenoise.android.state.PendingAttachment
 
 private const val TAG = "WNContactShare"
 
 /** MIME type for the portable vCard attachment carried by a contact share. */
 internal const val VCARD_MIME_TYPE = "text/vcard"
+
+/** MIME types contact apps and file providers report for an exported `.vcf`. */
+private val VCARD_SOURCE_MIME_TYPES = setOf(VCARD_MIME_TYPE, "text/x-vcard")
 
 /**
  * The only fields extracted from a picked contact — never the address book.
@@ -52,6 +56,19 @@ internal fun parseSharedContactFromText(text: String): SharedContact? {
     // ordinary captions remain visible beside the file attachment.
     if (phone == null && email == null) return null
     return SharedContact(name = name, phone = phone, email = email)
+}
+
+/**
+ * Recovers the contact from a raw `.vcf` the user attached, so the file can go
+ * out exactly like a picker share and draw the same card. Null for other files,
+ * multi-contact files, and cards whose caption would not parse back as a contact.
+ */
+internal fun attachedVCardContact(attachment: PendingAttachment): SharedContact? {
+    val vcard =
+        attachment.mediaType in VCARD_SOURCE_MIME_TYPES ||
+            attachment.fileName.endsWith(".vcf", ignoreCase = true)
+    val contact = if (vcard) parseSingleVCard(attachment.plaintextBytes) else null
+    return contact?.takeIf { parseSharedContactFromText(formatContactShareText(it)) != null }
 }
 
 private fun vcardEscape(value: String): String =
