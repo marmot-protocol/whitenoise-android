@@ -1,7 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.hardware.biometrics.BiometricManager
+import android.media.AudioManager
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
@@ -55,6 +59,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowBiometricManager
@@ -338,27 +343,26 @@ class PlaybackTransportOwnershipTest {
 
     /** A rejected reader preparation cannot stop the newer queue that replaced its source owner. */
     @Test fun staleAttachmentPreparationCannotStopReplacementSpeech() {
-        val appState = appState()
+        shadowOf(context.getSystemService(AudioManager::class.java))
+            .setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        val preparationContext = PreparationServiceContext(context)
+        val appState = appState(preparationContext)
         val engine = FakeSessionEngine()
         appState.ttsController.attachEngine(engine)
         var current = true
         var replacementSession = 0L
-        val actions =
-            TextAttachmentNativeActions(
-                sourceIsCurrent = {
-                    if (current && appState.ttsController.state.value is TtsState.Preparing) {
-                        current = false
-                        assertTrue(
-                            appState.speakAloud(
-                                listOf(TtsSpeakableEntry("sender", "Maya", "Replacement queue.")),
-                                Locale.US,
-                            ),
-                        )
-                        replacementSession = appState.ttsController.state.value.sessionId
-                    }
-                    current
-                },
-            ) {}
+        preparationContext.onStart = {
+            assertTrue(appState.ttsController.state.value is TtsState.Preparing)
+            current = false
+            assertTrue(
+                appState.speakAloud(
+                    listOf(TtsSpeakableEntry("sender", "Maya", "Replacement queue.")),
+                    Locale.US,
+                ),
+            )
+            replacementSession = appState.ttsController.state.value.sessionId
+        }
+        val actions = TextAttachmentNativeActions(sourceIsCurrent = { current }) {}
         val preview =
             TextAttachmentPreview(
                 TextAttachmentCandidate("notes.txt", "text/plain", TextAttachmentFormat.PlainText),
@@ -387,9 +391,9 @@ class PlaybackTransportOwnershipTest {
     }
 
     /** Builds one signed-in account with isolated preferences and no durable draft side effects. */
-    private fun appState() =
+    private fun appState(appContext: Context = context) =
         WhiteNoiseAppState(
-            context = context,
+            context = appContext,
             draftStore = DraftStore(DiscardedDrafts),
             accountIdHexResolver = { null },
             accounts = listOf(AccountSummaryFfi("personal", "id-a", true, false, false, true)),
@@ -409,6 +413,24 @@ class PlaybackTransportOwnershipTest {
                 .apply { isAccessible = true }
         val state = field.get(appState) as androidx.compose.runtime.MutableState<List<AccountSummaryFfi>>
         state.value = accounts
+    }
+
+    /** Admits the platform service request synchronously so replacement occurs at the actual Preparing boundary. */
+    private class PreparationServiceContext(
+        base: Context,
+    ) : ContextWrapper(base) {
+        var onStart: () -> Unit = {}
+
+        /** Retains the service-boundary fixture when app state requests its application context. */
+        override fun getApplicationContext(): Context = this
+
+        /** Fires once; a replacement queue may make its own service request without recursion. */
+        override fun startForegroundService(service: Intent): ComponentName {
+            val callback = onStart
+            onStart = {}
+            callback()
+            return checkNotNull(service.component)
+        }
     }
 
     private object DiscardedDrafts : DraftPersistence {

@@ -615,6 +615,7 @@ internal fun ConversationScreen(
     onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
+    playbackTransport: @Composable () -> Unit = {},
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
 ) {
     androidx.compose.runtime.LaunchedEffect(
@@ -3451,48 +3452,53 @@ internal fun ConversationScreen(
         // as one cluster (#895, #1109).
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
         topBar = {
-            ConversationTopBar(
-                selectionMode = selectionMode,
-                selectedCount = batchSelectionUi.actionItems.size,
-                onCloseSelection = {
-                    if (!batchDeleteInFlight) {
-                        batchDeleteRetryState = null
-                        selectedMessages.clear()
-                    }
+            ConversationHeaderFrame(
+                header = {
+                    ConversationTopBar(
+                        selectionMode = selectionMode,
+                        selectedCount = batchSelectionUi.actionItems.size,
+                        onCloseSelection = {
+                            if (!batchDeleteInFlight) {
+                                batchDeleteRetryState = null
+                                selectedMessages.clear()
+                            }
+                        },
+                        searchOpen = navigationState.searchOpen,
+                        searchQuery = navigationState.searchQuery,
+                        onSearchQueryChange = {
+                            navigationState.searchJob?.cancel()
+                            navigationState.searchJob = null
+                            navigationState.navigateReplyJob?.cancel()
+                            navigationState.targetNavigation.cancel()
+                            navigationState.targetHighlight.clear()
+                            navigationState.searchQuery = it
+                            navigationState.searchPinnedMatchId = null
+                        },
+                        onClearSearch = {
+                            navigationState.searchJob?.cancel()
+                            navigationState.searchJob = null
+                            navigationState.navigateReplyJob?.cancel()
+                            navigationState.targetNavigation.cancel()
+                            navigationState.targetHighlight.clear()
+                            navigationState.searchQuery = ""
+                            navigationState.searchPinnedMatchId = null
+                        },
+                        onCloseSearch = ::closeSearch,
+                        onSearchAction = { navigateToSearchMatch(forward = true) },
+                        searchFocusRequester = navigationState.searchFocusRequester,
+                        appState = appState,
+                        controller = controller,
+                        groupTitleCopy = groupTitleCopy,
+                        openedAsDmHint = openedAsDmHint,
+                        firstFrameAvatar = chat.firstFrameAvatar,
+                        freezeRoutePresentation = freezeRoutePresentation,
+                        openDetailsDescription = openDetailsDescription,
+                        onOpenDetails = { showDetails = true },
+                        onBack = exitConversation,
+                        compactHeight = compactHeightConversation,
+                    )
                 },
-                searchOpen = navigationState.searchOpen,
-                searchQuery = navigationState.searchQuery,
-                onSearchQueryChange = {
-                    navigationState.searchJob?.cancel()
-                    navigationState.searchJob = null
-                    navigationState.navigateReplyJob?.cancel()
-                    navigationState.targetNavigation.cancel()
-                    navigationState.targetHighlight.clear()
-                    navigationState.searchQuery = it
-                    navigationState.searchPinnedMatchId = null
-                },
-                onClearSearch = {
-                    navigationState.searchJob?.cancel()
-                    navigationState.searchJob = null
-                    navigationState.navigateReplyJob?.cancel()
-                    navigationState.targetNavigation.cancel()
-                    navigationState.targetHighlight.clear()
-                    navigationState.searchQuery = ""
-                    navigationState.searchPinnedMatchId = null
-                },
-                onCloseSearch = ::closeSearch,
-                onSearchAction = { navigateToSearchMatch(forward = true) },
-                searchFocusRequester = navigationState.searchFocusRequester,
-                appState = appState,
-                controller = controller,
-                groupTitleCopy = groupTitleCopy,
-                openedAsDmHint = openedAsDmHint,
-                firstFrameAvatar = chat.firstFrameAvatar,
-                freezeRoutePresentation = freezeRoutePresentation,
-                openDetailsDescription = openDetailsDescription,
-                onOpenDetails = { showDetails = true },
-                onBack = exitConversation,
-                compactHeight = compactHeightConversation,
+                playbackTransport = playbackTransport,
             )
         },
         bottomBar = {

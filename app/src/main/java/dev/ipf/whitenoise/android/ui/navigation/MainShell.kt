@@ -2167,7 +2167,12 @@ internal fun MainShell(
         }.collectAsState(initial = false)
     val playbackVisible = appState.observePlaybackTransportVisible()
     val playbackInChatList = section == MainSection.Chats && selectedChat == null && pendingConversationOpen == null
-    val playbackInShell = playbackVisible && !playbackInChatList && !appState.appLockScreenVisible && navAccountStable
+    val playbackInShell =
+        playbackVisible &&
+            !playbackInChatList &&
+            selectedChat == null &&
+            !appState.appLockScreenVisible &&
+            navAccountStable
     MainShellNoticeLayout(
         notice = appState.transientNotice,
         dictationController = appState.conversationDictation,
@@ -2317,6 +2322,14 @@ internal fun MainShell(
                             chat = chat,
                             controller = content.controller,
                             surfaceState = content.surfaceState,
+                            playbackTransport = {
+                                if (navAccountStable && selectedChat?.id == chat.id && !appState.appLockScreenVisible) {
+                                    dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar(
+                                        appState,
+                                        onBodyClick = guardedPlaybackSourceOpen,
+                                    )
+                                }
+                            },
                             dictationControlsVisible =
                                 dictationControlOwner == ConversationDictationControlOwner.Composer &&
                                     content.controller === selectedOrPendingConversationController &&

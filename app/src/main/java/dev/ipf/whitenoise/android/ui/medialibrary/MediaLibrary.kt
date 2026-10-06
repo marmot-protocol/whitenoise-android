@@ -78,8 +78,8 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
-import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
@@ -109,11 +109,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import java.net.URI
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Calendar
-import androidx.compose.foundation.lazy.grid.items as gridItems
 
 // A renderable image/video tile resolved from the conversation timeline. Unlike
 // MediaInventory's MediaEntry (which is transport-free and carries only the

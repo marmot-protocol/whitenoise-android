@@ -60,6 +60,19 @@ import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
 internal const val CONVERSATION_TOP_BAR_TAG = "conversation-top-bar"
 
+/** Keeps navigation chrome above playback so starting or stopping media never moves the header. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun ConversationHeaderFrame(
+    header: @Composable () -> Unit,
+    playbackTransport: @Composable () -> Unit,
+) {
+    Column {
+        header()
+        playbackTransport()
+    }
+}
+
 /** Renders frozen route-owned conversation identity and the active top-bar mode. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
