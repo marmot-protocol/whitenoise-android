@@ -5,12 +5,15 @@ import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
+import dev.ipf.whitenoise.android.audio.tts.TtsQueueHarness
+import dev.ipf.whitenoise.android.audio.tts.TtsQueuePreparation
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class TextAttachmentReaderPolicyTest {
     @Test
@@ -114,7 +117,48 @@ class TextAttachmentReaderPolicyTest {
         assertFalse(entry.text.contains("example.com"))
         assertEquals("attachment:message:2", entry.messageIdHex)
         assertEquals("alice", entry.senderKey)
-        assertEquals("Alice · notes.md", entry.senderDisplayName)
+        assertEquals("Alice", entry.senderDisplayName)
+        assertEquals("notes.md", entry.attachmentDisplayName)
+    }
+
+    /** Both reader formats send document content as the first engine utterance, without a filename/sender prefix. */
+    @Test
+    fun readerPlaybackStartsWithDocumentContent() {
+        val previews =
+            listOf(
+                TextAttachmentPreview(plainCandidate(), "Hello world."),
+                TextAttachmentPreview(markdownCandidate(), "Hello world.", document("Hello world.")),
+            )
+        previews.forEach { preview ->
+            val entry = textAttachmentTtsEntry(preview, "alice", "Alice", "message", 2)
+            val prepared = with(TtsQueuePreparation(100)) { requireNotNull(entry.toQueuedMessage(Locale.US)) }
+            val harness = TtsQueueHarness()
+            harness.queue.start(listOf(prepared))
+            assertEquals("Hello world.", harness.spokenText())
+            assertEquals(
+                null,
+                harness.enqueued
+                    .single()
+                    .first.senderPrefix,
+            )
+            assertEquals(
+                "attachment:message:2",
+                harness.queue.state.value.passage
+                    ?.messageIdHex,
+            )
+        }
+    }
+
+    /** Display-only identity cannot consume the engine's utterance budget or reject document speech. */
+    @Test
+    fun longDocumentIdentityDoesNotPreventPlayback() {
+        val preview = TextAttachmentPreview(plainCandidate().copy(displayName = "notes".repeat(60)), "Hello world.")
+        val entry = textAttachmentTtsEntry(preview, "alice", "Alice".repeat(60), "message", 2)
+        val prepared = with(TtsQueuePreparation(20)) { requireNotNull(entry.toQueuedMessage(Locale.US)) }
+        val harness = TtsQueueHarness()
+        harness.queue.start(listOf(prepared))
+        assertEquals("Hello world.", harness.spokenText())
+        assertEquals(preview.candidate.displayName, prepared.attachmentDisplayName)
     }
 
     @Test
