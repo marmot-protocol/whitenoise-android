@@ -12,7 +12,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
@@ -21,7 +20,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -94,7 +92,6 @@ class LocalDeleteRecoveryScreenshotTest {
         val report = "operation=CHAT_LOCAL_DELETE\nphase=native_delete;attempt=3;exhausted=1;presence=present"
         composeRule.setContent {
             val hostState = remember { SnackbarHostState() }
-            val density = LocalDensity.current
             LaunchedEffect(hostState) {
                 hostState.showSnackbar(
                     ToastSnackbarVisuals(
@@ -107,12 +104,11 @@ class LocalDeleteRecoveryScreenshotTest {
                 )
             }
             CompositionLocalProvider(
-                LocalDensity provides Density(density.density, if (largeRtl) 2f else 1f),
                 LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 LocalSnackbarBottomInset provides remember { mutableStateOf(0.dp) },
                 LocalSnackbarContentInset provides remember { mutableStateOf(0.dp) },
             ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (largeRtl) 2f else 1f) {
                     Surface(Modifier.width(if (largeRtl) 320.dp else 360.dp)) {
                         Box(Modifier.fillMaxSize()) {
                             WhiteNoiseSnackbarHost(

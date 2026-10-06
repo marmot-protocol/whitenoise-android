@@ -34,11 +34,12 @@ internal fun WhiteNoiseAppState.localDeleteRetryNotice(
     groupId: String,
     isCurrent: () -> Boolean,
     retry: suspend () -> Unit,
-): LocalDeleteNotice = LocalDeleteNotice(account, setOf(groupId)) {
-    launchMutation {
-        if (isCurrent()) retry()
+): LocalDeleteNotice =
+    LocalDeleteNotice(account, setOf(groupId)) {
+        launchMutation {
+            if (isCurrent()) retry()
+        }
     }
-}
 
 /** Only confirmed native absence resolves a deletion warning; client cleanup continues quietly. */
 internal fun WhiteNoiseAppState.dismissLocalDeleteFailure(

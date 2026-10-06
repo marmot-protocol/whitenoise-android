@@ -56,13 +56,14 @@ internal fun WhiteNoiseAppState.localDeleteBatchRetryNotice(
     controller: ChatsController,
     groupIds: List<String>,
     isCurrent: () -> Boolean,
-): LocalDeleteNotice = LocalDeleteNotice(requireNotNull(controller.accountRef), groupIds.toSet()) { targets ->
-    val wanted = targets.map { it.lowercase() }.toSet()
-    val remaining = groupIds.filter { it.lowercase() in wanted }
-    launchMutation {
-        retryLocalChatDeleteBatch(controller, remaining, isCurrent)
+): LocalDeleteNotice =
+    LocalDeleteNotice(requireNotNull(controller.accountRef), groupIds.toSet()) { targets ->
+        val wanted = targets.map { it.lowercase() }.toSet()
+        val remaining = groupIds.filter { it.lowercase() in wanted }
+        launchMutation {
+            retryLocalChatDeleteBatch(controller, remaining, isCurrent)
+        }
     }
-}
 
 private suspend fun WhiteNoiseAppState.retryLocalChatDeleteBatch(
     controller: ChatsController,

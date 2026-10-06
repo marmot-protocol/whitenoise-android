@@ -151,37 +151,51 @@ class LocalGroupDeleteControllerTest {
             assertEquals(null, fixture.state.toast)
             assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
         }
+
     @Test
     fun backgroundRecoveryRetiresTheWarningWithoutAnotherNativeDelete() =
         runTest {
-            val fixture = fixture("selectedMessageDraft")
-            assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
-            fixture.state.presentLocalDeleteFailure(
-                R.string.toast_couldnt_delete_chat, MarmotKitException.TransportClosed(),
-                notice = LocalDeleteNotice(ACCOUNT, setOf(GROUP)),
-            )
-            fixture.failureMethod.set(null)
-            fixture.state.reconcilePendingLocalGroupDeleteCleanups()
-            assertEquals(null, fixture.state.toast)
-            assertEquals(null, fixture.state.transientNotice)
-            assertEquals(1, fixture.calls.count { it == "deleteGroupLocal" })
-            assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture("selectedMessageDraft")
+                assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+                fixture.state.presentLocalDeleteFailure(
+                    R.string.toast_couldnt_delete_chat,
+                    MarmotKitException.TransportClosed(),
+                    notice = LocalDeleteNotice(ACCOUNT, setOf(GROUP)),
+                )
+                fixture.failureMethod.set(null)
+                fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+                assertEquals(null, fixture.state.toast)
+                assertEquals(null, fixture.state.transientNotice)
+                assertEquals(1, fixture.calls.count { it == "deleteGroupLocal" })
+                assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+            } finally {
+                Dispatchers.resetMain()
+            }
         }
+
     @Test
     fun deferredCleanupRetainsAnUnrelatedWarningAndRecoversSilently() =
         runTest {
-            val fixture = fixture("selectedMessageDraft")
-            fixture.state.present(R.string.toast_couldnt_delete_chat)
-            val other = fixture.state.toast
-            assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
-            assertEquals(other, fixture.state.toast)
-            assertEquals(null, fixture.state.transientNotice)
-            fixture.failureMethod.set(null)
-            fixture.state.reconcilePendingLocalGroupDeleteCleanups()
-            assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
-            assertEquals(other, fixture.state.toast)
-            assertEquals(null, fixture.state.transientNotice)
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture("selectedMessageDraft")
+                fixture.state.present(R.string.toast_couldnt_delete_chat)
+                val other = fixture.state.toast
+                assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
+                assertEquals(other, fixture.state.toast)
+                assertEquals(null, fixture.state.transientNotice)
+                fixture.failureMethod.set(null)
+                fixture.state.reconcilePendingLocalGroupDeleteCleanups()
+                assertFalse(fixture.state.localGroupDeleteCleanupJournal.hasPending())
+                assertEquals(other, fixture.state.toast)
+                assertEquals(null, fixture.state.transientNotice)
+            } finally {
+                Dispatchers.resetMain()
+            }
         }
+
     @Test
     fun retainedAccountReactivationRejectsGestureBeforeOptimisticRowRemoval() =
         runTest {

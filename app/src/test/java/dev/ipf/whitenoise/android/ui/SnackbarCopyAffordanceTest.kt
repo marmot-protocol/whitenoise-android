@@ -33,11 +33,14 @@ class SnackbarCopyAffordanceTest {
 
     @Test
     fun deletionDiagnosticsAreOnlyAvailableBehindDetails() {
-        val visuals = ToastSnackbarVisuals(
-            message = "Couldn't delete chat", copyable = true,
-            copyText = "operation=CHAT_LOCAL_DELETE", details = "Retry guidance\noperation=CHAT_LOCAL_DELETE",
-            actionLabel = "Retry",
-        )
+        val visuals =
+            ToastSnackbarVisuals(
+                message = "Couldn't delete chat",
+                copyable = true,
+                copyText = "operation=CHAT_LOCAL_DELETE",
+                details = "Retry guidance\noperation=CHAT_LOCAL_DELETE",
+                actionLabel = "Retry",
+            )
         assertFalse(snackbarShowsCopyAffordance(visuals))
         assertFalse(visuals.message.contains("CHAT_LOCAL_DELETE"))
         assertEquals(SnackbarDuration.Indefinite, visuals.duration)

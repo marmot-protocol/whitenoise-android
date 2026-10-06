@@ -422,7 +422,10 @@ internal fun WhiteNoiseApp(
                         copyText = toast.diagnosticReport,
                         details =
                             deletion?.let {
-                                listOfNotNull(toast.detail?.resolve(context), toast.diagnosticReport).joinToString("\n\n")
+                                listOfNotNull(
+                                    toast.detail?.resolve(context),
+                                    toast.diagnosticReport,
+                                ).joinToString("\n\n")
                             },
                         actionLabel = deletion?.retry?.let { deletionRetryLabel },
                     ),
