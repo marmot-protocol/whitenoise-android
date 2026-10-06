@@ -48,15 +48,6 @@ dependencies {
     add(composeCompilerPlugin.name, "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:2.4.20")
 }
 
-val sdkDirectory = providers.environmentVariable("ANDROID_HOME")
-    .orElse(providers.environmentVariable("ANDROID_SDK_ROOT"))
-    .orElse(provider {
-        val properties = java.util.Properties()
-        val local = rootProject.file("local.properties")
-        if (local.isFile) local.inputStream().use(properties::load)
-        properties.getProperty("sdk.dir") ?: error("Set ANDROID_HOME to build the Compose source backport")
-    })
-val platformJar = files(sdkDirectory.map { "$it/platforms/android-37/android.jar" })
 val patchFile = layout.projectDirectory.file("third_party/compose-ui/fd550bed793.patch")
 
 subprojects {
@@ -71,7 +62,6 @@ subprojects {
                 originalClasspath.from(originalCompose)
                 sources.set(layout.file(provider { originalSources.singleFile }))
                 patch.set(patchFile)
-                androidJar.from(platformJar)
             }
         }
     }

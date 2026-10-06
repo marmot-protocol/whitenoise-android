@@ -35,8 +35,9 @@ explicitly pinned Kotlin compiler/Compose compiler plugin. The transform:
    enclosing checkouts. All four resulting source hashes must match the reviewed
    patched sources before compilation; a successful Git exit alone is insufficient.
 3. Compiles them against the original UI artifact and its resolved dependencies,
-   using Kotlin/Compose compiler 2.4.20, language/API 2.1, JVM 11 and module name
-   `ui`. The original jar is a friend module for its internal APIs. Compose
+   using Kotlin/Compose compiler 2.4.20, language/API 2.1, JVM 11, invokedynamic
+   lambdas (matching the released classes) and module name `ui`. These common
+   sources do not need an Android platform stub jar. The original jar is a friend module for its internal APIs. Compose
    compilation preserves the generated stability fields used by unchanged code.
 4. Requires every original class generated from those four sources to remain,
    with its existing non-private JVM members, superclass, interfaces and bytecode

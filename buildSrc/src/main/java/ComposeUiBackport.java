@@ -65,8 +65,6 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
         @InputFile @PathSensitive(PathSensitivity.NONE) RegularFileProperty getSources();
         /** Reviewed four-file production patch from the recorded AndroidX commit. */
         @InputFile @PathSensitive(PathSensitivity.NONE) RegularFileProperty getPatch();
-        /** Android 37 platform classes matching the app compile SDK. */
-        @Classpath ConfigurableFileCollection getAndroidJar();
     }
 
     /** The resolved AAR, before any Android artifact extraction or bytecode processing. */
@@ -128,12 +126,11 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
                     classpath.add(dependency.toString());
                 }
             }
-            getParameters().getAndroidJar().forEach(file -> classpath.add(file.toString()));
             Path classes = work.resolve("classes");
             List<String> args = new ArrayList<>(List.of(
                     "-no-stdlib", "-no-reflect", "-jvm-target", "11",
                     "-language-version", "2.1", "-api-version", "2.1", "-module-name", "ui",
-                    "-jvm-default=no-compatibility", "-Xlambdas=class",
+                    "-jvm-default=no-compatibility", "-Xlambdas=indy",
                     "-Xno-param-assertions", "-Xno-call-assertions", "-Xno-receiver-assertions",
                     "-Xfriend-paths=" + original,
                     "-Xplugin=" + getParameters().getComposeCompiler().getSingleFile(),
