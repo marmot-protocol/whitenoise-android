@@ -68,7 +68,7 @@ internal class ProfileNotificationOverridePreferences(
             saved
         }
 
-    /** Account removal leaves all OS channels dormant and preserves other local accounts' choices. */
+    /** Account removal preserves other owners and restores retryable choices after failed or thrown writes. */
     fun clearAccount(accountRef: String): Boolean =
         synchronized(mutationLock) {
             val prefix = accountPrefix(accountRef)
@@ -78,7 +78,11 @@ internal class ProfileNotificationOverridePreferences(
                     .associateWith { preferences.getString(it, null) }
             val editor = preferences.edit()
             previous.keys.forEach(editor::remove)
-            val saved = editor.commit()
+            val saved =
+                runCatching { editor.commit() }.getOrElse { error ->
+                    runCatching { restoreInMemory(previous) }
+                    throw error
+                }
             if (!saved) restoreInMemory(previous)
             if (saved) revision.value += 1
             saved

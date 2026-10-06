@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.Context
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,6 +17,47 @@ class ProfileNotificationOverridePreferencesTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
     private val alice = "a".repeat(64)
     private val bob = "b".repeat(64)
+
+    /** Thrown memory-first cleanup writes roll back across adapters and preserve the original error for retry. */
+    @Test fun thrownAccountCleanupRestoresRoutingAndRemainsRetryable() {
+        val preferences = context.getSharedPreferences("throwing-account-cleanup", Context.MODE_PRIVATE)
+        val stable = ProfileNotificationOverridePreferences(context, preferences)
+        val muted = ProfileNotificationOverride(ProfileNotificationMode.MUTED)
+        val custom = ProfileNotificationOverride(ProfileNotificationMode.CUSTOM, ConversationVibrationPattern.DOUBLE)
+        stable.set("removed", alice, muted)
+        stable.set("removed", bob, custom)
+        stable.set("retained", alice, custom)
+        val writeFailure = IllegalStateException("Cleanup disk write failed")
+        val rollbackFailure = IllegalStateException("Rollback disk write failed")
+        var commits = 0
+        val failing =
+            ProfileNotificationOverridePreferences(
+                context,
+                object : android.content.SharedPreferences by preferences {
+                    override fun edit(): android.content.SharedPreferences.Editor {
+                        val editor = preferences.edit()
+                        return object : android.content.SharedPreferences.Editor by editor {
+                            override fun commit(): Boolean {
+                                editor.commit()
+                                throw if (commits++ == 0) writeFailure else rollbackFailure
+                            }
+                        }
+                    }
+                },
+            )
+        val revision = failing.state.value
+
+        assertSame(writeFailure, assertThrows(IllegalStateException::class.java) { failing.clearAccount("removed") })
+        assertEquals(muted, stable.get("removed", alice))
+        assertEquals(custom, failing.get("removed", bob))
+        assertEquals(custom, stable.get("retained", alice))
+        assertEquals(revision, failing.state.value)
+        assertEquals(2, commits)
+        assertTrue(stable.clearAccount("removed"))
+        assertEquals(ProfileNotificationOverride(), failing.get("removed", alice))
+        assertEquals(ProfileNotificationOverride(), stable.get("removed", bob))
+        assertEquals(custom, ProfileNotificationOverridePreferences(context, preferences).get("retained", alice))
+    }
 
     /** Failed disk writes mutate SharedPreferences memory first; all adapters must retain the prior mute. */
     @Test fun failedSaveAndCleanupRestoreRoutingAcrossAdapters() {
