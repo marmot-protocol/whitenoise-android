@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "Disabled pinned shortcut message: R.string.pinned_shortcut_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PinnedConversationShortcuts.kt",
+        "anchor": "R.string.pinned_shortcut_unavailable",
+        "test_ids": [
+          "SYS-012"
+        ]
+      },
+      {
         "surface": "Pinned conversation lifecycle: fun request(",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/PinnedConversationShortcuts.kt",
         "anchor": "fun request(",

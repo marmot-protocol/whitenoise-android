@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -36,14 +37,16 @@ class PinnedConversationTokensTest {
             object : SecureStoreKeyProvider {
                 override fun secretKey(): SecretKey = key
             },
+        legacy: SharedPreferences = legacyPreferences,
     ): PinnedConversationTokens =
         PinnedConversationTokens(
             KeystoreSecureStore(context, "pin-encrypted-test", provider),
             verifiers,
-            legacyPreferences,
+            legacy,
         )
 
-    private val group = "ab".repeat(32)
+    /** Production group IDs are 16 bytes, so the fixtures use the 32-hex shape MDK emits. */
+    private val group = "ab".repeat(16)
 
     /** Each test starts with a private synthetic credential namespace. */
     @Before
@@ -66,7 +69,7 @@ class PinnedConversationTokensTest {
     @Test
     fun groupDeletionRevokesPendingAndExistingInstances() {
         val old = store.issue("personal", group)!!
-        val other = store.issue("personal", "cd".repeat(32))!!
+        val other = store.issue("personal", "cd".repeat(16))!!
         store.revokeGroup("personal", group)
         val recreated = tokenStore()
         assertFalse(recreated.isValid(old))
@@ -203,7 +206,7 @@ class PinnedConversationTokensTest {
         val wrongGroup =
             PinnedConversationCapability(
                 "personal",
-                "ef".repeat(32),
+                "ef".repeat(16),
                 original.accountToken,
                 original.groupToken,
             )
@@ -215,6 +218,8 @@ class PinnedConversationTokensTest {
     fun invalidIdentityAndCorruptCredentialsFailClosed() {
         assertNull(store.issue(" personal ", group))
         assertNull(store.issue("personal", "invalid"))
+        assertNull(store.issue("personal", group + "a"))
+        assertNotNull(store.issue("personal", "ab".repeat(32)))
         val original = store.issue("private-account-name", group)!!
         assertFalse(preferences.all.keys.any { it.contains("private-account-name") || it.contains(group) })
         preferences.all.keys.forEach { preferences.edit().putString(it, "invalid").commit() }
@@ -288,15 +293,48 @@ class PinnedConversationTokensTest {
         assertTrue(tokens.isValid(replacement))
     }
 
-    /** Missing encrypted material cannot silently invalidate a still-authorized existing launcher pin. */
-    @Test fun missingOrCorruptEncryptedTokensFailIssuanceWithoutRotatingExistingAuthority() {
+    /** Lost or corrupt sealed copies rotate only the keys being issued, so pinning recovers instead of failing. */
+    @Test fun missingOrCorruptEncryptedTokensRotateAuthorityInsteadOfBlockingIssuance() {
         val old = store.issue("personal", group)!!
+        val unrelated = store.issue("work", group)!!
         securePreferences.edit().clear().commit()
-        assertTrue(runCatching { store.issue("personal", group) }.isFailure)
-        assertTrue(store.isValid(old))
+        val afterLoss = store.issue("personal", group)!!
+        assertNotEquals(old.shortcutId, afterLoss.shortcutId)
+        assertFalse(store.isValid(old))
+        assertTrue(store.isValid(afterLoss))
+        // Verifier-only validation keeps the other account's pin until its own key is issued again.
+        assertTrue(store.isValid(unrelated))
         securePreferences.edit().putString("payload", "corrupt").commit()
-        assertTrue(runCatching { store.issue("personal", group) }.isFailure)
-        assertTrue(store.isValid(old))
+        val afterCorruption = store.issue("personal", group)!!
+        assertNotEquals(afterLoss.shortcutId, afterCorruption.shortcutId)
+        assertFalse(store.isValid(afterLoss))
+        assertTrue(store.isValid(afterCorruption))
+        // The reset store is readable again, so a repeat request reuses the recovered token.
+        assertEquals(afterCorruption.shortcutId, tokenStore().issue("personal", group)!!.shortcutId)
+    }
+
+    /** Removing an unrelated conversation or account cannot reject a request that only concerns another key. */
+    @Test fun unrelatedRevocationLeavesAQueuedRequestCurrent() {
+        val queued = PinnedConversationTokens.captureRequest()
+        store.revokeGroup("personal", "cd".repeat(16))
+        store.revokeAccount("work")
+        val issued = store.issue("personal", group, queued)!!
+        assertTrue(store.isValid(issued))
+        store.revokeGroup("personal", group)
+        assertNull(store.issue("personal", group, queued))
+        assertFalse(store.isValid(issued))
+    }
+
+    /** Preview cleanup is best-effort: a legacy commit that never lands blocks neither issuance nor revocation. */
+    @Test fun legacyCleanupFailureCannotBlockIssuanceOrRevocation() {
+        legacyPreferences.edit().putString("preview", "old-plaintext-token").commit()
+        val tokens = tokenStore(legacy = UncommittableLegacyPreferences(legacyPreferences))
+        val capability = tokens.issue("personal", group)!!
+        assertTrue(tokens.isValid(capability))
+        tokens.revokeGroup("personal", group)
+        assertFalse(tokens.isValid(capability))
+        tokens.revokeAccount("personal")
+        assertTrue(legacyPreferences.all.isNotEmpty())
     }
 
     /** A slow off-main encryption operation never holds the lock used by synchronous launcher validation. */
@@ -324,6 +362,23 @@ class PinnedConversationTokensTest {
         } finally {
             release.countDown()
             pool.shutdownNow()
+        }
+    }
+
+    /** Models a legacy preference file whose edits never reach disk. */
+    private class UncommittableLegacyPreferences(
+        private val delegate: SharedPreferences,
+    ) : SharedPreferences by delegate {
+        /** Hands out an editor whose commit always reports failure. */
+        override fun edit(): SharedPreferences.Editor {
+            val inner = delegate.edit()
+            return object : SharedPreferences.Editor by inner {
+                /** Keeps the chained editor so the production call shape reaches the failing commit. */
+                override fun clear(): SharedPreferences.Editor = apply { inner.clear() }
+
+                /** Models a write that never reaches disk. */
+                override fun commit(): Boolean = false
+            }
         }
     }
 

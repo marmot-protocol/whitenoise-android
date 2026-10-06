@@ -157,14 +157,21 @@ class ExternalSignerSignOutLifecycleTest {
         assertTrue(checkNotNull(recreated.read(retained)).isNotEmpty())
     }
 
-    /** Installs the scripted native runtime into a real app state using the supplied preference-failure context. */
-    private fun appState(ownerContext: Context = context): WhiteNoiseAppState =
+    /**
+     * Installs the scripted native runtime into a real app state using the supplied preference-failure context
+     * and, when given, a scripted push token store in place of the Keystore-backed default.
+     */
+    private fun appState(
+        ownerContext: Context = context,
+        pushTokenStore: PushTokenStore? = null,
+    ): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ownerContext,
             draftStore = DraftStore.forContext(ownerContext),
             accountIdHexResolver = { null },
             accounts = listOf(externalSignerAccount()),
             activeAccountRef = ACCOUNT_REF,
+            pushTokenStore = pushTokenStore,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
@@ -401,7 +408,6 @@ class ExternalSignerSignOutLifecycleTest {
     @Test
     fun signOutFailureAfterNativeAdmissionStillPropagates() =
         runBlocking {
-            val state = appState()
             val original = context.getSharedPreferences("sign-out-push-corruption", Context.MODE_PRIVATE)
             val corruptAfterSignOut =
                 object : SharedPreferences by original {
@@ -413,10 +419,7 @@ class ExternalSignerSignOutLifecycleTest {
                         return original.getStringSet(key, defValues)
                     }
                 }
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("pushTokenStore")
-                .apply { isAccessible = true }
-                .set(state, PushTokenStore(corruptAfterSignOut))
+            val state = appState(pushTokenStore = PushTokenStore(corruptAfterSignOut))
 
             assertTrue(runCatching { state.signOutActiveAccount() }.isFailure)
             assertEquals(1, signOutCalls.get())
@@ -432,7 +435,7 @@ class ExternalSignerSignOutLifecycleTest {
             val state = appState(owner)
             beforeListAccounts = {
                 assertTrue(state.accounts.single().signedOut)
-                assertNull(PinnedConversationTokens.create(owner).issue(ACCOUNT_REF, "ab".repeat(32)))
+                assertNull(PinnedConversationTokens.create(owner).issue(ACCOUNT_REF, "ab".repeat(16)))
             }
             assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
             assertTrue(listAccountsCalls.get() > 0)
@@ -450,7 +453,7 @@ class ExternalSignerSignOutLifecycleTest {
             val state = appState(owner)
             beforeListAccounts = {
                 assertTrue(state.accounts.isEmpty())
-                assertNull(PinnedConversationTokens.create(owner).issue(ACCOUNT_REF, "ab".repeat(32)))
+                assertNull(PinnedConversationTokens.create(owner).issue(ACCOUNT_REF, "ab".repeat(16)))
             }
             assertEquals(wipeOutcome, state.signOutAndWipeActiveAccount())
             assertTrue(listAccountsCalls.get() > 0)
@@ -464,7 +467,6 @@ class ExternalSignerSignOutLifecycleTest {
     @Test
     fun completedWipePublishesRemovedOwnershipBeforePushCleanupCanThrow() =
         runBlocking {
-            val state = appState()
             val original = context.getSharedPreferences("wipe-push-corruption", Context.MODE_PRIVATE)
             val corruptAfterWipe =
                 object : SharedPreferences by original {
@@ -476,10 +478,7 @@ class ExternalSignerSignOutLifecycleTest {
                         return original.getStringSet(key, defValues)
                     }
                 }
-            WhiteNoiseAppState::class.java
-                .getDeclaredField("pushTokenStore")
-                .apply { isAccessible = true }
-                .set(state, PushTokenStore(corruptAfterWipe))
+            val state = appState(pushTokenStore = PushTokenStore(corruptAfterWipe))
             assertTrue(runCatching { state.signOutAndWipeActiveAccount() }.isFailure)
             assertTrue(engineWiped)
             assertTrue(state.accounts.isEmpty())

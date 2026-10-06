@@ -21,6 +21,21 @@ class NotificationConversationOpenCoverageTest {
         assertFalse("queued bind must retain its account", bindEffect.contains("appState.activeAccountRef"))
     }
 
+    /** A pin tap waits for the App Lock decision instead of being armed, consumed or routed while it is pending. */
+    @Test
+    fun pinnedShortcutRouteWaitsForThePendingLockDecision() {
+        val source = mainShellSource()
+        val effect = source.substring(source.indexOf("LaunchedEffect(\n        inboundNotificationTarget,"))
+        val keys = effect.substringBefore(") {")
+        assertTrue("the routing effect must re-run on the lock decision", keys.contains("appUnlockEvaluationPending"))
+        val wait =
+            effect.indexOf(
+                "if (target.shortcutCapability != null && appState.appUnlockEvaluationPending) return@LaunchedEffect",
+            )
+        val arm = effect.indexOf("if (routingRequestId != armedNotificationRequestId) {")
+        assertTrue("pins must wait before the request is armed or consumed", wait >= 0 && wait < arm)
+    }
+
     /** Route state is published only after the awaited card cancellation has returned. */
     @Test
     fun routeCommitAwaitsDismissalBeforePublishingNavigationState() {

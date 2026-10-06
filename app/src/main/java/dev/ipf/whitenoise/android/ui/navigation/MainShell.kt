@@ -775,6 +775,7 @@ internal fun MainShell(
         inboundNotificationTarget,
         inboundNotificationRequestId,
         inboundNotificationTarget?.replyDraft != null && appState.appInForeground,
+        inboundNotificationTarget?.shortcutCapability != null && appState.appUnlockEvaluationPending,
         appState.activeAccountRef,
         appState.runtimeGeneration,
         appState.accounts,
@@ -806,6 +807,10 @@ internal fun MainShell(
                 return@LaunchedEffect
             }
         if (target.replyDraft != null && !appState.appInForeground) return@LaunchedEffect
+        // A cold-start pin tap arrives while the App Lock decision still waits for its unlock timestamp. Hold
+        // the capability instead of consuming it: this effect re-runs on the decision, and a lock that shows
+        // then fails closed through rejectUnavailablePin() while a cleared one opens the conversation.
+        if (target.shortcutCapability != null && appState.appUnlockEvaluationPending) return@LaunchedEffect
         if (routingRequestId != armedNotificationRequestId) {
             releaseNotificationFirstFrameGate(armedNotificationRequestId)
             notificationActiveRetryRequestId = null
@@ -1472,6 +1477,11 @@ internal fun MainShell(
         publish = {
             if (chatsController.boundAccountRef == appState.activeAccountRef && !chatsController.isLoading) {
                 appState.publishShareShortcuts(chatsController.forwardTargets())
+            }
+        },
+        refreshPins = {
+            if (chatsController.boundAccountRef == appState.activeAccountRef && !chatsController.isLoading) {
+                appState.refreshPinnedShortcuts(chatsController.forwardTargets())
             }
         },
     )

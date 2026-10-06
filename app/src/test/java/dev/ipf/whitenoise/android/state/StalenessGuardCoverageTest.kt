@@ -78,6 +78,8 @@ class StalenessGuardCoverageTest {
                     listOf("accountListLifetime.advance", "accountListLifetime.runIfCurrent"),
                 "AppState.kt:recordStartupLocalSnapshotRendered" to
                     listOf("accountListLifetime.isCurrent", "stillCurrent = accountListIsCurrent"),
+                "AppState.kt:refreshPinnedConversationPresentation" to
+                    listOf("isPublicationCurrent(publicationGeneration)", "runtimeGeneration == runtime"),
                 "AppState.kt:refreshProfile" to
                     listOf("profileCacheLifetime.capture", "profileCacheLifetime.isCurrent"),
                 "AppState.kt:materializeProfileLocally" to

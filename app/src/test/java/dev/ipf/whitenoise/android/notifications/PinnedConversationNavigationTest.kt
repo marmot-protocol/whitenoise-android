@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import dev.ipf.whitenoise.android.state.PinnedShortcutLockDecision
+import dev.ipf.whitenoise.android.state.pinnedShortcutLockDecision
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -91,6 +93,24 @@ class PinnedConversationNavigationTest {
         assertNull(target?.shortcutCapability)
     }
 
+    /** A cold-start tap keeps its capability while the lock decision loads; only a decided lock drops it. */
+    @Test
+    fun pendingLockEvaluationKeepsTheCapabilityUntilTheDecision() {
+        assertEquals(PinnedShortcutLockDecision.WAIT, pinnedShortcutLockDecision(true, true))
+        assertEquals(PinnedShortcutLockDecision.WAIT, pinnedShortcutLockDecision(false, true))
+        assertEquals(PinnedShortcutLockDecision.LOCKED, pinnedShortcutLockDecision(true, false))
+        assertEquals(PinnedShortcutLockDecision.OPEN, pinnedShortcutLockDecision(false, false))
+        val capability = requireNotNull(tokens.issue("account-a", GROUP))
+        val intent = PinnedConversationNavigation.intent(context, capability)
+        val locked = pinnedShortcutLockDecision(true, true) == PinnedShortcutLockDecision.LOCKED
+        val held = requireNotNull(PinnedConversationNavigation.target(context, intent, "account-a", locked))
+        assertEquals(NotificationTargetKind.MESSAGE, held.kind)
+        assertNotNull(held.shortcutCapability)
+        // The held target still fails closed once the lock is decided and showing.
+        assertFalse(PinnedConversationNavigation.isCurrent(context, held, setOf("account-a"), locked = true))
+        assertTrue(PinnedConversationNavigation.isCurrent(context, held, setOf("account-a"), locked = false))
+    }
+
     /** The queued target loses authority after group removal even if the same ID is recreated before routing. */
     @Test
     fun queuedTargetCannotInheritRecreatedGroup() {
@@ -157,6 +177,7 @@ class PinnedConversationNavigationTest {
     }
 
     private companion object {
-        val GROUP = "ab".repeat(32)
+        /** The 32-hex shape MDK emits for a 16-byte group ID. */
+        val GROUP = "ab".repeat(16)
     }
 }

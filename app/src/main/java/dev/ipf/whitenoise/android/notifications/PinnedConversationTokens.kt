@@ -2,12 +2,16 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.VisibleForTesting
 import dev.ipf.whitenoise.android.state.AndroidKeystoreSecretKeyProvider
 import dev.ipf.whitenoise.android.state.KeystoreSecureStore
+import dev.ipf.whitenoise.android.state.SecureStoreKeyProvider
 import dev.ipf.whitenoise.android.state.StalenessGuard
+import dev.ipf.whitenoise.android.state.appStateDebug
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import java.security.GeneralSecurityException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -48,14 +52,14 @@ internal class PinnedConversationTokens(
         requestGeneration: Long = captureRequest(),
     ): PinnedConversationCapability? =
         synchronized(lock) {
-            if (!revocations.isCurrent(requestGeneration)) return@synchronized null
             val account = accountRef.takeIf { it.isNotBlank() && it == it.trim() } ?: return@synchronized null
             val group = groupIdHex.lowercase(Locale.ROOT).takeIf(groupPattern::matches) ?: return@synchronized null
             val accountKey = accountKey(account)
             val groupKey = groupKey(account, group)
+            if (!requestIsCurrentFor(requestGeneration, accountKey, groupKey)) return@synchronized null
             if (removals.containsKey(accountKey) || removals.containsKey(groupKey)) return@synchronized null
             clearLegacyCredentials()
-            val stored = secureStore.readAll()
+            val stored = readSealedCredentials()
             val accountToken = reusableToken(stored[accountKey], verifiers.getString(accountKey, null))
             val groupToken = reusableToken(stored[groupKey], verifiers.getString(groupKey, null))
             check(secureStore.replaceAllDurably(stored + mapOf(accountKey to accountToken, groupKey to groupToken))) {
@@ -92,9 +96,9 @@ internal class PinnedConversationTokens(
         accountRef: String,
         groupIdHex: String,
     ) = synchronized(lock) {
-        revocations.advance()
-        clearLegacyCredentials()
         val key = groupKey(accountRef, groupIdHex.lowercase(Locale.ROOT))
+        revokedAfter[key] = revocations.advance()
+        clearLegacyCredentials()
         check(verifiers.edit().remove(key).commit()) {
             "Unable to revoke launcher credentials"
         }
@@ -104,9 +108,10 @@ internal class PinnedConversationTokens(
     /** Prefix-safe account cleanup also revokes requests the launcher has not yet added to its inventory. */
     fun revokeAccount(accountRef: String) =
         synchronized(lock) {
-            revocations.advance()
-            clearLegacyCredentials()
             val accountKey = accountKey(accountRef)
+            // Every group request checks its account key, so one entry fences the whole account.
+            revokedAfter[accountKey] = revocations.advance()
+            clearLegacyCredentials()
             val groupPrefix = "group.${sha256Hex(accountRef)}."
             val editor = verifiers.edit().remove(accountKey)
             verifiers.all.keys
@@ -116,10 +121,33 @@ internal class PinnedConversationTokens(
             removeEncryptedCredentials { it == accountKey || it.startsWith(groupPrefix) }
         }
 
-    /** Preview credentials are invalid in the new verifier namespace and must never be imported or reauthorized. */
+    /**
+     * Preview-build credentials are never read in the verifier namespace, so their removal is best-effort: a
+     * failed commit must not fail issuance, revocation or the sign-out that waits on that revocation.
+     */
     private fun clearLegacyCredentials() {
-        check(legacyPreferences.edit().clear().commit()) { "Unable to remove legacy launcher credentials" }
+        if (legacyPreferences.all.isEmpty()) return
+        runCatching { legacyPreferences.edit().clear().commit() }
     }
+
+    /**
+     * An unreadable sealed store has already lost every reusable copy: it is reset durably and each verifier
+     * rotates the next time its key is issued, while validation keeps working from the verifiers alone.
+     */
+    private fun readSealedCredentials(): Map<String, String> =
+        try {
+            secureStore.readAll()
+        } catch (failure: GeneralSecurityException) {
+            appStateDebug(failure) { "resetting unreadable launcher credentials" }
+            check(secureStore.clearDurably()) { "Unable to reset unreadable launcher credentials" }
+            emptyMap()
+        }
+
+    /** A request is stale only for keys revoked after it was captured; unrelated removals leave it current. */
+    private fun requestIsCurrentFor(
+        requestGeneration: Long,
+        vararg keys: String,
+    ): Boolean = keys.all { requestGeneration >= (revokedAfter[it] ?: 0L) }
 
     /** Verifier removal already revoked authority; a locked/corrupt Keystore must not block completed removal. */
     private fun removeEncryptedCredentials(removed: (String) -> Boolean) {
@@ -156,7 +184,7 @@ internal class PinnedConversationTokens(
                     synchronized(lock) {
                         // Entry revoked durably; the fence prevented new authority throughout native work.
                         // Invalidate queued requests without adding a fallible write after native completion.
-                        revocations.advance()
+                        revokedAfter[key] = revocations.advance()
                         val remaining = checkNotNull(removals[key]) - 1
                         if (remaining == 0) removals.remove(key) else removals[key] = remaining
                     }
@@ -177,15 +205,27 @@ internal class PinnedConversationTokens(
         private val lock = Any()
         private val revocations = StalenessGuard()
         private val removals = mutableMapOf<String, Int>()
+        private val revokedAfter = mutableMapOf<String, Long>()
         private val random = SecureRandom()
-        private val keyProvider = AndroidKeystoreSecretKeyProvider("whitenoise.pinned_conversation_tokens.aes_gcm.v1")
-        private val groupPattern = Regex("[0-9a-f]{64}")
+
+        @Volatile
+        private var keyProvider: SecureStoreKeyProvider = AndroidKeystoreSecretKeyProvider(KEY_ALIAS)
+
+        /** MDK group IDs are 16 bytes (32 hex chars); longer even-length IDs stay accepted for compatibility. */
+        private val groupPattern = Regex("(?:[0-9a-f]{2}){16,64}")
+        private const val KEY_ALIAS = "whitenoise.pinned_conversation_tokens.aes_gcm.v1"
         private const val TOKEN_BYTES = 32
         private const val TOKEN_LENGTH = 43
         private const val SHA256_HEX_LENGTH = 64
 
         /** Capture before suspending so a queued credential write cannot outlive a removal or sign-out. */
         fun captureRequest(): Long = revocations.capture()
+
+        /** Robolectric has no Android Keystore: tests install a deterministic key, null restores the Keystore. */
+        @VisibleForTesting
+        internal fun installKeyProvider(provider: SecureStoreKeyProvider?) {
+            keyProvider = provider ?: AndroidKeystoreSecretKeyProvider(KEY_ALIAS)
+        }
 
         /** Rejects queued Direct Share writes across account/group cleanup, including requests born during removal. */
         fun isPublicationCurrent(generation: Long): Boolean =
@@ -221,19 +261,14 @@ internal class PinnedConversationTokens(
                 .encodeToString(ByteArray(TOKEN_BYTES).also(random::nextBytes))
 
         /**
-         * A missing encrypted copy cannot silently rotate an existing pin; only absent authority permits a new
-         * token.
+         * The sealed copy is the only source of a reusable token. When it is missing or disagrees with the
+         * verifier, authority for that key rotates: pins issued under the old token fail closed and the next
+         * refresh disables them, instead of every new request for that key failing forever.
          */
         private fun reusableToken(
             stored: String?,
             verifier: String?,
-        ): String {
-            if (verifier == null) return newToken()
-            check(stored != null && matches(verifier, stored)) {
-                "Active launcher credentials cannot be decrypted consistently"
-            }
-            return stored
-        }
+        ): String = if (verifier != null && stored != null && matches(verifier, stored)) stored else newToken()
 
         /** Reject corrupt persisted values before constant-time comparison. */
         private fun validToken(value: String): Boolean =

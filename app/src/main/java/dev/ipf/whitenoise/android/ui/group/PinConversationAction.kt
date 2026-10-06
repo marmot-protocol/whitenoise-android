@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.appStateDebug
 import dev.ipf.whitenoise.android.state.isSignedInSigningAccount
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.settings.SettingsLeadingIcon
@@ -130,6 +131,13 @@ private suspend fun currentPinCapability(
             val member = it.selfMembership == SelfMembershipFfi.MEMBER
             member && !it.pendingConfirmation
         } ?: false
+    if (!available) {
+        // Debug-only shape of the refusal; it names no account, group or message.
+        appStateDebug {
+            "pin request unavailable: account=${account != null} current=${stillCurrent()} row=${currentRow != null} " +
+                "membership=${currentRow?.group?.selfMembership} pending=${currentRow?.group?.pendingConfirmation}"
+        }
+    }
     return if (available && stillCurrent()) {
         withContext(Dispatchers.IO) {
             PinnedConversationTokens.create(context).issue(checkNotNull(account), group, requestGeneration)

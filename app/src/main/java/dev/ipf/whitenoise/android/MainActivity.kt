@@ -52,8 +52,10 @@ import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.ChatScreenshotPreferences
 import dev.ipf.whitenoise.android.state.HostPerformanceAttemptSlot
 import dev.ipf.whitenoise.android.state.HostPerformanceRuntimeOwner
+import dev.ipf.whitenoise.android.state.PinnedShortcutLockDecision
 import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.pinnedShortcutLockDecision
 import dev.ipf.whitenoise.android.state.shouldReattachAppUnlockPrompt
 import dev.ipf.whitenoise.android.ui.WhiteNoiseApp
 import dev.ipf.whitenoise.android.ui.common.releaseSecureFlag
@@ -386,12 +388,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (intent?.action == PinnedConversationNavigation.ACTION_OPEN) appState.maybeShowAppLockForForeground()
+        // A pending lock evaluation keeps the capability: MainShell waits for the decision before routing,
+        // and a lock that then shows still fails closed there.
         val pinTarget =
             PinnedConversationNavigation.target(
                 this,
                 intent,
                 appState.activeAccountRef,
-                appState.appLockScreenVisible || appState.appUnlockEvaluationPending,
+                appState.pinnedShortcutLockDecision() == PinnedShortcutLockDecision.LOCKED,
             )
         val retainNotification = retainPendingShareOnRecreation && inboundNotificationTarget != null
         val parsedTarget =

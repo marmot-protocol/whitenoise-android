@@ -7,14 +7,21 @@ import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Launcher authority is checked again after native reads and account activation, immediately before routing. */
+/** The live App Lock decision for a launcher tap, read from the same state the lock screen renders. */
+internal fun WhiteNoiseAppState.pinnedShortcutLockDecision(): PinnedShortcutLockDecision =
+    pinnedShortcutLockDecision(appLockScreenVisible, appUnlockEvaluationPending)
+
+/**
+ * Launcher authority is checked again after native reads and account activation, immediately before routing.
+ * A still-pending lock evaluation counts as not current here: callers that can wait do so before asking.
+ */
 internal fun WhiteNoiseAppState.pinnedShortcutTargetIsCurrent(target: NotificationTarget): Boolean {
     if (target.shortcutCapability == null) return true
     return PinnedConversationNavigation.isCurrent(
         appContext,
         target,
         accounts.filter { it.isSignedInSigningAccount() }.mapTo(hashSetOf()) { it.label },
-        appLockScreenVisible || appUnlockEvaluationPending,
+        pinnedShortcutLockDecision() != PinnedShortcutLockDecision.OPEN,
     )
 }
 

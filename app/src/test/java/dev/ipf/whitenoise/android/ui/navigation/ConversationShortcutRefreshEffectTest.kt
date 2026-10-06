@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,53 +24,66 @@ import java.time.Duration
 class ConversationShortcutRefreshEffectTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** Nicknames, native off-window projections and both decoded-avatar caches refresh without acquiring media. */
+    /** Nicknames and native off-window projections republish; decoded pixels from both caches refresh pins only. */
     @Test
     fun presentationChangesRefreshMountedPins() {
         val profile = mutableIntStateOf(0)
         val targets = mutableIntStateOf(0)
         val title = mutableStateOf("Original")
-        val publications = mutableListOf<Triple<String, Int?, Int?>>()
+        val publications = mutableListOf<String>()
+        val pinRefreshes = mutableListOf<Pair<Int?, Int?>>()
         AvatarImageLoader.clear()
         GroupAvatarImageLoader.clear()
         composeRule.setContent {
-            ConversationShortcutRefreshEffect(this, "personal", true, targets.intValue.toLong(), profile.intValue) {
-                publications +=
-                    Triple(
-                        title.value,
-                        AvatarImageLoader.peekBitmap(PROFILE)?.getPixel(0, 0),
-                        GroupAvatarImageLoader.peek(GROUP)?.asAndroidBitmap()?.getPixel(0, 0),
-                    )
-            }
+            ConversationShortcutRefreshEffect(
+                owner = this,
+                accountRef = "personal",
+                ready = true,
+                targetRevision = targets.intValue.toLong(),
+                profileRevision = profile.intValue,
+                publish = { publications += title.value },
+                refreshPins = {
+                    pinRefreshes +=
+                        AvatarImageLoader.peekBitmap(PROFILE)?.getPixel(0, 0) to
+                        GroupAvatarImageLoader.peek(GROUP)?.asAndroidBitmap()?.getPixel(0, 0)
+                },
+            )
         }
-        awaitPublication { publications.lastOrNull()?.first == "Original" }
+        awaitPublication { publications.lastOrNull() == "Original" }
         composeRule.runOnIdle {
             title.value = "Private nickname"
             profile.intValue += 1
         }
-        awaitPublication { publications.lastOrNull()?.first == "Private nickname" }
+        awaitPublication { publications.lastOrNull() == "Private nickname" }
         composeRule.runOnIdle {
             title.value = "Native rename"
             targets.intValue += 1
         }
-        awaitPublication { publications.lastOrNull()?.first == "Native rename" }
+        awaitPublication { publications.lastOrNull() == "Native rename" }
+        assertEquals(3, publications.size)
+        assertTrue(pinRefreshes.isEmpty())
         composeRule.runOnIdle { AvatarImageLoader.putCached(PROFILE, pixels(Color.BLUE)) }
-        awaitPublication { publications.lastOrNull()?.second == Color.BLUE }
+        awaitPublication { pinRefreshes.lastOrNull()?.first == Color.BLUE }
         composeRule.runOnIdle { GroupAvatarImageLoader.putCached(GROUP, pixels(Color.RED)) }
-        awaitPublication { publications.lastOrNull()?.third == Color.RED }
+        awaitPublication { pinRefreshes.lastOrNull()?.second == Color.RED }
         composeRule.runOnIdle { GroupAvatarImageLoader.clear() }
-        awaitPublication { publications.lastOrNull()?.third == null }
+        awaitPublication { pinRefreshes.lastOrNull()?.second == null }
+        // Decoded pixels never re-issued the Direct Share inventory.
+        assertEquals(3, publications.size)
     }
 
-    /** An unavailable account cancels queued publication, and disposal ends all observation. */
+    /** An unavailable account cancels queued publication and pin refresh, and disposal ends all observation. */
     @Test
     fun unavailableAndDisposedOwnersCannotPublish() {
         val ready = mutableStateOf(true)
         val mounted = mutableStateOf(true)
         var publications = 0
+        var pinRefreshes = 0
         composeRule.setContent {
             if (mounted.value) {
-                ConversationShortcutRefreshEffect(this, "personal", ready.value, 0, 0) { publications += 1 }
+                ConversationShortcutRefreshEffect(this, "personal", ready.value, 0, 0, { publications += 1 }) {
+                    pinRefreshes += 1
+                }
             }
         }
         awaitPublication { publications == 1 }
@@ -78,11 +92,13 @@ class ConversationShortcutRefreshEffectTest {
         AvatarImageLoader.putCached(PROFILE, pixels(Color.GREEN))
         settle()
         assertEquals(1, publications)
+        assertEquals(0, pinRefreshes)
         composeRule.runOnIdle { mounted.value = false }
         composeRule.waitForIdle()
         GroupAvatarImageLoader.putCached(GROUP, pixels(Color.BLUE))
         settle()
         assertEquals(1, publications)
+        assertEquals(0, pinRefreshes)
     }
 
     /** Pump Android's paused main queue so the production coalescing delay reaches its publication boundary. */

@@ -70,10 +70,10 @@ internal class AndroidPinnedShortcutPlatform(
             shortcuts,
         )
 
-    /** Disables removed destinations and removes their dynamic/long-lived variants where supported. */
+    /** Disables removed destinations behind the localized unavailable message, then drops their other variants. */
     override fun disable(ids: List<String>) {
         if (ids.isEmpty()) return
-        ShortcutManagerCompat.disableShortcuts(context, ids, context.getString(R.string.app_name))
+        ShortcutManagerCompat.disableShortcuts(context, ids, context.getString(R.string.pinned_shortcut_unavailable))
         ShortcutManagerCompat.removeDynamicShortcuts(context, ids)
         ShortcutManagerCompat.removeLongLivedShortcuts(context, ids)
     }

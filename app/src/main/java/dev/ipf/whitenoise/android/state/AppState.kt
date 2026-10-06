@@ -1043,6 +1043,7 @@ class WhiteNoiseAppState private constructor(
     private val pushServerConfigProvider: () -> PushServerConfig?,
     private val nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability,
     preferencesOverride: SharedPreferences?,
+    pushTokenStoreOverride: PushTokenStore?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1099,6 +1100,7 @@ class WhiteNoiseAppState private constructor(
             pushServerConfigProvider = PushServerConfig::current,
             nativePushCapabilityResolver = { nativePushCapabilityForContext(context.applicationContext, it) },
             preferencesOverride = null,
+            pushTokenStoreOverride = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1137,6 +1139,7 @@ class WhiteNoiseAppState private constructor(
             nativePushCapabilityForContext(context.applicationContext, it)
         },
         preferences: SharedPreferences? = null,
+        pushTokenStore: PushTokenStore? = null,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1166,6 +1169,7 @@ class WhiteNoiseAppState private constructor(
         pushServerConfigProvider = pushServerConfigProvider,
         nativePushCapabilityResolver = nativePushCapabilityResolver,
         preferencesOverride = preferences,
+        pushTokenStoreOverride = pushTokenStore,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -1846,7 +1850,9 @@ class WhiteNoiseAppState private constructor(
         get() = ttsResolution != null
     val ttsHasUsableEngine: Boolean
         get() = ttsResolution?.hasUsableEngine == true
-    private val pushTokenStore = PushTokenStore.create(appContext)
+
+    /** Tests inject a scripted store; production seals push state in the Keystore-backed default. */
+    private val pushTokenStore = pushTokenStoreOverride ?: PushTokenStore.create(appContext)
 
     private fun pushWakeAttemptBudget() =
         PushWakeAttemptBudget(
@@ -2359,6 +2365,7 @@ class WhiteNoiseAppState private constructor(
                     ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
             peer?.let { contactAvatarOverride(account, it) } ?: (false to null)
         })
+    private var shareShortcutPublishJob: Job? = null
     private var pinnedShortcutRefreshJob: Job? = null
 
     /**
@@ -3683,7 +3690,7 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
-    /** Publishes Direct Share and replaces any pending pinned-label refresh for the captured account/runtime. */
+    /** Publishes Direct Share, then refreshes pinned labels, replacing any earlier publication still in flight. */
     fun publishShareShortcuts(chats: List<ChatListItem>) {
         val accountRef = activeAccountRef ?: return
         val runtime = runtimeGeneration
@@ -3694,8 +3701,8 @@ class WhiteNoiseAppState private constructor(
                 .filterNot { it.group.pendingConfirmation }
                 .take(dev.ipf.whitenoise.android.share.MAX_SHARE_SHORTCUTS)
                 .associate { item -> item.group.groupIdHex to chatListItemDisplayTitle(item, this, titleCopy) }
-        pinnedShortcutRefreshJob?.cancel()
-        pinnedShortcutRefreshJob =
+        shareShortcutPublishJob?.cancel()
+        shareShortcutPublishJob =
             mutationsScope.launch {
                 runCatchingCancellable {
                     withContext(Dispatchers.IO) {
@@ -3711,34 +3718,57 @@ class WhiteNoiseAppState private constructor(
                             },
                         ) { item -> shareTitles[item.group.groupIdHex].orEmpty() }
                     }
-                    val shortcuts =
-                        withContext(Dispatchers.IO) {
-                            PinnedConversationShortcuts(appContext)
-                        }
-                    val hasPins = withContext(Dispatchers.IO) { shortcuts.hasPinnedConversations(accountRef) }
-                    val ownsRuntime = isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
-                    val ownsPublication =
-                        withContext(Dispatchers.IO) {
-                            PinnedConversationTokens.isPublicationCurrent(publicationGeneration)
-                        }
-                    if (!hasPins || !ownsRuntime || !ownsPublication) {
-                        return@runCatchingCancellable
-                    }
-                    val presentations =
-                        chats.associate { item ->
-                            item.group.groupIdHex.lowercase(Locale.ROOT) to
-                                dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation(
-                                    chatListItemDisplayTitle(item, this@WhiteNoiseAppState, titleCopy),
-                                    firstFrameGroupAvatarSeed(item, accountRef, ::avatarUrl)?.image?.asAndroidBitmap(),
-                                )
-                        }
-                    withContext(Dispatchers.IO) {
-                        shortcuts.refresh(accountRef, presentations) {
-                            isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
-                        }
-                    }
+                    refreshPinnedConversationPresentation(accountRef, runtime, publicationGeneration, chats, titleCopy)
+                }.onFailure { failure -> appStateDebug(failure) { "share shortcut publication failed" } }
+            }
+    }
+
+    /**
+     * Decoded avatar pixels change only pin presentation, so they never re-issue the Direct Share inventory;
+     * a newer refresh replaces an older one still waiting for the launcher.
+     */
+    fun refreshPinnedShortcuts(chats: List<ChatListItem>) {
+        val accountRef = activeAccountRef ?: return
+        val runtime = runtimeGeneration
+        val publicationGeneration = PinnedConversationTokens.captureRequest()
+        val titleCopy = notificationGroupTitleCopy(appContext)
+        pinnedShortcutRefreshJob?.cancel()
+        pinnedShortcutRefreshJob =
+            mutationsScope.launch {
+                runCatchingCancellable {
+                    refreshPinnedConversationPresentation(accountRef, runtime, publicationGeneration, chats, titleCopy)
                 }.onFailure { failure -> appStateDebug(failure) { "pinned shortcut presentation refresh failed" } }
             }
+    }
+
+    /** Rebuilds approved pins' labels and cached pixels for one captured account/runtime; no pins means no work. */
+    private suspend fun refreshPinnedConversationPresentation(
+        accountRef: String,
+        runtime: Int,
+        publicationGeneration: Long,
+        chats: List<ChatListItem>,
+        titleCopy: dev.ipf.whitenoise.android.core.GroupTitleCopy,
+    ) {
+        val shortcuts = withContext(Dispatchers.IO) { PinnedConversationShortcuts(appContext) }
+        val hasPins = withContext(Dispatchers.IO) { shortcuts.hasPinnedConversations(accountRef) }
+        val ownsRuntime =
+            currentCoroutineContext().isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
+        val ownsPublication =
+            withContext(Dispatchers.IO) { PinnedConversationTokens.isPublicationCurrent(publicationGeneration) }
+        if (!hasPins || !ownsRuntime || !ownsPublication) return
+        val presentations =
+            chats.associate { item ->
+                item.group.groupIdHex.lowercase(Locale.ROOT) to
+                    dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation(
+                        chatListItemDisplayTitle(item, this, titleCopy),
+                        firstFrameGroupAvatarSeed(item, accountRef, ::avatarUrl)?.image?.asAndroidBitmap(),
+                    )
+            }
+        withContext(Dispatchers.IO) {
+            shortcuts.refresh(accountRef, presentations) {
+                isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
+            }
+        }
     }
 
     /**

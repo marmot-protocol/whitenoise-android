@@ -183,7 +183,7 @@ class PinnedConversationShortcutsTest {
         val platform = Platform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val retained = capability
-        val visibleGroup = "cd".repeat(32)
+        val visibleGroup = "cd".repeat(16)
         val visible = requireNotNull(tokens.issue(ACCOUNT, visibleGroup))
         owner.request(retained, "Retained", null) { true }
         platform.approve(platform.requests.last())
@@ -364,12 +364,13 @@ class PinnedConversationShortcutsTest {
         assertEquals(1, platform.requests.size)
     }
 
-    /** The existing account-cleanup entry point revokes even requests absent from the OS inventory. */
+    /** The account-cleanup sequence revokes even requests absent from the OS inventory before platform removal. */
     @Test
     fun accountCleanupRevokesPendingRequestWithoutAffectingAnotherAccount() {
         val removed = capability
         val kept = requireNotNull(tokens.issue("another-account", GROUP))
-        clearConversationShortcutsForAccount(context, ACCOUNT, includeUnscopedLegacy = false)
+        synchronized(UserEventNotificationGroup.mutationLock) { tokens.revokeAccount(ACCOUNT) }
+        clearRevokedConversationShortcutsForAccount(context, ACCOUNT, includeUnscopedLegacy = false)
         assertFalse(tokens.isValid(removed))
         assertTrue(tokens.isValid(kept))
     }
@@ -473,6 +474,8 @@ class PinnedConversationShortcutsTest {
 
     private companion object {
         const val ACCOUNT = "test-account"
-        val GROUP = "ab".repeat(32)
+
+        /** The 32-hex shape MDK emits for a 16-byte group ID. */
+        val GROUP = "ab".repeat(16)
     }
 }

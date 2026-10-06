@@ -84,18 +84,6 @@ internal fun accountConversationShortcutCleanupPlan(
     )
 }
 
-/** Destructively remove only the shortcuts owned by a signed-out or wiped account. */
-internal fun clearConversationShortcutsForAccount(
-    context: Context,
-    accountRef: String,
-    includeUnscopedLegacy: Boolean,
-) {
-    synchronized(UserEventNotificationGroup.mutationLock) {
-        PinnedConversationTokens.create(context).revokeAccount(accountRef)
-    }
-    clearRevokedConversationShortcutsForAccount(context, accountRef, includeUnscopedLegacy)
-}
-
 /** Removes platform entries after the caller has durably revoked and fenced account credentials. */
 internal fun clearRevokedConversationShortcutsForAccount(
     context: Context,
