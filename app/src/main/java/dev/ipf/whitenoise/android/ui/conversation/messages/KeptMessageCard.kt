@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlin.math.roundToInt
 
@@ -331,7 +332,7 @@ private fun KeptMessageBody(
             Box(Modifier.padding(top = KEPT_MESSAGE_BODY_GAP)) {
                 Text(text = presentation.body, style = MaterialTheme.typography.bodyMedium)
             }
-            Text(
+            EmojiLabel(
                 text = stringResource(R.string.floating_source, presentation.chatTitle, presentation.timeLabel),
                 modifier = Modifier.padding(top = KEPT_MESSAGE_BODY_GAP).testTag(KEPT_MESSAGE_SOURCE_TAG),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

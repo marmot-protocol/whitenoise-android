@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.share.outboundShareIntent
 import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
@@ -125,7 +126,11 @@ internal fun ProfileQrSheet(
                 size = 120.dp,
                 pictureUrl = appState.avatarUrl(accountIdHex),
             )
-            Text(appState.displayName(accountIdHex), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            EmojiLabel(
+                appState.displayName(accountIdHex),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+            )
             if (npub.isNotBlank()) {
                 Button(
                     onClick = {

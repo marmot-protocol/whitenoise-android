@@ -1023,7 +1023,9 @@ internal fun GroupDetailsScreen(
                     AlertDialog(
                         onDismissRequest = { pendingConfirm = null },
                         title = { Text(stringResource(R.string.confirm_leave_sole_admin_title)) },
-                        text = { Text(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName)) },
+                        text = {
+                            EmojiLabel(stringResource(R.string.confirm_leave_sole_admin_message, confirm.groupName))
+                        },
                         confirmButton = {
                             TextButton(onClick = { pendingConfirm = null }) {
                                 Text(stringResource(R.string.cancel))

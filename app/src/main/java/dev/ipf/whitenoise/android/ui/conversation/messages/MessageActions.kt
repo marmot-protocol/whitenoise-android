@@ -390,7 +390,7 @@ private fun LazyListScope.forwardFolderSection(
                 },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             leadingContent = { TriStateCheckbox(state = triState, onClick = null) },
-            headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            headlineContent = { EmojiLabel(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {
                 Text(pluralStringResource(R.plurals.chat_folder_chat_count, memberIds.size, memberIds.size))
             },
