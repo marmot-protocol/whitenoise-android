@@ -8,6 +8,8 @@ import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
+import android.os.Binder;
+import java.io.InputStream;
 import android.provider.OpenableColumns;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -26,7 +28,9 @@ public final class ExternalShareTestFileProvider extends ContentProvider {
 
     @Override
     public String getType(Uri uri) {
-        resolve(uri);
+        String name = resolve(uri).getName();
+        if (name.endsWith(".md")) return "text/markdown";
+        if (name.endsWith(".csv")) return "text/csv";
         return OCTET_STREAM_MIME_TYPE;
     }
 
@@ -52,7 +56,14 @@ public final class ExternalShareTestFileProvider extends ContentProvider {
                         : new String[] {OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE};
         Object[] values = new Object[columns.length];
         for (int index = 0; index < columns.length; index++) {
-            if (OpenableColumns.DISPLAY_NAME.equals(columns[index])) {
+            if ("revoke_read_grant".equals(columns[index])) {
+                long token = Binder.clearCallingIdentity();
+                try { getContext().revokeUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION); }
+                finally { Binder.restoreCallingIdentity(token); }
+                values[index] = 1;
+            } else if ("private_readable".equals(columns[index])) {
+                values[index] = canReadPrivate(selectionArgs) ? 1 : 0;
+            } else if (OpenableColumns.DISPLAY_NAME.equals(columns[index])) {
                 values[index] = file.getName();
             } else if (OpenableColumns.SIZE.equals(columns[index])) {
                 values[index] = file.length();
@@ -76,6 +87,21 @@ public final class ExternalShareTestFileProvider extends ContentProvider {
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
         throw new UnsupportedOperationException("External share fixtures are read-only");
+    }
+
+    /** Executes in this external provider's UID, not the instrumented target process. */
+    private boolean canReadPrivate(String[] selectionArgs) {
+        if (selectionArgs == null || selectionArgs.length != 1) return false;
+        long token = Binder.clearCallingIdentity();
+        try (InputStream input = getContext().getContentResolver().openInputStream(Uri.parse(selectionArgs[0]))) {
+            return input != null;
+        } catch (SecurityException | FileNotFoundException failure) {
+            return false;
+        } catch (java.io.IOException failure) {
+            throw new IllegalStateException(failure);
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
     }
 
     private File resolve(Uri uri) {
