@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
-class ConversationDictationNotificationRestorationTest : ConversationDictationNotificationTestFixture() {
+internal class ConversationDictationNotificationRestorationTest : ConversationDictationNotificationTestFixture() {
     /** Expiry as the first channel user must preserve the foreground card's badge-free settings. */
     @Test
     fun expiryCreatesTheSharedBadgeFreeDictationChannel() {
@@ -540,7 +540,7 @@ class ConversationDictationNotificationRestorationTest : ConversationDictationNo
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
-class ConversationDictationNotificationSuppressionTest : ConversationDictationNotificationTestFixture() {
+internal class ConversationDictationNotificationSuppressionTest : ConversationDictationNotificationTestFixture() {
     /** Rejected notification Send keeps a control-free recovery card until the composer is opened. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -685,7 +685,7 @@ class ConversationDictationNotificationSuppressionTest : ConversationDictationNo
         }
 }
 
-abstract class ConversationDictationNotificationTestFixture {
+internal abstract class ConversationDictationNotificationTestFixture {
     @Before
     fun modelAndroidForegroundIdentityReplacement() {
         NotificationStreamForegroundService.foregroundPublisher = modelForegroundIdReplacement(defaultPublisher)
