@@ -2243,4 +2243,15 @@
         <item quantity="one">%1$d altro allegato</item>
         <item quantity="other">Altri %1$d allegati</item>
     </plurals>
+    <string name="profile_notifications_default">Predefinito</string>
+    <string name="profile_notifications_muted">Silenziato</string>
+    <string name="profile_notifications_custom">Impostazioni Android personalizzate</string>
+    <string name="profile_notifications_custom_vibration">Vibrazione personalizzata</string>
+    <string name="profile_notifications_use_defaults">Usa impostazioni predefinite</string>
+    <string name="profile_notifications_mute">Silenzia le notifiche di questa persona</string>
+    <string name="profile_notifications_system">Suono e comportamento del sistema</string>
+    <string name="profile_notifications_android_vibration">Impostato da Android</string>
+    <string name="profile_notification_scope_detail">Si applica ai messaggi di questa persona in tutte le conversazioni di questo account. La consegna e il conteggio dei messaggi non letti restano invariati.</string>
+    <string name="profile_notification_precedence">Si applicano prima le regole del silenziamento della chat e delle sole menzioni. Seguono il silenziamento o le impostazioni Android personalizzate di questa persona. Le impostazioni predefinite ripristinano quelle della chat e globali. Le notifiche esistenti mantengono il canale originale.</string>
+    <string name="profile_notification_channel_name">%1$s · Messaggi in tutte le chat</string>
 </resources>

@@ -182,6 +182,12 @@ class AccountWipeMemberMuteRetentionTest {
         runBlocking {
             val appState = appState()
             appState.memberMutePreferences.setMuted(SURVIVING_ACCOUNT, GROUP, MEMBER, muted = true)
+            val author = "a".repeat(64)
+            val profileChoice =
+                dev.ipf.whitenoise.android.notifications.ProfileNotificationOverride(
+                    dev.ipf.whitenoise.android.notifications.ProfileNotificationMode.MUTED,
+                )
+            appState.profileNotificationOverrides.set(SURVIVING_ACCOUNT, author, profileChoice)
             listAccountsFailure = RuntimeException("account refresh unavailable")
 
             appState.signOutAndWipeActiveAccount()
@@ -189,6 +195,10 @@ class AccountWipeMemberMuteRetentionTest {
             assertTrue(
                 "a transient refresh failure must not wipe an unrelated account's mute",
                 appState.memberMutePreferences.isMuted(SURVIVING_ACCOUNT, GROUP, MEMBER),
+            )
+            org.junit.Assert.assertEquals(
+                profileChoice,
+                appState.profileNotificationOverrides.get(SURVIVING_ACCOUNT, author),
             )
         }
 

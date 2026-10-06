@@ -96,7 +96,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
 import kotlin.math.roundToInt
 
-private val ComposerManualMinimumHeight = 144.dp
+// One measured editor line, dedicated grip, bottom tools, and outer padding.
+private val ComposerManualChromeHeight = 72.dp
+private val ComposerManualCompactChromeHeight = 36.dp
+private val ComposerAutomaticEmptyChromeHeight = 48.dp
 
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
 private val ComposerSettleDeadband = 24.dp
@@ -517,6 +520,8 @@ internal fun ComposerBar(
         ) {
             mutableStateOf(false)
         }
+    var extraComposerControlsHeight by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(0.dp) }
+    var measuredComposerAccessoryHeight by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf(0.dp) }
     var automaticComposerHeightPx by
         remember(
             draftKey,
@@ -528,6 +533,14 @@ internal fun ComposerBar(
             mutableFloatStateOf(0f)
         }
     var customInputPaneHeightPx by remember(configuration.orientation) { mutableFloatStateOf(0f) }
+    var automaticLayoutEstimate by
+        remember(draftKey, draftAccountRef, draftGroupIdHex, configuration.orientation, configuration.fontScale) {
+            mutableStateOf<Pair<TextFieldValue, Float>?>(null)
+        }
+    var measuredAutomaticLayoutEstimate by
+        remember(draftKey, draftAccountRef, draftGroupIdHex, configuration.orientation, configuration.fontScale) {
+            mutableStateOf<Pair<TextFieldValue, Float>?>(null)
+        }
 
     /** Publishes one settled gesture or accessible toggle to the stable draft owner. */
     fun publishComposerExpansion(next: ComposerExpansionState) {
@@ -985,18 +998,46 @@ internal fun ComposerBar(
                 measuredEditorLineHeight = editorLineHeight,
             )
         val maximumComposerHeightPx = with(density) { maximumComposerHeight.toPx() }
+        val compactControlLayout = composerMultilineControlsSuppressed(automaticComposerCeiling)
+        val manualChromeHeight =
+            if (compactControlLayout) {
+                ComposerManualCompactChromeHeight
+            } else {
+                ComposerManualChromeHeight
+            }
         val minimumManualComposerHeightPx =
             with(density) {
-                ComposerManualMinimumHeight
-                    .coerceAtMost(maximumComposerHeight)
+                (
+                    editorLineHeight + manualChromeHeight +
+                        extraComposerControlsHeight + measuredComposerAccessoryHeight
+                ).coerceAtMost(maximumComposerHeight)
                     .toPx()
             }
         val automaticComposerCeilingPx = with(density) { automaticComposerCeiling.toPx() }
+        val composerHeightTransitionActive =
+            composerHeightTransitionEpoch != completedComposerHeightTransitionEpoch
+        val currentAutomaticEstimate = automaticLayoutEstimate?.takeIf { it.first == textFieldValue }
+        val sizingEstimateNeeded =
+            composerExpansion.mode != ComposerExpansionMode.Automatic || composerHeightTransitionActive
+        val automaticHeightPx =
+            if (sizingEstimateNeeded &&
+                currentAutomaticEstimate != null &&
+                currentAutomaticEstimate != measuredAutomaticLayoutEstimate
+            ) {
+                currentAutomaticEstimate.second
+            } else {
+                automaticComposerHeightPx
+            }
         val resolvedAutomaticHeightPx =
-            (automaticComposerHeightPx.takeIf { it > 0f } ?: with(density) { 44.dp.toPx() })
+            (automaticHeightPx.takeIf { it > 0f } ?: with(density) { 44.dp.toPx() })
                 .coerceAtMost(automaticComposerCeilingPx)
+        // A live drag can cross the gap between the compact row and the manual tool layout continuously.
         val minimumRenderedComposerHeightPx =
-            if (composerHeightDragActive) resolvedAutomaticHeightPx else minimumManualComposerHeightPx
+            if (composerHeightDragActive) {
+                minOf(minimumManualComposerHeightPx, resolvedAutomaticHeightPx)
+            } else {
+                minimumManualComposerHeightPx
+            }
         val resolvedComposerHeight =
             with(density) {
                 composerHeightPx(
@@ -1008,8 +1049,6 @@ internal fun ComposerBar(
             }
         val expandedControlLayout =
             composerUsesMultilineControls || composerExpansion.mode != ComposerExpansionMode.Automatic
-        val composerHeightTransitionActive =
-            composerHeightTransitionEpoch != completedComposerHeightTransitionEpoch
         val transitionTargetHeightPx =
             composerHeightPx(
                 state = composerExpansion,
@@ -1386,7 +1425,14 @@ internal fun ComposerBar(
                         },
                         onHeightDragStarted = {
                             composerHeightDragActive = true
-                            composerHeightDragState = currentComposerExpansion()
+                            composerHeightDragState =
+                                currentComposerExpansion().let { state ->
+                                    if (state.mode == ComposerExpansionMode.Manual) {
+                                        state.copy(manualHeightPx = visibleComposerHeightPx)
+                                    } else {
+                                        state
+                                    }
+                                }
                         },
                         onHeightDrag = { dragAmount ->
                             composerHeightDragState =
@@ -1394,19 +1440,19 @@ internal fun ComposerBar(
                                     state = composerHeightDragState ?: currentComposerExpansion(),
                                     dragDeltaYPx = dragAmount,
                                     automaticHeightPx = resolvedAutomaticHeightPx,
-                                    minimumManualHeightPx = resolvedAutomaticHeightPx,
+                                    minimumManualHeightPx = minimumManualComposerHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
                                 )
                         },
                         onHeightDragSettled = {
                             // A release keeps the height it was let go at. The endpoints keep a deadband
-                            // so the automatic height and full screen stay easy to land on deliberately,
+                            // for the minimum, automatic content height and full screen,
                             // but everything between them is the reader's own choice and is retained.
                             val settledExpansion =
                                 settleComposerHeight(
                                     state = composerHeightDragState ?: currentComposerExpansion(),
                                     automaticHeightPx = resolvedAutomaticHeightPx,
-                                    minimumManualHeightPx = resolvedAutomaticHeightPx,
+                                    minimumManualHeightPx = minimumManualComposerHeightPx,
                                     maximumHeightPx = maximumComposerHeightPx,
                                     deadbandPx = with(density) { ComposerSettleDeadband.toPx() },
                                 )
@@ -1437,7 +1483,32 @@ internal fun ComposerBar(
                                 null
                             },
                         onMultilineControlsChanged = { composerUsesMultilineControls = it },
-                        multilineControlsSuppressed = composerMultilineControlsSuppressed(automaticComposerCeiling),
+                        onExtraControlsHeightChanged = { extraComposerControlsHeight = it },
+                        onAccessoryHeightChanged = { measuredComposerAccessoryHeight = it },
+                        onAutomaticTextMeasured = { heightPx, automaticEditing ->
+                            val chrome =
+                                when {
+                                    compactControlLayout -> ComposerManualCompactChromeHeight
+                                    automaticEditing -> ComposerManualChromeHeight
+                                    else -> ComposerAutomaticEmptyChromeHeight
+                                }
+                            val extraChrome = chrome + extraComposerControlsHeight + measuredComposerAccessoryHeight
+                            val heightWithChrome = heightPx + with(density) { extraChrome.toPx() }
+                            val estimatePx = heightWithChrome.coerceAtMost(automaticComposerCeilingPx)
+                            val estimate = textFieldValue to estimatePx
+                            automaticLayoutEstimate = estimate
+                            if (composerExpansion.mode == ComposerExpansionMode.Automatic &&
+                                !composerHeightDragActive &&
+                                !composerHeightTransitionActive
+                            ) {
+                                // A transition can finish at the same measured size, without another
+                                // onSizeChanged callback. Retire the old natural height in that case too.
+                                automaticComposerHeightPx = visibleComposerHeightPx.takeIf { it > 0f } ?: estimatePx
+                                measuredAutomaticLayoutEstimate = estimate
+                            }
+                        },
+                        scrollOwnerKey = Triple(draftKey, draftAccountRef, draftGroupIdHex),
+                        multilineControlsSuppressed = compactControlLayout,
                         dismissInProgress = composerDismissInProgress,
                         collapsedBySend = textState.collapsedBySend,
                         onSendCollapseApplied = textState::consumeSendCollapse,
