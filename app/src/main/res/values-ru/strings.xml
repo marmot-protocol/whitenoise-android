@@ -2303,4 +2303,14 @@
     <string name="nostr_event_image_failed">Не удалось загрузить изображение. Попробуйте ещё раз.</string>
     <string name="nostr_event_type_image">Изображение</string>
     <string name="nostr_event_expand">Посмотреть событие целиком</string>
+    <string name="floating_attachment_resolving">Проверка доступности</string>
+    <string name="floating_attachment_available">Доступно на этом устройстве</string>
+    <string name="floating_attachment_remote">Откройте оригинал для просмотра</string>
+    <string name="floating_attachment_failed">Не удалось скачать. Откройте оригинал, чтобы повторить</string>
+    <plurals name="floating_attachment_more">
+        <item quantity="one">Ещё %1$d вложение</item>
+        <item quantity="few">Ещё %1$d вложения</item>
+        <item quantity="many">Ещё %1$d вложений</item>
+        <item quantity="other">Ещё %1$d вложения</item>
+    </plurals>
 </resources>
