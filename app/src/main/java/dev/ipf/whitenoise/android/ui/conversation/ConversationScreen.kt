@@ -4523,7 +4523,7 @@ internal fun ConversationScreen(
         onDocumentUrisChange = { if (!attachmentSendPending) pendingDocumentUris = it },
         mediaSender = mediaSender,
         chatTitle = controller.title(groupTitleCopy),
-        actionColors = accountActionColors(appState),
+        actionColors = accountActionColors(appState, conversationAccountRef),
         composerText = composerTextState::acceptanceToken,
         onCaptionAccepted = composerTextState::clearAccepted,
         onAddPhotos = {
