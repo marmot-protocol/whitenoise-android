@@ -48,7 +48,7 @@ import dev.ipf.whitenoise.android.core.NostrEventReferenceOccurrence
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import kotlinx.coroutines.launch
 
-/** Renders bounded event cards and owns their lifecycle-bound note/article/video viewers. */
+/** Renders bounded event cards and their lifecycle-bound fullscreen viewers. */
 @Composable
 internal fun NostrEventCards(
     references: List<NostrEventReferenceOccurrence>,
@@ -62,7 +62,6 @@ internal fun NostrEventCards(
 ) {
     if (references.isEmpty()) return
     var readerSelection by remember(resolver) { mutableStateOf<NostrEventReaderSelection?>(null) }
-    var videoCard by remember(resolver) { mutableStateOf<NostrEventCardModel?>(null) }
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -74,10 +73,11 @@ internal fun NostrEventCards(
                     resolver = resolver,
                     authorDisplayName = authorDisplayName,
                     contentColor = contentColor,
+                    mentionDisplayName = mentionDisplayName,
+                    parseMarkdown = parseMarkdown,
                     onReadEvent = { card, authoredReference ->
                         readerSelection = NostrEventReaderSelection(card, authoredReference)
                     },
-                    onPlayVideo = { videoCard = it },
                 )
             }
         }
@@ -91,13 +91,6 @@ internal fun NostrEventCards(
             onNostrProfileTap = onNostrProfileTap,
             parseMarkdown = parseMarkdown,
             onDismiss = { readerSelection = null },
-        )
-    }
-    videoCard?.let { card ->
-        NostrVideoPlayerDialog(
-            mediaUrl = checkNotNull(card.mediaUrl),
-            mediaMimeType = card.mediaMimeType,
-            onDismiss = { videoCard = null },
         )
     }
 }
@@ -114,17 +107,19 @@ private fun ResolvedNostrEventCard(
     resolver: NostrEventCardResolver,
     authorDisplayName: (String) -> String,
     contentColor: Color,
+    mentionDisplayName: (String) -> String?,
+    parseMarkdown: suspend (String) -> MarkdownDocumentFfi,
     onReadEvent: (NostrEventCardModel, String?) -> Unit,
-    onPlayVideo: (NostrEventCardModel) -> Unit,
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val flow = remember(resolver, occurrence.reference.stableId) { resolver.state(occurrence.reference) }
     val state by flow.collectAsState()
+    val presentedState = rememberNostrEventPreviewState(state, mentionDisplayName, parseMarkdown)
     val authoredReference = occurrence.authoredReference
     NostrEventCard(
-        state = state,
+        state = presentedState,
         authorDisplayName = authorDisplayName,
         referenceLabel = compactEventReference(authoredReference),
         contentColor = contentColor,
@@ -139,9 +134,7 @@ private fun ResolvedNostrEventCard(
         onReadNote = { card -> onReadEvent(card, authoredReference) },
         onOpen = { card ->
             when {
-                card?.kind == NostrEventCardKind.Article && !card.readerBody.isNullOrBlank() ->
-                    onReadEvent(card, null)
-                card?.kind == NostrEventCardKind.Video && card.mediaUrl != null -> onPlayVideo(card)
+                card != null -> onReadEvent(card, authoredReference)
                 else ->
                     runCatching {
                         context.startActivity(
@@ -371,7 +364,7 @@ private fun LoadedEventHeader(
     }
 }
 
-/** Makes the whole visible kind-1 preview a button while leaving other summaries inert. */
+/** Makes readable verified previews expand while retaining distinct copy and open actions. */
 @Composable
 private fun LoadedEventSummary(
     card: NostrEventCardModel,
@@ -381,11 +374,18 @@ private fun LoadedEventSummary(
     card.summary?.takeIf(String::isNotBlank)?.let { summary ->
         Spacer(Modifier.height(4.dp))
         val modifier =
-            if (card.kind == NostrEventCardKind.Note && !card.readerBody.isNullOrBlank()) {
+            if (!card.readerBody.isNullOrBlank()) {
                 Modifier
                     .fillMaxWidth()
                     .clickable(
-                        onClickLabel = stringResource(R.string.nostr_event_read_note),
+                        onClickLabel =
+                            stringResource(
+                                if (card.kind == NostrEventCardKind.Note) {
+                                    R.string.nostr_event_read_note
+                                } else {
+                                    R.string.nostr_event_expand
+                                },
+                            ),
                         role = Role.Button,
                         onClick = onReadNote,
                     ).minimumInteractiveComponentSize()

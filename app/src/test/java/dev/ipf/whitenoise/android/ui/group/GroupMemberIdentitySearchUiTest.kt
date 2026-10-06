@@ -6,9 +6,12 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -62,6 +65,7 @@ class GroupMemberIdentitySearchUiTest {
     @get:Rule
     val composeRule = createComposeRule()
     private val context: Context = ApplicationProvider.getApplicationContext()
+    private lateinit var focusManager: FocusManager
 
     @Test
     fun seeAllFindsPublicIdentityWithoutMetadataAndClearRestoresRoster() {
@@ -69,7 +73,7 @@ class GroupMemberIdentitySearchUiTest {
         openSearch()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement("nostr:$MEMBER_NPROFILE")
         awaitMatch()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_member_search_match_light.png")
+        captureSearch("group_member_search_match_light.png")
         composeRule.onNodeWithContentDescription("Clear").performClick()
         composeRule.onNodeWithTag("chat_info.member.$OTHER_HEX").assertExists()
         composeRule.onNodeWithTag(SEARCH).performTextReplacement("Bob: work")
@@ -117,7 +121,7 @@ class GroupMemberIdentitySearchUiTest {
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(MEMBER_NPUB)
         composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText("Retry").fetchSemanticsNodes().isNotEmpty() }
         composeRule.onNodeWithText("No matches").assertExists()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_member_search_retry_dark.png")
+        captureSearch("group_member_search_retry_dark.png")
         available.set(true)
         composeRule.onNodeWithText("Retry").performClick()
         awaitMatch()
@@ -137,7 +141,7 @@ class GroupMemberIdentitySearchUiTest {
         composeRule.onNodeWithTag(SEARCH).performTextReplacement(NON_MEMBER_HEX)
         composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText("No matches").fetchSemanticsNodes().isNotEmpty() }
         composeRule.onNodeWithText("Retry").assertDoesNotExist()
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/group_member_search_empty_rtl_large_dark.png")
+        captureSearch("group_member_search_empty_rtl_large_dark.png")
         composeRule.onNodeWithTag(SEARCH).performTextReplacement("npub1")
         composeRule.waitUntil(5_000) { composeRule.onAllNodesWithText("Retry").fetchSemanticsNodes().isNotEmpty() }
         composeRule.onNodeWithTag("chat_info.member.$MEMBER_HEX").assertDoesNotExist()
@@ -268,6 +272,14 @@ class GroupMemberIdentitySearchUiTest {
         composeRule.onNodeWithTag("chat_info.member.$OTHER_HEX").assertDoesNotExist()
     }
 
+    private fun captureSearch(snapshot: String) {
+        // The search state is the subject, not the focused cursor's blink phase.
+        composeRule.runOnIdle { focusManager.clearFocus() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(SEARCH).assertIsNotFocused()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshot")
+    }
+
     private fun render(
         fixture: Fixture,
         dark: Boolean = false,
@@ -287,6 +299,7 @@ class GroupMemberIdentitySearchUiTest {
                 LocalDensity provides Density(1f, fontScale),
             ) {
                 WhiteNoiseTheme(darkTheme = dark) {
+                    focusManager = LocalFocusManager.current
                     GroupDetailsScreen(fixture.value.state, fixture.value.controller, onBack = {}, onLeft = {})
                 }
             }

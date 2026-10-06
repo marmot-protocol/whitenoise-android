@@ -120,6 +120,15 @@ object AvatarImageLoader {
             fetchLane = AvatarFetchLane.REGULAR,
         )
 
+    /** An explicit user retry retires this bitmap variant's failed result before the bounded fetch. */
+    suspend fun retryBanner(
+        url: String,
+        targetWidthPx: Int,
+    ): ImageBitmap? {
+        synchronized(lock) { failureExpiresAt.remove(bannerRequest(url, targetWidthPx).cacheKey) }
+        return loadBanner(url, targetWidthPx)
+    }
+
     /** Synchronous banner counterpart to [peek]; an avatar-sized entry never satisfies it. */
     fun peekBanner(
         url: String?,
