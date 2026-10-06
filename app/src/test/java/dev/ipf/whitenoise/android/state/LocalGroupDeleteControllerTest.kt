@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import android.os.Looper
+import androidx.compose.material3.SnackbarResult
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotInterface
@@ -9,10 +10,12 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.chats.PendingLocalChatDelete
+import dev.ipf.whitenoise.android.ui.common.finishLocalDeleteSnackbar
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
@@ -143,7 +146,11 @@ class LocalGroupDeleteControllerTest {
         runTest {
             val fixture = fixture("deleteGroupLocal")
             assertFalse(fixture.controller.deleteGroupLocalFromChatList(GROUP))
-            assertNotNull(fixture.state.toast?.localDeleteNotice?.retry)
+            assertNotNull(
+                fixture.state.toast
+                    ?.localDeleteNotice
+                    ?.retry,
+            )
             fixture.failureMethod.set(null)
             val readsBefore = fixture.calls.count { it == "chatListRow" }
             assertTrue(fixture.controller.deleteGroupLocalFromChatList(GROUP))
@@ -232,12 +239,61 @@ class LocalGroupDeleteControllerTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             try {
                 val fixture = fixture()
-                val notice = fixture.state.localDeleteBatchRetryNotice(fixture.controller, listOf(GROUP)) { true }
+                val request =
+                    PendingLocalChatDelete.capture(
+                        listOf(chatListItemFromProjection(chatRow(GROUP))),
+                        fixture.controller,
+                        fixture.state,
+                    )
+                // MainShell retains the controller and hides its projection when Chats leaves composition.
+                fixture.controller.setChatListVisible(false)
+                val notice =
+                    fixture.state.localDeleteBatchRetryNotice(fixture.controller, request.groupIds) {
+                        request.isCurrent(fixture.state, fixture.controller)
+                    }
                 fixture.state.presentLocalDeleteFailure(R.string.toast_couldnt_delete_chat, null, notice = notice)
                 requireNotNull(notice.retry).invoke(setOf(GROUP.uppercase(), "unconfirmed-group"))
-                fixture.state.mutationsScope.coroutineContext[Job]?.children?.toList()?.forEach { it.join() }
+                fixture.state.mutationsScope.coroutineContext[Job]
+                    ?.children
+                    ?.toList()
+                    ?.forEach { it.join() }
                 assertEquals(1, fixture.calls.count { it == "deleteGroupLocal" })
                 assertEquals(null, fixture.state.toast)
+                assertEquals(null, fixture.state.transientNotice)
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
+    @Test
+    fun aFailedOneChatRemainderReplacesTheClearedBatchWarning() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            try {
+                val fixture = fixture("deleteGroupLocal")
+                val request =
+                    PendingLocalChatDelete.capture(
+                        listOf("already-deleted", GROUP).map { chatListItemFromProjection(chatRow(it)) },
+                        fixture.controller,
+                        fixture.state,
+                    ).remaining(1)
+                val notice =
+                    fixture.state.localDeleteBatchRetryNotice(fixture.controller, request.groupIds) {
+                        request.isCurrent(fixture.state, fixture.controller)
+                    }
+                fixture.state.presentLocalDeleteFailure(R.string.chat_list_delete_stopped, null, notice = notice)
+                val oldWarning = requireNotNull(fixture.state.toast)
+                finishLocalDeleteSnackbar(fixture.state, oldWarning, SnackbarResult.ActionPerformed)
+                fixture.state.mutationsScope.coroutineContext[Job]
+                    ?.children
+                    ?.toList()
+                    ?.forEach { it.join() }
+                val failure = requireNotNull(fixture.state.toast)
+                assertEquals(AppText.Resource(R.string.toast_couldnt_delete_chat), failure.title)
+                assertEquals(setOf(GROUP), failure.localDeleteNotice?.groupIds)
+                assertNotNull(failure.localDeleteNotice?.retry)
+                assertTrue(requireNotNull(failure.diagnosticReport).contains("phase=native_delete"))
+                assertEquals(3, fixture.calls.count { it == "deleteGroupLocal" })
                 assertEquals(null, fixture.state.transientNotice)
             } finally {
                 Dispatchers.resetMain()
@@ -252,14 +308,18 @@ class LocalGroupDeleteControllerTest {
                 val fixture = fixture()
                 val runtime = fixture.state.runtimeGeneration
                 val isCurrent = { fixture.state.runtimeGeneration == runtime }
-                val single = fixture.state.localDeleteRetryNotice(ACCOUNT, GROUP, isCurrent) {
-                    fixture.controller.deleteGroupLocalFromChatList(GROUP)
-                }
+                val single =
+                    fixture.state.localDeleteRetryNotice(ACCOUNT, GROUP, isCurrent) {
+                        fixture.controller.deleteGroupLocalFromChatList(GROUP)
+                    }
                 val batch = fixture.state.localDeleteBatchRetryNotice(fixture.controller, listOf(GROUP), isCurrent)
                 fixture.state.advanceLocalDeleteTestRuntime()
                 requireNotNull(single.retry).invoke(single.groupIds)
                 requireNotNull(batch.retry).invoke(batch.groupIds)
-                fixture.state.mutationsScope.coroutineContext[Job]?.children?.toList()?.forEach { it.join() }
+                fixture.state.mutationsScope.coroutineContext[Job]
+                    ?.children
+                    ?.toList()
+                    ?.forEach { it.join() }
                 assertEquals(0, fixture.calls.count { it == "chatListRow" || it == "deleteGroupLocal" })
             } finally {
                 Dispatchers.resetMain()

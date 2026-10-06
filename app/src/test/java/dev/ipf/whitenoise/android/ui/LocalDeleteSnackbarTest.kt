@@ -91,7 +91,10 @@ class LocalDeleteSnackbarTest {
         assertEquals(null, state.toast)
     }
 
-    private class NoticeData(context: Context, copyable: Boolean = true) : SnackbarData {
+    private class NoticeData(
+        context: Context,
+        copyable: Boolean = true,
+    ) : SnackbarData {
         override val visuals =
             ToastSnackbarVisuals(
                 message = context.getString(R.string.toast_couldnt_delete_chat),
