@@ -306,6 +306,12 @@
         "test_ids": ["MED-010"]
       },
       {
+        "surface": "Pending message action menu delivery handoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TextSendReconciliation.kt",
+        "anchor": "fun reconcileSuccessfulTextSend(",
+        "test_ids": ["MSG-004"]
+      },
+      {
         "surface": "rememberShareChatPickerActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
         "anchor": "fun rememberShareChatPickerActions(",

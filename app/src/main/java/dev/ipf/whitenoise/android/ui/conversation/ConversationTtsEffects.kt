@@ -359,7 +359,7 @@ internal fun ConversationTtsFollowEffects(
 
             val targetIndex = currentTimelineListIndex(target.messageIdHex) ?: return@LaunchedEffect
             val layoutInfo = (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo)
-            val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == row.id }
+            val visibleTarget = layoutInfo.visibleItemsInfo.firstOrNull { it.key == row.presentationId }
             val renderedForHeightSample = controller.timeline.filterNot { MessageProjector.isEdit(it.record) }
             val visibleTimelineHeights =
                 layoutInfo.visibleItemsInfo.mapNotNull { visible ->
@@ -386,7 +386,7 @@ internal fun ConversationTtsFollowEffects(
                     target = target,
                     direction = request.direction,
                     anchorAtTop = request.anchorAtTop,
-                    itemKey = row.id,
+                    itemKey = row.presentationId,
                     targetIndex = targetIndex,
                     estimatedItemHeightPx = itemHeight,
                     listState = listState,

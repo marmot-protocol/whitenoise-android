@@ -47,7 +47,7 @@ internal fun conversationFirstFrameSeedPresentation(
         // Start on the real keyed tail row. Compose then keeps that message key
         // stable while the local page reconciles, without a zero-sized sentinel.
         initialListIndex = if (anchorTailImmediately) SEEDED_CONVERSATION_TAIL_LIST_INDEX else 0,
-        latestTimelineId = rendered.lastOrNull()?.id.takeIf { anchorTailImmediately },
+        latestTimelineId = rendered.lastOrNull()?.presentationId.takeIf { anchorTailImmediately },
         awaitingAuthoritativeTimeline = anchorTailImmediately && !controller.hasPublishedAuthoritativeTimeline,
     )
 }

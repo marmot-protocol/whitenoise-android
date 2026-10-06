@@ -807,7 +807,7 @@ internal fun ConversationScreen(
     // non-focusable (#284), so long-pressing several bubbles would otherwise
     // stack several popovers; deriving each bubble's open state from this one id
     // makes opening one close any other.
-    var openActionMenuId by remember(chat.id) { mutableStateOf<String?>(null) }
+    var openActionMenuId by remember(controller) { mutableStateOf<String?>(null) }
     DismissMessageActionMenuOnScroll(listState) {
         openActionMenuId = null
     }
@@ -862,7 +862,8 @@ internal fun ConversationScreen(
     // over it rather than a second copy.
     val renderedTimelineNewestFirst =
         remember(renderedTimeline) { renderedTimeline.asReversed() }
-    val scrollIndicatorKeys = remember(renderedTimelineNewestFirst) { renderedTimelineNewestFirst.map { it.id } }
+    val scrollIndicatorKeys =
+        remember(renderedTimelineNewestFirst) { renderedTimelineNewestFirst.map { it.presentationId } }
     val navigationState =
         rememberConversationNavigationState(
             controller = controller,
@@ -948,7 +949,7 @@ internal fun ConversationScreen(
         transcriptReadyToReveal,
         routeTransitionInProgress,
         showDetails,
-        renderedTimeline.lastOrNull()?.id,
+        renderedTimeline.lastOrNull()?.presentationId,
         controller.inboundVisibleHostGeneration,
     ) {
         if (
@@ -1051,7 +1052,7 @@ internal fun ConversationScreen(
         remember(conversationMedia.visuals) { conversationMedia.visuals.toConversationViewerPages() }
     val renderedTimelineAnchorKeys =
         remember(renderedTimeline) {
-            renderedTimeline.map { it.id to it.record.messageIdHex }
+            renderedTimeline.map { it.presentationId to it.record.messageIdHex }
         }
     val mediaCacheRevision by appState.mediaCacheRevision.collectAsState()
     val forwardEligibilityExpiries =
@@ -1147,12 +1148,12 @@ internal fun ConversationScreen(
     // pass (plus the downstream invalid-ids pass and reconcile effect) on
     // every bump. Names are only shown for the selected few — resolved below.
     val selectableMessages = selectableMessageProjections
-    val orderedTimelineIds = remember(renderedTimeline) { renderedTimeline.map { it.id } }
+    val orderedTimelineIds = remember(renderedTimeline) { renderedTimeline.map { it.presentationId } }
     val timelineSelectionById =
         remember(renderedTimeline, selectableMessages) {
             renderedTimeline
                 .mapNotNull { item ->
-                    selectableMessages[item.record.messageIdHex]?.let { item.id to it }
+                    selectableMessages[item.record.messageIdHex]?.let { item.presentationId to it }
                 }.toMap()
         }
     LaunchedEffect(controller, controller.recoveryProjectionGeneration, renderedTimeline) {
@@ -1192,7 +1193,7 @@ internal fun ConversationScreen(
         return conversationScrollAnchor(
             listState = listState,
             timelineViewport = timelineViewport,
-            renderedItemIds = liveRenderedTimeline.map { it.id },
+            renderedItemIds = liveRenderedTimeline.map { it.presentationId },
             renderedMessageIds = liveRenderedTimeline.map { it.record.messageIdHex },
             trailingRowCount = controller.conversationTrailingRowCount(liveRenderedTimeline.size),
         )
@@ -1451,7 +1452,7 @@ internal fun ConversationScreen(
                 ?.let { messageId -> liveRenderedTimeline.indexOfFirst { it.record.messageIdHex == messageId } }
                 ?.takeIf { it >= 0 }
                 ?: anchor.itemId
-                    ?.let { itemId -> liveRenderedTimeline.indexOfFirst { it.id == itemId } }
+                    ?.let { itemId -> liveRenderedTimeline.indexOfFirst { it.presentationId == itemId } }
                     ?.takeIf { it >= 0 }
                 ?: return null
         return conversationTimelineListIndex(
@@ -2371,7 +2372,7 @@ internal fun ConversationScreen(
             controller.dismissConversationNotifications()
         }
     }
-    val latestTimelineItemId = renderedTimeline.lastOrNull()?.id
+    val latestTimelineItemId = renderedTimeline.lastOrNull()?.presentationId
     val currentController by rememberUpdatedState(controller)
     val transcriptLocale = LocalConfiguration.current.locales[0]
     val tailTimelineIndex =
@@ -2404,7 +2405,7 @@ internal fun ConversationScreen(
             seededTailAlignmentCommitted = true
             if (navigationState.seedTailAwaitingAuthoritative) {
                 navigationState.seedTailAwaitingAuthoritative = false
-                navigationState.lastFollowedLatestId = renderedTimeline.lastOrNull()?.id
+                navigationState.lastFollowedLatestId = renderedTimeline.lastOrNull()?.presentationId
                 initialTimelineAnchored = true
             }
         },
@@ -2994,7 +2995,7 @@ internal fun ConversationScreen(
             // of arrivals lands without motion and the follow effect pins the tail.
             previousIsNewestButOne =
                 navigationState.lastFollowedLatestId?.let { previous ->
-                    renderedTimeline.getOrNull(renderedTimeline.lastIndex - 1)?.id == previous
+                    renderedTimeline.getOrNull(renderedTimeline.lastIndex - 1)?.presentationId == previous
                 } == true,
             followingTail = scrollCoordinator.isFollowingTail,
             initialTimelineAnchored = initialTimelineAnchored,
@@ -3012,7 +3013,7 @@ internal fun ConversationScreen(
     }
     LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
         if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
-        val latestId = renderedTimeline.lastOrNull()?.id
+        val latestId = renderedTimeline.lastOrNull()?.presentationId
         val previousId = navigationState.lastFollowedLatestId
         // A genuine append: the last id changed and the row we last followed is
         // still present. An older-page trim drops it and is therefore excluded.
@@ -3020,7 +3021,7 @@ internal fun ConversationScreen(
             previousId != null &&
                 latestId != null &&
                 latestId != previousId &&
-                renderedTimeline.any { it.id == previousId }
+                renderedTimeline.any { it.presentationId == previousId }
         navigationState.lastFollowedLatestId = latestId ?: previousId
         if (isAppend) {
             scrollCoordinator.followTailIfAllowed(
@@ -3991,7 +3992,7 @@ internal fun ConversationScreen(
                                 }
                                 itemsIndexed(
                                     renderedTimelineNewestFirst,
-                                    key = { _, item -> item.id },
+                                    key = { _, item -> item.presentationId },
                                     // Pool layouts by category so Compose can reuse
                                     // structurally similar rows across scroll.
                                     contentType = { _, item ->
@@ -4015,7 +4016,7 @@ internal fun ConversationScreen(
                                         modifier =
                                             Modifier
                                                 .timelineReadingExposure(timelineViewport)
-                                                .conversationTailEntranceMotion(tailEntrance, item.id)
+                                                .conversationTailEntranceMotion(tailEntrance, item.presentationId)
                                                 .then(membershipFrameModifier),
                                         item = item,
                                         // Newest-first rows: the chronologically
@@ -4068,7 +4069,7 @@ internal fun ConversationScreen(
                                                 }
                                             }
                                         },
-                                        rangeDragActive = dragAnchorTimelineId == item.id,
+                                        rangeDragActive = dragAnchorTimelineId == item.presentationId,
                                         onDragSelectionStart = { pointerWindowY ->
                                             openActionMenuId = null
                                             clearTextSelection()
@@ -4078,7 +4079,7 @@ internal fun ConversationScreen(
                                                     appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
                                             )
                                             scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                                            dragAnchorTimelineId = item.id
+                                            dragAnchorTimelineId = item.presentationId
                                             dragPointerWindowY = pointerWindowY
                                         },
                                         onDragSelection = { pointerWindowY ->
@@ -4090,12 +4091,12 @@ internal fun ConversationScreen(
                                         quickReactionEmojis = quickReactionEmojis,
                                         recentEmojis = recentEmojiRecentsOwner.recents,
                                         onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                                        isActionMenuOpen = openActionMenuId == messageId,
+                                        isActionMenuOpen = openActionMenuId == item.presentationId,
                                         onActionMenuOpenChange = { open ->
                                             if (open) clearTextSelection()
                                             if (open) {
-                                                openActionMenuId = messageId
-                                            } else if (openActionMenuId == messageId) {
+                                                openActionMenuId = item.presentationId
+                                            } else if (openActionMenuId == item.presentationId) {
                                                 openActionMenuId = null
                                             }
                                         },
