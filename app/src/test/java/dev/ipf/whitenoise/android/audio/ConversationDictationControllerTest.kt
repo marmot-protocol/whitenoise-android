@@ -3165,7 +3165,8 @@ class ConversationDictationControllerTest {
                 assertTrue(fixture.controller.state is ConversationDictationState.Idle)
                 assertEquals(1, sends)
                 assertEquals(1, expired)
-                assertEquals(0, fixture.writes)
+                assertEquals(1, fixture.writes)
+                assertEquals("retained body", fixture.drafts.getValue(key()).text)
             }
         }
 
@@ -3956,7 +3957,7 @@ class ConversationDictationControllerTest {
         }
         fixture.platform.listener.onError(ConversationDictationFailure.NoSpeech)
 
-        assertEquals("", fixture.drafts.getValue(key()).text)
+        assertEquals("first", fixture.drafts.getValue(key()).text)
         assertTrue(fixture.controller.hasDurableSession)
         val failed = fixture.controller.state as ConversationDictationState.Failed
         assertEquals("first", failed.retainedTranscript)
