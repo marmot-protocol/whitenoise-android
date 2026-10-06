@@ -991,7 +991,8 @@ internal class TtsPlaybackQueue(
         // a forced announcement attaches to the target chunk itself.
         val forcedAtTarget = announceSenderForCurrentMessage && chunk.index == currentIndex
         val announced =
-            (forcedAtTarget || (isFirstChunkOfMessage && shouldAnnounceSender(messageIndex))) &&
+            message.attachmentDisplayName == null &&
+                (forcedAtTarget || (isFirstChunkOfMessage && shouldAnnounceSender(messageIndex))) &&
                 message.senderDisplayName.isNotBlank()
         if (!announced) return chunk.copy(senderPrefix = null)
         senderAnnouncedAtMessageIndex = messageIndex
@@ -1017,6 +1018,7 @@ internal class TtsPlaybackQueue(
             announceSenderForCurrentMessage -> true
             senderAnnouncedAtMessageIndex == messageIndex -> false
             messageIndex == 0 -> true
+            messages[messageIndex - 1].attachmentDisplayName != null -> true
             else ->
                 !messages[messageIndex].senderKey.equals(messages[messageIndex - 1].senderKey, ignoreCase = true)
         }

@@ -17,4 +17,6 @@ internal data class TtsQueuedMessage(
     val timelineAt: ULong = 0uL,
     val announcementsPrepared: Boolean = false,
     val prepared: dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage? = null,
+    /** Non-null marks a document entry, whose filename and sender are never prefixed to its spoken content. */
+    val attachmentDisplayName: String? = null,
 )

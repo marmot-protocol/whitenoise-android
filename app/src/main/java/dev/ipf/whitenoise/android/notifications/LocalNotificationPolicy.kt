@@ -25,6 +25,7 @@ object LocalNotificationPolicy {
         engineMuted: Boolean = false,
         senderMutedInGroup: GroupSenderMutePredicate = { _, _, _ -> false },
         categoryEnabled: (String, String, NotificationChannelSpec) -> Boolean? = { _, _, _ -> null },
+        profileMuted: (accountRef: String, author: String) -> Boolean = { _, _ -> false },
     ): Boolean {
         if (appLockScreenVisible) return false
         if (
@@ -46,6 +47,7 @@ object LocalNotificationPolicy {
             return false
         }
         if (isSenderMutedForUpdate(update, senderMutedInGroup)) return false
+        if (profileNotificationAuthor(update)?.let { profileMuted(update.accountRef, it) } == true) return false
 
         // Suppress only the conversation the user is actively viewing — and only
         // for the account that is viewing it. A group is shared by every local
