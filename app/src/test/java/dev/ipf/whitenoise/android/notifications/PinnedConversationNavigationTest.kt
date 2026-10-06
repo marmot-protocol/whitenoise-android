@@ -70,7 +70,12 @@ class PinnedConversationNavigationTest {
         assertTrue(gate.hold(first))
         assertFalse(gate.hold(Intent(Intent.ACTION_MAIN)))
         gate.supersedeForRoute(false, false, null)
-        val routes = listOf(Triple(true, false, null), Triple(false, true, null), Triple(false, false, "whitenoise:peer"))
+        val routes =
+            listOf(
+                Triple(true, false, null),
+                Triple(false, true, null),
+                Triple(false, false, "whitenoise:peer"),
+            )
         for ((target, share, data) in routes) {
             decision = PinnedShortcutLockDecision.WAIT
             assertTrue(gate.hold(first))
