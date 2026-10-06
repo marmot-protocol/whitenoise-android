@@ -130,7 +130,6 @@ import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
-import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
@@ -398,7 +397,8 @@ internal fun ComposerPill(
     highlightMentionChips: Boolean = false,
     mentionCandidates: List<MentionComposer.Candidate> = emptyList(),
     // Mention chips share the send button's colours: the exact account accent with readable content.
-    actionColors: AccountActionColors = accountActionColors(appState = null),
+    // Required so a caller cannot silently fall back to the default accent.
+    actionColors: AccountActionColors,
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
     onImeSend: () -> Unit = {},
     onPasteImageUris: ((List<Uri>) -> Unit)? = null,

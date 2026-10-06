@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
@@ -205,6 +206,7 @@ class ComposerAutofillMenuTest {
                     Surface {
                         Box(Modifier.width(360.dp).testTag(ROOT_TAG)) {
                             ComposerPill(
+                                actionColors = accountActionColors(appState = null),
                                 textFieldValue = value,
                                 composerFocus = focusRequester,
                                 emojiPickerOpen = false,

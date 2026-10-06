@@ -18,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -117,6 +118,7 @@ class ComposerResizeHandleTest {
                     val focusRequester = remember { FocusRequester() }
                     Box(Modifier.width(300.dp).height(140.dp)) {
                         ComposerPill(
+                            actionColors = accountActionColors(appState = null),
                             textFieldValue = value,
                             composerFocus = focusRequester,
                             emojiPickerOpen = false,
