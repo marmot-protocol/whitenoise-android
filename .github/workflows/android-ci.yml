@@ -1,8 +1,8 @@
 name: Android CI
 
 # Required validation CI for the Android client. Runs the same checks a
-# contributor should run locally before pushing (see README "Continuous
-# Integration"). Dev debug variant only: no signing secrets, no
+# contributor must require on GitHub (see README "Continuous
+# Integration" and docs/ci-request-policy.md). Dev debug variant only: no signing secrets, no
 # google-services.json, so this never depends on release/Play/Zapstore
 # credentials.
 #
@@ -26,11 +26,33 @@ permissions:
 
 jobs:
   changes:
-    name: Classify changes and validate tooling
+    name: Classify complete PR changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
       docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Test conservative CI classification
+        run: python3 -m unittest scripts/test_check_ci_changes.py
+
+      - name: Classify complete PR diff
+        id: classify
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
+
+  tooling-contracts:
+    name: Validate tooling and documentation contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -106,17 +128,6 @@ jobs:
         run: |
           python3 -m unittest scripts/test_run_android_instrumented_dispatch.py
           python3 -m unittest scripts/test_check_instrumented_required_cases.py
-
-      - name: Test conservative CI classification
-        run: python3 -m unittest scripts/test_check_ci_changes.py
-
-      - name: Classify complete PR diff
-        id: classify
-        env:
-          CI_EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: python3 scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
 
   offline-zsp:
     needs: changes
@@ -631,7 +642,7 @@ jobs:
   # Missing outputs, unexpected skips, failures and cancellations remain red.
   validate:
     name: Compile, test, ktlint, detekt, Android lint
-    needs: [changes, offline-zsp, build-contracts, compose-compiler, static-analysis, screenshots, tests]
+    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, static-analysis, screenshots, tests]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -645,12 +656,13 @@ jobs:
           set -euo pipefail
           printf '%s\n' "$JOB_RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
           printf '%s\n' "$JOB_RESULTS" | jq -e --arg event "$CI_EVENT" '
-            (keys == ["build-contracts", "changes", "compose-compiler", "offline-zsp", "screenshots", "static-analysis", "tests"]) and
+            (keys == ["build-contracts", "changes", "compose-compiler", "offline-zsp", "screenshots", "static-analysis", "tests", "tooling-contracts"]) and
             (.changes.result == "success") and
+            (."tooling-contracts".result == "success") and
             (.changes.outputs.docs_only == "true" or .changes.outputs.docs_only == "false") and
             (if .changes.outputs.docs_only == "true" then
               $event == "pull_request" and all(to_entries[];
-                if .key == "changes" then .value.result == "success"
+                if .key == "changes" or .key == "tooling-contracts" then .value.result == "success"
                 else .value.result == "skipped" end)
             else all(.[]; .result == "success") end)
           ' > /dev/null

@@ -24,6 +24,7 @@ class AndroidCiGateTest(unittest.TestCase):
         """Read the actual inline shell gate, avoiding a separate test-only copy."""
         cls.workflow = WORKFLOW.read_text()
         cls.changes = cls.job_block(cls.workflow, 'changes')
+        cls.tooling_contracts = cls.job_block(cls.workflow, 'tooling-contracts')
         cls.build_contracts = cls.job_block(cls.workflow, 'build-contracts')
         cls.compose_compiler = cls.job_block(cls.workflow, 'compose-compiler')
         cls.static_analysis = cls.job_block(cls.workflow, 'static-analysis')
@@ -92,8 +93,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('  pull_request:\n    branches: [master]', events)
         self.assertNotIn('paths:', events)
         self.assertNotIn('paths-ignore:', events)
-        self.assertNotIn('\n    if:', self.changes.split('    steps:', 1)[0])
-        step = self.named_step(self.changes, 'Validate fuzz PR production triggers')
+        self.assertNotIn('\n    if:', self.tooling_contracts.split('    steps:', 1)[0])
+        step = self.named_step(self.tooling_contracts, 'Validate fuzz PR production triggers')
         self.assertNotIn('        if:', step)
         self.assertIn('python3 scripts/check_fuzz_pr_triggers.py\n', step)
         self.assertIn('python3 -m unittest scripts/test_check_fuzz_pr_triggers.py', step)
@@ -207,7 +208,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('scripts/check_viewport_restoration_coverage.py', floor)
         self.assertNotIn('continue-on-error:', floor)
         self.assertNotIn('./gradlew', floor)
-        self.assertIn('scripts/test_check_viewport_restoration_coverage.py', self.changes)
+        self.assertIn('scripts/test_check_viewport_restoration_coverage.py', self.tooling_contracts)
 
     def test_screenshot_owners_come_from_the_checked_registry(self):
         """Both flavors verify the registered owners, then prove every golden was compared."""
@@ -226,14 +227,14 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertNotIn("--tests '", step)
         self.assertNotIn('\n        if:', step)
         self.assertNotIn('continue-on-error:', self.screenshots)
-        static = self.named_step(self.changes, 'Check committed screenshot golden owners')
+        static = self.named_step(self.tooling_contracts, 'Check committed screenshot golden owners')
         self.assertNotIn('        if:', static)
         self.assertIn('python3 -m unittest scripts/test_check_screenshot_baseline_owners.py', static)
         self.assertIn('python3 scripts/check_screenshot_baseline_owners.py\n', static)
 
     def test_instrumented_dispatch_tooling_runs_without_an_emulator(self):
         """The dispatcher and required-case parser tests run in the fast tooling phase."""
-        step = self.named_step(self.changes, 'Test instrumented dispatch and required cases')
+        step = self.named_step(self.tooling_contracts, 'Test instrumented dispatch and required cases')
         self.assertNotIn('        if:', step)
         self.assertIn('python3 -m unittest scripts/test_run_android_instrumented_dispatch.py', step)
         self.assertIn('python3 -m unittest scripts/test_check_instrumented_required_cases.py', step)
@@ -355,9 +356,18 @@ class AndroidCiGateTest(unittest.TestCase):
         outcomes = self.successful_outcomes()
         outcomes['changes']['outputs']['docs_only'] = 'true'
         for job in self.dependencies:
-            if job != 'changes':
+            if job not in {'changes', 'tooling-contracts'}:
                 outcomes[job]['result'] = 'skipped'
         return outcomes
+
+    def test_slow_tooling_does_not_block_android_job_start(self):
+        self.assertNotIn('    needs:', self.tooling_contracts.split('    steps:', 1)[0])
+        for name in ('offline-zsp', 'build-contracts', 'compose-compiler',
+                     'static-analysis', 'screenshots', 'tests'):
+            job = self.job_block(self.workflow, name)
+            self.assertIn('    needs: changes\n', job)
+            self.assertIn("    if: needs.changes.outputs.docs_only != 'true'\n", job)
+            self.assertNotIn('    needs: tooling-contracts', job)
 
     def test_docs_only_accepts_only_classified_skips(self):
         self.assertEqual(self.run_gate(self.docs_outcomes()).returncode, 0)

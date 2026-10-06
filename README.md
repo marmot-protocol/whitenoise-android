@@ -99,7 +99,8 @@ failed suite cannot trigger a second full test execution. The existing
 the offline ZSP contract, and fails if any dependency fails or is cancelled.
 A successful docs-only classifier permits only the explicitly named Android
 job skips on a PR. All tooling/manual-guide/metadata validators still run, and
-missing classification or unexpected skips fail the aggregate. Classification
+missing classification or unexpected skips fail the aggregate. Lightweight
+tooling contracts run separately in parallel and remain required. Classification
 uses the whole PR diff: a docs fixup on a code PR still runs the full matrix.
 Master pushes always run full validation.
 

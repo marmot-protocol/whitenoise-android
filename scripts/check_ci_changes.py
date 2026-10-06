@@ -7,11 +7,16 @@ import re
 import subprocess
 
 
+# A Kotlin compatibility test reads this fixture; prose edits need that test.
+BUILD_INPUT_DOCS = {'docs/composer-dictation-device-matrix.md'}
+
 ROOT_DOCS = {'README.md', 'AGENTS.md', 'CLAUDE.md', 'CONTRIBUTING.md',
              'SECURITY.md', 'CODE_OF_CONDUCT.md', 'CHANGELOG.md'}
 
 
 def documentation_path(path):
+    if path in BUILD_INPUT_DOCS:
+        return False
     parts = PurePosixPath(path).parts
     if not parts or path.startswith('/') or any(p in {'.', '..'} for p in parts):
         return False

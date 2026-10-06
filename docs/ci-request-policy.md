@@ -46,16 +46,19 @@ they are not permission to use old APKs or build a substitute locally.
 ## Documentation-only core validation
 
 The core workflow always starts and reports the existing required check. Its
-`changes` job runs the non-Gradle tooling/metadata/manual-guide/fuzz-policy
-validators and examines the **whole PR diff**, with rename detection disabled.
+`changes` job examines the **whole PR diff**, with rename detection disabled.
+A separate `tooling-contracts` job runs the non-Gradle tooling/metadata/manual-guide/
+fuzz-policy validators in parallel; it does not delay Android job startup.
 Only ordinary non-executable Markdown blobs in the named root guides or `docs/`
 qualify. JSON inventories, source-tree Markdown, build/workflow inputs,
 executables, symlinks, deleted code and unknown paths require full Android CI.
+`docs/composer-dictation-device-matrix.md` is a Kotlin-test fixture and also
+requires the full suite; document any future build/test input in the classifier.
 An unavailable/empty diff, missing refs or any non-PR event also requires full CI.
 
-The aggregate accepts skipped Android jobs only when this classifier and all
-its validators succeeded with `docs_only=true` on a PR. It rejects missing or
-unexpected outcomes, code-path skips, failures and cancellations. A docs fixup
+The aggregate accepts skipped Android jobs only when classification succeeded
+with `docs_only=true` on a PR and the separate tooling validators passed. It
+rejects missing or unexpected outcomes, code-path skips, failures and cancellations. A docs fixup
 on a code PR does not turn that PR into a docs-only candidate.
 
 Code candidates still run every existing core check, including both

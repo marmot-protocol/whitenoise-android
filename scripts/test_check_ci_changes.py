@@ -17,7 +17,8 @@ class CiChangesTest(unittest.TestCase):
     def test_only_known_plain_prose_files_skip_android(self):
         self.assertTrue(docs_only_diff(entry('README.md') + entry('docs/ci.md')))
         for path in ['app/src/main/assets/help.md', 'scripts/README.md',
-                     'docs/manual-release-testing-surfaces.json', '.github/workflows/ci.yml',
+                     'docs/manual-release-testing-surfaces.json',
+                     'docs/composer-dictation-device-matrix.md', '.github/workflows/ci.yml',
                      'gradle.properties', 'new-unclassified-file.md', '../README.md']:
             with self.subTest(path=path):
                 self.assertFalse(docs_only_diff(entry('README.md') + entry(path)))
