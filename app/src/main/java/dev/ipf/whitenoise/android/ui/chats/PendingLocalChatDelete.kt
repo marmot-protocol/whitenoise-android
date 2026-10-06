@@ -31,6 +31,16 @@ internal class PendingLocalChatDelete private constructor(
     private fun accountIsSuspended(appState: WhiteNoiseAppState): Boolean =
         appState.signOutInProgress || appState.wipeInProgress || appState.retainedAccountReactivationRef != null
 
+    fun remaining(deleted: Int) =
+        PendingLocalChatDelete(
+            groupIds.drop(deleted),
+            controller,
+            ownerState,
+            account,
+            runtime,
+            bindEpoch,
+        )
+
     companion object {
         fun capture(
             items: List<ChatListItem>,

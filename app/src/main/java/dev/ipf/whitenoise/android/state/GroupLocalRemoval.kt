@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -81,7 +80,7 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
             )
         onNativeCommitted()
         if (pending != null) {
-            completeLocalGroupDeleteCleanup(pending, attempt, isCurrent)
+            completeLocalGroupDeleteCleanup(pending, attempt)
         } else {
             true
         }
@@ -90,7 +89,6 @@ internal suspend fun WhiteNoiseAppState.deleteChatGroupLocalWithRecovery(
 private suspend fun WhiteNoiseAppState.completeLocalGroupDeleteCleanup(
     pending: PendingLocalGroupDeleteCleanup,
     attempt: LocalGroupDeleteAttempt,
-    isCurrent: () -> Boolean,
 ) = withContext(NonCancellable) {
     var cleanupFailure: Throwable? = null
     val result =
@@ -104,15 +102,8 @@ private suspend fun WhiteNoiseAppState.completeLocalGroupDeleteCleanup(
                 withContext(Dispatchers.IO) { localGroupDeleteCleanupJournal.finish(pending) }
             }
         }.onFailure { failure ->
-            // Report deferred client cleanup, not a failed native delete.
-            if (isCurrent()) {
-                presentFailure(
-                    R.string.toast_chat_deleted_local,
-                    "CHAT_LOCAL_DELETE",
-                    failure,
-                    detail = AppText.Resource(R.string.local_delete_cleanup_pending),
-                )
-            }
+            // Native deletion is confirmed. Retain the intent and retry cleanup without routine notices.
+            appStateDebug(failure) { "local delete client cleanup deferred" }
             schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
         }
     result.isSuccess
@@ -146,7 +137,12 @@ internal suspend fun WhiteNoiseAppState.reconcilePendingLocalGroupDeleteCleanups
                             accounts.any { it.label == pending.account && it.isSignedInSigningAccount() }
                     },
                     isGroupPresent = { nativeGroupPresent(pending.account, pending.groupIdHex) },
-                    cleanup = { withContext(NonCancellable) { finishLocalGroupDeleteCleanup(it) } },
+                    cleanup = {
+                        withContext(Dispatchers.Main.immediate) {
+                            dismissLocalDeleteFailure(it.account, it.groupIdHex)
+                        }
+                        withContext(NonCancellable) { finishLocalGroupDeleteCleanup(it) }
+                    },
                     finish = localGroupDeleteCleanupJournal::finish,
                 )
             }.onFailure { appStateDebug(it) { "local delete cleanup reconciliation deferred" } }
