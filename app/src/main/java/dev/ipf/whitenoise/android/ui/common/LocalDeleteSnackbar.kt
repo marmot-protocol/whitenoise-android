@@ -87,13 +87,14 @@ private fun LocalDeleteDetails(
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.dismiss)) } },
-        dismissButton = visuals.copyText?.let { report ->
-            {
-                TextButton(onClick = { clipboard.setText(AnnotatedString(report)) }) {
-                    Text(stringResource(R.string.copy))
+        dismissButton =
+            visuals.copyText?.takeIf { visuals.copyable && it.isNotBlank() }?.let { report ->
+                {
+                    TextButton(onClick = { clipboard.setText(AnnotatedString(report)) }) {
+                        Text(stringResource(R.string.copy))
+                    }
                 }
-            }
-        },
+            },
     )
 }
 

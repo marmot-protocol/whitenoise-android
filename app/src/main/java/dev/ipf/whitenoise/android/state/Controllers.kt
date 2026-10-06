@@ -4782,9 +4782,10 @@ class ChatsController private constructor(
                     appState.presentLocalDeleteFailure(
                         failureMessage,
                         failure,
-                        notice = appState.localDeleteRetryNotice(account, groupIdHex, isCurrent) {
-                            deleteGroupLocalFromChatList(groupIdHex, failureMessage = failureMessage)
-                        },
+                        notice =
+                            appState.localDeleteRetryNotice(account, groupIdHex, isCurrent) {
+                                deleteGroupLocalFromChatList(groupIdHex, failureMessage = failureMessage)
+                            },
                     )
                     observer.onFailure(failure)
                 }

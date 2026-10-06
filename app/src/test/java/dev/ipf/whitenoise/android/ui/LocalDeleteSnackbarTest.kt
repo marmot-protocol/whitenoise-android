@@ -47,6 +47,17 @@ class LocalDeleteSnackbarTest {
     }
 
     @Test
+    fun detailsDoNotOfferCopyWhenTheReportIsNotCopyable() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val data = NoticeData(context, copyable = false)
+        composeRule.setContent { WhiteNoiseTheme { LocalDeleteSnackbar(data, data.visuals) } }
+        composeRule.onNodeWithText(context.getString(R.string.details)).performClick()
+        composeRule.onNodeWithText(REPORT).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.copy)).assertDoesNotExist()
+        assertEquals(0, data.retries)
+    }
+
+    @Test
     fun retryUsesTheSnackbarActionExactlyOnce() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val data = NoticeData(context)
@@ -80,11 +91,11 @@ class LocalDeleteSnackbarTest {
         assertEquals(null, state.toast)
     }
 
-    private class NoticeData(context: Context) : SnackbarData {
+    private class NoticeData(context: Context, copyable: Boolean = true) : SnackbarData {
         override val visuals =
             ToastSnackbarVisuals(
                 message = context.getString(R.string.toast_couldnt_delete_chat),
-                copyable = true,
+                copyable = copyable,
                 copyText = REPORT,
                 details = REPORT,
                 actionLabel = context.getString(R.string.retry),
