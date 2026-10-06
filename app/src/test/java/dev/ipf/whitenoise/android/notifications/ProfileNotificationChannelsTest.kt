@@ -24,6 +24,10 @@ class ProfileNotificationChannelsTest {
     private val author = "a".repeat(64)
     private val default = ConversationVibrationPattern.SYSTEM_DEFAULT
 
+    /**
+     * Opening settings and resetting choices must not grow the OS inventory; only four deliberate waveform
+     * versions exist.
+     */
     @Test fun viewingAndResetNeverCreateChannelsAndExplicitVersionsAreBounded() {
         val channels = ProfileNotificationChannels(context)
         val store = ProfileNotificationOverridePreferences(context)
@@ -42,6 +46,10 @@ class ProfileNotificationChannelsTest {
         assertEquals(4, profileCount())
     }
 
+    /**
+     * Changing display identity or hiding it preserves Android-owned importance and custom sound on the same
+     * channel.
+     */
     @Test fun renameAndPrivacyPreserveIdAndAndroidAlertSettings() {
         NotificationChannels.ensureChannels(context)
         val channels = ProfileNotificationChannels(context)
@@ -62,6 +70,7 @@ class ProfileNotificationChannelsTest {
         assertEquals(1, profileCount())
     }
 
+    /** A person has one bounded channel identity per local account, independent of the chats where they appear. */
     @Test fun distinctAccountsAndAuthorsHaveDistinctBoundedIdsAndNoGroupDimension() {
         val id = checkNotNull(ProfileNotificationChannels.id("personal", author, default))
         assertNotEquals(id, ProfileNotificationChannels.id("work", author, default))
@@ -71,6 +80,10 @@ class ProfileNotificationChannelsTest {
         assertFalse(id.contains("personal"))
     }
 
+    /**
+     * A new waveform uses a new immutable channel while copying the prior sound without mutating existing
+     * notifications.
+     */
     @Test fun creatingANewPatternCopiesThePreviousSoundAndLeavesOldChannelUntouched() {
         NotificationChannels.ensureChannels(context)
         val channels = ProfileNotificationChannels(context)
@@ -93,6 +106,7 @@ class ProfileNotificationChannelsTest {
         )
     }
 
+    /** Counts only this feature’s channels, excluding the application’s required parent channel inventory. */
     private fun profileCount(): Int {
         val channels = manager.notificationChannels
         return channels.count { it.id.startsWith(ProfileNotificationChannels.PREFIX) }

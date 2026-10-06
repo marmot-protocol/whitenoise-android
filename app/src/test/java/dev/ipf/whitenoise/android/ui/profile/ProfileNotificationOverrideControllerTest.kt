@@ -56,6 +56,10 @@ class ProfileNotificationOverrideControllerTest {
             assertFalse(controller.state.value.busy)
         }
 
+    /**
+     * Suspended UI actions lose authority after account replacement or route disposal, even if their coroutine
+     * resumes.
+     */
     @Test fun lateAccountAndDisposedOwnersDoNotCreateChannelsOrWritePreferences() =
         runTest {
             NotificationChannels.ensureChannels(context)

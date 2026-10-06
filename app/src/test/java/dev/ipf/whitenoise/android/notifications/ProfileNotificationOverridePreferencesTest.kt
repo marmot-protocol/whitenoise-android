@@ -62,6 +62,10 @@ class ProfileNotificationOverridePreferencesTest {
         }
     }
 
+    /**
+     * A recreated UI/background adapter reads the saved choice without applying it to another author or local
+     * identity.
+     */
     @Test fun restartAndCrossInstanceReadsPreserveOnlyTheSelectedAuthorAndAccount() {
         val background = ProfileNotificationOverridePreferences(context)
         val ui = ProfileNotificationOverridePreferences(context)
@@ -73,6 +77,10 @@ class ProfileNotificationOverridePreferencesTest {
         assertEquals(ProfileNotificationMode.DEFAULT, background.get("work", alice).mode)
     }
 
+    /**
+     * Mute/default transitions preserve a chosen waveform; removing an account clears only its own hashed
+     * namespace.
+     */
     @Test fun muteAndResetKeepDormantWaveformAndAccountCleanupIsPrefixSafe() {
         val store = ProfileNotificationOverridePreferences(context)
         val selected = ProfileNotificationOverride(ProfileNotificationMode.CUSTOM, ConversationVibrationPattern.LONG)
@@ -89,6 +97,19 @@ class ProfileNotificationOverridePreferencesTest {
         assertEquals(selected, store.get("personal-extra", alice))
     }
 
+    /** Authoritative account retention removes obsolete records while preserving every retained owner's choice. */
+    @Test fun retentionRetriesFailedCleanupWithoutTouchingAnotherAccount() {
+        val store = ProfileNotificationOverridePreferences(context)
+        val choice = ProfileNotificationOverride(ProfileNotificationMode.MUTED)
+        store.set("removed", alice, choice)
+        store.set("retained", alice, choice)
+        store.retainAccounts(listOf("retained"))
+        val restarted = ProfileNotificationOverridePreferences(context)
+        assertEquals(ProfileNotificationOverride(), restarted.get("removed", alice))
+        assertEquals(choice, restarted.get("retained", alice))
+    }
+
+    /** Invalid public keys and revoked editor owners must not create even an inert preference entry. */
     @Test fun malformedIdentitiesAndExpiredOwnersCannotWrite() {
         val store = ProfileNotificationOverridePreferences(context)
         val mute = ProfileNotificationOverride(ProfileNotificationMode.MUTED)
@@ -100,6 +121,7 @@ class ProfileNotificationOverridePreferencesTest {
         assertEquals(ProfileNotificationOverride(), store.get("personal", alice))
     }
 
+    /** The persisted routing index contains no raw account label or author key. */
     @Test fun persistedKeysContainOnlyBoundedHashes() {
         val key = checkNotNull(ProfileNotificationOverridePreferences.key("private-account", alice))
         assertTrue(key.matches(Regex("[0-9a-f]{64}\\.[0-9a-f]{64}")))

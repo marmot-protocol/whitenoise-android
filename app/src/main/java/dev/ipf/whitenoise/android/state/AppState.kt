@@ -5261,6 +5261,7 @@ class WhiteNoiseAppState private constructor(
                 accounts = refreshedAccounts
                 refreshNativeAttachmentPermissions()
                 releaseContactClearGuardForSignedInAccounts(refreshedAccounts)
+                retainProfileAlertsForAccounts(refreshedAccounts)
                 publishedAccounts = refreshedAccounts
             }
             publishedAccounts
@@ -6162,12 +6163,16 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Local alert write failures are retryable; completed native removal must still reconcile the active account. */
     private suspend fun clearConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
     ) {
         withContext(Dispatchers.IO) {
-            check(profileNotificationOverrides.clearAccount(accountRef)) { "Unable to clear profile alert preferences" }
+            val cleared = runCatching { profileNotificationOverrides.clearAccount(accountRef) }.getOrDefault(false)
+            if (!cleared) {
+                appStateDebug { "profile alert preference cleanup will retry after an authoritative account refresh" }
+            }
             localNotificationPresenter.clearConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
         }
     }
@@ -6405,6 +6410,7 @@ class WhiteNoiseAppState private constructor(
                 // transient failure must not wipe every other account's mutes (#2782 follow-up).
                 refreshedAccountsResult.getOrNull()?.let { successfulAccounts ->
                     retainMemberMutesForAccounts(successfulAccounts.map(AccountSummaryFfi::label))
+                    retainProfileAlertsForAccounts(successfulAccounts)
                 }
             }
             refreshAccountUnreadCounts(refreshedAccounts)

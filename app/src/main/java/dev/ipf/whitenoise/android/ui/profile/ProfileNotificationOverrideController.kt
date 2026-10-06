@@ -140,5 +140,6 @@ internal class ProfileNotificationOverrideController(
         }
     }
 
+    /** Checks both entry disposal and the live account/profile owner before any queued side effect. */
     private fun current(): Boolean = active && ownerIsCurrent()
 }

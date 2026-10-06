@@ -35,12 +35,17 @@ class ProfileNotificationPresenterTest {
     private val pattern = ConversationVibrationPattern.SYSTEM_DEFAULT
     private lateinit var presenter: LocalNotificationPresenter
 
+    /** Starts with an empty notification inventory and explicit preview policy so prior tests cannot mask routing. */
     @Before fun setUp() {
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         presenter = LocalNotificationPresenter(context, groupReconciliation = {}, enrichmentLauncher = {})
         presenter.ensureChannels()
     }
 
+    /**
+     * The real presenter chooses the author override across chats while unrelated senders retain conversation
+     * routing.
+     */
     @Test fun oneAuthorUsesOneChannelAcrossDmAndGroupsWhileOtherAuthorsKeepChatRoutes() =
         runBlocking {
             val id = customize(alice)
@@ -66,6 +71,7 @@ class ProfileNotificationPresenterTest {
             assertEquals(1, manager.notificationChannels.count { it.id.startsWith(ProfileNotificationChannels.PREFIX) })
         }
 
+    /** A person mute must not suppress a different author or the same author under another signed-in identity. */
     @Test fun muteSuppressesOnlyAuthoredMessagesAndAnotherAccountIsIndependent() =
         runBlocking {
             ProfileNotificationOverridePreferences(context).set(
@@ -88,6 +94,7 @@ class ProfileNotificationPresenterTest {
             assertEquals(0, manager.notificationChannels.count { it.id.startsWith(ProfileNotificationChannels.PREFIX) })
         }
 
+    /** Person-specific sound remains subordinate to per-chat mute, mention-only mode and global category policy. */
     @Test fun profileCustomCannotBypassChatModeOrGlobalEligibility() =
         runBlocking {
             customize(alice)
@@ -114,6 +121,7 @@ class ProfileNotificationPresenterTest {
             assertEquals(0, manager.activeNotifications.size)
         }
 
+    /** Reset reroutes future alerts without moving or alerting an already-posted card during silent corrections. */
     @Test fun resetAffectsFuturePostsButSilentCorrectionsKeepTheExistingCardChannel() =
         runBlocking {
             val update = update()
@@ -135,6 +143,7 @@ class ProfileNotificationPresenterTest {
             assertNotNull(manager.getNotificationChannel(id))
         }
 
+    /** Locked/redacted notifications retain alert policy while removing identifying names and people metadata. */
     @Test fun redactionKeepsPersonPolicyButExposesNoProfileNameOrPeopleIdentity() =
         runBlocking {
             val id = customize(alice)
@@ -203,6 +212,10 @@ class ProfileNotificationPresenterTest {
             assertEquals(0, manager.activeNotifications.size)
         }
 
+    /**
+     * Self messages, reactions, membership events and agent traffic remain outside person-specific notification
+     * policy.
+     */
     @Test fun exclusionsNeverResolveAProfileOverride() {
         val normal = update()
         assertEquals(alice, profileNotificationAuthor(normal))
@@ -221,6 +234,7 @@ class ProfileNotificationPresenterTest {
         assertNull(profileNotificationAuthor(normal.copy(sender = NotificationUserFfi("invalid", null, null))))
     }
 
+    /** Creates a real OS channel plus its persisted routing choice for assertions against posted notifications. */
     private fun customize(author: String): String {
         val id = ProfileNotificationChannels(context).customize("personal", author, "Alice", pattern, pattern)
         check(
@@ -233,6 +247,7 @@ class ProfileNotificationPresenterTest {
         return id
     }
 
+    /** Finds the exact account/conversation card rather than accepting any notification in the inventory. */
     private fun card(update: NotificationUpdateFfi) =
         manager.activeNotifications
             .single {
@@ -240,6 +255,10 @@ class ProfileNotificationPresenterTest {
                 it.tag == key.tag && it.id == key.id
             }.notification
 
+    /**
+     * Builds a native notification projection with stable identities while allowing sender, chat and message
+     * variation.
+     */
     private fun update(
         author: String = alice,
         group: String = "first",

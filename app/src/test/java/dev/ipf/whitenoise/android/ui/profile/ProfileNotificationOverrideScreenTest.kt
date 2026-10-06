@@ -32,6 +32,7 @@ import org.robolectric.annotation.GraphicsMode
 class ProfileNotificationOverrideScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Mode selection updates visible state, while OS settings and waveform actions remain distinct callbacks. */
     @Test fun defaultAndMuteActionsUpdateTheVisibleSelection() {
         val state = mutableStateOf(ProfileNotificationOverrideState())
         var systemClicks = 0
@@ -57,6 +58,7 @@ class ProfileNotificationOverrideScreenTest {
         assertEquals(1, vibrationClicks)
     }
 
+    /** Only a resolved external author exposes cross-conversation notification preferences. */
     @Test fun overviewRowIsSuppressedForLocalAndUnresolvedProfiles() {
         val self = mutableStateOf(false)
         val resolved = mutableStateOf(true)
@@ -71,18 +73,23 @@ class ProfileNotificationOverrideScreenTest {
         composeRule.onNodeWithTag("person_profile.notifications").assertDoesNotExist()
     }
 
+    /** The actual profile overview places the entry among personal controls and keeps it reachable by scrolling. */
     @Test fun profileRowLight() {
         composeRule.setContent { profile() }
         composeRule.onNodeWithTag("person_profile.notifications").performScrollTo()
         capture("profile_notification_row_light")
     }
 
+    /** The default state explains inherited policy and exposes Android’s system settings without creating a channel. */
     @Test fun defaultScreenLight() = screen("profile_notifications_light")
 
+    /** Custom policy keeps the selected waveform and system-owned sound controls legible in the dark theme. */
     @Test fun customScreenDark() = screen("profile_notifications_dark", dark = true)
 
+    /** OLED surfaces retain visible dividers, selected policy and waveform controls without raised gray panels. */
     @Test fun customScreenAmoled() = screen("profile_notifications_amoled", dark = true, amoled = true)
 
+    /** At twice-normal text size in RTL, the waveform action remains reachable through the screen’s own scrolling. */
     @Test fun customScreenLargeRtl() = screen("profile_notifications_large_rtl", dark = true, rtl = true, scale = 2f)
 
     /** Scrollable large-text fixture keeps controls reachable without changing preference or channel state. */

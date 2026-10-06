@@ -84,6 +84,19 @@ internal class ProfileNotificationOverridePreferences(
             saved
         }
 
+    /** Retry obsolete-account cleanup on an authoritative account refresh without blocking the main thread. */
+    fun retainAccounts(accountRefs: Collection<String>) {
+        val retained = accountRefs.map(::accountPrefix).toSet()
+        synchronized(mutationLock) {
+            val removed = preferences.all.keys.filter { key -> retained.none(key::startsWith) }
+            if (removed.isEmpty()) return
+            val editor = preferences.edit()
+            removed.forEach(editor::remove)
+            editor.apply()
+            revision.value += 1
+        }
+    }
+
     /**
      * Android mutates its memory map before commit reports a failed disk write. Roll it back while
      * readers hold the same lock; even a failed rollback flush still restores the old in-memory policy.
@@ -120,6 +133,7 @@ internal class ProfileNotificationOverridePreferences(
             return if (account != null && identity != null) accountPrefix(account) + sha256Hex(identity) else null
         }
 
+        /** Separates account records by a fixed-width digest so cleanup cannot match a similarly named owner. */
         private fun accountPrefix(account: String): String = "${sha256Hex(account)}."
     }
 }

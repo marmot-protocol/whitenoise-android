@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
+import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
 import kotlinx.coroutines.runBlocking
@@ -97,6 +98,10 @@ class ExternalSignerSignOutLifecycleTest {
                     listAccountsFailure?.let(::suspendFailure)
                     if (engineWiped) emptyList() else listOf(externalSignerAccount(signedOut = engineSignedOut))
                 }
+                // Permit the authoritative refresh instead of silently taking cached-account fallback.
+                "attachmentDownloadPolicy" -> dev.ipf.marmotkit.AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
+                "onboardingRecoveryRequired" -> false
+                "onboardingSnapshot" -> null
                 "accountUnreadSummary", "chatList" -> emptyList<Any>()
                 "toString" -> "ExternalSignerSignOutMarmotFake"
                 "hashCode" -> System.identityHashCode(proxy)
@@ -115,7 +120,7 @@ class ExternalSignerSignOutLifecycleTest {
         ShortcutManagerCompat.removeAllDynamicShortcuts(context)
     }
 
-    private fun appState(): WhiteNoiseAppState =
+    private fun appState(context: android.content.Context = this.context): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore.forContext(context),
@@ -149,6 +154,83 @@ class ExternalSignerSignOutLifecycleTest {
             assertNull(appState.activeAccountRef)
             assertTrue(appState.phase is AppPhase.Onboarding)
         }
+
+    /** A failed local alert write cannot leave an account active after native sign-out already completed. */
+    @Test
+    fun failedProfileAlertCleanupStillCompletesSignOutAndRetriesOnRefresh() =
+        runBlocking {
+            val state = appState(profileCleanupFailureContext(throws = false))
+            seedProfileAlertChoices(state)
+            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            assertNull(state.activeAccountRef)
+            assertTrue(state.accounts.single().signedOut)
+            assertTrue(state.phase is AppPhase.Onboarding)
+            assertEquals(
+                dev.ipf.whitenoise.android.notifications.ProfileNotificationMode.DEFAULT,
+                state.profileNotificationOverrides.get(ACCOUNT_REF, ACCOUNT_HEX).mode,
+            )
+        }
+
+    /** Even an exceptional preferences failure must not bypass post-wipe account refresh and safe routing. */
+    @Test
+    fun exceptionalProfileAlertCleanupStillCompletesWipeAndRefresh() =
+        runBlocking {
+            val state = appState(profileCleanupFailureContext(throws = true))
+            seedProfileAlertChoices(state)
+            assertTrue(checkNotNull(state.signOutAndWipeActiveAccount()).localCleanup.completed)
+            assertEquals(1, wipeCalls.get())
+            assertTrue(listAccountsCalls.get() > 0)
+            assertNull(state.activeAccountRef)
+            assertTrue(state.accounts.isEmpty())
+            assertTrue(state.phase is AppPhase.Onboarding)
+            assertEquals(
+                dev.ipf.whitenoise.android.notifications.ProfileNotificationMode.DEFAULT,
+                state.profileNotificationOverrides.get(ACCOUNT_REF, ACCOUNT_HEX).mode,
+            )
+        }
+
+    /** Commits fail only for the new alert store; all native/account persistence keeps its real behavior. */
+    private fun profileCleanupFailureContext(throws: Boolean): android.content.Context =
+        object : android.content.ContextWrapper(context) {
+            override fun getApplicationContext(): android.content.Context = this
+
+            override fun getSharedPreferences(
+                name: String,
+                mode: Int,
+            ): android.content.SharedPreferences {
+                val delegate = super.getSharedPreferences(name, mode)
+                if (name != "whitenoise.profile_notification_overrides") return delegate
+                return object : android.content.SharedPreferences by delegate {
+                    override fun edit(): android.content.SharedPreferences.Editor {
+                        val editor = delegate.edit()
+                        return object : android.content.SharedPreferences.Editor by editor {
+                            override fun commit(): Boolean {
+                                if (throws) throw IllegalStateException("injected preferences failure")
+                                editor.commit()
+                                return false
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    /** Preloads the real persisted key directly so only teardown encounters the failing commit adapter. */
+    private fun seedProfileAlertChoices(state: WhiteNoiseAppState) {
+        val key =
+            checkNotNull(
+                ProfileNotificationOverridePreferences.key(ACCOUNT_REF, ACCOUNT_HEX),
+            )
+        context
+            .getSharedPreferences("whitenoise.profile_notification_overrides", android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putString(key, "MUTED|SYSTEM_DEFAULT")
+            .commit()
+        assertEquals(
+            dev.ipf.whitenoise.android.notifications.ProfileNotificationMode.MUTED,
+            state.profileNotificationOverrides.get(ACCOUNT_REF, ACCOUNT_HEX).mode,
+        )
+    }
 
     /** An unfinished engine teardown retains both the active session and its composer geometry. */
     @Test
