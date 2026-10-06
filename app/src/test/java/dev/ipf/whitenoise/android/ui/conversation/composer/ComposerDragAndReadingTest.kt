@@ -268,6 +268,34 @@ class ComposerDragAndReadingTest {
     }
 
     @Test
+    fun reversingAnOutwardBoundaryDragReadsWithoutUndoingRejectedMovement() {
+        render(longDraft)
+        val original = observed
+        for (outward in listOf(-1f, 1f)) {
+            if (outward > 0f) {
+                composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
+                composeRule.waitForIdle()
+            }
+            val before = scroll()
+            composeRule.mainClock.autoAdvance = false
+            composeRule.onNode(hasSetTextAction()).performTouchInput {
+                val start = center
+                down(start)
+                moveTo(start + Offset(0f, outward * 40f), delayMillis = 16)
+                moveTo(start + Offset(0f, outward * 80f), delayMillis = 16)
+                moveTo(start + Offset(0f, outward * 40f), delayMillis = 16)
+                cancel()
+            }
+            val moved = (scroll() - before) * outward
+            composeRule.mainClock.autoAdvance = true
+            composeRule.waitForIdle()
+            assertTrue("reversing at either edge must read only the new movement", moved in 20f..60f)
+            assertEquals(original, observed)
+            assertEquals("reading must never submit", 0, sends)
+        }
+    }
+
+    @Test
     fun cancelledReadingTouchDoesNotStartMomentum() {
         render(longDraft)
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()

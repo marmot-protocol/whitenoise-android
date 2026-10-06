@@ -203,6 +203,11 @@ internal suspend fun PointerInputScope.composerEditorReadingScrollGestures(
                                     if (scrollBy(-accumulatedY)) {
                                         owningDrag = true
                                         onReadingScroll()
+                                    } else {
+                                        // Rejected movement belongs to the ancestor, not a future
+                                        // reversal. Start fresh so reading responds at either edge.
+                                        accumulatedX = 0f
+                                        accumulatedY = 0f
                                     }
                                 }
                             }
