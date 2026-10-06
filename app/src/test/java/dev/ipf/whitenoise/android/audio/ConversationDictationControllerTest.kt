@@ -6268,7 +6268,7 @@ class ConversationDictationControllerTest {
                 f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
                 if (validation == ConversationDictationTargetValidation.DefinitelyRemoved) {
                     localAvailable = false
-                    f.controller.onTargetUnavailable(ACCOUNT, GROUP)
+                    f.controller.onTargetRemoved(ACCOUNT, GROUP)
                 } else {
                     f.controller.send()
                     f.platform.listener.onResult("recognized")
