@@ -34,10 +34,21 @@ def _finite(value):
 
 
 def segment(events, marker):
-    """The ledger events strictly between marker N and marker N+1, so a sample owns exactly its own requests."""
+    """Own requests admitted between adjacent markers, including their later server acknowledgements.
+
+    A client can verify the final bytes and start its next sample before the server logs completion.
+    Join response events by request ID; retain orphan events in their window so missing parents cannot
+    hide evidence, and keep every duplicate event for the strict count/byte checks.
+    """
     start = next((i for i, e in enumerate(events) if e["kind"] == "marker" and e["value"] == marker), None)
     end = next((i for i, e in enumerate(events) if e["kind"] == "marker" and e["value"] == marker + 1), None)
-    return None if start is None or end is None or end < start else events[start + 1:end]
+    if start is None or end is None or end < start:
+        return None
+    request_kinds = {"upload", "get", "head"}
+    admitted = {e["seq"] for e in events[start + 1:end] if e["kind"] in request_kinds}
+    known = {e["seq"] for e in events if e["kind"] in request_kinds}
+    return [e for i, e in enumerate(events) if e["request"] in admitted
+            or (start < i < end and e["request"] not in known)]
 
 
 def _server(events, size):
