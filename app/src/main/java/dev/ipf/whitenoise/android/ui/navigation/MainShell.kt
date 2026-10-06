@@ -987,6 +987,7 @@ internal fun MainShell(
                 // inbound target) while its switch is still landing, so the
                 // switch stays current either while the target is still armed
                 // or after this exact request committed an early open (#586).
+
                 /**
                  * Allows only this notification request and runtime to finish its account switch,
                  * including its own early open.
@@ -1067,6 +1068,7 @@ internal fun MainShell(
 
                 // This effect is keyed on activeAccountRef, so an inline suspend
                 // switch would cancel itself the moment the ref flips.
+
                 /** Runs the owned preload/activation route outside the effect that account activation will replace. */
                 suspend fun runNotificationAccountSwitchRoute() {
                     if (canPreload) {
