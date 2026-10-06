@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.MessageDraftMutationResult
+import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStageResult
 import dev.ipf.whitenoise.android.media.editor.PhotoDraftStager
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
@@ -537,7 +538,7 @@ internal class ConversationMediaDraftState(
                         accountRef = accountRef,
                         groupIdHex = controller.group.groupIdHex,
                         quality = appState.mediaQuality,
-                        legacyOccurrenceIndex = legacyOccurrenceIndex(slot),
+                        legacyOccurrenceIndex = legacyOccurrenceIndex(currentSlots, slot),
                     )
             handleStageResult(slot, accountRef, staged)
         } finally {
@@ -578,7 +579,14 @@ internal class ConversationMediaDraftState(
                 controller.group.groupIdHex,
                 slot.id,
             )
-        val prepared = stageGenericAttachment(accountRef, attachmentId, pending) ?: return
+        val prepared =
+            stageGenericAttachment(
+                appState.messageDraftRepository,
+                controller.group.groupIdHex,
+                accountRef,
+                attachmentId,
+                pending,
+            ) ?: return
         if (currentSlots.any { it.id == slot.id }) {
             preparedPhotos += slot.id to prepared
         } else {
@@ -599,7 +607,14 @@ internal class ConversationMediaDraftState(
         preparingSlotIds += attachmentId
         try {
             val pending = attachmentReader.readDocumentDraft(uri) ?: return
-            val prepared = stageGenericAttachment(accountRef, attachmentId, pending) ?: return
+            val prepared =
+                stageGenericAttachment(
+                    appState.messageDraftRepository,
+                    controller.group.groupIdHex,
+                    accountRef,
+                    attachmentId,
+                    pending,
+                ) ?: return
             val currentUris = currentDocumentUris.map(Uri::toString)
             if (canPublishDocument(uri.toString(), currentUris, owner, removalFence)) {
                 preparedDocuments += uri to prepared
@@ -623,35 +638,6 @@ internal class ConversationMediaDraftState(
             removalFence.canPublish(uri, currentUris)
 
     /** Adds generic video/document bytes idempotently and recovers the authoritative duplicate. */
-    private suspend fun stageGenericAttachment(
-        accountRef: String,
-        attachmentId: String,
-        pending: PendingAttachment,
-    ): DraftPreparedPhoto? {
-        val attachment = pending.toMessageDraftAttachment(attachmentId)
-        val admission =
-            appState.messageDraftRepository.addAttachment(accountRef, controller.group.groupIdHex, attachment)
-        val committed =
-            when (admission) {
-                is MessageDraftMutationResult.Success -> attachment
-                MessageDraftMutationResult.DuplicateAttachment ->
-                    appState.messageDraftRepository
-                        .draft(accountRef, controller.group.groupIdHex)
-                        .getOrNull()
-                        ?.mediaAttachments
-                        ?.firstOrNull { it.id == attachmentId }
-                else -> null
-            } ?: return null
-        return DraftPreparedPhoto(
-            committed,
-            committed.editorDigest(),
-            restoredFromNative =
-                admission == MessageDraftMutationResult.DuplicateAttachment &&
-                    committed.isComposerVisual() &&
-                    !committed.isComposerDocument(),
-        )
-    }
-
     private suspend fun handleStagedPhoto(
         slot: PendingMediaSlot,
         accountRef: String,
@@ -725,15 +711,6 @@ internal class ConversationMediaDraftState(
     private fun clearRequestedEditor(slotId: String) {
         if (requestedEditorSlotId == slotId) requestedEditorSlotId = null
     }
-
-    private fun legacyOccurrenceIndex(slot: PendingMediaSlot): Int? =
-        if (slot.isLegacyRestore()) {
-            currentSlots
-                .takeWhile { it.id != slot.id }
-                .count { it.isLegacyRestore() && it.uri == slot.uri }
-        } else {
-            null
-        }
 
     private fun dismissEditor(editor: ActivePhotoEditor) {
         if (activeEditor !== editor) return
@@ -845,6 +822,47 @@ private fun preparedPhotoQualities(
             hdDimensions = dimensions(photoApprovalOutputQuality(photo.quality, MediaQuality.High)),
         )
     }
+
+private fun legacyOccurrenceIndex(
+    slots: List<PendingMediaSlot>,
+    slot: PendingMediaSlot,
+): Int? =
+    if (slot.isLegacyRestore()) {
+        slots.takeWhile { it.id != slot.id }.count { it.isLegacyRestore() && it.uri == slot.uri }
+    } else {
+        null
+    }
+
+private suspend fun stageGenericAttachment(
+    drafts: MessageDraftRepository,
+    groupIdHex: String,
+    accountRef: String,
+    attachmentId: String,
+    pending: PendingAttachment,
+): DraftPreparedPhoto? {
+    val attachment = pending.toMessageDraftAttachment(attachmentId)
+    val admission =
+        drafts.addAttachment(accountRef, groupIdHex, attachment)
+    val committed =
+        when (admission) {
+            is MessageDraftMutationResult.Success -> attachment
+            MessageDraftMutationResult.DuplicateAttachment ->
+                drafts
+                    .draft(accountRef, groupIdHex)
+                    .getOrNull()
+                    ?.mediaAttachments
+                    ?.firstOrNull { it.id == attachmentId }
+            else -> null
+        } ?: return null
+    return DraftPreparedPhoto(
+        committed,
+        committed.editorDigest(),
+        restoredFromNative =
+            admission == MessageDraftMutationResult.DuplicateAttachment &&
+                committed.isComposerVisual() &&
+                !committed.isComposerDocument(),
+    )
+}
 
 /** A native refresh cannot replace locally editable bytes or relabel freshly prepared picks. */
 internal fun nativePhotosNeedingRestoration(
