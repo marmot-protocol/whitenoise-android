@@ -8,6 +8,7 @@ internal fun ConversationController.voicePlaybackSource(
     appState: WhiteNoiseAppState,
     messageId: String,
     titleCopy: GroupTitleCopy,
+    focusMessage: Boolean = true,
 ): VoicePlaybackSource? {
     val account = boundAccountRef
     if (account == null ||
@@ -16,5 +17,5 @@ internal fun ConversationController.voicePlaybackSource(
     ) {
         return null
     }
-    return VoicePlaybackSource(account, group.groupIdHex, messageId, title(titleCopy))
+    return VoicePlaybackSource(account, group.groupIdHex, messageId, title(titleCopy), focusMessage)
 }

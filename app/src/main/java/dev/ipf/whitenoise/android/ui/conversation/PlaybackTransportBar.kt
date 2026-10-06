@@ -25,7 +25,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.audio.matchesPlaybackSession
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
+import dev.ipf.whitenoise.android.state.observePlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.useVoiceTransport
 import dev.ipf.whitenoise.android.ui.conversation.media.formatVoiceTime
 
@@ -36,6 +39,14 @@ internal fun PlaybackTransportBar(
     appState: WhiteNoiseAppState,
     onBodyClick: (() -> Unit)? = null,
 ) {
+    val destination = appState.observePlaybackConversationDestination()
+    val sourceClick =
+        onBodyClick?.takeIf { destination != null }?.let { callback ->
+            {
+                val current = appState.currentPlaybackConversationDestination()
+                if (destination?.matchesPlaybackSession(current) == true) callback()
+            }
+        }
     val voice by VoicePlaybackController.state.collectAsState()
     val speech by appState.ttsController.state.collectAsState()
     val ownerAvailable =
@@ -52,10 +63,10 @@ internal fun PlaybackTransportBar(
             state = voice,
             onPlayingChange = { VoicePlaybackController.setSessionPlaying(voice.sessionId, it) },
             onStop = { VoicePlaybackController.stopSession(voice.sessionId) },
-            onBodyClick = onBodyClick.takeIf { voice.source != null && voice.ready },
+            onBodyClick = sourceClick.takeIf { voice.source != null && voice.ready },
         )
     } else {
-        TtsTransportBar(appState, onBodyClick = onBodyClick)
+        TtsTransportBar(appState, onBodyClick = sourceClick)
     }
 }
 

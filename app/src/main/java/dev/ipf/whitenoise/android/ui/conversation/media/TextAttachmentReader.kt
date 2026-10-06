@@ -87,7 +87,7 @@ internal const val TEXT_ATTACHMENT_READER_FULL_FILENAME_TAG = "text-attachment-r
 
 /** Projects a local text attachment and reports the precise media-mix start refusal. */
 @Suppress("LongParameterList", "LongMethod")
-private suspend fun WhiteNoiseAppState.speakTextAttachment(
+internal suspend fun WhiteNoiseAppState.speakTextAttachment(
     preview: TextAttachmentPreview,
     senderKey: String,
     senderDisplayName: String,
@@ -119,6 +119,18 @@ private suspend fun WhiteNoiseAppState.speakTextAttachment(
             )
     if (!started && actions.isCurrent()) {
         present(if (entry.text.isBlank()) R.string.tts_bar_error else ttsStartFailureMessage())
+    } else {
+        val speech = ttsController.state.value
+        val source = actions.playbackSource
+        if (source != null && actions.isCurrent() && source.accountRef == activeAccountRef) {
+            attachmentSpeechDestination.value =
+                dev.ipf.whitenoise.android.audio
+                    .AttachmentSpeechDestination(source, speech.sessionId)
+                    .current(speech)
+        } else if (!actions.isCurrent()) {
+            // A replaced reader cannot keep speaking bytes prepared under its former account/route owner.
+            stopSpeaking()
+        }
     }
 }
 

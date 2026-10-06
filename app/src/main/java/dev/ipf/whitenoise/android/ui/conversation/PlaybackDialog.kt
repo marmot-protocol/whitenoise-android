@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Dialog
@@ -34,15 +37,28 @@ internal fun PlaybackDialog(
     val host = LocalShellPlaybackHost.current
     val sourceAllowed = LocalPlaybackSourceAllowed.current && onSourceDismiss != null
     val parentDismissals = LocalPlaybackDismissals.current
-    val dismissals = parentDismissals + listOfNotNull(onSourceDismiss)
+    val latestDismissal by rememberUpdatedState(onSourceDismiss)
+    val dismissCurrent =
+        remember {
+            {
+                latestDismissal?.invoke()
+                Unit
+            }
+        }
+    val hasSourceDismissal = onSourceDismiss != null
+    // Callback refreshes must not invalidate every native selectable child in the modal hierarchy.
+    val dismissals =
+        remember(parentDismissals, hasSourceDismissal) {
+            if (hasSourceDismissal) parentDismissals + dismissCurrent else parentDismissals
+        }
     Dialog(onDismissRequest = onDismissRequest, properties = properties) {
-        CompositionLocalProvider(
-            LocalPlaybackDismissals provides dismissals,
-            LocalPlaybackSourceAllowed provides sourceAllowed,
-        ) {
-            if (host == null) {
-                content()
-            } else {
+        if (host == null) {
+            content()
+        } else {
+            CompositionLocalProvider(
+                LocalPlaybackDismissals provides dismissals,
+                LocalPlaybackSourceAllowed provides sourceAllowed,
+            ) {
                 val visible = host.appState.observePlaybackTransportVisible() && !host.appState.appLockScreenVisible
                 Column(Modifier.fillMaxSize()) {
                     if (visible) {
@@ -52,8 +68,9 @@ internal fun PlaybackDialog(
                                 onBodyClick =
                                     onSourceDismiss?.takeIf { sourceAllowed }?.let {
                                         {
-                                            dismissals.asReversed().forEach { dismiss -> dismiss() }
-                                            host.openSource()
+                                            host.requestOpenSource {
+                                                dismissals.asReversed().forEach { dismiss -> dismiss() }
+                                            }
                                         }
                                     },
                             )

@@ -387,6 +387,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                             )
                         },
                     mine = true,
+                    focusPlaybackMessage = false,
                     controller = controller,
                     appState = appState,
                     presentationOwner = presentationOwner,

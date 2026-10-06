@@ -134,3 +134,7 @@
 *.VoiceTransportBarTest.amoled
 *.VoiceTransportBarTest.largeRtl
 *.VoiceTransportBarTest.paused
+
+# Persistent playback across actual Chats folder destinations.
+*.ChatContextMenuFlowTest.folderManagerRetainsPlaybackControls
+*.ChatContextMenuFlowTest.directFolderEditorRetainsPlaybackControls

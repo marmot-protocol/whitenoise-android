@@ -70,6 +70,27 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(player.positionMs, VoicePlaybackController.state.value.positionMs)
     }
 
+    /** A retained player can discover duration after preparation; shell resume refreshes that display metadata. */
+    @Test fun shellResumeRefreshesLateDurationAndPreservesItAcrossUnavailableReports() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 0))
+        VoicePlaybackController.pause()
+        player.durationMs = 900
+        assertTrue(VoicePlaybackController.setSessionPlaying(42, true))
+        assertEquals(900, VoicePlaybackController.state.value.durationMs)
+        VoicePlaybackController.pause()
+        player.durationMs = 0
+        assertTrue(VoicePlaybackController.setSessionPlaying(42, true))
+        assertEquals(900, VoicePlaybackController.state.value.durationMs)
+        VoicePlaybackController.pause()
+        player.failDurationQuery = true
+        assertTrue(VoicePlaybackController.setSessionPlaying(42, true))
+        assertEquals(900, VoicePlaybackController.state.value.durationMs)
+        assertFalse(player.released)
+    }
+
     /** A stale rendered strip cannot pause, resume or stop its successor. */
     @Test fun replacedShellSessionRejectsEveryOldControl() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
@@ -105,6 +126,29 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(0, player.startCount)
         assertTrue(player.released)
         assertNull(VoicePlaybackController.state.value.source)
+    }
+
+    /** Display-name refreshes cannot replace the same account/message player or reset its playback position. */
+    @Test fun renamedSourceResumesSamePlayerAndRefreshesTitle() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingMediaPlayer()
+        primeActivePlayer(player)
+        val source = VoicePlaybackSource("personal", "chat", "message", "Before")
+        setPlaybackState(VoicePlaybackController.state.value.copy(source = source, sessionId = 42, ready = true))
+        VoicePlaybackController.pause()
+        val result =
+            runBlocking {
+                VoicePlaybackController.play("voice-key", File("unused.amr"), source = source.copy(title = "After"))
+            }
+        assertEquals(VoicePlaybackController.PlaybackStartResult.Resumed, result)
+        assertEquals(42L, VoicePlaybackController.state.value.sessionId)
+        assertEquals(
+            "After",
+            VoicePlaybackController.state.value.source
+                ?.title,
+        )
+        assertFalse(player.released)
+        assertEquals(1, player.startCount)
     }
 
     @After
@@ -430,6 +474,10 @@ class VoicePlaybackControllerFocusTest {
         method.invoke(VoicePlaybackController, change)
     }
 
+    /**
+     * Installs one retained codec and matching public state so controls can be tested without reopening a media
+     * file.
+     */
     private fun primeActivePlayer(mediaPlayer: TrackingMediaPlayer) {
         setControllerField("player", mediaPlayer)
         setControllerField("currentKey", "voice-key")
@@ -467,6 +515,7 @@ class VoicePlaybackControllerFocusTest {
         field.set(AudioFocusOwner, value)
     }
 
+    /** Publishes controlled session transitions through the controller flow observed by real shell controls. */
     @Suppress("UNCHECKED_CAST")
     private fun setPlaybackState(state: VoicePlaybackController.PlaybackState) {
         val field = VoicePlaybackController::class.java.getDeclaredField("_state")
@@ -508,7 +557,8 @@ class VoicePlaybackControllerFocusTest {
         var rightVolume = 1f
         var startCount = 0
         val positionMs = 123
-        val durationMs = 456
+        var durationMs = 456
+        var failDurationQuery = false
 
         override fun isPlaying(): Boolean {
             if (failPlayingQuery) throw IllegalStateException("isPlaying failed")
@@ -531,7 +581,11 @@ class VoicePlaybackControllerFocusTest {
 
         override fun getCurrentPosition(): Int = positionMs
 
-        override fun getDuration(): Int = durationMs
+        /** Models codecs that discover duration late or reject a metadata query without losing the player. */
+        override fun getDuration(): Int {
+            if (failDurationQuery) throw IllegalStateException("duration unavailable")
+            return durationMs
+        }
 
         override fun setVolume(
             leftVolume: Float,

@@ -45,14 +45,19 @@ class VoiceTransportBarTest {
     private var opens = 0
     private var rowOpens = 0
 
+    /** Records light-theme contrast and the compact elapsed-time layout. */
     @Test fun light() = renderAndCapture("light")
 
+    /** Records source text and independent transport controls against the dark surface. */
     @Test fun dark() = renderAndCapture("dark", dark = true)
 
+    /** Protects control visibility against the pure-black AMOLED surface. */
     @Test fun amoled() = renderAndCapture("amoled", dark = true, amoled = true)
 
+    /** Checks two-times text and RTL layout without overlapping the destination row. */
     @Test fun largeRtl() = renderAndCapture("large_rtl", rtl = true)
 
+    /** Records the retained source and Resume affordance while the player is paused. */
     @Test fun paused() = renderAndCapture("paused", paused = true)
 
     /** Source and transport buttons never trigger each other or overlap destination content. */
@@ -71,6 +76,7 @@ class VoiceTransportBarTest {
         assertEquals(1, stops)
     }
 
+    /** Captures only the strip after mounting the same destination layout used by interaction assertions. */
     private fun renderAndCapture(
         name: String,
         dark: Boolean = false,
@@ -82,6 +88,10 @@ class VoiceTransportBarTest {
         rule.onNodeWithTag("voice-transport").captureRoboImage("src/test/snapshots/shell_voice_$name.png")
     }
 
+    /**
+     * Mounts a fixed-width shell with a separate clickable destination to expose overlay and action-routing
+     * regressions.
+     */
     private fun render(
         dark: Boolean = false,
         amoled: Boolean = false,

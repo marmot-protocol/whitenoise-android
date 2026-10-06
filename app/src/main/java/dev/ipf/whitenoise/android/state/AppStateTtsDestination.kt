@@ -46,6 +46,7 @@ internal fun WhiteNoiseAppState.currentPlaybackConversationDestination(): Playba
         }
     } else {
         currentTtsConversationDestination()
+            ?: attachmentSpeechDestination.value?.current(ttsController.state.value)
     }
 }
 
@@ -58,13 +59,14 @@ internal fun WhiteNoiseAppState.observePlaybackConversationDestination(): Playba
                 VoicePlaybackController.state,
                 ttsHistorySession.conversationSource,
                 ttsController.state,
-            ) { voice, source, speech ->
+                attachmentSpeechDestination,
+            ) { voice, source, speech, attachment ->
                 if (useVoiceTransport(voice, speech)) {
                     voice.source?.takeIf { voice.ready && voice.sessionId > 0L }?.let {
                         VoiceConversationDestination(it, voice.sessionId)
                     }
                 } else {
-                    ttsConversationDestination(source, speech)
+                    ttsConversationDestination(source, speech) ?: attachment?.current(speech)
                 }
             }.distinctUntilChanged()
         }

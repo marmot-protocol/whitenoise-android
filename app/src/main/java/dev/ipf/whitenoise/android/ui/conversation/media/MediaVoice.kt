@@ -276,6 +276,7 @@ internal fun MediaVoiceBubble(
     appState: WhiteNoiseAppState,
     presentationOwner: Any,
     mine: Boolean,
+    focusPlaybackMessage: Boolean = true,
     onLongPress: () -> Unit = {},
 ) {
     val playbackTitleCopy =
@@ -397,7 +398,9 @@ internal fun MediaVoiceBubble(
             return
         }
         localFile = playableFile
-        val source = controller.voicePlaybackSource(appState, messageIdHex, playbackTitleCopy) ?: return
+        val source =
+            controller.voicePlaybackSource(appState, messageIdHex, playbackTitleCopy, focusPlaybackMessage)
+                ?: return
         val playbackResult = presentationRuntime.play(pillKey, playableFile, controller.group.groupIdHex, source)
         if (shouldInvalidateVoiceAttachmentCache(playbackResult)) {
             clearBadVoiceCache("playback start failed")

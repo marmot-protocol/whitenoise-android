@@ -315,6 +315,7 @@ private fun openNostrEvent(
 
 internal const val NOSTR_EVENT_READER_REFERENCE_TAG = "nostr-event-reader-reference"
 
+/** Hosts the referenced video in its own window and uses normal dismissal when returning to a playback source. */
 @Composable
 internal fun NostrVideoPlayerDialog(
     mediaUrl: String,

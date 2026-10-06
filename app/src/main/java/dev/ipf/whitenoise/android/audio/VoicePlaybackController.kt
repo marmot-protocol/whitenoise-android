@@ -242,7 +242,15 @@ object VoicePlaybackController {
         // below performs a fresh arbitration and can still deny us cleanly.
         if (resumeOnAudioFocusGain) abandonFocus()
         clearAudioFocusInterruption(restoreVolume = true)
-        if (currentKey == key && player != null && _state.value.source == source) {
+        val previousSource = _state.value.source
+        val sameSource =
+            previousSource?.let {
+                source != null &&
+                    it.accountRef == source.accountRef &&
+                    it.groupIdHex == source.groupIdHex &&
+                    it.messageIdHex == source.messageIdHex
+            } ?: (source == null)
+        if (currentKey == key && player != null && sameSource) {
             // User-paused playback abandons focus, so reacquire it before
             // resuming. A user retry after transient loss also arrives here
             // after dropping its retained request above.
@@ -258,6 +266,7 @@ object VoicePlaybackController {
                     key = key,
                     isPlaying = true,
                     durationMs = activePlayer.duration,
+                    source = source,
                 )
             startTicker()
             return PlaybackStartResult.Resumed
@@ -512,7 +521,12 @@ object VoicePlaybackController {
         if (resumeOnAudioFocusGain) abandonFocus()
         clearAudioFocusInterruption(restoreVolume = true)
         if (!requestFocus() || !startCurrentPlayer(active)) return false
-        _state.value = _state.value.copy(isPlaying = true)
+        val reportedDuration = runCatching { active.duration }.getOrDefault(0)
+        _state.value =
+            _state.value.copy(
+                isPlaying = true,
+                durationMs = reportedDuration.takeIf { it > 0 } ?: _state.value.durationMs,
+            )
         startTicker()
         return true
     }

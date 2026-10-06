@@ -70,6 +70,10 @@ private fun configureOsmdroid(context: Context) {
     Configuration.getInstance().userAgentValue = context.packageName
 }
 
+/**
+ * Stages a location selection without hiding active playback; source navigation cancels the picker through its
+ * owner.
+ */
 @Composable
 internal fun LocationPickerScreen(
     hasFineGrant: Boolean,

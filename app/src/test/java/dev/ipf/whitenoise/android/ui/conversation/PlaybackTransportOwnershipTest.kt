@@ -10,26 +10,40 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.window.DialogProperties
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoicePlaybackSource
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
+import dev.ipf.whitenoise.android.audio.tts.TtsNavigationOutcome
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.TtsSpokenTextSpan
+import dev.ipf.whitenoise.android.audio.tts.TtsTextRange
+import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.currentPlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.observePlaybackConversationDestination
 import dev.ipf.whitenoise.android.state.observePlaybackTransportVisible
+import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentCandidate
+import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentFormat
+import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentNativeActions
+import dev.ipf.whitenoise.android.ui.conversation.media.TextAttachmentPreview
+import dev.ipf.whitenoise.android.ui.conversation.media.speakTextAttachment
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
@@ -160,14 +174,178 @@ class PlaybackTransportOwnershipTest {
         assertEquals(before, commits)
     }
 
+    /** Source navigation uses the real folder editor's discard confirmation and never writes a dirty draft. */
+    @Test fun dirtyFolderDraftSurvivesSourceReturnUntilDiscardIsConfirmed() {
+        val appState = appState()
+        setVoice()
+        var opened = 0
+        val host = ShellPlaybackHost(appState) { opened++ }
+        rule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalShellPlaybackHost provides host) {
+                    androidx.compose.foundation.layout.Column {
+                        PlaybackTransportBar(appState, onBodyClick = { host.requestOpenSource() })
+                        dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen(
+                            appState,
+                            "personal",
+                            null,
+                            onClose = {},
+                        )
+                    }
+                }
+            }
+        }
+        rule.onNodeWithTag("folder.name").performTextReplacement("Unsaved folder")
+        rule.onNodeWithText("Maya").performClick()
+        rule.onNodeWithText(context.getString(dev.ipf.whitenoise.android.R.string.folder_keep_editing)).performClick()
+        assertEquals(0, opened)
+        rule.onNodeWithTag("folder.name").assertTextContains("Unsaved folder")
+        rule.onNodeWithTag("voice-transport").assertIsDisplayed()
+        rule.onNodeWithText("Maya").performClick()
+        rule.onNodeWithText(context.getString(dev.ipf.whitenoise.android.R.string.folder_discard)).performClick()
+        assertEquals(1, opened)
+        assertTrue(appState.chatFolderPreferences.foldersFor("personal").none { it.name == "Unsaved folder" })
+    }
+
+    /** Speech without canonical source metadata cannot dismiss an unrelated modal through its body label. */
+    @Test fun sourceLessSpeechKeepsModalOpenAndTransportControlsAvailable() {
+        val appState = appState()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("m", "Maya", "Speech.")), Locale.US))
+        var dismissals = 0
+        val host = ShellPlaybackHost(appState) { error("No canonical source") }
+        rule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalShellPlaybackHost provides host) {
+                    PlaybackDialog(onDismissRequest = { dismissals++ }) { Text("Reader stays open") }
+                }
+            }
+        }
+        rule.onNodeWithTag(TTS_TRANSPORT_BODY_TAG).assertHasNoClickAction()
+        rule.onNodeWithText("Reader stays open").assertIsDisplayed()
+        assertEquals(0, dismissals)
+        rule.runOnIdle { host.requestOpenSource { dismissals++ } }
+        assertEquals(0, dismissals)
+        rule.runOnIdle { appState.stopSpeaking() }
+    }
+
+    /** Pending dirty confirmation loses authority if playback is stopped or replaced while it is visible. */
+    @Test fun deferredSourceNavigationCannotDismissAfterSessionReplacement() {
+        val appState = appState()
+        setVoice()
+        var opened = 0
+        var dismissed = 0
+        var confirm: (() -> Unit)? = null
+        val host = ShellPlaybackHost(appState) { opened++ }
+        host.registerLeaveGuard(this) { confirm = it }
+        host.requestOpenSource { dismissed++ }
+        VoicePlaybackController.stop()
+        checkNotNull(confirm).invoke()
+        assertEquals(0, dismissed)
+        assertEquals(0, opened)
+    }
+
+    /** A current speech queue may advance naturally while the user decides whether to discard an editor draft. */
+    @Test fun deferredSourceReturnFollowsTheCurrentPassageOfTheSameSpeechSession() {
+        val appState = appState()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        assertTrue(
+            appState.speakAloudAutoRead(
+                "group",
+                listOf("first" to "First message.", "next" to "Next message.").map { (id, text) ->
+                    TtsSpeakableEntry(
+                        senderKey = "maya",
+                        senderDisplayName = "Maya",
+                        text = text,
+                        messageIdHex = id,
+                        spokenTextSpans =
+                            listOf(
+                                TtsSpokenTextSpan(
+                                    TtsTextRange(0, text.length),
+                                    TtsVisibleTextSpan("body", 0, text.length),
+                                ),
+                            ),
+                        projectionId = id,
+                        visibleLeaves = mapOf("body" to text),
+                    )
+                },
+                Locale.US,
+            ),
+        )
+        var opened = 0
+        var confirm: (() -> Unit)? = null
+        val host = ShellPlaybackHost(appState) { opened++ }
+        host.registerLeaveGuard(this) { confirm = it }
+        assertEquals("first", appState.currentPlaybackConversationDestination()?.messageIdHex)
+        host.requestOpenSource()
+        assertEquals(TtsNavigationOutcome.Moved, appState.ttsController.skipNextMessage())
+        assertEquals("next", appState.currentPlaybackConversationDestination()?.messageIdHex)
+        checkNotNull(confirm).invoke()
+        assertEquals(1, opened)
+        appState.stopSpeaking()
+    }
+
+    /** A discarded editor cannot replay a captured confirmation into a later shell destination. */
+    @Test fun disposedLeaveGuardRevokesItsCapturedConfirmation() {
+        val appState = appState()
+        setVoice()
+        var opened = 0
+        var mounted by mutableStateOf(true)
+        var confirm: (() -> Unit)? = null
+        val host = ShellPlaybackHost(appState) { opened++ }
+        rule.setContent {
+            CompositionLocalProvider(LocalShellPlaybackHost provides host) {
+                if (mounted) PlaybackSourceLeaveGuard { confirm = it }
+            }
+        }
+        rule.runOnIdle { host.requestOpenSource() }
+        rule.runOnIdle { mounted = false }
+        rule.runOnIdle { checkNotNull(confirm).invoke() }
+        assertEquals(0, opened)
+    }
+
+    /** Attachment reading returns to its canonical message after the reader closes without enabling history paging. */
+    @Test fun attachmentSpeechRetainsOnlyItsAcceptedCanonicalSource() {
+        val appState = appState()
+        appState.ttsController.attachEngine(FakeSessionEngine())
+        val owner =
+            dev.ipf.whitenoise.android.audio
+                .AttachmentSpeechOwner("personal", "group", "canonical", 2)
+        val actions = TextAttachmentNativeActions({ true }, owner) {}
+        val preview =
+            TextAttachmentPreview(
+                TextAttachmentCandidate("notes.txt", "text/plain", TextAttachmentFormat.PlainText),
+                "Attachment speech.",
+            )
+        kotlinx.coroutines.runBlocking {
+            appState.speakTextAttachment(preview, "sender", "Maya", "canonical", 2, actions)
+        }
+        actions.release()
+        val destination = checkNotNull(appState.currentPlaybackConversationDestination())
+        assertEquals("canonical", destination.messageIdHex)
+        assertEquals("personal", destination.accountRef)
+        assertEquals("group", destination.groupIdHex)
+        assertNull(destination.ttsFocusSessionId)
+        assertNull(appState.ttsHistorySession.conversationSource.value)
+        appState.ttsController.pause()
+        assertEquals(destination, appState.currentPlaybackConversationDestination())
+        assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("another", "Maya", "New queue.")), Locale.US))
+        assertNull(appState.currentPlaybackConversationDestination())
+        assertNull(appState.attachmentSpeechDestination.value)
+        appState.stopSpeaking()
+    }
+
+    /** Releases the process-wide player so a failed ownership assertion cannot leak a session into another fixture. */
     @After fun resetPlayer() {
         VoicePlaybackController.stop()
     }
 
+    /** Mounts the production voice-versus-speech selector against the supplied account state. */
     private fun render(appState: WhiteNoiseAppState) {
         rule.setContent { WhiteNoiseTheme { PlaybackTransportBar(appState, onBodyClick = {}) } }
     }
 
+    /** Builds one signed-in account with isolated preferences and no durable draft side effects. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -178,6 +356,7 @@ class PlaybackTransportOwnershipTest {
             preferences = context.getSharedPreferences("playback-ownership", Context.MODE_PRIVATE),
         )
 
+    /** Publishes account removal through the real observable state without invoking native account teardown. */
     @Suppress("UNCHECKED_CAST")
     private fun setAccounts(
         appState: WhiteNoiseAppState,
@@ -192,8 +371,10 @@ class PlaybackTransportOwnershipTest {
     }
 
     private object DiscardedDrafts : DraftPersistence {
+        /** Keeps unrelated saved drafts out of playback ownership fixtures. */
         override fun read(): Map<String, String> = emptyMap()
 
+        /** Discards fixture draft writes so playback tests cannot persist composer state. */
         override fun write(
             key: String,
             value: String?,

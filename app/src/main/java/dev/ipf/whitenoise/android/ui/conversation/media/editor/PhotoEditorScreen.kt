@@ -83,6 +83,7 @@ import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import kotlin.math.hypot
 import kotlin.math.min
 
+/** Keeps transport controls available while the photo editor retains sole ownership of dirty-recipe dismissal. */
 @Composable
 @Suppress("LongParameterList")
 internal fun PhotoEditorDialog(

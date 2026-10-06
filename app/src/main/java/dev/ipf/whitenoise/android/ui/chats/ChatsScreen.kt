@@ -1236,22 +1236,30 @@ internal fun ChatsScreen(
     }
 
     if (showNewChatFlow) {
-        NewChatFlowHost(
-            appState = appState,
-            onOpenConversation = { item, justCreated ->
-                showNewChatFlow = false
-                openGroupFromVisibleList(item, null, justCreated)
-            },
-            onClose = {
+        dev.ipf.whitenoise.android.ui.conversation.PlaybackFlowContent(
+            enabled = showPlaybackTransport,
+            onSourceLeave = {
                 showNewChatFlow = false
                 onGroupCreateFlowSuperseded()
             },
-            onGroupCreateSubmitted = onGroupCreateSubmitted,
-            onGroupCreateCompletedOpen = { item, requestToken ->
-                showNewChatFlow = false
-                onGroupCreateCompletedOpen(item, requestToken)
-            },
-        )
+        ) {
+            NewChatFlowHost(
+                appState = appState,
+                onOpenConversation = { item, justCreated ->
+                    showNewChatFlow = false
+                    openGroupFromVisibleList(item, null, justCreated)
+                },
+                onClose = {
+                    showNewChatFlow = false
+                    onGroupCreateFlowSuperseded()
+                },
+                onGroupCreateSubmitted = onGroupCreateSubmitted,
+                onGroupCreateCompletedOpen = { item, requestToken ->
+                    showNewChatFlow = false
+                    onGroupCreateCompletedOpen(item, requestToken)
+                },
+            )
+        }
         return
     }
 
@@ -1260,23 +1268,36 @@ internal fun ChatsScreen(
     // new-chat flow so filter/search/list state survives close/save.
     val folderManagerAvailable = folderManagerAccount != null && !appState.signOutInProgress && !appState.wipeInProgress
     if (folderManagerOpen && folderManagerAvailable) {
-        ChatFoldersScreen(appState, onBack = { folderManagerOpen = false })
+        dev.ipf.whitenoise.android.ui.conversation.PlaybackFlowContent(
+            enabled = showPlaybackTransport,
+            onSourceLeave = { folderManagerOpen = false },
+        ) {
+            ChatFoldersScreen(appState, onBack = { folderManagerOpen = false })
+        }
         return
     }
     val folderEditorTargets = folderHandoff.editorChatIds
     val folderEditorAccountRef = appState.activeAccountRef
     val folderEditId = folderHandoff.editingFolderId
     if (folderEditorAccountRef != null && (folderEditorTargets != null || folderEditId != null)) {
-        ChatFolderEditScreen(
-            appState = appState,
-            accountRef = folderEditorAccountRef,
-            folderId = folderEditId,
-            onClose = {
+        dev.ipf.whitenoise.android.ui.conversation.PlaybackFlowContent(
+            enabled = showPlaybackTransport,
+            onSourceLeave = {
                 folderHandoff.editorChatIds = null
                 folderHandoff.editingFolderId = null
             },
-            initialManualChatIds = folderEditorTargets.orEmpty(),
-        )
+        ) {
+            ChatFolderEditScreen(
+                appState = appState,
+                accountRef = folderEditorAccountRef,
+                folderId = folderEditId,
+                onClose = {
+                    folderHandoff.editorChatIds = null
+                    folderHandoff.editingFolderId = null
+                },
+                initialManualChatIds = folderEditorTargets.orEmpty(),
+            )
+        }
         return
     }
 
