@@ -14,6 +14,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -122,6 +123,7 @@ class MessageBubbleCaptionedFileScreenshotTest : MessageBubbleFileAttachmentFixt
             }
         }
         composeRule.waitForIdle()
+        awaitSentFileTerminalTransferState()
 
         val sentCard = fileAttachmentCardTestTag(sent.record.messageIdHex, 0)
         val receivedCard = fileAttachmentCardTestTag(received.record.messageIdHex, 0)
@@ -135,6 +137,23 @@ class MessageBubbleCaptionedFileScreenshotTest : MessageBubbleFileAttachmentFixt
         assertCardNamesOnlyTheFile(sentCard, SENT_FILE)
         assertCardNamesOnlyTheFile(receivedCard, RECEIVED_FILE)
         composeRule.onRoot().captureRoboImage(SNAPSHOT_PATH)
+    }
+
+    /**
+     * Waits for the uncached own file to settle on its retryable state before anything is captured.
+     *
+     * An own file with no cached bytes starts its automatic materialization on a background
+     * dispatcher, so [androidx.compose.ui.test.ComposeTestRule.waitForIdle] returns while the card
+     * still shows the Resolving spinner. The baseline holds the terminal frame, and capturing before
+     * it is reached is a race, not a rendering change.
+     */
+    private fun awaitSentFileTerminalTransferState() {
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule
+                .onAllNodesWithContentDescription("Tap to retry", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
     }
 
     /** The card's merged text is the filename alone; time and state have moved to the caption. */

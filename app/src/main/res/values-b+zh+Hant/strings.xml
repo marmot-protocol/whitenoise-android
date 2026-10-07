@@ -2250,4 +2250,11 @@
     <string name="contact_picture_clear">清除私人圖片</string>
     <string name="contact_picture_local_only">僅用於此裝置上的此帳號。絕不分享或上傳。</string>
     <string name="contact_picture_failed">無法使用此圖片或儲存變更。先前的選擇未改變，請重試。</string>
+
+    <string name="add_conversation_to_home_screen">加入主螢幕</string>
+    <string name="pinned_shortcut_unsupported">您的啟動器不支援釘選捷徑。</string>
+    <string name="pinned_shortcut_already_added">此聊天已加入主螢幕。</string>
+    <string name="pinned_shortcut_finish">請在啟動器中確認加入此聊天。</string>
+    <string name="pinned_shortcut_unavailable">此聊天已無法使用。</string>
+    <string name="pinned_shortcut_failed">無法要求主螢幕捷徑。請重試。</string>
 </resources>

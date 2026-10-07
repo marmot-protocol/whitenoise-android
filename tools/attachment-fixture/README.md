@@ -134,8 +134,9 @@ download, and a warm retained read, for 64 KiB, 1 MiB, 8 MiB and 30 MiB generate
 8 MiB: a 30 MiB upload needs about 4.5 minutes there and the engine rejected its reference once the group epoch moved). The cold download records the
 authoritative phase times from a 2 ms read-only poll next to the production subscription feed, plus sampled Java and
 native peaks, so a delay is attributed to Android preparation, the FFI and engine, storage or transport instead of
-guessed. A numbered ledger marker brackets every sample, so each sample owns exactly its own requests, bytes and
-retries. The host then force-stops only the isolated package and a new process reads one kept file per size offline.
+guessed. Numbered ledger markers bracket request admission for every sample. Response bytes and completion events
+remain owned by that request ID when server logging finishes after the next marker, so each sample owns its
+requests, bytes and retries. The host then force-stops only the isolated package and a new process reads one kept file per size offline.
 Every sample carries only a size, a repetition and measurements: no file name, identifier, URL, key or content.
 
 ```bash

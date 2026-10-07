@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PinnedShortcutLifecycle.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Pinned conversation lifecycle: fun WhiteNoiseAppState.pinnedShortcutTargetIsCurrent(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/PinnedShortcutLifecycle.kt",
+        "anchor": "fun WhiteNoiseAppState.pinnedShortcutTargetIsCurrent(",
+        "test_ids": [
+          "SYS-012"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

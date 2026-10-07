@@ -2249,4 +2249,11 @@
     <string name="contact_picture_clear">清除私密图片</string>
     <string name="contact_picture_local_only">仅用于此设备上的此账号。绝不会分享或上传。</string>
     <string name="contact_picture_failed">无法使用此图片或保存更改。之前的选择未改变，请重试。</string>
+
+    <string name="add_conversation_to_home_screen">添加到主屏幕</string>
+    <string name="pinned_shortcut_unsupported">您的启动器不支持固定快捷方式。</string>
+    <string name="pinned_shortcut_already_added">此聊天已添加到主屏幕。</string>
+    <string name="pinned_shortcut_finish">请在启动器中确认添加此聊天。</string>
+    <string name="pinned_shortcut_unavailable">此聊天已不可用。</string>
+    <string name="pinned_shortcut_failed">无法请求主屏幕快捷方式。请重试。</string>
 </resources>

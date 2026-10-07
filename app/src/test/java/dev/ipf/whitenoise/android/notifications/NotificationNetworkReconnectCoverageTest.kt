@@ -243,7 +243,7 @@ class NotificationNetworkReconnectCoverageTest {
             File(appStateSource().parentFile, "AppRuntimeListenerTeardownOwner.kt")
                 .readText()
                 .functionBody("stopForAccountTeardown")
-        val wipe = appState.functionBody("signOutAndWipeActiveAccount")
+        val wipe = appState.functionBody("finishRevokedAccountWipe")
         val recovery = notificationNetworkRecoverySource().readText()
         val reconnect = recovery.functionBody("schedule")
         val bridge = appState.propertyInitializerCall("notificationNetworkRecovery")

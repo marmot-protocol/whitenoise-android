@@ -129,9 +129,16 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /** The fenced wipe completion must clear native push state under the same mutex as push synchronization. */
     @Test
     fun destructiveWipeDropsSyncedPushFingerprintUnderNativePushMutex() {
-        val body = appStateFunctionBody("signOutAndWipeActiveAccount")
+        val entry = appStateFunctionBody("signOutAndWipeActiveAccount")
+        assertTrue(
+            "the public wipe must delegate completion inside the durable launcher-revocation bracket",
+            entry.indexOf("withRevokedPinnedTarget(wipedRef)") in
+                0 until entry.indexOf("finishRevokedAccountWipe(wipedRef)"),
+        )
+        val body = appStateFunctionBody("finishRevokedAccountWipe")
         val serializedWipeIndex = body.indexOf("nativePushSyncMutex.withSerializedNativePushWipe")
         val removalIndex = body.indexOf("perAccountSyncedFingerprints.remove(wipedRef)")
 
@@ -203,9 +210,10 @@ class AppStateSendLockCoverageTest {
         }
     }
 
+    /** Refused native wipes must exit before any successful-wipe-only profile or avatar cache eviction. */
     @Test
     fun failedDestructiveWipeBranchesExitBeforeProcessGlobalProfileCachesAreCleared() {
-        val body = appStateFunctionBody("signOutAndWipeActiveAccount")
+        val body = appStateFunctionBody("finishRevokedAccountWipe")
         val engineFailureIndex = body.indexOf("val failure = wipeResult.exceptionOrNull()")
         val engineFailureReturnIndex = body.indexOf("return null", startIndex = engineFailureIndex)
         val nullOutcomeFallbackIndex = body.indexOf("wipeResult.getOrNull() ?: run")
