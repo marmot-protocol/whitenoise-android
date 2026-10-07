@@ -142,7 +142,8 @@ class MessageBubbleTextSelectionSpeakTest {
         val appState = appStateWithTts(engine)
         val item =
             timelineMessage(
-                "First sentence. Second sentence is deliberately long enough to wrap onto another line, leaving a short end.",
+                "First sentence. Second sentence is deliberately long enough to wrap onto another line, " +
+                    "leaving a short end.",
             )
         val controller = conversationController(appState)
         var menuOpen by mutableStateOf(false)

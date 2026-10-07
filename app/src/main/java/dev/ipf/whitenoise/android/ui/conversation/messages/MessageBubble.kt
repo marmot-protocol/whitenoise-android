@@ -83,6 +83,7 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsSeekResult
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
@@ -1138,6 +1139,17 @@ internal fun MessageBubble(
     // A text press retains its rendered hit; genuine gutter/edge presses retain
     // the deterministic message-top fallback without guessing a nearby glyph.
 
+    suspend fun speakFromHereEntries(literalCode: Boolean): List<TtsSpeakableEntry> =
+        ttsSpeakFromHereCandidates(timeline = controller.timeline, selected = record)
+            .mapNotNull { entryRecord -> ttsEntry(entryRecord) }
+            .mapIndexed { index, entry ->
+                if (index == 0 && literalCode) {
+                    entry.copy(speechMode = dev.ipf.whitenoise.android.audio.tts.speech.SpeechMode.LiteralCode)
+                } else {
+                    entry
+                }
+            }
+
     /** Starts from the selected sentence and preserves a specific start-gate explanation. */
     fun startSpeakAloud(
         startRenderedHit: RenderedTextHit? = null,
@@ -1159,21 +1171,7 @@ internal fun MessageBubble(
         val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
         val locale = java.util.Locale.getDefault()
         appState.launchMutation {
-            val candidateRecords =
-                ttsSpeakFromHereCandidates(
-                    timeline = controller.timeline,
-                    selected = record,
-                )
-            val entries =
-                candidateRecords.mapNotNull { entryRecord -> ttsEntry(entryRecord) }.mapIndexed { index, entry ->
-                    if (index == 0 && literalCode) {
-                        entry.copy(
-                            speechMode = dev.ipf.whitenoise.android.audio.tts.speech.SpeechMode.LiteralCode,
-                        )
-                    } else {
-                        entry
-                    }
-                }
+            val entries = speakFromHereEntries(literalCode)
             if (!canCommit() || !projectionStillCurrent()) {
                 return@launchMutation
             }

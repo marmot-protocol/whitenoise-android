@@ -253,15 +253,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         if (newSession) {
             activeDirection = TtsFollowDirection.Forward
         } else if (newSentence && previousTarget != null) {
-            activeDirection =
-                when {
-                    previousMessageIndex != null && state.messageIndex < previousMessageIndex ->
-                        TtsFollowDirection.Reverse
-                    previousMessageIndex != null && state.messageIndex > previousMessageIndex ->
-                        TtsFollowDirection.Forward
-                    target.sentenceIndex < previousTarget.sentenceIndex -> TtsFollowDirection.Reverse
-                    else -> TtsFollowDirection.Forward
-                }
+            activeDirection = followDirection(previousTarget, target, previousMessageIndex, state.messageIndex)
         }
         isSpeaking = state is TtsState.Speaking
         sessionId = state.sessionId
@@ -348,8 +340,7 @@ internal class ConversationTtsFollowPolicy private constructor(
 
     /** A changed clear viewport may clip the same sentence; user scroll ownership still wins. */
     fun recheckViewport(): Boolean {
-        val target = activeTarget ?: return false
-        if (!isFollowEnabled || !isSpeaking || awaitingPreparedPassage) return false
+        val target = activeTarget?.takeIf { isFollowEnabled && isSpeaking && !awaitingPreparedPassage } ?: return false
         evaluatedTarget = null
         retriedTarget = null
         correctedTarget = null
@@ -369,16 +360,17 @@ internal class ConversationTtsFollowPolicy private constructor(
     /** Returns true when one bounded retry was scheduled for the current sentence. */
     fun retryFailedFollowAttempt(target: ConversationTtsFollowTarget): Boolean {
         if (!isCurrentTarget(target)) return false
-        if (retriedTarget == target) {
+        return if (retriedTarget == target) {
             if (explicitRevealTarget == target) explicitRevealTarget = null
             pendingAnchorAtTop = false
-            return false
+            false
+        } else {
+            retriedTarget = target
+            evaluatedTarget = null
+            pendingTarget = target
+            pendingDirection = activeDirection
+            true
         }
-        retriedTarget = target
-        evaluatedTarget = null
-        pendingTarget = target
-        pendingDirection = activeDirection
-        return true
     }
 
     fun isCurrentTarget(target: ConversationTtsFollowTarget): Boolean {
@@ -640,3 +632,17 @@ internal suspend fun followTtsTargetInViewport(
     if (succeeded) scrollCoordinator.settleReadingAt(currentScrollAnchor())
     return succeeded
 }
+
+/** Transport moves across messages before comparing sentence positions within one message. */
+private fun followDirection(
+    previousTarget: ConversationTtsFollowTarget,
+    target: ConversationTtsFollowTarget,
+    previousMessageIndex: Int?,
+    messageIndex: Int,
+): TtsFollowDirection =
+    when {
+        previousMessageIndex != null && messageIndex < previousMessageIndex -> TtsFollowDirection.Reverse
+        previousMessageIndex != null && messageIndex > previousMessageIndex -> TtsFollowDirection.Forward
+        target.sentenceIndex < previousTarget.sentenceIndex -> TtsFollowDirection.Reverse
+        else -> TtsFollowDirection.Forward
+    }

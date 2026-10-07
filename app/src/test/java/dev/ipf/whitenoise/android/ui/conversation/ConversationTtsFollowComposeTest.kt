@@ -621,7 +621,12 @@ class ConversationTtsFollowComposeTest {
             LazyColumn(
                 state = listState,
                 reverseLayout = reverseLayout,
-                contentPadding = if (reverseLayout) PaddingValues(top = 23.dp, bottom = 51.dp) else PaddingValues(0.dp),
+                contentPadding =
+                    if (reverseLayout) {
+                        PaddingValues(top = 23.dp, bottom = 51.dp)
+                    } else {
+                        PaddingValues(0.dp)
+                    },
                 modifier =
                     Modifier
                         .fillMaxWidth()

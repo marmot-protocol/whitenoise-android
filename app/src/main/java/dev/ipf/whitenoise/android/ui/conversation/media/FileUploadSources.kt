@@ -4,6 +4,9 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import java.io.ByteArrayInputStream
 import java.io.File
 
+private const val MAX_FILE_UPLOAD_ITEMS = 64
+private const val FILE_AUTH_TAG_BYTES = 16L
+
 /** Host-local metadata; only the native runtime creates protocol references and ciphertext. */
 internal data class FileUploadSource(
     val sourcePath: String,
@@ -26,8 +29,8 @@ internal class FileUploadSources(
         resources.asReversed().forEach { resource ->
             try {
                 resource.close()
-            } catch (error: Exception) {
-                if (failure == null) failure = error else failure!!.addSuppressed(error)
+            } catch (expectedCloseFailure: Exception) {
+                if (failure == null) failure = expectedCloseFailure else failure.addSuppressed(expectedCloseFailure)
             }
         }
         failure?.let { throw it }
@@ -45,13 +48,15 @@ internal fun stageFileUploadSources(
     maxCiphertextBytes: Long,
     checkCancellation: () -> Unit = {},
 ): FileUploadSources {
-    require(attachments.isNotEmpty() && attachments.size <= 64)
+    require(attachments.isNotEmpty() && attachments.size <= MAX_FILE_UPLOAD_ITEMS)
     var remaining = maxCiphertextBytes
     attachments.forEach { item ->
-        require(item.byteCount > 0 && remaining >= 16 && item.byteCount <= remaining - 16) {
+        val withinBound =
+            item.byteCount > 0 && remaining >= FILE_AUTH_TAG_BYTES && item.byteCount <= remaining - FILE_AUTH_TAG_BYTES
+        require(withinBound) {
             "file attachments exceed native transfer bound"
         }
-        remaining -= item.byteCount + 16
+        remaining -= item.byteCount + FILE_AUTH_TAG_BYTES
     }
     val resources = mutableListOf<AutoCloseable>()
     try {
@@ -68,15 +73,28 @@ internal fun stageFileUploadSources(
                         read.source.also(resources::add)
                     }
                 resources += source.acquire()
-                FileUploadSource(source.file.absolutePath, source.byteCount, item.fileName, item.mediaType, item.dim, item.thumbhash)
+                fileUploadInput(source, item)
             }
         return FileUploadSources(inputs, resources)
-    } catch (failure: Exception) {
+    } catch (expectedStagingFailure: Exception) {
         try {
             FileUploadSources(emptyList(), resources).close()
-        } catch (cleanup: Exception) {
-            failure.addSuppressed(cleanup)
+        } catch (expectedCleanupFailure: Exception) {
+            expectedStagingFailure.addSuppressed(expectedCleanupFailure)
         }
-        throw failure
+        throw expectedStagingFailure
     }
 }
+
+private fun fileUploadInput(
+    source: StagedUploadSource,
+    item: PendingAttachment,
+): FileUploadSource =
+    FileUploadSource(
+        source.file.absolutePath,
+        source.byteCount,
+        item.fileName,
+        item.mediaType,
+        item.dim,
+        item.thumbhash,
+    )

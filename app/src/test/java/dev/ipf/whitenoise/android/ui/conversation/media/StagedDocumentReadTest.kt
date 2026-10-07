@@ -133,7 +133,8 @@ class StagedDocumentReadTest {
     @Test
     fun mixedAlbumPinsExistingSourcesAndRemovesOnlyConvertedArrays() {
         val root = temporary.newFolder("staged")
-        val source = (readStagedDocument(root, 10) { ByteArrayInputStream(byteArrayOf(1, 2)) } as StagedDocumentRead.Success).source
+        val staged = readStagedDocument(root, 10) { ByteArrayInputStream(byteArrayOf(1, 2)) }
+        val source = (staged as StagedDocumentRead.Success).source
         val batch =
             stageFileUploadSources(
                 listOf(

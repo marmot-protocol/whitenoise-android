@@ -662,26 +662,42 @@ class TtsController internal constructor(
     ): Boolean {
         val ticket =
             synchronized(this) {
-                if (state.value.sessionId != sessionId || !canNavigate()) return false
-                (engine ?: return false) to queueLocale
+                engine?.takeIf { state.value.sessionId == sessionId && canNavigate() }?.let { it to queueLocale }
             }
-        val target =
-            withContext(Dispatchers.Default) {
-                val job = currentCoroutineContext()
-                with(preparation) {
-                    request.entry.toQueuedMessage(ticket.second) { !job.isActive || !isCurrent() }
+        return ticket?.let { (ownerEngine, locale) ->
+            prepareRenderedSeekTarget(request, locale, isCurrent)?.let { target ->
+                synchronized(this) {
+                    val sameOwner =
+                        state.value.sessionId == sessionId && engine === ownerEngine && queueLocale == locale
+                    val eligible = sameOwner && canNavigate() && isCurrent()
+                    val ordinal = if (eligible) renderedSeekOrdinal(request, target) else null
+                    ordinal != null && installPreparedSeekTarget(request.entry, ordinal, target)
                 }
-            } ?: return false
-        return synchronized(this) {
-            val sameOwner =
-                state.value.sessionId == sessionId && engine === ticket.first && queueLocale == ticket.second
-            if (!sameOwner || !canNavigate() || !isCurrent()) return@synchronized false
-            if (!request.canCommit()) return@synchronized false
-            val ordinal = target.prepared?.let(request.sentenceIndex) ?: return@synchronized false
-            if (target.chunks.none { it.sentenceIndex == ordinal }) return@synchronized false
-            installPreparedSeekTarget(request.entry, ordinal, target)
-        }
+            }
+        } ?: false
     }
+
+    private suspend fun prepareRenderedSeekTarget(
+        request: TtsRenderedSeekRequest,
+        locale: Locale,
+        isCurrent: () -> Boolean,
+    ): TtsQueuedMessage? =
+        withContext(Dispatchers.Default) {
+            val job = currentCoroutineContext()
+            with(preparation) {
+                request.entry.toQueuedMessage(locale) { !job.isActive || !isCurrent() }
+            }
+        }
+
+    private fun renderedSeekOrdinal(
+        request: TtsRenderedSeekRequest,
+        target: TtsQueuedMessage,
+    ): Int? =
+        request.takeIf { it.canCommit() }?.let {
+            target.prepared?.let(request.sentenceIndex)?.takeIf { ordinal ->
+                target.chunks.any { it.sentenceIndex == ordinal }
+            }
+        }
 
     /** Commit a freshly revalidated seek target without replacing the playback session. */
     @Synchronized

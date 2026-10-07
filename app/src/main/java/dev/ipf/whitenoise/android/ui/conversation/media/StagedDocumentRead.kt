@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.io.InputStream
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.attribute.PosixFilePermissions
@@ -63,60 +64,79 @@ internal fun readStagedDocument(
 ): StagedDocumentRead {
     require(maxBytes > 0)
     var partial: File? = null
-    try {
-        checkCancellation()
-        if (Files.isSymbolicLink(directory.toPath())) return StagedDocumentRead.Unreadable
-        Files.createDirectories(directory.toPath())
-        if (!Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS)) {
-            return StagedDocumentRead.Unreadable
-        }
-        Files.setPosixFilePermissions(directory.toPath(), PosixFilePermissions.fromString("rwx------"))
-        val stream = open() ?: return StagedDocumentRead.Unreadable
-        val completed =
-            stream.use { input ->
-                val output =
-                    Files
-                        .createTempFile(
+    val result =
+        try {
+            checkCancellation()
+            if (!prepareStagingDirectory(directory)) {
+                StagedDocumentRead.Unreadable
+            } else {
+                open()?.use { input ->
+                    val output =
+                        Files.createTempFile(
                             directory.toPath(),
                             "upload-source-",
                             ".part",
                             PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")),
                         ).toFile()
-                partial = output
-                var total = 0L
-                output.outputStream().use { sink ->
-                    val buffer = ByteArray(64 * 1024)
-                    while (true) {
-                        checkCancellation()
-                        val available = (maxBytes - total).coerceAtLeast(0)
-                        val take = if (available >= buffer.size) buffer.size else available.toInt() + 1
-                        val count = input.read(buffer, 0, take)
-                        if (count == -1) break
-                        if (count == 0) {
-                            val next = input.read()
-                            if (next == -1) break
-                            if (available == 0L) return StagedDocumentRead.TooLarge
-                            sink.write(next)
-                            total++
-                        } else {
-                            if (count.toLong() > available) return StagedDocumentRead.TooLarge
-                            sink.write(buffer, 0, count)
-                            total += count
+                    partial = output
+                    val total = output.outputStream().use { copyStagedDocument(input, it, maxBytes, checkCancellation) }
+                    checkCancellation()
+                    when (total) {
+                        null -> StagedDocumentRead.TooLarge
+                        0L -> StagedDocumentRead.Empty
+                        else -> {
+                            Files.setPosixFilePermissions(output.toPath(), PosixFilePermissions.fromString("r--------"))
+                            StagedDocumentRead.Success(StagedUploadSource(output, total))
                         }
                     }
-                }
-                checkCancellation()
-                if (total == 0L) return StagedDocumentRead.Empty
-                Files.setPosixFilePermissions(output.toPath(), PosixFilePermissions.fromString("r--------"))
-                StagedDocumentRead.Success(StagedUploadSource(output, total))
+                }?.also { if (it is StagedDocumentRead.Success) partial = null } ?: StagedDocumentRead.Unreadable
             }
-        partial = null
-        return completed
-    } catch (cancel: CancellationException) {
-        throw cancel
-    } catch (_: Exception) {
-        return StagedDocumentRead.Unreadable
-    } finally {
-        partial?.let { Files.deleteIfExists(it.toPath()) }
-    }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            StagedDocumentRead.Unreadable
+        } finally {
+            partial?.let { Files.deleteIfExists(it.toPath()) }
+        }
+    return result
 }
+
+private fun prepareStagingDirectory(directory: File): Boolean {
+    if (Files.isSymbolicLink(directory.toPath())) return false
+    Files.createDirectories(directory.toPath())
+    val isDirectory = Files.isDirectory(directory.toPath(), LinkOption.NOFOLLOW_LINKS)
+    if (isDirectory) Files.setPosixFilePermissions(directory.toPath(), PosixFilePermissions.fromString("rwx------"))
+    return isDirectory
+}
+
+/** Null means overflow; read at most one extra byte and handle providers that return zero. */
+private fun copyStagedDocument(
+    input: InputStream,
+    sink: OutputStream,
+    maxBytes: Long,
+    checkCancellation: () -> Unit,
+): Long? {
+    val buffer = ByteArray(STAGED_DOCUMENT_BUFFER_BYTES)
+    var total = 0L
+    while (true) {
+        checkCancellation()
+        val available = (maxBytes - total).coerceAtLeast(0)
+        val take = if (available >= buffer.size) buffer.size else available.toInt() + 1
+        val read = input.read(buffer, 0, take)
+        val count =
+            if (read == 0) {
+                val next = input.read()
+                if (next >= 0) buffer[0] = next.toByte()
+                if (next < 0) -1 else 1
+            } else {
+                read
+            }
+        if (count == -1) break
+        if (count.toLong() > available) return null
+        sink.write(buffer, 0, count)
+        total += count
+    }
+    return total
+}
+
+private const val STAGED_DOCUMENT_BUFFER_BYTES = 64 * 1024
