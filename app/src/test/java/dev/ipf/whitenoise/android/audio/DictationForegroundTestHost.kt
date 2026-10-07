@@ -57,6 +57,8 @@ internal class DictationForegroundTestHost(
 internal class DictationForegroundTestPlatform : ConversationDictationPlatform {
     var sessionsCreated = 0
     var pendingCallerAudio = false
+    var deferEmptyCaptureClosure = false
+    var captureClosureCallback: (() -> Unit)? = null
 
     lateinit var listener: ConversationDictationRecognitionListener
 
@@ -75,6 +77,10 @@ internal class DictationForegroundTestPlatform : ConversationDictationPlatform {
     }
 
     override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
+        if (deferEmptyCaptureClosure) {
+            captureClosureCallback = onClosed
+            return true
+        }
         if (!pendingCallerAudio) return false
         pendingCallerAudio = false
         onClosed()

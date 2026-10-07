@@ -6345,6 +6345,7 @@ class ConversationDictationControllerTest {
         var stops = 0
         val fixture = fixture(draft = TextFieldValue("Draft"), platform = platform, stopDurableSession = { stops++ })
         assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key())))
+        val promotedToken = requireNotNull(fixture.controller.notificationSessionToken)
         val report = mainThreadDictationCallerAudioFailure(platform.listener) { true }
         report(ConversationDictationCallerAudioFailure.CaptureFailed)
         shadowOf(Looper.getMainLooper()).idle()
@@ -6357,6 +6358,7 @@ class ConversationDictationControllerTest {
         if (dismissFailure) fixture.controller.dismissFailure()
         assertTrue(fixture.controller.hasDurableSession)
         assertTrue(fixture.controller.foregroundMicrophoneRequired)
+        assertEquals(promotedToken, fixture.controller.notificationSessionToken)
         assertEquals(0, stops)
         assertFalse(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key())))
         platform.discardCaptureActive = false

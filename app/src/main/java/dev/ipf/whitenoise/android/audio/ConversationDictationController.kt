@@ -587,6 +587,7 @@ internal class ConversationDictationController internal constructor(
     private var captureClosureTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var captureClosureGeneration = 0L
     private var pendingCaptureLeaseReleaseGeneration: Long? = null
+    private var pendingCaptureLeaseSessionToken: String? = null
     private var silenceTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var readinessHandle: ConversationDictationTimeoutHandle? = null
     private var readinessStartedAtMillis: Long? = null
@@ -671,7 +672,9 @@ internal class ConversationDictationController internal constructor(
 
     /** Opaque process-and-session identity; delayed notification taps cannot target a later draft. */
     val notificationSessionToken: String?
-        get() = state.sessionId?.let { "$notificationInstanceId:$durableSessionGeneration:$it" }
+        get() =
+            pendingCaptureLeaseSessionToken
+                ?: state.sessionId?.let { "$notificationInstanceId:$durableSessionGeneration:$it" }
 
     val deliveryInProgress: Boolean
         get() = dispatchedSessionId != null && dispatchedSessionId == state.sessionId
@@ -1505,6 +1508,7 @@ internal class ConversationDictationController internal constructor(
         captureClosureTimeoutHandle = null
         if (releasesTerminalLease) {
             pendingCaptureLeaseReleaseGeneration = null
+            pendingCaptureLeaseSessionToken = null
             releaseDurableSessionLease()
         }
         val failed = state as? ConversationDictationState.Failed
@@ -3108,7 +3112,11 @@ internal class ConversationDictationController internal constructor(
         val closingSessionId = state.sessionId
         val closingCaptureGeneration = captureClosureGeneration
         val releaseAfterCaptureClosure = releaseDurableSession && durableSession && foregroundMicrophoneRequired
-        if (releaseAfterCaptureClosure) pendingCaptureLeaseReleaseGeneration = closingCaptureGeneration
+        if (releaseAfterCaptureClosure) {
+            pendingCaptureLeaseReleaseGeneration = closingCaptureGeneration
+            // Dismissal can publish Idle, but the service must retain its promoted capture identity.
+            pendingCaptureLeaseSessionToken = notificationSessionToken
+        }
         val captureSessionId = activeCaptureSessionId
         val onCaptureFinished: () -> Unit = {
             captureSessionId?.let(::finishPlaybackInterruption)
