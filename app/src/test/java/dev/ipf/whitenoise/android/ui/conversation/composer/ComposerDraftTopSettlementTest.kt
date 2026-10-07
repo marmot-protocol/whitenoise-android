@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -49,8 +50,8 @@ class ComposerDraftTopSettlementTest {
         composeRule.mainClock.autoAdvance = false
         composeRule.onNode(hasSetTextAction()).performTextReplacement(longDraft)
         repeat(COMPOSER_EXPANSION_ANIMATION_MILLIS / FRAME_STEP_MS) {
+            advanceRenderedFrame()
             composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
-            composeRule.mainClock.advanceTimeByFrame()
         }
         composeRule.mainClock.advanceTimeBy(COMPOSER_EXPANSION_ANIMATION_MILLIS.toLong())
         composeRule.mainClock.autoAdvance = true
@@ -68,11 +69,9 @@ class ComposerDraftTopSettlementTest {
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnUiThread { windowHeight = 280 }
-        composeRule.mainClock.advanceTimeByFrame()
-        // Android measure/draw is separate from the stopped Compose animation clock.
-        composeRule.waitForIdle()
+        advanceRenderedFrame()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
-        composeRule.mainClock.advanceTimeByFrame()
+        advanceRenderedFrame()
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
@@ -93,22 +92,25 @@ class ComposerDraftTopSettlementTest {
             down(center)
             moveBy(Offset(0f, -60f), delayMillis = FRAME_STEP_MS.toLong())
         }
-        composeRule.mainClock.advanceTimeByFrame()
-        // Android measure/draw is separate from the stopped Compose animation clock.
-        composeRule.waitForIdle()
+        advanceRenderedFrame()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
             moveBy(Offset(0f, 30f), delayMillis = FRAME_STEP_MS.toLong())
         }
-        composeRule.mainClock.advanceTimeByFrame()
-        // Android measure/draw is separate from the stopped Compose animation clock.
-        composeRule.waitForIdle()
+        advanceRenderedFrame()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput { cancel() }
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
         assertEquals(original, observed)
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+    }
+
+    /** Publish external/pointer snapshot writes before ticking; draw completion does not tick another frame. */
+    private fun advanceRenderedFrame() {
+        composeRule.runOnUiThread { Snapshot.sendApplyNotifications() }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
     }
 
     /** Uses the production bar so its animation/IME/window constraints own the editor. */
