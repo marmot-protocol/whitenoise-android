@@ -52,7 +52,9 @@ internal class NewMessageRecipientPreparation internal constructor(
      * Normally completed children stay non-cancelled when disposed, so navigation does not invent replacement.
      */
     fun cancel(replaced: Boolean = false) {
-        val unfinished = prewarm.isActive || lookup.isActive || prewarm.isCancelled || lookup.isCancelled
+        val prewarmUnfinished = prewarm.isActive || prewarm.isCancelled
+        val lookupUnfinished = lookup.isActive || lookup.isCancelled
+        val unfinished = prewarmUnfinished || lookupUnfinished
         if (replaced && unfinished && !replacementRecorded) {
             replacementRecorded = true
             diagnosticAttempt?.record(

@@ -7,8 +7,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 
-/** A destination-owned frame effect consumes only its captured ticket after rendering, never a later owner's attempt. */
+/** Consumes the destination's captured ticket after rendering; an older effect cannot claim a newer attempt. */
 @Composable
+@Suppress("FunctionNaming") // Compose effects use the same naming convention as UI composables.
 internal fun RecordDmConversationFirstFrame(
     accountRef: String?,
     groupId: String,

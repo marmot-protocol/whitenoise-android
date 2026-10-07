@@ -50,7 +50,11 @@ class DmPreparationEffectOwnershipTest {
                             capturedKey,
                             prewarm = { if (capturedKey.retryKey == 0) heldPrewarm.await() },
                             lookup = {
-                                if (capturedKey.retryKey == 0) heldLookup.await() else NewMessageDirectChatResolution(null, true)
+                                if (capturedKey.retryKey == 0) {
+                                    heldLookup.await()
+                                } else {
+                                    NewMessageDirectChatResolution(null, true)
+                                }
                             },
                             diagnosticAttempt = interaction.preparation(),
                         ).awaitCompletion()
