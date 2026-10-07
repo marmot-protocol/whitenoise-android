@@ -576,6 +576,15 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
             self.assertNotIn('Open settings.*', path.read_text(), path.name)
 
+    def test_emulator_interruption_guard_is_limited_to_the_external_launcher(self):
+        """Never hide a tested-app crash behind the disposable launcher's known boot interruption."""
+        path = runtime.ROOT / '.maestro/fixtures/emulator-interruption.yaml'
+        _, commands = list(yaml.safe_load_all(path.read_text()))
+        self.assertEqual(commands, [{'runFlow': {'when': {'visible': "Pixel Launcher isn't responding"},
+                                                'commands': [{'tapOn': 'Close app'}]}}])
+        for title in ("Maestro Test Lab isn't responding", "White Noise isn't responding", 'App keeps stopping'):
+            self.assertIsNone(re.fullmatch(commands[0]['runFlow']['when']['visible'], title))
+
     def test_every_runtime_subflow_exists_and_preserves_the_live_host(self):
         """Shared navigation helpers cannot silently refer to absent flows or reset the fixture."""
         for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):

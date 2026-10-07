@@ -11,10 +11,8 @@ import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
-import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppPhase
-import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -221,11 +219,9 @@ class MaestroRuntimeHostTest {
             verifyMaestroConsent(native, checkNotNull(state), postcondition)
         }
         if (postcondition.startsWith("folder-")) verifyMaestroFolder(checkNotNull(state), postcondition)
-        if (postcondition == "light") check(state?.themeMode == AppThemeMode.Light)
-        if (postcondition == "amoled") check(state?.themeMode == AppThemeMode.Amoled)
-        if (postcondition == "dark") check(state?.themeMode == AppThemeMode.Dark)
-        if (postcondition == "font-large") check(state?.fontScale == AppFontScale.Large)
         when (postcondition) {
+            "light", "dark", "amoled", "font-large" ->
+                verifyMaestroPreferences(checkNotNull(state), postcondition)
             "send" -> verifyMaestroSend(native, checkNotNull(state), peerLabel, group)
             "reactions-retained" ->
                 verifyMaestroReactions(native, checkNotNull(state?.activeAccountRef), peerLabel, group)

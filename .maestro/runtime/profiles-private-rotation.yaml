@@ -13,20 +13,41 @@ name: profiles-private-rotation
       text: "Maestro Bob"
     direction: DOWN
 - tapOn: "Maestro Bob"
-- assertVisible: "Nickname & notes"
+- assertVisible: "User Profile"
 - scrollUntilVisible:
     element:
       text: "Nickname & notes"
     direction: DOWN
 - tapOn: "Nickname & notes"
+- scrollUntilVisible:
+    element:
+      text: "Name"
+    direction: DOWN
 - tapOn: "Name"
 - inputText: "Maestro unsaved nickname"
+- scrollUntilVisible:
+    element:
+      text: "Notes"
+    direction: DOWN
 - tapOn: "Notes"
 - inputText: "Maestro unsaved note"
 - hideKeyboard
 - setOrientation: LANDSCAPE_LEFT
+- scrollUntilVisible:
+    element:
+      text: "Maestro unsaved nickname"
+    direction: UP
 - assertVisible: "Maestro unsaved nickname"
 - setOrientation: PORTRAIT
+- scrollUntilVisible:
+    element:
+      text: "Maestro unsaved note"
+    direction: DOWN
 - assertVisible: "Maestro unsaved note"
 - tapOn: "Cancel"
+- assertVisible: "User Profile"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Bob"
+    direction: UP
 - assertVisible: "Maestro Bob"

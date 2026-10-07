@@ -42,6 +42,28 @@ class MediaLifecycleRunnerTest(unittest.TestCase):
         self.assertFalse(runner.passed("FAILURES!!!\nTests run: 1, Failures: 1"))
         self.assertFalse(runner.passed(""))
 
+    def test_failure_categories_keep_the_stage_actionable_without_native_details(self):
+        """Classify recognized headers while discarding sensitive messages and every raw stack frame."""
+        for exception, expected in [("java.lang.OutOfMemoryError", "out-of-memory"),
+                                    ("kotlinx.coroutines.TimeoutCancellationException", "timeout"),
+                                    ("java.util.concurrent.TimeoutException", "timeout"),
+                                    ("java.lang.AssertionError", "assertion"),
+                                    ("dev.ipf.NativeException", "instrumentation-failure")]:
+            with self.subTest(exception=exception):
+                text = f"INSTRUMENTATION_STATUS: stack={exception}: private-identity https://secret.invalid\nFAILURES!!!"
+                category = runner.failure_kind(text)
+                self.assertEqual(category, expected)
+                self.assertNotIn("private", category)
+                self.assertNotIn("secret", category)
+        self.assertIsNone(runner.failure_kind("OK (1 test)"))
+
+    def test_lookalike_exception_text_is_never_treated_as_a_stack_header(self):
+        """Failure messages and unstructured output cannot masquerade as a trusted exception category."""
+        for text in ("java.lang.OutOfMemoryError", "INSTRUMENTATION_STATUS: message=java.lang.OutOfMemoryError",
+                     "INSTRUMENTATION_STATUS: stack=java.lang.OutOfMemoryErrorSuffix: secret", ""):
+            with self.subTest(text=text):
+                self.assertEqual(runner.failure_kind(text), "instrumentation-failure")
+
     def test_completion_wait_returns_when_every_upload_and_request_is_terminal(self):
         """Wait for the independently committed upload and request outcomes, not a fixed delay."""
         rows = [

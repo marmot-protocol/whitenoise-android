@@ -1,5 +1,6 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 ---
+- runFlow: emulator-interruption.yaml
 # Bound only initial consent/permission readiness; never retry the journey itself.
 - retry:
     maxRetries: 3

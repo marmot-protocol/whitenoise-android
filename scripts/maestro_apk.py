@@ -74,7 +74,7 @@ def offline():
     """Disable emulator radios and print evidence of no active default network.
 
     Only the disposable CI emulator is admitted. Commands have five-second
-    bounds and disconnection gets five observations. Unexpected airplane-mode
+    bounds and disconnection gets at most twenty observations. Unexpected airplane-mode
     state, unknown dump format or a remaining network raises ValueError; ADB
     failures propagate. The last connectivity dump is printed on failure too.
     """
@@ -90,13 +90,13 @@ def offline():
     state = adb('cmd', 'connectivity', 'airplane-mode').strip()
     print(f'airplane_mode={state}', flush=True)
     require(state == 'enabled', 'Airplane mode was not applied')
-    for attempt in range(5):
+    for attempt in range(20):
         dump = adb('dumpsys', 'connectivity')
         require(len(dump) <= 256 * 1024, 'Connectivity dump exceeds pilot bounds')
         if re.search(r'^\s*Active default network: none\s*$', dump, re.MULTILINE):
             print(dump, flush=True)
             return
-        if attempt < 4:
+        if attempt < 19:
             time.sleep(1)
     print(dump, flush=True)
     raise ValueError('Emulator must have no active default network before launching the app')

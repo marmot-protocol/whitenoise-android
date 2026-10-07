@@ -13,7 +13,7 @@ name: profiles-start-group-back
       text: "Maestro Bob"
     direction: DOWN
 - tapOn: "Maestro Bob"
-- assertVisible: "Nickname & notes"
+- assertVisible: "User Profile"
 - scrollUntilVisible:
     element:
       text: "Start group"

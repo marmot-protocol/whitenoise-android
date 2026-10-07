@@ -7,8 +7,7 @@ name: search-custom-start-cancel
 - hideKeyboard
 - tapOn:
     id: "chat-list-search-filters-action"
-- tapOn:
-    id: "chat-list-search-filter-menu-Date"
+- tapOn: "Date"
 - assertVisible: "Date"
 - tapOn: "Custom Range"
 - assertVisible: "Start date"

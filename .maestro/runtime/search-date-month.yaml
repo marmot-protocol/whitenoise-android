@@ -7,8 +7,7 @@ name: search-date-month
 - hideKeyboard
 - tapOn:
     id: "chat-list-search-filters-action"
-- tapOn:
-    id: "chat-list-search-filter-menu-Date"
+- tapOn: "Date"
 - assertVisible: "Date"
 - tapOn: "Last 30 Days"
 - tapOn: "OK"

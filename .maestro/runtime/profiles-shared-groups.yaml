@@ -13,7 +13,7 @@ name: profiles-shared-groups
       text: "Maestro Bob"
     direction: DOWN
 - tapOn: "Maestro Bob"
-- assertVisible: "Nickname & notes"
+- assertVisible: "User Profile"
 - scrollUntilVisible:
     element:
       text: "Groups in Common"
@@ -21,4 +21,4 @@ name: profiles-shared-groups
 - tapOn: "Groups in Common"
 - assertVisible: "Maestro group"
 - back
-- assertVisible: "Nickname & notes"
+- assertVisible: "User Profile"

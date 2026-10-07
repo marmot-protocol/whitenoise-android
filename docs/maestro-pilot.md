@@ -6,7 +6,7 @@ account and uses no relays. The disposable API 34 x86_64 emulator runs offline
 with runtime permissions denied. Each journey clears only that emulator's dev
 app data and declines the optional diagnostics sheet without enabling sharing.
 Before launch, the runner applies airplane mode through Android's connectivity
-service, disables Wi-Fi and mobile data, and requires no active default network.
+service, disables Wi-Fi and mobile data, and requires no active default network. Radio teardown has at most twenty bounded observations; the probe returns immediately when disconnection is observed and rejects any remaining or unknown network before installation.
 The bounded check retains its connectivity dump as `network-state.txt`.
 
 Select `onboarding`, the original six-case `offline` suite, or the focused

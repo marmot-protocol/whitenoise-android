@@ -13,7 +13,7 @@ name: profiles-member-back
       text: "Maestro Bob"
     direction: DOWN
 - tapOn: "Maestro Bob"
-- assertVisible: "Nickname & notes"
+- assertVisible: "User Profile"
 - assertVisible: "Maestro Bob"
 - back
 - assertVisible:

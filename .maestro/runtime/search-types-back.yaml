@@ -7,8 +7,7 @@ name: search-types-back
 - hideKeyboard
 - tapOn:
     id: "chat-list-search-filters-action"
-- tapOn:
-    id: "chat-list-search-filter-menu-ChatType"
+- tapOn: "Chat type"
 - assertVisible: "Chat type"
 - assertVisible: "Direct chats"
 - assertVisible: "Groups"

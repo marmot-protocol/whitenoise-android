@@ -13,7 +13,7 @@ name: profiles-admin-picker-back
       text: "Maestro Bob"
     direction: DOWN
 - tapOn: "Maestro Bob"
-- assertVisible: "Nickname & notes"
+- assertVisible: "User Profile"
 - scrollUntilVisible:
     element:
       text: "Make admin in groups"
@@ -21,4 +21,4 @@ name: profiles-admin-picker-back
 - tapOn: "Make admin in groups"
 - assertVisible: "Make admin in groups"
 - back
-- assertVisible: "Nickname & notes"
+- assertVisible: "User Profile"

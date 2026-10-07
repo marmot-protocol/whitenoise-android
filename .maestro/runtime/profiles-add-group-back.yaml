@@ -13,7 +13,7 @@ name: profiles-add-group-back
       text: "Maestro Bob"
     direction: DOWN
 - tapOn: "Maestro Bob"
-- assertVisible: "Nickname & notes"
+- assertVisible: "User Profile"
 - scrollUntilVisible:
     element:
       text: "Add to a group"
@@ -21,4 +21,4 @@ name: profiles-add-group-back
 - tapOn: "Add to a group"
 - assertVisible: "Add to a group"
 - back
-- assertVisible: "Nickname & notes"
+- assertVisible: "User Profile"

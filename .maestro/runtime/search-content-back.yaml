@@ -7,8 +7,7 @@ name: search-content-back
 - hideKeyboard
 - tapOn:
     id: "chat-list-search-filters-action"
-- tapOn:
-    id: "chat-list-search-filter-menu-Content"
+- tapOn: "Content"
 - assertVisible: "Content"
 - back
 - assertVisible:
