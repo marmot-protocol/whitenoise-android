@@ -380,8 +380,9 @@ private suspend fun ConversationController.pageWithRetryBudget(
             }
         if (retryDelayMs == null) break
         delay(retryDelayMs)
-        if (!retainsSubscription(handle)) break
-        outcome = withContext(Dispatchers.IO) { page(handle) }
+        if (retainsSubscription(handle)) {
+            outcome = withContext(Dispatchers.IO) { page(handle) }
+        }
     }
     return outcome.takeIf { retainsSubscription(handle) }
 }
