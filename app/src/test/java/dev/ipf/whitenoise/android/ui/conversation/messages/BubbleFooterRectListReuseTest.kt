@@ -196,7 +196,8 @@ class BubbleFooterRectListReuseTest {
         val document = remember(id, flip) { twoParagraphDocument(if (flip) id + 1 else id) }
         var lastLineLayout by remember(id) { mutableStateOf<TextLayoutResult?>(null) }
         val density = LocalDensity.current
-        val lineHeightPx = with(density) { MaterialTheme.typography.bodyLarge.lineHeight.toPx() }
+        val bodyTextStyle = MaterialTheme.typography.bodyLarge
+        val lineHeightPx = with(density) { bodyTextStyle.lineHeight.toPx() }
         val maxBodyHeightPx = lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT
         val maxBodyHeight = with(density) { maxBodyHeightPx.toDp() }
         val contentColor = MaterialTheme.colorScheme.onSurface
