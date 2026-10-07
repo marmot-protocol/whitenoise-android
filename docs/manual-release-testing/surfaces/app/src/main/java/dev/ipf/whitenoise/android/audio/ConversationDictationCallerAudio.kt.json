@@ -1,0 +1,50 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+  "legacy_sha256": "e56796b6db88b3b179a878efef110948fa2de2434a0f4e83e9c87ecb3a59e9f5",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Dictation capture-close callback retains an in-progress recorder read and restores media after available audio drains",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+        "anchor": "internal fun onCaptureClosed(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-007"
+        ]
+      },
+      {
+        "surface": "Dictation caller-audio successful pipe completion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+        "anchor": "fun fullyFed(): Boolean = fullyFed.get()",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation caller-audio chunks keep a stable identity across recognizer generations",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+        "anchor": "fun chunkId(): Long? = chunk.get()?.chunkId",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Recorder failure seals completed PCM and waits for current-generation acceptance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+        "anchor": "private fun finishCaptureThread(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Provider pipe failures and zero-progress stalls retain exact PCM and notify bounded recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCallerAudio.kt",
+        "anchor": "private fun reportFeedFailure(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

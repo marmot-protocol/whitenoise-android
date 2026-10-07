@@ -178,6 +178,7 @@ import dev.ipf.whitenoise.android.ui.common.reverseLazyListDragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
+import dev.ipf.whitenoise.android.ui.conversation.composer.conversationDictationDraftWriter
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberAttachmentState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
@@ -3616,7 +3617,14 @@ internal fun ConversationScreen(
                 messageTextCopy = messageTextCopy,
                 onBack = exitConversation,
                 initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-                onDraftChange = { appState.setDraft(draftAccountRef, controller.group.groupIdHex, it) },
+                onDraftChange =
+                    conversationDictationDraftWriter(
+                        dictation = appState.conversationDictation,
+                        accountRef = draftAccountRef,
+                        groupIdHex = controller.group.groupIdHex,
+                        presentationRevision = composerDictationRevision,
+                        write = { appState.setDraft(draftAccountRef, controller.group.groupIdHex, it) },
+                    ),
                 composerTextState = composerTextState,
                 composerAttachmentSheet = composerAttachmentSheet,
                 hasPendingAttachments = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty(),

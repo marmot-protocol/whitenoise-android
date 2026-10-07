@@ -8,13 +8,15 @@ name: Android Release Runtime Verify
 on:
   pull_request:
     branches: [master]
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [master]
   workflow_dispatch:
 
 concurrency:
-  group: android-release-runtime-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: android-release-runtime-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 permissions:
   contents: read
@@ -29,6 +31,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Configure MarmotKit cache directory
@@ -44,7 +47,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -55,7 +58,15 @@ jobs:
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
       - name: Restore MarmotKit artifact
+        if: github.event_name != 'merge_group'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      - name: Restore MarmotKit artifact for queue
+        if: github.event_name == 'merge_group'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
@@ -89,7 +100,7 @@ jobs:
           -Pwhitenoise.allowUnconfiguredProductionFirebaseForReleaseRuntimeTest=true
           -Pandroid.injected.build.abi=x86_64
           -Pandroid.injected.testOnly=false
-          ${{ github.event_name == 'pull_request' && '-x :app:lintVitalProductionZapstoreRelease' || '' }}
+          ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && '-x :app:lintVitalProductionZapstoreRelease' || '' }}
           --build-cache --no-daemon --stacktrace
 
       - name: Locate release APK
@@ -149,6 +160,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Configure MarmotKit cache directory
@@ -164,7 +176,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
       - name: Read MarmotKit artifact pin
         id: marmotkit
@@ -175,7 +187,15 @@ jobs:
           printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
 
       - name: Restore MarmotKit artifact
+        if: github.event_name != 'merge_group'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/marmotkit-cache
+          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      - name: Restore MarmotKit artifact for queue
+        if: github.event_name == 'merge_group'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
@@ -205,7 +225,7 @@ jobs:
         run: >-
           ./gradlew :app:assembleStagingZapstoreRelease
           -Pandroid.injected.testOnly=false
-          ${{ github.event_name == 'pull_request' && '-x :app:lintVitalStagingZapstoreRelease' || '' }}
+          ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && '-x :app:lintVitalStagingZapstoreRelease' || '' }}
           --build-cache --no-daemon --stacktrace
 
       - name: Locate ARM64 and x86_64 staging APKs

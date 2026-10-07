@@ -22,6 +22,7 @@ internal class ConversationDictationDraftRecovery(
         val appendOnly: Boolean = false,
         val appendPayload: Boolean = false,
         val emptiedRevision: Long? = null,
+        val recoveryUnavailable: Boolean = false,
     )
 
     private var receipt: Receipt? = null
@@ -35,6 +36,22 @@ internal class ConversationDictationDraftRecovery(
         target: ConversationDictationTarget,
     ): Boolean = receipt?.let { it.session == session && it.target == target } == true
 
+    /** Recovery requires a verified save; Retry may inspect historical ownership before checking again. */
+    fun hasSavedTranscript(
+        session: Long,
+        target: ConversationDictationTarget,
+        transcript: String?,
+        requireVerifiedRecovery: Boolean = true,
+    ): Boolean =
+        !transcript.isNullOrBlank() &&
+            receipt?.let {
+                it.session == session &&
+                    it.target == target &&
+                    it.transcript == transcript.trim() &&
+                    it.emptiedRevision == null &&
+                    (!requireVerifiedRecovery || !it.recoveryUnavailable)
+            } == true
+
     /** Tracks only the clear or restoration actually performed by this session's dispatch. */
     fun updateDispatch(
         session: Long,
@@ -42,11 +59,16 @@ internal class ConversationDictationDraftRecovery(
         clearedRevision: Long? = null,
         restoredRevision: Long? = null,
     ) {
-        val saved = receipt?.takeIf { owns(session, target) } ?: return
+        val saved = receipt?.takeIf { it.session == session && it.target == target } ?: return
         if (clearedRevision != null) {
             receipt = saved.copy(emptiedRevision = clearedRevision)
         } else if (restoredRevision != null) {
-            receipt = saved.copy(draft = saved.draft.copy(revision = restoredRevision), emptiedRevision = null)
+            receipt =
+                saved.copy(
+                    draft = saved.draft.copy(revision = restoredRevision),
+                    emptiedRevision = null,
+                    recoveryUnavailable = false,
+                )
         }
     }
 
@@ -63,24 +85,46 @@ internal class ConversationDictationDraftRecovery(
         val appendPayload: Boolean,
     )
 
-    /** Repeated failures replace our unchanged insertion; newer edits receive only a new suffix. */
-    fun recover(
+    enum class Result(
+        val draftRecovered: Boolean,
+    ) {
+        Written(true),
+        AlreadyPresent(true),
+        Superseded(false),
+        Unavailable(false),
+    }
+
+    /** Distinguishes a new accepted draft write from an unchanged, verified receipt. */
+    fun recoverWithResult(
         session: Long,
         target: ConversationDictationTarget,
         transcript: String,
         options: Options = Options(),
-    ): Boolean {
+    ): Result {
         val text = transcript.trim()
-        if (text.isEmpty()) return false
+        if (text.isEmpty()) return Result.Unavailable
         var result = RecoveryAttempt.Retry
         repeat(DICTATION_DRAFT_WRITE_ATTEMPTS) {
             if (result == RecoveryAttempt.Retry) result = recoverAttempt(session, target, text, options)
         }
-        return result == RecoveryAttempt.Recovered
+        val outcome =
+            when (result) {
+                RecoveryAttempt.Written -> Result.Written
+                RecoveryAttempt.AlreadyPresent -> Result.AlreadyPresent
+                RecoveryAttempt.Superseded -> Result.Superseded
+                else -> Result.Unavailable
+            }
+        // Preserve historical ownership through failed reads, while protecting uncertain recovery.
+        receipt?.takeIf { it.session == session && it.target == target && it.transcript == text }?.let {
+            receipt = it.copy(recoveryUnavailable = outcome == Result.Unavailable)
+        }
+        return outcome
     }
 
     private enum class RecoveryAttempt {
-        Recovered,
+        Written,
+        AlreadyPresent,
+        Superseded,
         Retry,
         Unavailable,
     }
@@ -104,7 +148,13 @@ internal class ConversationDictationDraftRecovery(
             val current =
                 runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull()
                     ?: return@run RecoveryAttempt.Unavailable
-            if (previous?.transcript == text && previous.emptiedRevision == null) return@run RecoveryAttempt.Recovered
+            if (previous?.transcript == text && previous.emptiedRevision == null && !options.restoreCapturedPrefix) {
+                return@run if (sameDictationRecoveryDraft(previous.draft, current)) {
+                    RecoveryAttempt.AlreadyPresent
+                } else {
+                    RecoveryAttempt.Superseded
+                }
+            }
             val insertion = planInsertion(previous, current, text, options) ?: return@run RecoveryAttempt.Unavailable
             val value = insertionValue(target, text, insertion)
             val revision =
@@ -118,7 +168,7 @@ internal class ConversationDictationDraftRecovery(
                     options,
                     RecoveryWrite(previous, current, insertion, value, revision),
                 )
-            RecoveryAttempt.Recovered
+            RecoveryAttempt.Written
         }
 
     private fun recoveryReceipt(
@@ -231,8 +281,8 @@ internal class ConversationDictationDraftRecovery(
         previous: String,
         current: String,
     ): Int? {
-        val before = words(previous)
-        val after = words(current)
+        val before = dictationRecoveryWords(previous)
+        val after = dictationRecoveryWords(current)
         val represented =
             before.isNotEmpty() &&
                 after.size >= before.size &&
@@ -243,24 +293,32 @@ internal class ConversationDictationDraftRecovery(
             else -> null
         }
     }
+}
 
-    private fun words(text: String): List<Pair<String, Int>> {
-        val boundaries = BreakIterator.getWordInstance(Locale.ROOT)
-        boundaries.setText(text)
-        val result = mutableListOf<Pair<String, Int>>()
-        var start = boundaries.first()
-        var end = boundaries.next()
-        while (end != BreakIterator.DONE) {
-            val word = text.substring(start, end)
-            if (word.any(Char::isLetterOrDigit)) result += word.lowercase(Locale.ROOT) to start
-            start = end
-            end = boundaries.next()
-        }
-        return result
+private fun dictationRecoveryWords(text: String): List<Pair<String, Int>> {
+    val boundaries = BreakIterator.getWordInstance(Locale.ROOT)
+    boundaries.setText(text)
+    val result = mutableListOf<Pair<String, Int>>()
+    var start = boundaries.first()
+    var end = boundaries.next()
+    while (end != BreakIterator.DONE) {
+        val word = text.substring(start, end)
+        if (word.any(Char::isLetterOrDigit)) result += word.lowercase(Locale.ROOT) to start
+        start = end
+        end = boundaries.next()
     }
+    return result
 }
 
 private fun sameDictationRecoveryDraft(
     a: ConversationDictationDraftSnapshot,
     b: ConversationDictationDraftSnapshot,
 ): Boolean = a.revision == b.revision && a.value.text == b.value.text
+
+/** Boolean callers require current ownership, even when the transcript was saved before an edit. */
+internal fun ConversationDictationDraftRecovery.recover(
+    session: Long,
+    target: ConversationDictationTarget,
+    transcript: String,
+    options: ConversationDictationDraftRecovery.Options = ConversationDictationDraftRecovery.Options(),
+): Boolean = recoverWithResult(session, target, transcript, options).draftRecovered

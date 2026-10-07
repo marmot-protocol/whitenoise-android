@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+  "legacy_sha256": "91cb4642bc38038a28944ea0e3c7768e9952154d7ffebbdba1cdf8829a4d6c2f",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Automatic dictation draft recovery and retry fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+        "anchor": "internal class ConversationDictationDraftRecovery(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Repeated dictation recovery verifies the current native draft receipt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+        "anchor": "fun recoverWithResult(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Historical saved transcript identity remains distinct from verified recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+        "anchor": "requireVerifiedRecovery: Boolean = true,",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -49,19 +49,33 @@ def docs_only_diff(raw):
     return True
 
 
-def classify(event, base, head):
-    if event != 'pull_request':
-        return False
+def complete_diff(event, base, head):
+    """Use the queue's tested integration, never its original PR branch."""
+    if event not in {'pull_request', 'push', 'merge_group'}:
+        return None
     if not all(re.fullmatch(r'[0-9a-f]{40}', ref or '') for ref in (base, head)):
-        return False
+        return None
     try:
+        if event == 'merge_group':
+            # A queue base must be contained in its integration commit. Missing
+            # objects or a raced/invalid event select conservative validation.
+            subprocess.run(['git', 'merge-base', '--is-ancestor', base, head],
+                           capture_output=True, check=True, timeout=30)
         diff = subprocess.run(
             ['git', 'diff', '--raw', '--no-abbrev', '--no-renames', '-z',
-             f'{base}...{head}'], capture_output=True, check=True, timeout=30,
+             f'{base}{".." if event == "merge_group" else "..."}{head}'],
+            capture_output=True, check=True, timeout=30,
         )
     except (OSError, subprocess.SubprocessError):
+        return None
+    return diff.stdout
+
+
+def classify(event, base, head):
+    if event not in {'pull_request', 'merge_group'}:
         return False
-    return docs_only_diff(diff.stdout)
+    diff = complete_diff(event, base, head)
+    return diff is not None and docs_only_diff(diff)
 
 
 
@@ -106,18 +120,8 @@ def supplemental_campaigns_diff(raw):
 
 
 def supplemental_campaigns(event, base, head):
-    if event not in {'pull_request', 'push'}:
-        return True
-    if not all(re.fullmatch(r'[0-9a-f]{40}', ref or '') for ref in (base, head)):
-        return True
-    try:
-        diff = subprocess.run(
-            ['git', 'diff', '--raw', '--no-abbrev', '--no-renames', '-z',
-             f'{base}...{head}'], capture_output=True, check=True, timeout=30,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return True
-    return supplemental_campaigns_diff(diff.stdout)
+    diff = complete_diff(event, base, head)
+    return diff is None or supplemental_campaigns_diff(diff)
 
 
 def main():

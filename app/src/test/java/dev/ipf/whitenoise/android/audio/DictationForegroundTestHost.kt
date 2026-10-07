@@ -57,6 +57,8 @@ internal class DictationForegroundTestHost(
 internal class DictationForegroundTestPlatform : ConversationDictationPlatform {
     var sessionsCreated = 0
     var pendingCallerAudio = false
+    var deferEmptyCaptureClosure = false
+    var captureClosureCallback: (() -> Unit)? = null
 
     lateinit var listener: ConversationDictationRecognitionListener
 
@@ -74,12 +76,19 @@ internal class DictationForegroundTestPlatform : ConversationDictationPlatform {
         return true
     }
 
-    override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
-        if (!pendingCallerAudio) return false
-        pendingCallerAudio = false
-        onClosed()
-        return true
-    }
+    override fun discardCallerAudio(onClosed: () -> Unit): Boolean =
+        when {
+            deferEmptyCaptureClosure -> {
+                captureClosureCallback = onClosed
+                true
+            }
+            !pendingCallerAudio -> false
+            else -> {
+                pendingCallerAudio = false
+                onClosed()
+                true
+            }
+        }
 
     /** Captures the listener and returns a no-op provider generation. */
     @Suppress("MaxLineLength")
