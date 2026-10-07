@@ -1,13 +1,11 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
-import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.core.chatListItemTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import java.time.ZoneId
 import java.util.Locale
@@ -60,6 +58,18 @@ internal fun restrictToChatIds(
         source.filter { canonicalChatListGroupId(it.group.groupIdHex) in canonical }
     }
 
+/** All search consumers share this final intersection, including an explicitly empty folder. */
+internal fun globalSearchScopedChats(
+    source: List<ChatListItem>,
+    state: GlobalSearchState,
+    folderChatIds: Set<String>?,
+): List<ChatListItem> =
+    applyGlobalSearchChatScope(
+        restrictToChatIds(source, folderChatIds),
+        state.chatTypeFilters,
+        state.chatFilters.mapTo(mutableSetOf()) { it.stableId },
+    )
+
 /** Sender, date and content filters as message-search constraints; null when none is active. */
 internal fun messageSearchConstraintsFor(
     state: GlobalSearchState,
@@ -77,43 +87,72 @@ internal fun messageSearchConstraintsFor(
 /** Picker choices: the account's folders, the chats in the current scope and everyone who writes in them. */
 internal fun globalSearchFilterOptions(
     appState: WhiteNoiseAppState,
-    folders: List<GlobalSearchFolderOption>,
-    scopedChats: List<ChatListItem>,
-    titleCopy: GroupTitleCopy,
+    scope: GlobalSearchFilterScope,
 ): GlobalSearchFilterOptions =
-    GlobalSearchFilterOptions(
-        folders = folders,
-        chats =
-            scopedChats.map { item ->
-                val peer =
-                    GroupProjector.avatarAccount(
-                        item.group,
-                        item.presentationOtherMemberAccount,
-                        item.presentationMemberCount,
-                    )
-                WhiteNoisePickerItem(
-                    id = canonicalChatListGroupId(item.group.groupIdHex),
-                    title = chatListItemDisplayTitle(item, appState, titleCopy),
-                    avatarSeed = item.selectedAvatarSeed ?: peer ?: item.group.groupIdHex,
-                    avatarUrl =
-                        peer?.let {
-                            appState.privateContactAvatarSource(it) ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
-                        },
-                )
-            },
-        senders =
-            scopedChats
-                .flatMap { it.memberSnapshot?.members.orEmpty() }
-                // memberIdHex is the Nostr pubkey the timeline's `sender` carries; `account` is a local label.
-                .map { member -> member.memberIdHex.lowercase(Locale.ROOT) }
-                .filter { it.isNotBlank() }
-                .distinct()
-                .map { hex ->
+    with(scope) {
+        GlobalSearchFilterOptions(
+            folders = folders,
+            chats =
+                chatChoices.map { item ->
+                    val peer =
+                        GroupProjector.avatarAccount(
+                            item.group,
+                            item.presentationOtherMemberAccount,
+                            item.presentationMemberCount,
+                        )
                     WhiteNoisePickerItem(
-                        id = hex,
-                        title = appState.chatMemberTitle(hex),
-                        avatarSeed = hex,
-                        avatarUrl = appState.contactAvatarSource(hex),
+                        id = canonicalChatListGroupId(item.group.groupIdHex),
+                        title =
+                            chatListItemTitle(
+                                item,
+                                { appState.contactNicknameFor(accountRef, it) },
+                                { appState.contactDisplayNameCached(accountRef, it) },
+                                titleCopy,
+                            ),
+                        avatarSeed = item.selectedAvatarSeed ?: peer ?: item.group.groupIdHex,
+                        avatarUrl =
+                            peer?.let { appState.contactAvatarSource(it, accountRef) }
+                                ?: item.selectedAvatarUrl,
                     )
-                }.sortedBy { it.title.lowercase(Locale.ROOT) },
-    )
+                },
+            senders =
+                globalSearchSenderIds(senderChats, selfId)
+                    .map { hex ->
+                        WhiteNoisePickerItem(
+                            id = hex,
+                            title =
+                                if (hex.equals(selfId, ignoreCase = true)) {
+                                    selfLabel
+                                } else {
+                                    appState.contactDisplayNameCached(accountRef, hex)
+                                },
+                            avatarSeed = hex,
+                            avatarUrl = appState.contactAvatarSource(hex, accountRef),
+                        )
+                    }.sortedWith(
+                        compareBy<WhiteNoisePickerItem> { !it.id.equals(selfId, ignoreCase = true) }
+                            .thenBy { it.title.lowercase(Locale.ROOT) }
+                            .thenBy { it.id },
+                    ),
+            membersPending = senderChats.any { it.memberSnapshot == null },
+        )
+    }
+
+/** Membership keys, never account labels, identify sender filters; the current identity is always selectable. */
+internal fun globalSearchSenderIds(
+    chats: List<ChatListItem>,
+    selfId: String?,
+): Set<String> =
+    (
+        chats
+            .asSequence()
+            .flatMap {
+                it.memberSnapshot
+                    ?.members
+                    .orEmpty()
+                    .asSequence()
+            }.map { it.memberIdHex } +
+            sequenceOf(selfId).filterNotNull()
+    ).map { it.trim().lowercase(Locale.ROOT) }
+        .filter { it.isNotEmpty() }
+        .toSet()

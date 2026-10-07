@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -94,6 +95,7 @@ internal fun GlobalAttachmentBrowser(
     thumbnail: (GlobalAttachmentItem) -> ImageBitmap? = { null },
     modifier: Modifier = Modifier,
     zoneId: ZoneId = ZoneId.systemDefault(),
+    gridState: LazyGridState = rememberLazyGridState(),
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val formatter =
@@ -123,9 +125,7 @@ internal fun GlobalAttachmentBrowser(
         }
         GlobalAttachmentGrid(
             days = days,
-            visual = visual,
-            formatter = formatter,
-            bottomPadding = bottomPadding,
+            layout = GlobalAttachmentGridLayout(visual, formatter, bottomPadding, gridState),
             onOpenMessage = onOpenMessage,
             thumbnail = thumbnail,
         )
@@ -133,24 +133,29 @@ internal fun GlobalAttachmentBrowser(
 }
 
 /** The grid itself: a day heading spanning the row, then the cards of that day. */
+private data class GlobalAttachmentGridLayout(
+    val visual: Boolean,
+    val formatter: DateTimeFormatter,
+    val bottomPadding: Dp,
+    val state: LazyGridState,
+)
+
 @Composable
 private fun GlobalAttachmentGrid(
     days: List<GlobalAttachmentDay>,
-    visual: Boolean,
-    formatter: DateTimeFormatter,
-    bottomPadding: Dp,
+    layout: GlobalAttachmentGridLayout,
     onOpenMessage: (groupIdHex: String, messageIdHex: String) -> Unit,
     thumbnail: (GlobalAttachmentItem) -> ImageBitmap?,
 ) {
     LazyVerticalGrid(
-        columns = if (visual) GridCells.Adaptive(LibraryGridCellSize) else GridCells.Fixed(1),
-        state = rememberLazyGridState(),
+        columns = if (layout.visual) GridCells.Adaptive(LibraryGridCellSize) else GridCells.Fixed(1),
+        state = layout.state,
         modifier = Modifier.fillMaxWidth().testTag(GLOBAL_LIBRARY_RESULTS_TAG),
         contentPadding =
             PaddingValues(
                 start = WhiteNoiseSpacing.CompactScreenMargin,
                 end = WhiteNoiseSpacing.CompactScreenMargin,
-                bottom = bottomPadding + WhiteNoiseSpacing.Section,
+                bottom = layout.bottomPadding + WhiteNoiseSpacing.Section,
             ),
         horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
@@ -158,7 +163,7 @@ private fun GlobalAttachmentGrid(
         days.forEach { day ->
             item(key = "day-${day.day}", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
-                    text = day.day.format(formatter),
+                    text = day.day.format(layout.formatter),
                     modifier =
                         Modifier
                             .padding(vertical = WhiteNoiseSpacing.Related)

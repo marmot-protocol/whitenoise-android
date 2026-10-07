@@ -1470,6 +1470,8 @@ internal fun ConversationScreen(
     LaunchedEffect(listState, scrollCoordinator) {
         listState.interactionSource.interactions.collectConversationDragInteractions(
             onStarted = {
+                navigationState.targetNavigation.cancel()
+                navigationState.targetHighlight.clear()
                 ttsFollowHandle.suspendForDirectDrag(
                     state = appState.ttsController.state.value,
                     ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
@@ -3127,15 +3129,24 @@ internal fun ConversationScreen(
         }
 
         var focus = latestFocusMessageId() ?: return@LaunchedEffect
+        val navigationRequest = navigationState.targetNavigation.begin()
         // Let the initial unread/newest anchor run first so our scroll isn't
         // immediately overwritten by it.
         snapshotFlow { initialTimelineAnchored }.filter { it }.first()
+        if (!navigationRequest.isCurrent()) return@LaunchedEffect
+        val scrollIntent = scrollCoordinator.intentToken
         var target = controller.loadScrollNavigationTarget(focus)
+        if (!navigationRequest.isCurrent() || scrollCoordinator.intentToken.revision != scrollIntent.revision) {
+            return@LaunchedEffect
+        }
         val latestFocus = latestFocusMessageId()
         if (ttsFocusSessionId != null && latestFocus == null) return@LaunchedEffect
         if (latestFocus != null && latestFocus != focus) {
             focus = latestFocus
             target = controller.loadScrollNavigationTarget(focus)
+        }
+        if (!navigationRequest.isCurrent() || scrollCoordinator.intentToken.revision != scrollIntent.revision) {
+            return@LaunchedEffect
         }
         if (ttsFocusSessionId != null && latestFocusMessageId() != focus) return@LaunchedEffect
         if (target == null) {
@@ -3157,7 +3168,7 @@ internal fun ConversationScreen(
                 requireNotNull(currentTimelineListIndex(target)),
                 ConversationScrollReason.FocusMessage,
             )
-        if (!centered) return@LaunchedEffect
+        if (!centered || !navigationRequest.isCurrent()) return@LaunchedEffect
         showTransientMessageHighlight(target)
     }
 

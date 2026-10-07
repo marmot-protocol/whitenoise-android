@@ -187,6 +187,7 @@ internal fun ChatsScreen(
     // Shell-owned global search state survives conversation navigation (#1941).
     globalSearchState: GlobalSearchState = GlobalSearchState(),
     onGlobalSearchStateChange: ((GlobalSearchState) -> GlobalSearchState) -> Unit = {},
+    searchViewport: GlobalSearchViewport? = null,
     // Shell-owned so the filter survives conversation navigation (issue #1897).
     selectedFolderId: String? = null,
     onSelectFolder: (String?) -> Unit = {},
@@ -434,11 +435,11 @@ internal fun ChatsScreen(
             )
         }
     val scopedSourceList =
-        remember(sourceList, globalSearchState.chatTypeFilters, globalSearchState.chatFilters) {
-            applyGlobalSearchChatScope(
+        remember(sourceList, globalSearchState.chatTypeFilters, globalSearchState.chatFilters, effectiveFolderChatIds) {
+            globalSearchScopedChats(
                 sourceList,
-                globalSearchState.chatTypeFilters,
-                globalSearchState.chatFilters.mapTo(mutableSetOf()) { it.stableId },
+                globalSearchState,
+                effectiveFolderChatIds,
             )
         }
     val messageSearchConstraints =
@@ -452,28 +453,37 @@ internal fun ChatsScreen(
     val globalSearchFolderOptions = accountFolders.map { GlobalSearchFolderOption(it.id, chatFolderDisplayName(it)) }
     val globalSearchFolderNames =
         remember(globalSearchFolderOptions) { globalSearchFolderOptions.associate { it.id to it.name } }
+    val selfLabel = stringResource(R.string.you)
     val globalSearchFilterOptions =
-        remember(globalSearchFolderOptions, folderTypeScopedList, groupTitleCopy, appState.profileRevisionForCompose) {
-            globalSearchFilterOptions(appState, globalSearchFolderOptions, folderTypeScopedList, groupTitleCopy)
-        }
-    // Deleted folders and chats outside the folder / type scope leave the filters (prototype `reconcile`).
-    LaunchedEffect(globalSearchState.isOpen, accountFolders, folderTypeScopedList) {
+        rememberGlobalSearchFilterOptions(
+            appState = appState,
+            scope =
+                GlobalSearchFilterScope(
+                    folders = globalSearchFolderOptions,
+                    chatChoices = folderTypeScopedList,
+                    senderChats = scopedSourceList,
+                    titleCopy = groupTitleCopy,
+                    selfId = controller.boundAccountIdHex(),
+                    selfLabel = selfLabel,
+                    accountRef = controller.boundAccountRef,
+                    accountScope = globalSearchState.accountScopeToken,
+                ),
+            enabled = globalSearchState.isOpen,
+        )
+    // Existing bounded native roster loading owns membership; opening search adds no cache.
+    LaunchedEffect(controller, globalSearchState.isOpen, scopedSourceList) {
         if (!globalSearchState.isOpen) return@LaunchedEffect
-        val folderIds =
-            if (appState.activeAccountRef == null) {
-                null
-            } else {
-                accountFolders.mapTo(mutableSetOf()) {
-                    it.id
-                }
-            }
-        val chatIds =
-            if (sourceList.isEmpty()) {
-                null
-            } else {
-                folderTypeScopedList.mapTo(mutableSetOf()) { canonicalChatListGroupId(it.group.groupIdHex) }
-            }
-        onGlobalSearchStateChange { GlobalSearchTransitions.reconcileAvailable(it, folderIds, chatIds) }
+        controller.requestMemberSnapshots(scopedSourceList.map { it.group.groupIdHex })
+    }
+    LaunchedEffect(globalSearchState.isOpen, globalSearchFilterOptions) {
+        if (!globalSearchState.isOpen) return@LaunchedEffect
+        onGlobalSearchStateChange {
+            GlobalSearchTransitions.reconcileLabels(
+                it,
+                globalSearchFilterOptions.chats.associate { choice -> choice.id to choice.title },
+                globalSearchFilterOptions.senders.associate { choice -> choice.id to choice.title },
+            )
+        }
     }
     // Subscribing read of the profile-cache revision so the filter
     // re-runs when a DM peer's display name resolves — the title
@@ -520,6 +530,10 @@ internal fun ChatsScreen(
             ?.takeIf { it.request === bodySearchRequest }
             ?.matches
             .orEmpty()
+    val bodySearchLoading =
+        searchActive &&
+            (trimmedQuery.isNotEmpty() || messageSearchConstraints != null) &&
+            bodySearchResult?.request !== bodySearchRequest
     LaunchedEffect(bodySearchRequest) {
         // Folder / type / chat scopes alone need no body search; a needle or a
         // message-level filter does.
@@ -618,7 +632,7 @@ internal fun ChatsScreen(
             runtimeGeneration = appState.runtimeGeneration,
             showArchived = showArchived,
         )
-    val chatListState = key(viewportOwner) { rememberLazyListState() }
+    val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberLazyListState() }
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
     LaunchedEffect(chatListState, actionSheetChatId, actionMenuOwner.token, actionMenuOwner.pointerHeld) {
         val anchorId = actionSheetChatId ?: return@LaunchedEffect
@@ -919,13 +933,16 @@ internal fun ChatsScreen(
             query = normalizedSearchQuery,
             accountRef = appState.activeAccountRef,
             runtimeGeneration = appState.runtimeGeneration,
+            searchFilters = globalSearchState.viewportFilters(),
         )
     ChatListSearchTopResetEffect(
         listState = chatListState,
         datasetKey = chatListDatasetKey,
         searchActive = searchActive,
+        viewportState = searchViewport?.resetState(showArchived),
         onScrollRequested = { programmaticViewportGeneration += 1L },
     )
+    GlobalSearchGridResetEffect(searchViewport, chatListDatasetKey, browsingAttachments)
     var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
     val density = LocalDensity.current
     val dragEdgeThresholdPx = with(density) { 56.dp.toPx() }
@@ -1779,6 +1796,9 @@ internal fun ChatsScreen(
                                 openSearchMessage(groupIdHex, messageIdHex)
                             },
                             thumbnail = { item -> libraryThumbnail(appState, controller.boundAccountRef, item) },
+                            gridState =
+                                searchViewport?.attachmentGrid ?: androidx.compose.foundation.lazy.grid
+                                    .rememberLazyGridState(),
                         )
                     controller.isLoading && sourceList.isEmpty() -> {
                         val slowCopy = stringResource(R.string.chat_list_startup_slow)
@@ -1790,6 +1810,10 @@ internal fun ChatsScreen(
                             requireNotNull(controller.error),
                             onRetry = controller::retryLoad,
                         )
+                    bodySearchLoading && visibleItems.isEmpty() ->
+                        // Do not measure an empty replacement list while refreshing results on Back:
+                        // that would clamp the retained viewport to zero before matching rows arrive.
+                        LoadingScreen(message = stringResource(R.string.conversation_search_loading))
                     sourceList.isEmpty() && showArchived -> EmptyArchivedChats()
                     sourceList.isEmpty() ->
                         EmptyChats(onCreate = openNewMessageFlow)
