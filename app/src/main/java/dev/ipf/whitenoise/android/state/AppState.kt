@@ -98,6 +98,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
@@ -4195,18 +4196,20 @@ class WhiteNoiseAppState private constructor(
 
     fun existingDirectChat(reference: String): ChatListItem? = chatsController?.existingDirectChat(reference)
 
+    /** Revalidates picker provenance through the attached native-backed controller and keeps trace attribution. */
     internal suspend fun resolveProvenanceDirectChat(
         provenanceGroupIdHex: String?,
         targetReference: String,
-        diagnosticAttempt: dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt? = null,
+        diagnosticAttempt: DmCreationAttempt? = null,
     ): NewMessageDirectChatResolution =
         chatsController?.resolveProvenanceDirectChat(provenanceGroupIdHex, targetReference, diagnosticAttempt)
             ?: NewMessageDirectChatResolution(item = null, createRequired = false)
 
+    /** Performs the authoritative existing-DM lookup; a missing controller remains unavailable, never a create miss. */
     internal suspend fun resolveExistingDirectChat(
         targetReference: String,
         excludingGroupIdHex: String? = null,
-        diagnosticAttempt: dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt? = null,
+        diagnosticAttempt: DmCreationAttempt? = null,
     ): NewMessageDirectChatResolution =
         chatsController?.resolveExistingDirectChat(targetReference, excludingGroupIdHex, diagnosticAttempt)
             ?: NewMessageDirectChatResolution(item = null, createRequired = false)

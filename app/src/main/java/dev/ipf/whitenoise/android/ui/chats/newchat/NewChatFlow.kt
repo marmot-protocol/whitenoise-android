@@ -45,7 +45,6 @@ import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
-import dev.ipf.whitenoise.android.diagnostics.DmCreationFailure
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
 import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
@@ -114,7 +113,6 @@ internal sealed interface StartChatAttemptResult {
     data class Open(
         val item: ChatListItem,
         val newlyCreated: Boolean = true,
-        val diagnosticAttempt: DmCreationAttempt? = null,
     ) : StartChatAttemptResult
 
     data class Failed(
@@ -207,7 +205,6 @@ internal suspend fun attemptStartProfileChat(
             StartChatAttemptResult
                 .Open(
                     loadCreatedChatListItem(groupIdHex),
-                    diagnosticAttempt = diagnosticAttempt,
                 ).also { diagnosticAttempt?.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS) }
         }.getOrElse { error ->
             diagnosticAttempt?.failed(DmCreationPhase.PROJECTION, error)
@@ -561,90 +558,82 @@ private fun NewMessageAccountScreen(
             }
         val preparedLookup = preparationKeyForTap?.let(preparationCoordinator::current)
         appState.launchMutation {
-            var openedConversation = false
             try {
-                session.ensureCurrent()
-                when (
-                    val result =
-                        attemptOpenOrStartProfileChat(
-                            npub = npub,
-                            progressHex = hexForProgress,
-                            recipientName = recipientName,
-                            retryGroupIdHex = retryGroupIdHex,
-                            resolveDirectChat = {
-                                session.currentValue {
-                                    preparedLookupOrFresh(
-                                        preparedLookup,
-                                        revisionMatches = {
-                                            preparedLookup?.key?.chatRevision == appState.forwardTargetsRevision
-                                        },
-                                    ) {
-                                        resolveNewMessageDirectChat(
-                                            npub = npub,
-                                            existingDmGroupIdHex = existingDmGroupIdHex,
-                                            provenanceDirectChat = { provenance, target ->
-                                                session.currentValue {
-                                                    appState.resolveProvenanceDirectChat(
-                                                        provenance,
-                                                        target,
-                                                        diagnosticAttempt,
-                                                    )
-                                                }
+                withDmCreationOwner(diagnosticAttempt, session::isCurrent) { markOpened ->
+                    session.ensureCurrent()
+                    when (
+                        val result =
+                            attemptOpenOrStartProfileChat(
+                                npub = npub,
+                                progressHex = hexForProgress,
+                                recipientName = recipientName,
+                                retryGroupIdHex = retryGroupIdHex,
+                                resolveDirectChat = {
+                                    session.currentValue {
+                                        preparedLookupOrFresh(
+                                            preparedLookup,
+                                            revisionMatches = {
+                                                preparedLookup?.key?.chatRevision == appState.forwardTargetsRevision
                                             },
-                                            existingDirectChat = { target ->
-                                                session.currentValue {
-                                                    appState.resolveExistingDirectChat(
-                                                        target,
-                                                        existingDmGroupIdHex,
-                                                        diagnosticAttempt,
-                                                    )
-                                                }
-                                            },
-                                        )
+                                        ) {
+                                            resolveNewMessageDirectChat(
+                                                npub = npub,
+                                                existingDmGroupIdHex = existingDmGroupIdHex,
+                                                provenanceDirectChat = { provenance, target ->
+                                                    session.currentValue {
+                                                        appState.resolveProvenanceDirectChat(
+                                                            provenance,
+                                                            target,
+                                                            diagnosticAttempt,
+                                                        )
+                                                    }
+                                                },
+                                                existingDirectChat = { target ->
+                                                    session.currentValue {
+                                                        appState.resolveExistingDirectChat(
+                                                            target,
+                                                            existingDmGroupIdHex,
+                                                            diagnosticAttempt,
+                                                        )
+                                                    }
+                                                },
+                                            )
+                                        }
                                     }
+                                },
+                                createGroup = { target ->
+                                    session.currentValue { appState.createProfileChatGroup(target) }
+                                },
+                                loadCreatedChatListItem = { id ->
+                                    session.currentValue { appState.loadCreatedChatListItem(id) }
+                                },
+                                displayName = appState::displayName,
+                                markCreateOpenStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
+                                abandonCreateOpenTiming = {
+                                    if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)
+                                },
+                                directChatLookupAlreadyStarted = preparedLookup != null,
+                                diagnosticAttempt = diagnosticAttempt,
+                            )
+                    ) {
+                        is StartChatAttemptResult.Open ->
+                            if (session.isCurrent()) {
+                                accountRef?.let {
+                                    DmCreationDiagnostics.awaitFrame(
+                                        it,
+                                        result.item.group.groupIdHex,
+                                        runtimeGeneration,
+                                        diagnosticAttempt,
+                                    )
                                 }
-                            },
-                            createGroup = { target ->
-                                session.currentValue { appState.createProfileChatGroup(target) }
-                            },
-                            loadCreatedChatListItem = { id ->
-                                session.currentValue { appState.loadCreatedChatListItem(id) }
-                            },
-                            displayName = appState::displayName,
-                            markCreateOpenStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
-                            abandonCreateOpenTiming = {
-                                if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)
-                            },
-                            directChatLookupAlreadyStarted = preparedLookup != null,
-                            diagnosticAttempt = diagnosticAttempt,
-                        )
-                ) {
-                    is StartChatAttemptResult.Open ->
-                        if (session.isCurrent()) {
-                            accountRef?.let {
-                                DmCreationDiagnostics.awaitFrame(
-                                    it,
-                                    result.item.group.groupIdHex,
-                                    runtimeGeneration,
-                                    result.diagnosticAttempt,
-                                )
+                                markOpened()
+                                session.dispose()
+                                onOpenConversation(result.item, result.newlyCreated)
                             }
-                            openedConversation = true
-                            session.dispose()
-                            onOpenConversation(result.item, result.newlyCreated)
-                        }
-                    is StartChatAttemptResult.Failed -> if (session.isCurrent()) startChatError = result.error
+                        is StartChatAttemptResult.Failed -> if (session.isCurrent()) startChatError = result.error
+                    }
                 }
             } finally {
-                if (!openedConversation &&
-                    !session.isCurrent()
-                ) {
-                    diagnosticAttempt.record(
-                        DmCreationPhase.OWNER,
-                        DmCreationOutcome.REPLACED,
-                        DmCreationFailure.OWNER_REPLACED,
-                    )
-                }
                 creatingHex = null
             }
         }

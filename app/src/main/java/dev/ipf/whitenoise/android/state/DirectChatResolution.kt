@@ -4,6 +4,8 @@ import dev.ipf.marmotkit.ExistingDirectConversationFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
+import dev.ipf.whitenoise.android.diagnostics.DmCreationFailure
+import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
 import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
@@ -102,18 +104,30 @@ private suspend fun WhiteNoiseAppState.readExistingDirectConversation(
     diagnosticAttempt: DmCreationAttempt?,
 ): ExistingDirectRead =
     try {
-        withTimeoutOrNull(DIRECT_LOOKUP_TIMEOUT_MS) {
+        withDirectChatLookupDeadline(diagnosticAttempt) {
             ExistingDirectRead.Completed(marmotIo { existingDirectConversation(account, peer) })
-        } ?: ExistingDirectRead.Failed(DirectLookup.Unavailable).also {
-            val deadline = IllegalStateException("Native lookup deadline exceeded")
-            diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, deadline)
-        }
+        } ?: ExistingDirectRead.Failed(DirectLookup.Unavailable)
     } catch (cancel: CancellationException) {
         diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, cancel)
         throw cancel
     } catch (failure: MarmotKitException) {
         diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, failure)
         ExistingDirectRead.Failed(directLookupFailure(failure))
+    }
+
+/** A non-null read wrapper distinguishes a completed native miss from an expired Android deadline. */
+internal suspend fun <T : Any> withDirectChatLookupDeadline(
+    diagnosticAttempt: DmCreationAttempt?,
+    read: suspend () -> T,
+): T? =
+    withTimeoutOrNull(DIRECT_LOOKUP_TIMEOUT_MS) { read() }.also { result ->
+        if (result == null) {
+            diagnosticAttempt?.record(
+                DmCreationPhase.EXISTING_LOOKUP,
+                DmCreationOutcome.FAILURE,
+                DmCreationFailure.LOOKUP_TIMEOUT,
+            )
+        }
     }
 
 /**

@@ -40,13 +40,14 @@ internal class NewMessageRecipientPreparation internal constructor(
     suspend fun directChatResolution(): NewMessageDirectChatResolution =
         lookup.await().getOrElse { NewMessageDirectChatResolution(item = null, createRequired = false) }
 
+    /** Waits for both independent native boundaries without altering their typed results. */
     suspend fun awaitCompletion() {
         joinAll(prewarm, lookup)
     }
 
     /** Explicit cancellation and owner replacement have distinct trace outcomes without changing cancellation. */
     fun cancel(replaced: Boolean = false) {
-        if (replaced) {
+        if (replaced && (prewarm.isActive || lookup.isActive)) {
             diagnosticAttempt?.record(
                 DmCreationPhase.OWNER,
                 DmCreationOutcome.REPLACED,
@@ -78,6 +79,7 @@ internal suspend fun preparedLookupOrFresh(
 internal class NewMessageRecipientPreparationCoordinator {
     private var current: NewMessageRecipientPreparation? = null
 
+    /** Reuses an identical recipient key, replacing only unfinished work when the key changes. */
     fun prepare(
         scope: CoroutineScope,
         key: NewMessageRecipientPreparationKey,
@@ -113,7 +115,8 @@ internal class NewMessageRecipientPreparationCoordinator {
                 markStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_START)
                 diagnosticBoundary(diagnosticAttempt, DmCreationPhase.EXISTING_LOOKUP) { lookup() }.also {
                     if (it.isSuccess) {
-                        diagnosticAttempt?.record(DmCreationPhase.EXISTING_LOOKUP, DmCreationOutcome.SUCCESS)
+                        val resolution = it.getOrThrow()
+                        diagnosticAttempt?.lookupFinished(resolution.item != null || resolution.createRequired)
                     } else {
                         diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, requireNotNull(it.exceptionOrNull()))
                     }
@@ -129,11 +132,13 @@ internal class NewMessageRecipientPreparationCoordinator {
         return NewMessageRecipientPreparation(key, prewarmResult, lookupResult, diagnosticAttempt).also { current = it }
     }
 
+    /** Returns only the preparation owned by this exact account, query, retry and chat revision. */
     fun current(key: NewMessageRecipientPreparationKey): NewMessageRecipientPreparation? {
         val matching = current?.takeIf { it.key == key }
         return matching
     }
 
+    /** Cancels unfinished screen work; disposing a completed preparation produces no replacement record. */
     fun clear() {
         current?.cancel(replaced = true)
         current = null

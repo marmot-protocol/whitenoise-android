@@ -10,7 +10,8 @@ import dev.ipf.whitenoise.android.audio.DictationDiagnosticStore
 import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /** Closed native/host failure vocabulary: no message, identity, route or raw exception ever enters a trace. */
 internal enum class DmCreationFailure {
@@ -21,6 +22,9 @@ internal enum class DmCreationFailure {
     INVALID_IDENTITY,
     HYDRATION_PENDING,
     INDEX_NOT_READY,
+    LOOKUP_TIMEOUT,
+    LOOKUP_UNAVAILABLE,
+    OTHER_BINDING_ERROR,
     CREATED_PROJECTION_UNAVAILABLE,
     PUBLISH,
     CANCELLED,
@@ -40,10 +44,11 @@ internal fun dmCreationFailure(error: Throwable): DmCreationFailure =
         is MarmotKitException.DirectConversationIndexNotReady -> DmCreationFailure.INDEX_NOT_READY
         is MarmotKitException.CreatedGroupProjectionUnavailable -> DmCreationFailure.CREATED_PROJECTION_UNAVAILABLE
         is MarmotKitException.Publish -> DmCreationFailure.PUBLISH
+        is MarmotKitException -> DmCreationFailure.OTHER_BINDING_ERROR
         else -> DmCreationFailure.UNKNOWN
     }
 
-/** Preparation is ordinal zero; a tap/retry gets a separate attempt under its process-local interaction. */
+/** Closed Android-visible operation boundaries; native subphase distinctions remain unavailable. */
 internal enum class DmCreationPhase { PREWARM, EXISTING_LOOKUP, CREATE, PROJECTION, FIRST_FRAME, OWNER }
 
 internal enum class DmCreationOutcome { START, SUCCESS, FAILURE, CANCELLED, REPLACED }
@@ -55,20 +60,19 @@ internal class DmCreationInteraction(
 ) {
     private val token = UUID.randomUUID().toString()
     private val start = nowNanos()
-    private val attempts = AtomicInteger()
+    private val attempts = AtomicLong(-1L)
 
     /** Retries stay related without retaining any recipient/account/group identifier. */
-    fun nextAttempt(): DmCreationAttempt = attempt(attempts.incrementAndGet())
+    fun nextAttempt(): DmCreationAttempt = attempt(attempts.updateAndGet { (it + 1L).coerceAtLeast(1L) })
 
-    /** Parallel prewarm and lookup are distinguishable from the subsequent create tap. */
-    fun preparation(): DmCreationAttempt = attempt(0)
+    /** Every re-preparation gets a distinct ordinal; the initial preparation can precede tap ordinal one. */
+    fun preparation(): DmCreationAttempt = attempt(attempts.incrementAndGet())
 
     /** Separates overlapping preparation phases while keeping one interaction clock and attempt owner. */
-    private fun attempt(ordinal: Int): DmCreationAttempt {
-        val starts = java.util.concurrent.ConcurrentHashMap<DmCreationPhase, Long>()
+    private fun attempt(ordinal: Long): DmCreationAttempt {
+        val starts = ConcurrentHashMap<DmCreationPhase, Long>()
         return DmCreationAttempt { phase, outcome, failure ->
             val now = nowNanos()
-            if (ordinal > MAX_ATTEMPT) return@DmCreationAttempt
             if (outcome == DmCreationOutcome.START) starts[phase] = now
             val duration = starts[phase]?.let { ((now - it) / NANOS_PER_MS).coerceIn(0, MAX_ELAPSED_MS) } ?: -1L
             emit(
@@ -88,7 +92,6 @@ internal class DmCreationInteraction(
     }
 
     private companion object {
-        const val MAX_ATTEMPT = 1000
         const val NANOS_PER_MS = 1_000_000L
         const val MAX_ELAPSED_MS = 86_400_000L
     }
@@ -98,12 +101,32 @@ internal class DmCreationInteraction(
 internal class DmCreationAttempt(
     private val emit: (DmCreationPhase, DmCreationOutcome, DmCreationFailure) -> Unit,
 ) {
+    private val phaseFailures = ConcurrentHashMap<DmCreationPhase, DmCreationFailure>()
+
     /** Emits one typed boundary result without consulting private exception messages or stack contents. */
     fun record(
         phase: DmCreationPhase,
         outcome: DmCreationOutcome,
         failure: DmCreationFailure = DmCreationFailure.NONE,
-    ) = emit(phase, outcome, failure)
+    ) {
+        if (outcome == DmCreationOutcome.START) phaseFailures.remove(phase)
+        if (outcome == DmCreationOutcome.FAILURE || outcome == DmCreationOutcome.CANCELLED) {
+            phaseFailures[phase] = failure
+        }
+        emit(phase, outcome, failure)
+    }
+
+    /** Both preparation and taps classify an uncertain resolution identically, preserving any typed native cause. */
+    fun lookupFinished(definitive: Boolean) =
+        record(
+            DmCreationPhase.EXISTING_LOOKUP,
+            if (definitive) DmCreationOutcome.SUCCESS else DmCreationOutcome.FAILURE,
+            if (definitive) {
+                DmCreationFailure.NONE
+            } else {
+                phaseFailures[DmCreationPhase.EXISTING_LOOKUP] ?: DmCreationFailure.LOOKUP_UNAVAILABLE
+            },
+        )
 
     /** Lifecycle replacement is distinct from a caller cancellation and carries no owner identifiers. */
     fun ownerReplaced() = record(DmCreationPhase.OWNER, DmCreationOutcome.REPLACED, DmCreationFailure.OWNER_REPLACED)
@@ -122,10 +145,14 @@ internal class DmCreationAttempt(
 /** Bounded, opt-in local diagnostics share the existing private writer/retention/export controls. */
 internal object DmCreationDiagnostics {
     @Volatile private var recorder: DictationDiagnosticRecorder? = null
+
+    @Volatile private var enabled = false
     private val pendingFrames = LinkedHashMap<Destination, PendingFrame>()
 
     /** Installs an independent no-backup stream; no records enter automatic native telemetry upload. */
+    @Synchronized
     fun attach(context: Context) {
+        enabled = false
         recorder?.close()
         recorder =
             DictationDiagnosticRecorder(
@@ -139,21 +166,26 @@ internal object DmCreationDiagnostics {
     }
 
     /** Uses the same audit recording/disclosure grant and immediate revoke fence as other local diagnostics. */
+    @Synchronized
     fun setEnabled(enabled: Boolean) {
+        this.enabled = false
         recorder?.setEnabled(enabled)
+        this.enabled = enabled && recorder != null
     }
 
     /** Adds only compile-time/public platform context; unsupported revision fields say unknown. */
     fun record(fields: Map<String, Any>) {
-        recorder?.recordFields(
-            fields.filterKeys { it in TRACE_FIELDS } +
-                mapOf(
-                    "app_version" to safeBuildToken(BuildConfig.VERSION_NAME),
-                    "app_version_code" to BuildConfig.VERSION_CODE,
-                    "distribution" to safeBuildToken(BuildConfig.FLAVOR_distribution),
-                    "android_api" to Build.VERSION.SDK_INT,
-                    "mdk_revision" to safeBuildToken(BuildConfig.MDK_SHORT_SHA),
-                ),
+        if (!enabled) return
+        recorder?.recordFields(fields.filterKeys { it in TRACE_FIELDS } + buildContext)
+    }
+
+    private val buildContext by lazy {
+        mapOf(
+            "app_version" to safeBuildToken(BuildConfig.VERSION_NAME),
+            "app_version_code" to BuildConfig.VERSION_CODE,
+            "distribution" to safeBuildToken(BuildConfig.FLAVOR_distribution),
+            "android_api" to Build.VERSION.SDK_INT,
+            "mdk_revision" to safeBuildToken(BuildConfig.MDK_SHORT_SHA),
         )
     }
 
@@ -168,9 +200,8 @@ internal object DmCreationDiagnostics {
         account: String,
         group: String,
         generation: Int,
-        attempt: DmCreationAttempt?,
+        attempt: DmCreationAttempt,
     ) {
-        if (attempt == null) return
         attempt.record(DmCreationPhase.FIRST_FRAME, DmCreationOutcome.START)
         synchronized(pendingFrames) {
             pruneFrames()
@@ -220,7 +251,7 @@ internal object DmCreationDiagnostics {
 
     /** Compile metadata is a small token rather than an arbitrary string from a provider or exception. */
     private fun safeBuildToken(value: String): String {
-        val allowed = value.matches(Regex("[A-Za-z0-9._-]{1,80}"))
+        val allowed = value.matches(BUILD_TOKEN)
         return if (allowed) value else "unknown"
     }
 
@@ -235,6 +266,7 @@ internal object DmCreationDiagnostics {
         val createdAt: Long,
     )
 
+    private val BUILD_TOKEN = Regex("[A-Za-z0-9._-]{1,80}")
     private val TRACE_FIELDS =
         setOf(
             "operation",

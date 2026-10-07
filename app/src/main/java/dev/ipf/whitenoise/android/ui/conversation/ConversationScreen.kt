@@ -106,7 +106,6 @@ import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
 import dev.ipf.whitenoise.android.core.timelineRowKind
 import dev.ipf.whitenoise.android.core.usesPersistedFailurePresentation
-import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.BlockOutcome
@@ -3261,20 +3260,12 @@ internal fun ConversationScreen(
                 ),
         )
 
-    val dmFrameGeneration = appState.runtimeGeneration
-    val dmFrameGroup = controller.group.groupIdHex
-    val dmFrameAttempt =
-        remember(chat.id, conversationAccountRef, dmFrameGeneration) {
-            conversationAccountRef?.let { DmCreationDiagnostics.pendingFrame(it, dmFrameGroup, dmFrameGeneration) }
-        }
-    LaunchedEffect(dmFrameAttempt) {
-        val attempt = dmFrameAttempt ?: return@LaunchedEffect
-        val account = conversationAccountRef ?: return@LaunchedEffect
-        withFrameNanos { }
-        if (appState.runtimeGeneration == dmFrameGeneration) {
-            DmCreationDiagnostics.firstFrame(account, dmFrameGroup, dmFrameGeneration, attempt)
-        }
-    }
+    RecordDmConversationFirstFrame(
+        accountRef = conversationAccountRef,
+        groupId = controller.group.groupIdHex,
+        runtimeGeneration = appState.runtimeGeneration,
+        currentRuntimeGeneration = { appState.runtimeGeneration },
+    )
 
     var createOpenConversationTiming by remember(chat.id) {
         mutableStateOf(ChatCreateOpenConversationTimingState())

@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
-import dev.ipf.whitenoise.android.diagnostics.DmCreationFailure
 import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
 import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.state.AppText
@@ -40,7 +39,6 @@ internal suspend fun attemptOpenOrStartProfileChat(
                     StartChatAttemptResult.Open(
                         item = resolution.item,
                         newlyCreated = false,
-                        diagnosticAttempt = diagnosticAttempt,
                     )
                 !resolution.createRequired -> {
                     abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_FAILED)
@@ -99,18 +97,6 @@ private suspend fun tracedExistingDirectChatLookup(
     if (!directChatLookupAlreadyStarted) {
         markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_RETURN)
     }
-    diagnosticAttempt?.record(
-        DmCreationPhase.EXISTING_LOOKUP,
-        if (resolution.item != null || resolution.createRequired) {
-            DmCreationOutcome.SUCCESS
-        } else {
-            DmCreationOutcome.FAILURE
-        },
-        if (resolution.item != null || resolution.createRequired) {
-            DmCreationFailure.NONE
-        } else {
-            DmCreationFailure.UNKNOWN
-        },
-    )
+    diagnosticAttempt?.lookupFinished(resolution.item != null || resolution.createRequired)
     return resolution
 }

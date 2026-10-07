@@ -254,6 +254,7 @@ class DmCreationDiagnosticsTest {
         }
     }
 
+    /** An explicit synthetic group keeps private fixture values out of the diagnostic vocabulary. */
     private fun group(name: String) =
         AppGroupRecordFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
@@ -284,6 +285,7 @@ class DmCreationDiagnosticsTest {
             disbandRequest = null,
         )
 
+    /** Builds required native group media metadata without issuing a network read or upload. */
     private fun encryptedMedia(): AppGroupEncryptedMediaComponentFfi {
         val endpoint = AppBlobEndpointFfi("blossom-v1", "https://blossom.primal.net")
         return AppGroupEncryptedMediaComponentFfi(
