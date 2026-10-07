@@ -137,6 +137,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelinePage
 import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelineRecord
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PUSH_WAKE_MAX_ATTEMPTS
+import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
 import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
 import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
 import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
@@ -3783,6 +3784,42 @@ class WhiteNoiseAppState private constructor(
             },
         )
     }
+
+    /**
+     * Approval may outlive a private-picture edit and the bounded chat projection. Re-read its exact native row;
+     * failed lookup, account changes and cold approval leave the scrubbed pin generic until a later refresh.
+     */
+    internal suspend fun refreshApprovedPinnedShortcut(capability: PinnedConversationCapability) {
+        val account = capability.accountRef
+        val runtime = runtimeGeneration
+        val revision = pinnedShortcutPresentationRevision.incrementAndGet()
+        if (!canRefreshApprovedPin(account, runtime)) return
+        val item = preloadNotificationChatListItem(account, capability.groupIdHex)
+        val available = item.group.selfMembership == SelfMembershipFfi.MEMBER && !item.group.pendingConfirmation
+        if (!available || !canRefreshApprovedPin(account, runtime)) return
+        val title = chatListItemDisplayTitle(item, this, notificationGroupTitleCopy(appContext))
+        val presentation = pinnedConversationPresentation(account, item, title)
+        withContext(Dispatchers.IO) {
+            val tokens = PinnedConversationTokens.create(appContext)
+            PinnedConversationShortcuts(appContext).refresh(account, mapOf(capability.groupIdHex to presentation)) {
+                isActive &&
+                    canRefreshApprovedPin(account, runtime) &&
+                    pinnedShortcutPresentationRevision.get() == revision &&
+                    tokens.isValid(capability)
+            }
+        }
+    }
+
+    /** A background callback never switches accounts or publishes through an undecided or showing App Lock. */
+    private fun canRefreshApprovedPin(
+        account: String,
+        runtime: Int,
+    ): Boolean =
+        activeAccountRef == account &&
+            runtimeGeneration == runtime &&
+            !appLockScreenVisible &&
+            !appUnlockEvaluationPending &&
+            accounts.any { it.label == account && it.isSignedInSigningAccount() }
 
     /** Rebuilds approved pins' labels and cached pixels for one captured account/runtime; no pins means no work. */
     private suspend fun refreshPinnedConversationPresentation(

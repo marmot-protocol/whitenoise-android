@@ -10,7 +10,14 @@ import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Request acceptance is distinct from the launcher's later approval; no app-owned pinned flag is stored. */
 internal enum class ConversationPinResult { REQUESTED, ALREADY_PINNED, UNSUPPORTED, UNAVAILABLE, FAILED }
@@ -131,8 +138,11 @@ internal class PinnedConversationShortcuts(
             }.getOrDefault(ConversationPinResult.FAILED)
         }
 
-    /** A stale approval can scrub/disable only its old platform ID; it never recreates a shortcut. */
-    fun approved(capability: PinnedConversationCapability) =
+    /**
+     * Scrubs peer-owned pixels captured before approval; true asks the caller to rebuild from a current native row.
+     * A stale approval can disable only its old platform ID, and group-owned pictures retain precedence.
+     */
+    fun approved(capability: PinnedConversationCapability): Boolean =
         synchronized(UserEventNotificationGroup.mutationLock) {
             val prior = runCatching { platform.shortcuts().firstOrNull { it.id == capability.shortcutId } }.getOrNull()
             if (!tokens.isValid(capability)) {
@@ -141,9 +151,20 @@ internal class PinnedConversationShortcuts(
                 } finally {
                     platform.disable(listOf(capability.shortcutId))
                 }
-            } else if (prior != null && !shortcutPreviewAllowed(context, prior)) {
-                platform.update(listOf(genericNotificationShortcut(context, prior)))
+                return@synchronized false
             }
+            if (prior == null) return@synchronized false
+            val previewAllowed = shortcutPreviewAllowed(context, prior)
+            val contactOwned = contactPictureOwnsConversationIcon(prior)
+            if (!previewAllowed || contactOwned) {
+                val scrubbed = runCatching { platform.update(listOf(genericNotificationShortcut(context, prior))) }
+                if (!scrubbed.getOrDefault(false)) {
+                    platform.disable(listOf(capability.shortcutId))
+                    scrubbed.getOrThrow()
+                    return@synchronized false
+                }
+            }
+            previewAllowed && contactOwned
         }
 
     /** Queries launcher ownership off-main before the caller prepares titles or cached avatar pixels. */
@@ -293,13 +314,29 @@ internal class PinnedConversationShortcuts(
 
 /** Receives only the app-created explicit success callback; denial produces no callback or persisted pin state. */
 class PinnedConversationPinReceiver : BroadcastReceiver() {
-    /** Rejects unrelated broadcasts and limits late approval to scrubbing or disabling its exact old ID. */
+    /** Scrubs approval off-main, then bounds optional native lookup to the broadcast lifetime. */
     override fun onReceive(
         context: Context,
         intent: Intent,
     ) {
         if (intent.action != PinnedConversationNavigation.ACTION_PINNED) return
         val capability = PinnedConversationNavigation.capability(intent) ?: return
-        runCatching { PinnedConversationShortcuts(context).approved(capability) }
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                withTimeoutOrNull(2_000L) {
+                    runCatchingCancellable {
+                        if (PinnedConversationShortcuts(context).approved(capability)) {
+                            val appState = (context.applicationContext as? WhiteNoiseApplication)?.initializedAppState()
+                            withContext(Dispatchers.Main.immediate) {
+                                appState?.refreshApprovedPinnedShortcut(capability)
+                            }
+                        }
+                    }
+                }
+            } finally {
+                pending.finish()
+            }
+        }
     }
 }

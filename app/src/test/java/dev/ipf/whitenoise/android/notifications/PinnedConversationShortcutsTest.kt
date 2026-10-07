@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -360,6 +361,96 @@ class PinnedConversationShortcutsTest {
         val cleared = reconciled.single()
         assertEquals(refreshed.intent.data, cleared.intent.data)
         assertNotEquals(Color.MAGENTA, (cleared.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
+    }
+
+    /** A Clear or replacement while approval waits cannot retain the request's old private photo. */
+    @Test
+    fun approvalAfterPrivatePictureEditRebuildsOnlyCurrentPixels() {
+        val platform = Platform(context)
+        val cap = capability
+        val stale = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        var current: Bitmap? = stale
+        val presentation = PinnedConversationPresentation("Peer", contact = "peer", currentAvatar = { current })
+        val owner = PinnedConversationShortcuts(context, platform)
+        owner.request(cap, "Peer", null, presentation = presentation) { true }
+        current = null
+        platform.approve(platform.requests.single())
+
+        assertTrue(PinnedConversationShortcuts(context, platform).approved(cap))
+        val scrubbed = platform.updates.single().single()
+        assertEquals(context.getString(R.string.app_name), scrubbed.longLabel)
+        assertEquals(IconCompat.TYPE_RESOURCE, scrubbed.icon!!.type)
+        assertEquals(cap, PinnedConversationNavigation.capability(scrubbed.intent))
+        assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
+        val cleared = platform.updates.last().single()
+        assertNotEquals(Color.MAGENTA, (cleared.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
+
+        current = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
+        assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
+        val replaced = platform.updates.last().single()
+        assertEquals(Color.BLUE, (replaced.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
+    }
+
+    /** Replacement before approval is resolved from the current source rather than the captured request bitmap. */
+    @Test
+    fun approvalAfterPrivatePictureReplacementUsesTheNewPicture() {
+        val platform = Platform(context)
+        val cap = capability
+        var current = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        val presentation = PinnedConversationPresentation("Peer", contact = "peer", currentAvatar = { current })
+        val owner = PinnedConversationShortcuts(context, platform)
+        owner.request(cap, "Peer", null, presentation = presentation) { true }
+        current = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
+        platform.approve(platform.requests.single())
+        assertTrue(owner.approved(cap))
+        assertTrue(owner.refresh(ACCOUNT, mapOf(GROUP to presentation)))
+        val rebuilt = platform.updates.last().single()
+        assertEquals(Color.BLUE, (rebuilt.icon!!.loadDrawable(context) as BitmapDrawable).bitmap.getPixel(0, 0))
+    }
+
+    /** A pin outside the projection stays generic after approval when canonical lookup cannot supply its row. */
+    @Test
+    fun approvalWithoutCurrentRowCannotRestorePendingPrivatePixels() {
+        val platform = Platform(context)
+        val cap = capability
+        val stale = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
+        val presentation = PinnedConversationPresentation("Peer", stale, "peer")
+        val owner = PinnedConversationShortcuts(context, platform)
+        owner.request(cap, "Peer", null, presentation = presentation) { true }
+        platform.approve(platform.requests.single())
+        assertTrue(PinnedConversationShortcuts(context, platform).approved(cap))
+        assertTrue(owner.refresh(ACCOUNT, emptyMap()))
+        val retained = platform.updates.single().single()
+        assertEquals(IconCompat.TYPE_RESOURCE, retained.icon!!.type)
+        assertEquals(context.getString(R.string.app_name), retained.longLabel)
+        assertTrue(tokens.isValid(cap))
+    }
+
+    /** A group-owned picture has no contact-pixel ownership and does not need a peer-photo approval scrub. */
+    @Test
+    fun approvalPreservesGroupOwnedPicture() {
+        val platform = Platform(context)
+        val cap = capability
+        val groupPicture = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888)
+        val owner = PinnedConversationShortcuts(context, platform)
+        owner.request(cap, "Group", null, groupPicture) { true }
+        platform.approve(platform.requests.single())
+        assertFalse(owner.approved(cap))
+        assertTrue(platform.updates.isEmpty())
+    }
+
+    /** Failed approval scrubbing makes that exact pin unavailable rather than leaving usable old private pixels. */
+    @Test
+    fun failedApprovalScrubDisablesOnlyTheAffectedPin() {
+        val platform = Platform(context)
+        val cap = capability
+        val presentation = PinnedConversationPresentation("Peer", contact = "peer")
+        val owner = PinnedConversationShortcuts(context, platform)
+        owner.request(cap, "Peer", null, presentation = presentation) { true }
+        platform.approve(platform.requests.single())
+        platform.failNextUpdate = true
+        assertTrue(runCatching { owner.approved(cap) }.isFailure)
+        assertEquals(listOf(cap.shortcutId), platform.disabled)
     }
 
     /** An older avatar-only refresh cannot overwrite a newer projection after waiting on launcher inventory. */

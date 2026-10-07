@@ -24,6 +24,11 @@ internal fun stampContactPictureShortcut(
     }
 }
 
+/** Identifies peer-owned conversation pixels that may have changed while launcher approval was pending. */
+internal fun contactPictureOwnsConversationIcon(shortcut: ShortcutInfoCompat): Boolean =
+    shortcut.extras?.getString(CONTACT_ICON_SCOPE) != null &&
+        shortcut.extras?.getBoolean(CONTACT_CONVERSATION_ICON) == true
+
 /** Replaces cached/pinned pixels after Save or Clear, including shortcuts outside the recent chat window. */
 internal fun refreshContactPictureShortcuts(
     context: Context,
