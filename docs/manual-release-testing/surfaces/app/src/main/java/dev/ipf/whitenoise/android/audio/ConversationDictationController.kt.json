@@ -191,7 +191,7 @@
         ]
       },
       {
-        "surface": "Terminal dictation failures without recorded audio retain foreground protection until native capture closes",
+        "surface": "Terminal dictation failures and direct replacement retain foreground protection until native capture closes",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "val releaseAfterCaptureClosure = releaseDurableSession && durableSession && foregroundMicrophoneRequired",
         "test_ids": [

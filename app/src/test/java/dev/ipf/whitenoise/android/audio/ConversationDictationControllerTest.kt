@@ -3733,15 +3733,19 @@ class ConversationDictationControllerTest {
         var oldClosures = 0
         val fixture = fixture(draft = TextFieldValue(""), onDraftRead = { onDraftRead() })
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
-        val oldSessionId = fixture.controller.state.sessionId
         fixture.platform.pendingCallerAudio = true
         fixture.platform.tracksCallerAudioDisposal = true
+        fixture.platform.discardCaptureActive = true
         fixture.platform.deferDiscardClosure = true
         fixture.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("")
+        assertFalse(fixture.controller.requestStart(OTHER_ACCOUNT, OTHER_GROUP, TextFieldValue("")))
+        val oldClosure = requireNotNull(fixture.platform.discardClosureCallback)
+        fixture.platform.discardCaptureActive = false
+        oldClosure()
         onDraftRead = {
-            assertEquals(oldSessionId, fixture.controller.state.sessionId)
+            assertTrue(fixture.controller.state is ConversationDictationState.Idle)
             onDraftRead = {}
-            requireNotNull(fixture.platform.discardClosureCallback).invoke()
+            oldClosure()
             oldClosures++
         }
         assertTrue(fixture.controller.requestStart(OTHER_ACCOUNT, OTHER_GROUP, TextFieldValue("")))
@@ -3753,7 +3757,7 @@ class ConversationDictationControllerTest {
         )
         assertTrue(fixture.controller.foregroundMicrophoneRequired)
         assertTrue(fixture.controller.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE != 0)
-        requireNotNull(fixture.platform.discardClosureCallback).invoke()
+        oldClosure()
         assertTrue(fixture.controller.foregroundMicrophoneRequired)
         fixture.controller.cancel()
     }
@@ -6321,6 +6325,40 @@ class ConversationDictationControllerTest {
         replay.onResult("recovered on first retry")
         assertEquals("Draft recovered on first retry", fixture.drafts.getValue(key()).text)
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    /** A direct replacement cannot carry the old closing recorder's service token into another chat. */
+    @Test
+    fun activeReplacementWaitsForNativeClosureBeforeChangingCaptureOwner() {
+        val platform =
+            FakePlatform(deferCaptureCompletion = true).apply {
+                tracksCallerAudioDisposal = true
+                discardCaptureActive = true
+                deferDiscardClosure = true
+            }
+        var stops = 0
+        val fixture = fixture(draft = TextFieldValue("Draft"), platform = platform, stopDurableSession = { stops++ })
+        fixture.drafts[OTHER_ACCOUNT to OTHER_GROUP] = TextFieldValue("Other")
+        assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key())))
+        val oldToken = requireNotNull(fixture.controller.notificationSessionToken)
+        assertFalse(fixture.controller.requestStart(OTHER_ACCOUNT, OTHER_GROUP, TextFieldValue("Other")))
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        assertEquals(oldToken, fixture.controller.notificationSessionToken)
+        assertEquals(1, platform.captureSessionsStarted)
+        assertTrue(fixture.controller.hasDurableSession)
+        assertEquals(0, stops)
+        val nativeClosed = checkNotNull(platform.discardClosureCallback)
+        platform.discardCaptureActive = false
+        nativeClosed()
+        assertFalse(fixture.controller.hasDurableSession)
+        assertEquals(1, stops)
+        assertTrue(fixture.controller.requestStart(OTHER_ACCOUNT, OTHER_GROUP, TextFieldValue("Other")))
+        assertEquals(2, platform.captureSessionsStarted)
+        assertFalse(oldToken == fixture.controller.notificationSessionToken)
+        nativeClosed()
+        assertTrue(fixture.controller.hasDurableSession)
+        assertEquals(1, stops)
+        fixture.controller.cancel()
     }
 
     /** An empty recorder failure keeps foreground protection until caller capture actually closes. */

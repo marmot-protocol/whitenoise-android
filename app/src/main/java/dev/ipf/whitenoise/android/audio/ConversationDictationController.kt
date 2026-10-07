@@ -807,19 +807,7 @@ internal class ConversationDictationController internal constructor(
         // cannot be synchronously terminated by this controller. Keep its one
         // ActivityResult owner stable until the provider returns, so a result
         // can never be misattributed to a replacement target.
-        if (state is ConversationDictationState.ProviderActivityActive) {
-            conversationDictationDiagnostic("event=request_start accepted=false reason=provider_activity_active")
-            return false
-        }
-        val retainsTranscript =
-            accumulatedTranscript.isNotBlank() ||
-                pendingCompletedTranscript.isNotBlank() ||
-                (state as? ConversationDictationState.Failed)?.retainedTranscript?.isNotBlank() == true
-        if (blocksNewRequest && (hasSameTarget(accountRef, groupIdHex, mode) || retainsTranscript)) {
-            val reason = if (retainsTranscript) "transcript_pending" else "session_active"
-            conversationDictationDiagnostic("event=request_start accepted=false reason=$reason")
-            return false
-        }
+        if (rejectsExistingSession(accountRef, groupIdHex, mode)) return false
 
         // A request for a different target/mode is an explicit replacement.
         // Tear down the previous generation before publishing the new target;
@@ -829,7 +817,7 @@ internal class ConversationDictationController internal constructor(
         draftRecovery.reset()
         draftTargetRemoved = false
         resetTranscriptSession()
-        beginCaptureOwnership()
+        if (!beginCaptureOwnership()) return false
         if (state.sessionId != null) conversationDictationDiagnostic("event=session_finished outcome=replaced")
         val sessionId = ++nextSessionId
         val capturedRevision = readDraft(accountRef, groupIdHex).revision
@@ -866,6 +854,28 @@ internal class ConversationDictationController internal constructor(
         return true
     }
 
+    /** An external Activity or useful transcript keeps its original gesture owner. */
+    private fun rejectsExistingSession(
+        accountRef: String,
+        groupIdHex: String,
+        mode: ConversationDictationMode,
+    ): Boolean {
+        if (state is ConversationDictationState.ProviderActivityActive) {
+            conversationDictationDiagnostic("event=request_start accepted=false reason=provider_activity_active")
+            return true
+        }
+        val retainsTranscript =
+            accumulatedTranscript.isNotBlank() ||
+                pendingCompletedTranscript.isNotBlank() ||
+                (state as? ConversationDictationState.Failed)?.retainedTranscript?.isNotBlank() == true
+        val rejected = blocksNewRequest && (hasSameTarget(accountRef, groupIdHex, mode) || retainsTranscript)
+        if (rejected) {
+            val reason = if (retainsTranscript) "transcript_pending" else "session_active"
+            conversationDictationDiagnostic("event=request_start accepted=false reason=$reason")
+        }
+        return rejected
+    }
+
     /** Capture closing and an unavailable target both reject a gesture before changing its owner. */
     private fun canBeginCapture(
         accountRef: String,
@@ -883,11 +893,17 @@ internal class ConversationDictationController internal constructor(
     }
 
     /** A new gesture cannot inherit capture closure or notification actions from its predecessor. */
-    private fun beginCaptureOwnership() {
+    private fun beginCaptureOwnership(): Boolean {
+        // An explicit replacement can begin teardown after the initial gesture preflight passed.
+        if (pendingCaptureLeaseReleaseGeneration != null) {
+            cancelSession()
+            return false
+        }
         captureClosureGeneration += 1L
         platform.beginCaptureSession()
         foregroundMicrophoneRequired = true
         notificationActionGeneration += 1L
+        return true
     }
 
     /** Whether a duplicate request points at the current conversation and recognition mode. */
