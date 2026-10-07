@@ -3094,6 +3094,81 @@ class ConversationDictationControllerTest {
         assertEquals(1, expired)
     }
 
+    /** Saved text can be edited or deleted without creating a new recovery-service obligation. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun editedSavedTextCompletesPasteOrExpiresBlockedRetrySilently() =
+        runTest {
+            for (edited in listOf("edited", "", "Draft retained")) {
+                for (paste in listOf(true, false)) {
+                    var expired = 0
+                    var starts = 0
+                    var sends = 0
+                    val f = fixture(
+                        draft = TextFieldValue("Draft", TextRange(5)),
+                        targetValidationScope = this,
+                        startDurableSession = { _, ready ->
+                            starts++
+                            ready()
+                            true
+                        },
+                        onRecoveryExpired = { expired++ },
+                        sendTranscriptIfOriginUnchanged = {
+                            sends++
+                            false
+                        },
+                    )
+                    f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+                    f.controller.send()
+                    f.platform.listener.onResult("retained")
+                    advanceUntilIdle()
+                    assertEquals(1, sends)
+                    f.edit(key(), TextFieldValue(edited))
+                    f.controller.onAppForegrounded()
+                    assertFalse(f.controller.hasUnrecoveredTranscript)
+                    assertFalse(f.controller.canRetryRecoveredSend)
+                    assertFalse(f.controller.hasDurableSession)
+                    if (paste) f.controller.paste() else repeat(2) { f.controller.retry() }
+                    advanceUntilIdle()
+                    assertEquals(paste, f.controller.state is ConversationDictationState.Idle)
+                    assertFalse(f.controller.hasDurableSession)
+                    assertEquals(1, starts)
+                    assertEquals(1, sends)
+                    assertEquals(1, f.writes)
+                    assertEquals(edited, f.drafts.getValue(key()).text)
+                    f.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
+                    f.controller.onAppForegrounded()
+                    assertTrue(f.controller.state is ConversationDictationState.Idle)
+                    assertEquals(0, expired)
+                }
+            }
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun neverWrittenTextRetainsRecoveryProtectionAndExpiryWarning() =
+        runTest {
+            var expired = 0
+            val f = fixture(
+                draft = TextFieldValue(""),
+                targetValidationScope = this,
+                allowDraftWrite = { false },
+                onRecoveryExpired = { expired++ },
+            )
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            f.controller.send()
+            f.platform.listener.onResult("unsaved")
+            advanceUntilIdle()
+            f.controller.onAppForegrounded()
+            assertTrue(f.controller.hasUnrecoveredTranscript)
+            assertTrue(f.controller.hasDurableSession)
+            assertEquals(0, f.writes)
+            f.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
+            f.controller.onAppForegrounded()
+            assertEquals(1, expired)
+            assertFalse(f.controller.hasDurableSession)
+        }
+
     /** A sleeping device cannot reattach expired PCM before its delayed timer is dispatched. */
     @Test
     fun foregroundReturnExpiresRecoveryAfterSleepWithoutReattaching() {
@@ -3315,13 +3390,14 @@ class ConversationDictationControllerTest {
         f.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
         assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
         assertEquals("body", f.drafts.getValue(key()).text)
+        f.edit(key(), TextFieldValue("edited"))
         f.controller.onAppForegrounded()
         assertTrue(f.controller.foregroundMicrophoneRequired)
         assertTrue(f.controller.hasDurableSession)
         closingCapture.completeCapture()
         assertFalse(f.controller.foregroundMicrophoneRequired)
         assertFalse(f.controller.hasDurableSession)
-        assertEquals("body", f.drafts.getValue(key()).text)
+        assertEquals("edited", f.drafts.getValue(key()).text)
         assertEquals(1, f.writes)
         assertTrue(f.controller.state is ConversationDictationState.Failed)
     }
@@ -3922,7 +3998,8 @@ class ConversationDictationControllerTest {
 
     @Test
     fun repeatedFinalNoMatchKeepsEditedDraftAndUnresolvedRecovery() {
-        val f = fixture(draft = TextFieldValue(""))
+        var expired = 0
+        val f = fixture(draft = TextFieldValue(""), onRecoveryExpired = { expired++ })
         f.platform.pendingCallerAudio = true
         f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
         f.platform.listener.onResult("first")
@@ -3944,7 +4021,9 @@ class ConversationDictationControllerTest {
         assertFalse(f.controller.canRetryRecoveredSend)
         assertEquals(1, f.writes)
         assertEquals(1, f.controller.completionRevision(ACCOUNT, GROUP))
-        f.controller.cancel()
+        f.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
+        f.controller.onAppForegrounded()
+        assertEquals(1, expired)
         assertTrue(f.controller.state is ConversationDictationState.Idle)
         assertEquals("New draft", f.drafts.getValue(key()).text)
     }

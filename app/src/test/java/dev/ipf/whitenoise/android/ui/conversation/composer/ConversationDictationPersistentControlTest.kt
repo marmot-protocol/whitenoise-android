@@ -259,6 +259,22 @@ class ConversationDictationPersistentControlTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Failed)
     }
 
+    /** The visible Send retry stays disabled after an intentionally edited or deleted saved transcript. */
+    @Test
+    fun editedSavedTranscriptDisablesRetrySendAndKeepsDismissAvailable() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        fixture.controller.send()
+        fixture.platform.listener.onResult("dictated")
+        fixture.edit(TextFieldValue(""))
+        fixture.controller.onAppForegrounded()
+        render(fixture)
+        composeRule.onNodeWithContentDescription("Retry Send").assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed().performClick()
+        assertEquals("", fixture.draft.text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
     /** Verifies provider-readiness feedback and cancellation fit at large font in RTL. */
     @Test
     fun readinessFeedbackFitsTheRootBarAtLargeFontRtl() {

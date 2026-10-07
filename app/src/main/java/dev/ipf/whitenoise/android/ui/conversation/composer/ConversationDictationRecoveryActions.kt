@@ -41,7 +41,7 @@ internal fun ConversationDictationFailureAction(
     val retrySend = state.reason == ConversationDictationFailure.SendBlocked
     var confirmPartialSend by remember(state) { mutableStateOf(false) }
     val recoveredSendAvailable =
-        !state.draftRecovered || controller.canRetryRetainedAudio || controller.canRetryRecoveredSend
+        controller.hasUnrecoveredTranscript || controller.canRetryRetainedAudio || controller.canRetryRecoveredSend
     IconButton(
         enabled =
             !retrySend ||

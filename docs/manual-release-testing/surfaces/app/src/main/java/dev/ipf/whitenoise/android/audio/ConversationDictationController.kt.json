@@ -165,6 +165,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Saved dictation edits expire silently while unsaved text and audio remain protected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "val hasUnrecoveredTranscript: Boolean",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

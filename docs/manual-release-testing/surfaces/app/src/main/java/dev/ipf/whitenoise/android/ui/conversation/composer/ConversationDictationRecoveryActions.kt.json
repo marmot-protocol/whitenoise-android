@@ -1,0 +1,102 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+  "legacy_sha256": "73f24433091ec72302706752d670e0769c4370fdcd522e382eaab2731054cb8a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "string:dictation_incomplete_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_incomplete_title",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_incomplete_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_incomplete_text",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_send_recognized_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_send_recognized_text",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationSendConfirmation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "fun ConversationDictationSendConfirmation(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationPartialSendDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "fun ConversationDictationPartialSendDialog(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationFailureAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "fun ConversationDictationFailureAction(",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:dictation_retry_send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_retry_send",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_open_speech_service",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.dictation_open_speech_service",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:open_app_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.open_app_settings",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Edited saved dictation cannot restart an ineligible Retry Send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+        "anchor": "controller.hasUnrecoveredTranscript",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
