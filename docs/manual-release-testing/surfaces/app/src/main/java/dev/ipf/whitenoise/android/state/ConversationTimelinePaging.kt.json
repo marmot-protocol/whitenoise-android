@@ -1,0 +1,41 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+  "legacy_sha256": "0db59be86e9c8a9cd7a27c161e51016159ae4975a8635436ded5581252a9cba7",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Automatic older prefetch stands down after a page brings no older rows instead of looping",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.settleOlderPrefetchGuard(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Automatic older history failures recover quietly; delayed retryable replies use the pre-request oldest row to distinguish committed older progress from unrelated replacements",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.loadOlderPageInternal(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "A superseded page retries the replacement window within a bounded gesture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.pageWithRetryBudget(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "An upward page reports the reader's oldest visible row as the window anchor before paging",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
+        "anchor": "fun ConversationController.pageOlderIfActive(",
+        "test_ids": [
+          "CON-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

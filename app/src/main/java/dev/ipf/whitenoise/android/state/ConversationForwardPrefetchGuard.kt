@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.setValue
+import dev.ipf.marmotkit.ConversationWindowRevisionFfi
 
 /** Why a page was asked for, which decides how its failure is treated (#2764). */
 enum class ConversationPagingOrigin {
@@ -22,11 +24,11 @@ enum class ConversationPagingOrigin {
 internal const val CONVERSATION_AUTOMATIC_NEWER_PAGE_ATTEMPTS = 3
 
 /**
- * How many automatic older pages may come back without new rows before the prefetch stands down.
+ * How many automatic older pages may fail or return no new rows before the prefetch stands down.
  *
  * One is enough: a page the engine answered with nothing older is an answer, not a failure to
- * answer, so asking again on the next layout pass only repeats it (#2727). Not-ready and deadline
- * outcomes never reach this budget, because they arm the visible retry row instead.
+ * answer, so asking again on the next layout pass only repeats it (#2727). Transient failures
+ * also wait quietly for recovery instead of inserting a retry row into the transcript.
  */
 internal const val CONVERSATION_AUTOMATIC_OLDER_PAGE_ATTEMPTS = 1
 
@@ -44,8 +46,15 @@ internal const val CONVERSATION_AUTOMATIC_OLDER_PAGE_ATTEMPTS = 1
 internal class AutomaticPagingGuard(
     private val budget: Int,
 ) {
+    private var failedRevision: ConversationWindowRevisionFfi? = null
+    private var requiresReplacement = false
+
     /** Consecutive automatic pages that made no progress since the last one that advanced. */
     var consecutiveFailures by mutableIntStateOf(0)
+        private set
+
+    /** Monotonic demand ticket: survives a block/release while the UI collector awaits a page. */
+    var recoveryGeneration by mutableLongStateOf(0L)
         private set
 
     /** Whether the automatic prefetch should stand down until something advances the window. */
@@ -53,13 +62,38 @@ internal class AutomaticPagingGuard(
         get() = consecutiveFailures >= budget
 
     /** Counts one automatic page that made no progress against the recovery budget. */
-    fun recordFailure() {
+    fun recordFailure(
+        revision: ConversationWindowRevisionFfi? = null,
+        waitForReplacement: Boolean = false,
+    ) {
+        failedRevision = revision
+        requiresReplacement = waitForReplacement
         if (consecutiveFailures < budget) consecutiveFailures += 1
+    }
+
+    /** A queued echo of the failed attempt cannot release its own block. */
+    fun onWindowApplied(revision: ConversationWindowRevisionFfi?) {
+        val failed = failedRevision
+        if (failed == null) {
+            reset()
+            return
+        }
+        val advanced =
+            revision != null && revision.generation == failed.generation && revision.sequence > failed.sequence
+        if (advanced) reset()
+    }
+
+    /** New touch intent permits one more attempt, except while MDK explicitly requires a replacement. */
+    fun onUserGestureStarted() {
+        if (!requiresReplacement) reset()
     }
 
     /** Releases the block after a page in this direction advances the window. */
     fun reset() {
+        if (consecutiveFailures > 0) recoveryGeneration += 1L
         consecutiveFailures = 0
+        failedRevision = null
+        requiresReplacement = false
     }
 }
 
