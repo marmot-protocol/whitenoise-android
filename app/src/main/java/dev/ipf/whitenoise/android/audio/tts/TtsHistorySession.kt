@@ -236,7 +236,6 @@ class TtsHistorySession internal constructor(
         // An engine completion between invalidation and re-arming must retain the session.
         pending.invalidate()
         val deferred = controller.deferForTargetSeek()
-        if (!deferred) controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
         if (deferred) {
             val generation = pending.requests.advance()
             pending.targetSeek = true
@@ -283,6 +282,8 @@ class TtsHistorySession internal constructor(
                         }
                     }
                 }
+        } else {
+            controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
         }
         return deferred
     }

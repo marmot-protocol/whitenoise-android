@@ -420,7 +420,23 @@ class ConversationTtsFollowPolicyTest {
         )
     }
 
-    /** Sentence progression leaves manual browsing alone until explicit Resume. */
+    private fun decide(
+        itemOffset: Int,
+        sentenceTop: Int,
+        sentenceBottom: Int,
+        direction: TtsFollowDirection = TtsFollowDirection.Forward,
+        anchorAtTop: Boolean = false,
+    ): TtsFollowViewportDecision =
+        TtsFollowViewport.decide(
+            viewportStart = 0,
+            viewportEnd = 1_000,
+            itemOffset = itemOffset,
+            sentenceTop = sentenceTop,
+            sentenceBottom = sentenceBottom,
+            direction = direction,
+            anchorAtTop = anchorAtTop,
+        )
+
     private fun speaking(
         sessionId: Long,
         sentenceIndex: Int,

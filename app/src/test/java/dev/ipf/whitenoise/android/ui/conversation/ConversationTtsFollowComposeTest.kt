@@ -633,7 +633,8 @@ class ConversationTtsFollowComposeTest {
                         .height(320.dp)
                         .onGloballyPositioned {
                             timelineViewport.onPaintViewportMeasured(it)
-                            val bounds = if (reverseLayout) timelineViewport.readingBoundsInWindow else it.boundsInWindow()
+                            val bounds =
+                                if (reverseLayout) timelineViewport.readingBoundsInWindow else it.boundsInWindow()
                             bounds?.let(sentenceLayouts::updateViewportBounds)
                         },
             ) {
