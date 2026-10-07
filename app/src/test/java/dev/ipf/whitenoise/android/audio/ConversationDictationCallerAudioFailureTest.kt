@@ -138,7 +138,9 @@ class ConversationDictationCallerAudioFailureTest {
         }
     }
 
-    private inner class RecorderFaultFixture(private val fault: ReadFault) {
+    private inner class RecorderFaultFixture(
+        private val fault: ReadFault,
+    ) {
         val readEntered = CountDownLatch(1)
         val continueRead = CountDownLatch(1)
         val releaseEntered = CountDownLatch(1)
@@ -151,15 +153,22 @@ class ConversationDictationCallerAudioFailureTest {
             object : ConversationDictationAudioCaptureDevice {
                 override val initialized = true
                 override val recording = true
+
                 override fun start() {
                     starts.incrementAndGet()
                 }
+
                 override fun stop() = Unit
+
                 override fun release() {
                     releaseEntered.countDown()
                     check(continueRelease.await(5, TimeUnit.SECONDS))
                 }
-                override fun read(target: ShortArray, waitForSamples: Boolean): Int {
+
+                override fun read(
+                    target: ShortArray,
+                    waitForSamples: Boolean,
+                ): Int {
                     if (reads.incrementAndGet() == 1) {
                         readEntered.countDown()
                         check(continueRead.await(5, TimeUnit.SECONDS))
@@ -178,10 +187,11 @@ class ConversationDictationCallerAudioFailureTest {
             ConversationDictationCallerAudio(
                 device,
                 buffer,
-                pipeWriter = ConversationDictationAudioPipeWriter { _, source, offset, length ->
-                    written.addAll(source.slice(offset until offset + length))
-                    length
-                },
+                pipeWriter =
+                    ConversationDictationAudioPipeWriter { _, source, offset, length ->
+                        written.addAll(source.slice(offset until offset + length))
+                        length
+                    },
             )
         val listener = failureListener(failures)
         val stream =
@@ -208,10 +218,17 @@ class ConversationDictationCallerAudioFailureTest {
                 object : ConversationDictationAudioCaptureDevice {
                     override val initialized = true
                     override val recording = true
+
                     override fun start() = Unit
+
                     override fun stop() = stopped.countDown()
+
                     override fun release() = Unit
-                    override fun read(target: ShortArray, waitForSamples: Boolean): Int {
+
+                    override fun read(
+                        target: ShortArray,
+                        waitForSamples: Boolean,
+                    ): Int {
                         readEntered.countDown()
                         check(stopped.await(5, TimeUnit.SECONDS))
                         throw IllegalStateException("read interrupted by native stop")
@@ -243,15 +260,23 @@ class ConversationDictationCallerAudioFailureTest {
             object : ConversationDictationAudioCaptureDevice {
                 override val initialized = true
                 override val recording = true
+
                 override fun start() = Unit
+
                 override fun stop() = Unit
+
                 override fun release() = finished.countDown()
-                override fun read(target: ShortArray, waitForSamples: Boolean): Int = -6
+
+                override fun read(
+                    target: ShortArray,
+                    waitForSamples: Boolean,
+                ): Int = -6
             }
-        val capture = ConversationDictationCallerAudio(
-            device,
-            ConversationDictationAudioChunkBuffer(sessionId = 3L, chunkBytes = 8, maxBufferedBytes = 16),
-        )
+        val capture =
+            ConversationDictationCallerAudio(
+                device,
+                ConversationDictationAudioChunkBuffer(sessionId = 3L, chunkBytes = 8, maxBufferedBytes = 16),
+            )
         val oldFailures = CopyOnWriteArrayList<ConversationDictationCallerAudioFailure>()
         val old = checkNotNull(capture.openProviderStream(oldFailures::add))
         try {
@@ -265,7 +290,8 @@ class ConversationDictationCallerAudioFailureTest {
                 checkNotNull(
                     capture.openProviderStream(
                         mainThreadDictationCallerAudioFailure(
-                            failureListener(nextFailures), capture::acknowledgeFailure,
+                            failureListener(nextFailures),
+                            capture::acknowledgeFailure,
                         ),
                     ),
                 )
@@ -286,8 +312,11 @@ class ConversationDictationCallerAudioFailureTest {
     private fun failureListener(failures: MutableList<ConversationDictationFailure>) =
         object : ConversationDictationRecognitionListener {
             override fun onReady() = Unit
+
             override fun onEndOfSpeech() = Unit
+
             override fun onResult(transcript: String?) = Unit
+
             override fun onError(error: ConversationDictationFailure) {
                 assertEquals(Looper.getMainLooper(), Looper.myLooper())
                 failures.add(error)

@@ -21,8 +21,6 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
-import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
-import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
@@ -37,6 +35,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener as RecognitionListener
+import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession as RecognitionSession
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -88,13 +88,14 @@ class ConversationDictationDraftPresentationTest {
 
     private class Fixture {
         var draft by mutableStateOf(TextFieldValue("Draft", TextRange(5)))
+
         // Native draft generations and editor presentation revisions are separate domains.
         var revision = 41L
         var editorWrites = 0
         lateinit var editor: ComposerTextState
         lateinit var lateSendAcceptance: () -> Unit
         val writers = mutableMapOf<Int, (TextFieldValue) -> Unit>()
-        private lateinit var listener: ConversationDictationRecognitionListener
+        private lateinit var listener: RecognitionListener
         val controller =
             ConversationDictationController(
                 platform =
@@ -103,11 +104,9 @@ class ConversationDictationDraftPresentationTest {
 
                         override fun recognitionAvailable(): Boolean = true
 
-                        override fun createSession(
-                            listener: ConversationDictationRecognitionListener,
-                        ): ConversationDictationRecognitionSession {
+                        override fun createSession(listener: RecognitionListener): RecognitionSession {
                             this@Fixture.listener = listener
-                            return object : ConversationDictationRecognitionSession {
+                            return object : RecognitionSession {
                                 override fun start() = listener.onReady()
 
                                 override fun stop() = Unit

@@ -61,7 +61,10 @@ class ConversationDictationCallerAudioPipeFailureTest {
                 },
             )
         val closed = CountDownLatch(1)
-        stream.onFeedClosed { events.add("closed"); closed.countDown() }
+        stream.onFeedClosed {
+            events.add("closed")
+            closed.countDown()
+        }
         try {
             assertTrue(stream.start())
             assertTrue(closed.await(2, TimeUnit.SECONDS))
@@ -89,9 +92,12 @@ class ConversationDictationCallerAudioPipeFailureTest {
         val clock = AtomicLong(0L)
         val buffer = pcmBuffer()
         val capture =
-            sealedCapture(buffer, ConversationDictationAudioPipeWriter { _, _, _, _ ->
-                if (writes.incrementAndGet() % 2 == 1) 0 else 2
-            }) { clock.getAndAdd(10_000L) }
+            sealedCapture(
+                buffer,
+                ConversationDictationAudioPipeWriter { _, _, _, _ ->
+                    if (writes.incrementAndGet() % 2 == 1) 0 else 2
+                },
+            ) { clock.getAndAdd(10_000L) }
         val failures = CopyOnWriteArrayList<ConversationDictationCallerAudioFailure>()
         val stream = checkNotNull(capture.openProviderStream(failures::add))
         val closed = CountDownLatch(1)
@@ -117,12 +123,15 @@ class ConversationDictationCallerAudioPipeFailureTest {
         val worker = AtomicReference<Thread>()
         val buffer = pcmBuffer()
         val capture =
-            sealedCapture(buffer, ConversationDictationAudioPipeWriter { _, _, _, _ ->
-                worker.set(Thread.currentThread())
-                entered.countDown()
-                check(cancelled.await(5, TimeUnit.SECONDS))
-                throw IOException("cancelled pipe")
-            }) { 0L }
+            sealedCapture(
+                buffer,
+                ConversationDictationAudioPipeWriter { _, _, _, _ ->
+                    worker.set(Thread.currentThread())
+                    entered.countDown()
+                    check(cancelled.await(5, TimeUnit.SECONDS))
+                    throw IOException("cancelled pipe")
+                },
+            ) { 0L }
         val failures = CopyOnWriteArrayList<ConversationDictationCallerAudioFailure>()
         val stream = checkNotNull(capture.openProviderStream(failures::add))
         try {
@@ -204,10 +213,17 @@ class ConversationDictationCallerAudioPipeFailureTest {
                 object : ConversationDictationAudioCaptureDevice {
                     override val initialized = true
                     override val recording = true
+
                     override fun start() = Unit
+
                     override fun stop() = Unit
+
                     override fun release() = Unit
-                    override fun read(target: ShortArray, waitForSamples: Boolean): Int {
+
+                    override fun read(
+                        target: ShortArray,
+                        waitForSamples: Boolean,
+                    ): Int {
                         readEntered.countDown()
                         check(failRead.await(5, TimeUnit.SECONDS))
                         return -6
@@ -243,10 +259,16 @@ class ConversationDictationCallerAudioPipeFailureTest {
             object : ConversationDictationAudioCaptureDevice {
                 override val initialized = true
                 override val recording = false
+
                 override fun start() = throw AssertionError("sealed Retry must not reopen the microphone")
-                override fun read(target: ShortArray, waitForSamples: Boolean): Int =
-                    throw AssertionError("capture sealed")
+
+                override fun read(
+                    target: ShortArray,
+                    waitForSamples: Boolean,
+                ): Int = throw AssertionError("capture sealed")
+
                 override fun stop() = Unit
+
                 override fun release() = Unit
             },
             buffer,

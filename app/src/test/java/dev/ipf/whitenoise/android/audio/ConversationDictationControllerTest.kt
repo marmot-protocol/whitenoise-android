@@ -3106,20 +3106,21 @@ class ConversationDictationControllerTest {
                     var expired = 0
                     var starts = 0
                     var sends = 0
-                    val f = fixture(
-                        draft = TextFieldValue("Draft", TextRange(5)),
-                        targetValidationScope = this,
-                        startDurableSession = { _, ready ->
-                            starts++
-                            ready()
-                            true
-                        },
-                        onRecoveryExpired = { expired++ },
-                        sendTranscriptIfOriginUnchanged = {
-                            sends++
-                            false
-                        },
-                    )
+                    val f =
+                        fixture(
+                            draft = TextFieldValue("Draft", TextRange(5)),
+                            targetValidationScope = this,
+                            startDurableSession = { _, ready ->
+                                starts++
+                                ready()
+                                true
+                            },
+                            onRecoveryExpired = { expired++ },
+                            sendTranscriptIfOriginUnchanged = {
+                                sends++
+                                false
+                            },
+                        )
                     f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
                     f.controller.send()
                     f.platform.listener.onResult("retained")
@@ -3155,12 +3156,13 @@ class ConversationDictationControllerTest {
                 for (readRecovers in listOf(false, true)) {
                     var readUnavailable = false
                     var expired = 0
-                    val f = fixture(
-                        draft = TextFieldValue("Draft", TextRange(5)),
-                        targetValidationScope = this,
-                        onDraftRead = { check(!readUnavailable) },
-                        onRecoveryExpired = { expired++ },
-                    )
+                    val f =
+                        fixture(
+                            draft = TextFieldValue("Draft", TextRange(5)),
+                            targetValidationScope = this,
+                            onDraftRead = { check(!readUnavailable) },
+                            onRecoveryExpired = { expired++ },
+                        )
                     f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
                     f.controller.send()
                     f.platform.listener.onResult("retained")
@@ -3232,12 +3234,13 @@ class ConversationDictationControllerTest {
     fun neverWrittenTextRetainsRecoveryProtectionAndExpiryWarning() =
         runTest {
             var expired = 0
-            val f = fixture(
-                draft = TextFieldValue(""),
-                targetValidationScope = this,
-                allowDraftWrite = { false },
-                onRecoveryExpired = { expired++ },
-            )
+            val f =
+                fixture(
+                    draft = TextFieldValue(""),
+                    targetValidationScope = this,
+                    allowDraftWrite = { false },
+                    onRecoveryExpired = { expired++ },
+                )
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             f.controller.send()
             f.platform.listener.onResult("unsaved")
@@ -6244,28 +6247,31 @@ class ConversationDictationControllerTest {
     /** A recorder fault after Send keeps PCM and text recoverable until actual microphone closure. */
     @Test
     fun captureFailureDuringFinishNeverSendsPartialTextOrAcknowledgesEarlyClosure() {
-        val platform = FakePlatform(deferCaptureCompletion = true).apply {
-            pendingCallerAudio = true
-            deferCallerAudioFinish = true
-        }
+        val platform =
+            FakePlatform(deferCaptureCompletion = true).apply {
+                pendingCallerAudio = true
+                deferCallerAudioFinish = true
+            }
         var sends = 0
-        val fixture = fixture(
-            draft = TextFieldValue("Draft", TextRange(5)),
-            platform = platform,
-            sendTranscriptIfOriginUnchanged = {
-                sends++
-                true
-            },
-        )
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Draft", TextRange(5)),
+                platform = platform,
+                sendTranscriptIfOriginUnchanged = {
+                    sends++
+                    true
+                },
+            )
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         platform.listener.onResult("recognized prefix")
         fixture.scheduler.advanceBy(500L)
         fixture.controller.send()
         var consumed = 0
-        val report = mainThreadDictationCallerAudioFailure(platform.listener) {
-            consumed++
-            true
-        }
+        val report =
+            mainThreadDictationCallerAudioFailure(platform.listener) {
+                consumed++
+                true
+            }
         report(ConversationDictationCallerAudioFailure.CaptureFailed)
         shadowOf(Looper.getMainLooper()).idle()
         val failed = fixture.controller.state as ConversationDictationState.Failed
