@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -6320,6 +6321,55 @@ class ConversationDictationControllerTest {
         replay.onResult("recovered on first retry")
         assertEquals("Draft recovered on first retry", fixture.drafts.getValue(key()).text)
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
+    /** An empty recorder failure keeps foreground protection until caller capture actually closes. */
+    @Test
+    fun emptyCaptureFailureKeepsForegroundLeaseUntilNativeClosure() {
+        assertEmptyCaptureFailureWaitsForNativeClosure(dismissFailure = false)
+    }
+
+    /** Dismissing the failure cannot release foreground protection while native cleanup is blocked. */
+    @Test
+    fun dismissedEmptyCaptureFailureKeepsForegroundLeaseUntilNativeClosure() {
+        assertEmptyCaptureFailureWaitsForNativeClosure(dismissFailure = true)
+    }
+
+    private fun assertEmptyCaptureFailureWaitsForNativeClosure(dismissFailure: Boolean) {
+        val platform =
+            FakePlatform(deferCaptureCompletion = true).apply {
+                tracksCallerAudioDisposal = true
+                discardCaptureActive = true
+                deferDiscardClosure = true
+            }
+        var stops = 0
+        val fixture = fixture(draft = TextFieldValue("Draft"), platform = platform, stopDurableSession = { stops++ })
+        assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key())))
+        val report = mainThreadDictationCallerAudioFailure(platform.listener) { true }
+        report(ConversationDictationCallerAudioFailure.CaptureFailed)
+        shadowOf(Looper.getMainLooper()).idle()
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertNull(failed.retainedTranscript)
+        assertFalse(platform.pendingCallerAudio)
+        val nativeClosed = checkNotNull(platform.discardClosureCallback)
+        // Provider teardown does not prove closure of the separate caller-owned recorder.
+        platform.session.completeCapture()
+        if (dismissFailure) fixture.controller.dismissFailure()
+        assertTrue(fixture.controller.hasDurableSession)
+        assertTrue(fixture.controller.foregroundMicrophoneRequired)
+        assertEquals(0, stops)
+        assertFalse(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key())))
+        platform.discardCaptureActive = false
+        nativeClosed()
+        assertFalse(fixture.controller.hasDurableSession)
+        assertFalse(fixture.controller.foregroundMicrophoneRequired)
+        assertEquals(1, stops)
+        assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key())))
+        assertTrue(fixture.controller.hasDurableSession)
+        nativeClosed()
+        assertEquals(1, stops)
+        assertTrue(fixture.controller.hasDurableSession)
+        fixture.controller.cancel()
     }
 
     /** A recorder fault after Send keeps PCM and text recoverable until actual microphone closure. */

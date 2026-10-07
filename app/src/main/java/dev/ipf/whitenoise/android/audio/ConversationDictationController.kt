@@ -586,6 +586,7 @@ internal class ConversationDictationController internal constructor(
     private var sessionTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var captureClosureTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var captureClosureGeneration = 0L
+    private var pendingCaptureLeaseReleaseGeneration: Long? = null
     private var silenceTimeoutHandle: ConversationDictationTimeoutHandle? = null
     private var readinessHandle: ConversationDictationTimeoutHandle? = null
     private var readinessStartedAtMillis: Long? = null
@@ -798,6 +799,10 @@ internal class ConversationDictationController internal constructor(
     ): Boolean {
         expireRetainedRecoveryIfDue()
         conversationDictationDiagnostic("event=request_start mode=${mode.name}")
+        if (pendingCaptureLeaseReleaseGeneration != null) {
+            conversationDictationDiagnostic("event=request_start accepted=false reason=capture_closing")
+            return false
+        }
         if (!targetAvailable(accountRef, groupIdHex)) {
             conversationDictationDiagnostic("event=request_start accepted=false reason=target_unavailable")
             return false
@@ -1492,10 +1497,16 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         captureGeneration: Long,
     ) {
-        if (state.sessionId != sessionId || captureGeneration != captureClosureGeneration) return
+        if (captureGeneration != captureClosureGeneration) return
+        val releasesTerminalLease = pendingCaptureLeaseReleaseGeneration == captureGeneration
+        if (state.sessionId != sessionId && !releasesTerminalLease) return
         foregroundMicrophoneRequired = false
         captureClosureTimeoutHandle?.cancel()
         captureClosureTimeoutHandle = null
+        if (releasesTerminalLease) {
+            pendingCaptureLeaseReleaseGeneration = null
+            releaseDurableSessionLease()
+        }
         val failed = state as? ConversationDictationState.Failed
         val recoveryPresented =
             failed?.let { pendingForegroundRecoverySessionId == sessionId || it.draftSuperseded } == true
@@ -3096,6 +3107,8 @@ internal class ConversationDictationController internal constructor(
         silenceDeadlineElapsedMillis = null
         val closingSessionId = state.sessionId
         val closingCaptureGeneration = captureClosureGeneration
+        val releaseAfterCaptureClosure = releaseDurableSession && durableSession && foregroundMicrophoneRequired
+        if (releaseAfterCaptureClosure) pendingCaptureLeaseReleaseGeneration = closingCaptureGeneration
         val captureSessionId = activeCaptureSessionId
         val onCaptureFinished: () -> Unit = {
             captureSessionId?.let(::finishPlaybackInterruption)
@@ -3114,7 +3127,7 @@ internal class ConversationDictationController internal constructor(
             cancel = cancel,
             onAudioCaptureFinished = onGenerationClosed,
         )
-        if (releaseDurableSession) releaseDurableSessionLease()
+        if (releaseDurableSession && !releaseAfterCaptureClosure) releaseDurableSessionLease()
     }
 
     /** Failed dictation keeps foreground protection without recording controls, bounded to 30 minutes. */
