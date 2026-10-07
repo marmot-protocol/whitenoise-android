@@ -46,6 +46,7 @@ class ChatListWindowFallbackTest {
             receiver.join()
             windows.close()
             assertTrue(windows.closed)
+            withTimeout(5_000) { windows.awaitReleased() }
             assertEquals(1, whole.releaseCount)
             windows.close()
             assertEquals(1, whole.releaseCount)
