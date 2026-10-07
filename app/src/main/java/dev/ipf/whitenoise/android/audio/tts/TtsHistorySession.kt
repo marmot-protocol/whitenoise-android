@@ -275,12 +275,13 @@ class TtsHistorySession internal constructor(
                     if (conversation != source || controller.state.value.sessionId != source.sessionId) {
                         return@runIfCurrent
                     }
+                    controller.settleEdgeRequest(
+                        if (committed) TtsEdgeSettlement.Resolved else TtsEdgeSettlement.Retained,
+                    )
                     _edgeState.value = null
                     if (committed) {
                         liveTailAttached = false
                         onCommitted()
-                    } else {
-                        controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
                     }
                 }
             }
@@ -310,7 +311,7 @@ class TtsHistorySession internal constructor(
             beforeNavigate = {
                 if (_edgeState.value is TtsHistoryEdgeState.Loading) {
                     if (pendingTargetSeek) {
-                        invalidatePending()
+                        cancelPendingSeek()
                         true
                     } else {
                         false

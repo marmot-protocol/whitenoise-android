@@ -11,13 +11,13 @@ internal data class TtsLongPressStart(
     val sourceText: String?,
     val accountRef: String?,
     val groupIdHex: String,
-    val runtimeGeneration: Long,
+    val runtimeGeneration: Int,
 ) {
     fun isCurrent(
         text: String?,
         account: String?,
         group: String,
-        generation: Long,
+        generation: Int,
     ): Boolean {
         val sameOwner = accountRef == account && groupIdHex == group && runtimeGeneration == generation
         return sameOwner && sourceText == text

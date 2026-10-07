@@ -48,6 +48,9 @@ class TtsRenderedTargetSeekTest {
                     ?.messageIdHex,
             )
             assertEquals(1, harness.controller.state.value.sentenceIndexWithinMessage)
+            harness.engine.complete(harness.engine.spoken.lastIndex)
+            runCurrent()
+            assertTrue(harness.controller.state.value is TtsState.Idle)
         }
 
     @Test
@@ -218,6 +221,35 @@ class TtsRenderedTargetSeekTest {
             gate.complete(Unit)
             advanceUntilIdle()
             assertFalse(projectionFinished)
+        }
+
+    @Test
+    fun transportAtFirstSentenceCancelsDeferralWithoutMovingTheCursor() =
+        runTest {
+            val harness = SessionHarness(this)
+            harness.speakConversation("m1")
+            val gate = CompletableDeferred<Unit>()
+            harness.session.requestRenderedSentenceSeek(
+                "m2",
+                2uL,
+                harness.session.conversationSource.value!!,
+                {
+                    gate.await()
+                    null
+                },
+                { error("A cancelled target must not commit") },
+            )
+            runCurrent()
+            harness.session.previousSentence()
+            runCurrent()
+            assertEquals(0, harness.controller.state.value.sentenceIndexWithinMessage)
+            assertEquals(null, harness.session.edgeState.value)
+            harness.engine.complete(harness.engine.spoken.lastIndex)
+            runCurrent()
+            assertTrue(harness.controller.state.value is TtsState.Idle)
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertTrue(harness.controller.state.value is TtsState.Idle)
         }
 
     @Test
