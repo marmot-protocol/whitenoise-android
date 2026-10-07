@@ -51,6 +51,9 @@ on:
   pull_request:
     paths:
       - '.github/workflows/android-instrumented.yml'
+      - 'buildSrc/**'
+      - 'gradle/compose-ui-backport.gradle.kts'
+      - 'third_party/compose-ui/**'
       - 'app/build.gradle.kts'
       - 'app/src/androidTest/AndroidManifest.xml'
       - 'app/src/main/marmotkit/**'
@@ -64,6 +67,8 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/TtsHighlightPlacementAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/TtsRichLeafPlacementAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/messages/LongCjkBubbleScrollAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/messages/ComposeRectListBackportAndroidTest.kt'
+      - 'app/src/testSupport/kotlin/dev/ipf/whitenoise/android/ui/conversation/messages/ComposeRectListReuseFixture.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/TtsReadAloudHighlight.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaReferenceSupportFuzzIntegrationTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaReferenceSupport.kt'

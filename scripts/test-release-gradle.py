@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def main():
+    """Assert the application build's signing and task-isolation contracts without packaging."""
     with tempfile.TemporaryDirectory() as directory:
         temporary = Path(directory)
         keystore = temporary / 'fixture.keystore'
@@ -20,6 +21,8 @@ def main():
                 env[f'WHITENOISE_{prefix}_{suffix}'] = value
         init = temporary / 'assert-signing.gradle'
         init.write_text('''gradle.projectsEvaluated {
+    // Init scripts also run for buildSrc/included builds; only the main build owns :app.
+    if (gradle.parent != null) return
     def app = gradle.rootProject.project(':app')
     def bundleMode = app.findProperty('whitenoise.playBundle') == 'true'
     def android = app.extensions.getByName('android')
