@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -140,7 +140,7 @@ internal fun ComposerAttachmentMenu(
                         .heightIn(max = menuMaxHeight)
                         .testTag("conversation.attachment.menu"),
             ) {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
+                Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
                     items.forEachIndexed { index, item ->
                         DropdownMenuItem(
                             text = { Text(item.label) },

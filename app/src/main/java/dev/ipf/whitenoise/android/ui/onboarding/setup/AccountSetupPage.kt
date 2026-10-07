@@ -16,13 +16,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.reserveSnackbarSpace
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 
@@ -56,7 +56,7 @@ internal fun SetupPage(
                             .widthIn(max = 520.dp)
                             .fillMaxWidth()
                             .heightIn(max = actionLimit)
-                            .verticalScroll(rememberScrollState()),
+                            .fadingVerticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         content = actions,
                     )

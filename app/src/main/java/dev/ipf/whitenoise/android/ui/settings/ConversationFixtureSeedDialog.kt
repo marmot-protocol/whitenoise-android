@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,6 +30,7 @@ import dev.ipf.whitenoise.android.state.seedConversationFixture
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogChoiceRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -147,7 +147,7 @@ internal fun ConversationFixtureSeedDialogContent(
         onDismissRequest = { if (!running) onDismiss() },
         title = { Text(stringResource(R.string.seed_fixture_title)) },
         text = {
-            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            Column(Modifier.heightIn(max = 420.dp).fadingVerticalScroll(rememberScrollState())) {
                 Text(stringResource(R.string.seed_fixture_detail), style = MaterialTheme.typography.bodyMedium)
                 WhiteNoiseTextField(
                     state = count,

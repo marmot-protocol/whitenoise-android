@@ -47,9 +47,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MarkdownBlockFfi
@@ -100,7 +100,11 @@ class ConversationTtsFollowComposeTest {
         captureResumeControl(dark = false, name = "rtl_large_font", fontScale = 2f)
     }
 
-    private fun captureResumeControl(dark: Boolean, name: String, fontScale: Float = 1f) {
+    private fun captureResumeControl(
+        dark: Boolean,
+        name: String,
+        fontScale: Float = 1f,
+    ) {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {

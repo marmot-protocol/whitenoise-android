@@ -134,8 +134,10 @@ import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.primaryClipPlainText
 import dev.ipf.whitenoise.android.ui.common.rememberClipboardCanOfferPaste
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.conversation.ComposerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
@@ -1045,7 +1047,7 @@ internal fun ComposerPill(
                             .onSizeChanged { size ->
                                 // Accessories insert 12dp beyond the ordinary editor padding in either layout.
                                 onAccessoryHeightChanged(with(density) { size.height.toDp() } + 12.dp)
-                            }.verticalScroll(rememberScrollState()),
+                            }.fadingVerticalScroll(rememberScrollState()),
                     ) {
                         accessoryContent()
                     }
@@ -1205,7 +1207,10 @@ internal fun ComposerPill(
                                     // resulting scroll state here so programmatic bulk
                                     // commits can follow the real selection, not merely
                                     // the final text line or the conversation tail.
-                                    .verticalScroll(composerScrollState)
+                                    .scrollEdgeFade(
+                                        composerScrollState,
+                                        fadeEnabled = !composerFocused && textFieldValue.selection.collapsed,
+                                    ).verticalScroll(composerScrollState)
                                     .onGloballyPositioned { editorBounds = it.boundsInWindow() }
                                     .pointerInput(composerFocused, inputContentVisible, inputFocusEnabled) {
                                         if (!composerFocused && inputContentVisible && inputFocusEnabled) {

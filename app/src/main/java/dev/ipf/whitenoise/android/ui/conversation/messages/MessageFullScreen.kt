@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +41,7 @@ import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.readerScrollIndicator
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 
@@ -222,7 +222,7 @@ internal fun MessageFullScreenView(
                             Modifier
                                 .fillMaxSize()
                                 // Android stretch can draw over the dialog chrome during edge drags.
-                                .verticalScroll(scrollState, overscrollEffect = null)
+                                .fadingVerticalScroll(scrollState, overscrollEffect = null)
                                 .padding(16.dp),
                     )
                 }

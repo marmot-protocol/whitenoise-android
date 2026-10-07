@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,6 +36,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -415,7 +415,7 @@ internal fun SmartFolderConditionDialog(
             title = { Text(stringResource(fieldLabel(field))) },
             text = {
                 Column(
-                    Modifier.verticalScroll(rememberScrollState()),
+                    Modifier.fadingVerticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (field != FolderField.TITLE) {

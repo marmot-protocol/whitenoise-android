@@ -42,6 +42,17 @@
         "test_ids": [
           "MSG-016"
         ]
+      },
+      {
+        "surface": "Scroll boundaries: ReportMessageSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
       }
     ],
     "settings_controls": [

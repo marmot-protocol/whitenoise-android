@@ -110,6 +110,7 @@ Before the exhaustive pass, run these release-blocking paths in order: `INT-001`
 | `SET` | Settings and customization |
 | `SYS` | Relays and system intents |
 | `TTS` | Text to speech |
+| `SCR` | Consistent scroll boundaries across app-owned vertical viewports |
 
 ### Release identity and first launch
 
@@ -591,6 +592,15 @@ The separate `controller-automatic-resume` fixture uses the actual connectivity 
 3. [ ] **END-003 — Cleanup** — Remove exported files, revoke temporary permissions, clear sensitive clipboard, delete synthetic contacts/media, and wipe disposable identities as authorized. → **Expected:** Test artifacts no longer appear in storage, notifications, Recents, clipboard, or account selector.
 4. [ ] **END-004 — Release verdict** — Attach the completed checklist and summarize failures by severity and point ID against the recorded APK SHA. → **Expected:** The report states one unambiguous PASS or FAIL for that exact artifact and never transfers results to a different build.
 
+
+### Consistent scroll boundaries
+
+Use the destinations in [the reviewed viewport inventory](scroll-edge-fade-surfaces.json) while running their existing detailed checks. Use a populated disposable profile, long harmless messages/files and enough picker/list items to overflow the visible area. A short or empty page should not be made scrollable just for this check.
+
+1. [ ] **SCR-001 — Ordinary screens and overlays** — Visit Settings destinations, profile/edit/QR pages, group details/members, onboarding/setup, Files & Media tabs, full-screen message/file readers, and recipient/reaction/share/emoji pickers. Include a long menu, sheet and dialog. Scroll from the beginning into the middle and then to the end. → **Expected:** Only the edge with more content beyond it fades; both edges fade in the middle. The reached edge becomes fully readable immediately. A fitting or empty view has no fade. Headers, sheet handles, borders and fixed action bars keep their normal appearance and remain usable.
+2. [ ] **SCR-002 — Changing modes and content** — Repeat after search/filter changes, loading/error recovery, selection, expanded/collapsed cards and composer previews; remove enough test items or clear the filter so a previously long list becomes short. Switch profiles and reopen a screen with a saved scroll position. Open/dismiss the keyboard and rotate. → **Expected:** Fades follow the current viewport and actual content, with no stale band from an earlier list, profile or direction. Scroll position, touch targets, selection and recovery controls behave as before.
+3. [ ] **SCR-003 — Themes, direction and readability** — Repeat overflowing lists, forms, grids and menus in light, dark and AMOLED, then RTL, large text, landscape and a short keyboard-visible sheet. Read the content and use TalkBack to reach its last control. → **Expected:** The content dissolves into the real background without a grey covering band; RTL does not reverse vertical edges. Small ordinary viewports retain at least their middle half at full strength. Native calendar/system widgets and caret-managed text fields keep their native internal presentation; their enclosing app viewport follows the fade policy.
+4. [ ] **SCR-004 — Conversation and editor geometry** — Read older conversation history with search/selection active, then return to newest with the keyboard shown and hidden. Read a long unfocused draft or accessory preview, then focus the draft and select text. → **Expected:** The transcript has one fade at its physical top when older rows remain, and its existing measured fade beneath the floating composer; a read-only/no-composer viewport uses ordinary reversed-list continuation cues at both physical edges; the resting newest message is fully readable. Reading previews use ordinary edge cues. An active editor caret or selection stays fully readable without resetting the draft's scroll position. The emoji/attachment panes and fixed Send controls remain usable.
 
 ## Report a failure
 

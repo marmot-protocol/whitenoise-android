@@ -232,8 +232,10 @@ private fun isInsideRenderedTextLine(
     val point = layout.coordinates.windowToLocal(pointInWindow)
     val result = layout.layoutResult
     val line = result.getLineForVerticalPosition(point.y)
-    return point.y >= result.getLineTop(line) && point.y < result.getLineBottom(line) &&
-        point.x >= result.getLineLeft(line) && point.x <= result.getLineRight(line)
+    return point.y >= result.getLineTop(line) &&
+        point.y < result.getLineBottom(line) &&
+        point.x >= result.getLineLeft(line) &&
+        point.x <= result.getLineRight(line)
 }
 
 private fun visibleLayoutSentence(text: String): String {

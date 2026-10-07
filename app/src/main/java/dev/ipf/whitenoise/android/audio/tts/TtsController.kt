@@ -544,8 +544,10 @@ class TtsController internal constructor(
             synchronized(this) {
                 val current = state.value
                 preparationRequests.isCurrent(preparationGeneration) &&
-                    (queue.callbackGeneration == callbackGeneration ||
-                        (current is TtsState.Idle && current.sessionId == sessionId))
+                    (
+                        queue.callbackGeneration == callbackGeneration ||
+                            (current is TtsState.Idle && current.sessionId == sessionId)
+                    )
             }
         }
     }

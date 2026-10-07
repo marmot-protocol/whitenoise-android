@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,6 +22,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDialogCheckRow
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEntityPickerSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.search.GlobalSearchContentFilterChips
 import dev.ipf.whitenoise.android.ui.search.GlobalSearchDateCustomStage
 import dev.ipf.whitenoise.android.ui.search.GlobalSearchDateFilterDialog
@@ -210,7 +210,7 @@ private fun GlobalSearchCheckDialog(
         title = { Text(title) },
         text = {
             Column(
-                modifier = if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier,
+                modifier = if (scrollable) Modifier.fadingVerticalScroll(rememberScrollState()) else Modifier,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 content = content,
             )

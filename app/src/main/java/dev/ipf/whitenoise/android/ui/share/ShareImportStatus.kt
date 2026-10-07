@@ -5,7 +5,6 @@ package dev.ipf.whitenoise.android.ui.share
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -22,6 +21,7 @@ import dev.ipf.whitenoise.android.share.ShareImportError
 import dev.ipf.whitenoise.android.share.ShareImportProgress
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.share.ShareRequest
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 /** Payload-free progress and recovery stay behind the shell's existing app-lock gate. */
 @Composable
@@ -76,7 +76,7 @@ private fun ShareImportErrorDialog(
         onDismissRequest = onCancel,
         title = { Text(stringResource(R.string.share_import_error_title)) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
                 if (payload.importRejectedCount > 0) {
                     Text(stringResource(R.string.share_import_rejected_count, payload.importRejectedCount))
                 }

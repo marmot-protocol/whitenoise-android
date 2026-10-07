@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +38,7 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 private val ADD_MORE_TILE = 56.dp
@@ -129,7 +131,10 @@ internal fun AddMoreThumb(
                 tint = MaterialTheme.colorScheme.onBackground,
             )
         }
+        val menuScrollState = rememberScrollState()
         DropdownMenu(
+            scrollState = menuScrollState,
+            modifier = Modifier.scrollEdgeFade(menuScrollState),
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
             shape = MenuDefaults.shape,

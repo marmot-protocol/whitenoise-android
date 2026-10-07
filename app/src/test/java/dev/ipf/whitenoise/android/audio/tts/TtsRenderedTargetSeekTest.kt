@@ -42,7 +42,11 @@ class TtsRenderedTargetSeekTest {
             preparation.complete(Unit)
             committed.await()
             assertEquals(session, harness.controller.state.value.sessionId)
-            assertEquals("m2", harness.controller.state.value.passage?.messageIdHex)
+            assertEquals(
+                "m2",
+                harness.controller.state.value.passage
+                    ?.messageIdHex,
+            )
             assertEquals(1, harness.controller.state.value.sentenceIndexWithinMessage)
         }
 
@@ -54,7 +58,11 @@ class TtsRenderedTargetSeekTest {
             val session = harness.controller.state.value.sessionId
             assertTrue(harness.controller.installRenderedSeekTarget(request(harness, "m2"), session) { true })
             assertEquals(session, harness.controller.state.value.sessionId)
-            assertEquals("m2", harness.controller.state.value.passage?.messageIdHex)
+            assertEquals(
+                "m2",
+                harness.controller.state.value.passage
+                    ?.messageIdHex,
+            )
             assertEquals(1, harness.controller.state.value.sentenceIndexWithinMessage)
         }
 
@@ -237,7 +245,11 @@ class TtsRenderedTargetSeekTest {
             gate.complete(Unit)
             advanceUntilIdle()
             assertEquals(listOf("m1", "m2"), harness.controller.queuedMessageIds())
-            assertEquals("m1", harness.controller.state.value.passage?.messageIdHex)
+            assertEquals(
+                "m1",
+                harness.controller.state.value.passage
+                    ?.messageIdHex,
+            )
             assertEquals(null, harness.session.edgeState.value)
         }
 

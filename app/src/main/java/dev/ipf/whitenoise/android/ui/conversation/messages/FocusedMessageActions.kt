@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -80,6 +79,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -392,7 +392,7 @@ internal fun FocusedMessageActions(
                     modifier =
                         Modifier
                             .weight(1f, fill = false)
-                            .verticalScroll(rememberScrollState())
+                            .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
                     FocusedActionMenu(actions)

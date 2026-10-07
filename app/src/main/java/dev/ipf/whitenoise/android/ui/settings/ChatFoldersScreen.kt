@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,6 +52,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -252,7 +252,7 @@ internal fun ChatFoldersContent(
             }
         },
     ) {
-        LazyColumn(
+        WhiteNoiseLazyColumn(
             state = list,
             modifier = Modifier.fillMaxSize().testTag(CHAT_FOLDERS_CONTENT_TAG),
             contentPadding = PaddingValues(vertical = WhiteNoiseSpacing.CompactScreenMargin),

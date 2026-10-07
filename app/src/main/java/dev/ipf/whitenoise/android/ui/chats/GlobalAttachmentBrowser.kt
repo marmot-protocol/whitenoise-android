@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
@@ -61,6 +60,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.mediaCacheKey
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import java.time.ZoneId
@@ -142,7 +142,7 @@ private fun GlobalAttachmentGrid(
     onOpenMessage: (groupIdHex: String, messageIdHex: String) -> Unit,
     thumbnail: (GlobalAttachmentItem) -> ImageBitmap?,
 ) {
-    LazyVerticalGrid(
+    WhiteNoiseLazyVerticalGrid(
         columns = if (visual) GridCells.Adaptive(LibraryGridCellSize) else GridCells.Fixed(1),
         state = rememberLazyGridState(),
         modifier = Modifier.fillMaxWidth().testTag(GLOBAL_LIBRARY_RESULTS_TAG),

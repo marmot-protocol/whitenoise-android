@@ -368,6 +368,17 @@
         "test_ids": [
           "ACC-007"
         ]
+      },
+      {
+        "surface": "Scroll boundaries: ProfileSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
       }
     ]
   },

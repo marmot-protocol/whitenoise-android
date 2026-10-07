@@ -177,7 +177,12 @@ class MessageBubbleTextSelectionSpeakTest {
         assertTrue(menuOpen)
         composeRule.onNodeWithText(app.getString(R.string.read_aloud)).performScrollTo().performClick()
         waitForTts(engine, appState)
-        assertTrue(engine.spoken.first().text.endsWith("First sentence."))
+        assertTrue(
+            engine.spoken
+                .first()
+                .text
+                .endsWith("First sentence."),
+        )
     }
 
     @Test
@@ -237,7 +242,12 @@ class MessageBubbleTextSelectionSpeakTest {
         composeRule.runOnIdle { offset = 32.dp }
         composeRule.onNodeWithText(app.getString(R.string.read_aloud)).performScrollTo().performClick()
         waitForTts(engine, appState)
-        assertTrue(engine.spoken.first().text.endsWith("Second sentence."))
+        assertTrue(
+            engine.spoken
+                .first()
+                .text
+                .endsWith("Second sentence."),
+        )
     }
 
     @Test
@@ -493,7 +503,11 @@ class MessageBubbleTextSelectionSpeakTest {
             engine.spoken.size > submissions
         }
         assertEquals(session, appState.ttsController.state.value.sessionId)
-        assertEquals(item.record.messageIdHex, appState.ttsController.state.value.passage?.messageIdHex)
+        assertEquals(
+            item.record.messageIdHex,
+            appState.ttsController.state.value.passage
+                ?.messageIdHex,
+        )
         assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
         assertTrue(engine.spoken[submissions].text.endsWith("Second sentence."))
     }
@@ -558,7 +572,11 @@ class MessageBubbleTextSelectionSpeakTest {
         waitForTts(engine, appState)
         composeRule.mainClock.autoAdvance = false
         singleTapOnMessageText("https://example.com")
-        composeRule.mainClock.advanceTimeBy(android.view.ViewConfiguration.getDoubleTapTimeout().toLong() + 1L)
+        composeRule.mainClock.advanceTimeBy(
+            android.view.ViewConfiguration
+                .getDoubleTapTimeout()
+                .toLong() + 1L,
+        )
         composeRule.waitForIdle()
         assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity?.action)
     }
@@ -593,7 +611,11 @@ class MessageBubbleTextSelectionSpeakTest {
             engine.spoken.size > submissions
         }
         assertEquals(session, appState.ttsController.state.value.sessionId)
-        assertEquals(item.record.messageIdHex, appState.ttsController.state.value.passage?.messageIdHex)
+        assertEquals(
+            item.record.messageIdHex,
+            appState.ttsController.state.value.passage
+                ?.messageIdHex,
+        )
         assertTrue(engine.spoken[submissions].text.endsWith("Second sentence."))
     }
 

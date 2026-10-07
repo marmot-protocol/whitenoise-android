@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -78,6 +77,7 @@ import dev.ipf.whitenoise.android.ui.common.LoadingScreen
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
@@ -549,7 +549,7 @@ private fun ForwardTargetList(
         filteredTargets.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.first.selectedAvatarAsset },
         ownerAccountRef,
     ) {
-        LazyColumn(
+        WhiteNoiseLazyColumn(
             modifier = modifier.fillMaxWidth().testTag("forward.destinations"),
             contentPadding = PaddingValues(bottom = Dimens.spaceLg),
         ) {

@@ -10,7 +10,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -48,6 +47,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseFilledTonalButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import kotlinx.coroutines.flow.first
 
@@ -487,7 +487,7 @@ internal fun AddRelaySheet(
     WhiteNoiseModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth()) {
             WhiteNoiseSheetHeader(title = stringResource(R.string.add_relay), onClose = onDismiss)
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+            Column(Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState())) {
                 WhiteNoiseTextField(
                     state = value,
                     modifier =

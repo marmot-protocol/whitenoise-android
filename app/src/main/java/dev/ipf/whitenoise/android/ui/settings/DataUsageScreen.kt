@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -36,6 +35,7 @@ import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseDialogSelection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
@@ -160,7 +160,7 @@ internal fun DataUsageScreen(
             onDismissRequest = { picker = null },
             title = { Text(stringResource(type.labelRes)) },
             text = {
-                Column(Modifier.verticalScroll(rememberScrollState()).testTag("download.network.options")) {
+                Column(Modifier.fadingVerticalScroll(rememberScrollState()).testTag("download.network.options")) {
                     DownloadNetworkOptions(
                         networks = MediaAutoDownloadNetwork.entries.filter { matrix.isEnabled(type, it) }.toSet(),
                         onChange = { network, enabled -> appState.setMediaAutoDownload(type, network, enabled) },

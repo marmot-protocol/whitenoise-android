@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -23,6 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 
 @Composable
 internal fun <T> FolderChoice(
@@ -36,7 +38,13 @@ internal fun <T> FolderChoice(
         TextButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth().testTag(tag)) {
             FolderButtonLabel(label, R.drawable.ic_expand_more, open)
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        val menuScrollState = rememberScrollState()
+        DropdownMenu(
+            scrollState = menuScrollState,
+            modifier = Modifier.scrollEdgeFade(menuScrollState),
+            expanded = open,
+            onDismissRequest = { open = false },
+        ) {
             options.forEach { (value, title) ->
                 DropdownMenuItem(text = { Text(title) }, onClick = {
                     open = false

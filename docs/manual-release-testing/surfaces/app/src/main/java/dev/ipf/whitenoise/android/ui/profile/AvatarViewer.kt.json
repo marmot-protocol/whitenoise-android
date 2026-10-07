@@ -60,6 +60,19 @@
           "PRO-006"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: AvatarViewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": ".scrollEdgeFade(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

@@ -1,0 +1,1590 @@
+{
+  "source_revision": "c1ff4230dcd67e2cfc3c694b8e5b1c79eac49753",
+  "policy": "Only physical edges with offscreen content fade; ordinary bands max28dp and one-quarter viewport. Reached/fitted edges clear immediately. Transcript composer overlap remains explicit.",
+  "state_owner": "Original caller state, or native default remembered state; no replacement or extra layout. Only scroll viewport content is masked; chrome stays outside.",
+  "families": {
+    "common": "Startup loading/error/recovery and lock; shared dialogs, choices, anchored menus and entity picker with loading, empty, query, selection and clipped short-height states.",
+    "account": "One/multiple profiles; cached identities and avatars, selected profile, switching/busy, restored list position.",
+    "settings": "Home/profile list; every settings destination through SettingsList, plain forms and detail dialogs; enabled/disabled preferences, populated/no-data lists, diagnostic loading/error, search/filter/selected choices.",
+    "profile": "Self/person/group profile tabs, loading/fallback names and images; group membership searches and empty matches; edit/QR forms, shown keyboard and retained scroll.",
+    "onboarding": "Welcome/sign-in/sign-up/setup statuses, existing-account recovery list, progress/error/retry, keyboard and smaller screen.",
+    "chats": "Browse/search/folders and global attachment results; loading/empty/failure/paged results, filters/selection, retained state and header. Chat list retains one explicit shared fade.",
+    "chats/newchat": "Browse/address resolving/empty/error recipients, selected recipient rail and member removal, group setup busy/retry and photo picker; text keyboard shown/hidden.",
+    "group": "Overview/member/admin forms, add/remove confirmations, image search input/loading/error/no hits/grid/paging; mute/disappearing controls. Native calendar remains an internal widget.",
+    "medialibrary": "Visual grid and file/audio/link lists, every content tab/filter, loading/empty/error and pagination; item menus, restored positions and large-font variants.",
+    "share": "Shared-entry account/recipient list, loading/error/no targets and selection, retained private staged attachments; keyboard and short-height picker.",
+    "search": "Content-kind/date filters, expanded choices, selected/unselected and reset. Native calendar owns internal year/month scrolling.",
+    "qr": "Permission/loading/recovery/invalid-result copy with short-height or large-text overflow.",
+    "design": "Expanded/collapsed popup menus, short or overflowing item sets and native input/dismiss behavior.",
+    "conversation/ConversationScreen.kt": "Reverse transcript, incoming/outgoing/system rows, loading/history/search/selection, keyboard and measured floating composer overlap; preserve newest row readability.",
+    "conversation/PollCreateDialog.kt": "Create/edit poll option form, keyboard, validity/error/busy and overflowing option list.",
+    "conversation/PollVotesSheet.kt": "Loading/empty/result/paged votes and retry/load-more footers.",
+    "conversation/GroupSystemRow.kt": "System-row native context menu open/closed and overflow.",
+    "conversation/TtsTransportRatePicker.kt": "Read-aloud rate menu open/closed, selected rate and overflow.",
+    "conversation/composer": "Emoji categories/search/recents and grid; attachment menu, accessory preview, recovery actions, collapsed/expanded composer. Reading draft fades; active caret or text selection keeps editor unmasked.",
+    "conversation/media": "Reader loading/error/source too long/plain/Markdown, seek/read-aloud and overflow menu; media-send additions and keyboard. Photo/video pan is not a vertical scroll viewport.",
+    "conversation/messages": "Focused message/forward picker/progress/details/history/kept-message cards, expanded/collapsed and selection/read-aloud states; menus and keyboard.",
+    "conversation/nostr": "Loaded/error and long Nostr event detail content, expandable blocks and links.",
+    "conversation/reactions": "Reaction configuration/participant lists, chosen emoji, loading/empty and own-reaction actions.",
+    "TtsSentenceAccessibility.kt": "Read-aloud sentence chooser, active sentence and overflowing labels."
+  },
+  "exclusions": [
+    {
+      "surface": "Horizontal rows, shelves, code and photo-editor tools",
+      "reason": "Horizontal scrolling has no vertical continuation; no vertical fade."
+    },
+    {
+      "surface": "Image/map pan, zoom and crop canvases",
+      "reason": "Gestural spatial manipulation is not a vertical text/list viewport."
+    },
+    {
+      "surface": "Native calendar/year picker and Android system sheets",
+      "reason": "Native internal scroll state/viewport is not app-owned; a global mask would dim native labels and controls."
+    },
+    {
+      "surface": "Implicit editable text-field scrolling",
+      "reason": "Native caret, focus and selection own internal text scrolling. Surrounding app form scrolls get fades; field borders/icons/labels remain unmasked."
+    }
+  ],
+  "surfaces": [
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/TtsSentenceAccessibility.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "TtsSentenceAccessibility.kt",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "account",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "chats",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+      "calls": {
+        "LazyColumn": 1
+      },
+      "family": "chats",
+      "policy": "explicit_shared_chat_mask",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+      "calls": {
+        "WhiteNoiseLazyVerticalGrid": 1
+      },
+      "family": "chats",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "chats",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ContactPickerScreen.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "chats/newchat",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupRecipientContent.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "chats/newchat",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewGroupSetupContent.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "chats/newchat",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "chats/newchat",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "chats/newchat",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AppLockScreen.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/StartupScreens.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseAnchoredMenu.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+      "calls": {
+        "fadingVerticalScroll": 2
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseMenus.kt",
+      "calls": {
+        "DropdownMenu": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScaffold.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "common",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScrollContainers.kt",
+      "calls": {
+        "verticalScroll": 1,
+        "LazyColumn": 1,
+        "LazyVerticalGrid": 1
+      },
+      "family": "common",
+      "policy": "adapter_internal",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+      "calls": {
+        "LazyColumn": 1
+      },
+      "family": "conversation/ConversationScreen.kt",
+      "policy": "measured_reverse_composer",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemRow.kt",
+      "calls": {
+        "DropdownMenu": 1
+      },
+      "family": "conversation/GroupSystemRow.kt",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollCreateDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/PollCreateDialog.kt",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "conversation/PollVotesSheet.kt",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportRatePicker.kt",
+      "calls": {
+        "DropdownMenu": 1
+      },
+      "family": "conversation/TtsTransportRatePicker.kt",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerAttachmentMenu.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/composer",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+      "calls": {
+        "fadingVerticalScroll": 1,
+        "verticalScroll": 1
+      },
+      "family": "conversation/composer",
+      "policy": "reading_preview_or_caret_exception",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/composer",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+      "calls": {
+        "WhiteNoiseLazyVerticalGrid": 1
+      },
+      "family": "conversation/composer",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreviewSendBar.kt",
+      "calls": {
+        "DropdownMenu": 1
+      },
+      "family": "conversation/media",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+      "calls": {
+        "fadingVerticalScroll": 3
+      },
+      "family": "conversation/media",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorCoordinatesDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/media",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorScreen.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/media",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/EditHistory.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/messages",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/messages",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "conversation/messages",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/messages",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "conversation/messages",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/messages",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/messages",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/messages",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "conversation/nostr",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ConfigureReactionsSheet.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/reactions",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "conversation/reactions",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/AppMenus.kt",
+      "calls": {
+        "DropdownMenu": 1
+      },
+      "family": "design",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/DisappearingMessages.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 2
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupEditScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupImageSearch.kt",
+      "calls": {
+        "fadingVerticalScroll": 1,
+        "WhiteNoiseLazyVerticalGrid": 1
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 2
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+      "calls": {
+        "fadingVerticalScroll": 2
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembersScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/MuteDurationDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "group",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
+      "calls": {
+        "WhiteNoiseLazyVerticalGrid": 1,
+        "WhiteNoiseLazyColumn": 1,
+        "DropdownMenu": 1
+      },
+      "family": "medialibrary",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "onboarding",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignInScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "onboarding",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "onboarding",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "onboarding",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupPage.kt",
+      "calls": {
+        "fadingVerticalScroll": 1,
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "onboarding",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+      "calls": {
+        "DropdownMenu": 1
+      },
+      "family": "profile",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonGroupsInCommonContent.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "profile",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "profile",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "profile",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileNotificationOverrideScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "profile",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "profile",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+      "calls": {
+        "fadingVerticalScroll": 3,
+        "WhiteNoiseLazyColumn": 2
+      },
+      "family": "profile",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/qr/QrScannerChrome.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "qr",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchContentFilterChips.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "search",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "search",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+      "calls": {
+        "SettingsList": 1,
+        "fadingVerticalScroll": 3
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt",
+      "calls": {
+        "SettingsList": 2
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+      "calls": {
+        "SettingsList": 1,
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderEditScreen.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt",
+      "calls": {
+        "SettingsList": 1,
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsScreen.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1,
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationProviderSheet.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt",
+      "calls": {
+        "SettingsList": 3
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+      "calls": {
+        "SettingsList": 2,
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsLayout.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+      "calls": {
+        "whiteNoiseVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderAddFilter.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderChoice.kt",
+      "calls": {
+        "DropdownMenu": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderEditor.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+      "calls": {
+        "DropdownMenu": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
+      "calls": {
+        "fadingVerticalScroll": 2
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "share",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "share",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "share",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    }
+  ]
+}

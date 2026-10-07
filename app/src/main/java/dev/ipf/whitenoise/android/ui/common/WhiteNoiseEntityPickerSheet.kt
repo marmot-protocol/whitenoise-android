@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.BasicTextField
@@ -49,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -100,7 +100,7 @@ fun WhiteNoiseEntityPickerSheet(
                             vertical = WhiteNoiseSpacing.Related,
                         ).testTag(searchTag),
             )
-            LazyColumn(
+            WhiteNoiseLazyColumn(
                 modifier = Modifier.weight(1f, fill = false).fillMaxWidth().testTag("entity.list"),
                 contentPadding =
                     PaddingValues(
