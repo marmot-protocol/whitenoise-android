@@ -33,6 +33,34 @@ def sha256(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def device_locale():
+    require(os.environ.get('GITHUB_ACTIONS') == 'true', 'Locale probe requires the disposable CI emulator')
+    def property_value(name):
+        value = subprocess.check_output(
+            ['adb', '-s', 'emulator-5554', 'shell', 'getprop', name], text=True, timeout=10,
+        ).strip()
+        return '' if value == 'null' else value
+    # API 34 fresh images use ro.product.locale until a locale is persisted.
+    # Legacy components preserve Android's fallback order without guessing English.
+    locale = property_value('persist.sys.locale')
+    if not locale:
+        language = property_value('persist.sys.language')
+        if language:
+            locale = '-'.join(filter(None, [language, property_value('persist.sys.country'),
+                                           property_value('persist.sys.localevar')]))
+    if not locale:
+        locale = property_value('ro.product.locale')
+    if not locale:
+        locale = '-'.join(filter(None, [property_value('ro.product.locale.language'),
+                                       property_value('ro.product.locale.region')]))
+    require(locale, 'Cannot determine emulator locale')
+    return locale
+
+
+def matches(pattern, value):
+    return isinstance(value, str) and re.fullmatch(pattern, value) is not None
+
+
 def api(path):
     raw = subprocess.check_output(
         ['gh', 'api', f'repos/{REPOSITORY}/{path}'], timeout=60,
@@ -71,7 +99,7 @@ def validate_metadata(artifact, run, artifact_id, source):
             'Artifact has expired')
     require(type(artifact.get('size_in_bytes')) is int and
             0 < artifact['size_in_bytes'] <= MAX_APK_BYTES + 65536, 'Artifact size exceeds pilot bounds')
-    require(re.fullmatch(r'sha256:[0-9a-f]{64}', artifact.get('digest', '')), 'Artifact digest is missing')
+    require(matches(r'sha256:[0-9a-f]{64}', artifact.get('digest')), 'Artifact digest is missing')
     require(run.get('repository', {}).get('full_name') == REPOSITORY and
             run.get('head_repository', {}).get('full_name') == REPOSITORY, 'Producer must be in this repository')
     require(run.get('path') == WORKFLOW and run.get('event') in ('push', 'pull_request'),
@@ -118,7 +146,7 @@ def extract_verified(archive, destination, artifact, run, source):
                 'source_sha': source, 'run_id': run['id'], 'run_attempt': run['run_attempt'],
                 'application_id': PACKAGE, 'variant': 'devZapstoreBenchmarkRelease'}
     require(all(manifest.get(k) == v for k, v in expected.items()), 'Producer provenance mismatch')
-    require(re.fullmatch(r'[0-9a-f]{40}', manifest.get('checkout_sha', '')), 'Missing integration checkout SHA')
+    require(matches(r'[0-9a-f]{40}', manifest.get('checkout_sha')), 'Missing integration checkout SHA')
     require(manifest.get('apk_sha256') == sha256(destination / 'app.apk'), 'APK checksum mismatch')
     inspect_apk(destination / 'app.apk')
     return manifest
@@ -174,15 +202,20 @@ def main():
     consumer.add_argument('--repetitions', required=True)
     consumer.add_argument('--destination', required=True, type=Path)
     commands.add_parser('idle')
+    commands.add_parser('locale')
     args = parser.parse_args()
     try:
         if args.command == 'stage':
             stage(args.apk, args.destination)
         elif args.command == 'fetch':
             fetch(args.artifact_id, args.source, args.repetitions, args.destination)
-        else:
+        elif args.command == 'idle':
             idle()
-    except (ValueError, KeyError, OSError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
+        else:
+            locale = device_locale()
+            print(locale, flush=True)
+            require(locale.replace('_', '-') in ('en-US', 'en'), 'Pilot selectors require English')
+    except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
         parser.exit(1, f'Maestro APK preflight failed: {error}\n')
 
 

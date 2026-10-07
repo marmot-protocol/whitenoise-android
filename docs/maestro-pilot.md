@@ -19,6 +19,10 @@ The job retains that same APK as
 `maestro-dev-apk-SOURCE_SHA-RUN_ID-RUN_ATTEMPT` for seven days, with its checksum
 and source/checkout/run provenance. Retention adds an upload, not compilation.
 No signed ARM64 preview can substitute for this x86_64-compatible artifact.
+Staging and retention are non-blocking steps after required Baseline Profile
+verification. An upload failure leaves normal CI green but no usable pilot APK.
+Only internal PR and master-push runs retain these APKs; scheduled, manual and
+fork runs skip retention.
 
 Copy the full source SHA and numeric artifact ID from that run. The artifact
 link has the form `.../actions/runs/RUN_ID/artifacts/ARTIFACT_ID`. The run must be
@@ -66,6 +70,8 @@ or cancels another run. Pilot dispatches have a separate concurrency group with
 cancellation disabled. This check detects existing work; it cannot reserve
 capacity against CI that starts later. The only excluded workflow is the
 lightweight PR screenshot-description updater.
+The concurrency group protects an active pilot but keeps only one pending
+dispatch: another dispatch can replace that pending run. Request one at a time.
 
 If the capacity check fails, reuse the same artifact in a new manual request
 after CI becomes idle. Do not rebuild the app or make an empty commit.

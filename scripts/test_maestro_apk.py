@@ -2,11 +2,13 @@
 
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 import re
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest import mock
 import zipfile
 
 from scripts import maestro_apk as pilot
@@ -43,7 +45,8 @@ class MaestroArtifactTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     pilot.validate_metadata(artifact(), run, '456', SOURCE)
         for key, value in [('expired', True), ('expires_at', '2020-01-01T00:00:00+00:00'),
-                           ('digest', ''), ('id', 457), ('size_in_bytes', pilot.MAX_APK_BYTES * 2),
+                           ('digest', ''), ('digest', None), ('digest', 123),
+                           ('id', 457), ('size_in_bytes', pilot.MAX_APK_BYTES * 2),
                            ('workflow_run', {'id': 999, 'head_sha': SOURCE}), ('name', 'unrelated-apk')]:
             with self.subTest(field=key):
                 selected = artifact()
@@ -89,6 +92,7 @@ class MaestroArtifactTest(unittest.TestCase):
     def test_archive_integrity_and_native_architecture(self):
         for changes in [{}, {'arm64': True}, {'extra': '../escape'},
                         {'manifest_changes': {'source_sha': 'e' * 40}},
+                        {'manifest_changes': {'checkout_sha': None}},
                         {'manifest_changes': {'apk_sha256': 'f' * 64}}]:
             with self.subTest(changes=changes), tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
@@ -108,6 +112,83 @@ class MaestroArtifactTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'archive digest'):
                 pilot.extract_verified(archive, directory / 'out', selected, producer(), SOURCE)
             self.assertFalse((directory / 'out').exists())
+
+
+    def test_stage_records_existing_apk_without_a_build(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            self.make_archive(directory)
+            with mock.patch.dict(os.environ, {'APK_SOURCE_SHA': SOURCE, 'GITHUB_RUN_ID': '123',
+                                              'GITHUB_RUN_ATTEMPT': '1'}), \
+                    mock.patch.object(pilot.subprocess, 'check_output', return_value='d' * 40 + '\n') as git:
+                pilot.stage(directory / 'fixture.apk', directory / 'stage')
+            git.assert_called_once_with(['git', 'rev-parse', 'HEAD'], text=True)
+            manifest = json.loads((directory / 'stage/provenance.json').read_text())
+            self.assertEqual(manifest['source_sha'], SOURCE)
+            self.assertEqual(manifest['checkout_sha'], 'd' * 40)
+            self.assertEqual((manifest['run_id'], manifest['run_attempt']), (123, 1))
+            self.assertEqual(manifest['apk_sha256'], pilot.sha256(directory / 'stage/app.apk'))
+            self.assertEqual((directory / 'stage/app.apk').read_bytes(), (directory / 'fixture.apk').read_bytes())
+
+    def test_fetch_records_identity_and_rejects_wrong_archive_size(self):
+        for wrong_size in (False, True):
+            with self.subTest(wrong_size=wrong_size), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                archive, selected = self.make_archive(directory)
+                selected['size_in_bytes'] = archive.stat().st_size + int(wrong_size)
+                destination = directory / 'reports/apk'
+                def download(command, *, stdout, check, timeout):
+                    self.assertEqual(command, ['gh', 'api', f'repos/{pilot.REPOSITORY}/actions/artifacts/456/zip'])
+                    self.assertTrue(check)
+                    self.assertEqual(timeout, 120)
+                    stdout.write(archive.read_bytes())
+                with mock.patch.dict(os.environ, {'GITHUB_SHA': 'e' * 40, 'GITHUB_RUN_ID': '999'}), \
+                        mock.patch.object(pilot, 'idle') as idle, \
+                        mock.patch.object(pilot, 'api', side_effect=[selected, producer()]), \
+                        mock.patch.object(pilot.subprocess, 'run', side_effect=download):
+                    if wrong_size:
+                        with self.assertRaisesRegex(ValueError, 'archive size'):
+                            pilot.fetch('456', SOURCE, '20', destination)
+                        self.assertFalse(destination.exists())
+                    else:
+                        pilot.fetch('456', SOURCE, '20', destination)
+                        evidence = json.loads((destination.parent / 'selection.json').read_text())
+                        self.assertEqual(evidence['producer']['source_sha'], SOURCE)
+                        self.assertEqual(evidence['artifact_digest'], selected['digest'])
+                        self.assertEqual(evidence['pilot_sha'], 'e' * 40)
+                        self.assertEqual(evidence['repetitions'], 20)
+                    idle.assert_called_once_with()
+
+
+class MaestroLocaleTest(unittest.TestCase):
+    def test_persisted_and_fresh_image_properties_follow_android_order(self):
+        cases = [({'persist.sys.locale': 'en-US'}, 'en-US'),
+                 ({'ro.product.locale': 'en-US'}, 'en-US'),
+                 ({'persist.sys.locale': 'null', 'ro.product.locale': 'en-US'}, 'en-US'),
+                 ({'persist.sys.locale': 'fr-FR', 'ro.product.locale': 'en-US'}, 'fr-FR'),
+                 ({'persist.sys.language': 'fr', 'persist.sys.country': 'CA',
+                   'ro.product.locale': 'en-US'}, 'fr-CA'),
+                 ({'ro.product.locale.language': 'en', 'ro.product.locale.region': 'US'}, 'en-US')]
+        for properties, expected in cases:
+            with self.subTest(properties=properties), mock.patch.dict(os.environ, {'GITHUB_ACTIONS': 'true'}):
+                def getprop(command, *, text, timeout):
+                    self.assertEqual(command[:5], ['adb', '-s', 'emulator-5554', 'shell', 'getprop'])
+                    self.assertTrue(text)
+                    self.assertEqual(timeout, 10)
+                    return properties.get(command[-1], '') + '\r\n'
+                with mock.patch.object(pilot.subprocess, 'check_output', side_effect=getprop):
+                    self.assertEqual(pilot.device_locale(), expected)
+
+    def test_unknown_locale_and_non_ci_device_probe_fail_closed(self):
+        with mock.patch.dict(os.environ, {'GITHUB_ACTIONS': 'true'}), \
+                mock.patch.object(pilot.subprocess, 'check_output', return_value='null\n'):
+            with self.assertRaisesRegex(ValueError, 'Cannot determine'):
+                pilot.device_locale()
+        with mock.patch.dict(os.environ, {'GITHUB_ACTIONS': 'false'}), \
+                mock.patch.object(pilot.subprocess, 'check_output') as adb:
+            with self.assertRaisesRegex(ValueError, 'disposable'):
+                pilot.device_locale()
+            adb.assert_not_called()
 
 
 class MaestroWorkflowTest(unittest.TestCase):
@@ -156,6 +237,34 @@ class MaestroWorkflowTest(unittest.TestCase):
         runner = (ROOT / 'scripts/run-maestro-pilot.sh').read_text()
         self.assertIn('MAESTRO_NEGATIVE_CONTROL_IMPOSSIBLE_3141', runner)
         self.assertNotIn('|| true', runner.split('maestro --device', 1)[1])
+
+    def test_pilot_retention_cannot_fail_required_baseline_verification(self):
+        workflow = (ROOT / '.github/workflows/android-ci.yml').read_text()
+        def step(name):
+            return workflow.split(f'      - name: {name}\n', 1)[1].split('\n      - name:', 1)[0]
+        baseline = step('Verify packaged Baseline Profile assets')
+        stage = step('Stage the existing APK for optional Maestro testing')
+        upload = step('Retain the existing APK for optional Maestro testing')
+        self.assertNotIn('continue-on-error:', baseline)
+        self.assertNotIn('maestro_apk.py', baseline)
+        self.assertIn('verify-baseline-profile.sh', baseline)
+        self.assertIn('continue-on-error: true', stage)
+        self.assertIn('continue-on-error: true', upload)
+        self.assertIn("if: steps.maestro_stage.outcome == 'success'", upload)
+        expression = re.search(r'^        if: (.+)$', stage, re.MULTILINE).group(1)
+        expression = expression.replace('&&', ' and ').replace('||', ' or ')
+        for event in ('push', 'pull_request', 'schedule', 'workflow_dispatch'):
+            for internal in (True, False):
+                for phase in ('tooling', 'baseline'):
+                    with self.subTest(event=event, internal=internal, phase=phase):
+                        repo = pilot.REPOSITORY if internal else 'someone/fork'
+                        github = SimpleNamespace(event_name=event, repository=pilot.REPOSITORY,
+                            event=SimpleNamespace(pull_request=SimpleNamespace(
+                                head=SimpleNamespace(repo=SimpleNamespace(full_name=repo)))))
+                        enabled = eval(expression, {'__builtins__': {}},
+                                       {'github': github, 'matrix': SimpleNamespace(phase=phase)})
+                        self.assertEqual(enabled, phase == 'baseline' and
+                                         (event == 'push' or (event == 'pull_request' and internal)))
 
 
 if __name__ == '__main__':
