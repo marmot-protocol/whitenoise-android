@@ -63,6 +63,7 @@ class ComposerDragAndReadingTest {
     val composeRule = createComposeRule()
 
     private var observed = TextFieldValue()
+    private var windowHeight by mutableStateOf(600)
     private var sends = 0
     private var cancels = 0
 
@@ -248,6 +249,28 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
         assertEquals("the animation must not send", 0, sends)
+    }
+
+    /** Window/IME bounds can clamp a settled manual composer without changing its expansion mode. */
+    @Test
+    fun draftTopWaitsForUnchangedDraftWindowReflow() {
+        render(longDraft)
+        drag(-400f)
+        val before = observed
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread { windowHeight = 280 }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        assertEquals(before, observed)
+        assertEquals(0, sends)
+        composeRule.runOnUiThread { windowHeight = 600 }
+        composeRule.waitForIdle()
+        assertEquals(before, observed)
     }
 
     /** Pointer-rate resize and reversal cannot mount a control or change the current selection. */
@@ -684,6 +707,7 @@ class ComposerDragAndReadingTest {
         selection: TextRange = TextRange(draft.length),
     ) {
         observed = TextFieldValue(draft, selection)
+        windowHeight = surfaceHeight
         sends = 0
         cancels = 0
         composeRule.setContent {
@@ -694,7 +718,7 @@ class ComposerDragAndReadingTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark) {
-                    Surface(Modifier.width(width.dp).height(surfaceHeight.dp)) {
+                    Surface(Modifier.width(width.dp).height(windowHeight.dp)) {
                         Box(contentAlignment = Alignment.BottomCenter) {
                             ComposerBar(
                                 replyingTo = null,

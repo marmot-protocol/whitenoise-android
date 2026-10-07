@@ -427,6 +427,8 @@ internal fun ComposerPill(
     multilineControlsSuppressed: Boolean = false,
     // The owning bar controls pointer-rate resize and its discrete height animation.
     geometryTransitionActive: Boolean = false,
+    // Available owner bounds also change with IME/window reflow without a stored expansion change.
+    geometryAvailableHeight: Dp = Dp.Unspecified,
     // Back has asked the keyboard to hide: the editing row collapses now, in the
     // same frame, instead of waiting for focus to clear once the IME inset lands.
     dismissInProgress: Boolean = false,
@@ -672,6 +674,8 @@ internal fun ComposerPill(
     var draftTopGeometrySettled by remember(
         scrollOwnerKey,
         textFieldValue,
+        geometryAvailableHeight,
+        transformedText,
         compactMeasurementWidth,
         compactOuterEndInset,
         expandedTrailingActionInset,
@@ -926,6 +930,8 @@ internal fun ComposerPill(
     }
     LaunchedEffect(
         geometryTransitionActive,
+        geometryAvailableHeight,
+        transformedText,
         textFieldValue,
         scrollOwnerKey,
         compactMeasurementWidth,
@@ -949,15 +955,26 @@ internal fun ComposerPill(
                 expansionProgress.value == expansionTarget &&
                 dictationControlWidthState.value == targetDictationControlWidth &&
                 composerScrollState.viewportSize > 0 &&
-                textLayoutSnapshot?.sourceText == textFieldValue.text
+                textLayoutSnapshot?.let { it.sourceText == textFieldValue.text && it.transformedText == transformedText } == true
 
         snapshotFlow { layoutSettled() }.collectLatest { settled ->
             draftTopGeometrySettled = false
             if (settled) {
                 // Await actual measure/layout frames so caret correction sees the final viewport.
+                var previousViewport = composerScrollState.viewportSize
+                var previousLayout = textLayoutSnapshot?.result?.size
+                do {
+                    withFrameNanos { }
+                    val viewport = composerScrollState.viewportSize
+                    val layout = textLayoutSnapshot?.result?.size
+                    val unchanged = viewport == previousViewport && layout == previousLayout
+                    previousViewport = viewport
+                    previousLayout = layout
+                } while (!unchanged && layoutSettled())
                 withFrameNanos { }
-                withFrameNanos { }
-                draftTopGeometrySettled = layoutSettled()
+                draftTopGeometrySettled = layoutSettled() &&
+                    previousViewport == composerScrollState.viewportSize &&
+                    previousLayout == textLayoutSnapshot?.result?.size
             }
         }
     }
