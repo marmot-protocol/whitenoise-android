@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -34,7 +35,9 @@ class ChatFolderPillsUnreadTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
-                    ChatFolderPills(listOf(chip), selected, { selected = it }, {}, {}, chatsUnreadCount = count)
+                    ChatFolderPills(listOf(ChatFolderChipModel("home", SystemFolderKind.CHATS, "", 0, unfilteredHome = true), chip), selected, {
+                        selected = it
+                    }, {}, {}, chatsUnreadCount = count)
                 }
             }
         }

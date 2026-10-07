@@ -25,6 +25,29 @@ import org.robolectric.RobolectricTestRunner
  */
 @RunWith(RobolectricTestRunner::class)
 class ChatListWindowFallbackTest {
+    /** Explicit non-recent folders use the complete stream without probing a bounded 200-row source. */
+    @Test fun sortedFolderOpensEveryRowAndClosesItsOnlyNativeHandle() =
+        runBlocking {
+            val whole = ScriptedPresentedList(rows = (0..250).map { "row-$it" })
+            val sources =
+                ChatListLiveSubscriptions(
+                    openChatListWindow = { _, _ -> error("Sorted folders must not use bounded windows") },
+                    openChats = { _, _ -> error("This test owns only the list source") },
+                    openPresentedChatList = { whole.handle },
+                )
+            val windows = sources.openFolderSource("acct", complete = true)
+            assertEquals(251, windows.rows.size)
+            var replaced = false
+            val receiver = launch { windows.receive { _, _ -> replaced = true } }
+            whole.emit(2uL, (0..251).map { "row-$it" })
+            awaitUntil { replaced }
+            assertEquals(252, windows.rows.size)
+            receiver.cancel()
+            receiver.join()
+            windows.close()
+            assertTrue(windows.closed)
+        }
+
     /** A refused window set is rebuilt from the whole-list handle as one live CHATS view. */
     @Test
     fun fallsBackToTheWholeListWhenWindowsAreRefused() =

@@ -46,21 +46,24 @@ internal fun chatFolderChatIds(
     activeAccountIdHex: String?,
     isMuted: (groupIdHex: String) -> Boolean,
     displayTitle: (ChatListItem) -> String,
+    excludedChatIds: Set<String> = emptySet(),
 ): Set<String> {
-    if (rule == null) return manualChatIds
+    if (rule == null) return manualChatIds - excludedChatIds
     rule.smartFilter?.let { payload ->
-        val filter = SmartFolderCodec.decode(payload)?.takeIf(SmartFolderCodec::valid) ?: return manualChatIds
-        return manualChatIds +
-            items
-                .filter {
-                    smartFolderMatches(
-                        filter,
-                        it,
-                        displayTitle,
-                    ) == FolderTruth.TRUE
-                }.map {
-                    it.foldedId
-                }
+        val filter = SmartFolderCodec.decode(payload)?.takeIf(SmartFolderCodec::valid) ?: return manualChatIds - excludedChatIds
+        return (
+            manualChatIds +
+                items
+                    .filter {
+                        smartFolderMatches(
+                            filter,
+                            it,
+                            displayTitle,
+                        ) == FolderTruth.TRUE
+                    }.map {
+                        it.foldedId
+                    }
+        ) - excludedChatIds
     }
     val criteria =
         FolderRuleCriteria(
@@ -78,7 +81,7 @@ internal fun chatFolderChatIds(
             matched.add(item.foldedId)
         }
     }
-    return matched
+    return matched - excludedChatIds
 }
 
 // The rule with its match inputs pre-normalized once per evaluation pass.
@@ -101,7 +104,7 @@ private fun chatFolderRuleMatches(
     val rule = criteria.rule
     val base =
         if (criteria.memberHexes.isEmpty() && criteria.ciKeyword == null) {
-            rule.hasCategoryConstraint()
+            rule.includeAll || rule.hasCategoryConstraint()
         } else {
             chatHasAnyMember(item, criteria.memberHexes) ||
                 chatMatchesKeyword(item, criteria.ciKeyword, displayTitle)

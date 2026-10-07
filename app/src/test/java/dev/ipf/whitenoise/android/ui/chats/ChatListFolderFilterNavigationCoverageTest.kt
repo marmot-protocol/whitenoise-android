@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * Regression for issue #1897: the active chat-list folder filter must survive
- * opening a conversation and returning; only explicit All / account switch clears it.
+ * opening a conversation and returning; committed folder Back, explicit All or account switch clears it.
  */
 class ChatListFolderFilterNavigationCoverageTest {
     @Test
@@ -92,12 +92,12 @@ class ChatListFolderFilterNavigationCoverageTest {
         )
     }
 
-    /** Proves the permanent All chip remains the sole explicit folder-filter reset action. */
+    /** The unfiltered root remains reachable when Chats is changed or removed. */
     @Test
     fun explicitAllActionClearsRememberedFolderFilter() {
         val pills =
             chatFolderPillsSource().readText().requiredSection(
-                start = "ChatFolderPill(\n                stringResource(R.string.chats)",
+                start = "stringResource(R.string.folder_all_chats)",
                 end = "unreadMessageCount = chatsUnreadCount",
             )
 

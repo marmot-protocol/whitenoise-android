@@ -29,12 +29,69 @@ class ChatFolderPreferencesTest {
         store = ChatFolderPreferences(context)
     }
 
+    /** Upgrade preserves all old definitions and seeds Chats once, including after deliberate deletion. */
+    @Test fun chatsMigrationPreservesEditedRulesMembershipAndRelativeOrder() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val preferences = context.getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)
+        val custom = store.createFolder("acct-a", "Edited")!!
+        store.setFolderRule("acct-a", custom.id, ChatFolderRule(keyword = "work"))
+        store.setChatInFolder("acct-a", custom.id, "g1", true)
+        store.deleteFolder("acct-a", ChatFolderPreferences.SYSTEM_FOLDER_CHATS_ID)
+        val oldOrder = store.foldersFor("acct-a").map { it.id }
+        preferences.edit().putInt("cf:acct-a:v", 2).commit()
+        val migrated = ChatFolderPreferences(context)
+        val folders = migrated.foldersFor("acct-a")
+        assertEquals(ChatFolderPreferences.SYSTEM_FOLDER_CHATS_ID, folders.first().id)
+        assertEquals(oldOrder, folders.drop(1).map { it.id })
+        assertEquals(ChatFolderRule(keyword = "work"), migrated.folderRule("acct-a", custom.id))
+        assertEquals(setOf("g1"), migrated.membershipFor("acct-a", custom.id))
+        assertEquals(ChatFolderRule(includeAll = true, includeMuted = true), migrated.folderRule("acct-a", folders.first().id))
+        migrated.deleteFolder("acct-a", folders.first().id)
+        assertEquals(oldOrder, ChatFolderPreferences(context).foldersFor("acct-a").map { it.id })
+    }
+
+    /** Exclusions survive process recreation, stay account-local, and a deliberate manual add clears them. */
+    @Test fun exclusionRoundTripsAndReAddIsReversibleWithoutChangingRules() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val folder = store.createFolder("acct-a", "Unread")!!
+        val rule = ChatFolderRule(unreadOnly = true)
+        store.setFolderRule("acct-a", folder.id, rule)
+        store.setChatInFolder("acct-a", folder.id, "G1", true)
+        assertTrue(store.excludeChat("acct-a", folder.id, " G1 "))
+        assertEquals(emptySet<String>(), store.membershipFor("acct-a", folder.id))
+        val reloaded = ChatFolderPreferences(context)
+        assertEquals(setOf("g1"), reloaded.excludedChats("acct-a", folder.id))
+        assertEquals(emptySet<String>(), reloaded.excludedChats("acct-b", folder.id))
+        assertEquals(rule, reloaded.folderRule("acct-a", folder.id))
+        assertTrue(reloaded.setChatInFolder("acct-a", folder.id, "g1", true))
+        assertEquals(emptySet<String>(), ChatFolderPreferences(context).excludedChats("acct-a", folder.id))
+        assertEquals(setOf("g1"), reloaded.membershipFor("acct-a", folder.id))
+        reloaded.excludeChat("acct-a", folder.id, "g1")
+        reloaded.deleteFolder("acct-a", folder.id)
+        assertFalse(reloaded.excludeChat("acct-a", folder.id, "g1"))
+        assertEquals(emptySet<String>(), ChatFolderPreferences(context).excludedChats("acct-a", folder.id))
+    }
+
+    /** Sort is persisted with the draft and unknown future values retain safe recent ordering. */
+    @Test fun sortRoundTripsWithDraftAndIsAccountLocal() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val folder = store.createFolder("acct-a", "Work")!!
+        store.commitFolderDraft("acct-a", folder.id, "Sorted", "", emptySet(), null, sort = ChatFolderSort.NAME)
+        val reloaded = ChatFolderPreferences(context)
+        assertEquals(ChatFolderSort.NAME, reloaded.foldersFor("acct-a").first { it.id == folder.id }.sort)
+        assertTrue(reloaded.foldersFor("acct-b").all { it.sort == ChatFolderSort.RECENT })
+        val preferences = context.getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)
+        val key = preferences.all.keys.single { it.startsWith("cf:acct-a:") && it.endsWith("folders") }
+        preferences.edit().putString(key, preferences.getString(key, "")!!.replace("NAME", "FUTURE")).commit()
+        assertEquals(ChatFolderSort.RECENT, ChatFolderPreferences(context).foldersFor("acct-a").first { it.id == folder.id }.sort)
+    }
+
     @Test
-    fun firstReadSeedsTheThreeSystemFoldersInOrder() {
+    fun firstReadSeedsAllFourStandardFoldersInOrder() {
         val folders = store.foldersFor("acct-a")
 
         assertEquals(
-            listOf(SystemFolderKind.UNREAD, SystemFolderKind.ARCHIVED, SystemFolderKind.GROUPS),
+            listOf(SystemFolderKind.CHATS, SystemFolderKind.UNREAD, SystemFolderKind.ARCHIVED, SystemFolderKind.GROUPS),
             folders.map { it.systemKind },
         )
         // Each default seeds with its old chip behavior expressed as a rule.
@@ -69,7 +126,7 @@ class ChatFolderPreferencesTest {
         val folder = reloaded.foldersFor("acct-a").first { it.id == id }
         assertEquals("Work stuff", folder.name)
         assertEquals("All of it", folder.description)
-        assertEquals(3, folder.order)
+        assertEquals(4, folder.order)
         assertEquals(setOf("group1"), reloaded.membershipFor("acct-a", id))
 
         assertTrue(reloaded.setChatInFolder("acct-a", id, "group1", included = false))
@@ -192,7 +249,7 @@ class ChatFolderPreferencesTest {
         val ordered = store.foldersFor("acct-a").map { it.id }
         assertEquals(custom.id, ordered[0])
         assertEquals(ChatFolderPreferences.SYSTEM_FOLDER_GROUPS_ID, ordered[1])
-        assertEquals(4, ordered.size)
+        assertEquals(5, ordered.size)
     }
 
     @Test

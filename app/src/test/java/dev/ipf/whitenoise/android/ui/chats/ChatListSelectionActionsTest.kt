@@ -6,6 +6,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatListSelectionActionsTest {
+    /** Committed Back unwinds search/selection before a folder; root has no callback and can exit. */
+    @Test fun folderBackIsTheLastPresentationLayerBeforeRootExit() {
+        assertTrue(chatListBackHandlerEnabled(false, false, folderSelected = true))
+        assertEquals(ChatListBackDismissal.ClearFolder, chatListBackDismissal(false, GlobalSearchState(), true))
+        assertEquals(ChatListBackDismissal.CloseSearch, chatListBackDismissal(false, GlobalSearchState(isOpen = true), true))
+        assertEquals(ChatListBackDismissal.ClearSelection, chatListBackDismissal(true, GlobalSearchState(), true))
+        assertEquals(null, chatListBackDismissal(false, GlobalSearchState(), false))
+    }
+
     @Test
     fun bulkArchiveActionUnarchivesOnlyWhenEverySelectedChatIsArchived() {
         assertEquals(ChatListBulkArchiveAction.Unarchive, chatListBulkArchiveAction(listOf(true)))

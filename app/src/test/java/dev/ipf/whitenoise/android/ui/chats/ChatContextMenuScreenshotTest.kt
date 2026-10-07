@@ -29,6 +29,13 @@ import org.robolectric.annotation.GraphicsMode
 class ChatContextMenuScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Current-folder exclusion remains reachable in the native menu. */
+    @Test fun folderExclusionLight() = capture("chat_context_folder_exclusion_light", folder = true)
+
+    @Test fun folderExclusionAmoled() = capture("chat_context_folder_exclusion_amoled", dark = true, amoled = true, folder = true)
+
+    @Test fun folderExclusionLargeRtl() = capture("chat_context_folder_exclusion_rtl_200", rtl = true, folder = true)
+
     /** Screenshot: light theme. */
     @Test fun light() = capture("chat_context_menu_light")
 
@@ -62,6 +69,7 @@ class ChatContextMenuScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
         left: Boolean = false,
+        folder: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context
@@ -70,6 +78,8 @@ class ChatContextMenuScreenshotTest {
             .clear()
             .commit()
         val app = ChatRowPortFixtures.state(context)
+        val selectedFolder = if (folder) app.chatFolderPreferences.createFolder(ChatRowPortFixtures.ACCOUNT_REF, "Study") else null
+        selectedFolder?.let { app.chatFolderPreferences.setChatInFolder(ChatRowPortFixtures.ACCOUNT_REF, it.id, "Study group", true) }
         val membership = if (left) SelfMembershipFfi.LEFT else SelfMembershipFfi.MEMBER
         val controller = leftScopeController(app, listOf(leftScopeRow("Study group", membership)))
         try {
@@ -78,7 +88,7 @@ class ChatContextMenuScreenshotTest {
                     CompositionLocalProvider(
                         LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                     ) {
-                        ChatsScreen(app, controller, {}, { _, _, _, _ -> })
+                        ChatsScreen(app, controller, {}, { _, _, _, _ -> }, selectedFolderId = selectedFolder?.id)
                     }
                 }
             }
