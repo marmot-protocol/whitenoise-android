@@ -105,6 +105,9 @@ internal class DmCreationAttempt(
         failure: DmCreationFailure = DmCreationFailure.NONE,
     ) = emit(phase, outcome, failure)
 
+    /** Lifecycle replacement is distinct from a caller cancellation and carries no owner identifiers. */
+    fun ownerReplaced() = record(DmCreationPhase.OWNER, DmCreationOutcome.REPLACED, DmCreationFailure.OWNER_REPLACED)
+
     /** Failure attribution remains bound to this captured attempt even after its UI owner is replaced. */
     fun failed(
         phase: DmCreationPhase,

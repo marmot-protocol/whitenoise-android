@@ -90,10 +90,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
-import dev.ipf.whitenoise.android.diagnostics.DmCreationFailure
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
-import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
-import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.share.launchInviteShare
 import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.BlockOutcome
@@ -739,11 +736,7 @@ internal fun ProfileSheet(
                 }
             } finally {
                 if (!openedConversation && !owner.canAct()) {
-                    diagnosticAttempt.record(
-                        DmCreationPhase.OWNER,
-                        DmCreationOutcome.REPLACED,
-                        DmCreationFailure.OWNER_REPLACED,
-                    )
+                    diagnosticAttempt.ownerReplaced()
                 }
                 creatingChat = false
             }

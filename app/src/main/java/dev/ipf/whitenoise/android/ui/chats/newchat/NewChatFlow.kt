@@ -153,7 +153,6 @@ internal fun startChatErrorUiState(
  * important: a successful MLS create must retry by group id rather than
  * creating a second direct chat when projection is merely delayed (#1729).
  */
-// Injectable native and diagnostic boundaries share one retry state machine.
 @Suppress("TooGenericExceptionCaught", "LongParameterList")
 internal suspend fun attemptStartProfileChat(
     npub: String,
@@ -242,92 +241,6 @@ private fun projectionFailureUi(
         title = AppText.Resource(R.string.couldnt_load_chats),
         retryGroupIdHex = groupIdHex,
     )
-
-// Trace any native boundary failure, then preserve its existing propagation.
-@Suppress("LongParameterList", "TooGenericExceptionCaught")
-internal suspend fun attemptOpenOrStartProfileChat(
-    npub: String,
-    progressHex: String,
-    recipientName: String?,
-    retryGroupIdHex: String? = null,
-    resolveDirectChat: suspend () -> NewMessageDirectChatResolution,
-    createGroup: suspend (String) -> String,
-    loadCreatedChatListItem: suspend (String) -> ChatListItem,
-    displayName: (String) -> String,
-    markCreateOpenStage: (String) -> Unit = {},
-    abandonCreateOpenTiming: (String) -> Unit = {},
-    directChatLookupAlreadyStarted: Boolean = false,
-    diagnosticAttempt: DmCreationAttempt? = null,
-): StartChatAttemptResult {
-    val existingChatResult =
-        if (retryGroupIdHex == null) {
-            diagnosticAttempt?.record(DmCreationPhase.EXISTING_LOOKUP, DmCreationOutcome.START)
-            if (!directChatLookupAlreadyStarted) {
-                markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_START)
-            }
-            val resolution =
-                try {
-                    resolveDirectChat()
-                } catch (failure: Exception) {
-                    diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, failure)
-                    if (failure is kotlinx.coroutines.CancellationException) {
-                        abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
-                    }
-                    throw failure
-                }
-            if (!directChatLookupAlreadyStarted) {
-                markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_RETURN)
-            }
-            diagnosticAttempt?.record(
-                DmCreationPhase.EXISTING_LOOKUP,
-                if (resolution.item != null || resolution.createRequired) {
-                    DmCreationOutcome.SUCCESS
-                } else {
-                    DmCreationOutcome.FAILURE
-                },
-                if (resolution.item != null || resolution.createRequired) {
-                    DmCreationFailure.NONE
-                } else {
-                    DmCreationFailure.UNKNOWN
-                },
-            )
-            when {
-                resolution.item != null ->
-                    StartChatAttemptResult.Open(
-                        item = resolution.item,
-                        newlyCreated = false,
-                        diagnosticAttempt = diagnosticAttempt,
-                    )
-                !resolution.createRequired -> {
-                    abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_FAILED)
-                    StartChatAttemptResult.Failed(
-                        StartChatErrorUiState(
-                            npub = npub,
-                            progressHex = progressHex,
-                            detail = AppText.Resource(R.string.couldnt_load_chats),
-                            diagnosticReport = null,
-                            recipientName = recipientName,
-                        ),
-                    )
-                }
-                else -> null
-            }
-        } else {
-            null
-        }
-    return existingChatResult ?: attemptStartProfileChat(
-        npub = npub,
-        progressHex = progressHex,
-        recipientName = recipientName,
-        retryGroupIdHex = retryGroupIdHex,
-        createGroup = createGroup,
-        loadCreatedChatListItem = loadCreatedChatListItem,
-        displayName = displayName,
-        markCreateOpenStage = markCreateOpenStage,
-        abandonCreateOpenTiming = abandonCreateOpenTiming,
-        diagnosticAttempt = diagnosticAttempt,
-    )
-}
 
 /**
  * Full-screen New Message flow: pick a person to open/start a direct chat, or
