@@ -85,9 +85,9 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
                 outputs.file(input);
                 return;
             }
-            verifyHash(input.toPath(), AAR_SHA);
+            verifyHash(input.toPath(), AAR_SHA, "Verify the official UI artifact before reviewing a Compose upgrade.");
             Path sourceJar = getParameters().getSources().get().getAsFile().toPath();
-            verifyHash(sourceJar, SOURCES_SHA);
+            verifyHash(sourceJar, SOURCES_SHA, "Verify the official UI source archive matches the pinned release.");
             File output = outputs.file("ui-android-1.12.1-whitenoise-rectlist.aar");
             Path work = output.toPath().getParent().resolve("compile");
             Files.createDirectories(work);
@@ -103,7 +103,8 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
             applyPatch(work, true);
             applyPatch(work, false);
             for (var expected : PATCHED_SOURCES.entrySet()) {
-                verifyHash(sourceRoot.resolve(expected.getKey()), expected.getValue());
+                verifyHash(sourceRoot.resolve(expected.getKey()), expected.getValue(),
+                        "Patched source differs: check patch integrity and LF line endings; do not remove the backport.");
             }
 
             Map<String, byte[]> aar = readZip(Files.readAllBytes(input.toPath()));
@@ -128,7 +129,7 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
             }
             Path classes = work.resolve("classes");
             List<String> args = new ArrayList<>(List.of(
-                    "-no-stdlib", "-no-reflect", "-jvm-target", "11",
+                    "-no-stdlib", "-no-reflect", "-Xjdk-release=11",
                     "-language-version", "2.1", "-api-version", "2.1", "-module-name", "ui",
                     "-jvm-default=no-compatibility", "-Xlambdas=indy",
                     "-Xno-param-assertions", "-Xno-call-assertions", "-Xno-receiver-assertions",
@@ -166,7 +167,7 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
             aar.put("classes.jar", writeZip(originalClasses));
             Files.write(output.toPath(), writeZip(aar));
             Logging.getLogger(ComposeUiBackport.class).lifecycle(
-                    "Backported Compose UI 1.12.1 from {} ({} source-compiled classes; source hashes and JVM linkage verified)",
+                    "Backported Compose UI 1.12.1 from {} ({} source-compiled classes; source hashes and existing JVM declarations verified)",
                     COMMIT, replacements.size());
         } catch (Exception exception) {
             throw new GradleException("Compose 1.12.1 source backport failed; do not bypass the guard", exception);
@@ -197,19 +198,24 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
             environment.put("GIT_CEILING_DIRECTORIES", work.getParent().toString());
             spec.setEnvironment(environment);
             spec.setWorkingDir(work);
-            List<String> command = new ArrayList<>(List.of("git", "apply"));
-            if (checkOnly) command.add("--check");
-            command.add(getParameters().getPatch().get().getAsFile().toString());
-            spec.commandLine(command);
+            spec.commandLine(patchCommand(getParameters().getPatch().get().getAsFile().toPath(), checkOnly));
         }).assertNormalExitValue();
     }
 
-    /** Rejects changed Google artifacts rather than silently patching an unreviewed version. */
-    private static void verifyHash(Path file, String expected) throws Exception {
+    /** Keeps patched source bytes independent of the contributor's global Git line-ending settings. */
+    static List<String> patchCommand(Path patch, boolean checkOnly) {
+        List<String> command = new ArrayList<>(List.of("git", "-c", "core.autocrlf=false", "-c", "core.eol=lf", "apply"));
+        if (checkOnly) command.add("--check");
+        command.add(patch.toString());
+        return command;
+    }
+
+    /** Rejects mismatched inputs with remediation specific to the artifact or patched source. */
+    private static void verifyHash(Path file, String expected, String remediation) throws Exception {
         String actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
         if (!expected.equals(actual)) {
-            throw new GradleException("Unexpected Compose artifact " + file.getFileName() + ": " + actual +
-                    ". Verify the official fix, then remove the backport when upgrading Compose.");
+            throw new GradleException("Unexpected SHA-256 for " + file.getFileName() + ": expected " + expected +
+                    ", found " + actual + ". " + remediation);
         }
     }
 
@@ -228,12 +234,13 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
     }
 
     /** Writes stable archive bytes without host timestamps or filesystem ordering. */
-    private static byte[] writeZip(Map<String, byte[]> entries) throws IOException {
+    static byte[] writeZip(Map<String, byte[]> entries) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
             for (var entry : new TreeMap<>(entries).entrySet()) {
                 ZipEntry member = new ZipEntry(entry.getKey());
-                member.setTimeLocal(java.time.LocalDateTime.of(1980, 1, 1, 0, 0));
+                // January 1 equals ZipEntry's pre-1980 sentinel and emits timezone-dependent extra data.
+                member.setTimeLocal(java.time.LocalDateTime.of(1980, 2, 1, 0, 0));
                 zip.putNextEntry(member);
                 zip.write(entry.getValue());
                 zip.closeEntry();
@@ -263,11 +270,11 @@ public abstract class ComposeUiBackport implements TransformAction<ComposeUiBack
         return node;
     }
 
-    /** Prevents recompilation from breaking unchanged Compose classes' JVM linkage. */
+    /** Checks existing class/member declarations; this is not a general whole-program linkage proof. */
     private static void verifyAbi(String name, byte[] before, byte[] after) {
         ClassNode oldNode = classNode(before);
         ClassNode newNode = classNode(after);
-        if (!java.util.Objects.equals(oldNode.superName, newNode.superName) ||
+        if (oldNode.access != newNode.access || !java.util.Objects.equals(oldNode.superName, newNode.superName) ||
                 !newNode.interfaces.containsAll(oldNode.interfaces) || oldNode.version != newNode.version ||
                 !members(newNode).containsAll(members(oldNode))) {
             throw new GradleException("Backport changes existing JVM linkage: " + name);

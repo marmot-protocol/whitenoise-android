@@ -28,6 +28,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -37,8 +38,11 @@ import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
 import dev.ipf.whitenoise.android.ui.conversation.LazyListConversationScrollWriter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,6 +73,8 @@ class BubbleFooterRectListReuseTest {
     }
 
     private val swapped = mutableStateMapOf<Int, Boolean>()
+    private val rowSizes = mutableMapOf<Int, IntSize>()
+    private val renderedParagraphs = mutableMapOf<Int, String>()
 
     /** Far snaps preserve RectList consistency while lazy items reuse another message's nodes. */
     @Test
@@ -114,15 +120,15 @@ class BubbleFooterRectListReuseTest {
     /** Snaps to each far target with the production scroll writer. */
     private fun farSnaps(timeline: Timeline) {
         FAR_TARGETS.forEach { target ->
-            composeRule.runOnIdle { timeline.scope.launch { timeline.writer.scrollToItem(target, 0) } }
-            composeRule.waitForIdle()
+            val job = composeRule.runOnIdle { timeline.scope.launch { timeline.writer.scrollToItem(target, 0) } }
+            assertScrollReached(timeline, target, job)
         }
     }
 
     /** Mirrors ConversationScrollCommandScope.animateScrollToItem: snap near a far target, then animate. */
     private fun centringJumps(timeline: Timeline) {
         FAR_TARGETS.forEach { target ->
-            composeRule.runOnIdle {
+            val job = composeRule.runOnIdle {
                 timeline.scope.launch {
                     val current = timeline.writer.firstVisibleItemIndex
                     if (abs(target - current) > APPROACH_ROWS) {
@@ -132,7 +138,21 @@ class BubbleFooterRectListReuseTest {
                     timeline.writer.animateScrollToItem(target, 0)
                 }
             }
-            composeRule.waitForIdle()
+            assertScrollReached(timeline, target, job)
+        }
+    }
+
+    /** Rejects cancelled or unfinished scrolls and proves the requested row was actually reached. */
+    private fun assertScrollReached(
+        timeline: Timeline,
+        target: Int,
+        job: Job,
+    ) {
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertTrue("scroll to $target completed", job.isCompleted)
+            assertFalse("scroll to $target was not cancelled", job.isCancelled)
+            assertEquals(target, timeline.state.firstVisibleItemIndex)
         }
     }
 
@@ -141,13 +161,19 @@ class BubbleFooterRectListReuseTest {
         timeline: Timeline,
         edit: Boolean = true,
     ) {
+        val originalSize = composeRule.runOnIdle { rowSizes.getValue(0) }
         repeat(6) { round ->
-            composeRule.runOnIdle { timeline.scope.launch { timeline.writer.scrollToItem(200, 0) } }
-            composeRule.waitForIdle()
+            val away = composeRule.runOnIdle { timeline.scope.launch { timeline.writer.scrollToItem(200, 0) } }
+            assertScrollReached(timeline, 200, away)
             // An off-screen edit that moves text between the two paragraphs, keeping the total size.
             if (edit) composeRule.runOnIdle { (0 until 30).forEach { swapped[it] = round % 2 == 0 } }
-            composeRule.runOnIdle { timeline.scope.launch { timeline.writer.scrollToItem(0, 0) } }
-            composeRule.waitForIdle()
+            val returned = composeRule.runOnIdle { timeline.scope.launch { timeline.writer.scrollToItem(0, 0) } }
+            assertScrollReached(timeline, 0, returned)
+            composeRule.runOnIdle {
+                assertEquals("the reactivated row retains its measured size", originalSize, rowSizes.getValue(0))
+                val expectedRow = if (edit && round % 2 == 0) 1 else 0
+                assertTrue("the edited body was laid out", renderedParagraphs.getValue(0).contains("Row $expectedRow."))
+            }
         }
     }
 
@@ -202,7 +228,10 @@ class BubbleFooterRectListReuseTest {
         val maxBodyHeight = with(density) { maxBodyHeightPx.toDp() }
         val contentColor = MaterialTheme.colorScheme.onSurface
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp)
+                .onSizeChanged { rowSizes[id] = it },
             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
         ) {
             Column(Modifier.widthIn(max = 300.dp)) {
@@ -230,7 +259,13 @@ class BubbleFooterRectListReuseTest {
                         // selectableMessageBody → readAloudMessageSemantics → MarkdownMessageBody.
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Box(Modifier.onSizeChanged { }) {
-                                MarkdownMessageBody(document, onLastTextLayout = { lastLineLayout = it })
+                                MarkdownMessageBody(
+                                    document,
+                                    onLastTextLayout = {
+                                        lastLineLayout = it
+                                        renderedParagraphs[id] = it.layoutInput.text.text
+                                    },
+                                )
                             }
                         }
                     }

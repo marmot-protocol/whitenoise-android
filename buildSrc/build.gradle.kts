@@ -7,14 +7,15 @@ repositories {
 }
 
 dependencies {
+    implementation(gradleApi())
     implementation("org.ow2.asm:asm-tree:9.9.1")
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    testImplementation("junit:junit:4.13.2")
 }
 
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(17)
+}
+
+tasks.test {
+    useJUnit()
 }

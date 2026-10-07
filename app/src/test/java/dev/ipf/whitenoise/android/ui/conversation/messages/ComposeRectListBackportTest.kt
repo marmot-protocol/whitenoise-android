@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -24,5 +25,14 @@ class ComposeRectListBackportTest : ComposeRectListReuseFixture() {
         requireNotNull(stream).use(properties::load)
         assertEquals("1.12.1", properties.getProperty("base"))
         assertEquals("fd550bed793b66378c83091532e29c18fdef44cc", properties.getProperty("upstream"))
+        val owner = Class.forName("androidx.compose.ui.node.AlignmentLinesOwner")
+        val setter = owner.getDeclaredMethod("setPlacingForAlignment", Boolean::class.javaPrimitiveType)
+        assertEquals(Void.TYPE, setter.returnType)
+        listOf("MeasurePassDelegate", "LookaheadPassDelegate").forEach { name ->
+            val implementation = Class.forName("androidx.compose.ui.node.$name")
+            assertTrue(owner.isAssignableFrom(implementation))
+            val implementedSetter = implementation.getDeclaredMethod(setter.name, Boolean::class.javaPrimitiveType)
+            assertEquals(Void.TYPE, implementedSetter.returnType)
+        }
     }
 }

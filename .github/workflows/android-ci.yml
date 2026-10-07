@@ -143,7 +143,7 @@ jobs:
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Android CI aggregate gate
-        run: python3 -m unittest scripts/test_android_ci_gate.py
+        run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_verify_compose_backport_control.py
 
       - name: Check committed screenshot golden owners
         run: |
@@ -255,7 +255,9 @@ jobs:
 
       - name: Compile (Kotlin)
         if: matrix.phase == 'tooling'
-        run: ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
+        run: |
+          ./gradlew -p buildSrc test --build-cache --profile --no-daemon --stacktrace
+          ./gradlew :app:compileDevZapstoreDebugAndroidTestKotlin :benchmark:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
       - name: ktlint and detekt
         if: matrix.phase == 'tooling'
@@ -282,6 +284,24 @@ jobs:
           ' "$metadata")
           app_apk="$(dirname "$metadata")/$output_file"
           bash scripts/verify-baseline-profile.sh "$app_apk"
+
+      - name: Verify unpatched Compose regression control
+        if: matrix.phase == 'baseline' && github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/verify_compose_backport_control.py --base "$BASE_SHA" --head "$HEAD_SHA"
+
+      - name: Upload Compose backport verification
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: compose-backport-verification-${{ matrix.phase }}
+          path: |
+            build/reports/compose-backport-control/
+            buildSrc/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
 
       # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
