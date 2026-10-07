@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Before
@@ -28,7 +29,14 @@ class DmConversationFirstFrameTest {
     @Before
     fun resetTickets() {
         DmCreationDiagnostics.attach(ApplicationProvider.getApplicationContext<Context>())
+        DmCreationDiagnostics.setEnabled(true)
         composeRule.mainClock.autoAdvance = false
+    }
+
+    /** Restores consent after exercising the real admission fence with a captured diagnostic sink. */
+    @After
+    fun disableRecording() {
+        DmCreationDiagnostics.setEnabled(false)
     }
 
     /** A mounted destination cannot claim success until its awaited frame arrives, and consumes the ticket once. */

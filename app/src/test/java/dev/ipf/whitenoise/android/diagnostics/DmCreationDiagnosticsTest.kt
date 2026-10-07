@@ -22,6 +22,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -35,6 +36,12 @@ import java.util.zip.ZipFile
 @RunWith(RobolectricTestRunner::class)
 class DmCreationDiagnosticsTest {
     @get:Rule val folder = TemporaryFolder()
+
+    /** Ensures captured-sink frame tests do not retain a recording grant after their sandbox ends. */
+    @After
+    fun disableRecording() {
+        DmCreationDiagnostics.setEnabled(false)
+    }
 
     /** An overlapping preparation error remains separate from retries and survives the real archive path. */
     @Test
@@ -82,6 +89,8 @@ class DmCreationDiagnosticsTest {
     @Test
     fun replacementAndLateFramesStayWithTheirCapturedOwners() =
         runTest {
+            DmCreationDiagnostics.attach(ApplicationProvider.getApplicationContext<Context>())
+            DmCreationDiagnostics.setEnabled(true)
             val records = mutableListOf<Map<String, Any>>()
             val old = DmCreationInteraction(records::add)
             val replacement = DmCreationInteraction(records::add)

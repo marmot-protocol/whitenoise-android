@@ -169,10 +169,12 @@ internal object DmCreationDiagnostics {
     /** Uses the same audit recording/disclosure grant and immediate revoke fence as other local diagnostics. */
     @Synchronized
     fun setEnabled(enabled: Boolean) {
-        this.enabled = false
-        if (!enabled) synchronized(pendingFrames) { pendingFrames.clear() }
-        recorder?.setEnabled(enabled)
-        this.enabled = enabled && recorder != null
+        if (!enabled) this.enabled = false
+        synchronized(pendingFrames) {
+            if (!enabled) pendingFrames.clear()
+            recorder?.setEnabled(enabled)
+            this.enabled = enabled && recorder != null
+        }
     }
 
     /** Adds only compile-time/public platform context; unsupported revision fields say unknown. */
@@ -208,8 +210,9 @@ internal object DmCreationDiagnostics {
         generation: Int,
         attempt: DmCreationAttempt,
     ) {
-        attempt.record(DmCreationPhase.FIRST_FRAME, DmCreationOutcome.START)
         synchronized(pendingFrames) {
+            if (!enabled) return
+            attempt.record(DmCreationPhase.FIRST_FRAME, DmCreationOutcome.START)
             pruneFrames()
             val destination = Destination(account, group, generation)
             while (destination !in pendingFrames && pendingFrames.size >= MAX_PENDING_FRAMES) {
