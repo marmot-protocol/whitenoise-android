@@ -41,6 +41,7 @@ import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapGate
+import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapState
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.share.ShareRequest
@@ -83,8 +84,11 @@ class MainActivity : AppCompatActivity() {
         }
     private var inboundAppUpdateTap by mutableIntStateOf(0)
 
+    /** Pending launcher capabilities belong to this task's retained owner, never saved instance state. */
+    private val pendingPinTapState: PinnedShortcutTapState by viewModels()
+
     /** Holds pin taps while the App Lock decision loads and parses them under the decided state. */
-    private val pinTapGate by lazy { PinnedShortcutTapGate(appState) }
+    private val pinTapGate by lazy { PinnedShortcutTapGate(appState, pendingPinTapState) }
     private lateinit var appUnlockPrompt: BiometricPrompt
     private val appUnlockCryptoGate by lazy(::AppUnlockCryptoGate)
     private var attachedAppUnlockSessionId: Long? = null
@@ -391,7 +395,8 @@ class MainActivity : AppCompatActivity() {
             setIntent(Intent(this, MainActivity::class.java))
             return
         }
-        // A pin tap held for the App Lock decision replaces the stored intent so recreation cannot replay it.
+        // Retained state preserves an unresolved tap across recreation; clear the launch intent to avoid replay
+        // after the gate has consumed or superseded it.
         if (pinTapGate.hold(intent)) {
             setIntent(Intent(this, MainActivity::class.java))
             return

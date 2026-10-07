@@ -324,7 +324,7 @@ class PinnedConversationPinReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                withTimeoutOrNull(2_000L) {
+                withTimeoutOrNull(APPROVAL_REFRESH_TIMEOUT_MS) {
                     runCatchingCancellable {
                         if (PinnedConversationShortcuts(context).approved(capability)) {
                             val appState = (context.applicationContext as? WhiteNoiseApplication)?.initializedAppState()
@@ -338,5 +338,9 @@ class PinnedConversationPinReceiver : BroadcastReceiver() {
                 pending.finish()
             }
         }
+    }
+
+    private companion object {
+        const val APPROVAL_REFRESH_TIMEOUT_MS = 2_000L
     }
 }

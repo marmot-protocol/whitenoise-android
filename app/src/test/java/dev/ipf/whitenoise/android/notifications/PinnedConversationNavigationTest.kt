@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.notifications
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import dev.ipf.whitenoise.android.state.PinnedShortcutLockDecision
 import dev.ipf.whitenoise.android.state.pinnedShortcutLockDecision
 import org.junit.After
@@ -104,6 +107,65 @@ class PinnedConversationNavigationTest {
         assertFalse(gate.hold(first))
         assertNull(gate.release())
     }
+
+    /** Activity recreation keeps the unresolved capability in its retained task owner and consumes it only once. */
+    @Test
+    fun recreatedGateRetainsPendingTapUntilLockDecisionSettles() {
+        val store = ViewModelStore()
+        var decision = PinnedShortcutLockDecision.WAIT
+        val first = gate({ decision }, retainedPinState(store))
+        val intent = PinnedConversationNavigation.intent(context, requireNotNull(tokens.issue("account-a", GROUP)))
+        assertTrue(first.hold(intent))
+        val recreated = gate({ decision }, retainedPinState(store))
+        assertFalse(recreated.hold(Intent(Intent.ACTION_MAIN)))
+        decision = PinnedShortcutLockDecision.OPEN
+        val replayed = requireNotNull(recreated.release())
+        assertEquals(intent.data, replayed.data)
+        assertEquals(GROUP, recreated.target(context, replayed)?.groupIdHex)
+        assertNull(gate({ decision }, retainedPinState(store)).release())
+        store.clear()
+    }
+
+    /** A newer route after recreation clears the retained tap; separate and finished tasks cannot inherit it. */
+    @Test
+    fun recreatedGateSupersessionAndTaskSeparationRetainOneShotOwnership() {
+        val store = ViewModelStore()
+        val decision = { PinnedShortcutLockDecision.WAIT }
+        val first = gate(decision, retainedPinState(store))
+        val intent = PinnedConversationNavigation.intent(context, requireNotNull(tokens.issue("account-a", GROUP)))
+        assertTrue(first.hold(intent))
+        val otherStore = ViewModelStore()
+        assertNull(gate(decision, retainedPinState(otherStore)).release())
+        val recreated = gate(decision, retainedPinState(store))
+        recreated.supersedeForRoute(true, false, null)
+        assertNull(gate(decision, retainedPinState(store)).release())
+        assertTrue(recreated.hold(intent))
+        val state = retainedPinState(store)
+        store.clear()
+        assertNull(state.held)
+        otherStore.clear()
+    }
+
+    /** Recreates the Activity's actual ViewModel lookup while retaining its task store. */
+    private fun retainedPinState(store: ViewModelStore): PinnedShortcutTapState =
+        ViewModelProvider(
+            object : ViewModelStoreOwner {
+                override val viewModelStore: ViewModelStore = store
+            },
+            ViewModelProvider.NewInstanceFactory(),
+        )[PinnedShortcutTapState::class.java]
+
+    /** Rebinds ephemeral lock callbacks to the retained pending-tap owner, as a replacement Activity does. */
+    private fun gate(
+        decision: () -> PinnedShortcutLockDecision,
+        state: PinnedShortcutTapState,
+    ): PinnedShortcutTapGate =
+        PinnedShortcutTapGate(
+            lockDecision = decision,
+            activeAccount = { "account-a" },
+            evaluationPending = { decision() == PinnedShortcutLockDecision.WAIT },
+            pending = state,
+        )
 
     /** Changing an account while retaining a valid pair of tokens invalidates both the URI identity and credentials. */
     @Test

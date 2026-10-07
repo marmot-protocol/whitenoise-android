@@ -21,32 +21,35 @@ internal class PinnedShortcutTapGate(
     private val activeAccount: () -> String?,
     private val evaluationPending: () -> Boolean,
     private val evaluateForeground: () -> Unit = {},
+    private val pending: PinnedShortcutTapState = PinnedShortcutTapState(),
 ) {
     /** Production ownership stays in AppState; callbacks let routing interleavings use the actual gate in tests. */
-    constructor(appState: WhiteNoiseAppState) : this(
+    constructor(
+        appState: WhiteNoiseAppState,
+        pending: PinnedShortcutTapState,
+    ) : this(
         lockDecision = { appState.pinnedShortcutLockDecision() },
         activeAccount = { appState.activeAccountRef },
         evaluationPending = { appState.appUnlockEvaluationPending },
         evaluateForeground = { appState.maybeShowAppLockForForeground() },
+        pending = pending,
     )
-
-    private var held: Intent? = null
 
     /** True while the lock decision for this pin tap is still loading; the tap is retained for [release]. */
     fun hold(intent: Intent?): Boolean {
         if (intent?.action != PinnedConversationNavigation.ACTION_OPEN) return false
         evaluateForeground()
         val waiting = lockDecision() == PinnedShortcutLockDecision.WAIT
-        held = if (waiting) intent else null
+        pending.held = if (waiting) Intent(intent) else null
         return waiting
     }
 
     /** Hands back the held tap once; null when nothing waits. */
-    fun release(): Intent? = held.also { held = null }
+    fun release(): Intent? = pending.held.also { pending.held = null }
 
     /** A newer accepted route owns navigation, including while a pin waits for the lock decision. */
     fun supersede() {
-        held = null
+        pending.held = null
     }
 
     /** Mirrors accepted inbound routing without discarding a pin for a harmless dataless launcher intent. */

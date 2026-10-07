@@ -3800,16 +3800,17 @@ class WhiteNoiseAppState private constructor(
         if (pinnedShortcutPresentationRevision.get() != revision) return
         val item = preloadNotificationChatListItem(account, capability.groupIdHex)
         val available = item.group.selfMembership == SelfMembershipFfi.MEMBER && !item.group.pendingConfirmation
-        if (!available || !canRefreshApprovedPin(account, runtime)) return
-        val title = chatListItemDisplayTitle(item, this, notificationGroupTitleCopy(appContext))
-        val presentation = pinnedConversationPresentation(account, item, title)
-        withContext(Dispatchers.IO) {
-            val tokens = PinnedConversationTokens.create(appContext)
-            PinnedConversationShortcuts(appContext).refresh(account, mapOf(capability.groupIdHex to presentation)) {
-                isActive &&
-                    canRefreshApprovedPin(account, runtime) &&
-                    pinnedShortcutPresentationRevision.get() == revision &&
-                    tokens.isValid(capability)
+        if (available && canRefreshApprovedPin(account, runtime)) {
+            val title = chatListItemDisplayTitle(item, this, notificationGroupTitleCopy(appContext))
+            val presentation = pinnedConversationPresentation(account, item, title)
+            withContext(Dispatchers.IO) {
+                val tokens = PinnedConversationTokens.create(appContext)
+                PinnedConversationShortcuts(appContext).refresh(account, mapOf(capability.groupIdHex to presentation)) {
+                    isActive &&
+                        canRefreshApprovedPin(account, runtime) &&
+                        pinnedShortcutPresentationRevision.get() == revision &&
+                        tokens.isValid(capability)
+                }
             }
         }
     }
