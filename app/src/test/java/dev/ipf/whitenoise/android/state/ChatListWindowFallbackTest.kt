@@ -46,6 +46,9 @@ class ChatListWindowFallbackTest {
             receiver.join()
             windows.close()
             assertTrue(windows.closed)
+            assertEquals(1, whole.releaseCount)
+            windows.close()
+            assertEquals(1, whole.releaseCount)
         }
 
     /** A refused window set is rebuilt from the whole-list handle as one live CHATS view. */
@@ -115,13 +118,18 @@ private suspend fun awaitUntil(condition: () -> Boolean) {
 private class ScriptedPresentedList(
     rows: List<String>,
 ) {
+    var releaseCount = 0
+        private set
     private val updates = Channel<PresentedChatListUpdateFfi>(Channel.UNLIMITED)
     private val initial = update(1uL, rows)
     val handle =
         PresentedChatListWindowHandle(
             snapshotOnce = { initial },
             nextUpdate = { updates.receiveCatching().getOrNull() },
-            release = { updates.close() },
+            release = {
+                releaseCount += 1
+                updates.close()
+            },
         )
 
     fun emit(

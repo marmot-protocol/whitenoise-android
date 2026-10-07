@@ -34,7 +34,7 @@ class ChatFolderLiveSourceTest {
             assertFalse(source.receiveUntilChanged(true) {})
         }
 
-    @Test fun cancellationRetiresReceiverAndReopeningCannotConsumeOldAccountFrames() =
+    @Test fun cancellationRetiresReceiverBeforeReopening() =
         runBlocking {
             val source = ChatFolderLiveSource()
             val entered = CompletableDeferred<Unit>()
