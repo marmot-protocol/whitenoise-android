@@ -229,6 +229,15 @@ def exhausted_selection_result(journal, effect):
             continue
         previous = record['payload']
         identity = previous['identity']
+        recovered = any(
+            newer['state'] == 'confirmed'
+            and newer['payload']['kind'] == previous['kind']
+            and newer['payload']['identity']['number'] == identity['number']
+            and newer['payload']['identity']['pull_request_id'] == identity['pull_request_id']
+            and newer['payload']['generation'] > previous['generation']
+            for newer in journal['effects'].values())
+        if recovered:
+            continue
         if (effect is None or effect.identity.number != identity['number']
                 or effect.identity.pull_request_id != identity['pull_request_id']
                 or effect.generation <= previous['generation']):

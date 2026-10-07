@@ -343,6 +343,27 @@ class QueueTest(unittest.TestCase):
                                   self.readback, self.save), 'not-sent-exhausted-held')
         self.assertFalse(self.writes)
 
+    def test_confirmed_explicit_recovery_releases_historical_exhaustion_hold(self):
+        self.exhaust_never_sent_budget()
+        old_key = next(iter(self.journal['effects']))
+        self.snapshot['generation'] = 1
+        self.assertEqual(self.tick(), 'authorize-source-confirmed')
+        other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        self.assertEqual(self.tick(candidate=other), 'authorize-source-confirmed')
+        self.assertEqual(self.journal['effects'][old_key]['state'], 'not-sent-exhausted')
+        self.assertEqual(len(self.writes), 2)
+
+    def test_never_sent_recovery_does_not_release_old_selection_hold(self):
+        self.exhaust_never_sent_budget()
+        self.snapshot['generation'] = 1
+        self.assertEqual(self.tick(write=lambda *_: (_ for _ in ()).throw(q.NotSent('e' * 64))),
+                         'not-sent-backoff')
+        other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        self.assertEqual(self.tick(candidate=other), 'not-sent-exhausted-held')
+        self.assertFalse(self.writes)
+
     def test_changed_proof_cannot_reset_exhausted_candidate_budget(self):
         self.exhaust_never_sent_budget()
         self.assertEqual(self.tick(verify_source=lambda *_: 'f' * 64), 'not-sent-exhausted-held')

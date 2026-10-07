@@ -71,7 +71,10 @@ original owner may explicitly record a new admission generation; the exhausted
 record is retained, and the new effect still requires fresh identity/proof checks.
 The exhausted selection also holds other PRs and changed proof keys. A new
 generation only admits recovery of the same PR identity; it never silently
-advances another candidate.
+advances another candidate. After the matching recovery effect is confirmed,
+the historical exhaustion remains as evidence and releases its hold. An attempted,
+unknown or never-sent recovery does not clear that hold. The trusted adapter still
+retains the selected PR until its final merge/retirement proof releases the slot.
 Changing generation never releases an uncertain sent write. A remote API refusal stays held for explicit
 recovery; a sent request with a lost response stays uncertain. The CLI child
 verifies the journal intent and its actual ancestor producer lock.
