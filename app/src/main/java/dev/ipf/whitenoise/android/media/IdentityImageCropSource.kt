@@ -47,6 +47,10 @@ private suspend fun readSourceOrNull(
         null
     }
 
+/**
+ * Keeps the original encoded pixels and prepares an orientation-aware bounded preview for cropping.
+ * Unreadable or undecodable input returns null; cancellation propagates so a departed picker cannot upload.
+ */
 internal suspend fun loadIdentityImageCropSource(
     contentResolver: ContentResolver,
     uri: Uri,

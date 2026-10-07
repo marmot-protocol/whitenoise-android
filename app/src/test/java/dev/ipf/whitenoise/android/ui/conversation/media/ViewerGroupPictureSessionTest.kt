@@ -186,8 +186,10 @@ class ViewerGroupPictureSessionTest {
         return IdentityImageCropSource(byteArrayOf(1, 2, 3), preview, EditorPixelSize(20, 20))
     }
 
+    /** Prepared synthetic pixels make retries comparable without invoking a native upload. */
     private fun draft() = ImageUploadDraft(byteArrayOf(1, 2, 3), "image/jpeg", null, "20x20", null)
 
+    /** A decodable original exceeds the production minimum crop size and contains opaque visible pixels. */
     private fun png(): ByteArray =
         ByteArrayOutputStream()
             .also {
@@ -196,6 +198,7 @@ class ViewerGroupPictureSessionTest {
                 assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
             }.toByteArray()
 
+    /** Synthetic attachment locators identify the captured gallery page without using a public source URL. */
     private fun reference() =
         MediaAttachmentReferenceFfi(
             emptyList(),

@@ -117,6 +117,7 @@ private fun isSvgMime(mime: String?): Boolean =
         ?.trim()
         ?.equals("image/svg+xml", ignoreCase = true) == true
 
+/** Detects candidate XML/SVG bytes; the rasterizer still validates content before any crop is offered. */
 private fun looksLikeGroupSvg(
     mime: String?,
     source: ByteArray,
