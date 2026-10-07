@@ -3,7 +3,7 @@ name: keys-back-clears
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
-- tapOn: "Open settings.*"
+- runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Settings"
 - tapOn: "Profile Keys"
 - assertVisible: "Private key hidden"

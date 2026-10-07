@@ -1,0 +1,36 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: alerts-person-vibration-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- assertVisible: Generated fixture message
+- tapOn: Maestro group
+- assertVisible:
+    id: chat_info.list
+- scrollUntilVisible:
+    element:
+      text: Maestro Bob
+    direction: DOWN
+- tapOn: Maestro Bob
+- assertVisible: Nickname & notes
+- scrollUntilVisible:
+    element:
+      id: person_profile.notifications
+    direction: DOWN
+- tapOn:
+    id: person_profile.notifications
+- assertVisible:
+    id: profile_notifications.defaults
+- assertVisible:
+    id: profile_notifications.mute
+- scrollUntilVisible:
+    element:
+      id: profile_notifications.vibration
+    direction: DOWN
+- tapOn:
+    id: profile_notifications.vibration
+- assertVisible: System default
+- back
+- assertVisible:
+    id: profile_notifications.defaults

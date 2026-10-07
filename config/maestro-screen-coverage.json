@@ -81,15 +81,41 @@
       "nested-donate"
     ],
     "TextToSpeech": [
-      "settings-read-aloud"
+      "settings-read-aloud",
+      "speech-rate-back",
+      "speech-custom-cancel",
+      "speech-custom-back",
+      "speech-custom-reopen",
+      "speech-custom-empty",
+      "speech-custom-zero",
+      "speech-custom-below-min",
+      "speech-custom-above-max",
+      "speech-custom-minimum-cancel",
+      "speech-custom-maximum-cancel",
+      "speech-custom-rotation-cancel",
+      "speech-rate-return",
+      "speech-custom-duplicate-decimal",
+      "speech-custom-overflow"
     ],
     "Dictation": [
-      "advanced-dictation"
+      "advanced-dictation",
+      "dictation-provider-back",
+      "dictation-provider-rotation",
+      "dictation-finish-back",
+      "dictation-provider-reopen"
     ],
     "ChatFolders": [
       "advanced-folders",
       "folders-create-reopen",
-      "folders-delete-confirm"
+      "folders-delete-confirm",
+      "smart-folders-picker-back",
+      "smart-folders-unread-cancel",
+      "smart-folders-chat-type-cancel",
+      "smart-folders-participants-empty",
+      "smart-folders-participants-picker-back",
+      "smart-folders-condition-rotation",
+      "smart-folders-title-empty",
+      "smart-folders-title-draft-cancel"
     ],
     "Gestures": [
       "advanced-gestures"

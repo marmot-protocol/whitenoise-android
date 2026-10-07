@@ -4,7 +4,7 @@ name: navigation-account-empty
 - runFlow: ../fixtures/runtime-ready.yaml
 # The instrumentation host owns launch, reset and disposal.
 - assertVisible: "Maestro group"
-- tapOn: "Open settings.*"
+- runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Settings"
 - tapOn:
     id: "settings.switch_profile"
@@ -12,7 +12,7 @@ name: navigation-account-empty
 - assertVisible: "Maestro Carol"
 - tapOn: "Back"
 - assertNotVisible: "Maestro group"
-- tapOn: "Open settings.*"
+- runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Maestro Carol"
 - tapOn:
     id: "settings.switch_profile"

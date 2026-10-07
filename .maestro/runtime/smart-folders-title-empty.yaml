@@ -1,0 +1,40 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: smart-folders-title-empty
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Folders
+    direction: DOWN
+- tapOn: Folders
+- assertVisible:
+    id: chat-folders-content
+- tapOn: New Folder
+- assertVisible:
+    id: folder.name
+- scrollUntilVisible:
+    element:
+      id: folder.add.
+    direction: DOWN
+- tapOn:
+    id: folder.add.
+- assertVisible:
+    id: folder.addField.PARTICIPANTS
+- scrollUntilVisible:
+    element:
+      id: folder.addField.TITLE
+    direction: DOWN
+- tapOn:
+    id: folder.addField.TITLE
+- assertVisible:
+    id: folder.conditionDone
+    enabled: false
+- tapOn: Cancel
+- assertVisible:
+    id: folder.name
+- back
+- assertVisible:
+    id: chat-folders-content

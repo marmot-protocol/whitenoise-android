@@ -6,7 +6,7 @@ name: notifications-deny-settings
 - tapOn:
     id: "com.android.permissioncontroller:id/permission_deny_button"
 - assertVisible: "Maestro group"
-- tapOn: "Open settings.*"
+- runFlow: ../fixtures/open-settings.yaml
 - tapOn: "Notifications"
 - assertVisible: "Notifications"
 - back

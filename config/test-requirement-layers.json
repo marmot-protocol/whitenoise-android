@@ -1,0 +1,188 @@
+{
+  "schema": 1,
+  "scope": "Campaign prerequisites, never execution or complete acceptance proof. Every permanent family keeps its full manual requirement and subcases.",
+  "families": {
+    "INT": {
+      "layers": [
+        "core-ci",
+        "native-runtime-ui",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Exact candidate APK/package/signing identity, populated upgrade snapshots and disposable native runtime; use the real startup failure/loading/upgrade states."
+    },
+    "ONB": {
+      "layers": [
+        "offline-ui",
+        "native-runtime-ui",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Disposable fresh install, synthetic keys and controlled relay success/failure; signer, QR scanning and actual setup/import success require their own fixtures."
+    },
+    "ACC": {
+      "layers": [
+        "native-runtime-ui",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Three generated identities plus populated distinct histories; account deletion/signout, switching during work and persistent isolation need native state proof."
+    },
+    "NAV": {
+      "layers": [
+        "native-runtime-ui",
+        "core-ci",
+        "controlled-integration"
+      ],
+      "prerequisites": "Real app destinations and nested dialog stacks; warm resume, recreation, process death and pending-work return are separate lifecycle campaigns."
+    },
+    "CHL": {
+      "layers": [
+        "native-runtime-ui",
+        "core-ci",
+        "controlled-integration"
+      ],
+      "prerequisites": "Empty and populated account projections, unread/pinned/folder state and controlled incoming activity; verify persistence and account isolation, not only row labels."
+    },
+    "NCH": {
+      "layers": [
+        "native-runtime-ui",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Synthetic known/unknown contacts, loopback discovery/invitations and actual group/direct-chat creation; cancellation alone does not prove published membership."
+    },
+    "GRP": {
+      "layers": [
+        "native-runtime-ui",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Generated members/admins and controlled invites, removal, stale membership and recovery; use bounded native peer proof for every membership mutation."
+    },
+    "CON": {
+      "layers": [
+        "native-runtime-ui",
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Real empty/populated/long conversation timelines, composer geometry and peer events; audio, attachment playback and interrupted operations need dedicated media/device fixtures."
+    },
+    "MSG": {
+      "layers": [
+        "native-runtime-ui",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Real outgoing/incoming/native messages, reactions and polls; distinguish cancellation from published edits, deletion, reports, forwarding and concurrent peer results."
+    },
+    "MED": {
+      "layers": [
+        "native-runtime-ui",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Real system pickers plus controlled attachment corruption, size, transfer, retry, storage and lifecycle fixtures; camera/microphone/audio hardware remains a physical campaign."
+    },
+    "FIND": {
+      "layers": [
+        "native-runtime-ui",
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Controlled contact/history/date datasets, invalid identifiers and timezone boundaries; staged date-chip UI is not evidence of native search or daylight-saving semantics."
+    },
+    "SET": {
+      "layers": [
+        "native-runtime-ui",
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Every SettingsDetail route, nested controls and persisted preferences; external Android destinations, release-only controls and notifications need appropriate installed-platform state."
+    },
+    "PRO": {
+      "layers": [
+        "native-runtime-ui",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Synthetic self/peer metadata, private notes, photos and known invalid fields; native persistence/publication, image cropping and cross-account visibility need real postconditions."
+    },
+    "SEC": {
+      "layers": [
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Disposable identity, biometric enrollment/lockout, screenshots/clipboard and backup fixtures; never treat hidden-key navigation or cancelled export as cryptographic/export proof."
+    },
+    "NTF": {
+      "layers": [
+        "native-runtime-ui",
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Fresh-install notification flags plus real channels, peer events, foreground/background state and Android overrides; an allowed permission is not delivery or alert-quality proof."
+    },
+    "TTS": {
+      "layers": [
+        "native-runtime-ui",
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Rate/voice/engine dialogs plus installed trusted/untrusted engines and controlled timelines; measure actual audio/highlights/seeking/interruptions rather than certifying sound from a UI control."
+    },
+    "DIC": {
+      "layers": [
+        "native-runtime-ui",
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Real provider chooser plus installed service/activity/IME providers, microphone access, delayed callbacks and target-loss fixtures; cancellation does not prove recognition or immutable-origin delivery."
+    },
+    "AXY": {
+      "layers": [
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Theme/RTL/large-font/layout variants plus real TalkBack, Switch Access and keyboard traversal; accessible labels or screenshots alone cannot certify focus order or announcements."
+    },
+    "SYS": {
+      "layers": [
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Disposable share intents, files/providers, installer/self-update and release identity; startup, corrupt import and interrupted install require their actual platform entry points."
+    },
+    "FLD": {
+      "layers": [
+        "native-runtime-ui",
+        "core-ci",
+        "controlled-integration"
+      ],
+      "prerequisites": "Generated conversations, basic/smart folders and rule boundaries; verify folder store persistence and native matching independently of editor cancellation."
+    },
+    "RDR": {
+      "layers": [
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Controlled Nostr event/link/media content, unavailable relays, reader selection and navigation; reserved-domain link text does not exercise actual event/video reader acquisition."
+    },
+    "END": {
+      "layers": [
+        "release-audit"
+      ],
+      "prerequisites": "Exact-source reports from every required layer, all failures/unexecuted points and justified inapplicability; final certification must reconcile those reports and remaining checklist subcases."
+    }
+  }
+}

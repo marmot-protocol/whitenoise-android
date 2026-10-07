@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: speech-custom-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Read Aloud
+    direction: DOWN
+- tapOn: Read Aloud
+- assertVisible:
+    id: speech.engine.group
+- tapOn: Speech rate
+- tapOn: Custom
+- assertVisible:
+    id: speech.custom_rate
+- hideKeyboard
+- back
+- assertNotVisible:
+    id: speech.custom_rate
+- assertVisible:
+    id: speech.engine.group

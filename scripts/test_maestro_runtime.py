@@ -1,6 +1,7 @@
 """Regression contracts for fixture isolation, result identity and manual-only admission."""
 
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -12,7 +13,7 @@ import xml.etree.ElementTree as ET
 import yaml
 
 from scripts import maestro_runtime as runtime
-from scripts.maestro_coverage import inventory, screen_catalog
+from scripts.maestro_coverage import EDGE_DIMENSIONS, family_plans, inventory, markdown_inventory, named_edges, screen_catalog
 from scripts.maestro_runtime_summary import campaign
 from scripts.maestro_runtime_pair import pair
 from scripts.maestro_runtime_selection import selection, matrix_selection
@@ -20,6 +21,21 @@ from scripts.manual_test_fragments import definitions, load_guide
 
 
 class CampaignSummaryTest(unittest.TestCase):
+    def test_workflow_upload_root_matches_actual_download_layout(self):
+        """Keep the real multi-path artifact search root aligned with the reconciler's sibling directories."""
+        workflow = yaml.safe_load((runtime.ROOT / '.github/workflows/android-instrumented.yml').read_text())
+        upload = next(step for step in workflow['jobs']['maestro-runtime']['steps']
+                      if step.get('name') == 'Retain runtime results, including failed or incomplete cases')
+        paths = upload['with']['path'].splitlines()
+        # upload-artifact uses the least common ancestor of multiple search paths as its root.
+        # Real hosted navigation artifacts contain these same two sibling directories.
+        prefix = os.path.commonpath(paths)
+        self.assertEqual(prefix, 'build')
+        paths = [str(Path(path).relative_to(prefix)) for path in paths]
+        self.assertEqual(paths, ['maestro-runtime-${{ matrix.slice }}-${{ matrix.partition }}',
+                                 'maestro-runtime-pair/pair.json'])
+        self.assertNotIn('build/', '\n'.join(paths))
+
     def prepare(self, root):
         """Create six independently identified synthetic success leaves for reconciler boundary tests."""
         identity = {'schema': 1, 'source_sha': 'a' * 40, 'run_id': '123', 'run_attempt': '1',
@@ -233,6 +249,78 @@ class RuntimeEvidenceTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'no maintained source'):
                 screen_catalog(root, {}, {})
 
+    def test_named_edges_are_preserved_without_inheriting_parent_ui_proof(self):
+        """A parent journey cannot certify a migration/dictation recovery subcase it did not run."""
+        result = inventory()
+        self.assertGreater(result['named_edge_case_count'], 0)
+        for edge in result['named_edge_cases']:
+            self.assertIn(edge, result['requirements'][edge['parent']]['named_edge_cases'])
+            self.assertFalse(edge['full_release_proof'])
+            self.assertIn(edge['requirement'], load_guide(runtime.ROOT))
+        for guide in ('- **BAD-001 missing subcase:** Action → Expected: Outcome',
+                      '- **INT-010 repeat:** First\n- **INT-010 repeat:** Second'):
+            with self.subTest(guide=guide), self.assertRaises(ValueError):
+                named_edges(guide, {'INT-010': 'existing'})
+
+    def test_campaign_plan_covers_all_requirements_and_original_flow_filenames(self):
+        """Every permanent point receives layer prerequisites and every journey links to its actual source."""
+        result = inventory()
+        text = markdown_inventory(result, 'a' * 40)
+        for test_id, requirement in result['requirements'].items():
+            self.assertTrue(requirement['campaign_plan']['prerequisites'])
+            self.assertIn(requirement['requirement'], text)
+            self.assertFalse(requirement['full_release_proof'])
+        for case in result['cases'].values():
+            self.assertTrue((runtime.ROOT / case['flow']).is_file())
+            self.assertIn(case['flow'], text)
+        for screen in result['screen_catalog']:
+            self.assertIn(f"[{screen['symbol']}]", text)
+        for dimension in EDGE_DIMENSIONS:
+            self.assertIn('- [ ] ' + dimension, text)
+        self.assertIn('activity-recreation', text)
+        self.assertIn('process-death', text)
+        self.assertNotIn('[x]', text)
+        with self.assertRaises(ValueError):
+            markdown_inventory(result, '../master')
+
+    def test_new_requirement_family_requires_an_explicit_campaign_plan(self):
+        """New families cannot silently inherit a generic or obsolete layer assignment."""
+        for fault in ('missing', 'extra', 'unknown-layer', 'no-prerequisite', 'non-string-layer'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                (root / 'config').mkdir()
+                plan = {'schema': 1, 'families': {'ONB': {'layers': ['offline-ui'], 'prerequisites': 'Fresh install'}}}
+                if fault == 'missing':
+                    plan['families'] = {}
+                elif fault == 'extra':
+                    plan['families']['OLD'] = plan['families']['ONB']
+                elif fault == 'unknown-layer':
+                    plan['families']['ONB']['layers'] = ['made-up']
+                elif fault == 'non-string-layer':
+                    plan['families']['ONB']['layers'] = [None]
+                else:
+                    plan['families']['ONB']['prerequisites'] = ''
+                (root / 'config/test-requirement-layers.json').write_text(json.dumps(plan))
+                with self.assertRaises(ValueError):
+                    family_plans(root, {'ONB-001': 'existing'})
+
+    def test_same_file_companion_reference_does_not_certify_a_private_dialog(self):
+        """A parent-render test can help find coverage but cannot become proof of its nested dialog."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = 'app/src/main/java/dev/ipf/whitenoise/android/ui/Nested.kt'
+            path = root / source
+            path.parent.mkdir(parents=True)
+            path.write_text('fun ParentContent() {}\nprivate fun HiddenDialog() {}')
+            test = root / 'app/src/test/NestedTest.kt'
+            test.parent.mkdir(parents=True)
+            test.write_text('fun render() { ParentContent() }')
+            screens = screen_catalog(root, {'ui': [{'source': source, 'test_ids': ['INT-001']}]}, {}, True)
+            self.assertEqual(len(screens), 1)
+            self.assertFalse(screens[0]['execution_verified'])
+            self.assertEqual(screens[0]['companion_test_source_references'], [
+                {'source': 'app/src/test/NestedTest.kt', 'direct_surface_reference': False}])
+
     def test_retry_reuses_only_an_explicit_same_source_producer(self):
         """A UI-only retry can use its original pair while rejecting stale and future identities."""
         env = {'GITHUB_ACTIONS': 'true', 'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '1', 'GITHUB_RUN_ATTEMPT': '1'}
@@ -383,6 +471,30 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 self.assertNotIn('openLink:', text)
                 self.assertTrue(case['assertions'])
                 self.assertTrue(set(case['manual_ids']) <= set(ids), case['manual_ids'])
+
+    def test_settings_entry_uses_real_multi_identity_selector(self):
+        """Regress the hosted tree where the avatar says Switch Profile rather than Open settings."""
+        helper = (runtime.ROOT / '.maestro/fixtures/open-settings.yaml').read_text()
+        self.assertIn('Switch Profile, Maestro (Alice|Bob|Carol)', helper)
+        self.assertIn('- tapOn: "Settings"', helper)
+        for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
+            self.assertNotIn('Open settings.*', path.read_text(), path.name)
+
+    def test_every_runtime_subflow_exists_and_preserves_the_live_host(self):
+        """Shared navigation helpers cannot silently refer to absent flows or reset the fixture."""
+        for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
+            _, commands = list(yaml.safe_load_all(path.read_text()))
+            for item in commands:
+                if not isinstance(item, dict) or not isinstance(item.get('runFlow'), str):
+                    continue
+                reference = item['runFlow']
+                with self.subTest(flow=path.name, reference=reference):
+                    target = (path.parent / reference).resolve()
+                    self.assertEqual(target.parent, runtime.ROOT / '.maestro/fixtures')
+                    header, _ = list(yaml.safe_load_all(target.read_text()))
+                    self.assertEqual(header['appId'], runtime.PACKAGE)
+                    for forbidden in ('launchApp', 'stopApp', 'clearState', 'point:', 'openLink:'):
+                        self.assertNotIn(forbidden, target.read_text())
 
     def test_unknown_slices_are_rejected_before_building(self):
         """Reject invalid selection and enforce the per-shard case budget."""

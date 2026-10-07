@@ -926,6 +926,7 @@
     "chats-folder-cancel": {
       "suite": "chats",
       "manual_ids": [
+        "FLD-002",
         "SET-009"
       ],
       "assertions": "Cancelling Add-to-folder with no custom folders does not create a folder or remove the chat.",
@@ -1317,6 +1318,280 @@
       ],
       "assertions": "Encrypted-backup passphrase dialog remains usable during handled landscape/portrait changes; explicit Cancel clears its fields on reopen and the raw key remains hidden.",
       "postcondition": "none"
+    },
+    "speech-rate-back": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "The rate chooser lists system/custom choices; Android Back dismisses it to Read Aloud.",
+      "postcondition": "none"
+    },
+    "speech-custom-cancel": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Custom rate input is dismissed by Cancel without applying a value.",
+      "postcondition": "none"
+    },
+    "speech-custom-back": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "The custom rate dialog dismisses after the keyboard is hidden and Android Back is pressed.",
+      "postcondition": "none"
+    },
+    "speech-custom-reopen": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "An unapplied custom rate is discarded when the dialog is cancelled and reopened.",
+      "postcondition": "none"
+    },
+    "speech-custom-empty": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Unapplied custom rate '' cannot close the dialog after Apply; the range error remains visible.",
+      "postcondition": "none"
+    },
+    "speech-custom-zero": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Unapplied custom rate '0' cannot close the dialog after Apply; the range error remains visible.",
+      "postcondition": "none"
+    },
+    "speech-custom-below-min": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Unapplied custom rate '0.09' cannot close the dialog after Apply; the range error remains visible.",
+      "postcondition": "none"
+    },
+    "speech-custom-above-max": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Unapplied custom rate '10.01' cannot close the dialog after Apply; the range error remains visible.",
+      "postcondition": "none"
+    },
+    "speech-custom-minimum-cancel": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "The exact 0.1 rate boundary is editable; Cancel leaves the destination intact. No applied-rate or audio proof is claimed.",
+      "postcondition": "none"
+    },
+    "speech-custom-maximum-cancel": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "The exact 10.0 rate boundary is editable; Cancel leaves the destination intact. No applied-rate or audio proof is claimed.",
+      "postcondition": "none"
+    },
+    "speech-custom-rotation-cancel": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Custom-rate dialog and entered value remain accessible through handled orientation changes, then Cancel dismisses it.",
+      "postcondition": "none"
+    },
+    "speech-rate-return": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "After dismissing the rate chooser, toolbar Back returns through Settings to Chats.",
+      "postcondition": "none"
+    },
+    "dictation-provider-back": {
+      "suite": "dictation",
+      "manual_ids": [
+        "DIC-003",
+        "DIC-006"
+      ],
+      "assertions": "The actual provider chooser exposes Automatic and dismisses without choosing an external provider; handled rotation stays navigable.",
+      "postcondition": "none"
+    },
+    "dictation-provider-rotation": {
+      "suite": "dictation",
+      "manual_ids": [
+        "DIC-003",
+        "DIC-006"
+      ],
+      "assertions": "The actual provider chooser exposes Automatic and dismisses without choosing an external provider; handled rotation stays navigable.",
+      "postcondition": "none"
+    },
+    "dictation-finish-back": {
+      "suite": "dictation",
+      "manual_ids": [
+        "DIC-001"
+      ],
+      "assertions": "The automatic-completion chooser includes manual Paste or Send and dismisses without changing the option.",
+      "postcondition": "none"
+    },
+    "dictation-provider-reopen": {
+      "suite": "dictation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "A cancelled provider chooser can be opened again; Automatic remains available.",
+      "postcondition": "none"
+    },
+    "reactions-configure-back": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-001"
+      ],
+      "assertions": "The quick-reaction configuration back path cancels without reacting to or deleting the original message.",
+      "postcondition": "none"
+    },
+    "reactions-configure-reset-back": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-001"
+      ],
+      "assertions": "The quick-reaction configuration reset-back path cancels without reacting to or deleting the original message.",
+      "postcondition": "none"
+    },
+    "reactions-configure-rotation": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-001"
+      ],
+      "assertions": "The quick-reaction configuration rotation path cancels without reacting to or deleting the original message.",
+      "postcondition": "none"
+    },
+    "reactions-configure-slot-cancel": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-001"
+      ],
+      "assertions": "The quick-reaction configuration slot-cancel path cancels without reacting to or deleting the original message.",
+      "postcondition": "none"
+    },
+    "alerts-person-back": {
+      "suite": "alert-dialogs",
+      "manual_ids": [
+        "NTF-033"
+      ],
+      "assertions": "Person-scoped notification options open for Bob and Back returns to that same profile.",
+      "postcondition": "none"
+    },
+    "alerts-person-vibration-cancel": {
+      "suite": "alert-dialogs",
+      "manual_ids": [
+        "NTF-033"
+      ],
+      "assertions": "Bob’s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "postcondition": "none"
+    },
+    "alerts-chat-sounds-back": {
+      "suite": "alert-dialogs",
+      "manual_ids": [
+        "NTF-031"
+      ],
+      "assertions": "The chat sound-and-appearance drawer opens and cancels through back; no Android channel or delivery assertion is claimed.",
+      "postcondition": "none"
+    },
+    "alerts-chat-sounds-rotation": {
+      "suite": "alert-dialogs",
+      "manual_ids": [
+        "NTF-031"
+      ],
+      "assertions": "The chat sound-and-appearance drawer opens and cancels through rotation; no Android channel or delivery assertion is claimed.",
+      "postcondition": "none"
+    },
+    "speech-custom-duplicate-decimal": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Malformed/overflow rate input cannot dismiss the custom dialog after Apply; the range error is visible and Cancel returns to Read Aloud.",
+      "postcondition": "none"
+    },
+    "speech-custom-overflow": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Malformed/overflow rate input cannot dismiss the custom dialog after Apply; the range error is visible and Cancel returns to Read Aloud.",
+      "postcondition": "none"
+    },
+    "smart-folders-picker-back": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The filter picker cancels to the unchanged new-folder form. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-unread-cancel": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The Unread condition editor opens and cancels without adding a rule. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-chat-type-cancel": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The Chat type editor opens and cancels without adding a rule. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-participants-empty": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "An empty Participants condition cannot be saved; cancelling creates no folder. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-participants-picker-back": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The participant picker cancels to the still-empty condition and disabled Save. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-condition-rotation": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The Unread condition editor survives handled orientation changes before cancellation. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-title-empty": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "An empty title keyword cannot be saved; cancelling creates no folder. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-title-draft-cancel": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "A typed title keyword enables condition Save, but Cancel leaves the folder form unchanged. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
     }
   }
 }

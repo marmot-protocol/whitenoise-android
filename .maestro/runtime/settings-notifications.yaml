@@ -4,7 +4,7 @@ name: settings-notifications
 - runFlow: ../fixtures/runtime-ready.yaml
 # The instrumentation host owns launch, reset and disposal.
 - assertVisible: "Maestro group"
-- tapOn: "Open settings.*"
+- runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:

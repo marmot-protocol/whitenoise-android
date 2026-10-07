@@ -3,7 +3,7 @@ name: nested-share-connect
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
-- tapOn: "Open settings.*"
+- runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Settings"
 - tapOn:
     id: "settings.active_profile"
