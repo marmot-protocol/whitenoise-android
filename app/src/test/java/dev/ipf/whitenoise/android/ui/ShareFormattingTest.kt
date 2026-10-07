@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.isBareLocationShare
+import dev.ipf.whitenoise.android.ui.conversation.share.isContactShareCaption
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
@@ -147,6 +148,27 @@ class ShareFormattingTest {
         assertEquals("+1 555 0100", parsed?.phone)
         assertEquals("ada@example.org", parsed?.email)
         assertNull(parseSharedContactFromText("See the attached details"))
+    }
+
+    /** Sender prose that mentions a number stays a caption; only a bare number line is a phone. */
+    @Test
+    fun captionProseWithANumberIsNotContactText() {
+        assertNull(parseSharedContactFromText("Please call 555-0100 tomorrow"))
+        assertNull(parseSharedContactFromText("Ada\nRoom 4012345, ask at the desk"))
+        assertEquals("+1 (555) 010-0100", parseSharedContactFromText("Ada\n+1 (555) 010-0100")?.phone)
+    }
+
+    /** Only the exact generated caption may be replaced by the card; extra sender words keep it visible. */
+    @Test
+    fun onlyTheGeneratedCaptionCountsAsContactText() {
+        val contact = SharedContact(name = "Ada Example", phone = "+1 555 0100", email = null)
+        assertTrue(isContactShareCaption(" Ada Example \n\n+1 555 0100\n", contact))
+        assertFalse(isContactShareCaption("Call Ada\n+1 555 0100", contact))
+        assertFalse(isContactShareCaption("Ada Example\n+1 555 0100\nAfter six", contact))
+
+        // A picked contact without a name carries its number as the vCard name but not in the caption.
+        val unnamed = SharedContact(name = "+1 555 0100", phone = "+1 555 0100", email = null)
+        assertTrue(isContactShareCaption("+1 555 0100", unnamed))
     }
 
     private val sampleNpub = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"

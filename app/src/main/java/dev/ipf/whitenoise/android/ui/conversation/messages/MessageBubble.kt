@@ -164,9 +164,11 @@ import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
 import dev.ipf.whitenoise.android.ui.conversation.share.isBareLocationShare
+import dev.ipf.whitenoise.android.ui.conversation.share.isContactShareCaption
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
+import dev.ipf.whitenoise.android.ui.conversation.share.rememberLocalVCardContact
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
@@ -1879,16 +1881,6 @@ internal fun MessageBubble(
                 // image/video; a file card or caption owns the footer instead.
                 // The prototype keeps time and status below the media, inside the bubble, never overlaid on it.
                 val footerOnVisualMedia = false
-                // A caption is the message's last line, so it carries the time and
-                // delivery state the way a text bubble does; the file card keeps the
-                // footer only when there is no caption to carry it.
-                val confirmedFileFooterInCard =
-                    fileCardOwnsFooter(
-                        deleted = deleted,
-                        fileCount = fileAttachments.size,
-                        visualOwnsFooter = footerOnVisualMedia,
-                        hasCaption = mediaCaption != null,
-                    )
                 // Share-message recognition (app-side rich rendering). A contact
                 // ships as a text/vcard attachment with a name/phone caption, so
                 // its card draws from the caption without fetching the blob; a
@@ -1907,7 +1899,7 @@ internal fun MessageBubble(
                     canRenderSharedContent &&
                         !anyConfirmedMedia &&
                         record.kind == 9uL
-                val sharedContact =
+                val captionContact =
                     remember(vcardAttachment, shareBodyText, canRenderSharedContent) {
                         if (vcardAttachment != null && canRenderSharedContent) {
                             parseSharedContactFromText(shareBodyText)
@@ -1915,6 +1907,41 @@ internal fun MessageBubble(
                             null
                         }
                     }
+                // The vCard itself is the authority once its bytes are on this
+                // device, which also covers a raw .vcf sent without the caption.
+                // Reading it never starts a download.
+                val fileContact =
+                    rememberLocalVCardContact(
+                        controller = controller,
+                        appState = appState,
+                        messageIdHex = record.messageIdHex,
+                        attachment = vcardAttachment.takeIf { canRenderSharedContent },
+                        mine = mine,
+                    )
+                val sharedContact = fileContact ?: captionContact
+                // The card replaces the caption only when the caption is the
+                // generated name/phone text. Once the file is local, anything
+                // else, such as "Call Ada" above the number, is the sender's own
+                // words and stays visible.
+                val captionIsContactText =
+                    remember(fileContact, captionContact, shareBodyText) {
+                        if (fileContact == null) {
+                            captionContact != null
+                        } else {
+                            isContactShareCaption(shareBodyText, fileContact)
+                        }
+                    }
+                // A caption is the message's last line, so it carries the time and
+                // delivery state the way a text bubble does; the file card keeps the
+                // footer only when there is no caption to carry it. A contact card
+                // replaces its .vcf file card, so that file cannot own the footer.
+                val confirmedFileFooterInCard =
+                    fileCardOwnsFooter(
+                        deleted = deleted,
+                        fileCount = fileAttachments.size - if (sharedContact != null) 1 else 0,
+                        visualOwnsFooter = footerOnVisualMedia,
+                        hasCaption = mediaCaption != null,
+                    )
                 val sharedLocation =
                     remember(shareBodyText, canRenderStructuredShare) {
                         if (canRenderStructuredShare) {
@@ -2019,7 +2046,7 @@ internal fun MessageBubble(
                         deleted = deleted,
                         persistedFailure = persistedFailure,
                         structuredShareOwnsBody =
-                            sharedContact != null ||
+                            captionIsContactText ||
                                 sharedLocationOwnsBody ||
                                 sharedUser != null ||
                                 remoteGiphyMedia != null,

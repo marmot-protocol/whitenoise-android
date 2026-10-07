@@ -7639,6 +7639,22 @@
         ]
       },
       {
+        "surface": "attachedVCardContact",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactShare.kt",
+        "anchor": "fun attachedVCardContact(",
+        "test_ids": [
+          "MED-029"
+        ]
+      },
+      {
+        "surface": "rememberLocalVCardContact",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ReceivedContactActions.kt",
+        "anchor": "fun rememberLocalVCardContact(",
+        "test_ids": [
+          "MED-029"
+        ]
+      },
+      {
         "surface": "ContactFieldRow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
         "anchor": "fun ContactFieldRow(",
@@ -11909,6 +11925,36 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationHistoryBoundary.kt",
         "anchor": "R.string.conversation_history_retention_description",
         "test_ids": ["CON-023"]
+      },
+      {
+        "surface": "Existing member public identity search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)",
+        "test_ids": [
+          "GRP-027"
+        ]
+      },
+      {
+        "surface": "Existing member decoder retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-027"
+        ]
+      },
+      {
+        "surface": "Accessible local member resolution progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.recipient_preview_resolving",
+        "test_ids": ["GRP-027"]
+      },
+      {
+        "surface": "Local member identity resolution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMemberIdentitySearch.kt",
+        "anchor": "internal fun rememberGroupMemberSearchResolution(",
+        "test_ids": [
+          "GRP-027"
+        ]
       },
       {
         "surface": "Restored attachment shelf after native send cleanup",
