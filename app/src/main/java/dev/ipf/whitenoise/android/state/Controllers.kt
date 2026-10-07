@@ -12015,6 +12015,10 @@ class ConversationController(
     val automaticOlderPagingBlocked: Boolean
         get() = automaticPaging.older.blocked
 
+    /** Recovery ticket read by the paging collector even when visible geometry did not change. */
+    val olderPagingRecoveryGeneration: Long
+        get() = automaticPaging.older.recoveryGeneration
+
     /** Releases quiet older prefetch on a new drag; never changes the viewport or unread state. */
     fun onOlderPagingGestureStarted() {
         automaticPaging.older.onUserGestureStarted()

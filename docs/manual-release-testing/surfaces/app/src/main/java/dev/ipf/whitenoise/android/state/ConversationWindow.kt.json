@@ -29,7 +29,7 @@
         ]
       },
       {
-        "surface": "A successful command and its exact stream echo acknowledge one page or navigation in either delivery order",
+        "surface": "Successful paging or navigation stays acknowledged when a stream echo or newer replacement overtakes its reply",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
         "anchor": "suspend fun commandOutcome(",
         "test_ids": [

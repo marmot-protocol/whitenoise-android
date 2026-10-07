@@ -175,7 +175,7 @@ private class ConversationWindowInstaller {
         }
 
     /**
-     * Runs a revision-quoted command, acknowledging its matching stream echo under the same lock.
+     * Runs a revision-quoted command, acknowledging successful work while retaining the newest window.
      * Recoverable native errors retain the newest window; only a requested missing jump target
      * escapes, so delayed reply navigation cannot be confused with an unavailable message.
      */
@@ -197,11 +197,15 @@ private class ConversationWindowInstaller {
                 return unchanged(windowOutcome.unchangedReason(), revision)
             }
         return synchronized(lock) {
-            // MDK publishes to next() before completing the command. Its exact echo acknowledges
-            // this command even when the receive path installed it first; paging again would move
-            // the viewport twice. A genuinely newer or foreign revision remains superseded.
+            // A successful native command stays acknowledged even if next() already installed its
+            // echo or a later replacement. Keep that newest state; repeating a completed relative
+            // page would move history twice. Native stale errors above remain retryable.
             val installed = latest
-            if (installed?.frame?.revision == result.revision) {
+            val belongsToCommand =
+                result.revision.generation == revision.generation && result.revision.sequence >= revision.sequence
+            if (
+                belongsToCommand && installed != null && result.revision.sequence <= installed.frame.revision.sequence
+            ) {
                 Advanced(installed.page)
             } else {
                 install(result)?.let(::Advanced) ?: unchanged(ConversationWindowUnchangedReason.SUPERSEDED)
@@ -209,7 +213,7 @@ private class ConversationWindowInstaller {
         }
     }
 
-    /** The newly installed page, or null for every outcome that left the window where it was. */
+    /** The current page after a successful command, or null when the native command did not succeed. */
     suspend fun command(
         rethrowMissingTarget: Boolean = false,
         block: suspend (ConversationWindowRevisionFfi) -> ConversationWindowSnapshotFfi,

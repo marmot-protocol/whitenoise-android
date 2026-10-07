@@ -117,9 +117,9 @@ class ConversationWindowHandleTest {
             assertEquals(1, fake.pageCalls.size)
         }
 
-    /** A later window really does supersede the command; never acknowledge or reinstall the old page. */
+    /** A later viewport wins presentation without repeating the already completed relative page. */
     @Test
-    fun newerStreamRevisionStillSupersedesACommandReply() =
+    fun newerViewportKeepsTheSuccessfulCommandAcknowledged() =
         runBlocking {
             val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
             val handle = FfiConversationWindowHandle(fake, release = fake::release)
@@ -129,18 +129,39 @@ class ConversationWindowHandleTest {
                 handle.nextWindow()
             }
 
-            val outcome = handle.paginateBackwards(50u) as TimelinePageOutcome.Unchanged
+            val outcome = handle.paginateBackwards(50u) as TimelinePageOutcome.Advanced
 
-            assertEquals(ConversationWindowUnchangedReason.SUPERSEDED, outcome.reason)
-            assertEquals(listOf("newer-viewport"), outcome.current?.messages?.map { it.messageIdHex })
+            assertEquals(listOf("newer-viewport"), outcome.page.messages.map { it.messageIdHex })
+            assertEquals(1, fake.pageCalls.size)
             assertEquals(3uL, handle.latestWindowFrame()?.revision?.sequence)
+        }
+
+    /** A content-only replacement can overtake both the successful page's echo and its reply. */
+    @Test
+    fun newerContentUpdateDoesNotRepeatASuccessfulPage() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            fake.beforeCommandReply = { completed ->
+                fake.emit(completed.copy(revision = completed.revision.copy(sequence = 3uL)))
+                handle.nextWindow()
+            }
+
+            val outcome = handle.paginateBackwards(50u) as TimelinePageOutcome.Advanced
+
+            assertSame(handle.latestInstalledWindow()?.page, outcome.page)
+            assertEquals(listOf("m1", "m1-older"), outcome.page.messages.map { it.messageIdHex })
+            assertEquals(3uL, handle.latestWindowFrame()?.revision?.sequence)
+            assertEquals(1, fake.pageCalls.size)
         }
 
     /** A foreign generation must never acknowledge or replace the active window. */
     @Test
     fun foreignCommandReplyCannotReplaceTheActiveWindow() =
         runBlocking {
-            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1"), generation = "active"))
+            val fake =
+                FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1"), generation = "active"))
             val handle = FfiConversationWindowHandle(fake, release = fake::release)
             val initial = handle.snapshot()
             // The fake's command replies use generation "gen", distinct from the installed handle.

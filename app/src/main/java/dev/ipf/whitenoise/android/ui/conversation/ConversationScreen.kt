@@ -2821,7 +2821,7 @@ internal fun ConversationScreen(
         }
     }
     LaunchedEffect(listState, controller) {
-        snapshotFlow {
+        olderPagingRequests {
             // The reversed list emits the older-loading row, the top error row and the top spacer
             // after the messages, so they hold the highest indexes — exactly the oldest end, and
             // exactly what is on screen when a page is due. Taking the last visible item would pick
@@ -2837,24 +2837,28 @@ internal fun ConversationScreen(
                     timelineSize = liveRenderedSize,
                     trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
                 )
-            oldestVisible to
-                (liveRenderedSize > 0 &&
-                    shouldPrefetchOlder(
-                        anchored = initialTimelineAnchored,
-                        hasMoreBefore = controller.hasMoreBefore,
-                        pageInFlight = controller.isLoadingPage,
-                        olderPageBlocked = controller.olderPageBlocked || controller.automaticOlderPagingBlocked,
-                        oldestVisibleIndex = oldestVisible?.index ?: -1,
-                        oldestMessageListIndex = oldestMessageListIndex,
-                    ))
-        }.collect { (oldestVisible, prefetch) ->
-            if (!prefetch) return@collect
+            ConversationOlderPagingDemand(
+                anchorMessageId = conversationAnchorMessageId(oldestVisible?.key),
+                oldestLoadedMessageId = controller.timeline.firstOrNull { !MessageProjector.isEdit(it.record) }?.id,
+                prefetch =
+                    liveRenderedSize > 0 &&
+                        shouldPrefetchOlder(
+                            anchored = initialTimelineAnchored,
+                            hasMoreBefore = controller.hasMoreBefore,
+                            pageInFlight = controller.isLoadingPage,
+                            olderPageBlocked = controller.olderPageBlocked || controller.automaticOlderPagingBlocked,
+                            oldestVisibleIndex = oldestVisible?.index ?: -1,
+                            oldestMessageListIndex = oldestMessageListIndex,
+                        ),
+                recoveryGeneration = controller.olderPagingRecoveryGeneration,
+            )
+        }.collect { demand ->
             val edgeMessageId = controller.timeline.firstOrNull { !MessageProjector.isEdit(it.record) }?.id
             // MDK places a replacement relative to the window's anchor, so tell it which row the
             // reader is actually on before paging. Without this an upward page is placed against
             // whatever the read pointer last reported, which only ever moves towards newer
             // messages — the reason scrolling up could move the reading position.
-            controller.loadOlder(conversationAnchorMessageId(oldestVisible?.key), ConversationPagingOrigin.AUTOMATIC)
+            controller.loadOlder(demand.anchorMessageId, ConversationPagingOrigin.AUTOMATIC)
             recordOlderPageLanding(controller, listState, edgeMessageId)
         }
     }

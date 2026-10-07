@@ -93,8 +93,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
     val subscription = timelineSubscription ?: return ConversationPageLoad.INACTIVE
     val priorMessageIds = timelineRecords.keys.toSet()
     // Opportunistic work must not dismiss an unrelated explicit navigation failure.
-    if (!automatic) clearRecoveredPageFailure(ConversationSearchPageDirection.OLDER)
-    pageLoadInFlight = ConversationSearchPageDirection.OLDER
+    beginPageLoad(ConversationSearchPageDirection.OLDER, origin)
     val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
     val startedMs = SystemClock.elapsedRealtime()
     val hostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_PAGE)
@@ -198,8 +197,7 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
     val priorMessageIds = timelineRecords.keys.toSet()
     // An opportunistic page must not clear a failure the reader can still act on; it clears only
     // the matching newer-page failure, and only once newer rows have actually arrived.
-    if (!automatic) clearRecoveredPageFailure(ConversationSearchPageDirection.NEWER)
-    pageLoadInFlight = ConversationSearchPageDirection.NEWER
+    beginPageLoad(ConversationSearchPageDirection.NEWER, origin)
     val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
     val startedMs = SystemClock.elapsedRealtime()
     val hostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_PAGE)
@@ -277,26 +275,6 @@ private suspend fun ConversationController.applyNewerPage(
     }
     trace.recordPhase(phase = PerformancePhase.PAGE_APPLY, startedMs = appliedAtMs, count = page.messages.size)
     return progressPageLoad(priorMessageIds)
-}
-
-/**
- * Retires only the matching page failure once its direction recovers.
- *
- * Only the matching direction is cleared, so an older-page failure the reader still has a retry row
- * for, and any unrelated subscription error, survive a forward recovery.
- */
-internal fun ConversationController.clearRecoveredPageFailure(direction: ConversationSearchPageDirection) {
-    if (failedPageDirection != direction) return
-    failedPageDirection = null
-    pageError = null
-}
-
-/** Clears a stale older retry only when committed rows extend past the previously loaded oldest row. */
-internal fun ConversationController.clearRecoveredOlderPageFailure(priorOldestId: String?) {
-    if (failedPageDirection != ConversationSearchPageDirection.OLDER) return
-    if (priorOldestId != null && timeline.indexOfFirst { it.id == priorOldestId } > 0) {
-        clearRecoveredPageFailure(ConversationSearchPageDirection.OLDER)
-    }
 }
 
 /**
@@ -381,10 +359,9 @@ private suspend fun ConversationController.pageWithRetryBudget(
     page: suspend (PagingHandle) -> TimelinePageOutcome,
 ): TimelinePageOutcome? {
     var outcome = withContext(Dispatchers.IO) { page(handle) }
-    if (!retainsSubscription(handle)) return null
     var notReadyAttempts = 0
     var supersededAttempts = 0
-    while (outcome is TimelinePageOutcome.Unchanged) {
+    while (retainsSubscription(handle) && outcome is TimelinePageOutcome.Unchanged) {
         val retryDelayMs =
             when (outcome.reason) {
                 NOT_READY -> {
@@ -403,11 +380,10 @@ private suspend fun ConversationController.pageWithRetryBudget(
             }
         if (retryDelayMs == null) break
         delay(retryDelayMs)
-        if (!retainsSubscription(handle)) return null
+        if (!retainsSubscription(handle)) break
         outcome = withContext(Dispatchers.IO) { page(handle) }
-        if (!retainsSubscription(handle)) return null
     }
-    return outcome
+    return outcome.takeIf { retainsSubscription(handle) }
 }
 
 /** Whether this subscription is still the controller's live one and the account is not tearing down. */

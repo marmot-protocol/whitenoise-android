@@ -75,6 +75,35 @@ internal fun ConversationController.reportPageFailure(
         )
 }
 
+/** Starts one owned page without dismissing a failure from another direction. */
+internal fun ConversationController.beginPageLoad(
+    direction: ConversationSearchPageDirection,
+    origin: ConversationPagingOrigin,
+) {
+    if (origin == ConversationPagingOrigin.EXPLICIT) clearRecoveredPageFailure(direction)
+    pageLoadInFlight = direction
+}
+
+/**
+ * Retires only the matching page failure once its direction recovers.
+ *
+ * Only the matching direction is cleared, so an older-page failure the reader still has a retry row
+ * for, and any unrelated subscription error, survive a forward recovery.
+ */
+internal fun ConversationController.clearRecoveredPageFailure(direction: ConversationSearchPageDirection) {
+    if (failedPageDirection != direction) return
+    failedPageDirection = null
+    pageError = null
+}
+
+/** Clears a stale older retry only when committed rows extend past the previously loaded oldest row. */
+internal fun ConversationController.clearRecoveredOlderPageFailure(priorOldestId: String?) {
+    if (failedPageDirection != ConversationSearchPageDirection.OLDER) return
+    if (priorOldestId != null && timeline.indexOfFirst { it.id == priorOldestId } > 0) {
+        clearRecoveredPageFailure(ConversationSearchPageDirection.OLDER)
+    }
+}
+
 /** The release-log operation name for a page in this direction. */
 private fun pageOperation(direction: ConversationSearchPageDirection): String =
     when (direction) {

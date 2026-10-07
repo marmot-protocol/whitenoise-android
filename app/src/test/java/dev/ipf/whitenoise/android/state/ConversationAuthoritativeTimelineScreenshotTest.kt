@@ -103,7 +103,12 @@ class ConversationAuthoritativeTimelineScreenshotTest {
                 assertFalse(fixture.controller.isLoadingOlder)
                 assertEquals(3, fixture.controller.timeline.size)
             }
-            assertEquals("quiet failure must not move the visible row", topBefore, row.fetchSemanticsNode().boundsInRoot.top, 1f)
+            assertEquals(
+                "quiet failure must not move the visible row",
+                topBefore,
+                row.fetchSemanticsNode().boundsInRoot.top,
+                1f,
+            )
             composeRule.onNodeWithText("Couldn't load more", substring = true).assertDoesNotExist()
             composeRule.onNodeWithText("Retry").assertDoesNotExist()
             composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_quiet_older_timeout_$suffix.png")

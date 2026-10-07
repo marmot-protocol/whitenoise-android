@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.ConversationWindowRevisionFfi
 
@@ -52,6 +53,10 @@ internal class AutomaticPagingGuard(
     var consecutiveFailures by mutableIntStateOf(0)
         private set
 
+    /** Monotonic demand ticket: survives a block/release while the UI collector awaits a page. */
+    var recoveryGeneration by mutableLongStateOf(0L)
+        private set
+
     /** Whether the automatic prefetch should stand down until something advances the window. */
     val blocked: Boolean
         get() = consecutiveFailures >= budget
@@ -85,6 +90,7 @@ internal class AutomaticPagingGuard(
 
     /** Releases the block after a page in this direction advances the window. */
     fun reset() {
+        if (consecutiveFailures > 0) recoveryGeneration += 1L
         consecutiveFailures = 0
         failedRevision = null
         requiresReplacement = false
