@@ -327,10 +327,10 @@ jobs:
           retention-days: 7
 
       - name: Verify unpatched Compose regression control
-        if: matrix.phase == 'baseline' && github.event_name == 'pull_request'
+        if: matrix.phase == 'baseline' && (github.event_name == 'pull_request' || github.event_name == 'merge_group')
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha }}
         run: python3 scripts/verify_compose_backport_control.py --base "$BASE_SHA" --head "$HEAD_SHA"
 
       - name: Upload Compose backport verification

@@ -247,6 +247,22 @@ class AndroidCiGateTest(unittest.TestCase):
                 with self.subTest(dependency=dependency, result=result):
                     self.assertNotEqual(self.run_gate(bad, 'merge_group').returncode, 0)
 
+    def test_queue_runs_required_compose_regression_control_on_integration(self):
+        control = self.named_step(self.build_contracts, 'Verify unpatched Compose regression control')
+        self.assertIn("if: matrix.phase == 'baseline' && "
+                      "(github.event_name == 'pull_request' || github.event_name == 'merge_group')", control)
+        self.assertIn('BASE_SHA: ${{ github.event.merge_group.base_sha || '
+                      'github.event.pull_request.base.sha }}', control)
+        self.assertIn('HEAD_SHA: ${{ github.event.merge_group.head_sha || '
+                      'github.event.pull_request.head.sha }}', control)
+        self.assertIn('python3 scripts/verify_compose_backport_control.py --base "$BASE_SHA" --head "$HEAD_SHA"', control)
+        self.assertNotIn('continue-on-error:', control)
+        self.assertIn('fetch-depth: 0', self.named_step(self.build_contracts, 'Checkout'))
+        # The existing production aggregate must reject a failed baseline control.
+        outcomes = self.successful_outcomes()
+        outcomes['build-contracts']['result'] = 'failure'
+        self.assertNotEqual(self.run_gate(outcomes, 'merge_group').returncode, 0)
+
     def test_queue_documentation_shortcut_still_requires_the_classifiers(self):
         outcomes = self.successful_outcomes()
         outcomes['changes']['outputs'] = {'docs_only': 'true', 'supplemental_campaigns': 'false'}
