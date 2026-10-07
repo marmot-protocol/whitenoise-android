@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.net.Uri
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -24,7 +23,6 @@ class MediaPreviewCaptionTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 MediaPreviewContent(
-                    actionColors = accountActionColors(appState = null),
                     mediaSlots = listOf(PendingMediaSlot("slot-1", Uri.parse("content://test/photo-1"))),
                     documentUris = emptyList(),
                     chatTitle = "Chat",
@@ -47,7 +45,6 @@ class MediaPreviewCaptionTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 MediaPreviewContent(
-                    actionColors = accountActionColors(appState = null),
                     mediaSlots = listOf(PendingMediaSlot("slot-1", Uri.parse("content://test/photo-1"))),
                     documentUris = emptyList(),
                     chatTitle = "Chat",

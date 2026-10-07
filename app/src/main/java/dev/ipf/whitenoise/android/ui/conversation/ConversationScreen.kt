@@ -168,7 +168,6 @@ import dev.ipf.whitenoise.android.ui.common.LocalSnackbarBottomInset
 import dev.ipf.whitenoise.android.ui.common.LocalSnackbarContentInset
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
-import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.anchoredDragSelection
 import dev.ipf.whitenoise.android.ui.common.dragSelectionAutoScrollDelta
 import dev.ipf.whitenoise.android.ui.common.lifecycleOwner
@@ -4540,7 +4539,6 @@ internal fun ConversationScreen(
         onDocumentUrisChange = { if (!attachmentSendPending) pendingDocumentUris = it },
         mediaSender = mediaSender,
         chatTitle = controller.title(groupTitleCopy),
-        actionColors = accountActionColors(appState, conversationAccountRef),
         composerText = composerTextState::acceptanceToken,
         onCaptionAccepted = composerTextState::clearAccepted,
         onAddPhotos = {

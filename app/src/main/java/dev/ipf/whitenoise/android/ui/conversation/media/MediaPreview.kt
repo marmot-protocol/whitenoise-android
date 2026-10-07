@@ -40,7 +40,6 @@ import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.MediaQuality
-import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -215,7 +214,6 @@ internal fun MediaPreviewScreen(
     mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
-    actionColors: AccountActionColors,
     onDismiss: () -> Unit,
     onSend: (caption: String, onResult: (accepted: Boolean) -> Unit) -> Unit,
     onRemoveAt: (Int) -> Unit,
@@ -245,7 +243,6 @@ internal fun MediaPreviewScreen(
             mediaSlots = mediaSlots,
             documentUris = documentUris,
             chatTitle = chatTitle,
-            actionColors = actionColors,
             initialCaption = initialCaption,
             previewOnly = previewOnly,
             initialIndex = initialIndex,
@@ -278,7 +275,6 @@ internal fun MediaPreviewContent(
     mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
     chatTitle: String?,
-    actionColors: AccountActionColors,
     onClose: () -> Unit,
     onSend: (caption: String, onResult: (accepted: Boolean) -> Unit) -> Unit,
     onRemoveMediaAt: (Int) -> Unit,
@@ -392,7 +388,6 @@ internal fun MediaPreviewContent(
                     initialCaption = initialCaption,
                     sending = sending,
                     sendEnabled = !sending && !preparing && items.isNotEmpty(),
-                    actionColors = actionColors,
                     onSend = { caption ->
                         sending = true
                         onSend(caption) { accepted -> if (!accepted) sending = false }

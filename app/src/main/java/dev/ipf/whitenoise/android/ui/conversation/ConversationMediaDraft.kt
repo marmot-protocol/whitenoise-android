@@ -39,7 +39,6 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAcceptanceToken
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewScreen
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
@@ -880,7 +879,6 @@ internal fun ConversationMediaDraftContent(
     onDocumentUrisChange: (List<Uri>) -> Unit,
     mediaSender: ConversationMediaSender,
     chatTitle: String,
-    actionColors: AccountActionColors,
     composerText: () -> ComposerAcceptanceToken,
     onCaptionAccepted: (seededCaption: ComposerAcceptanceToken) -> Unit,
     onAddPhotos: () -> Unit,
@@ -919,7 +917,6 @@ internal fun ConversationMediaDraftContent(
                 mediaSlots = mediaSlots,
                 documentUris = documentUris,
                 chatTitle = chatTitle,
-                actionColors = actionColors,
                 initialCaption = seededCaption.text,
                 previewOnly = onClosePreview != null,
                 initialIndex = previewIndex,

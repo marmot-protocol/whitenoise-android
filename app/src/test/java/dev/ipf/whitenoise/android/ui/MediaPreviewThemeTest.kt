@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
@@ -159,7 +158,6 @@ class MediaPreviewThemeTest {
                     surfaceColor = androidx.compose.material3.MaterialTheme.colorScheme.background
                     Box(Modifier.size(320.dp, height.dp).testTag("preview-frame")) {
                         MediaPreviewContent(
-                            actionColors = accountActionColors(appState = null),
                             mediaSlots = listOf(PendingMediaSlot("stable-photo", uri)),
                             documentUris = emptyList(),
                             chatTitle = "Preview",

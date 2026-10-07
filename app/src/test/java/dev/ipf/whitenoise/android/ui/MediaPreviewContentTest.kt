@@ -25,7 +25,6 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MediaQuality
-import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
@@ -95,7 +94,6 @@ class MediaPreviewContentTest {
             WhiteNoiseTheme(darkTheme = true) {
                 var media by remember { mutableStateOf(initialSlots) }
                 MediaPreviewContent(
-                    actionColors = accountActionColors(appState = null),
                     mediaSlots = media,
                     documentUris = emptyList(),
                     chatTitle = "Test chat",
@@ -270,7 +268,6 @@ class MediaPreviewContentTest {
                 if (previewVisible) {
                     stateHolder.SaveableStateProvider("preview") {
                         MediaPreviewContent(
-                            actionColors = accountActionColors(appState = null),
                             mediaSlots = slots,
                             documentUris = emptyList(),
                             chatTitle = "Test chat",
@@ -307,7 +304,6 @@ class MediaPreviewContentTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true) {
                 MediaPreviewContent(
-                    actionColors = accountActionColors(appState = null),
                     mediaSlots = listOf(slot),
                     documentUris = emptyList(),
                     chatTitle = "Test chat",
