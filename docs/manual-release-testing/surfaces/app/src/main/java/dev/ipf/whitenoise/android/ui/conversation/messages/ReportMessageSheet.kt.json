@@ -1,0 +1,91 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+  "legacy_sha256": "2062388d8eff4fac603b4b8a7f18dd4153b0c7d8357446ac96361cc244dd1531",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ReportMessageSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportMessageSheet(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "ReportReasonRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportReasonRow(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "ReportMessageForm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportMessageForm(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "ReportMessageBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportMessageBody(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "ReportMessageDragHandle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportMessageDragHandle(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:report_message_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_message_detail",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_explanation_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_message_explanation_hint",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_message_send",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.report_message_title",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "MSG-016"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
