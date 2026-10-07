@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
+  "legacy_sha256": "e2a59d2865506985cf220246ac1a2e00a522600cc4426cb02c1d32d84652fe43",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationJumpToNewestButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
+        "anchor": "fun ConversationJumpToNewestButton(",
+        "test_ids": [
+          "CON-001",
+          "CHL-022"
+        ]
+      },
+      {
+        "surface": "Jump to newest accessibility text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
+        "anchor": "R.string.jump_to_newest",
+        "test_ids": [
+          "CON-001",
+          "CHL-022"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Timeline downward endpoint navigation icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
+        "anchor": "R.drawable.ic_jump_to_edge",
+        "test_ids": [
+          "CHL-022"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

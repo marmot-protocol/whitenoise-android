@@ -1,0 +1,144 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+  "legacy_sha256": "0b11808daf17f2fe5e0699589cb4c729935d54bed3b119678863615433fc714c",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerPill",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "fun ComposerPill(",
+        "test_ids": [
+          "CON-001",
+          "CON-005",
+          "CON-007",
+          "CON-013",
+          "CON-020",
+          "CON-021",
+          "CON-024",
+          "SET-004",
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "Collapsed composer Paste toolbar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "onLongPress = {",
+        "test_ids": [
+          "CON-013",
+          "CON-021"
+        ]
+      },
+      {
+        "surface": "ComposerPlatformPreImeBackHandler",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "fun ComposerPlatformPreImeBackHandler(",
+        "test_ids": [
+          "CON-013",
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "ComposerResizeGestureStrip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "fun ComposerResizeGestureStrip(",
+        "test_ids": [
+          "CON-007",
+          "CON-013",
+          "CON-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Composer compact draft navigation icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.drawable.ic_jump_to_edge",
+        "test_ids": [
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "Composer draft top navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.scroll_to_top",
+        "test_ids": [
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "R.string.attach_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.attach_options",
+        "test_ids": [
+          "MED-001",
+          "CON-013"
+        ]
+      },
+      {
+        "surface": "R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "MED-001",
+          "CON-013"
+        ]
+      },
+      {
+        "surface": "R.string.composer_collapse",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.composer_collapse",
+        "test_ids": [
+          "CON-013",
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "R.string.composer_expand_full_screen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.composer_expand_full_screen",
+        "test_ids": [
+          "CON-013",
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "R.string.dictate_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.dictate_text",
+        "test_ids": [
+          "CON-013",
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "R.string.message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.message",
+        "test_ids": [
+          "CON-013",
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "Settled draft viewport navigation eligibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "val showDraftTop =",
+        "test_ids": [
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: ComposerPills",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": ".scrollEdgeFade(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
