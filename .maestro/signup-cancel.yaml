@@ -43,4 +43,11 @@ name: signup-cancel
       id: "onboarding.sign_up.name"
     direction: DOWN
 - assertVisible: "Name"
+- assertNotVisible: "Maestro Offline Draft"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.about"
+    direction: DOWN
+- assertVisible: "About"
+- assertNotVisible: "Synthetic offline test only"
 - takeScreenshot: signup-cancel

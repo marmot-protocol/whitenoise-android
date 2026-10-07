@@ -39,7 +39,17 @@ name: signup-system-back
 - back
 - assertVisible: "Sign In"
 - tapOn: "Sign Up"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.name"
+    direction: DOWN
+- assertVisible: "Name"
 - assertNotVisible: "Maestro Offline Draft"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.about"
+    direction: DOWN
+- assertVisible: "About"
 - assertNotVisible: "Synthetic offline test only"
 - tapOn: "Back"
 - assertVisible: "Sign Up"
