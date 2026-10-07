@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnosticStore.kt",
+  "legacy_sha256": "1be453394ecc7ceb16cf3b507ad40b32129510076aafbf7615dbe4db86a6316b",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Retained dictation diagnostic metadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnosticStore.kt",
+        "anchor": "internal class DictationDiagnosticStore(",
+        "test_ids": [
+          "DIC-002",
+          "SEC-009",
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "DM trace attribution and owner-approved diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnosticStore.kt",
+        "anchor": "filePrefix: String =",
+        "test_ids": [
+          "SEC-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

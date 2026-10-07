@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarmotInterface
@@ -19,6 +20,7 @@ import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.whitenoise.android.core.ForwardAttachmentSource
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -86,7 +88,7 @@ class ForwardDiagnosticsProductionPathTest {
                             ),
                         sent = null,
                     )
-                "sendMediaAttachments" ->
+                "sendMediaAttachments", "sendText" ->
                     SendSummaryFfi(
                         published = 1u,
                         messageIds = listOf("media-id-${messageIdCounter.incrementAndGet()}"),
@@ -168,14 +170,41 @@ class ForwardDiagnosticsProductionPathTest {
             .forEach { denied -> assertTrue("identifier leaked: $denied", lines.none { denied in it }) }
     }
 
+    /** Main.immediate completion inside start must reach the trace installed for that same operation. */
+    @Test
+    fun immediateTextCompletionCannotLoseItsTerminalDiagnostic() {
+        PerformanceDiagnostics.stop()
+        assumeTrue(PerformanceDiagnostics.start().active)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val state = appState(Dispatchers.Main.immediate)
+            assertTrue(
+                state.startForwardMessages(
+                    targetGroupIds = listOf(TARGET_GROUP),
+                    messages = listOf(ForwardMessagePayload.Text(SOURCE_GROUP, SOURCE_MESSAGE, "PRIVATE")),
+                    sourceAccountRef = ACCOUNT,
+                    destinationAccountRef = ACCOUNT,
+                ),
+            )
+            assertEquals(ForwardOperationPhase.Completed, state.activeForwardOperation.value?.phase)
+            val terminal =
+                PerformanceDiagnostics.exportLines().filter {
+                    " op=message_forward " in it && " phase=forward_complete " in it
+                }
+            assertEquals(1, terminal.size)
+            assertTrue(terminal.single().contains(" result=success "))
+            assertTrue(terminal.none { "PRIVATE" in it || ACCOUNT in it || TARGET_GROUP in it })
+        }
+    }
+
     /** Builds an app state wired to the scripted engine proxy. */
-    private fun appState(): WhiteNoiseAppState =
+    private fun appState(ioDispatcher: CoroutineDispatcher = Dispatchers.IO): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
             draftStore = DraftStore.forContext(context),
             accountIdHexResolver = { null },
             accounts = listOf(account()),
             activeAccountRef = ACCOUNT,
+            marmotIoDispatcher = ioDispatcher,
         ).also { state ->
             fixtureState = state
             WhiteNoiseAppState::class.java

@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -15,16 +16,10 @@ internal fun prepareAuditAndDictationLogArchive(
     sourcePaths: List<String>,
     performanceLogBytes: ByteArray? = PerformanceDiagnostics.storedLogForExport(),
 ): File? {
-    val entries = DictationDiagnostics.snapshot()
-    val dropped =
-        entries["dictation-manifest.json"]?.let {
-            val manifest = JSONObject(it.decodeToString())
-            if (manifest.optString("coverage") == "snapshot_unavailable") {
-                1L
-            } else {
-                manifest.optLong("dropped_in_process") + manifest.optLong("invalid_files_in_process")
-            }
-        } ?: 0L
+    val dmEntries = DmCreationDiagnostics.snapshot()
+    val hasDmRecords = dmEntries.keys.any { it.endsWith(".jsonl") } || diagnosticDroppedCount(dmEntries) > 0
+    val entries = DictationDiagnostics.snapshot() + if (hasDmRecords) dmEntries else emptyMap()
+    val dropped = diagnosticDroppedCount(entries)
     val hasDictationRecords = entries.keys.any { it.endsWith(".jsonl") } || dropped != 0L
     if (sourcePaths.isEmpty() && !hasDictationRecords && performanceLogBytes == null) return null
     return prepareAuditLogArchive(
@@ -39,15 +34,21 @@ internal fun prepareAuditAndDictationLogArchive(
 /** Attempts every app-owned diagnostic store; one deletion cannot hide another store's failure. */
 internal fun clearAuditAndDictationLogShares(cacheDir: File): Boolean {
     val dictation = runCatchingCancellable { DictationDiagnostics.clear() }
+    val dmCreation = runCatchingCancellable { DmCreationDiagnostics.clear() }
     val performance = runCatchingCancellable { PerformanceDiagnostics.clearStoredLog() }
     val prepared = runCatchingCancellable { clearPreparedAuditLogShares(cacheDir) }
-    val failure = dictation.exceptionOrNull() ?: performance.exceptionOrNull() ?: prepared.exceptionOrNull()
+    val failure =
+        dictation.exceptionOrNull()
+            ?: dmCreation.exceptionOrNull()
+            ?: performance.exceptionOrNull()
+            ?: prepared.exceptionOrNull()
     if (failure != null) {
+        dmCreation.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
         performance.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
         prepared.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
         throw failure
     }
-    return dictation.getOrThrow() || performance.getOrThrow() || prepared.getOrThrow()
+    return dictation.getOrThrow() || dmCreation.getOrThrow() || performance.getOrThrow() || prepared.getOrThrow()
 }
 
 /** Installs independent destinations before startup; collection stops before any native consent update. */
@@ -63,3 +64,14 @@ internal suspend fun configureAndroidPrivacyRuntime(
     }
     runtime.setProductAnalyticsRuntimeConfig(androidProductAnalyticsRuntimeConfig())
 }
+
+/** Reads only closed export manifests; JSONL records never masquerade as metadata or extend retention. */
+private fun diagnosticDroppedCount(entries: Map<String, ByteArray>): Long =
+    entries.filterKeys { it.endsWith("-manifest.json") }.values.sumOf {
+        val manifest = JSONObject(it.decodeToString())
+        if (manifest.optString("coverage") == "snapshot_unavailable") {
+            1L
+        } else {
+            manifest.optLong("dropped_in_process") + manifest.optLong("invalid_files_in_process")
+        }
+    }

@@ -89,6 +89,8 @@ import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
+import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.share.launchInviteShare
 import dev.ipf.whitenoise.android.share.presentOutboundShareFailure
 import dev.ipf.whitenoise.android.state.BlockOutcome
@@ -117,6 +119,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorCard
 import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatErrorUiState
 import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
 import dev.ipf.whitenoise.android.ui.chats.newchat.recipientNip05Verified
+import dev.ipf.whitenoise.android.ui.chats.newchat.withDmCreationOwner
 import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerColor
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
@@ -679,41 +682,59 @@ internal fun ProfileSheet(
         }
     }
 
+    val profileDmDiagnostic = remember(owner, npub) { DmCreationInteraction() }
+
     /** Opens the direct chat with this profile or creates it. */
     fun openOrCreateProfileChat(retryGroupIdHex: String? = null) {
         if (!owner.canAct() || creatingChat) return
         val progressHex = hex ?: return
         startChatError = null
         creatingChat = true
+        val diagnosticAttempt = profileDmDiagnostic.nextAttempt()
         appState.beginChatCreateOpenTiming()
         appState.launchMutation {
             try {
-                when (
-                    val result =
-                        attemptOpenOrStartProfileChat(
-                            npub = npub,
-                            progressHex = progressHex,
-                            recipientName = displayTitle,
-                            retryGroupIdHex = retryGroupIdHex,
-                            resolveDirectChat = {
-                                owner.requireCurrent()
-                                appState.resolveExistingDirectChat(npub)
-                            },
-                            createGroup = { reference ->
-                                owner.requireCurrent()
-                                appState.createProfileChatGroup(reference)
-                            },
-                            loadCreatedChatListItem = { id ->
-                                owner.requireCurrent()
-                                appState.loadCreatedChatListItem(id)
-                            },
-                            displayName = appState::displayName,
-                            markCreateOpenStage = appState::markChatCreateOpenStage,
-                            abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
-                        )
-                ) {
-                    is StartChatAttemptResult.Open -> owner.leave { onOpenGroup(result.item, result.newlyCreated) }
-                    is StartChatAttemptResult.Failed -> if (owner.canAct()) startChatError = result.error
+                withDmCreationOwner(diagnosticAttempt, owner::canAct) { markOpened ->
+                    when (
+                        val result =
+                            attemptOpenOrStartProfileChat(
+                                npub = npub,
+                                progressHex = progressHex,
+                                recipientName = displayTitle,
+                                retryGroupIdHex = retryGroupIdHex,
+                                resolveDirectChat = {
+                                    owner.requireCurrent()
+                                    appState.resolveExistingDirectChat(npub, diagnosticAttempt = diagnosticAttempt)
+                                },
+                                createGroup = { reference ->
+                                    owner.requireCurrent()
+                                    appState.createProfileChatGroup(reference)
+                                },
+                                loadCreatedChatListItem = { id ->
+                                    owner.requireCurrent()
+                                    appState.loadCreatedChatListItem(id)
+                                },
+                                displayName = appState::displayName,
+                                markCreateOpenStage = appState::markChatCreateOpenStage,
+                                abandonCreateOpenTiming = appState::abandonChatCreateOpenTiming,
+                                diagnosticAttempt = diagnosticAttempt,
+                            )
+                    ) {
+                        is StartChatAttemptResult.Open ->
+                            owner.leave {
+                                accountAtOpen?.let {
+                                    DmCreationDiagnostics.awaitFrame(
+                                        it,
+                                        result.item.group.groupIdHex,
+                                        appState.runtimeGeneration,
+                                        diagnosticAttempt,
+                                    )
+                                }
+                                markOpened()
+                                onOpenGroup(result.item, result.newlyCreated)
+                            }
+                        is StartChatAttemptResult.Failed -> if (owner.canAct()) startChatError = result.error
+                    }
                 }
             } finally {
                 creatingChat = false

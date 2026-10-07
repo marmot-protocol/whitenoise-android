@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DictationAuditLogShare.kt",
+  "legacy_sha256": "cfc5fcb823f38f1187e8f8194de2e5b3e493e8a024e8c7af6e25b44388a3e055",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "host timing configuration and consent boundary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DictationAuditLogShare.kt",
+        "anchor": "setProductAnalyticsRuntimeConfig(",
+        "test_ids": [
+          "SEC-011"
+        ]
+      },
+      {
+        "surface": "DM trace attribution and owner-approved diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DictationAuditLogShare.kt",
+        "anchor": "val dmEntries =",
+        "test_ids": [
+          "SEC-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

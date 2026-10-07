@@ -283,6 +283,14 @@
           "NTF-002",
           "NTF-022"
         ]
+      },
+      {
+        "surface": "DM trace attribution and owner-approved diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "DmCreationDiagnostics.setEnabled(",
+        "test_ids": [
+          "SEC-009"
+        ]
       }
     ]
   },
