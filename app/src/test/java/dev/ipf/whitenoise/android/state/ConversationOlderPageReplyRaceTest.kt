@@ -91,54 +91,53 @@ class ConversationOlderPageReplyRaceTest {
         replacement: TimelinePageFfi,
         recovered: Boolean,
         preserveNewerFailure: Boolean = false,
-    ) =
-        coroutineScope {
-            val requested = CompletableDeferred<Unit>()
-            val reply = CompletableDeferred<Unit>()
-            val subscription = subscriptionWith(*Array(CONVERSATION_PAGE_NOT_READY_ATTEMPTS) { outcome(reason) })
-            subscription.beforeBackwardsReply = {
-                requested.complete(Unit)
-                reply.await()
+    ) = coroutineScope {
+        val requested = CompletableDeferred<Unit>()
+        val reply = CompletableDeferred<Unit>()
+        val subscription = subscriptionWith(*Array(CONVERSATION_PAGE_NOT_READY_ATTEMPTS) { outcome(reason) })
+        subscription.beforeBackwardsReply = {
+            requested.complete(Unit)
+            reply.await()
+        }
+        withController(subscription) { controller ->
+            awaitRecoveryCondition { controller.timeline.firstOrNull()?.record?.messageIdHex == SEED_ID }
+            if (preserveNewerFailure) {
+                controller.reportPageFailure(ConversationSearchPageDirection.NEWER, IllegalStateException())
             }
-            withController(subscription) { controller ->
-                awaitRecoveryCondition { controller.timeline.firstOrNull()?.id == SEED_ID }
-                if (preserveNewerFailure) {
-                    controller.reportPageFailure(ConversationSearchPageDirection.NEWER, IllegalStateException())
+            val previousFailure = controller.pageError
+            val loading = async { controller.loadOlderPageInternal(origin = origin) }
+            try {
+                withTimeout(5_000) { requested.await() }
+                emitWindowAndDrain(subscription, replacement)
+                awaitRecoveryCondition {
+                    controller.timeline.map { it.record.messageIdHex } == replacement.messages.map { it.messageIdHex } &&
+                        controller.timeline.map { it.record.plaintext } == replacement.messages.map { it.plaintext }
                 }
-                val previousFailure = controller.pageError
-                val loading = async { controller.loadOlderPageInternal(origin = origin) }
-                try {
-                    withTimeout(5_000) { requested.await() }
-                    emitWindowAndDrain(subscription, replacement)
-                    awaitRecoveryCondition {
-                        controller.timeline.map { it.id } == replacement.messages.map { it.messageIdHex } &&
-                            controller.timeline.map { it.record.plaintext } == replacement.messages.map { it.plaintext }
+                reply.complete(Unit)
+                val expected =
+                    when {
+                        recovered -> ConversationPageLoad.NO_PROGRESS
+                        reason == ConversationWindowUnchangedReason.TIMED_OUT -> ConversationPageLoad.TIMED_OUT
+                        else -> ConversationPageLoad.NOT_READY
                     }
-                    reply.complete(Unit)
-                    val expected =
-                        when {
-                            recovered -> ConversationPageLoad.NO_PROGRESS
-                            reason == ConversationWindowUnchangedReason.TIMED_OUT -> ConversationPageLoad.TIMED_OUT
-                            else -> ConversationPageLoad.NOT_READY
-                        }
-                    assertEquals(expected, withTimeout(5_000) { loading.await() })
-                    assertFalse(controller.isLoadingOlder)
-                    assertFalse(controller.automaticOlderPagingBlocked)
-                    if (recovered) {
-                        assertSame(previousFailure, controller.pageError)
-                        val expectedDirection = ConversationSearchPageDirection.NEWER.takeIf { preserveNewerFailure }
-                        assertEquals(expectedDirection, controller.failedPageDirection)
-                    } else {
-                        assertTrue(controller.olderPageBlocked)
-                        assertEquals(ConversationSearchPageDirection.OLDER, controller.failedPageDirection)
-                    }
-                } finally {
-                    reply.complete(Unit)
-                    loading.cancel()
-                    loading.join()
+                assertEquals(expected, withTimeout(5_000) { loading.await() })
+                assertFalse(controller.isLoadingOlder)
+                assertFalse(controller.automaticOlderPagingBlocked)
+                if (recovered) {
+                    assertSame(previousFailure, controller.pageError)
+                    val expectedDirection = ConversationSearchPageDirection.NEWER.takeIf { preserveNewerFailure }
+                    assertEquals(expectedDirection, controller.failedPageDirection)
+                } else {
+                    assertTrue(controller.olderPageBlocked)
+                    assertEquals(ConversationSearchPageDirection.OLDER, controller.failedPageDirection)
                 }
+            } finally {
+                reply.complete(Unit)
+                loading.cancel()
+                loading.join()
             }
         }
+    }
 
     /** Advances the paused Android clock while background preparation hands the replacement back. */
     private fun awaitRecoveryCondition(condition: () -> Boolean) {
