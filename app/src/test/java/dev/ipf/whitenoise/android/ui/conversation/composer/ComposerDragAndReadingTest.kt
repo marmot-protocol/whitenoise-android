@@ -233,11 +233,12 @@ class ComposerDragAndReadingTest {
         assertEquals(original, observed)
     }
 
+    /** The icon-only toolbar button stays accessible and changes scroll without editing or sending. */
     @Test
     fun jumpToTopPreservesTextAndSelectionAndHidesAtTop() {
         render(longDraft, dark = true)
         val original = observed
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        assertDraftTopIconButton(composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG))
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_draft_top_dark.png")
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
         composeRule.waitForIdle()

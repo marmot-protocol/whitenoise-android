@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationPagingPrefetch.kt",
+  "legacy_sha256": "2a372b55534700186631b9879504d6d9b72207bb71a3d3ccbae957289fcfb562",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Viewport-driven forward prefetch stands down after an unanswered page",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationPagingPrefetch.kt",
+        "anchor": "internal fun shouldPrefetchNewer(",
+        "test_ids": [
+          "CON-005",
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Older prefetch retains recovery demand while the previous command waits, even without viewport movement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationPagingPrefetch.kt",
+        "anchor": "internal fun olderPagingRequests(",
+        "test_ids": [
+          "CON-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

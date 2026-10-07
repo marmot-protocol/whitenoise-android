@@ -157,6 +157,22 @@ class ConversationUnreadTest {
         assertEquals("r3", nextStack.pendingMessageId)
     }
 
+    /** Prepending recovered history must not retarget a pending unread jump to an old message. */
+    @Test
+    fun recoveredOlderPagePreservesThePendingUnreadTarget() {
+        val captured =
+            ConversationUnreadJumpState(pendingMessageId = "r2", unreadStackActive = true, initialized = true)
+        val recovered =
+            reconcileConversationUnreadJump(
+                current = captured,
+                timeline = listOf(received("older-1"), received("older-2"), received("r1"), received("r2")),
+                readAnchorMessageId = "r1",
+                unreadCount = 1,
+                nearBottom = false,
+            )
+        assertEquals(captured, recovered)
+    }
+
     // ---- firstUnreadReceivedIndex -------------------------------------------
 
     @Test

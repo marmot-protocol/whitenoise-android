@@ -1,10 +1,25 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.snapshotFlow
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationPagingTraceSection
 import dev.ipf.whitenoise.android.state.markPagingEvent
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
+
+/** One edge request, including recovery that may have happened while the prior request suspended. */
+internal data class ConversationOlderPagingDemand(
+    val anchorMessageId: String?,
+    val oldestLoadedMessageId: String?,
+    val prefetch: Boolean,
+    val recoveryGeneration: Long,
+)
+
+/** Keeps a fresh recovery ticket observable even if snapshotFlow conflates the intervening block. */
+internal fun olderPagingRequests(readDemand: () -> ConversationOlderPagingDemand): Flow<ConversationOlderPagingDemand> =
+    snapshotFlow(readDemand).filter { it.prefetch }
 
 /**
  * The message a conversation list item key stands for, or null when the row is not an authoritative

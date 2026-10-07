@@ -51,6 +51,9 @@ internal class ScriptedConversationTimelineSubscription(
     private val windows = Channel<TimelinePageFfi>(Channel.UNLIMITED)
     private val anchorCalls = CopyOnWriteArrayList<String>()
 
+    /** Holds a page reply while the receive loop commits an independently delivered replacement. */
+    var beforeBackwardsReply: suspend () -> Unit = {}
+
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
 
@@ -97,6 +100,7 @@ internal class ScriptedConversationTimelineSubscription(
     /** Returns the next scripted backward outcome, or the configured window once the script runs dry. */
     override suspend fun paginateBackwards(count: UInt): TimelinePageOutcome {
         lifecycleEvents += "paginateBackwards"
+        beforeBackwardsReply()
         return backwardsOutcomes.removeFirstOrNull() ?: Advanced(backwardsPage)
     }
 

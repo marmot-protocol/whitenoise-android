@@ -1418,6 +1418,8 @@ internal fun ComposerBar(
                             val reviewedClip = voiceReviewClip
                             if (reviewedClip != null) voiceReview?.send(reviewedClip) else submitMessage()
                         },
+                        geometryTransitionActive = composerHeightDragActive || composerHeightTransitionActive,
+                        geometryAvailableHeight = maximumComposerHeight,
                         expansionMode = composerExpansion.mode,
                         onExpansionToggle = {
                             composerHeightDragActive = false
