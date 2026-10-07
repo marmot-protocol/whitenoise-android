@@ -17,6 +17,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.ReportReasonFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.state.REPORT_EXPLANATION_LIMIT
+import dev.ipf.whitenoise.android.state.REPORT_REASONS
+import dev.ipf.whitenoise.android.state.reportReasonLabel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -56,6 +58,7 @@ class ReportMessageImeTest {
         composeRule.onNodeWithTag("message.report.explanation").performTextReplacement(explanation)
         composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometry() != null }
         assertActionAboveIme()
+        assertReasonsReachableAboveIme()
         composeRule.runOnUiThread {
             val window = WindowInspector.getGlobalWindowViews().first { it.hasWindowFocus() }
             ViewCompat.getWindowInsetsController(window)?.hide(WindowInsetsCompat.Type.ime())
@@ -72,6 +75,19 @@ class ReportMessageImeTest {
                 submissions,
             )
         }
+    }
+
+    /** Every reason can still be reached without dismissing the keyboard or moving the Send footer. */
+    private fun assertReasonsReachableAboveIme() {
+        REPORT_REASONS.forEach { candidate ->
+            composeRule
+                .onNodeWithText(composeRule.activity.getString(reportReasonLabel(candidate)))
+                .performScrollTo()
+                .assertIsDisplayed()
+                .performClick()
+            assertActionAboveIme()
+        }
+        composeRule.onNodeWithText("Impersonation").performScrollTo().performClick()
     }
 
     /** Uses the focused sheet window, rather than assuming the Activity receives its dialog's IME insets. */

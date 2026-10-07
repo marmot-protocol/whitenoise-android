@@ -26,6 +26,22 @@
         "test_ids": [
           "MSG-016"
         ]
+      },
+      {
+        "surface": "ReportMessageBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportMessageBody(",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "ReportMessageDragHandle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "fun ReportMessageDragHandle(",
+        "test_ids": [
+          "MSG-016"
+        ]
       }
     ],
     "settings_controls": [
@@ -57,6 +73,14 @@
         "surface": "string:report_message_title",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
         "anchor": "R.string.report_message_title",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
+        "anchor": "R.string.dismiss",
         "test_ids": [
           "MSG-016"
         ]

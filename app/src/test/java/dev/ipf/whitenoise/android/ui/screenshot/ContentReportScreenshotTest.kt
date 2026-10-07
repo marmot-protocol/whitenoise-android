@@ -122,6 +122,25 @@ class ContentReportScreenshotTest {
         assertPinnedFooter()
         composeRule.runOnIdle { height.value = 200.dp }
         assertPinnedFooter()
+        composeRule.runOnIdle {
+            height.value = 100.dp
+            sending.value = false
+        }
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        REPORT_REASONS.forEach { candidate ->
+            composeRule
+                .onNodeWithText(context.getString(reportReasonLabel(candidate)))
+                .performScrollTo()
+                .assertIsDisplayed()
+                .performClick()
+            assertPinnedFooter()
+        }
+        composeRule.onNodeWithTag("message.report.explanation").performScrollTo().assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("report.viewport")
+            .captureRoboImage("src/test/snapshots/message_report_landscape_keyboard_large_rtl.png")
+        composeRule.onNodeWithTag("message.report.send").performClick()
+        assertEquals(REPORT_REASONS.last() to explanation.value.trim(), submitted.last())
     }
 
     /** Footer and scroll-body bounds are sampled from the production form after every viewport change. */
@@ -130,6 +149,7 @@ class ContentReportScreenshotTest {
         val footer = composeRule.onNodeWithTag("message.report.send").fetchSemanticsNode().boundsInRoot
         val body = composeRule.onNodeWithTag(REPORT_BODY_TEST_TAG).fetchSemanticsNode().boundsInRoot
         val viewport = composeRule.onNodeWithTag("report.viewport").fetchSemanticsNode().boundsInRoot
+        assertTrue("scrollable body collapsed", body.height > 0f)
         assertTrue("body overlaps footer", body.bottom <= footer.top)
         assertTrue("footer outside viewport", footer.bottom <= viewport.bottom)
     }
