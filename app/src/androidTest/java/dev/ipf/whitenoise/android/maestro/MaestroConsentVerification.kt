@@ -18,7 +18,7 @@ internal suspend fun verifyMaestroConsent(
     withTimeout(30_000L) {
         while (true) {
             check(!native.auditLogSettings().enabled) { "Disclosure/cancellation enabled audit logging" }
-            val decision = native.usageDiagnosticsSnapshot().settings.decision
+            val decision = native.usageDiagnosticsSettings().decision
             check(decision != UsageDiagnosticsDecisionFfi.GRANTED) { "Disclosure/cancellation granted telemetry" }
             if (decision == expected && state.auditUploadConsentRequired != declined) return@withTimeout
             delay(100L)

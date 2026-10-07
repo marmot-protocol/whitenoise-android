@@ -415,7 +415,7 @@ jobs:
     name: Maestro generated accounts (${{ matrix.slice }} ${{ matrix.partition }}/${{ matrix.partitions }})
     needs: maestro-runtime-build
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       max-parallel: 2

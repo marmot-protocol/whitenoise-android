@@ -17,8 +17,8 @@ HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
 SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys')
 MAX_CASES_PER_SHARD = 4
-CAMPAIGN_SECONDS = 900
 CASE_RESERVE_SECONDS = 600
+CAMPAIGN_SECONDS = MAX_CASES_PER_SHARD * CASE_RESERVE_SECONDS
 CASES = json.loads((ROOT / 'config/maestro-runtime-cases.json').read_text())['cases']
 
 

@@ -10,12 +10,30 @@ import xml.etree.ElementTree as ET
 import yaml
 
 from scripts import maestro_runtime as runtime
+from scripts.maestro_coverage import inventory, screen_catalog
 from scripts.maestro_runtime_pair import pair
 from scripts.maestro_runtime_selection import selection, matrix_selection
 from scripts.manual_test_fragments import definitions, load_guide
 
 
 class RuntimeEvidenceTest(unittest.TestCase):
+    def test_screen_inventory_keeps_partial_and_unexecuted_requirements_visible(self):
+        """Screen discovery cannot transform same-ID flow links into complete or executed coverage."""
+        result = inventory()
+        self.assertTrue(result['screen_catalog'])
+        self.assertTrue(result['unmapped_requirement_ids'])
+        self.assertFalse(result['full_release_coverage'])
+        for screen in result['screen_catalog']:
+            self.assertTrue(screen['manual_ids'])
+            self.assertFalse(screen['execution_verified'])
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / 'app/src/main/java/dev/ipf/whitenoise/android/ui/new/NewScreen.kt'
+            path.parent.mkdir(parents=True)
+            path.write_text('internal fun NewScreen() {}')
+            with self.assertRaisesRegex(ValueError, 'no maintained source'):
+                screen_catalog(root, {}, {})
+
     def test_retry_reuses_only_an_explicit_same_source_producer(self):
         """A UI-only retry can use its original pair while rejecting stale and future identities."""
         env = {'GITHUB_ACTIONS': 'true', 'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '1', 'GITHUB_RUN_ATTEMPT': '1'}
@@ -180,6 +198,24 @@ class RuntimeEvidenceTest(unittest.TestCase):
             with self.subTest(partition=part), self.assertRaises(ValueError):
                 runtime.case_selection('navigation', part)
 
+    def test_full_partition_admits_every_case_at_its_reserved_ceiling(self):
+        """Worst-case reserved durations must leave enough time to admit the entire selected partition."""
+        selected = runtime.case_selection('navigation', 1)
+        with tempfile.TemporaryDirectory() as temporary:
+            reports = Path(temporary) / 'report'
+            ticks = [0] + [index * runtime.CASE_RESERVE_SECONDS for index in range(len(selected))]
+            with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+                 patch('sys.argv', ['runtime', '--suite', 'navigation', '--reports', str(reports)]), \
+                 patch.object(runtime, 'command', return_value='1'), \
+                 patch.object(runtime.time, 'monotonic', side_effect=ticks), \
+                 patch.object(runtime, 'run_case', side_effect=lambda name, _: {
+                     'case': name, 'passed': True, 'cleanup_safe': True}) as runner:
+                runtime.main()
+            self.assertEqual(runner.call_count, len(selected))
+            summary = json.loads((reports / 'results.json').read_text())
+            self.assertTrue(summary['evidence_complete'])
+            self.assertEqual([case['case'] for case in summary['results']], selected)
+
     def test_campaign_budget_refuses_a_case_without_a_cleanup_window(self):
         """Fail with explicit unexecuted cases before a CI timeout can interrupt teardown."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -187,7 +223,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
             with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
                  patch('sys.argv', ['runtime', '--suite', 'navigation', '--reports', str(reports)]), \
                  patch.object(runtime, 'command', return_value='1'), \
-                 patch.object(runtime.time, 'monotonic', side_effect=[0, 900]), \
+                 patch.object(runtime.time, 'monotonic', side_effect=[0, runtime.CAMPAIGN_SECONDS]), \
                  patch.object(runtime, 'run_case') as runner, self.assertRaises(SystemExit):
                 runtime.main()
             runner.assert_not_called()
