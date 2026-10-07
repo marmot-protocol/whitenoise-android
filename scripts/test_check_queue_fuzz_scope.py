@@ -35,7 +35,9 @@ class QueueFuzzScopeTest(unittest.TestCase):
             self.assertTrue(selected('pull_request', None, None, WORKFLOW))
 
     def test_unknown_or_malformed_pattern_runs(self):
-        for workflow in [WORKFLOW.replace("'fuzz/**'", "'fuzz/[ab]/**'"), 'on: {}']:
+        for workflow in [WORKFLOW.replace("'fuzz/**'", "'fuzz/[ab]/**'"),
+                         WORKFLOW.replace("'fuzz/**'", "'**/Parser.kt'"),
+                         WORKFLOW.replace("'fuzz/**'", "'fuzz/**/Parser.kt'"), 'on: {}']:
             self.assertTrue(selected('merge_group', 'a', 'b', workflow))
 
 

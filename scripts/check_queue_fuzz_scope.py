@@ -16,7 +16,7 @@ def selected(event, base, head, workflow):
         patterns = pr_paths(workflow)
         # GitHub supports more glob syntax than fnmatch. Unknown syntax runs
         # fuzz rather than approximating an exclusion or silently skipping it.
-        if any(any(c in pattern for c in '![]?+') for pattern in patterns):
+        if any(any(c in pattern for c in '![]?+') or '**/' in pattern for pattern in patterns):
             return True
         raw = complete_diff(event, base, head)
         if raw is None:

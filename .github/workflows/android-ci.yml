@@ -78,6 +78,13 @@ jobs:
           python3 scripts/check_fuzz_pr_triggers.py
           python3 -m unittest scripts/test_check_fuzz_pr_triggers.py scripts/test_check_queue_fuzz_scope.py scripts/test_whitenoise_android_serial_queue.py
 
+      - name: Validate Actions merge authorization boundary
+        run: |
+          python3 -m venv "$RUNNER_TEMP/ci-permissions"
+          "$RUNNER_TEMP/ci-permissions/bin/pip" install --disable-pip-version-check PyYAML==6.0.3
+          "$RUNNER_TEMP/ci-permissions/bin/python" scripts/check_merge_authorization_boundary.py
+          "$RUNNER_TEMP/ci-permissions/bin/python" -m unittest scripts/test_merge_authorization_boundary.py
+
       - name: Test attachment fixture HTTP ledger and cancellation contracts
         run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
 

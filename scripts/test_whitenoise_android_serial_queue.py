@@ -43,7 +43,7 @@ class QueueTest(unittest.TestCase):
     def queued(self, head='d' * 40):
         self.snapshot.update(total_count=1, entries=[{
             'position': 1, 'state': 'AWAITING_CHECKS', 'base': 'b' * 40,
-            'jump': False, 'source_mapping_verified': True, 'number': 10,
+            'jump': False, 'number': 10,
             'pull_request_id': 'PR_node', 'source': 'a' * 40,
             'integration': head, 'entry_id': 'ENTRY_node'}])
 
@@ -122,7 +122,7 @@ class QueueTest(unittest.TestCase):
     def test_unmapped_foreign_or_partial_queue_entry_is_held(self):
         self.queued()
         for key, value in [('position', 2), ('state', 'unknown'), ('jump', True),
-                           ('source_mapping_verified', False), ('integration', None),
+                           ('integration', None),
                            ('entry_id', None), ('source', 'invalid')]:
             bad = copy.deepcopy(self.snapshot)
             bad['entries'][0][key] = value
@@ -201,6 +201,31 @@ class QueueTest(unittest.TestCase):
         self.assertEqual(self.tick(), 'observed-confirmed')
         self.assertEqual(len(self.writes), 1)
 
+
+    def test_known_api_refusal_is_not_an_unknown_write_or_automatic_retry(self):
+        def rejected(*_):
+            raise q.DefiniteRefusal('e' * 64)
+        self.assertEqual(self.tick(write=rejected), 'known-refusal-held')
+        record = next(iter(self.journal['effects'].values()))
+        self.assertEqual(record['state'], 'refused')
+        self.assertEqual(record['response_sha256'], 'e' * 64)
+        self.assertEqual(self.tick(), 'known-refusal-held')
+        self.assertFalse(self.writes)
+
+    def test_explicit_recovery_generation_creates_a_new_pinned_attempt(self):
+        self.tick()
+        first = self.writes[-1][0]
+        self.snapshot['source_authorization'] = {'effect_key':first.key(),
+            'source':self.identity.source,'creator_id':q.ACTOR_ID,'state':'success'}
+        self.tick()
+        self.snapshot['generation'] = 1
+        self.assertEqual(self.tick(),'authorize-source-confirmed')
+        new = self.writes[-1][0]
+        self.assertNotEqual(first.key(),new.key())
+        self.assertEqual(new.generation,1)
+        self.snapshot['source_authorization']['effect_key'] = new.key()
+        self.assertEqual(self.tick(),'enqueue-confirmed')
+        self.assertEqual(len(self.journal['effects']),4)
 
 if __name__ == '__main__':
     unittest.main()

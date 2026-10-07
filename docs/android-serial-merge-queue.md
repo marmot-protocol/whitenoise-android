@@ -10,7 +10,9 @@ is verified.
 `android-ci.yml`, `android-release-runtime.yml`, `android-repro-verify.yml` and
 `fuzz-pr.yml` handle `merge_group: checks_requested`. Checkouts use the event's
 immutable SHA. Queue concurrency keys include that SHA and do not cancel earlier
-integration runs. Queue caches are read-only; preview and release publishing
+integration runs. Queue caches are read-only; all workflows reserve the authorization check name
+and restrict token writes to the existing explicit publishers. Repository
+default token permissions must be read-only with PR approval disabled; preview and release publishing
 remain separate.
 
 Classification uses the complete `base_sha..head_sha` integration diff and
@@ -36,7 +38,7 @@ There are two separate authorization transitions:
 2. Integration `G` receives merge authorization only after its exact PR, source
    `H`, current base `B`, native entry ID, tree mapping, compatibility review and
    applicable CI are verified again. A source admission status cannot authorize
-   `G`.
+   `G`. All expected queue workflows must register and complete before release.
 
 The watchdog writes `Android merge authorization`; the ruleset requires it on
 both source admission and queue integration. Shared authentication is an
@@ -50,7 +52,9 @@ authoritative absence does not permit automatic replay. Queue failures keep the
 selected PR with its existing source owner. They do not launch a competing
 branch writer or advance another PR. Obsolete integration authorization is
 revoked before reassessment. Final squash signature, parent and tree must match
-before releasing the slot.
+before releasing the slot. A known timeout/refusal can receive a new
+logged admission generation from the original source owner after fresh proof;
+this never replays an uncertain effect.
 
 ## Controlled activation
 
@@ -73,7 +77,9 @@ natural shadow ticks. Finally admit one qualified PR, verify its signed squash
 and an empty queue, and confirm the existing watchdog remains healthy.
 
 If a canary fails or a read is incomplete, keep authorization closed. Rollback
-freezes the sole producer, reconciles uncertain effects, withdraws only known
+first enters draining mode to revoke known live integrations and withdraw pinned
+entries; frozen mode still permits read-only uncertain-effect reconciliation. It
+then freezes the sole producer, reconciles uncertain effects, withdraws only known
 entries, restores the matching strict rules and legacy controller, and verifies
 queue absence and current-base CI before allowing legacy merges again. Do not
 remove required authorization while an entry remains capable of merging.

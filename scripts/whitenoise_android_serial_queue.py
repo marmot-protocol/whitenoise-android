@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from dataclasses import asdict, dataclass
 from typing import Callable
 
@@ -26,6 +27,12 @@ UNCERTAIN = {'attempted', 'unknown'}
 
 class Held(ValueError):
     """A content-free gate; never permission to replay an effect."""
+
+
+class DefiniteRefusal(Held):
+    def __init__(self, response_sha256):
+        self.response_sha256 = response_sha256
+        super().__init__('verified-api-refusal')
 
 
 def digest(value):
@@ -61,9 +68,12 @@ class Effect:
     kind: str
     identity: Identity
     proof_sha256: str
+    generation: int = 0
 
     def payload(self):
         self.identity.validate()
+        if type(self.generation) is not int or not 0 <= self.generation < 2**31:
+            raise Held('invalid-generation')
         if not DIGEST.fullmatch(self.proof_sha256):
             raise Held('invalid-proof-digest')
         if self.kind not in {'authorize-source', 'enqueue', 'authorize-integration', 'revoke-integration', 'dequeue'}:
@@ -113,8 +123,7 @@ def entry_identity(snapshot):
     if (not isinstance(entry, dict) or entry.get('position') != 1
             or entry.get('state') not in {'QUEUED', 'AWAITING_CHECKS', 'MERGEABLE'}
             or entry.get('base') != snapshot['master']
-            or entry.get('jump') is not False
-            or entry.get('source_mapping_verified') is not True):
+            or entry.get('jump') is not False):
         raise Held('queue-entry-held')
     return Identity(entry['number'], entry['pull_request_id'], entry['source'],
                     entry['base'], entry['integration'], entry['entry_id']).validate()
@@ -129,12 +138,13 @@ def plan(snapshot, candidate, verify_source, verify_integration):
     compatibility, actual G tree mapping and successful current G Actions CI.
     These are trusted local adapters, not data supplied by a PR or workflow.
     """
+    generation = snapshot.get('generation', 0)
     identity = entry_identity(snapshot)
     if identity:
         proof = verify_integration(identity, snapshot)
         if not isinstance(proof, str) or not DIGEST.fullmatch(proof):
             raise Held('integration-evidence-held')
-        return Effect('authorize-integration', identity, proof)
+        return Effect('authorize-integration', identity, proof, generation)
     if candidate is None:
         return None
     candidate.validate()
@@ -146,15 +156,15 @@ def plan(snapshot, candidate, verify_source, verify_integration):
         raise Held('source-evidence-held')
     authorized = snapshot.get('source_authorization')
     if authorized is not None:
-        expected = Effect('authorize-source', candidate, proof)
+        expected = Effect('authorize-source', candidate, proof, generation)
         if (not isinstance(authorized, dict) or authorized.get('source') != candidate.source
                 or authorized.get('creator_id') != ACTOR_ID
                 or authorized.get('state') != 'success'
                 or not DIGEST.fullmatch(str(authorized.get('effect_key', '')))):
             raise Held('source-authorization-changed')
         if authorized['effect_key'] == expected.key():
-            return Effect('enqueue', candidate, proof)
-    return Effect('authorize-source', candidate, proof)
+            return Effect('enqueue', candidate, proof, generation)
+    return Effect('authorize-source', candidate, proof, generation)
 
 
 def validate_journal(journal):
@@ -163,13 +173,13 @@ def validate_journal(journal):
         raise Held('invalid-journal')
     for key, record in journal['effects'].items():
         if (not isinstance(record, dict) or record.get('state') not in
-                {'attempted', 'unknown', 'confirmed'}
+                {'attempted', 'unknown', 'confirmed', 'refused'}
                 or digest(record.get('payload')) != key
                 or record.get('payload', {}).get('repo') != REPO):
             raise Held('invalid-journal-record')
         payload = record['payload']
         identity = Identity(**payload['identity'])
-        rebuilt = Effect(payload['kind'], identity, payload['proof_sha256'])
+        rebuilt = Effect(payload['kind'], identity, payload['proof_sha256'], payload['generation'])
         if rebuilt.payload() != payload:
             raise Held('invalid-journal-payload')
     return journal
@@ -202,7 +212,7 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
         return 'idle'
     key = effect.key()
     if key in journal['effects']:
-        return 'observed-confirmed'
+        return 'known-refusal-held' if journal['effects'][key]['state'] == 'refused' else 'observed-confirmed'
     if shadow:
         return 'shadow-eligible'
     # A second full fresh read and proof verification must agree. Unknown reads
@@ -221,11 +231,15 @@ def execute(journal, effect, write, readback, persist):
     if any(r['state'] in UNCERTAIN for r in journal['effects'].values()):
         return 'unknown-held'
     if key in journal['effects']:
-        return 'observed-confirmed'
-    journal['effects'][key] = {'payload': effect.payload(), 'state': 'attempted'}
+        return 'known-refusal-held' if journal['effects'][key]['state'] == 'refused' else 'observed-confirmed'
+    journal['effects'][key] = {'payload': effect.payload(), 'state': 'attempted', 'attempted_at': time.time()}
     persist()  # Any failure propagates: write has not been invoked.
     try:
         write(effect, key)
+    except DefiniteRefusal as refusal:
+        journal['effects'][key].update(state='refused', response_sha256=refusal.response_sha256)
+        persist()
+        return 'known-refusal-held'
     except Exception:
         # Catch only normal call failures. KeyboardInterrupt/SystemExit/process
         # death preserve the fsynced attempted record for read-only recovery.
