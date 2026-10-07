@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.dev
+name: Welcome, sign in, and return
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+# Back closes this known optional sheet and records declined sharing choices.
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign In"
+- assertVisible: "Private key"
+- assertNotVisible: "Sign Up"
+- back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- assertNotVisible: "Private key"
+- takeScreenshot: welcome-returned

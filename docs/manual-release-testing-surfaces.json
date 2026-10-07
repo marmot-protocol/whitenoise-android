@@ -8660,6 +8660,14 @@
         ]
       },
       {
+        "surface": "Blank sign-up name pseudonym fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "name.setTextAndPlaceCursorAtEnd(randomName(null))",
+        "test_ids": [
+          "ONB-025"
+        ]
+      },
+      {
         "surface": "OnboardingContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/WelcomeScreen.kt",
         "anchor": "fun OnboardingContent(",

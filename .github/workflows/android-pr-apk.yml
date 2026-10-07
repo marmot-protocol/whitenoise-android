@@ -151,6 +151,7 @@ jobs:
           apks=(app/build/{outputs,intermediates}/apk/previewPlay/release/*arm64-v8a*.apk)
           [[ ${#apks[@]} -eq 1 ]]
           apk=${apks[0]}
+          python3 scripts/verify_compose_backport_apk.py "$apk"
           mapping=app/build/outputs/mapping/previewPlayRelease/mapping.txt
           test -s "$mapping"
           apk_sha256=$(sha256sum "$apk" | cut -d' ' -f1)
