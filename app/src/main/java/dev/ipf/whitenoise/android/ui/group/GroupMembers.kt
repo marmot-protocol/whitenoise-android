@@ -253,7 +253,7 @@ internal fun SoleAdminDeletePicker(
                             title = appState.displayName(member.memberIdHex),
                             seed = member.memberIdHex,
                             size = 40.dp,
-                            pictureUrl = appState.avatarUrl(member.memberIdHex),
+                            pictureUrl = appState.contactAvatarSource(member.memberIdHex),
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

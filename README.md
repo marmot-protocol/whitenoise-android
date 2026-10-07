@@ -78,18 +78,24 @@ frozen in `config/detekt/detekt-baseline.xml`. The workflow runs both the
 `google-services.json`.
 
 Validation runs concurrently on separate runners: tooling and packaging contracts,
-Compose compiler reports, one static-analysis job per distribution, one full unit
-and coverage job per distribution, and one curated screenshot job per distribution.
-Each static-analysis job runs its Android lint variant; the tooling job owns
-the flavor-independent ktlint and detekt checks. Unit jobs run the complete suite
-once, and the Zapstore job also enforces all Kover ratchets. Screenshot jobs keep
-the established committed-baseline allowlist and run beside the full suite instead
-of extending its critical path. API preparation and system-label checks reuse
-one runner-local Gradle daemon across sequential invocations, as do both test
-jobs. System-label checks read each invocation's stable or isolated preview
-environment, then stop the lightweight daemon before isolated builds. Tooling
-compilation and static analysis, baseline packaging, fresh Compose reports and
-independent reproducibility builds retain process isolation.
+one static-analysis job per distribution, and one full unit, screenshot and coverage
+job per distribution. Each static-analysis job runs its Android lint variant;
+the tooling job owns the flavor-independent ktlint and detekt checks. Unit jobs
+run the complete suite once with Roborazzi verification enabled, then require that
+every committed golden was compared. The Zapstore job also enforces all Kover
+ratchets. Coverage invocations retain identical verification inputs to reuse the
+completed suite. There are no separate screenshot runners or reduced unit filters.
+API preparation and system-label checks reuse one runner-local Gradle daemon across
+sequential invocations, as do both test jobs. System-label checks read each
+invocation's stable or isolated preview environment, then stop the lightweight
+daemon before isolated builds. Tooling compilation, static analysis and baseline
+packaging retain process isolation.
+Compose compiler reports and independent unsigned release reproduction run nightly,
+on manual dispatch, and for changed build/packaging/CI inputs; known ordinary source
+PRs defer only those supplemental campaigns. Release lint remains per-PR. See the
+conservative classifier and release-candidate requirements in
+[CI request policy](docs/ci-request-policy.md). Draft and ready PRs run the same
+applicable checks; marking a draft ready starts no additional CI.
 Unit suites use three isolated 1 GiB workers;
 tests outside CI stay serial unless `-PciTestForks=3` is set. Coding agents
 use hosted tests rather than duplicating CI compilation locally. Coverage reports run only
@@ -102,13 +108,14 @@ job skips on a PR. All tooling/manual-guide/metadata validators still run, and
 missing classification or unexpected skips fail the aggregate. Lightweight
 tooling contracts run separately in parallel and remain required. Classification
 uses the whole PR diff: a docs fixup on a code PR still runs the full matrix.
-Master pushes always run full validation.
+Master pushes always run the required core validation; supplemental campaigns use
+the same conservative diff policy and run in full on the daily schedule.
 
 Coverage artifacts are `kover-coverage-report-Zapstore` and
 `kover-coverage-report-Play`. Failure reports and Gradle timing profiles use
 `android-ci-reports-<job>` and `android-ci-gradle-profiles-<job>`, where `<job>` is
 `build-contracts-<phase>`, `compose-compiler`, `static-analysis-Zapstore`,
-`static-analysis-Play`, `screenshots-Zapstore`, `screenshots-Play`, `Zapstore`, or
+`static-analysis-Play`, `Zapstore`, or
 `Play`. Separate runners
 reduce the serial critical path but repeat some setup/compilation; compare both
 wall time and summed job durations when measuring CI performance. Each Gradle job
@@ -205,17 +212,17 @@ they are not app/runtime configuration. An `IllegalAccessException` mentioning
 test-JVM flags, not a screenshot mismatch; do not re-record baselines for it.
 
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
-runs `:app:verifyRoborazziDevZapstoreDebug` and
-`:app:verifyRoborazziDevPlayDebug` in parallel jobs, filtered to the
-committed-baseline owners in `config/screenshot-baseline-owners.txt`. Tests named
-`*ScreenshotTest` are included automatically; a mixed-name test that owns
-committed baselines must list its golden-producing methods there (its other
-assertions already run in the full unit job). `scripts/check_screenshot_baseline_owners.py`
-fails the tooling job when a class calls `captureRoboImage` without a registered
-owner, and fails the screenshot job when any committed PNG was not compared. On a mismatch,
-the build fails and diff/compare images are uploaded in
-`android-ci-reports-screenshots-Zapstore` and
-`android-ci-reports-screenshots-Play`.
+runs both complete dev-debug unit suites with `-Proborazzi.test.verify=true`.
+The committed-baseline owner registry in `config/screenshot-baseline-owners.txt`
+remains a static coverage contract and provides focused local regeneration filters.
+Tests named `*ScreenshotTest` are included automatically; a mixed-name test that
+owns committed baselines lists its golden-producing methods there.
+`scripts/check_screenshot_baseline_owners.py` fails the tooling job when a capturing
+class has no registered owner and fails either full-unit job if any committed PNG
+was not compared. A mismatch fails the test; diff/compare images are uploaded in
+`android-ci-reports-Zapstore` and `android-ci-reports-Play`. All goldens remain
+protected. PR descriptions show up to four inline comparisons and preserve links
+to the complete visual diff.
 
 **Re-baseline after an intentional UI change.** When you deliberately change a
 covered composable, regenerate the baselines and commit the updated PNGs:

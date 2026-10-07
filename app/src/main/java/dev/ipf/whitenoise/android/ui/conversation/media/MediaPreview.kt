@@ -36,11 +36,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -231,7 +231,7 @@ internal fun MediaPreviewScreen(
     previewOnly: Boolean = false,
     initialIndex: Int = 0,
 ) {
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(

@@ -1,0 +1,375 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+  "legacy_sha256": "ccfcf602534a74567fded7661be52cdb745ce6aad97027f22785978699d25fb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji prompt: ProfileSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "private_contact_dialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ContactPrivateDetailsDialog(",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Profile block failed toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.block_change_failed",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile block unavailable toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.block_list_unavailable",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "Profile block uncertain toast",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.block_publication_uncertain",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "ContactPrivateDetailsDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ContactPrivateDetailsDialog(",
+        "test_ids": [
+          "PRO-001"
+        ]
+      },
+      {
+        "surface": "ProfileAddToGroupsContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileAddToGroupsContent(",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "ProfileAddToGroupsSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileAddToGroupsSheet(",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "ProfileBannerImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileBannerImage(",
+        "test_ids": [
+          "PRO-002"
+        ]
+      },
+      {
+        "surface": "ProfileGroupPickerPendingState",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileGroupPickerPendingState(",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "ProfileMakeAdminContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileMakeAdminContent(",
+        "test_ids": [
+          "GRP-007"
+        ]
+      },
+      {
+        "surface": "ProfileSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileSheet(",
+        "test_ids": [
+          "PRO-001"
+        ]
+      },
+      {
+        "surface": "ProfileSheetAdminActionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileSheetAdminActionRow(",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "ProfileSheetAdminActionRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileSheetAdminActionRows(",
+        "test_ids": [
+          "GRP-006",
+          "GRP-007"
+        ]
+      },
+      {
+        "surface": "ProfileSheetAdminActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileSheetAdminActions(",
+        "test_ids": [
+          "PRO-001"
+        ]
+      },
+      {
+        "surface": "ProfileSheetModerationConfirmDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileSheetModerationConfirmDialog(",
+        "test_ids": [
+          "ACC-007"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:group_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.group_actions",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:make_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.make_admin",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:make_admin_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.make_admin_question",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:remove_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.remove_admin",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:remove_admin_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.remove_admin_question",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:remove_from_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.remove_from_group",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "string:remove_member_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.remove_member_question",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "setting:profile_invite_to_white_noise",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.invite_to_white_noise",
+        "test_ids": [
+          "ACC-003",
+          "ACC-017"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Stored group-avatar surface: R.string.close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.forward_search_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.forward_search_chats",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.members_count",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.no_matches",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_add_to_groups_confirm_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_add_to_groups_confirm_label",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_add_to_groups_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_add_to_groups_description",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_add_to_groups_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_add_to_groups_title",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_make_admin_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_make_admin_description",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_make_admin_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_make_admin_title",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_no_addable_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_no_addable_groups",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.profile_no_promotable_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_no_promotable_groups",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "R.string.cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "R.string.person_add_to_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.person_add_to_group",
+        "test_ids": [
+          "ACC-008"
+        ]
+      },
+      {
+        "surface": "R.string.person_promote_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.person_promote_groups",
+        "test_ids": [
+          "GRP-007"
+        ]
+      },
+      {
+        "surface": "R.string.profile_contact_editor_private_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_contact_editor_private_hint",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "R.string.profile_contact_name_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_contact_name_hint",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "R.string.profile_contact_notes_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_contact_notes_hint",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "R.string.profile_follow_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_follow_failed",
+        "test_ids": [
+          "ACC-001"
+        ]
+      },
+      {
+        "surface": "R.string.profile_name_from_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_name_from_profile",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "R.string.profile_nickname_and_notes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.profile_nickname_and_notes",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "R.string.save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "ACC-007"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

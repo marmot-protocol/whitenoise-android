@@ -64,6 +64,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController.PlaybackStartResult
+import dev.ipf.whitenoise.android.audio.VoicePlaybackSource
 import dev.ipf.whitenoise.android.media.AttachmentCachePublication
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
@@ -77,6 +78,7 @@ import dev.ipf.whitenoise.android.state.automaticAttachmentDownloadSuppressed
 import dev.ipf.whitenoise.android.state.downloadAttachmentSource
 import dev.ipf.whitenoise.android.state.evictCachedAttachment
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
+import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -193,6 +195,7 @@ internal interface VoiceAttachmentPresentationRuntime {
         key: String,
         file: java.io.File,
         ownerKey: String,
+        source: VoicePlaybackSource,
     ): VoicePlaybackController.PlaybackStartResult
 
     /** Pauses the active voice clip. */
@@ -227,11 +230,13 @@ private object DefaultVoiceAttachmentPresentationRuntime : VoiceAttachmentPresen
 
     override suspend fun durationMs(file: java.io.File): Int = VoicePlaybackController.probeDuration(file)
 
+    /** Starts platform playback with the captured attachment source and presentation owner kept together. */
     override suspend fun play(
         key: String,
         file: java.io.File,
         ownerKey: String,
-    ): VoicePlaybackController.PlaybackStartResult = VoicePlaybackController.play(key, file, ownerKey)
+        source: VoicePlaybackSource,
+    ): VoicePlaybackController.PlaybackStartResult = VoicePlaybackController.play(key, file, ownerKey, source)
 
     override fun pause() {
         VoicePlaybackController.pause()
@@ -272,8 +277,12 @@ internal fun MediaVoiceBubble(
     appState: WhiteNoiseAppState,
     presentationOwner: Any,
     mine: Boolean,
+    focusPlaybackMessage: Boolean = true,
     onLongPress: () -> Unit = {},
 ) {
+    val playbackTitleCopy =
+        dev.ipf.whitenoise.android.ui.common
+            .rememberGroupTitleCopy()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val presentationRuntime = LocalVoiceAttachmentPresentationRuntime.current
@@ -390,7 +399,10 @@ internal fun MediaVoiceBubble(
             return
         }
         localFile = playableFile
-        val playbackResult = presentationRuntime.play(pillKey, playableFile, controller.group.groupIdHex)
+        val source =
+            controller.voicePlaybackSource(appState, messageIdHex, playbackTitleCopy, focusPlaybackMessage)
+                ?: return
+        val playbackResult = presentationRuntime.play(pillKey, playableFile, controller.group.groupIdHex, source)
         if (shouldInvalidateVoiceAttachmentCache(playbackResult)) {
             clearBadVoiceCache("playback start failed")
         }

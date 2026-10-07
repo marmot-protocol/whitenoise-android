@@ -1,0 +1,73 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/PinConversationAction.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PinConversationAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/PinConversationAction.kt",
+        "anchor": "fun PinConversationAction(",
+        "test_ids": [
+          "SYS-012"
+        ]
+      },
+      {
+        "surface": "PinConversationActionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/PinConversationAction.kt",
+        "anchor": "fun PinConversationActionRow(",
+        "test_ids": [
+          "SYS-012"
+        ]
+      },
+      {
+        "surface": "Pinned conversation shortcut: R.string.add_conversation_to_home_screen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/PinConversationAction.kt",
+        "anchor": "R.string.add_conversation_to_home_screen",
+        "test_ids": [
+          "SYS-012"
+        ]
+      },
+      {
+        "surface": "Pinned conversation shortcut: R.string.pinned_shortcut_unsupported",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/PinConversationAction.kt",
+        "anchor": "R.string.pinned_shortcut_unsupported",
+        "test_ids": [
+          "SYS-012"
+        ]
+      },
+      {
+        "surface": "Pinned conversation shortcut: R.string.pinned_shortcut_already_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/PinConversationAction.kt",
+        "anchor": "R.string.pinned_shortcut_already_added",
+        "test_ids": [
+          "SYS-012"
+        ]
+      },
+      {
+        "surface": "Pinned conversation shortcut: R.string.pinned_shortcut_finish",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/PinConversationAction.kt",
+        "anchor": "R.string.pinned_shortcut_finish",
+        "test_ids": [
+          "SYS-012"
+        ]
+      },
+      {
+        "surface": "Pinned conversation shortcut: R.string.pinned_shortcut_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/PinConversationAction.kt",
+        "anchor": "R.string.pinned_shortcut_unavailable",
+        "test_ids": [
+          "SYS-012"
+        ]
+      },
+      {
+        "surface": "Pinned conversation shortcut: R.string.pinned_shortcut_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/PinConversationAction.kt",
+        "anchor": "R.string.pinned_shortcut_failed",
+        "test_ids": [
+          "SYS-012"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

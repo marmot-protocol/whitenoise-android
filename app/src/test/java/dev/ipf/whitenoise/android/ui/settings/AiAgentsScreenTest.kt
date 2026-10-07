@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -47,11 +48,12 @@ class AiAgentsScreenTest {
     private var documentationHandOffs = 0
     private var backCount = 0
 
-    /** Codex remains the fourth shipped connector. */
+    /** Claude Code joins the existing connectors without changing the Codex row's position. */
     @Test
-    fun agentConnectorsIncludeCodexAsFourthConnector() {
-        assertEquals(4, agentConnectors.size)
+    fun agentConnectorsAppendClaudeAfterCodex() {
+        assertEquals(5, agentConnectors.size)
         assertEquals("codex", agentConnectors[3].id)
+        assertEquals("claude", agentConnectors[4].id)
     }
 
     /** Every connector prompt carries the account's npub and leaves no placeholder behind. */
@@ -78,6 +80,65 @@ class AiAgentsScreenTest {
         assertTrue(prompt.contains("send a test message"))
         assertTrue(prompt.contains("Do not report setup complete until wn-codex returns a reply through White Noise"))
         assertTrue(prompt.contains("device verification required"))
+    }
+
+    /** Profile binding and a phone round trip must be explicit before Hermes pairing is complete. */
+    @Test
+    fun hermesPromptRequiresProfileConfirmationAndPhoneVerification() {
+        val prompt = app.getString(R.string.agent_connector_hermes_prompt, TEST_NPUB)
+
+        assertTrue(prompt.contains("integrations/hermes/marmot/README.md"))
+        assertTrue(prompt.contains("confirm the intended Hermes profile"))
+        assertTrue(prompt.contains("do not assume the default profile or overwrite another installation"))
+        assertTrue(prompt.contains("Distinguish invite authorization from message-sender authorization"))
+        assertTrue(
+            prompt.contains("verify that the selected profile replies in White Noise before calling pairing complete"),
+        )
+    }
+
+    /** Claude setup is available in-app and copying carries the active public key and harness guide. */
+    @Test
+    fun claudeSetupCopiesTheExactActiveAccountPrompt() {
+        render()
+        openSetupSheet("claude")
+
+        val name = app.getString(R.string.agent_connector_claude_name)
+        val prompt = app.getString(R.string.agent_connector_claude_prompt, TEST_NPUB)
+        composeRule.onNodeWithText(app.getString(R.string.ai_agents_setup_title, name)).assertExists()
+        composeRule.onNodeWithTag("ai_agents.copy.claude").performClick()
+        composeRule.runOnIdle {
+            assertEquals(listOf(app.getString(R.string.ai_agents_setup_title, name) to prompt), copies)
+        }
+        assertEquals(1, prompt.windowed(TEST_NPUB.length).count { it == TEST_NPUB })
+        assertTrue(prompt.contains("integrations/claude/marmot/README.md"))
+        assertTrue(prompt.contains("install-claude-marmot.sh"))
+        assertTrue(prompt.contains("wn-claude --version"))
+        composeRule.onNodeWithTag("ai_agents.copy_feedback").assertExists()
+    }
+
+    /** An account change closes the old setup sheet before its public-key prompt can be copied. */
+    @Test
+    fun accountChangeClosesClaudeSetupBeforeCopy() {
+        val npub = mutableStateOf(TEST_NPUB)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                AiAgentsContent(
+                    npub = npub.value,
+                    onBack = {},
+                    onCopy = { label, value -> copies += label to value },
+                    onOpenDocs = { true },
+                )
+            }
+        }
+        openSetupSheet("claude")
+        val replacement = "npub1" + "b".repeat(58)
+        composeRule.runOnIdle { npub.value = replacement }
+        composeRule.onNodeWithTag("ai_agents.setup_content").assertDoesNotExist()
+        openSetupSheet("claude")
+        composeRule.onNodeWithTag("ai_agents.copy.claude").performClick()
+        composeRule.runOnIdle {
+            assertEquals(app.getString(R.string.agent_connector_claude_prompt, replacement), copies.single().second)
+        }
     }
 
     /** A connector row opens its setup sheet, which names the agent and shows the formatted prompt. */
@@ -177,6 +238,9 @@ class AiAgentsScreenTest {
         composeRule.onNodeWithTag("ai_agents.public_key_unavailable").assertExists()
         composeRule.onNodeWithText(app.getString(R.string.ai_agents_public_key_unavailable)).assertExists()
         composeRule.onNodeWithTag("ai_agents.connector.hermes").assertIsNotEnabled().performClick()
+        composeRule.onNodeWithTag("ai_agents.setup_content").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("ai_agents.connector.claude"))
+        composeRule.onNodeWithTag("ai_agents.connector.claude").assertIsNotEnabled().performClick()
         composeRule.onNodeWithTag("ai_agents.setup_content").assertDoesNotExist()
 
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("ai_agents.copy_public_key"))

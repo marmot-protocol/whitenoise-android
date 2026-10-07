@@ -1,5 +1,5 @@
 <resources>
     <string name="dictation_disclosure_offline_title">Reconhecimento de voz offline</string>
-    <string name="dictation_disclosure_offline_message">O Offline Speech to Text processa o que você diz neste dispositivo. O White Noise mantém o texto devolvido apenas até você colar ou enviar. O envio automático fica desativado até que você o ative nas configurações de ditado.</string>
-    <string name="dictation_settings_explainer_offline">O Offline Speech to Text processa o ditado neste dispositivo. O White Noise mantém o texto devolvido apenas até você colar ou enviar.</string>
+    <string name="dictation_disclosure_offline_message">O Offline Speech to Text processa o que você diz neste dispositivo. Após uma falha, o texto reconhecido pode ser salvo automaticamente no rascunho original. O envio automático fica desativado até que você o ative nas configurações de ditado.</string>
+    <string name="dictation_settings_explainer_offline">O Offline Speech to Text processa o ditado neste dispositivo. O texto recuperado permanece no rascunho original.</string>
 </resources>

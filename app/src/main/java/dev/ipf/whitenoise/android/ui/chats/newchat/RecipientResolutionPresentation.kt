@@ -4,6 +4,10 @@ import dev.ipf.whitenoise.android.core.ProfileFieldValidation
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
+/**
+ * Combines the resolved identity with the current viewer's local picture while preserving unresolved/loading
+ * distinctions.
+ */
 internal fun resolvedRecipientResolution(
     input: String,
     resolving: Boolean,
@@ -11,7 +15,8 @@ internal fun resolvedRecipientResolution(
     appState: WhiteNoiseAppState,
 ): RecipientResolution {
     val profile = resolvedHex?.let { appState.userProfile(it) }
-    val pictureUrl = resolvedHex?.let { appState.avatarUrl(it) } ?: ProfileSanitizer.protocolImageUrl(profile?.picture)
+    val published = ProfileSanitizer.protocolImageUrl(profile?.picture)
+    val pictureUrl = resolvedHex?.let { appState.contactAvatarSource(it) } ?: published
     val about = ProfileSanitizer.about(profile?.about)
     val nip05 = profile?.nip05?.trim()?.takeIf { ProfileFieldValidation.isAcceptableNip05(it) }
     val hasProfile =

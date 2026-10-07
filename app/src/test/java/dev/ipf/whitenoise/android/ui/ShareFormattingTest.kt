@@ -6,6 +6,8 @@ import dev.ipf.whitenoise.android.ui.conversation.share.buildVCard
 import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
+import dev.ipf.whitenoise.android.ui.conversation.share.isBareLocationShare
+import dev.ipf.whitenoise.android.ui.conversation.share.isContactShareCaption
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
@@ -95,7 +97,47 @@ class ShareFormattingTest {
         )
         assertNull(parseSharedLocationFromText("just a normal message, no coordinates"))
         assertNull(parseSharedLocationFromText("https://maps.google.com/maps?q=999,999"))
-        assertNull(parseSharedLocationFromText("Meet me here: https://maps.google.com/maps?q=11.871263,8.534887"))
+    }
+
+    /** A maps link inside prose still draws the card, but the prose stays visible. */
+    @Test
+    fun locationInsideProseParsesWithoutOwningTheBody() {
+        val body = "Meet me here: https://maps.google.com/maps?q=11.871263,8.534887 at noon"
+        assertEquals(11.871263, parseSharedLocationFromText(body)?.latitude)
+        assertEquals(8.534887, parseSharedLocationFromText(body)?.longitude)
+        assertFalse(isBareLocationShare(body))
+        assertTrue(isBareLocationShare(" Location: https://maps.google.com/maps?q=11.871263,8.534887\n"))
+    }
+
+    @Test
+    fun outOfRangeLinkDoesNotHideALaterValidLink() {
+        val body = "https://maps.google.com/maps?q=999,999 or https://maps.google.com/maps?q=11.871263,8.534887"
+        assertEquals(11.871263, parseSharedLocationFromText(body)?.latitude)
+    }
+
+    /** Sender-controlled whitespace must not make ordinary conversation text quadratic to scan. */
+    @Test(timeout = 5_000)
+    fun longWhitespaceWithoutAMapsLinkRemainsOrdinaryText() {
+        val body = "Before" + " \n".repeat(50_000) + "after"
+        assertNull(parseSharedLocationFromText(body))
+        assertFalse(isBareLocationShare(body))
+    }
+
+    /** Skipping a long whitespace run still finds the link without consuming its caption. */
+    @Test(timeout = 5_000)
+    fun longWhitespaceBeforeAMapsLinkPreservesProse() {
+        val body = "Meet here" + " \n".repeat(50_000) + "https://maps.google.com/maps?q=-33.868820,151.209290"
+        assertEquals(-33.86882, parseSharedLocationFromText(body)?.latitude)
+        assertEquals(151.20929, parseSharedLocationFromText(body)?.longitude)
+        assertFalse(isBareLocationShare(body))
+    }
+
+    @Test
+    fun bareLocationCheckRetainsLegacyCaseAndEncodedCoordinates() {
+        val body = " \nLOCATION: HTTPS://MAPS.GOOGLE.COM/?Q=-33.868820%2c151.209290\t"
+        assertEquals(-33.86882, parseSharedLocationFromText(body)?.latitude)
+        assertTrue(isBareLocationShare(body))
+        assertFalse(isBareLocationShare("Meet here: $body"))
     }
 
     @Test
@@ -106,6 +148,27 @@ class ShareFormattingTest {
         assertEquals("+1 555 0100", parsed?.phone)
         assertEquals("ada@example.org", parsed?.email)
         assertNull(parseSharedContactFromText("See the attached details"))
+    }
+
+    /** Sender prose that mentions a number stays a caption; only a bare number line is a phone. */
+    @Test
+    fun captionProseWithANumberIsNotContactText() {
+        assertNull(parseSharedContactFromText("Please call 555-0100 tomorrow"))
+        assertNull(parseSharedContactFromText("Ada\nRoom 4012345, ask at the desk"))
+        assertEquals("+1 (555) 010-0100", parseSharedContactFromText("Ada\n+1 (555) 010-0100")?.phone)
+    }
+
+    /** Only the exact generated caption may be replaced by the card; extra sender words keep it visible. */
+    @Test
+    fun onlyTheGeneratedCaptionCountsAsContactText() {
+        val contact = SharedContact(name = "Ada Example", phone = "+1 555 0100", email = null)
+        assertTrue(isContactShareCaption(" Ada Example \n\n+1 555 0100\n", contact))
+        assertFalse(isContactShareCaption("Call Ada\n+1 555 0100", contact))
+        assertFalse(isContactShareCaption("Ada Example\n+1 555 0100\nAfter six", contact))
+
+        // A picked contact without a name carries its number as the vCard name but not in the caption.
+        val unnamed = SharedContact(name = "+1 555 0100", phone = "+1 555 0100", email = null)
+        assertTrue(isContactShareCaption("+1 555 0100", unnamed))
     }
 
     private val sampleNpub = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"

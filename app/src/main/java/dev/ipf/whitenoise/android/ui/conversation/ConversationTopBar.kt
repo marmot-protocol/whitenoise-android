@@ -47,6 +47,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.isPeerSourced
+import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
@@ -58,6 +59,19 @@ import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
 internal const val CONVERSATION_TOP_BAR_TAG = "conversation-top-bar"
+
+/** Keeps navigation chrome above playback so starting or stopping media never moves the header. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun ConversationHeaderFrame(
+    header: @Composable () -> Unit,
+    playbackTransport: @Composable () -> Unit,
+) {
+    Column {
+        header()
+        playbackTransport()
+    }
+}
 
 /** Renders frozen route-owned conversation identity and the active top-bar mode. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,7 +97,6 @@ internal fun ConversationTopBar(
     openDetailsDescription: String,
     onOpenDetails: () -> Unit,
     onBack: () -> Unit,
-    onTtsTransportBodyClick: (() -> Unit)? = null,
     // Compact-height windows (landscape with the IME open) trade top-bar
     // height back to the transcript and composer while keeping Back, the
     // conversation identity and the details action reachable.
@@ -150,6 +163,23 @@ internal fun ConversationTopBar(
                     ?.avatarSource
                     ?.isPeerSourced() == true
             }
+    val avatarSource =
+        if (freezeRoutePresentation || controller.window.header == null) {
+            currentRow?.selectedPresentation
+        } else {
+            controller.window.header?.selected
+        }
+    val peerEligible =
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .lendsPeerAvatar(presentedGroup, presentedMemberCount)
+    val peerSourced = avatarSource?.avatarSource?.isPeerSourced() == true
+    val privatePeer =
+        (presentedAvatarAccount ?: avatarSource?.peerId?.takeIf { peerSourced })
+            ?.takeIf {
+                peerEligible &&
+                    !dev.ipf.whitenoise.android.core.GroupProjector
+                        .ownsGroupPicture(presentedGroup, selectedAsset, peerSourced)
+            }?.let { appState.privateContactAvatarSource(it, controller.boundAccountRef) }
     val hasExplicitSelection = controller.window.header != null || liveRow?.selectedAvatarAsset != null
     val explicitSelectionMissing = hasExplicitSelection && selectedAsset == null
     val avatarGroup =
@@ -213,13 +243,15 @@ internal fun ConversationTopBar(
                                     seed = presentedAvatarAccount ?: presentedGroup.groupIdHex,
                                     size = if (compactHeight) 28.dp else 40.dp,
                                     fallbackPictureUrl =
-                                        presentedAvatarAccount
+                                        privatePeer ?: presentedAvatarAccount
                                             ?.takeUnless { explicitSelectionMissing }
                                             ?.let(appState::avatarUrl),
                                     firstFrameAvatar = firstFrameAvatar,
                                     accountRef = controller.boundAccountRef,
                                     durableAvatar = selectedAsset,
-                                    durableAvatarIsPersonPicture = selectedAssetIsPersonPicture,
+                                    durableAvatarIsPersonPicture =
+                                        selectedAssetIsPersonPicture ||
+                                            avatarSource?.avatarSource?.isPeerSourced() == true,
                                 )
                             }
                             Column(verticalArrangement = Arrangement.spacedBy(CONVERSATION_TITLE_LINE_SPACING_DP.dp)) {
@@ -322,10 +354,6 @@ internal fun ConversationTopBar(
                 )
             }
         }
-        TtsTransportBar(
-            appState = appState,
-            onBodyClick = onTtsTransportBodyClick,
-        )
     }
 }
 

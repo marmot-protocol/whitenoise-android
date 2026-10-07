@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -179,18 +180,22 @@ class EmojiPickerRecentsBehaviorTest {
             .captureRoboImage("src/test/snapshots/emoji_picker_builtin_recents.png")
     }
 
+    /** Keeps the focused search cursor visible while verifying the literal choice and no recents mutation. */
     @Test
     fun builtInSearchConfiguresLiteralQuickReactionWithoutRecordingUsage() {
         var picked = ""
         val used = mutableListOf<String>()
         composeRule.setContent {
-            WhiteNoiseTheme {
-                EmojiPickerContent(
-                    onEmojiPicked = { picked = it },
-                    onEmojiUsed = used::add,
-                    purpose = EmojiPickerPurpose.CONFIGURE_QUICK_REACTION,
-                    modifier = Modifier.width(360.dp).height(400.dp).testTag("builtin.search"),
-                )
+            // Only the screenshot fixture pins the caret phase; normal text editing still blinks.
+            CompositionLocalProvider(LocalCursorBlinkEnabled provides false) {
+                WhiteNoiseTheme {
+                    EmojiPickerContent(
+                        onEmojiPicked = { picked = it },
+                        onEmojiUsed = used::add,
+                        purpose = EmojiPickerPurpose.CONFIGURE_QUICK_REACTION,
+                        modifier = Modifier.width(360.dp).height(400.dp).testTag("builtin.search"),
+                    )
+                }
             }
         }
         waitForBrowseGrid()

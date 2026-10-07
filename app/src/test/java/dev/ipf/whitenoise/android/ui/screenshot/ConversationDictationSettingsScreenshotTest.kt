@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -82,7 +83,7 @@ class ConversationDictationSettingsScreenshotTest {
                 }
             }
         }
-        val explanation = "If the chat or draft changes before sending, the dictation stays unsent."
+        val explanation = context.getString(R.string.dictation_send_safety_note)
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(explanation, substring = true))
         composeRule.onNodeWithText(explanation, substring = true).assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name")

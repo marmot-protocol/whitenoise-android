@@ -203,6 +203,7 @@ internal fun PublicIdentifierFieldTrailingAction(
     value: String,
     enabled: Boolean = true,
     allowHexPublicKey: Boolean = true,
+    clipboardInput: ((String?) -> String?)? = null,
     onValueChange: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -222,7 +223,13 @@ internal fun PublicIdentifierFieldTrailingAction(
             SystemPasteIconButton(
                 onPaste = {
                     clipboardManager.withPrimaryClipForPaste { clip ->
-                        val pasteValue = ClipboardPasteAffordance.pasteValue(clip.plainText(context), allowHexPublicKey)
+                        val clipboardText = clip.plainText(context)
+                        val pasteValue =
+                            if (clipboardInput != null) {
+                                clipboardInput(clipboardText)
+                            } else {
+                                ClipboardPasteAffordance.pasteValue(clipboardText, allowHexPublicKey)
+                            }
                         if (pasteValue != null) onValueChange(pasteValue)
                     }
                 },

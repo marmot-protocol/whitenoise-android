@@ -1,0 +1,66 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+  "legacy_sha256": "4fc12b0bf1bcb004ae407bbdd35623116de436d7c0443d0e652f7753358c87df",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "private_contact_viewer_media_saved",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "R.string.media_saved",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "private_contact_viewer_media_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "R.string.media_save_failed",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Stored avatar export failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "Stored avatar is no longer available",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "AvatarFullScreenViewer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "fun AvatarFullScreenViewer(",
+        "test_ids": [
+          "PRO-001"
+        ]
+      },
+      {
+        "surface": "AvatarViewerFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "fun AvatarViewerFrame(",
+        "test_ids": [
+          "PRO-001"
+        ]
+      },
+      {
+        "surface": "BoxScope.AvatarViewerImageContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "fun BoxScope.AvatarViewerImageContent(",
+        "test_ids": [
+          "ACC-004"
+        ]
+      },
+      {
+        "surface": "ZoomableAvatarImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/AvatarViewer.kt",
+        "anchor": "fun ZoomableAvatarImage(",
+        "test_ids": [
+          "PRO-001",
+          "PRO-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

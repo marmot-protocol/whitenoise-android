@@ -1685,7 +1685,7 @@
     <string name="ai_agents_connector_docs_subtitle">Kurulum betikleri, sağlık denetimleri ve sorun giderme</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Nous Research terminal ajanı</string>
-    <string name="agent_connector_hermes_prompt">Bu bir kurulum istemidir; bu Hermes kurulumunu Marmot üzerinden White Noise’a bağlar. https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki en güncel bağlayıcı kılavuzunu okuyun. Bağlayıcının nasıl çalıştığını ve kurulumun neleri değiştireceğini bana açıklayın. Ardından genel npub’ım için kurulum adımlarını önerin: %1$s ve herhangi bir değişiklik yapmadan önce onayımı isteyin. Ben onayladıktan sonra bağlayıcıyı kurup doğrulayın ve ardından ajan npub’ınızla yanıt verin.</string>
+    <string name="agent_connector_hermes_prompt">Bu bir kurulum istemidir; bu Hermes kurulumunu Marmot üzerinden White Noise’a bağlar. https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md / https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki en güncel bağlayıcı kılavuzunu okuyun. Bağlayıcının nasıl çalıştığını ve kurulumun neleri değiştireceğini bana açıklayın. Ardından genel npub’ım için kurulum adımlarını önerin: %1$s ve herhangi bir değişiklik yapmadan önce onayımı isteyin. Ben onayladıktan sonra bağlayıcıyı kurup doğrulayın ve ardından ajan npub’ınızla yanıt verin. Değişiklik önermeden önce hedef Hermes profilini, Hermes dizinini, Marmot dizini ve soketini, aracı hesabını ve hizmetini, ağ geçidi örneğini doğrula. Varsayılan profili varsayma veya başka kurulumu üzerine yazma. Sağlama toplamı doğrulanmış Hermes yükleyicisini kullan. Davet yetkisini mesaj gönderen yetkisinden ayır. Telefonda davet ve test mesajı için yönlendir; eşleştirmeyi tamamlanmış saymadan önce seçilen profilin White Noise üzerinden yanıt verdiğini doğrula.</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">Kendi sunucunuzda kişisel yapay zeka asistanı</string>
     <string name="agent_connector_openclaw_prompt">Bu bir kurulum istemidir; bu OpenClaw örneğini Marmot üzerinden White Noise’a bağlar. https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki en güncel bağlayıcı kılavuzunu okuyun. Bağlayıcının nasıl çalıştığını ve kurulumun neleri değiştireceğini bana açıklayın. Ardından genel npub’ım için kurulum adımlarını önerin: %1$s ve herhangi bir değişiklik yapmadan önce onayımı isteyin. Ben onayladıktan sonra bağlayıcıyı kurup doğrulayın ve ardından ajan npub’ınızla yanıt verin.</string>
@@ -1853,7 +1853,7 @@
     <string name="discard">Sil</string>
     <string name="open_app_settings">Uygulama ayarlarını aç</string>
     <string name="dictation_disclosure_title">Harici konuşma tanıma</string>
-    <string name="dictation_disclosure_message">Bu cihazda yüklü konuşma hizmeti söylediklerinizi işler ve sesi sağlayıcısına gönderebilir. White Noise, döndürülen metni yalnızca siz yapıştırana veya gönderene kadar saklar. Dikte ayarlarından açmadığınız sürece otomatik gönderme kapalıdır.</string>
+    <string name="dictation_disclosure_message">Bu cihazda yüklü konuşma hizmeti söylediklerinizi işler ve sesi sağlayıcısına gönderebilir. Bir hatadan sonra tanınan metin özgün taslağa otomatik olarak kaydedilebilir. Dikte ayarlarından açmadığınız sürece otomatik gönderme kapalıdır.</string>
     <string name="dictation_continue">Devam</string>
     <string name="dictation_microphone_muted">Mikrofon erişimi kapalı</string>
     <string name="dictation_microphone_muted_help">Android gizlilik ayarlarından veya Hızlı Ayarlar’dan mikrofon erişimini açın, ardından dikteyi tekrar deneyin.</string>
@@ -2229,6 +2229,9 @@
     <string name="profile_readiness_added">Eklendi</string>
     <string name="profile_readiness_recommended">Önerilen</string>
     <string name="profile_readiness_field_optional">İsteğe bağlı</string>
+    <string name="agent_connector_claude_subtitle">Claude Code CLI kodlama aracısı</string>
+    <string name="agent_connector_claude_prompt">Bu bir kurulum istemidir; bu Claude Code kurulumunu Marmot üzerinden White Noise’a bağlar. https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md adresindeki yetkili Claude Code harness kılavuzunu ve https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki kalıcı bağlayıcı kılavuzunu okuyun. Bağlayıcının nasıl çalıştığını ve kurulumun neleri değiştireceğini bana açıklayın. Önkoşulları doğrulayın: Claude Code CLI kurulu, kimliği doğrulanmış ve PATH üzerinde kullanılabilir durumda; bu makine telefonumla aynı genel relay kümesini kullanıyor. Ardından genel npub’ım için kurulum adımlarını önerin: %1$s ve herhangi bir değişiklik yapmadan önce onayımı isteyin. Ben onayladıktan sonra sağlama toplamıyla doğrulanmış install-claude-marmot.sh sürüm akışını kullanın, izin verilen welcomer ile o npub için wn-agent önyüklemesini yapın ve wn-claude --version komutunu doğrulayın. Ardından ajan npub’ınızla yanıt verin; benden onu White Noise üzerinden davet etmemi ve yapılandırılmış relay’ler aracılığıyla bu izin verilen npub’dan bir test mesajı göndermemi isteyin. wn-claude White Noise üzerinden yanıt verene kadar kurulumun tamamlandığını bildirmeyin; bu gidiş dönüş otomatik olarak doğrulanamıyorsa cihaz doğrulaması gerektiğini açıkça belirtin.</string>
+    <string name="ai_agents_project_groups_tip">Her proje için ayrı bir grup kullan ve proje konumu ile bağlamını vererek başla. Oturum komutları bağlayıcıya göre değişir; sürdürme veya dallandırma komutlarından önce kılavuzunu kontrol et.</string>
     <string name="nostr_event_view_image">Görseli görüntüle</string>
     <string name="nostr_event_image_failed">Bu görsel yüklenemedi. Tekrar deneyin.</string>
     <string name="nostr_event_type_image">Görsel</string>
@@ -2252,4 +2255,36 @@
     <string name="profile_notification_scope_detail">Bu hesaptaki tüm sohbetlerde bu kişinin mesajlarına uygulanır. Teslimat ve okunmamış mesaj sayısı değişmez.</string>
     <string name="profile_notification_precedence">Önce sohbeti sessize alma ve yalnızca bahsetmeler kuralları uygulanır. Ardından bu kişinin sessize alma veya özel Android ayarları gelir. Varsayılanları kullanmak sohbet ve genel ayarları geri getirir. Mevcut bildirimler özgün kanallarını korur.</string>
     <string name="profile_notification_channel_name">%1$s · Tüm sohbetlerdeki mesajlar</string>
+    <string name="destination_filter_all">Tüm sohbetler</string>
+    <string name="destination_filter_selected">Seçilenleri incele (%1$d)</string>
+    <string name="destination_filter_label">Sohbetleri filtrele</string>
+    <string name="forward_select_by_folder">Klasöre göre seç</string>
+    <string name="destination_filter_incomplete">Bazı sohbetler eksik olabilir. Tekrar deneyin veya Tüm sohbetler seçeneğini seçin.</string>
+    <string name="gestures_title">Kaydırma işlemleri</string>
+    <string name="gestures_physical_hint">Sol ve sağ parmağın hareket yönünü belirtir. Açıkça seçtiğiniz işlemler dil değiştiğinde aynı kalır. Varsayılan, dilin yanıt yönünü izler. Sohbet kaydırmaları varsayılan olarak kapalıdır.</string>
+    <string name="gestures_messages">Mesajlar</string>
+    <string name="gestures_left">Sola kaydır</string>
+    <string name="gestures_right">Sağa kaydır</string>
+    <string name="gestures_default">Varsayılan</string>
+    <string name="gestures_default_summary">Varsayılan: %1$s</string>
+    <string name="gestures_off">Kapalı</string>
+    <string name="gestures_react">Tepki ver</string>
+    <string name="gestures_read_unread">Okundu / okunmadı</string>
+    <string name="gestures_mute_unmute">Sessize al / sesi aç</string>
+    <string name="gestures_pin_unpin">Sabitle / sabitlemeyi kaldır</string>
+
+    <string name="contact_private_picture">Özel resim</string>
+    <string name="contact_picture_pick">Fotoğraf seç</string>
+    <string name="contact_picture_replace">Fotoğrafı değiştir</string>
+    <string name="contact_picture_reposition">Konumlandır / kırp</string>
+    <string name="contact_picture_clear">Özel resmi kaldır</string>
+    <string name="contact_picture_local_only">Yalnızca bu cihazdaki bu hesap için. Asla paylaşılmaz veya yüklenmez.</string>
+    <string name="contact_picture_failed">Bu resim kullanılamadı veya değişiklikler kaydedilemedi. Önceki seçiminiz değişmedi. Tekrar deneyin.</string>
+
+    <string name="add_conversation_to_home_screen">Ana ekrana ekle</string>
+    <string name="pinned_shortcut_unsupported">Başlatıcınız sabitlenmiş kısayolları desteklemiyor.</string>
+    <string name="pinned_shortcut_already_added">Bu sohbet zaten ana ekranınızda.</string>
+    <string name="pinned_shortcut_finish">Bu sohbeti eklemek için başlatıcınızda onaylayın.</string>
+    <string name="pinned_shortcut_unavailable">Bu sohbet artık kullanılamıyor.</string>
+    <string name="pinned_shortcut_failed">Ana ekran kısayolu istenemedi. Tekrar deneyin.</string>
 </resources>

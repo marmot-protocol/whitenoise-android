@@ -7,7 +7,9 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.conversation.messages.SWIPE_TEST_HOST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.SWIPE_TEST_MESSAGE_ID
 import dev.ipf.whitenoise.android.ui.conversation.messages.SwipeTestBubbleHost
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageReplySwipeGlyphTestTag
 import dev.ipf.whitenoise.android.ui.conversation.messages.swipeTestSurface
 import org.junit.After
 import org.junit.Before
@@ -79,11 +81,12 @@ class MessageBubbleSwipeScreenshotTest {
         }
         val host = composeRule.onNodeWithTag(SWIPE_TEST_HOST_TAG)
         host.performTouchInput {
-            down(centerLeft)
-            moveBy(Offset(DRAG_PX, 0f))
+            down(if (rtl) centerRight else centerLeft)
+            moveBy(Offset(if (rtl) -DRAG_PX else DRAG_PX, 0f))
         }
         composeRule.waitForIdle()
 
+        composeRule.onNodeWithTag(messageReplySwipeGlyphTestTag(SWIPE_TEST_MESSAGE_ID), true).assertExists()
         host.captureRoboImage("src/test/snapshots/$path")
 
         host.performTouchInput { cancel() }

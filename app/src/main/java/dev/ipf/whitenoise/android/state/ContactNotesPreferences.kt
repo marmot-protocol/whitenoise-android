@@ -10,6 +10,7 @@ import java.util.Locale
 internal object ContactNotesPreferences {
     private const val KeyPrefix = "contact_notes:"
 
+    /** Rejects incomplete ownership and combines a length-prefixed account scope with a normalized contact key. */
     fun preferenceKey(
         accountRef: String?,
         contactPubkeyHex: String,
@@ -19,15 +20,18 @@ internal object ContactNotesPreferences {
         return accountKeyPrefix(account) + contact
     }
 
+    /** Reads the account-private notes under the shared picture/details transaction lock. */
     fun readNotes(
         preferences: SharedPreferences,
         accountRef: String?,
         contactPubkeyHex: String,
-    ): String? {
-        val key = preferenceKey(accountRef, contactPubkeyHex) ?: return null
-        return normalizedNotes(preferences.getString(key, null))
-    }
+    ): String? =
+        synchronized(ContactPictureStore.lock) {
+            val key = preferenceKey(accountRef, contactPubkeyHex) ?: return@synchronized null
+            normalizedNotes(preferences.getString(key, null))
+        }
 
+    /** Stores only normalized changes and removes blank overrides so public defaults remain authoritative. */
     fun writeNotes(
         preferences: SharedPreferences,
         accountRef: String?,
@@ -48,6 +52,7 @@ internal object ContactNotesPreferences {
         return true
     }
 
+    /** Commits deletion of the exact account prefix on disk; similar account labels retain their private records. */
     fun clearAllForAccount(
         preferences: SharedPreferences,
         accountRef: String?,
@@ -63,21 +68,25 @@ internal object ContactNotesPreferences {
         return edit.commit()
     }
 
+    /** Removes outer whitespace while preserving internal lines; empty notes remove the local override. */
     private fun normalizedNotes(notes: String?): String? =
         notes
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
 
+    /** Trims local account labels without changing their case-sensitive storage identity. */
     private fun normalizedAccountRef(accountRef: String?): String? =
         accountRef
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
 
+    /** Canonicalizes hex contact identity independently of the viewing account label. */
     private fun normalizedContactPubkey(contactPubkeyHex: String): String? =
         contactPubkeyHex
             .trim()
             .lowercase(Locale.ROOT)
             .takeIf { it.isNotEmpty() }
 
+    /** Length-prefixes the account label so prefix-based cleanup cannot match another account. */
     private fun accountKeyPrefix(accountRef: String): String = "$KeyPrefix${accountRef.length}:$accountRef:"
 }

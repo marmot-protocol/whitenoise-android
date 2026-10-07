@@ -78,6 +78,8 @@ class StalenessGuardCoverageTest {
                     listOf("accountListLifetime.advance", "accountListLifetime.runIfCurrent"),
                 "AppState.kt:recordStartupLocalSnapshotRendered" to
                     listOf("accountListLifetime.isCurrent", "stillCurrent = accountListIsCurrent"),
+                "AppState.kt:refreshPinnedConversationPresentation" to
+                    listOf("isPublicationCurrent(publicationGeneration)", "runtimeGeneration == runtime"),
                 "AppState.kt:refreshProfile" to
                     listOf("profileCacheLifetime.capture", "profileCacheLifetime.isCurrent"),
                 "AppState.kt:materializeProfileLocally" to
@@ -224,10 +226,15 @@ class StalenessGuardCoverageTest {
                 "AppState.kt:loginWithAmber" to "authoritative identity command result",
                 // Durable per-account clears are idempotent and fenced against later contact writes.
                 "AppState.kt:clearContactPrivateDetailsForAccount" to "idempotent account-private clear",
+                // Commits check editor/account ownership under the cleanup lock; refreshes reread current pixels.
+                "AppState.kt:saveContactPrivateDetails" to "serialized private command with current-state refresh",
                 // Sign-out completion is an accepted destructive command whose engine result is authoritative.
                 "AppState.kt:signOutActiveAccount" to "authoritative destructive command result",
                 // The wipe owns a cancellation-safe lifecycle bracket and serialized native-push teardown.
                 "AppState.kt:signOutAndWipeActiveAccount" to "serialized destructive lifecycle",
+                // Both completion bodies run inside withRevokedPinnedTarget, retaining native command ownership.
+                "AppState.kt:finishRevokedAccountSignOut" to "durably fenced authoritative sign-out completion",
+                "AppState.kt:finishRevokedAccountWipe" to "durably fenced serialized native wipe completion",
                 // Existing settings snapshot refresh is outside the audited stale-counter migration inventory.
                 "AppState.kt:refreshSecurityPrivacySettings" to "pre-existing settings snapshot path",
                 // Telemetry toggle completion is an authoritative engine command, not a replaceable cache read.

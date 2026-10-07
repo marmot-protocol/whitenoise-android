@@ -1428,10 +1428,12 @@ internal class ControlledVoicePresentationRuntime(
         return control.hydratedDurationMs
     }
 
+    /** Publishes deterministic fixture playback ownership without starting real platform audio. */
     override suspend fun play(
         key: String,
         file: File,
         ownerKey: String,
+        source: dev.ipf.whitenoise.android.audio.VoicePlaybackSource,
     ): VoicePlaybackController.PlaybackStartResult {
         val control = requireNotNull(fileOwners[file.absolutePath])
         mutablePlaybackState.value =

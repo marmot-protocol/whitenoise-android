@@ -266,7 +266,9 @@ internal const val SEEDED_TAIL_ALIGNMENT_MAX_ATTEMPTS = 24
 /**
  * Residual loading feedback for genuinely uncached or deliberately hidden
  * anchor paths. The grace period prevents a fast local open from flashing an
- * indicator while keeping slow direct routes honest.
+ * indicator while keeping slow direct routes honest. Route motion owns the
+ * first frames; its completion starts the grace period instead of spending
+ * that budget while the destination is still entering or leaving.
  */
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -275,14 +277,15 @@ internal fun ConversationInitialLoadingOverlay(
     visible: Boolean,
     modifier: Modifier = Modifier,
     graceMillis: Long = CONVERSATION_INITIAL_LOADING_GRACE_MILLIS,
+    routeTransitionInProgress: Boolean = false,
 ) {
-    var graceElapsed by remember(visible) { mutableStateOf(false) }
-    LaunchedEffect(visible) {
-        if (!visible) return@LaunchedEffect
+    var graceElapsed by remember(visible, routeTransitionInProgress) { mutableStateOf(false) }
+    LaunchedEffect(visible, routeTransitionInProgress) {
+        if (!visible || routeTransitionInProgress) return@LaunchedEffect
         delay(graceMillis.coerceAtLeast(0L))
         graceElapsed = true
     }
-    if (visible && graceElapsed) {
+    if (visible && !routeTransitionInProgress && graceElapsed) {
         Box(
             modifier = modifier.fillMaxSize().testTag(CONVERSATION_INITIAL_LOADING_TEST_TAG),
             contentAlignment = Alignment.Center,

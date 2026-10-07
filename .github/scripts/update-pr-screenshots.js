@@ -1,7 +1,7 @@
 const START = '<!-- pr-screenshots:start -->'
 const END = '<!-- pr-screenshots:end -->'
 const SNAPSHOT_PREFIX = 'app/src/test/snapshots/'
-const MAX_INLINE_SNAPSHOTS = 12
+const MAX_INLINE_SNAPSHOTS = 4
 const MAX_BASELINE_NAMES_LENGTH = 24_000
 // Opt-out for purely behavioral changes to UI sources, where nothing renders
 // differently and a screenshot baseline would be noise. The declaration is

@@ -16,7 +16,7 @@ import java.util.Locale
  * already hold, projected with this controller's caches; null when no account is bound, the read is
  * unavailable or failed, or the binding changed while the read was in flight.
  */
-internal suspend fun ChatsController.loadAccountWideForwardTargets(): List<ChatListItem>? {
+internal suspend fun ChatsController.loadAccountWideForwardTargets(): AccountWideForwardTargets? {
     val account = accountRef
     val read = liveSubscriptions.presentedChatList
     if (account == null || read == null) return null
@@ -24,16 +24,33 @@ internal suspend fun ChatsController.loadAccountWideForwardTargets(): List<ChatL
     return runCatchingCancellable { read(account, true) }
         .getOrNull()
         ?.takeIf { isActiveBindEpoch(epoch) && accountRef == account }
-        ?.let { presented -> eligibleTargetsBeyondWindow(presented) }
+        ?.let { presented -> AccountWideForwardTargets(this, epoch, presented) }
 }
 
-/** Projects the presented rows the window does not retain and keeps those a forward can be sent into. */
-private fun ChatsController.eligibleTargetsBeyondWindow(presented: List<PresentedChatRowFfi>): List<ChatListItem> {
-    val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
-    return presented
-        .filterNot { containsGroup(it.row.groupIdHex) }
-        .map { projectPresentedRow(it, activeAccountIdHex) }
-        .filter { isEligibleForwardTarget(it, activeAccountIdHex) }
+/** Native rows owned only by an open picker; derived rows always use the controller's current roster cache. */
+internal class AccountWideForwardTargets(
+    private val controller: ChatsController,
+    private val epoch: Long,
+    private val presented: List<PresentedChatRowFfi>,
+) {
+    /** A successful read stops proving completeness when its controller is rebound or cleared. */
+    val isCurrent: Boolean get() = controller.isActiveBindEpoch(epoch)
+
+    /** Rejects expired bindings and prefers the current retained window over the account-wide snapshot. */
+    fun items(): List<ChatListItem> {
+        if (!isCurrent) return emptyList()
+        val accountId = controller.boundAccountIdHex()
+        return presented
+            .filterNot { controller.containsGroup(it.row.groupIdHex) }
+            .map { controller.projectPresentedRow(it, accountId) }
+            .filter { isEligibleForwardTarget(it, accountId) }
+    }
+
+    /** Resolves only missing rosters requested from this exact account-owned presented snapshot. */
+    suspend fun resolveMembers(groupIds: Set<String>) {
+        if (!isCurrent) return
+        controller.resolveForwardTargetMembers(presented.filter { it.row.groupIdHex in groupIds })
+    }
 }
 
 /**

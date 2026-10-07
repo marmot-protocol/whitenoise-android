@@ -640,6 +640,10 @@ android {
     }
     packaging {
         jniLibs {
+            // Preserve the pinned prebuilt bytes: independent release builds
+            // have packaged stripped and unstripped copies of these libraries.
+            // Their loadable code is identical, but the ELF metadata differs.
+            keepDebugSymbols += setOf("**/libjnidispatch.so", "**/libmarmot_uniffi.so")
             excludes +=
                 setOf(
                     "lib/armeabi/libjnidispatch.so",
@@ -1165,7 +1169,8 @@ tasks.withType<Test>().configureEach {
     // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite.
     // Double Gradle's 512 MiB worker default while keeping one bounded, non-parallel process per task.
     maxHeapSize = "1g"
-    // CI's filtered verifyRoborazzi tasks delegate to these variant test tasks.
+    // CI verifies goldens in the complete variant test suites; these inputs also
+    // keep focused local verifyRoborazzi tasks correct.
     // Include the custom baseline directory in Gradle's input fingerprint so a
     // baseline-only change cannot reuse stale verification outputs. This also
     // intentionally invalidates full-suite outputs on baseline-only commits.

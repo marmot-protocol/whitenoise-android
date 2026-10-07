@@ -73,6 +73,7 @@ internal data class AgentOperationSenderPresentation(
     val avatarUrl: String?,
 )
 
+/** Renders the native operation with the viewer's actor presentation without changing its operation data. */
 @Composable
 internal fun AgentOperationTimelineRow(
     item: TimelineMessage,
@@ -102,7 +103,7 @@ internal fun AgentOperationTimelineRow(
                 AgentOperationSenderPresentation(
                     name = senderName,
                     seed = record.sender,
-                    avatarUrl = appState.avatarUrl(record.sender),
+                    avatarUrl = appState.contactAvatarSource(record.sender),
                 )
             } else {
                 null

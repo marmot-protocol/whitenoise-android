@@ -1658,7 +1658,7 @@
     <string name="ai_agents_connector_docs_subtitle">安裝指令碼、健康檢查與疑難排解</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Nous Research 的終端代理</string>
-    <string name="agent_connector_hermes_prompt">這是一則安裝提示，用於透過 Marmot 將此 Hermes 安裝連接到 White Noise。請閱讀最新的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請安裝並驗證連接器，然後回覆你的代理 npub。</string>
+    <string name="agent_connector_hermes_prompt">這是一則安裝提示，用於透過 Marmot 將此 Hermes 安裝連接到 White Noise。請閱讀最新的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md / https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請安裝並驗證連接器，然後回覆你的代理 npub。 提出變更前，請確認目標 Hermes 設定、Hermes 目錄、Marmot 目錄和通訊端、助手帳號與服務，以及閘道實例。不要逕自選擇預設設定，也不要覆寫其他安裝。使用校驗和已驗證的 Hermes 安裝程式。區分邀請授權和訊息傳送者授權。指引我從手機邀請並傳送測試訊息，確認所選設定在 White Noise 中回覆後，才能宣告配對完成。</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">自架個人 AI 助手</string>
     <string name="agent_connector_openclaw_prompt">這是一則安裝提示，用於透過 Marmot 將此 OpenClaw 執行個體連接到 White Noise。請閱讀最新的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請安裝並驗證連接器，然後回覆你的代理 npub。</string>
@@ -1826,7 +1826,7 @@
     <string name="discard">捨棄</string>
     <string name="open_app_settings">開啟應用程式設定</string>
     <string name="dictation_disclosure_title">外部語音辨識</string>
-    <string name="dictation_disclosure_message">此裝置上安裝的語音服務會處理你說的內容，並可能將音訊傳送給其供應商。White Noise 只會在你貼上或傳送前保留傳回的文字。除非你在「聽寫」設定中開啟，否則不會自動傳送。</string>
+    <string name="dictation_disclosure_message">此裝置上安裝的語音服務會處理你說的內容，並可能將音訊傳送給其供應商。發生錯誤後，辨識的文字可能會自動儲存到原始草稿中。除非你在「聽寫」設定中開啟，否則不會自動傳送。</string>
     <string name="dictation_continue">繼續</string>
     <string name="dictation_microphone_muted">麥克風存取已關閉</string>
     <string name="dictation_microphone_muted_help">請在 Android 隱私權設定或快速設定中開啟麥克風存取，然後重試聽寫。</string>
@@ -2200,6 +2200,9 @@
     <string name="profile_readiness_added">已新增</string>
     <string name="profile_readiness_recommended">建議填寫</string>
     <string name="profile_readiness_field_optional">選填</string>
+    <string name="agent_connector_claude_subtitle">Claude Code CLI 程式設計助手</string>
+    <string name="agent_connector_claude_prompt">這是一則安裝提示，用於透過 Marmot 將此 Claude Code 設定連接到 White Noise。請閱讀權威 Claude Code harness 指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md，以及長期有效的連接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。請向我解釋連接器的運作方式以及安裝會帶來哪些變更。確認前提條件：Claude Code CLI 已安裝、已驗證並可在 PATH 中使用，且此機器使用與手機相同的公開中繼集合。接著針對我的公開 npub 提出安裝步驟：%1$s，並在進行任何變更之前請求我的核准。我核准後，請使用經過校驗和驗證的 install-claude-marmot.sh 發佈流程，為該 npub 引導 wn-agent 並使用允許的 welcomer，接著驗證 wn-claude --version。然後回覆你的代理 npub，請我在 White Noise 中邀請它，並透過已設定的中繼從這個允許的 npub 傳送測試訊息。在 wn-claude 透過 White Noise 回覆之前，不要宣告設定完成；若無法自動驗證這個往返流程，請清楚標示仍需要裝置驗證。</string>
+    <string name="ai_agents_project_groups_tip">每個專案使用獨立的群組，先說明專案位置和上下文。不同連接器的工作階段控制不同，使用恢復工作階段或分支命令前請查看對應指南。</string>
     <string name="nostr_event_view_image">檢視圖片</string>
     <string name="nostr_event_image_failed">無法載入此圖片，請再試一次。</string>
     <string name="nostr_event_type_image">圖片</string>
@@ -2222,4 +2225,36 @@
     <string name="profile_notification_scope_detail">適用於此帳號所有對話中此人傳送的訊息。訊息接收和未讀數量不變。</string>
     <string name="profile_notification_precedence">先套用聊天靜音和僅提及規則，再套用此人的靜音或自訂 Android 設定。使用預設設定會恢復聊天和全域設定。現有通知保留原來的管道。</string>
     <string name="profile_notification_channel_name">%1$s · 所有聊天中的訊息</string>
+    <string name="destination_filter_all">所有聊天</string>
+    <string name="destination_filter_selected">查看已選（%1$d）</string>
+    <string name="destination_filter_label">篩選聊天</string>
+    <string name="forward_select_by_folder">按資料夾選取</string>
+    <string name="destination_filter_incomplete">部分聊天可能缺漏。請重試或選擇所有聊天。</string>
+    <string name="gestures_title">滑動操作</string>
+    <string name="gestures_physical_hint">左和右是指手指移動方向。變更語言後，明確選擇的操作保持不變。預設設定遵循目前語言的回覆方向。聊天滑動操作預設關閉。</string>
+    <string name="gestures_messages">訊息</string>
+    <string name="gestures_left">向左滑動</string>
+    <string name="gestures_right">向右滑動</string>
+    <string name="gestures_default">預設</string>
+    <string name="gestures_default_summary">預設：%1$s</string>
+    <string name="gestures_off">關閉</string>
+    <string name="gestures_react">回應</string>
+    <string name="gestures_read_unread">已讀 / 未讀</string>
+    <string name="gestures_mute_unmute">靜音 / 取消靜音</string>
+    <string name="gestures_pin_unpin">置頂 / 取消置頂</string>
+
+    <string name="contact_private_picture">私人圖片</string>
+    <string name="contact_picture_pick">選擇照片</string>
+    <string name="contact_picture_replace">更換照片</string>
+    <string name="contact_picture_reposition">調整位置 / 裁剪</string>
+    <string name="contact_picture_clear">清除私人圖片</string>
+    <string name="contact_picture_local_only">僅用於此裝置上的此帳號。絕不分享或上傳。</string>
+    <string name="contact_picture_failed">無法使用此圖片或儲存變更。先前的選擇未改變，請重試。</string>
+
+    <string name="add_conversation_to_home_screen">加入主螢幕</string>
+    <string name="pinned_shortcut_unsupported">您的啟動器不支援釘選捷徑。</string>
+    <string name="pinned_shortcut_already_added">此聊天已加入主螢幕。</string>
+    <string name="pinned_shortcut_finish">請在啟動器中確認加入此聊天。</string>
+    <string name="pinned_shortcut_unavailable">此聊天已無法使用。</string>
+    <string name="pinned_shortcut_failed">無法要求主螢幕捷徑。請重試。</string>
 </resources>

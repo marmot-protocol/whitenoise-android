@@ -278,7 +278,7 @@ internal fun ContactPickerScreen(
                                     appState.shortNpub(resolvedAccountIdHex).takeIf { it.isNotBlank() }
                                 },
                             avatarSeed = resolvedAccountIdHex,
-                            avatarUrl = appState.avatarUrl(resolvedAccountIdHex),
+                            avatarUrl = appState.contactAvatarSource(resolvedAccountIdHex),
                             enabled = !busy && !alreadyMember,
                             onClick = { toggle(candidate) },
                             onLongClick = { appState.presentProfile(candidate.npub) },
@@ -322,7 +322,7 @@ internal fun ContactPickerScreen(
                                 },
                             avatarSeed = candidate.accountIdHex,
                             avatarUrl =
-                                appState.avatarUrl(candidate.accountIdHex)
+                                appState.contactAvatarSource(candidate.accountIdHex)
                                     ?: ProfileSanitizer.protocolImageUrl(candidate.searchProfile?.picture),
                             isFollowed = candidate.isFollowing,
                             selectionState = isSelected,

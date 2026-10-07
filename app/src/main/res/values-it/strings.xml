@@ -1687,7 +1687,7 @@
     <string name="ai_agents_connector_docs_subtitle">Script di installazione, controlli di stato e risoluzione dei problemi</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Agente terminale di Nous Research</string>
-    <string name="agent_connector_hermes_prompt">Questo è un prompt di installazione per collegare questa installazione Hermes a White Noise tramite Marmot. Leggi la guida più recente del connettore all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Spiegami come funziona il connettore e cosa cambierà l’installazione. Quindi proponi i passaggi di installazione per la mia npub pubblica: %1$s e chiedi la mia approvazione prima di apportare qualsiasi modifica. Dopo la mia approvazione, installa e verifica il connettore, quindi rispondi con la npub del tuo agente.</string>
+    <string name="agent_connector_hermes_prompt">Questo è un prompt di installazione per collegare questa installazione Hermes a White Noise tramite Marmot. Leggi la guida più recente del connettore all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md / https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Spiegami come funziona il connettore e cosa cambierà l’installazione. Quindi proponi i passaggi di installazione per la mia npub pubblica: %1$s e chiedi la mia approvazione prima di apportare qualsiasi modifica. Dopo la mia approvazione, installa e verifica il connettore, quindi rispondi con la npub del tuo agente. Prima di proporre modifiche, conferma il profilo Hermes desiderato, la sua cartella, cartella e socket di Marmot, account e servizio del tuo agente e istanza gateway. Non presumere il profilo predefinito né sovrascrivere altre installazioni. Usa il programma di installazione Hermes con checksum verificato. Distingui autorizzazione degli inviti e dei mittenti. Guidami per invito e messaggio di prova dal telefono; verifica che il profilo scelto risponda in White Noise prima di dichiarare completato il collegamento.</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">Assistente IA personale self-hosted</string>
     <string name="agent_connector_openclaw_prompt">Questo è un prompt di installazione per collegare questa istanza OpenClaw a White Noise tramite Marmot. Leggi la guida più recente del connettore all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Spiegami come funziona il connettore e cosa cambierà l’installazione. Quindi proponi i passaggi di installazione per la mia npub pubblica: %1$s e chiedi la mia approvazione prima di apportare qualsiasi modifica. Dopo la mia approvazione, installa e verifica il connettore, quindi rispondi con la npub del tuo agente.</string>
@@ -1855,7 +1855,7 @@
     <string name="discard">Elimina</string>
     <string name="open_app_settings">Apri le impostazioni dell’app</string>
     <string name="dictation_disclosure_title">Riconoscimento vocale esterno</string>
-    <string name="dictation_disclosure_message">Il servizio vocale installato su questo dispositivo elabora ciò che dici e può inviare l’audio al proprio fornitore. White Noise conserva il testo restituito solo finché non lo incolli o lo invii. L’invio automatico è disattivato, a meno che tu non lo attivi nelle impostazioni di Dettatura.</string>
+    <string name="dictation_disclosure_message">Il servizio vocale installato su questo dispositivo elabora ciò che dici e può inviare l’audio al proprio fornitore. Dopo un errore, il testo riconosciuto può essere salvato automaticamente nella bozza originale. L’invio automatico è disattivato, a meno che tu non lo attivi nelle impostazioni di Dettatura.</string>
     <string name="dictation_continue">Continua</string>
     <string name="dictation_microphone_muted">L’accesso al microfono è disattivato</string>
     <string name="dictation_microphone_muted_help">Attiva l’accesso al microfono nelle impostazioni sulla privacy di Android o nelle Impostazioni rapide, poi riprova la dettatura.</string>
@@ -2231,6 +2231,9 @@
     <string name="profile_readiness_added">Aggiunto</string>
     <string name="profile_readiness_recommended">Consigliato</string>
     <string name="profile_readiness_field_optional">Facoltativo</string>
+    <string name="agent_connector_claude_subtitle">Agente di programmazione Claude Code CLI</string>
+    <string name="agent_connector_claude_prompt">Questo è un prompt di installazione per collegare questa configurazione Claude Code a White Noise tramite Marmot. Leggi la guida autorevole del harness Claude Code all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md e la guida permanente del connettore all’indirizzo https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Spiegami come funziona il connettore e cosa cambierà l’installazione. Conferma i prerequisiti: la CLI Claude Code è installata, autenticata e disponibile in PATH, e questa macchina usa lo stesso set di relay pubblici del mio telefono. Quindi proponi i passaggi di installazione per la mia npub pubblica: %1$s e chiedi la mia approvazione prima di apportare qualsiasi modifica. Dopo la mia approvazione, usa il flusso di release install-claude-marmot.sh verificato tramite checksum, avvia wn-agent per quella npub con il welcomer consentito e verifica wn-claude --version. Quindi rispondi con la npub del tuo agente e chiedimi di invitarlo da White Noise e inviare un messaggio di prova da questa npub consentita tramite i relay configurati. Non dichiarare completata la configurazione finché wn-claude non risponde tramite White Noise; se non è possibile verificare automaticamente questo percorso di andata e ritorno, indica chiaramente che è necessaria la verifica sul dispositivo.</string>
+    <string name="ai_agents_project_groups_tip">Usa un gruppo separato per ogni progetto e inizia dalla sua posizione e dal contesto. I comandi di sessione variano per connettore; consulta la sua guida prima di riprendere sessioni o creare rami.</string>
     <string name="nostr_event_view_image">Visualizza immagine</string>
     <string name="nostr_event_image_failed">Impossibile caricare questa immagine. Riprova.</string>
     <string name="nostr_event_type_image">Immagine</string>
@@ -2254,4 +2257,36 @@
     <string name="profile_notification_scope_detail">Si applica ai messaggi di questa persona in tutte le conversazioni di questo account. La consegna e il conteggio dei messaggi non letti restano invariati.</string>
     <string name="profile_notification_precedence">Si applicano prima le regole del silenziamento della chat e delle sole menzioni. Seguono il silenziamento o le impostazioni Android personalizzate di questa persona. Le impostazioni predefinite ripristinano quelle della chat e globali. Le notifiche esistenti mantengono il canale originale.</string>
     <string name="profile_notification_channel_name">%1$s · Messaggi in tutte le chat</string>
+    <string name="destination_filter_all">Tutte le chat</string>
+    <string name="destination_filter_selected">Controlla selezione (%1$d)</string>
+    <string name="destination_filter_label">Filtra chat</string>
+    <string name="forward_select_by_folder">Seleziona per cartella</string>
+    <string name="destination_filter_incomplete">Alcune chat potrebbero mancare. Riprova o scegli Tutte le chat.</string>
+    <string name="gestures_title">Azioni di scorrimento</string>
+    <string name="gestures_physical_hint">Sinistra e destra indicano il movimento del dito. Le scelte esplicite restano uguali quando cambi lingua. Il valore predefinito segue la direzione di risposta della lingua. I gesti nelle chat sono disattivati per impostazione predefinita.</string>
+    <string name="gestures_messages">Messaggi</string>
+    <string name="gestures_left">Scorri a sinistra</string>
+    <string name="gestures_right">Scorri a destra</string>
+    <string name="gestures_default">Predefinito</string>
+    <string name="gestures_default_summary">Predefinito: %1$s</string>
+    <string name="gestures_off">Disattivato</string>
+    <string name="gestures_react">Reagisci</string>
+    <string name="gestures_read_unread">Letto / non letto</string>
+    <string name="gestures_mute_unmute">Silenzia / riattiva</string>
+    <string name="gestures_pin_unpin">Fissa / rimuovi</string>
+
+    <string name="contact_private_picture">Immagine privata</string>
+    <string name="contact_picture_pick">Scegli foto</string>
+    <string name="contact_picture_replace">Sostituisci foto</string>
+    <string name="contact_picture_reposition">Riposiziona / ritaglia</string>
+    <string name="contact_picture_clear">Rimuovi immagine privata</string>
+    <string name="contact_picture_local_only">Solo per questo account su questo dispositivo. Mai condivisa o caricata.</string>
+    <string name="contact_picture_failed">Impossibile usare questa immagine o salvare le modifiche. La selezione precedente è invariata. Riprova.</string>
+
+    <string name="add_conversation_to_home_screen">Aggiungi alla schermata Home</string>
+    <string name="pinned_shortcut_unsupported">Il launcher non supporta le scorciatoie fissate.</string>
+    <string name="pinned_shortcut_already_added">Questa conversazione è già nella schermata Home.</string>
+    <string name="pinned_shortcut_finish">Conferma nel launcher per aggiungere questa conversazione.</string>
+    <string name="pinned_shortcut_unavailable">Questa conversazione non è più disponibile.</string>
+    <string name="pinned_shortcut_failed">Impossibile richiedere una scorciatoia. Riprova.</string>
 </resources>
