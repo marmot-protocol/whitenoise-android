@@ -491,6 +491,10 @@ internal fun MessageBubble(
     // the menu opens. The point seeds partial text selection; the bounds keep
     // the action surface visually attached to the selected bubble.
     var longPressWindowPosition by remember(item.presentationId) { mutableStateOf<Offset?>(null) }
+    var longPressTtsStart by remember(item.presentationId) { mutableStateOf<TtsLongPressStart?>(null) }
+    LaunchedEffect(isActionMenuOpen) {
+        if (!isActionMenuOpen) longPressTtsStart = null
+    }
     var selectionSeedVisibleOffset by remember(item.presentationId) { mutableStateOf<Int?>(null) }
     var longPressWindowY by remember { mutableStateOf<Float?>(null) }
     var actionMenuAnchorBounds by remember(item.presentationId) { mutableStateOf<IntRect?>(null) }
@@ -1131,8 +1135,8 @@ internal fun MessageBubble(
     // continue the read. Falls back to just this bubble when its record has
     // left the loaded timeline. When text is selected or the action menu was
     // opened from a text selection, start at the containing visible sentence.
-    // The ordinary long-press action starts at the message top; only an
-    // explicit text double-tap supplies a seek offset (#2136).
+    // A text press retains its rendered hit; genuine gutter/edge presses retain
+    // the deterministic message-top fallback without guessing a nearby glyph.
 
     /** Starts from the selected sentence and preserves a specific start-gate explanation. */
     fun startSpeakAloud(
@@ -1140,8 +1144,19 @@ internal fun MessageBubble(
         fallbackVisibleText: String? = null,
         fallbackVisibleOffset: Int? = null,
         literalCode: Boolean = false,
+        expectedPress: TtsLongPressStart? = null,
     ) {
         if (deleted) return
+        val owner =
+            expectedPress ?: captureTtsLongPressStart(
+                startRenderedHit,
+                ttsSpeakableSource?.text,
+                controller,
+                appState,
+            )
+        val canCommit = { isTtsLongPressStartCurrent(owner, record, controller, appState) }
+        if (!canCommit()) return
+        val projectionStillCurrent = appState.ttsController.speechStartProjectionGuard()
         val locale = java.util.Locale.getDefault()
         appState.launchMutation {
             val candidateRecords =
@@ -1159,7 +1174,10 @@ internal fun MessageBubble(
                         entry
                     }
                 }
-            if (entries.isEmpty()) {
+            if (!canCommit() || !projectionStillCurrent()) {
+                return@launchMutation
+            }
+            if (entries.firstOrNull()?.messageIdHex != record.messageIdHex) {
                 appState.present(R.string.tts_bar_error)
                 return@launchMutation
             }
@@ -1185,8 +1203,9 @@ internal fun MessageBubble(
                             preparedHitFromRenderedHit(entries.first(), it)
                         },
                     backgroundPreparation = true,
+                    canCommit = canCommit,
                 )
-            if (!started) appState.present(appState.ttsStartFailureMessage())
+            if (!started && canCommit()) appState.present(appState.ttsStartFailureMessage())
         }
     }
 
@@ -1194,7 +1213,7 @@ internal fun MessageBubble(
         val layouts = selectableTextLayouts.snapshot()
         val selectionActive = textSelectionMode && messageTextSelectionState.selectedTexts.isNotEmpty()
         if (!selectionActive) {
-            startSpeakAloud()
+            startSpeakAloud(longPressTtsStart?.renderedHit, expectedPress = longPressTtsStart)
             return
         }
         val visibleText = concatenatedVisibleText(layouts).ifBlank { displayedBody }
@@ -1259,6 +1278,55 @@ internal fun MessageBubble(
         }
     }
 
+    fun seekRenderedSentenceOutsideCurrentProjection(
+        hit: RenderedTextHit,
+        allowOmittedLinkNeighbor: Boolean,
+    ) {
+        val account = controller.boundAccountRef
+        val owner =
+            appState.ttsHistorySession.conversationSource.value?.takeIf {
+                it.accountRef == account && it.groupIdHex == controller.group.groupIdHex
+            } ?: return
+        val runtimeGeneration = appState.runtimeGeneration
+        val expectedText = ttsSpeakableSource?.text
+        val canCommit = {
+            val live = controller.timeline.firstOrNull { it.record.messageIdHex == record.messageIdHex }
+            val source =
+                dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource(
+                    live?.record ?: record,
+                    controller.editsByTarget[record.messageIdHex]?.latestText,
+                )
+            val sameOwner = appState.activeAccountRef == account && appState.runtimeGeneration == runtimeGeneration
+            val unavailable =
+                record.messageIdHex in controller.deletedMessageIds ||
+                    live?.projected?.deleted == true ||
+                    live?.projected?.invalidationStatus != null
+            sameOwner && !unavailable && source?.text == expectedText
+        }
+        if (!canCommit()) return
+        val accepted =
+            appState.ttsHistorySession.requestRenderedSentenceSeek(
+                record.messageIdHex,
+                record.recordedAt,
+                expectedSource = owner,
+                resolveTarget = {
+                    if (!canCommit()) return@requestRenderedSentenceSeek null
+                    val entry = ttsEntry(record) ?: return@requestRenderedSentenceSeek null
+                    val projection = entry.speakableProjection()
+                    dev.ipf.whitenoise.android.audio.tts.TtsRenderedSeekRequest(
+                        entry = entry,
+                        sentenceIndex = { prepared ->
+                            TtsHighlightProjectionResolver(projection, prepared)
+                                .sentenceIndexAtRenderedOffset(hit, allowOmittedLinkNeighbor)
+                        },
+                        canCommit = canCommit,
+                    )
+                },
+                onCommitted = { onTtsSentenceSeek(appState.ttsController.state.value) },
+            )
+        if (accepted) ttsLinkTapCoordinator.cancelPendingActivation()
+    }
+
     @Suppress("ComplexCondition", "ReturnCount")
     fun seekSpeakAloudAt(pressInWindow: Offset) {
         if (deleted || selectionMode || textSelectionMode || !canSpeakAloud) return
@@ -1283,6 +1351,11 @@ internal fun MessageBubble(
                 }
             if (sentenceIndex != null) {
                 seekActiveSentence(sentenceIndex)
+            } else if (ttsProjectionResolver == null && hit != null && !record.contentTokens.truncated) {
+                seekRenderedSentenceOutsideCurrentProjection(
+                    hit,
+                    markdownHasLinkAnnotationAt(markdownLinkLayouts.values, pressInWindow),
+                )
             }
             // An owned session must never be replaced merely because a hit is
             // ambiguous, outside the queue window, or denied audio focus. A
@@ -1599,6 +1672,22 @@ internal fun MessageBubble(
                                         // opening so both the popover and text
                                         // selection seed at the finger (#326, #1370).
                                         longPressWindowPosition = windowPosition
+                                        longPressTtsStart =
+                                            captureTtsLongPressStart(
+                                                hit =
+                                                    if (record.contentTokens.truncated) {
+                                                        null
+                                                    } else {
+                                                        renderedTextHitAtWindowPosition(
+                                                            selectableTextLayouts.snapshot(),
+                                                            windowPosition,
+                                                            requireTextLineHit = true,
+                                                        )
+                                                    },
+                                                sourceText = ttsSpeakableSource?.text,
+                                                controller = controller,
+                                                appState = appState,
+                                            )
                                         selectionSeedVisibleOffset =
                                             if (record.contentTokens.truncated) {
                                                 null

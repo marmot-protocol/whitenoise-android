@@ -2,15 +2,18 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +27,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -45,6 +49,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.MarkdownBlockFfi
@@ -73,6 +78,41 @@ import org.robolectric.annotation.GraphicsMode
 class ConversationTtsFollowComposeTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    @Config(qualifiers = "w360dp-h780dp-mdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun resumeTargetControlLight() {
+        captureResumeControl(dark = false, name = "light")
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h780dp-mdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun resumeTargetControlDark() {
+        captureResumeControl(dark = true, name = "dark")
+    }
+
+    @Test
+    @Config(qualifiers = "ar-w360dp-h780dp-mdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun resumeTargetControlRtlLargeFont() {
+        captureResumeControl(dark = false, name = "rtl_large_font", fontScale = 2f)
+    }
+
+    private fun captureResumeControl(dark: Boolean, name: String, fontScale: Float = 1f) {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+                WhiteNoiseTheme(darkTheme = dark) {
+                    Box(Modifier.size(64.dp)) {
+                        TtsResumeFollowButton(onClick = {})
+                    }
+                }
+            }
+        }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/tts_resume_target_$name.png")
+    }
 
     @Test
     fun ttsResumeFollowButtonUsesIconOnlyAccessibilitySemantics() {
@@ -442,7 +482,25 @@ class ConversationTtsFollowComposeTest {
         assertMeasuredShapeFollowsSentence(FollowTargetShape.ReplyAndFooterAroundBody)
     }
 
-    private fun assertMeasuredShapeFollowsSentence(shape: FollowTargetShape) {
+    @Test
+    fun reversedPaddedTranscriptAlignsTallMediaSentenceBelowPlayerHeader() {
+        assertMeasuredShapeFollowsSentence(FollowTargetShape.TallMediaBeforeSentence, reverseLayout = true)
+    }
+
+    @Test
+    fun reversedPaddedTranscriptAlignsCompleteMultiLeafSentence() {
+        assertMeasuredShapeFollowsSentence(FollowTargetShape.SplitMarkdown, reverseLayout = true)
+    }
+
+    @Test
+    fun reversedPaddedTranscriptIgnoresReplyAndFooterForSentenceAlignment() {
+        assertMeasuredShapeFollowsSentence(FollowTargetShape.ReplyAndFooterAroundBody, reverseLayout = true)
+    }
+
+    private fun assertMeasuredShapeFollowsSentence(
+        shape: FollowTargetShape,
+        reverseLayout: Boolean = false,
+    ) {
         var request by mutableStateOf(0)
         lateinit var targetLayout: () -> Pair<Rect?, Rect?>
         val messages = (0 until 30).map { "message-$it" }
@@ -456,6 +514,7 @@ class ConversationTtsFollowComposeTest {
                     onVisibleKeys = {},
                     targetShape = shape,
                     onTargetLayout = { targetLayout = it },
+                    reverseLayout = reverseLayout,
                 )
             }
         }
@@ -487,9 +546,21 @@ class ConversationTtsFollowComposeTest {
         targetShape: FollowTargetShape = FollowTargetShape.Compact,
         onTargetLayout: ((() -> Pair<Rect?, Rect?>) -> Unit)? = null,
         estimatedItemHeightPx: Int? = null,
+        reverseLayout: Boolean = false,
     ) {
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialFirstVisibleItemIndex)
         val sentenceLayouts = remember { ConversationTtsSentenceLayoutRegistry() }
+        val overlap = with(LocalDensity.current) { 40.dp.roundToPx() }
+        val basePadding = with(LocalDensity.current) { 11.dp.roundToPx() }
+        val timelineViewport =
+            remember(listState, overlap, basePadding) {
+                ConversationTimelineViewport(listState).apply {
+                    enabled = reverseLayout
+                    onComposerMeasured(overlap, overlap)
+                    onBottomChromeMeasured(overlap)
+                    onPaddingMeasured(basePadding, overlap)
+                }
+            }
         val coordinator =
             remember(listState) {
                 ConversationScrollCoordinator(
@@ -514,6 +585,7 @@ class ConversationTtsFollowComposeTest {
                 targetIndex = targetIndex,
                 estimatedItemHeightPx = estimatedItemHeightPx,
                 listState = listState,
+                timelineViewport = timelineViewport.takeIf { reverseLayout },
                 scrollCoordinator = coordinator,
                 sentenceLayouts = sentenceLayouts,
                 claimPreposition = { true },
@@ -540,24 +612,33 @@ class ConversationTtsFollowComposeTest {
                 },
             )
         }
-        LazyColumn(
-            state = listState,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(320.dp)
-                    .onGloballyPositioned { sentenceLayouts.updateViewportBounds(it.boundsInWindow()) },
-        ) {
-            items(messages, key = { it }) { messageId ->
-                if (messageId == targetMessageId) {
-                    ProductionShapedFollowTargetRow(
-                        messageId = messageId,
-                        target = followTarget(messageId),
-                        shape = targetShape,
-                        sentenceLayouts = sentenceLayouts,
-                    )
-                } else {
-                    Text(messageId, Modifier.fillMaxWidth().height(80.dp))
+        Column {
+            if (reverseLayout) Text("Read aloud player", Modifier.height(48.dp))
+            LazyColumn(
+                state = listState,
+                reverseLayout = reverseLayout,
+                contentPadding = if (reverseLayout) PaddingValues(top = 23.dp, bottom = 51.dp) else PaddingValues(0.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(320.dp)
+                        .onGloballyPositioned {
+                            timelineViewport.onPaintViewportMeasured(it)
+                            val bounds = if (reverseLayout) timelineViewport.readingBoundsInWindow else it.boundsInWindow()
+                            bounds?.let(sentenceLayouts::updateViewportBounds)
+                        },
+            ) {
+                items(messages, key = { it }) { messageId ->
+                    if (messageId == targetMessageId) {
+                        ProductionShapedFollowTargetRow(
+                            messageId = messageId,
+                            target = followTarget(messageId),
+                            shape = targetShape,
+                            sentenceLayouts = sentenceLayouts,
+                        )
+                    } else {
+                        Text(messageId, Modifier.fillMaxWidth().height(80.dp))
+                    }
                 }
             }
         }

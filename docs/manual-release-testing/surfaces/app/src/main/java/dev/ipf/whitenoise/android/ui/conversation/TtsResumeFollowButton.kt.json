@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsResumeFollowButton.kt",
+  "legacy_sha256": "dc88c2780158854f8d0ff98de8154fac74fcc14028e9409a267d0d723b99f1ad",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TtsResumeFollowButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsResumeFollowButton.kt",
+        "anchor": "Icons.Default.GpsFixed",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

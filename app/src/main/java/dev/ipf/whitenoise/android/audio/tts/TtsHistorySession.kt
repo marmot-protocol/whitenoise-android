@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+private const val RENDERED_SEEK_TIMEOUT_MS = 5_000L
+
 /** Transport-visible progress of a pending read-aloud history edge request. */
 sealed interface TtsHistoryEdgeState {
     val direction: TtsHistoryDirection
@@ -75,6 +77,8 @@ class TtsHistorySession internal constructor(
     private val historyRequests = StalenessGuard()
     private var pendingLoad: Job? = null
     private var pendingTargetSeek = false
+    private var pendingPlaybackDeferral = false
+    private var pendingRenderedSeek = false
     private var liveTailAttached = true
 
     /** Optional barrier used by concurrency tests at the guarded settlement boundary. */
@@ -144,11 +148,12 @@ class TtsHistorySession internal constructor(
      * A timeline-window trim also moves the window's last id without any
      * arrival, so acceptance additionally requires the last verified tail to
      * still be present in the loaded window (advancing it on success), and
-     * refuses while an edge load owns the window.
+     * refuses while a deferred edge load owns the window. Rendered-hit preparation
+     * leaves the audible window available for live continuation until it commits.
      */
     fun allowsLiveAppend(): Boolean {
         val convo = conversation ?: return true
-        val consultTimeline = liveTailAttached && _edgeState.value !is TtsHistoryEdgeState.Loading
+        val consultTimeline = liveTailAttached && (!pendingPlaybackDeferral || pendingRenderedSeek)
         val records =
             if (consultTimeline) {
                 resolvePager(convo.accountRef, convo.groupIdHex)?.timelineRecords().orEmpty()
@@ -178,6 +183,7 @@ class TtsHistorySession internal constructor(
             false
         } else {
             pendingTargetSeek = true
+            pendingPlaybackDeferral = true
             val direction =
                 if (timelineAt <
                     (controller.queuedMessagesSnapshot().firstOrNull()?.timelineAt ?: 0uL)
@@ -196,6 +202,7 @@ class TtsHistorySession internal constructor(
                         ).load(messageIdHex, timelineAt)
                     historyRequests.runIfCurrent(generation) {
                         pendingTargetSeek = false
+                        pendingPlaybackDeferral = false
                         if (conversation != source ||
                             controller.state.value.sessionId != source.sessionId
                         ) {
@@ -216,8 +223,68 @@ class TtsHistorySession internal constructor(
     }
 
     fun cancelPendingSeek() {
-        if (pendingTargetSeek) controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
+        if (pendingPlaybackDeferral) controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
         invalidatePending()
+    }
+
+    /** Reserve the intent before async projection, so an older tap cannot supersede a newer one. */
+    internal fun requestRenderedSentenceSeek(
+        messageIdHex: String,
+        timelineAt: ULong,
+        expectedSource: TtsConversationSource,
+        resolveTarget: suspend () -> TtsRenderedSeekRequest?,
+        onCommitted: () -> Unit,
+    ): Boolean {
+        val source =
+            conversation?.takeIf { it == expectedSource && it.sessionId == controller.state.value.sessionId }
+                ?: return false
+        cancelPendingSeek()
+        if (!controller.deferForTargetSeek()) return false
+        val generation = historyRequests.advance()
+        pendingTargetSeek = true
+        pendingPlaybackDeferral = true
+        pendingRenderedSeek = true
+        // Keep speech and live arrivals running, but retain the terminal cursor until settlement.
+        val direction =
+            if (timelineAt < (controller.queuedMessagesSnapshot().firstOrNull()?.timelineAt ?: 0uL)) {
+                TtsHistoryDirection.Older
+            } else {
+                TtsHistoryDirection.Newer
+            }
+        _edgeState.value = TtsHistoryEdgeState.Loading(direction)
+        pendingLoad =
+            scope.launch {
+                val committed =
+                    try {
+                        kotlinx.coroutines.withTimeoutOrNull(RENDERED_SEEK_TIMEOUT_MS) {
+                            val request = resolveTarget() ?: return@withTimeoutOrNull false
+                            if (request.entry.messageIdHex != messageIdHex) return@withTimeoutOrNull false
+                            controller.installRenderedSeekTarget(request, source.sessionId) {
+                                historyRequests.isCurrent(generation)
+                            }
+                        } == true
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        false
+                    }
+                historyRequests.runIfCurrent(generation) {
+                    pendingTargetSeek = false
+                    pendingPlaybackDeferral = false
+                    pendingRenderedSeek = false
+                    if (conversation != source || controller.state.value.sessionId != source.sessionId) {
+                        return@runIfCurrent
+                    }
+                    _edgeState.value = null
+                    if (committed) {
+                        liveTailAttached = false
+                        onCommitted()
+                    } else {
+                        controller.settleEdgeRequest(TtsEdgeSettlement.Retained)
+                    }
+                }
+            }
+        return true
     }
 
     fun nextMessage() {
@@ -263,6 +330,7 @@ class TtsHistorySession internal constructor(
         targetSentence: TtsWindowSentenceTarget,
     ) {
         val startedGeneration = historyRequests.advance()
+        pendingPlaybackDeferral = true
         _edgeState.value = TtsHistoryEdgeState.Loading(direction)
         pendingLoad =
             scope.launch {
@@ -328,6 +396,7 @@ class TtsHistorySession internal constructor(
                         // would clobber whichever request re-armed since.
                         TtsHistoryEdgeWalk.Result.Stale -> Unit
                     }
+                    pendingPlaybackDeferral = false
                 }
             }
     }
@@ -338,6 +407,8 @@ class TtsHistorySession internal constructor(
         pendingLoad?.cancel()
         pendingLoad = null
         pendingTargetSeek = false
+        pendingPlaybackDeferral = false
+        pendingRenderedSeek = false
         _edgeState.value = null
     }
 }

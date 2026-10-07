@@ -534,6 +534,22 @@ class TtsController internal constructor(
     @Synchronized
     internal fun playbackCallbackGeneration(): Long = queue.callbackGeneration
 
+    /** Explicit transport changes invalidate a pending UI start; natural completion does not. */
+    @Synchronized
+    internal fun speechStartProjectionGuard(): () -> Boolean {
+        val preparationGeneration = preparationRequests.capture()
+        val callbackGeneration = queue.callbackGeneration
+        val sessionId = state.value.sessionId
+        return {
+            synchronized(this) {
+                val current = state.value
+                preparationRequests.isCurrent(preparationGeneration) &&
+                    (queue.callbackGeneration == callbackGeneration ||
+                        (current is TtsState.Idle && current.sessionId == sessionId))
+            }
+        }
+    }
+
     @Synchronized
     fun resume() {
         if (state.value !is TtsState.Paused || !acquireAudioFocus()) return
@@ -635,6 +651,35 @@ class TtsController internal constructor(
 
     @Synchronized
     internal fun deferForTargetSeek(): Boolean = queue.deferForTargetSeek()
+
+    /** Prepares off-lock and resolves the rendered sentence against that exact speech without replacing the session. */
+    internal suspend fun installRenderedSeekTarget(
+        request: TtsRenderedSeekRequest,
+        sessionId: Long,
+        isCurrent: () -> Boolean,
+    ): Boolean {
+        val ticket =
+            synchronized(this) {
+                if (state.value.sessionId != sessionId || !canNavigate()) return false
+                (engine ?: return false) to queueLocale
+            }
+        val target =
+            withContext(Dispatchers.Default) {
+                val job = currentCoroutineContext()
+                with(preparation) {
+                    request.entry.toQueuedMessage(ticket.second) { !job.isActive || !isCurrent() }
+                }
+            } ?: return false
+        return synchronized(this) {
+            val sameOwner =
+                state.value.sessionId == sessionId && engine === ticket.first && queueLocale == ticket.second
+            if (!sameOwner || !canNavigate() || !isCurrent()) return@synchronized false
+            if (!request.canCommit()) return@synchronized false
+            val ordinal = target.prepared?.let(request.sentenceIndex) ?: return@synchronized false
+            if (target.chunks.none { it.sentenceIndex == ordinal }) return@synchronized false
+            installPreparedSeekTarget(request.entry, ordinal, target)
+        }
+    }
 
     /** Commit a freshly revalidated seek target without replacing the playback session. */
     @Synchronized

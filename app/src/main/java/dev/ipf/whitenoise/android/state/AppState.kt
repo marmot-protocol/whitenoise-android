@@ -1666,11 +1666,13 @@ class WhiteNoiseAppState private constructor(
         startSentenceIndex: Int = 0,
         startRenderedHit: dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit? = null,
         backgroundPreparation: Boolean,
+        canCommit: () -> Boolean = { true },
     ): Boolean {
+        if (!canCommit()) return false
         if (!backgroundPreparation) return speakAloudAutoRead(groupIdHex, entries, locale, startSentenceIndex)
         val ownerAccount = activeAccountRef
         return ttsAutoReadKey(ownerAccount, groupIdHex)?.let { owner ->
-            speakAloudPrepared(entries, locale, startSentenceIndex, startRenderedHit).also { started ->
+            speakAloudPrepared(entries, locale, startSentenceIndex, startRenderedHit, isCurrent = canCommit).also { started ->
                 if (started) {
                     ttsAutoReadSessionKey = owner
                     ttsHistorySession.onConversationSessionStarted(ownerAccount, groupIdHex)

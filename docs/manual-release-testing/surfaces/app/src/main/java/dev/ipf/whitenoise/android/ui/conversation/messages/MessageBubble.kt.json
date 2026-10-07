@@ -1,0 +1,155 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+  "legacy_sha256": "41b495260b83f905808aac5a7f7b22be8370f1860f4c1bbe3f0db43834a52e09",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: MessageBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "MessageBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "fun MessageBubble(",
+        "test_ids": [
+          "MED-009",
+          "MSG-001",
+          "MSG-005",
+          "MSG-013",
+          "MSG-015",
+          "MSG-019",
+          "CON-017"
+        ]
+      },
+      {
+        "surface": "Rendered sentence seek from other bubbles",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "fun seekRenderedSentenceOutsideCurrentProjection(",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:message_deleted_by_other",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.message_deleted_by_other",
+        "test_ids": [
+          "MSG-004",
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "string:message_deleted_by_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.message_deleted_by_admin",
+        "test_ids": [
+          "MSG-004",
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "string:message_deleted_by_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.message_deleted_by_you",
+        "test_ids": [
+          "MSG-004",
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "string:message_reported",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.message_reported",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_dismiss_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_dismiss_failed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_dismissed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_dismissed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_not_allowed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_message_not_allowed",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_queued",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_message_queued",
+        "test_ids": [
+          "MSG-016"
+        ]
+      },
+      {
+        "surface": "string:report_message_sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.report_message_sent",
+        "test_ids": [
+          "MSG-016"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.media_attachment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.media_attachment",
+        "test_ids": [
+          "MSG-004",
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "R.string.send_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.send_failed",
+        "test_ids": [
+          "MSG-004",
+          "CON-006"
+        ]
+      },
+      {
+        "surface": "R.string.sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.sending",
+        "test_ids": [
+          "MSG-004",
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "R.string.sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.sent",
+        "test_ids": [
+          "MSG-004",
+          "CON-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

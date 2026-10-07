@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTtsEffects.kt",
+  "legacy_sha256": "c50fe5c6f58baf485d040d618efcb5d1d022de5451c427b8f5c7616f8525c7e7",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationTtsAutoReadEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTtsEffects.kt",
+        "anchor": "fun ConversationTtsAutoReadEffects(",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "ConversationTtsFollowEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTtsEffects.kt",
+        "anchor": "fun ConversationTtsFollowEffects(",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

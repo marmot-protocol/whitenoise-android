@@ -184,14 +184,14 @@ class ConversationTtsFollowPolicyTest {
             ConversationTtsFollowRequest(
                 earlier.followTarget(),
                 TtsFollowDirection.Reverse,
-                anchorAtTop = true,
+                anchorAtTop = false,
             ),
             policy.claimPendingRequest(),
         )
     }
 
     @Test
-    fun restoredReverseTargetUsesTopAnchorForOversizedSentence() {
+    fun restoredReverseTargetKeepsVisibleSentenceStill() {
         val policy = ConversationTtsFollowPolicy()
         val later = speaking(sessionId = 1, sentenceIndex = 2)
         policy.observe(later, ownsSession = true)
@@ -208,7 +208,7 @@ class ConversationTtsFollowPolicyTest {
 
         assertEquals(TtsFollowDirection.Reverse, restoredRequest.direction)
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(100),
+            TtsFollowViewportDecision.Stay,
             decide(
                 itemOffset = 0,
                 sentenceTop = 100,
@@ -237,7 +237,7 @@ class ConversationTtsFollowPolicyTest {
 
         assertEquals(TtsFollowDirection.Forward, restoredRequest.direction)
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(100),
+            TtsFollowViewportDecision.Stay,
             decide(
                 itemOffset = 0,
                 sentenceTop = 100,
@@ -420,9 +420,9 @@ class ConversationTtsFollowPolicyTest {
         )
     }
 
-    /** A drag suspends follow for the current sentence only; the next spoken sentence resumes it. */
+    /** Sentence progression leaves manual browsing alone until explicit Resume. */
     @Test
-    fun directDragSuspendsCurrentSentenceAndNextSentenceResumesFollowing() {
+    fun directDragStaysSuspendedAcrossSentencesUntilExplicitResume() {
         val policy = ConversationTtsFollowPolicy()
         policy.observe(speaking(sessionId = 1, sentenceIndex = 0), ownsSession = true)
         policy.claimPendingTarget()
@@ -430,9 +430,13 @@ class ConversationTtsFollowPolicyTest {
         policy.onUserDrag()
         policy.observe(speaking(sessionId = 1, sentenceIndex = 1), ownsSession = true)
 
-        assertTrue(policy.isFollowEnabled)
-        assertFalse(policy.showResumeAction)
-        assertEquals(1, policy.claimPendingTarget()?.sentenceIndex)
+        assertFalse(policy.isFollowEnabled)
+        assertTrue(policy.showResumeAction)
+        assertNull(policy.claimPendingTarget())
+        policy.observe(speaking(sessionId = 1, sentenceIndex = 2, messageIdHex = "m2"), ownsSession = true)
+        assertNull(policy.claimPendingTarget())
+        policy.resumeFollow()
+        assertEquals("m2", policy.claimPendingTarget()?.messageIdHex)
 
         policy.onUserDrag()
         val restarted = speaking(sessionId = 2, sentenceIndex = 1)
@@ -458,7 +462,7 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
-    fun explicitResumeWhilePausedWaitsForPlaybackBeforeClaiming() {
+    fun explicitResumeRevealsPausedSentenceWithoutWaitingForPlayback() {
         val policy = ConversationTtsFollowPolicy()
         val speaking = speaking(sessionId = 4, sentenceIndex = 2)
         policy.observe(speaking, ownsSession = true)
@@ -467,10 +471,84 @@ class ConversationTtsFollowPolicyTest {
         policy.observe(paused(speaking), ownsSession = true)
 
         policy.resumeFollow()
-        assertNull(policy.claimPendingTarget())
+        assertEquals(speaking.followTarget(), policy.claimPendingTarget())
+        policy.onFollowSucceeded(speaking.followTarget())
 
         policy.observe(speaking, ownsSession = true)
-        assertEquals(speaking.followTarget(), policy.claimPendingTarget())
+        assertNull(policy.claimPendingTarget())
+    }
+
+    @Test
+    fun manualSuspensionSurvivesPreparingAndSentenceSeek() {
+        val policy = ConversationTtsFollowPolicy()
+        val initial = speaking(sessionId = 8, sentenceIndex = 0)
+        policy.observe(initial, ownsSession = true)
+        policy.claimPendingTarget()
+        policy.onUserDrag()
+        policy.observe(TtsState.Preparing(initial), ownsSession = true)
+        assertTrue(policy.showResumeAction)
+        val sought = speaking(sessionId = 8, sentenceIndex = 2)
+        policy.observe(sought, ownsSession = true)
+        policy.suppressNextFollowFor(sought.followTarget())
+        policy.observe(speaking(sessionId = 8, sentenceIndex = 3), ownsSession = true)
+        assertFalse(policy.isFollowEnabled)
+        assertTrue(policy.showResumeAction)
+        assertNull(policy.claimPendingTarget())
+    }
+
+    @Test
+    fun explicitResumeSurvivesPreparingAndRevealsTheNextLivePassage() {
+        val policy = ConversationTtsFollowPolicy()
+        val initial = speaking(sessionId = 9, sentenceIndex = 0)
+        policy.observe(initial, ownsSession = true)
+        policy.claimPendingTarget()
+        policy.onUserDrag()
+        policy.resumeFollow()
+        policy.observe(TtsState.Preparing(initial), ownsSession = true)
+        assertNull(policy.claimPendingRequest())
+        val next = speaking(sessionId = 9, sentenceIndex = 1)
+        policy.observe(next, ownsSession = true)
+        val request = policy.claimPendingRequest()!!
+        assertEquals(next.followTarget(), request.target)
+        assertTrue(request.anchorAtTop)
+    }
+
+    @Test
+    fun failedExplicitRevealDoesNotAnchorLaterSentences() {
+        val policy = ConversationTtsFollowPolicy()
+        val initial = speaking(sessionId = 9, sentenceIndex = 0)
+        policy.observe(initial, ownsSession = true)
+        policy.claimPendingTarget()
+        policy.resumeFollow()
+        assertTrue(policy.claimPendingRequest()!!.anchorAtTop)
+        assertTrue(policy.retryFailedFollowAttempt(initial.followTarget()))
+        assertTrue(policy.claimPendingRequest()!!.anchorAtTop)
+        assertFalse(policy.retryFailedFollowAttempt(initial.followTarget()))
+        policy.observe(speaking(sessionId = 9, sentenceIndex = 1), ownsSession = true)
+        assertFalse(policy.claimPendingRequest()!!.anchorAtTop)
+    }
+
+    @Test
+    fun unclaimedExplicitRevealDoesNotCarryAcrossOrdinaryProgress() {
+        val policy = ConversationTtsFollowPolicy()
+        policy.observe(speaking(sessionId = 9, sentenceIndex = 0), ownsSession = true)
+        policy.claimPendingTarget()
+        policy.resumeFollow()
+        policy.observe(speaking(sessionId = 9, sentenceIndex = 1), ownsSession = true)
+        assertFalse(policy.claimPendingRequest()!!.anchorAtTop)
+    }
+
+    @Test
+    fun viewportRecheckCannotTakeBackManuallyOwnedScroll() {
+        val policy = ConversationTtsFollowPolicy()
+        val current = speaking(sessionId = 10, sentenceIndex = 1)
+        policy.observe(current, ownsSession = true)
+        policy.claimPendingTarget()
+        assertTrue(policy.recheckViewport())
+        assertFalse(policy.claimPendingRequest()!!.anchorAtTop)
+        policy.onUserDrag()
+        assertFalse(policy.recheckViewport())
+        assertNull(policy.claimPendingRequest())
     }
 
     @Test

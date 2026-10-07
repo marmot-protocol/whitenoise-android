@@ -70,6 +70,14 @@ internal class ConversationTtsFollowHandle internal constructor(
         retryGeneration += 1L
     }
 
+    fun recheckViewport(
+        state: TtsState,
+        ownsSession: Boolean,
+    ) {
+        policy.observe(state, ownsSession)
+        if (policy.recheckViewport()) retryGeneration += 1L
+    }
+
     fun revealCurrentPassage(
         state: TtsState,
         ownsSession: Boolean,
@@ -291,6 +299,10 @@ internal fun ConversationTtsFollowEffects(
                     .conversationFollowSignal(),
         )
     val ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex)
+
+    LaunchedEffect(handle.sentenceLayouts.viewportBoundsInWindow, ownsSession) {
+        handle.recheckViewport(appState.ttsController.state.value, ownsSession)
+    }
 
     LaunchedEffect(explicitRevealRequestId, ownsSession) {
         if (explicitRevealRequestId > 0L) {

@@ -4238,7 +4238,12 @@ internal fun ConversationScreen(
                                     // Selection hides these controls; paging progress never covers message rows.
                                     if (!selectionMode && ttsFollowHandle.showResumeAction) {
                                         TtsResumeFollowButton(
-                                            onClick = ttsFollowHandle::resumeFollow,
+                                            onClick = {
+                                                ttsFollowHandle.revealCurrentPassage(
+                                                    appState.ttsController.state.value,
+                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                                )
+                                            },
                                         )
                                     }
                                     // Jump-to-mention chip: tap visits the oldest unread
