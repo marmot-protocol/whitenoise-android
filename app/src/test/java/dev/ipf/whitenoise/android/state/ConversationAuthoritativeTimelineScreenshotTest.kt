@@ -22,8 +22,6 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import java.time.Duration
-import java.util.TimeZone
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -35,6 +33,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.time.Duration
+import java.util.TimeZone
 
 /** Compose-level proof that authoritative and unresolved-local row order reaches visible rows. */
 @RunWith(RobolectricTestRunner::class)
@@ -71,8 +71,9 @@ class ConversationAuthoritativeTimelineScreenshotTest {
 
     /** The same recovery must not disturb reading order at RTL and 200% text. */
     @Test
-    fun quietOlderTimeoutRtlLargeText() =
+    fun quietOlderTimeoutRtlLargeText() {
         captureQuietOlderTimeout("rtl_200", dark = false, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+    }
 
     /** Drives production prefetch into a timeout and captures the retained conversation. */
     private fun captureQuietOlderTimeout(
