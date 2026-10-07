@@ -60,6 +60,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,8 +83,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -294,7 +299,10 @@ internal fun GroupDetailsScreen(
         val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
         var membersExpanded by remember(controller) { mutableStateOf(false) }
         var memberSearchOpen by remember(controller) { mutableStateOf(false) }
-        var memberQuery by remember(controller) { mutableStateOf("") }
+        var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
+        var memberSearchRetry by remember(controller) { mutableIntStateOf(0) }
+        val memberResolution =
+            rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)
         // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
         // leave path and the Admins prompt so a trapped sole admin can hand the
         // role to another member (issue #417).
@@ -1115,8 +1123,10 @@ internal fun GroupDetailsScreen(
                                 value = memberQuery,
                                 onValueChange = { memberQuery = it },
                                 placeholder = stringResource(R.string.search_members),
+                                clipboardInput = GroupMemberIdentitySearch::clipboardInput,
                                 modifier =
                                     Modifier
+                                        .testTag("chat_info.member_search")
                                         .padding(horizontal = Dimens.spaceLg)
                                         .padding(bottom = Dimens.spaceSm),
                             )
@@ -1162,21 +1172,37 @@ internal fun GroupDetailsScreen(
                             when {
                                 memberNeedle.isNotEmpty() ->
                                     displayedMembers.filter {
-                                        memberTitlesByHex[it.memberIdHex]
-                                            .orEmpty()
-                                            .contains(memberNeedle, ignoreCase = true)
+                                        GroupMemberIdentitySearch.matches(
+                                            memberNeedle,
+                                            memberResolution.hex,
+                                            it.memberIdHex,
+                                            memberTitlesByHex[it.memberIdHex].orEmpty(),
+                                        )
                                     }
                                 membersExpanded || displayedMembers.size <= GROUP_MEMBERS_PREVIEW_COUNT ->
                                     displayedMembers
                                 else -> displayedMembers.take(GROUP_MEMBERS_PREVIEW_COUNT)
                             }
-                        if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
+                        if (memberResolution.resolving) {
+                            val resolvingDescription = stringResource(R.string.recipient_preview_resolving)
+                            CircularProgressIndicator(
+                                Modifier
+                                    .padding(horizontal = Dimens.spaceLg)
+                                    .semantics {
+                                        contentDescription = resolvingDescription
+                                        liveRegion = LiveRegionMode.Polite
+                                    },
+                            )
+                        } else if (memberNeedle.isNotEmpty() && visibleMembers.isEmpty()) {
                             Text(
                                 stringResource(R.string.no_matches),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = Dimens.spaceLg),
                             )
+                            if (memberResolution.canRetry) {
+                                TextButton(onClick = { memberSearchRetry++ }) { Text(stringResource(R.string.retry)) }
+                            }
                         }
                         // Row taps route into the profile sheet, which carries the same
                         // admin actions (grant/revoke admin, remove) the old per-row menu

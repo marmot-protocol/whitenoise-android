@@ -53,6 +53,16 @@ internal suspend fun imageAttachmentBytes(
     allowNetwork: Boolean,
 ): ByteArray? {
     if (allowNetwork) return attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine, priority)
+    return localAttachmentBytes(controller, messageIdHex, attachmentIndex, mine)
+}
+
+/** Reads bytes this device already holds for an attachment, never starting a transfer. */
+internal suspend fun localAttachmentBytes(
+    controller: ConversationController,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    mine: Boolean,
+): ByteArray? {
     val retained =
         if (mine) {
             controller
