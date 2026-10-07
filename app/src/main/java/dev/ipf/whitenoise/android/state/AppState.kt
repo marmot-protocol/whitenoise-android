@@ -3907,11 +3907,15 @@ class WhiteNoiseAppState private constructor(
         // non-modal activity strip and retains terminal failures for explicit
         // retry/dismiss. Its bounded retries preserve the same safe recovery
         // boundary as the session: uncertain publishes converge, never resend.
+        // Main.immediate may deliver terminal completion inside start, so install its trace first.
+        // A rejected start still belongs to the previous operation and must retain that trace.
+        val previousDiagnostics = activeForwardDiagnostics
+        activeForwardDiagnostics = diagnostics
         val started = forwardOperationOwner.start(session)
         if (!started) {
+            activeForwardDiagnostics = previousDiagnostics
             session.release()
         } else {
-            activeForwardDiagnostics = diagnostics
             activeForwardDestinationAccountRef = account
             activeForwardTargetTitles = targetTitles
         }
