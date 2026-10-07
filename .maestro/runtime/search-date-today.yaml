@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: search-date-today
+---
+- assertVisible: "Maestro group"
+- tapOn: "Search chats"
+- hideKeyboard
+- tapOn:
+    id: "chat-list-search-filters-action"
+- tapOn:
+    id: "chat-list-search-filter-menu-Date"
+- assertVisible: "Date"
+- tapOn: "Today"
+- tapOn: "OK"
+- assertVisible:
+    id: "chat-list-search-filter-chip-date:today"
+- tapOn:
+    id: "chat-list-search-clear-all-filters"
+- assertNotVisible:
+    id: "chat-list-search-filter-chip-date:today"
+- assertVisible:
+    id: "chats.searchField"
+- back
+- assertVisible: "Maestro group"

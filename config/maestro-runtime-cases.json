@@ -1113,6 +1113,109 @@
       ],
       "assertions": "Activity recreation clears transient export passphrases and leaves the raw key hidden.",
       "postcondition": "none"
+    },
+    "search-date-cancel": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-008"
+      ],
+      "assertions": "Staging Today then cancelling the date picker leaves no applied date filter.",
+      "postcondition": "none"
+    },
+    "search-custom-start-cancel": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-009"
+      ],
+      "assertions": "Cancelling the custom-range start picker restores presets without applying a range.",
+      "postcondition": "none"
+    },
+    "search-custom-end-cancel": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-009"
+      ],
+      "assertions": "Advancing a selected start date then cancelling the end picker does not commit a partial range.",
+      "postcondition": "none"
+    },
+    "search-types-back": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-008"
+      ],
+      "assertions": "Chat-type filter dialog exposes both categories and Back closes the dialog before search.",
+      "postcondition": "none"
+    },
+    "search-content-back": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-008"
+      ],
+      "assertions": "Content filter dialog opens and Back returns to the same search without a selection.",
+      "postcondition": "none"
+    },
+    "search-date-today": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Today produces its exact active date chip; Clear all removes it.",
+      "postcondition": "none"
+    },
+    "search-date-week": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Last 7 days produces its exact active date chip; Clear all removes it.",
+      "postcondition": "none"
+    },
+    "search-date-month": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Last 30 days produces its exact active date chip; Clear all removes it.",
+      "postcondition": "none"
+    },
+    "notifications-deny": {
+      "suite": "permissions",
+      "manual_ids": [
+        "NTF-001"
+      ],
+      "assertions": "Deny the actual Android notification prompt and reach Chats with native permission denied.",
+      "postcondition": "notification-denied",
+      "fixture": "notifications"
+    },
+    "notifications-grant": {
+      "suite": "permissions",
+      "manual_ids": [
+        "NTF-001"
+      ],
+      "assertions": "Grant the actual Android notification prompt and verify the system permission is granted.",
+      "postcondition": "notification-granted",
+      "fixture": "notifications"
+    },
+    "notifications-back": {
+      "suite": "permissions",
+      "manual_ids": [
+        "NTF-001"
+      ],
+      "assertions": "Back dismisses the notification request without granting permission.",
+      "postcondition": "notification-denied",
+      "fixture": "notifications"
+    },
+    "notifications-deny-settings": {
+      "suite": "permissions",
+      "manual_ids": [
+        "NTF-001"
+      ],
+      "assertions": "Settings Notifications opens after system denial without silently granting permission.",
+      "postcondition": "notification-denied",
+      "fixture": "notifications"
     }
   }
 }

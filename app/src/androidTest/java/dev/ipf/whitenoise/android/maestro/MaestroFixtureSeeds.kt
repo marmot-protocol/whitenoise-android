@@ -10,7 +10,7 @@ internal suspend fun seedMaestroFixtureMessages(
     group: String,
     fixture: String,
 ) {
-    require(fixture in listOf("basic", "reader", "links", "poll-single", "poll-multiple", "consent"))
+    require(fixture in listOf("basic", "reader", "links", "poll-single", "poll-multiple", "consent", "notifications"))
     native.sendText(account, group, "Generated fixture message")
     when (fixture) {
         "reader" -> native.sendText(account, group, maestroReaderMessage())

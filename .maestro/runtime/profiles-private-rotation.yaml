@@ -23,7 +23,7 @@ name: profiles-private-rotation
 - tapOn: "Notes"
 - inputText: "Maestro unsaved note"
 - hideKeyboard
-- setOrientation: LANDSCAPE
+- setOrientation: LANDSCAPE_LEFT
 - assertVisible: "Maestro unsaved nickname"
 - setOrientation: PORTRAIT
 - assertVisible: "Maestro unsaved note"

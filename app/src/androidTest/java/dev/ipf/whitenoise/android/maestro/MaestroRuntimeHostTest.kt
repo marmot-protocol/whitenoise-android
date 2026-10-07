@@ -9,7 +9,6 @@ import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotAndroid
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
-import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
@@ -51,6 +50,8 @@ private val MAESTRO_POSTCONDITIONS =
         "chat-unpinned",
         "consent-pending",
         "consent-declined",
+        "notification-denied",
+        "notification-granted",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
@@ -161,7 +162,11 @@ class MaestroRuntimeHostTest {
                             .toString(),
                     )
                     activity = ActivityScenario.launch(MainActivity::class.java)
-                    awaitMaestroFixtureWindow(directory, requireConsent = fixture == "consent")
+                    awaitMaestroFixtureWindow(
+                        directory,
+                        requireConsent = fixture == "consent",
+                        requireNotificationPermission = fixture == "notifications",
+                    )
                     File(directory, "ready.json").writeText(
                         JSONObject()
                             .put("generation", generation)
@@ -215,6 +220,7 @@ class MaestroRuntimeHostTest {
         if (postcondition.startsWith("chat-")) {
             verifyMaestroChatList(native, checkNotNull(state?.activeAccountRef), peerLabel, group, postcondition)
         }
+        if (postcondition.startsWith("notification-")) verifyMaestroNotificationPermission(postcondition)
         if (postcondition.startsWith("consent-")) {
             verifyMaestroConsent(native, checkNotNull(state), postcondition)
         }
@@ -232,21 +238,6 @@ class MaestroRuntimeHostTest {
         if (postcondition == "amoled") check(state?.themeMode == AppThemeMode.Amoled)
         if (postcondition == "dark") check(state?.themeMode == AppThemeMode.Dark)
         if (postcondition == "font-large") check(state?.fontScale == AppFontScale.Large)
-        if (postcondition == "send") {
-            withTimeout(30_000L) {
-                while (true) {
-                    val messages =
-                        native
-                            .timelineMessages(
-                                peerLabel,
-                                TimelineMessageQueryFfi(group, null, null, null, null, null, 100u),
-                            ).messages
-                    val received = messages.count { it.plaintext == "Maestro verified send" }
-                    check(received <= 1) { "Duplicate peer delivery" }
-                    if (received == 1) break
-                    delay(100L)
-                }
-            }
-        }
+        if (postcondition == "send") verifyMaestroSend(native, checkNotNull(state), peerLabel, group)
     }
 }

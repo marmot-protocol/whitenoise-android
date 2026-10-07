@@ -1,0 +1,7 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: notifications-grant
+---
+- assertVisible: "Allow Maestro Test Lab to send you notifications[?]"
+- tapOn:
+    id: "com.android.permissioncontroller:id/permission_allow_button"
+- assertVisible: "Maestro group"

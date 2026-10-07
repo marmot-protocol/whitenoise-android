@@ -17,6 +17,22 @@ from scripts.manual_test_fragments import definitions, load_guide
 
 
 class RuntimeEvidenceTest(unittest.TestCase):
+    def test_rotation_commands_use_supported_pinned_cli_orientations(self):
+        """Reject flow parse failures before requesting an emulator; include every offline and runtime flow."""
+        # https://docs.maestro.dev/reference/commands-available/setorientation
+        allowed = {'PORTRAIT', 'LANDSCAPE_LEFT', 'LANDSCAPE_RIGHT', 'UPSIDE_DOWN'}
+        rotations = 0
+        for path in (runtime.ROOT / '.maestro').rglob('*.yaml'):
+            documents = list(yaml.safe_load_all(path.read_text()))
+            if len(documents) != 2:
+                continue
+            for command in documents[1]:
+                if 'setOrientation' in command:
+                    rotations += 1
+                    with self.subTest(flow=path.name):
+                        self.assertIn(command['setOrientation'], allowed)
+        self.assertGreater(rotations, 0)
+
     def test_screen_inventory_keeps_partial_and_unexecuted_requirements_visible(self):
         """Screen discovery cannot transform same-ID flow links into complete or executed coverage."""
         result = inventory()

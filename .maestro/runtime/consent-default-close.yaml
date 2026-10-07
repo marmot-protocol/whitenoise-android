@@ -5,5 +5,8 @@ name: consent-default-close
 - assertVisible: "Share usage"
 - assertVisible: "Share diagnostic logs"
 - tapOn: "Close"
+- assertVisible: "Allow Maestro Test Lab to send you notifications[?]"
+- tapOn:
+    id: "com.android.permissioncontroller:id/permission_deny_button"
 - assertVisible: "Maestro group"
 - assertNotVisible: "Help Improve White Noise"

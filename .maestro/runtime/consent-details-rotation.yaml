@@ -5,7 +5,7 @@ name: consent-details-rotation
 - assertVisible: "Share usage"
 - assertVisible: "Share diagnostic logs"
 - tapOn: "Share usage, Details"
-- setOrientation: LANDSCAPE
+- setOrientation: LANDSCAPE_LEFT
 - scrollUntilVisible:
     element:
       text: "Share usage, Hide details"

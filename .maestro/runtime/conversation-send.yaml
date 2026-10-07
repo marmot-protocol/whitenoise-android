@@ -8,6 +8,8 @@ name: conversation-send
 - tapOn: "Message"
 - inputText: "Maestro verified send"
 - tapOn: "Send"
+- assertVisible: "Message"
+- assertNotVisible: "Send"
 - assertVisible: "Maestro verified send"
 - hideKeyboard
 - back

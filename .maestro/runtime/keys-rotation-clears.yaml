@@ -19,7 +19,7 @@ name: keys-rotation-clears
 - assertVisible:
     text: "Export"
     enabled: true
-- setOrientation: LANDSCAPE
+- setOrientation: LANDSCAPE_LEFT
 - assertVisible: "Private key hidden"
 - assertNotVisible: "Encrypted Private Key"
 - setOrientation: PORTRAIT

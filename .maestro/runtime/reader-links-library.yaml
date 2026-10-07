@@ -3,6 +3,7 @@ name: reader-links-library
 ---
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
 - tapOn: "Maestro group"
 - assertVisible:
     id: "chat_info.list"

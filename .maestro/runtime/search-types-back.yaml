@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: search-types-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "Search chats"
+- hideKeyboard
+- tapOn:
+    id: "chat-list-search-filters-action"
+- tapOn:
+    id: "chat-list-search-filter-menu-ChatType"
+- assertVisible: "Chat type"
+- assertVisible: "Direct chats"
+- assertVisible: "Groups"
+- back
+- assertVisible:
+    id: "chats.searchField"
+- back
+- assertVisible: "Maestro group"
