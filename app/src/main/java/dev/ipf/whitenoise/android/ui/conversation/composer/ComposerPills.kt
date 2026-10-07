@@ -955,7 +955,9 @@ internal fun ComposerPill(
                 expansionProgress.value == expansionTarget &&
                 dictationControlWidthState.value == targetDictationControlWidth &&
                 composerScrollState.viewportSize > 0 &&
-                textLayoutSnapshot?.let { it.sourceText == textFieldValue.text && it.transformedText == transformedText } == true
+                textLayoutSnapshot?.let {
+                    it.sourceText == textFieldValue.text && it.transformedText == transformedText
+                } == true
 
         snapshotFlow { layoutSettled() }.collectLatest { settled ->
             draftTopGeometrySettled = false
@@ -1003,7 +1005,11 @@ internal fun ComposerPill(
             modifier = Modifier.width(draftTopWidth).height(40.dp).testTag(COMPOSER_DRAFT_TOP_TAG),
         ) {
             if (draftTopWidth > 48.dp) {
-                Icon(painterResource(R.drawable.ic_jump_to_top), contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(
+                    painterResource(R.drawable.ic_jump_to_top),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = draftTopLabel,

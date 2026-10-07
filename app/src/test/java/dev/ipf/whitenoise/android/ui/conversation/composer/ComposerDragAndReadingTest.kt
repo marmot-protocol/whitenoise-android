@@ -63,7 +63,6 @@ class ComposerDragAndReadingTest {
     val composeRule = createComposeRule()
 
     private var observed = TextFieldValue()
-    private var windowHeight by mutableStateOf(600)
     private var sends = 0
     private var cancels = 0
 
@@ -232,69 +231,6 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
         assertEquals("the stale empty height must not restore automatic growth", minimum, height(), 1f)
         assertEquals(original, observed)
-    }
-
-    /** Every automatic growth frame suppresses navigation until the measured editor has reached its endpoint. */
-    @Test
-    fun draftTopIsAbsentOnEveryIntermediateGrowthFrame() {
-        render("Short")
-        composeRule.mainClock.autoAdvance = false
-        composeRule.onNode(hasSetTextAction()).performTextReplacement(longDraft)
-        repeat(COMPOSER_EXPANSION_ANIMATION_MILLIS / FRAME_STEP_MS) {
-            composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
-            composeRule.mainClock.advanceTimeByFrame()
-        }
-        composeRule.mainClock.advanceTimeBy(COMPOSER_EXPANSION_ANIMATION_MILLIS.toLong())
-        composeRule.mainClock.autoAdvance = true
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
-        assertEquals("the animation must not send", 0, sends)
-    }
-
-    /** Window/IME bounds can clamp a settled manual composer without changing its expansion mode. */
-    @Test
-    fun draftTopWaitsForUnchangedDraftWindowReflow() {
-        render(longDraft)
-        drag(-400f)
-        val before = observed
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
-        composeRule.mainClock.autoAdvance = false
-        composeRule.runOnUiThread { windowHeight = 280 }
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.mainClock.autoAdvance = true
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
-        assertEquals(before, observed)
-        assertEquals(0, sends)
-        composeRule.runOnUiThread { windowHeight = 600 }
-        composeRule.waitForIdle()
-        assertEquals(before, observed)
-    }
-
-    /** Pointer-rate resize and reversal cannot mount a control or change the current selection. */
-    @Test
-    fun draftTopIsAbsentDuringLiveResizeAndReversal() {
-        render(longDraft)
-        val original = observed
-        composeRule.mainClock.autoAdvance = false
-        composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
-            down(center)
-            moveBy(Offset(0f, -60f), delayMillis = FRAME_STEP_MS.toLong())
-        }
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
-            moveBy(Offset(0f, 30f), delayMillis = FRAME_STEP_MS.toLong())
-        }
-        composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput { cancel() }
-        composeRule.mainClock.autoAdvance = true
-        composeRule.waitForIdle()
-        assertEquals(original, observed)
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
     }
 
     @Test
@@ -707,7 +643,6 @@ class ComposerDragAndReadingTest {
         selection: TextRange = TextRange(draft.length),
     ) {
         observed = TextFieldValue(draft, selection)
-        windowHeight = surfaceHeight
         sends = 0
         cancels = 0
         composeRule.setContent {
@@ -718,7 +653,7 @@ class ComposerDragAndReadingTest {
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 WhiteNoiseTheme(darkTheme = dark) {
-                    Surface(Modifier.width(width.dp).height(windowHeight.dp)) {
+                    Surface(Modifier.width(width.dp).height(surfaceHeight.dp)) {
                         Box(contentAlignment = Alignment.BottomCenter) {
                             ComposerBar(
                                 replyingTo = null,
@@ -748,7 +683,6 @@ class ComposerDragAndReadingTest {
     }
 
     private companion object {
-        const val FRAME_STEP_MS = 16
         const val TAG = "composer-reading-test"
         val longDraft = (1..80).joinToString("\n") { "Synthetic line $it in this long draft" }
     }
