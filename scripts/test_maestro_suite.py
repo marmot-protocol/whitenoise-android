@@ -10,6 +10,27 @@ from scripts import maestro_suite as suite
 
 
 class MaestroSuiteTest(unittest.TestCase):
+    def test_every_allowlisted_flow_starts_with_disposable_state(self):
+        """A new flow cannot accidentally retain prior identity or enable sharing."""
+        for filename, _ in suite.CASES.values():
+            with self.subTest(flow=filename):
+                flow = (suite.ROOT / '.maestro' / filename).read_text()
+                self.assertIn('clearState: true', flow)
+                self.assertIn('all: deny', flow)
+                self.assertNotIn('openLink:', flow)
+                self.assertNotIn('point:', flow)
+
+    def test_signup_dismisses_name_keyboard_before_scrolling_to_about(self):
+        """Regress the observed hosted failure on the small emulator viewport."""
+        for key in ('signup-cancel', 'signup-offline-retry'):
+            with self.subTest(flow=key):
+                flow = (suite.ROOT / '.maestro' / suite.CASES[key][0]).read_text()
+                after_name = flow.split('- inputText: "Maestro Offline Draft"', 1)[1]
+                before_about = after_name.split('id: "onboarding.sign_up.about"', 1)[0]
+                self.assertIn('- hideKeyboard', before_about)
+                self.assertIn('- scrollUntilVisible:', before_about)
+                self.assertLess(before_about.index('- hideKeyboard'), before_about.index('- scrollUntilVisible:'))
+
     def test_allowlist_and_budget_before_setup(self):
         self.assertEqual(suite.selection('onboarding', '20', 'false')[1], 20)
         self.assertEqual(len(suite.selection('offline', '3', 'false')[0]) * 3, 18)
