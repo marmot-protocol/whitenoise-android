@@ -63,11 +63,11 @@ class AndroidCiGateTest(unittest.TestCase):
         blocks = re.split(r'(?=^      - name: )', job, flags=re.MULTILINE)
         return [block for block in blocks if './gradlew' in block]
 
-    def run_gate(self, outcomes):
+    def run_gate(self, outcomes, event='pull_request'):
         """Run the production shell with synthetic, untrusted JSON input."""
         return subprocess.run(
             ['bash', '-c', self.script],
-            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': 'pull_request'},
+            env={**os.environ, 'JOB_RESULTS': json.dumps(outcomes), 'CI_EVENT': event},
             capture_output=True, text=True, check=False,
         )
 
@@ -229,6 +229,37 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertIn('python3 -m unittest scripts/test_run_android_instrumented_dispatch.py', step)
         self.assertIn('python3 -m unittest scripts/test_check_instrumented_required_cases.py', step)
 
+    def test_queue_trigger_and_revision_are_distinct_from_pr_runs(self):
+        self.assertIn('  merge_group:\n    types: [checks_requested]\n', self.workflow)
+        self.assertIn("cancel-in-progress: ${{ github.event_name != 'merge_group' }}", self.workflow)
+        self.assertIn("github.event_name == 'merge_group' && github.sha || github.ref", self.workflow)
+        self.assertIn('github.event.merge_group.base_sha ||', self.changes)
+        self.assertIn('github.event.merge_group.head_sha ||', self.changes)
+        self.assertIn('ref: ${{ github.sha }}', self.changes)
+
+    def test_queue_aggregate_requires_real_successful_jobs(self):
+        outcomes = self.successful_outcomes()
+        self.assertEqual(self.run_gate(outcomes, 'merge_group').returncode, 0)
+        for dependency in self.dependencies:
+            for result in ['failure', 'cancelled', 'skipped']:
+                bad = self.successful_outcomes()
+                bad[dependency]['result'] = result
+                with self.subTest(dependency=dependency, result=result):
+                    self.assertNotEqual(self.run_gate(bad, 'merge_group').returncode, 0)
+
+    def test_queue_documentation_shortcut_still_requires_the_classifiers(self):
+        outcomes = self.successful_outcomes()
+        outcomes['changes']['outputs'] = {'docs_only': 'true', 'supplemental_campaigns': 'false'}
+        for name in self.dependencies:
+            if name not in {'changes', 'tooling-contracts'}:
+                outcomes[name]['result'] = 'skipped'
+        self.assertEqual(self.run_gate(outcomes, 'merge_group').returncode, 0)
+        for name in ['changes', 'tooling-contracts']:
+            bad = json.loads(json.dumps(outcomes))
+            bad[name]['result'] = 'failure'
+            self.assertNotEqual(self.run_gate(bad, 'merge_group').returncode, 0)
+        self.assertNotEqual(self.run_gate(outcomes, 'push').returncode, 0)
+
     def test_job_caches(self):
         """Every workload retains its own task cache; forks remain read-only."""
         gradle_setup_steps = re.findall(
@@ -238,8 +269,8 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertEqual(len(gradle_setup_steps), 4)
         for step in gradle_setup_steps:
             self.assertIn(
-                "cache-read-only: ${{ github.event_name == 'pull_request' && "
-                "github.event.pull_request.head.repo.full_name != github.repository }}",
+                "cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && "
+                "github.event.pull_request.head.repo.full_name != github.repository) }}",
                 step,
             )
         self.assertNotIn('uses: actions/cache@', self.workflow)
@@ -247,6 +278,7 @@ class AndroidCiGateTest(unittest.TestCase):
         self.assertEqual(self.workflow.count('uses: actions/cache/save@'), 1)
         save_step = self.named_step(self.tests_job, 'Save MarmotKit artifact')
         self.assertIn("matrix.flavor == 'Play'", save_step)
+        self.assertIn("github.event_name != 'merge_group'", save_step)
         self.assertIn("github.event_name != 'pull_request'", save_step)
         self.assertIn(
             'github.event.pull_request.head.repo.full_name == github.repository',
@@ -324,7 +356,7 @@ class AndroidCiGateTest(unittest.TestCase):
         step = self.named_step(gate, 'Require independent builds and release lint')
         script = textwrap.dedent(step.split('        run: |\n', 1)[1])
         for campaign in ('true', 'false', '', 'unexpected'):
-            for event in ('pull_request', 'schedule', 'workflow_dispatch', 'push'):
+            for event in ('pull_request', 'merge_group', 'schedule', 'workflow_dispatch', 'push'):
                 for changes in ('success', 'failure', 'skipped', 'cancelled'):
                     for build in ('success', 'failure', 'cancelled', 'skipped'):
                         for lint in ('success', 'failure', 'cancelled', 'skipped'):
@@ -334,7 +366,7 @@ class AndroidCiGateTest(unittest.TestCase):
                                 capture_output=True, check=False)
                             expected = changes == lint == 'success' and (
                                 campaign == 'true' and build == 'success' or
-                                campaign == 'false' and event == 'pull_request' and build == 'skipped')
+                                campaign == 'false' and event in {'pull_request', 'merge_group'} and build == 'skipped')
                             self.assertEqual(result.returncode == 0, expected,
                                              (campaign, event, changes, build, lint))
 
@@ -418,7 +450,8 @@ class AndroidCiGateTest(unittest.TestCase):
             events = workflow.split('\non:\n', 1)[1].split('\nconcurrency:', 1)[0]
             self.assertIn('  schedule:\n', events)
             self.assertIn('  workflow_dispatch:', events)
-            self.assertIn('${{ github.event_name }}-${{ github.ref }}', workflow)
+            self.assertIn('${{ github.event_name }}-${{ github.event_name ==', workflow)
+            self.assertIn("'merge_group' && github.sha || github.ref", workflow)
             self.assertIn('  pull_request:\n    branches: [master]', events)
         # A readiness-only trigger or draft guard would create a second CI phase.
         for path in WORKFLOW.parent.glob('*.yml'):
