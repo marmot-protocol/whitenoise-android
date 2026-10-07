@@ -771,7 +771,10 @@ internal fun ChatsScreen(
         val canonical = canonicalChatListGroupId(groupIdHex)
         val item =
             sourceList.firstOrNull { canonicalChatListGroupId(it.group.groupIdHex) == canonical }
-                ?: return
+                ?: run {
+                    appState.present(R.string.toast_original_message_unavailable)
+                    return
+                }
         openGroupFromVisibleList(item, messageIdHex, false)
     }
 
@@ -940,7 +943,10 @@ internal fun ChatsScreen(
         datasetKey = chatListDatasetKey,
         searchActive = searchActive,
         viewportState = searchViewport?.resetState(showArchived),
-        onScrollRequested = { programmaticViewportGeneration += 1L },
+        onScrollRequested = {
+            searchViewport?.selection?.selected = GlobalSearchSelectedResult()
+            programmaticViewportGeneration += 1L
+        },
     )
     GlobalSearchGridResetEffect(searchViewport, chatListDatasetKey, browsingAttachments)
     var headScrollCorrectionInProgress by remember(chatListDatasetKey) { mutableStateOf(false) }
@@ -1329,16 +1335,28 @@ internal fun ChatsScreen(
         diagnosticsPrompt()
     }
 
+    val returnedSearchSelection = rememberReturnedSearchSelection(searchViewport?.selection)
     val chatRowContent: @Composable LazyItemScope.(ChatListItem, Int, MessageBodyMatch?) -> Unit =
         { item, targetIndex, bodyMatch ->
             val rowId = visibleRowId(item)
+            val returnedRow =
+                searchActive &&
+                    !selectionMode &&
+                    bodyMatch != null &&
+                    returnedSearchSelection == searchViewport?.selection?.selected &&
+                    returnedSearchSelection?.matches(item.group.groupIdHex, bodyMatch.messageIdHex) == true
+            val returnFocus =
+                globalSearchReturnFocusModifier(returnedRow, searchViewport?.selection?.returnGeneration ?: 0L) {
+                    !chatListState.isScrollInProgress &&
+                        chatListState.layoutInfo.visibleItemsInfo.any { it.key == rowId }
+                }
             Box(
                 modifier =
                     if (searchActive) {
                         Modifier
                     } else {
                         chatListRowMotion(targetIndex, rowPlacementDurationMillis)
-                    },
+                    }.then(returnFocus),
             ) {
                 val menuAccount = appState.activeAccountRef
                 val menuRuntime = appState.runtimeGeneration
@@ -1416,7 +1434,7 @@ internal fun ChatsScreen(
                         isMuted = item.engineMuted(),
                         interactionsEnabled = chatListInteractionsEnabled,
                         selectionMode = selectionMode,
-                        selected = rowId in selectedChatIds,
+                        selected = rowId in selectedChatIds || returnedRow,
                         menuHighlighted = actionSheetChatId == rowId,
                         onActionsHeldChange = { held ->
                             if (held && menuActionsCurrent()) {
@@ -1429,7 +1447,12 @@ internal fun ChatsScreen(
                             }
                         },
                         bodyMatch = bodyMatch,
-                        onOpen = { openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false) },
+                        onOpen = {
+                            searchViewport?.selection?.selected =
+                                bodyMatch?.let { GlobalSearchSelectedResult(item.group.groupIdHex, it.messageIdHex) }
+                                    ?: GlobalSearchSelectedResult()
+                            openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false)
+                        },
                         onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
                         onOpenActions = {
                             if (menuActionsCurrent()) {
@@ -1796,6 +1819,7 @@ internal fun ChatsScreen(
                                 openSearchMessage(groupIdHex, messageIdHex)
                             },
                             thumbnail = { item -> libraryThumbnail(appState, controller.boundAccountRef, item) },
+                            selectionOwner = searchViewport?.selection,
                             gridState =
                                 searchViewport?.attachmentGrid ?: androidx.compose.foundation.lazy.grid
                                     .rememberLazyGridState(),

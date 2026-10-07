@@ -8,9 +8,9 @@ import androidx.compose.runtime.saveable.listSaver
 import dev.ipf.whitenoise.android.search.GlobalSearchContentFilterSelection
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 
-internal class ChatListSearchViewportState(
-    var appliedDatasetKey: ChatListDatasetKey? = null,
-)
+private const val VIEWPORT_SAVED_FIELD_COUNT = 8
+private const val VIEWPORT_FILTERS_PRESENT_INDEX = 6
+private const val VIEWPORT_FILTERS_STATE_INDEX = 7
 
 /** Save coordinates' query identity, not result bodies, so rotation does not replay an already-applied reset. */
 internal val ChatListSearchViewportStateSaver =
@@ -49,7 +49,7 @@ internal val ChatListSearchViewportStateSaver =
 /** An invalid saved coordinate identity gets a fresh reset, never a restoration crash. */
 private fun restoreViewportDataset(saved: List<Any>): ChatListDatasetKey? =
     runCatching {
-        require(saved.size == 8)
+        require(saved.size == VIEWPORT_SAVED_FIELD_COUNT)
         if (saved[0] as Boolean) {
             ChatListDatasetKey(
                 showArchived = saved[1] as Boolean,
@@ -58,8 +58,8 @@ private fun restoreViewportDataset(saved: List<Any>): ChatListDatasetKey? =
                 accountRef = (saved[4] as String).ifEmpty { null },
                 runtimeGeneration = saved[5] as Int,
                 searchFilters =
-                    if (saved[6] as Boolean) {
-                        decodeGlobalSearchState(saved[7] as String).viewportFilters()
+                    if (saved[VIEWPORT_FILTERS_PRESENT_INDEX] as Boolean) {
+                        decodeGlobalSearchState(saved[VIEWPORT_FILTERS_STATE_INDEX] as String).viewportFilters()
                     } else {
                         null
                     },

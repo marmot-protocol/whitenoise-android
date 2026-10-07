@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.ui.chats.ChatListSearchTopResetEffect
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchAccountScope
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchChatFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchGridResetEffect
+import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSelectedResult
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSenderFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.viewportFilters
@@ -39,6 +40,26 @@ import org.robolectric.annotation.GraphicsMode
 class MainShellGlobalSearchStateRestorationTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    /** Selection persists only as identifiers; rotation retains it and a new account drops it. */
+    @Test
+    fun returnedResultSelectionSurvivesRotationButNotAccountReplacement() {
+        val account = mutableStateOf("personal")
+        var holder: MainShellGlobalSearchStateHolder? = null
+        val restoration = StateRestorationTester(composeRule)
+        restoration.setContent {
+            val owner = rememberMainShellGlobalSearchState(account.value, 1)
+            SideEffect { holder = owner }
+        }
+        val selected = GlobalSearchSelectedResult("group", "message", 2)
+        composeRule.runOnIdle { requireNotNull(holder).viewport.selection.selected = selected }
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.runOnIdle { assertEquals(selected, requireNotNull(holder).viewport.selection.selected) }
+        composeRule.runOnIdle { account.value = "work" }
+        composeRule.runOnIdle {
+            assertEquals(GlobalSearchSelectedResult(), requireNotNull(holder).viewport.selection.selected)
+        }
+    }
 
     /** Returning waits for fresh native rows without measuring an empty list or replaying a top reset. */
     @Test
@@ -95,14 +116,18 @@ class MainShellGlobalSearchStateRestorationTest {
         composeRule.runOnIdle { requireNotNull(holder).viewport.listState(false).requestScrollToItem(12, 13) }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
-            requireNotNull(holder).update { it.copy(senderFilters = setOf(GlobalSearchSenderFilter("sender", "Alice"))) }
+            requireNotNull(holder).update {
+                it.copy(senderFilters = setOf(GlobalSearchSenderFilter("sender", "Alice")))
+            }
         }
         composeRule.waitForIdle()
         assertListCoordinates({ holder }, 0, 0)
         composeRule.runOnIdle { requireNotNull(holder).viewport.listState(false).requestScrollToItem(12, 13) }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
-            requireNotNull(holder).update { it.copy(senderFilters = setOf(GlobalSearchSenderFilter("sender", "Renamed"))) }
+            requireNotNull(holder).update {
+                it.copy(senderFilters = setOf(GlobalSearchSenderFilter("sender", "Renamed")))
+            }
         }
         composeRule.waitForIdle()
         assertListCoordinates({ holder }, 12, 13)
@@ -139,7 +164,13 @@ class MainShellGlobalSearchStateRestorationTest {
         }
     }
 
-    private fun dataset(state: GlobalSearchState): ChatListDatasetKey = ChatListDatasetKey(false, null, "needle", searchFilters = state.viewportFilters())
+    private fun dataset(state: GlobalSearchState): ChatListDatasetKey =
+        ChatListDatasetKey(
+            false,
+            null,
+            "needle",
+            searchFilters = state.viewportFilters(),
+        )
 
     private fun assertListCoordinates(
         holder: () -> MainShellGlobalSearchStateHolder?,

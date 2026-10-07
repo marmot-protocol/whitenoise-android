@@ -342,7 +342,10 @@ class GlobalSearchStateTest {
             )
         val reconciled = GlobalSearchTransitions.reconcileLabels(state, mapOf("in" to "Renamed"), emptyMap())
         assertEquals(state.folderFilters, reconciled.folderFilters)
-        assertEquals(setOf(GlobalSearchChatFilter("in", "Renamed"), GlobalSearchChatFilter("out", "Out")), reconciled.chatFilters)
+        assertEquals(
+            setOf(GlobalSearchChatFilter("in", "Renamed"), GlobalSearchChatFilter("out", "Out")),
+            reconciled.chatFilters,
+        )
         assertEquals(state, GlobalSearchTransitions.reconcileLabels(state, emptyMap(), emptyMap()))
     }
 

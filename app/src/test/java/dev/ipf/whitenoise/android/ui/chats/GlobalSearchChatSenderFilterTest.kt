@@ -15,14 +15,21 @@ class GlobalSearchChatSenderFilterTest {
     fun folderTypeAndNamedChatsIntersectWithoutTurningEmptyIntoAll() {
         val a = leftScopeRow("AA")
         val b = leftScopeRow("BB")
-        val dm = leftScopeRow("CC").let { it.copy(projection = it.projection?.copy(conversationKind = ChatConversationKindFfi.DIRECT)) }
+        val dm =
+            leftScopeRow("CC").let {
+                it.copy(projection = it.projection?.copy(conversationKind = ChatConversationKindFfi.DIRECT))
+            }
         val rows = listOf(a, b, dm)
-        val state = GlobalSearchState(chatFilters = setOf(GlobalSearchChatFilter("aa", "A"), GlobalSearchChatFilter("cc", "C")))
+        val state =
+            GlobalSearchState(
+                chatFilters = setOf(GlobalSearchChatFilter("aa", "A"), GlobalSearchChatFilter("cc", "C")),
+            )
 
         assertEquals(listOf(a), globalSearchScopedChats(rows, state, setOf("AA", "BB")))
         assertTrue(globalSearchScopedChats(rows, state, emptySet()).isEmpty())
         assertEquals(listOf(a, dm), globalSearchScopedChats(rows, state, null))
-        assertEquals(listOf(a), globalSearchScopedChats(rows, state.copy(chatTypeFilters = setOf(GlobalSearchChatType.GROUPS)), null))
+        val groupsOnly = state.copy(chatTypeFilters = setOf(GlobalSearchChatType.GROUPS))
+        assertEquals(listOf(a), globalSearchScopedChats(rows, groupsOnly, null))
     }
 
     /** A selected chat narrows the roster; self is one canonical key, not a local account label. */
@@ -52,7 +59,10 @@ class GlobalSearchChatSenderFilterTest {
         assertEquals(listOf("selected", "other"), choices.map { it.id })
         assertEquals("Alice · Unavailable", choices.first().title)
         assertTrue(choices.first().enabled)
-        assertEquals("Alice", globalSearchPickerChoices(emptyList(), mapOf("selected" to "Alice"), true, "Unavailable").single().title)
+        assertEquals(
+            "Alice",
+            globalSearchPickerChoices(emptyList(), mapOf("selected" to "Alice"), true, "Unavailable").single().title,
+        )
     }
 
     /** Label hydration does not change the dataset or reset the viewport. */
@@ -65,5 +75,7 @@ class GlobalSearchChatSenderFilterTest {
     }
 
     private fun roster(vararg ids: String): GroupMemberSnapshot =
-        GroupMemberSnapshot(ids.map { AppGroupMemberRecordFfi(memberIdHex = it, account = "local-label", local = false) })
+        GroupMemberSnapshot(
+            ids.map { AppGroupMemberRecordFfi(memberIdHex = it, account = "local-label", local = false) },
+        )
 }

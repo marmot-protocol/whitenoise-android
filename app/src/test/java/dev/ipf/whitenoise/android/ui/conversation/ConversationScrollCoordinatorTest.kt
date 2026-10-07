@@ -1746,7 +1746,7 @@ class ConversationScrollCoordinatorTest {
         val searchNavigation =
             screen
                 .substringAfter("fun scrollToSearchMatch(match: ConversationSearchMatch)")
-                .substringBefore("// Step the cursor")
+                .substringBefore("fun navigateToSearchMatch(forward: Boolean)")
         val searchCallbacks =
             screen
                 .substringAfter("onSearchQueryChange = {")
@@ -1777,7 +1777,7 @@ class ConversationScrollCoordinatorTest {
     fun conversationScreenHighlightsOnlyCompletedCenteringCommands() {
         val screen = sourceFile("ConversationScreen.kt").readText()
 
-        assertEquals(1, Regex("if \\(!centered\\)").findAll(screen).count())
+        assertEquals(1, Regex("if \\(!centered \\|\\| !navigationRequest.isCurrent\\(\\)\\)").findAll(screen).count())
         assertEquals(1, Regex("if \\(centered && navigationRequest.isCurrent\\(\\)\\)").findAll(screen).count())
         val mention =
             screen

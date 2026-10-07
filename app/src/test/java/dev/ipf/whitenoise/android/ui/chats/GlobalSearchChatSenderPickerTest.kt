@@ -9,6 +9,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -41,7 +42,10 @@ class GlobalSearchChatSenderPickerTest {
     /** Search virtualizes a large roster, announces its count and toggles stable identities. */
     @Test
     fun largeRosterSearchAndMultiSelectKeepAccountKeys() {
-        val state = mutableStateOf(GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Sender))
+        val state =
+            mutableStateOf(
+                GlobalSearchState(isOpen = true, openFilterCategory = GlobalSearchFilterCategory.Sender),
+            )
         val options =
             GlobalSearchFilterOptions(
                 senders = List(1000) { WhiteNoisePickerItem("key-$it", "Person ${it.toString().padStart(4, '0')}") },
@@ -55,15 +59,22 @@ class GlobalSearchChatSenderPickerTest {
         composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SEARCH_TAG).performTextInput("Person 0999")
         assertResultCount(1)
         composeRule
-            .onNodeWithText("Person 0999")
+            .onNode(hasText("Person 0999") and SemanticsMatcher.keyIsDefined(SemanticsProperties.ToggleableState))
             .assertIsOff()
             .performClick()
             .assertIsOn()
-        composeRule.runOnIdle { assertEquals(setOf("key-999"), state.value.senderFilters.mapTo(mutableSetOf()) { it.stableId }) }
+        composeRule.runOnIdle {
+            assertEquals(setOf("key-999"), state.value.senderFilters.mapTo(mutableSetOf()) { it.stableId })
+        }
         composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SEARCH_TAG).performTextClearance()
         composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SEARCH_TAG).performTextInput("Person 0000")
-        composeRule.onNodeWithText("Person 0000").performClick()
-        composeRule.runOnIdle { assertEquals(setOf("key-999", "key-0"), state.value.senderFilters.mapTo(mutableSetOf()) { it.stableId }) }
+        composeRule
+            .onNode(
+                hasText("Person 0000") and SemanticsMatcher.keyIsDefined(SemanticsProperties.ToggleableState),
+            ).performClick()
+        composeRule.runOnIdle {
+            assertEquals(setOf("key-999", "key-0"), state.value.senderFilters.mapTo(mutableSetOf()) { it.stableId })
+        }
         composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SEARCH_TAG).performTextClearance()
         composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTER_SEARCH_TAG).performTextInput("Nobody matches")
         assertResultCount(0)

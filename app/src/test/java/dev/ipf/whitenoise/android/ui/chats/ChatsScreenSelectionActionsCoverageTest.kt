@@ -222,13 +222,17 @@ class ChatsScreenSelectionActionsCoverageTest {
             "onGlobalSearchStateChange:",
             // Keyed by the viewport's owner — account, runtime generation and list variant — so a
             // retained frame cannot carry one account's position into another's list.
-            "val chatListState = key(viewportOwner) { rememberLazyListState() }",
+            "val chatListState = searchViewport?.listState(showArchived)",
         ).forEach { declaration ->
             assertTrue(
                 "$declaration must remain outside the editor swap so closing it preserves list state",
                 source.indexOf(declaration) in 0 until handoffStart,
             )
         }
+        assertTrue(
+            "isolated owners must retain their account/runtime/list-keyed fallback outside the editor swap",
+            "?: key(viewportOwner) { rememberLazyListState() }" in source.substring(0, handoffStart),
+        )
         assertTrue(
             "global search must be shell-owned so the editor swap does not reset it",
             "globalSearchState = scopedGlobalSearchState" in mainShellSource().readText(),

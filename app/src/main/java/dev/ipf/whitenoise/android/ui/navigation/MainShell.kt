@@ -754,6 +754,7 @@ internal fun MainShell(
         val listVisible = selectedChat == null
         chatsController.setChatListVisible(listVisible)
         if (listVisible) {
+            globalSearch.viewport.selection.onConversationReturned()
             chatListReturnHeadSnap = onChatListBecameVisible(chatListReturnHeadSnap)
         }
     }

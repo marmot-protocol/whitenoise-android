@@ -65,6 +65,12 @@
         ]
       },
       {
+        "surface": "Removed search target notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": ["FIND-013"]
+      },
+      {
         "surface": "string:you",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.you",
