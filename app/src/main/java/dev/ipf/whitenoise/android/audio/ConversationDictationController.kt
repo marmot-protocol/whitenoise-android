@@ -3360,7 +3360,7 @@ internal class ConversationDictationController internal constructor(
             completedTargetValidation(target, includeReply = false) !=
             ConversationDictationTargetValidation.DefinitelyRemoved
         ) {
-            draftRecovery.recover(
+            recoverRecognizedDraft(
                 sessionId,
                 failedTarget,
                 transcript,
@@ -3600,20 +3600,33 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         target: ConversationDictationTarget,
         transcript: String?,
+        options: ConversationDictationDraftRecovery.Options = ConversationDictationDraftRecovery.Options(),
     ): Boolean {
         if (transcript.isNullOrBlank() || draftTargetRemoved || state.sessionId != sessionId) return false
         val available =
             completedTargetValidation(target, includeReply = false) !=
                 ConversationDictationTargetValidation.DefinitelyRemoved
-        val recovered =
-            available &&
-                draftRecovery.recover(
+        val result =
+            if (available) {
+                draftRecovery.recoverWithResult(
                     sessionId,
                     target,
                     transcript,
+                    options,
                 )
+            } else {
+                ConversationDictationDraftRecovery.Result.Unavailable
+            }
+        if (state.sessionId != sessionId) return false
+        val published = result == ConversationDictationDraftRecovery.Result.Written
+        if (published) {
+            val key = ConversationDictationKey.from(target.accountRef, target.groupIdHex)
+            completionRevisions[key] = (completionRevisions[key] ?: 0) + 1
+        }
+        val recovered = result != ConversationDictationDraftRecovery.Result.Unavailable
         conversationDictationDiagnostic(
-            "event=paste_write outcome=${if (recovered) "accepted" else "retained"} source=latest_draft",
+            "event=paste_write outcome=${if (recovered) "accepted" else "retained"} " +
+                "source=latest_draft published=$published",
         )
         return recovered
     }

@@ -69,18 +69,37 @@ internal class ConversationDictationDraftRecovery(
         target: ConversationDictationTarget,
         transcript: String,
         options: Options = Options(),
-    ): Boolean {
+    ): Boolean = recoverWithResult(session, target, transcript, options) != Result.Unavailable
+
+    enum class Result {
+        Written,
+        AlreadyPresent,
+        Unavailable,
+    }
+
+    /** Distinguishes a new accepted draft write from an unchanged, verified receipt. */
+    fun recoverWithResult(
+        session: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+        options: Options = Options(),
+    ): Result {
         val text = transcript.trim()
-        if (text.isEmpty()) return false
+        if (text.isEmpty()) return Result.Unavailable
         var result = RecoveryAttempt.Retry
         repeat(DICTATION_DRAFT_WRITE_ATTEMPTS) {
             if (result == RecoveryAttempt.Retry) result = recoverAttempt(session, target, text, options)
         }
-        return result == RecoveryAttempt.Recovered
+        return when (result) {
+            RecoveryAttempt.Written -> Result.Written
+            RecoveryAttempt.AlreadyPresent -> Result.AlreadyPresent
+            else -> Result.Unavailable
+        }
     }
 
     private enum class RecoveryAttempt {
-        Recovered,
+        Written,
+        AlreadyPresent,
         Retry,
         Unavailable,
     }
@@ -104,7 +123,13 @@ internal class ConversationDictationDraftRecovery(
             val current =
                 runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull()
                     ?: return@run RecoveryAttempt.Unavailable
-            if (previous?.transcript == text && previous.emptiedRevision == null) return@run RecoveryAttempt.Recovered
+            if (previous?.transcript == text && previous.emptiedRevision == null && !options.restoreCapturedPrefix) {
+                return@run if (sameDictationRecoveryDraft(previous.draft, current)) {
+                    RecoveryAttempt.AlreadyPresent
+                } else {
+                    RecoveryAttempt.Unavailable
+                }
+            }
             val insertion = planInsertion(previous, current, text, options) ?: return@run RecoveryAttempt.Unavailable
             val value = insertionValue(target, text, insertion)
             val revision =
@@ -118,7 +143,7 @@ internal class ConversationDictationDraftRecovery(
                     options,
                     RecoveryWrite(previous, current, insertion, value, revision),
                 )
-            RecoveryAttempt.Recovered
+            RecoveryAttempt.Written
         }
 
     private fun recoveryReceipt(

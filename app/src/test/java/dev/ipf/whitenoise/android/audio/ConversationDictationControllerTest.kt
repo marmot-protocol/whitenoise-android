@@ -3896,6 +3896,11 @@ class ConversationDictationControllerTest {
                 assertTrue(fixture.platform.pendingCallerAudio)
                 assertTrue(sent.isEmpty())
                 assertEquals("first", fixture.drafts.getValue(key()).text)
+                assertEquals(1, fixture.controller.completionRevision(ACCOUNT, GROUP))
+                assertEquals(0, fixture.controller.completionRevision(ACCOUNT, "another-group"))
+                fixture.controller.onAppForegrounded()
+                assertEquals(1, fixture.controller.completionRevision(ACCOUNT, GROUP))
+                assertEquals(1, fixture.writes)
                 assertEquals(0, rejected.acknowledgedCallerAudio)
                 fixture.scheduler.advanceBy(10_000L)
                 assertEquals(2, fixture.platform.sessions.size)
@@ -6368,12 +6373,14 @@ class ConversationDictationControllerTest {
             assertTrue(failed.draftRecovered)
             assertEquals("Draft recognized", f.drafts.getValue(key()).text)
             assertEquals(1, f.writes)
+            assertEquals(1, f.controller.completionRevision(ACCOUNT, GROUP))
             f.controller.onAppForegrounded()
             f.controller.retry()
             advanceUntilIdle()
             assertEquals("Draft recognized", f.drafts.getValue(key()).text)
             assertEquals(1, f.writes)
             assertEquals(0, sends)
+            assertEquals(1, f.controller.completionRevision(ACCOUNT, GROUP))
         }
 
     /** An authoritative removal rejects recovery even while the local origin still looks available. */

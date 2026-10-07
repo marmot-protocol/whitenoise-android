@@ -41,6 +41,53 @@ internal class ConversationDictationDraftRecoveryTest {
     }
 
     @Test
+    fun repeatedRecoveryReportsOnlyNewAcceptedWrites() {
+        val f = Fixture()
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.Written,
+            f.recovery.recoverWithResult(1, f.target, "first"),
+        )
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.AlreadyPresent,
+            f.recovery.recoverWithResult(1, f.target, "first"),
+        )
+        assertEquals(1, f.writes)
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.Written,
+            f.recovery.recoverWithResult(1, f.target, "first second"),
+        )
+        assertEquals("Draft first second", f.draft.value.text)
+        assertEquals(2, f.writes)
+    }
+
+    @Test
+    fun editedDraftCannotReuseAnOldTranscriptReceipt() {
+        listOf("Draft", "New text", "Draft first", "").forEach { edited ->
+            val f = Fixture()
+            assertTrue(f.recovery.recover(1, f.target, "first"))
+            f.edit(edited)
+            assertEquals(
+                ConversationDictationDraftRecovery.Result.Unavailable,
+                f.recovery.recoverWithResult(1, f.target, "first"),
+            )
+            assertFalse(f.recovery.recover(1, f.target, "first"))
+            assertEquals(edited, f.draft.value.text)
+            assertEquals(1, f.writes)
+            assertNull(f.recovery.sendTarget(1, f.target))
+        }
+    }
+
+    @Test
+    fun newSuffixRespectsRemovalOfThePreviousInsertion() {
+        val f = Fixture()
+        assertTrue(f.recovery.recover(1, f.target, "first"))
+        f.edit("New text")
+        assertTrue(f.recovery.recover(1, f.target, "first second"))
+        assertEquals("New text second", f.draft.value.text)
+        assertNull(f.recovery.sendTarget(1, f.target))
+    }
+
+    @Test
     fun editsBeforeTheFailureRemainThroughFurtherRecognition() {
         val f = Fixture()
         f.edit("New draft")
