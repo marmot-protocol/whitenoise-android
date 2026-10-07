@@ -15,6 +15,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.ReportReasonFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
+import dev.ipf.whitenoise.android.state.REPORT_EXPLANATION_LIMIT
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -24,6 +26,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /** Exercises the production sheet and platform IME; only the encrypted publication boundary is substituted. */
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class ReportMessageImeTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -49,12 +52,21 @@ class ReportMessageImeTest {
         }
         composeRule.onNodeWithText("Impersonation").performScrollTo().performClick()
         composeRule.onNodeWithTag("message.report.explanation").performScrollTo().performClick()
-        val explanation = "Evidence " + "repeated explanation ".repeat(30)
+        val explanation = "Evidence " + "repeated explanation ".repeat(80)
         composeRule.onNodeWithTag("message.report.explanation").performTextReplacement(explanation)
         composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometry() != null }
         assertActionAboveIme()
+        composeRule.runOnUiThread {
+            val window = WindowInspector.getGlobalWindowViews().first { it.hasWindowFocus() }
+            ViewCompat.getWindowInsetsController(window)?.hide(WindowInsetsCompat.Type.ime())
+        }
+        composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometry() == null }
+        composeRule.onNodeWithTag("message.report.send").assertIsDisplayed()
+        composeRule.onNodeWithTag("message.report.explanation").performScrollTo().performClick()
+        composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometry() != null }
+        assertActionAboveIme()
         composeRule.onNodeWithTag("message.report.send").performClick()
-        composeRule.runOnIdle { assertEquals(listOf(ReportReasonFfi.IMPERSONATION to explanation.trim()), submissions) }
+        composeRule.runOnIdle { assertEquals(listOf(ReportReasonFfi.IMPERSONATION to explanation.take(REPORT_EXPLANATION_LIMIT).trim()), submissions) }
     }
 
     /** Uses the focused sheet window, rather than assuming the Activity receives its dialog's IME insets. */

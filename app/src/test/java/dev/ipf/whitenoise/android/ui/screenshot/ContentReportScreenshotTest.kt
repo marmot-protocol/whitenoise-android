@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.content.Context
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Surface
@@ -15,14 +16,19 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.ReportReasonFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.REPORT_EXPLANATION_LIMIT
+import dev.ipf.whitenoise.android.state.REPORT_REASONS
+import dev.ipf.whitenoise.android.state.reportReasonLabel
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_DETAILS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.REPORT_BODY_TEST_TAG
@@ -126,6 +132,27 @@ class ContentReportScreenshotTest {
         val viewport = composeRule.onNodeWithTag("report.viewport").fetchSemanticsNode().boundsInRoot
         assertTrue("body overlaps footer", body.bottom <= footer.top)
         assertTrue("footer outside viewport", footer.bottom <= viewport.bottom)
+    }
+
+    /** Every reason stays reachable and the real field retains its bound after an oversized paste. */
+    @Test
+    fun everyReasonAndBoundedExplanationRemainUsable() {
+        val submitted = mutableListOf<Pair<ReportReasonFfi, String>>()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                ReportMessageSheet({}, { reason, explanation -> submitted += reason to explanation })
+            }
+        }
+        REPORT_REASONS.forEach { reason ->
+            composeRule.onNodeWithText(context.getString(reportReasonLabel(reason))).performScrollTo().performClick()
+            composeRule.onNodeWithTag("message.report.send").assertIsDisplayed().performClick()
+        }
+        val oversized = "explanation ".repeat(200)
+        composeRule.onNodeWithTag("message.report.explanation").performScrollTo().performTextReplacement(oversized)
+        composeRule.onNodeWithTag("message.report.send").performClick()
+        assertEquals(REPORT_REASONS, submitted.dropLast(1).map { it.first })
+        assertEquals(oversized.take(REPORT_EXPLANATION_LIMIT).trim(), submitted.last().second)
     }
 
     /** An admin sees each report's reason, explanation, reporter and time, with Dismiss only on open ones. */
