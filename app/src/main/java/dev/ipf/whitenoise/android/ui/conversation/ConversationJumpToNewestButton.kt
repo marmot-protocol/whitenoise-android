@@ -25,7 +25,7 @@ import dev.ipf.whitenoise.android.ui.common.unreadBadgeLabel
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 
-private const val JumpToNewestIconRotationDegrees = 180f
+private const val JUMP_TO_NEWEST_ICON_ROTATION_DEGREES = 180f
 
 /**
  * The floating arrow that returns the reader to the newest message, badged with the unread count.
@@ -69,7 +69,7 @@ internal fun ConversationJumpToNewestButton(
                 Icon(
                     painterResource(R.drawable.ic_jump_to_edge),
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = JumpToNewestIconRotationDegrees },
+                    modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = JUMP_TO_NEWEST_ICON_ROTATION_DEGREES },
                 )
             }
         }
