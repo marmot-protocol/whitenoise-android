@@ -18,7 +18,7 @@ finish() {
     python3 scripts/maestro_suite.py report --destination "$reports" --maestro-exit "$result" || result=2
   fi
   printf 'finished_at=%s\nexit_code=%s\n' "$(date +%s)" "$result" >> "$reports/timings.env"
-  adb -s emulator-5554 logcat -d -t 1000 > "$reports/logcat.txt" 2>&1 || true
+  timeout --kill-after=5s 15s adb -s emulator-5554 logcat -d -t 1000 > "$reports/logcat.txt" 2>&1 || true
   exit "$result"
 }
 trap finish EXIT
@@ -34,6 +34,7 @@ adb -s emulator-5554 install -r -t "$reports/apk/app.apk"
 printf 'test_started_at=%s\n' "$(date +%s)" >> "$reports/timings.env"
 maestro --version > "$reports/maestro-version.txt"
 maestro_started=true
-maestro --device emulator-5554 test --format JUNIT --output "$reports/junit.xml" \
+# Leave time inside the 15-minute job for diagnostics and artifact upload.
+timeout --signal=TERM --kill-after=30s 10m maestro --device emulator-5554 test --format JUNIT --output "$reports/junit.xml" \
   --test-suite-name 'White Noise onboarding pilot' --debug-output "$reports/debug" \
   --test-output-dir "$reports/screenshots" "$reports/suite"

@@ -1,6 +1,8 @@
 appId: dev.ipf.whitenoise.android.dev
 name: signin-invalid
 ---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
 - launchApp:
     clearState: true
     permissions:
@@ -38,3 +40,6 @@ name: signin-invalid
 - tapOn: "Sign In"
 - assertVisible: "Private key"
 - takeScreenshot: signin-invalid
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"

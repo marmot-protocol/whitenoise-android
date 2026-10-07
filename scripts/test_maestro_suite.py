@@ -16,6 +16,7 @@ class MaestroSuiteTest(unittest.TestCase):
             with self.subTest(flow=filename):
                 flow = (suite.ROOT / '.maestro' / filename).read_text()
                 self.assertIn('clearState: true', flow)
+                self.assertLess(flow.index('- stopApp'), flow.index('- launchApp:'))
                 self.assertIn('all: deny', flow)
                 self.assertNotIn('openLink:', flow)
                 self.assertNotIn('point:', flow)

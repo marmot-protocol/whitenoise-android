@@ -126,3 +126,8 @@ No speed claim is established by adding this workflow alone.
 Stop requesting the optional job to disable the pilot immediately. Removing
 the manual mode and retained artifact through a reviewed change restores the
 previous tooling; app code and installed user data are unaffected.
+
+Each case stops the previous app process before clearing app data. The Maestro
+command has a ten-minute deadline, leaving time within the fifteen-minute job
+for bounded log capture and diagnostic upload. A timeout is incomplete evidence,
+never a passing suite or a verified negative control.
