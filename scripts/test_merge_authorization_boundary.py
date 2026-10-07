@@ -27,7 +27,8 @@ class AuthorizationBoundaryTest(unittest.TestCase):
 
     def test_reserved_or_unbounded_dynamic_job_names_are_rejected(self):
         for name in ['Android merge authorization','Android merge authorization (${{ matrix.x }})',
-                     '${{ inputs.name }}','Android merge ${{ matrix.name }}']:
+                     '${{ inputs.name }}','Android merge ${{ matrix.name }}','android MERGE authorization',
+                     'Android merge queue canary hold']:
             with self.assertRaises(ValueError):validate('normal.yml',{'permissions':{},'jobs':{'test':{'name':name}}})
 
 
@@ -41,6 +42,11 @@ class AuthorizationBoundaryTest(unittest.TestCase):
         # existing secrets and reviewed non-status publishing permissions.
         validate('normal.yml',{'on':{'workflow_dispatch':{}},'permissions':{},'jobs':{'test':{
             'steps':[{'env':{'KEY':'${{ secrets.SIGNING_KEY }}'}}]}}})
+
+    def test_bare_secret_context_cannot_be_serialized(self):
+        for expression in ['${{ toJSON(secrets) }}','${{ fromJSON(toJSON(secrets)) }}','${{ secrets }}']:
+            with self.assertRaisesRegex(ValueError,'secrets'):
+                validate('normal.yml',{'on':'merge_group','permissions':{},'jobs':{'test':{'if':expression}}})
 
     def test_candidate_jobs_cannot_escape_through_reusable_jobs_or_environments(self):
         for job in [{'uses':'organization/repo/.github/workflows/build.yml@main'},

@@ -6,6 +6,7 @@ import json
 import yaml
 
 CONTEXT = 'Android merge authorization'
+RESERVED=[CONTEXT,'Android merge queue canary hold']
 # Existing publishers need these capabilities, never statuses/checks writes.
 WRITE_ALLOW = {
     ('android-pr-preview-publish.yml', 'publish'): {'contents', 'pull-requests'},
@@ -28,7 +29,7 @@ def validate(name, workflow):
         # Only explicit master-only pushes are known to exclude native queue
         # branches. Unknown glob/tag/filter combinations stay conservative.
         queue_trigger=queue_trigger or branches!=['master']
-    if queue_trigger and re.search(r'\bsecrets\s*[.\[]|"secrets"\s*:',json.dumps(workflow),re.IGNORECASE):
+    if queue_trigger and re.search(r'\bsecrets\b',json.dumps(workflow),re.IGNORECASE):
         raise ValueError('queue workflows cannot access repository secrets')
     for scope, permissions in [(None, workflow.get('permissions'))] + [
             (job_id, job.get('permissions', workflow.get('permissions')))
@@ -52,7 +53,7 @@ def validate(name, workflow):
         if not isinstance(value, str) or not value.strip():
             raise ValueError('unknown job name')
         prefix = value.split('${{', 1)[0].strip()
-        if not prefix or CONTEXT.startswith(prefix) or prefix.startswith(CONTEXT):
+        if not prefix or any(c.casefold().startswith(prefix.casefold()) or prefix.casefold().startswith(c.casefold()) for c in RESERVED):
             raise ValueError('reserved merge authorization job name')
 
 

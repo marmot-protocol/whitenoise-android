@@ -64,6 +64,10 @@ logged admission generation from the original source owner after fresh proof;
 this never replays an uncertain effect. Known pre-send guard/quota refusals
 carry a fixed marker and remain distinct from lost network responses. The
 CLI child verifies the journal intent and its actual ancestor producer lock.
+An explicit owner recovery can retire a positively closed, unmerged PR after
+two matching reads of the PR and an empty queue. It preserves the uncertain
+effect as terminal evidence, excludes the PR from future selection and never
+retries that write.
 Queue holds, their age, uncertain effects and API budget are exposed through
 the existing watchdog health report.
 
@@ -82,8 +86,11 @@ queue; the required CI and authorization contexts remain enforced.
 
 Activation is closed until a canary proves the actual GitHub entry/source/base/
 integration mapping and invalidation after a PR head changes, including after
-integration authorization. An additional required canary hold prevents that
-probe from merging. Verify that green CI alone cannot merge, then observe three
+integration authorization. A canary mode is restricted to one pinned PR head
+and requires an additional canary hold in live branch rules. The operator
+satisfies that hold on the source head only; it stays unsatisfied on generated
+integrations, preventing the canary from merging even after authorization.
+Workflow job names cannot claim either authorization or canary hold. Verify that green CI alone cannot merge, then observe three
 natural shadow ticks. Finally admit one qualified PR, verify its signed squash
 and an empty queue, and confirm the existing watchdog remains healthy.
 
@@ -92,7 +99,11 @@ first enters draining mode to revoke known live integrations and withdraw pinned
 entries; frozen mode still permits read-only uncertain-effect reconciliation. It
 then freezes the sole producer, reconciles uncertain effects, withdraws only known
 entries, restores the matching strict rules and legacy controller, and verifies
-queue absence and current-base CI before allowing legacy merges again. Do not
+queue absence and current-base CI before allowing legacy merges again. A
+read-only snapshot helper verifies the saved strict rules and token defaults.
+The explicit legacy-restored config binds that snapshot hash to live readback,
+retains the journal and freezes on drift; deleting the audit directory is
+unnecessary. Do not
 remove required authorization while an entry remains capable of merging.
 
 ## References

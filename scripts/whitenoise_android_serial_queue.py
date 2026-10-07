@@ -173,10 +173,12 @@ def validate_journal(journal):
         raise Held('invalid-journal')
     for key, record in journal['effects'].items():
         if (not isinstance(record, dict) or record.get('state') not in
-                {'attempted', 'unknown', 'confirmed', 'refused'}
+                {'attempted', 'unknown', 'confirmed', 'refused', 'retired-closed'}
                 or digest(record.get('payload')) != key
                 or record.get('payload', {}).get('repo') != REPO):
             raise Held('invalid-journal-record')
+        if record.get('state')=='retired-closed' and (not DIGEST.fullmatch(str(record.get('terminal_proof_sha256',''))) or not isinstance(record.get('retired_by'),dict) or record.get('terminal_unmerged') is not True):
+            raise Held('retired-terminal-proof-required')
         payload = record['payload']
         identity = Identity(**payload['identity'])
         rebuilt = Effect(payload['kind'], identity, payload['proof_sha256'], payload['generation'])
@@ -212,7 +214,7 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
         return 'idle'
     key = effect.key()
     if key in journal['effects']:
-        return 'known-refusal-held' if journal['effects'][key]['state'] == 'refused' else 'observed-confirmed'
+        return {'refused':'known-refusal-held','retired-closed':'terminal-retired-held'}.get(journal['effects'][key]['state'],'observed-confirmed')
     if shadow:
         return 'shadow-eligible'
     # A second full fresh read and proof verification must agree. Unknown reads
@@ -231,7 +233,7 @@ def execute(journal, effect, write, readback, persist):
     if any(r['state'] in UNCERTAIN for r in journal['effects'].values()):
         return 'unknown-held'
     if key in journal['effects']:
-        return 'known-refusal-held' if journal['effects'][key]['state'] == 'refused' else 'observed-confirmed'
+        return {'refused':'known-refusal-held','retired-closed':'terminal-retired-held'}.get(journal['effects'][key]['state'],'observed-confirmed')
     journal['effects'][key] = {'payload': effect.payload(), 'state': 'attempted', 'attempted_at': time.time()}
     persist()  # Any failure propagates: write has not been invoked.
     try:
