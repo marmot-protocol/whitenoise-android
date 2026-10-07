@@ -5,6 +5,26 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
+## Markdown timestamp prerequisite
+
+The Android timestamp renderer consumes `MarkdownInlineFfi.Timestamp` and
+`MarkdownTimestampStyleFfi` from [MDK #2214](https://github.com/marmot-protocol/mdk/pull/2214),
+reviewed at `2336afda22f6100ecb76916bf187cb9c311d3c8d`. The current
+`marmotkit-v0.12.0` archive, sourced from
+`122bd90ffac60bb6311346e228d0f609a18521ee`, does not contain these types.
+Full-app compilation and timestamp UI verification require a published immutable
+MarmotKit archive containing that API, adopted with the lock procedure below.
+The lock remains unchanged until such an archive is available. Do not regenerate
+or hand-edit bindings, invent an artifact pin, or parse timestamps in Kotlin.
+
+The host formats signed Unix seconds with the current local calendar and locale;
+Android ICU supplies localized relative labels. Only relative projections run a
+visible clock; timezone, time and locale broadcasts invalidate absolute labels.
+Native clock icons and each token's own text range carry hover/tap disclosure.
+A linked label keeps navigation while its clock opens disclosure. Message state
+retains only canonical typed nodes. Calendar values outside `java.time`'s range
+remain visible as their exact canonical token rather than wrapping or crashing.
+
 ## 1. Select and inspect the release
 
 Prefer a formal `marmotkit-v<version>` release. Record its exact tag, asset URL,

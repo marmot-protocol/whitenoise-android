@@ -1192,6 +1192,7 @@ internal fun ComposerBar(
                                                     )
                                                 }
                                         ReplyPreviewCard(
+                                            appState = appState,
                                             containerColor = MaterialTheme.colorScheme.surfaceContainer,
                                             contentColor = MaterialTheme.colorScheme.onSurface,
                                             secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant,

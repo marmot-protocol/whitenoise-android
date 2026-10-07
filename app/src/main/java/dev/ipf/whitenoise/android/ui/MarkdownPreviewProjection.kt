@@ -1,13 +1,14 @@
 package dev.ipf.whitenoise.android.ui
 
 /** Presentation-only styles; plain notification text never initializes Compose text classes. */
-internal enum class MarkdownPreviewStyle { Code, Bold, Italic, Strike }
+internal enum class MarkdownPreviewStyle { Code, Bold, Italic, Strike, Timestamp }
 
 /** A half-open styled range in the shared UTF-16 preview projection. */
 internal data class MarkdownPreviewRange(
     val style: MarkdownPreviewStyle,
     val start: Int,
     val end: Int,
+    val timestampToken: String? = null,
 )
 
 /** Immutable visible text and optional styling consumed by the chat-row adapter. */
@@ -67,13 +68,14 @@ internal class MarkdownPreviewBuilder(
     /** Retains nesting order without creating any platform or Compose style object. */
     fun withStyle(
         style: MarkdownPreviewStyle,
+        timestampToken: String? = null,
         block: MarkdownPreviewBuilder.() -> Unit,
     ) {
         val index = ranges.size
         val start = length
-        if (captureStyles) ranges += MarkdownPreviewRange(style, start, start)
+        if (captureStyles) ranges += MarkdownPreviewRange(style, start, start, timestampToken)
         block()
-        if (captureStyles) ranges[index] = MarkdownPreviewRange(style, start, length)
+        if (captureStyles) ranges[index] = MarkdownPreviewRange(style, start, length, timestampToken)
     }
 
     /** Freezes the builder before joining or clipping a segment. */
