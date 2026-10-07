@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.diagnostics
 import android.content.Context
 import android.os.Build
 import android.os.SystemClock
+import androidx.compose.runtime.mutableStateMapOf
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticRecorder
@@ -147,7 +148,7 @@ internal object DmCreationDiagnostics {
     @Volatile private var recorder: DictationDiagnosticRecorder? = null
 
     @Volatile private var enabled = false
-    private val pendingFrames = LinkedHashMap<Destination, PendingFrame>()
+    private val pendingFrames = mutableStateMapOf<Destination, PendingFrame>()
 
     /** Installs an independent no-backup stream; no records enter automatic native telemetry upload. */
     @Synchronized
@@ -205,21 +206,27 @@ internal object DmCreationDiagnostics {
         attempt.record(DmCreationPhase.FIRST_FRAME, DmCreationOutcome.START)
         synchronized(pendingFrames) {
             pruneFrames()
-            pendingFrames[Destination(account, group, generation)] =
-                PendingFrame(attempt, SystemClock.elapsedRealtime())
-            while (pendingFrames.size > MAX_PENDING_FRAMES) pendingFrames.remove(pendingFrames.keys.first())
+            val destination = Destination(account, group, generation)
+            while (destination !in pendingFrames && pendingFrames.size >= MAX_PENDING_FRAMES) {
+                pendingFrames.entries
+                    .minByOrNull { it.value.createdAt }
+                    ?.key
+                    ?.let(pendingFrames::remove)
+            }
+            pendingFrames[destination] = PendingFrame(attempt, SystemClock.elapsedRealtime())
         }
     }
 
-    /** Captured by the actual destination composition; a later operation cannot adopt an older effect. */
+    /** Observable ticket identity also admits a new attempt into an already-mounted destination. */
     fun pendingFrame(
         account: String,
         group: String,
         generation: Int,
     ): DmCreationAttempt? =
         synchronized(pendingFrames) {
-            pruneFrames()
-            pendingFrames[Destination(account, group, generation)]?.attempt
+            pendingFrames[Destination(account, group, generation)]
+                ?.takeIf { SystemClock.elapsedRealtime() - it.createdAt <= FRAME_TTL_MS }
+                ?.attempt
         }
 
     /** Consumes the exact ticket once and rejects stale effects after a same-destination retry. */

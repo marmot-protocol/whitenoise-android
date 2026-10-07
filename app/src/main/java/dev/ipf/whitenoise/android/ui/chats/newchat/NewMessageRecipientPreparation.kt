@@ -36,6 +36,8 @@ internal class NewMessageRecipientPreparation internal constructor(
     private val lookup: Deferred<Result<NewMessageDirectChatResolution>>,
     private val diagnosticAttempt: DmCreationAttempt? = null,
 ) {
+    private var replacementRecorded = false
+
     /** An uncertain lookup fails closed so tapping cannot create a duplicate DM. */
     suspend fun directChatResolution(): NewMessageDirectChatResolution =
         lookup.await().getOrElse { NewMessageDirectChatResolution(item = null, createRequired = false) }
@@ -45,9 +47,14 @@ internal class NewMessageRecipientPreparation internal constructor(
         joinAll(prewarm, lookup)
     }
 
-    /** Explicit cancellation and owner replacement have distinct trace outcomes without changing cancellation. */
+    /**
+     * Replaced work includes children cancelled by the old Compose effect before the next effect starts.
+     * Normally completed children stay non-cancelled when disposed, so navigation does not invent replacement.
+     */
     fun cancel(replaced: Boolean = false) {
-        if (replaced && (prewarm.isActive || lookup.isActive)) {
+        val unfinished = prewarm.isActive || lookup.isActive || prewarm.isCancelled || lookup.isCancelled
+        if (replaced && unfinished && !replacementRecorded) {
+            replacementRecorded = true
             diagnosticAttempt?.record(
                 DmCreationPhase.OWNER,
                 DmCreationOutcome.REPLACED,

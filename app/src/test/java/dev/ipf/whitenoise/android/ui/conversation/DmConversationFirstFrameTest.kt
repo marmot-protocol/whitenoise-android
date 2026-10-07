@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
@@ -55,18 +56,37 @@ class DmConversationFirstFrameTest {
         composeRule.runOnIdle { assertFalse(records.any { it["outcome"] == "success" }) }
     }
 
-    /** A later same-destination ticket is not adopted by the effect that captured an earlier attempt. */
+    /** A replacement ticket gets its own rendered frame; the old effect cannot claim that new attempt. */
     @Test
-    fun lateEffectCannotCompleteAReplacementTicket() {
+    fun replacementTicketCompletesOnlyItsOwnAttempt() {
         val interaction = DmCreationInteraction(records::add)
         val old = interaction.nextAttempt()
         DmCreationDiagnostics.awaitFrame("a", "g", 1, old)
         composeRule.setContent { RecordDmConversationFirstFrame("a", "g", 1) { 1 } }
         composeRule.runOnIdle {
             DmCreationDiagnostics.awaitFrame("a", "g", 1, interaction.nextAttempt())
+            Snapshot.sendApplyNotifications()
         }
-        repeat(3) { composeRule.mainClock.advanceTimeByFrame() }
-        composeRule.runOnIdle { assertFalse(records.any { it["outcome"] == "success" }) }
+        repeat(4) { composeRule.mainClock.advanceTimeByFrame() }
+        composeRule.runOnIdle {
+            assertEquals(listOf(2L), records.filter { it["outcome"] == "success" }.map { it["attempt"] })
+        }
+    }
+
+    /** Reopening a peer from an already-mounted conversation must not leave its first-frame trace pending. */
+    @Test
+    fun mountedDestinationObservesANewTicketWithoutChangingRouteKeys() {
+        composeRule.setContent { RecordDmConversationFirstFrame("a", "g", 1) { 1 } }
+        composeRule.runOnIdle {
+            assertEquals(0, records.size)
+            DmCreationDiagnostics.awaitFrame("a", "g", 1, DmCreationInteraction(records::add).nextAttempt())
+            Snapshot.sendApplyNotifications()
+            assertFalse(records.any { it["outcome"] == "success" })
+        }
+        repeat(4) { composeRule.mainClock.advanceTimeByFrame() }
+        composeRule.runOnIdle {
+            assertEquals(1, records.count { it["phase"] == "first_frame" && it["outcome"] == "success" })
+        }
     }
 
     /** Another account's destination cannot consume the pending ticket even when the group matches. */

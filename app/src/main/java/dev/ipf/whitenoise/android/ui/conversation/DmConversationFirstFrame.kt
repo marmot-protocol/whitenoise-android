@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
@@ -17,10 +16,7 @@ internal fun RecordDmConversationFirstFrame(
     currentRuntimeGeneration: () -> Int,
 ) {
     val currentGeneration by rememberUpdatedState(currentRuntimeGeneration)
-    val attempt =
-        remember(accountRef, groupId, runtimeGeneration) {
-            accountRef?.let { DmCreationDiagnostics.pendingFrame(it, groupId, runtimeGeneration) }
-        }
+    val attempt = accountRef?.let { DmCreationDiagnostics.pendingFrame(it, groupId, runtimeGeneration) }
     LaunchedEffect(accountRef, groupId, runtimeGeneration, attempt) {
         val capturedAttempt = attempt ?: return@LaunchedEffect
         val account = accountRef ?: return@LaunchedEffect
