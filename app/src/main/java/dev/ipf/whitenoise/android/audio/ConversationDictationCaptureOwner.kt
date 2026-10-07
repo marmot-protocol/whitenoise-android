@@ -18,6 +18,11 @@ internal class ConversationDictationCaptureOwner(
 
     fun silenceMillis(): Long? = current?.silenceMillis()
 
+    /** Consumes only the current retained recorder's already-published terminal receipt. */
+    fun acknowledgeRetainedFailure() {
+        current?.acknowledgeRetainedFailure()
+    }
+
     fun finish(onClosed: () -> Unit): Boolean {
         val capture = current ?: closing ?: return false
         capture.finish(mainThreadDictationCaptureClosure(onClosed))

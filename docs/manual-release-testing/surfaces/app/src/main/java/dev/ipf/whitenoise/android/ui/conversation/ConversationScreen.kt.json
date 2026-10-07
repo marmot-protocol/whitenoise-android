@@ -140,6 +140,14 @@
         "test_ids": [
           "MED-028"
         ]
+      },
+      {
+        "surface": "Composer callbacks retain the displayed dictation revision",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "conversationDictationDraftWriter(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

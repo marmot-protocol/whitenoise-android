@@ -302,6 +302,40 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
         lifecycle.destroy()
     }
 
+    /** Dismissing an empty failure keeps the real promoted service until the native recorder closes. */
+    @Test
+    fun dismissedEmptyFailureRetainsPromotedCaptureIdentityUntilClosure() {
+        val harness = installHost()
+        harness.platform.deferEmptyCaptureClosure = true
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        try {
+            val service = lifecycle.get()
+            service.onStartCommand(startIntent(service, harness), 0, 1)
+            val token = requireNotNull(harness.conversationDictation.notificationSessionToken)
+            harness.platform.listener.onCallerAudioFailure(
+                ConversationDictationCallerAudioFailure.CaptureFailed,
+            ) { true }
+            assertTrue(harness.conversationDictation.state is ConversationDictationState.Failed)
+            harness.conversationDictation.dismissFailure()
+            assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+            assertEquals(token, harness.conversationDictation.notificationSessionToken)
+            Snapshot.sendApplyNotifications()
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            service.foreground.dictation.refreshNotification()
+            assertTrue(harness.conversationDictation.foregroundMicrophoneRequired)
+            assertTrue(service.foreground.dictation.hasForegroundLease)
+            assertNotNull(ConversationDictationForegroundService.activeNotificationOrNull())
+            assertFalse(shadowOf(service as Service).isForegroundStopped)
+            checkNotNull(harness.platform.captureClosureCallback).invoke()
+            assertFalse(harness.conversationDictation.hasDurableSession)
+            assertFalse(service.foreground.dictation.hasForegroundLease)
+            assertNull(ConversationDictationForegroundService.activeNotificationOrNull())
+            assertTrue(shadowOf(service as Service).isForegroundStopped)
+        } finally {
+            lifecycle.destroy()
+        }
+    }
+
     /** A Cancel delivered as the first command never queues a foreground notification. */
     @Test
     fun cancelDuringFirstStartNeverPromotesNotification() {

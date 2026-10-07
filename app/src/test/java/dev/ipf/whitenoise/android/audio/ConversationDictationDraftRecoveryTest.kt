@@ -41,6 +41,54 @@ internal class ConversationDictationDraftRecoveryTest {
     }
 
     @Test
+    fun repeatedRecoveryReportsOnlyNewAcceptedWrites() {
+        val f = Fixture()
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.Written,
+            f.recovery.recoverWithResult(1, f.target, "first"),
+        )
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.AlreadyPresent,
+            f.recovery.recoverWithResult(1, f.target, "first"),
+        )
+        assertEquals(1, f.writes)
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.Written,
+            f.recovery.recoverWithResult(1, f.target, "first second"),
+        )
+        assertEquals("Draft first second", f.draft.value.text)
+        assertEquals(2, f.writes)
+    }
+
+    @Test
+    fun editedDraftCannotReuseAnOldTranscriptReceipt() {
+        listOf("Draft", "New text", "Draft first", "").forEach { edited ->
+            val f = Fixture()
+            assertTrue(f.recovery.recover(1, f.target, "first"))
+            f.edit(edited)
+            assertEquals(
+                ConversationDictationDraftRecovery.Result.Superseded,
+                f.recovery.recoverWithResult(1, f.target, "first"),
+            )
+            assertTrue(f.recovery.hasSavedTranscript(1, f.target, "first"))
+            assertFalse(f.recovery.recover(1, f.target, "first"))
+            assertEquals(edited, f.draft.value.text)
+            assertEquals(1, f.writes)
+            assertNull(f.recovery.sendTarget(1, f.target))
+        }
+    }
+
+    @Test
+    fun newSuffixRespectsRemovalOfThePreviousInsertion() {
+        val f = Fixture()
+        assertTrue(f.recovery.recover(1, f.target, "first"))
+        f.edit("New text")
+        assertTrue(f.recovery.recover(1, f.target, "first second"))
+        assertEquals("New text second", f.draft.value.text)
+        assertNull(f.recovery.sendTarget(1, f.target))
+    }
+
+    @Test
     fun editsBeforeTheFailureRemainThroughFurtherRecognition() {
         val f = Fixture()
         f.edit("New draft")
@@ -59,7 +107,11 @@ internal class ConversationDictationDraftRecoveryTest {
         f.recovery.updateDispatch(1, f.target, clearedRevision = f.draft.revision)
         f.edit(saved)
         f.recovery.updateDispatch(1, f.target, restoredRevision = f.draft.revision)
-        f.recovery.recover(1, f.target, "first")
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.AlreadyPresent,
+            f.recovery.recoverWithResult(1, f.target, "first"),
+        )
+        assertEquals(1, f.writes)
         assertEquals(saved, f.draft.value.text)
         assertEquals(f.draft.revision, f.recovery.sendTarget(1, f.target)?.capturedDraftRevision)
     }
@@ -92,6 +144,27 @@ internal class ConversationDictationDraftRecoveryTest {
                         restoreCapturedPrefix = true,
                         ownedEmptyRevision = empty,
                     ),
+            ),
+        )
+        assertEquals("Draft first", f.draft.value.text)
+        assertNotNull(f.recovery.sendTarget(1, f.target))
+    }
+
+    @Test
+    fun ownedEmptyRecoveryBypassesTheSameTranscriptShortcut() {
+        val f = Fixture()
+        assertTrue(f.recovery.recover(1, f.target, "first"))
+        f.edit("")
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.Written,
+            f.recovery.recoverWithResult(
+                1,
+                f.target,
+                "first",
+                ConversationDictationDraftRecovery.Options(
+                    restoreCapturedPrefix = true,
+                    ownedEmptyRevision = f.draft.revision,
+                ),
             ),
         )
         assertEquals("Draft first", f.draft.value.text)
@@ -167,14 +240,121 @@ internal class ConversationDictationDraftRecoveryTest {
         assertNull(f.recovery.sendTarget(1, f.target))
     }
 
+    @Test
+    fun historicalSaveDoesNotCoverAnotherTranscriptOrAnUnrestoredDispatchClear() {
+        val f = Fixture()
+        assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first"))
+        f.recovery.recover(1, f.target, "first")
+        assertTrue(f.recovery.hasSavedTranscript(1, f.target, " first "))
+        assertFalse(f.recovery.hasSavedTranscript(2, f.target, "first"))
+        assertFalse(f.recovery.hasSavedTranscript(1, f.target.copy(groupIdHex = "other"), "first"))
+        assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first second"))
+        assertFalse(f.recovery.hasSavedTranscript(1, f.target, "rewritten"))
+        f.edit("")
+        f.recovery.updateDispatch(1, f.target, clearedRevision = f.draft.revision)
+        f.reject = true
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.Unavailable,
+            f.recovery.recoverWithResult(1, f.target, "first"),
+        )
+        assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first"))
+        assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first", requireVerifiedRecovery = false))
+        f.reject = false
+        assertTrue(f.recovery.recover(1, f.target, "first"))
+        assertEquals("Draft first", f.draft.value.text)
+        assertTrue(f.recovery.hasSavedTranscript(1, f.target, "first"))
+    }
+
+    @Test
+    fun failedReadKeepsOwnershipButProtectsRecoveryUntilTheDraftCanBeVerified() {
+        listOf(null, "Edited text", "", "Draft first").forEach { edited ->
+            val f = Fixture()
+            f.recovery.recover(1, f.target, "first")
+            if (edited != null) f.edit(edited)
+            f.rejectRead = true
+            assertEquals(
+                ConversationDictationDraftRecovery.Result.Unavailable,
+                f.recovery.recoverWithResult(1, f.target, "first"),
+            )
+            assertTrue(f.recovery.owns(1, f.target))
+            assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first"))
+            assertTrue(f.recovery.hasSavedTranscript(1, f.target, "first", requireVerifiedRecovery = false))
+            assertFalse(f.recovery.hasSavedTranscript(2, f.target, "first", requireVerifiedRecovery = false))
+            assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first second", requireVerifiedRecovery = false))
+            assertNull(f.recovery.sendTarget(1, f.target))
+            assertEquals(1, f.writes)
+            f.rejectRead = false
+            assertEquals(
+                if (edited == null) {
+                    ConversationDictationDraftRecovery.Result.AlreadyPresent
+                } else {
+                    ConversationDictationDraftRecovery.Result.Superseded
+                },
+                f.recovery.recoverWithResult(1, f.target, "first"),
+            )
+            assertTrue(f.recovery.hasSavedTranscript(1, f.target, "first"))
+            assertEquals(edited ?: "Draft first", f.draft.value.text)
+            assertEquals(1, f.writes)
+            if (edited != null) assertNull(f.recovery.sendTarget(1, f.target))
+        }
+    }
+
+    @Test
+    fun unavailableAttemptsForOtherIdentitiesCannotChangeTheSavedReceipt() {
+        val f = Fixture()
+        f.recovery.recover(1, f.target, "first")
+        f.rejectRead = true
+        listOf(
+            Triple(2L, f.target, "first"),
+            Triple(1L, f.target.copy(groupIdHex = "other"), "first"),
+            Triple(1L, f.target, "first second"),
+        ).forEach { (session, target, transcript) ->
+            assertEquals(
+                ConversationDictationDraftRecovery.Result.Unavailable,
+                f.recovery.recoverWithResult(session, target, transcript),
+            )
+            assertTrue(f.recovery.hasSavedTranscript(1, f.target, "first"))
+            assertTrue(f.recovery.owns(1, f.target))
+            assertEquals(1, f.writes)
+        }
+    }
+
+    @Test
+    fun acceptedDispatchRestorationSettlesAnUnavailableRecoveryAttempt() {
+        val f = Fixture()
+        f.recovery.recover(1, f.target, "first")
+        val saved = f.draft.value.text
+        f.edit("")
+        f.recovery.updateDispatch(1, f.target, clearedRevision = f.draft.revision)
+        f.rejectRead = true
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.Unavailable,
+            f.recovery.recoverWithResult(1, f.target, "first"),
+        )
+        assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first"))
+        assertEquals("", f.draft.value.text)
+        f.edit(saved)
+        f.recovery.updateDispatch(1, f.target, restoredRevision = f.draft.revision)
+        assertTrue(f.recovery.hasSavedTranscript(1, f.target, "first"))
+        f.rejectRead = false
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.AlreadyPresent,
+            f.recovery.recoverWithResult(1, f.target, "first"),
+        )
+        assertEquals(f.draft.revision, f.recovery.sendTarget(1, f.target)?.capturedDraftRevision)
+        assertEquals(1, f.writes)
+    }
+
     private class Fixture {
         var draft = ConversationDictationDraftSnapshot(TextFieldValue("Draft", TextRange(5)), 0)
         val target = ConversationDictationTarget("account", "group", draft.value, 0, ConversationDictationMode.InApp)
         var writes = 0
         var reject = false
+        var rejectRead = false
         val recovery =
             ConversationDictationDraftRecovery(
                 read = { account, group ->
+                    check(!rejectRead)
                     assertEquals("account", account)
                     assertEquals("group", group)
                     draft
