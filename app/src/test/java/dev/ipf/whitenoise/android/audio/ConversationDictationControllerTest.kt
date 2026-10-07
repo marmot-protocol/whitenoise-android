@@ -3176,7 +3176,10 @@ class ConversationDictationControllerTest {
                     assertFalse(f.controller.canRetryRetainedAudio)
                     f.controller.onAppForegrounded()
                     assertTrue(f.controller.hasDurableSession)
-                    assertEquals("retained", (f.controller.state as ConversationDictationState.Failed).retainedTranscript)
+                    assertEquals(
+                        "retained",
+                        (f.controller.state as ConversationDictationState.Failed).retainedTranscript,
+                    )
                     assertEquals(1, f.writes)
                     assertEquals(1, f.controller.completionRevision(ACCOUNT, GROUP))
                     if (readRecovers) {
