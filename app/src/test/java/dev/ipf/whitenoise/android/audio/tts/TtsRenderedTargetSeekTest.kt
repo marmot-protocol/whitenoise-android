@@ -343,10 +343,11 @@ class TtsRenderedTargetSeekTest {
         }
 
     @Test
-    fun stalledRenderedProjectionReleasesFinalSpeechAtTheDeadline() =
+    fun stalledRenderedProjectionRetainsAResumableCursorAtTheDeadline() =
         runTest {
             val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.speakConversation("m1")
+            val sessionId = harness.controller.state.value.sessionId
             val gate = CompletableDeferred<Unit>()
             assertTrue(
                 harness.session.requestRenderedSentenceSeek(
@@ -363,14 +364,25 @@ class TtsRenderedTargetSeekTest {
             runCurrent()
             harness.engine.complete(0)
             runCurrent()
-            assertFalse(harness.controller.state.value is TtsState.Idle)
-            advanceTimeBy(5_000)
+            assertTrue(harness.controller.state.value is TtsState.Preparing)
+            advanceTimeBy(4_999)
             runCurrent()
-            assertTrue(harness.controller.state.value is TtsState.Idle)
+            assertTrue(harness.controller.state.value is TtsState.Preparing)
+            advanceTimeBy(1)
+            runCurrent()
+            val retained = harness.controller.state.value
+            assertTrue(retained is TtsState.Paused)
+            assertEquals(sessionId, retained.sessionId)
+            assertEquals(listOf("m1"), harness.controller.queuedMessageIds())
             assertEquals(null, harness.session.edgeState.value)
+            assertEquals(1, harness.engine.spoken.size)
             gate.complete(Unit)
             advanceUntilIdle()
-            assertTrue(harness.controller.queuedMessageIds().isEmpty())
+            assertEquals(retained, harness.controller.state.value)
+            assertEquals(1, harness.engine.spoken.size)
+            harness.controller.resume()
+            assertTrue(harness.controller.state.value is TtsState.Speaking)
+            harness.engine.complete(harness.engine.spoken.lastIndex)
             assertTrue(harness.controller.state.value is TtsState.Idle)
         }
 

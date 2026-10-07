@@ -74,14 +74,14 @@ internal fun readStagedDocument(
             } else {
                 open()
                     ?.use { input ->
-                        val output =
+                        val outputPath =
                             Files.createTempFile(
                                 directory.toPath(),
                                 "upload-source-",
                                 ".part",
                                 PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")),
                             )
-                                .toFile()
+                        val output = outputPath.toFile()
                         partial = output
                         val total =
                             output.outputStream().use { copyStagedDocument(input, it, maxBytes, checkCancellation) }
