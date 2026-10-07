@@ -21,7 +21,6 @@ WORKFLOW = '.github/workflows/android-ci.yml'
 PACKAGE = 'dev.ipf.whitenoise.android.dev'
 MAX_APK_BYTES = 512 * 1024 * 1024
 NATIVE_LIBRARY = 'lib/x86_64/libmarmot_uniffi.so'
-LIGHT_WORKFLOWS = {'.github/workflows/pr-screenshots.yml'}
 
 
 def require(condition, message):
@@ -119,30 +118,6 @@ def validate_inputs(artifact_id, source, repetitions):
     require(re.fullmatch(r'[1-9][0-9]{0,19}', artifact_id or ''), 'Provide a numeric artifact ID')
     require(re.fullmatch(r'[0-9a-f]{40}', source or ''), 'Provide the full source commit SHA')
     require(re.fullmatch(r'[1-9]|1[0-9]|20', repetitions or ''), 'Repetitions must be 1 through 20')
-
-
-def check_idle_runs(payload, current_run):
-    """Reject other active CI runs or incomplete capacity metadata with ValueError.
-
-    Admit only the current run and known lightweight screenshot workflow.
-    A truncated 100-run response cannot establish spare capacity. No runs are
-    cancelled or changed."""
-    require(isinstance(payload, dict) and isinstance(payload.get('workflow_runs'), list),
-            'Cannot determine current CI capacity')
-    require(type(payload.get('total_count')) is int and payload['total_count'] < 100,
-            'Too many active runs to establish spare CI capacity')
-    for run in payload['workflow_runs']:
-        require(type(run.get('id')) is int and isinstance(run.get('path'), str),
-                'Incomplete active-run metadata')
-        if str(run['id']) != current_run and run['path'] not in LIGHT_WORKFLOWS:
-            raise ValueError(f"CI capacity is busy (run {run['id']}); dispatch again when it is idle")
-
-
-def idle():
-    """Read all active GitHub run states and reject busy or unknown CI capacity."""
-    current = os.environ['GITHUB_RUN_ID']
-    for status in ('queued', 'in_progress', 'waiting', 'pending', 'requested'):
-        check_idle_runs(api(f'actions/runs?status={status}&per_page=100'), current)
 
 
 def validate_metadata(artifact, run, artifact_id, source):
@@ -251,7 +226,7 @@ def stage(apk, destination):
 
 
 def fetch(artifact_id, source, repetitions, destination):
-    """Download and admit one source-pinned APK only when repository CI is idle.
+    """Download and admit one source-pinned APK independently of other CI activity.
 
     Validate user inputs, producer identity, expiry, attempt, API archive size
     and digest before moving verified files from temporary quarantine into a
@@ -261,7 +236,6 @@ def fetch(artifact_id, source, repetitions, destination):
     Temporary files are cleaned on failure; a final evidence-write failure
     may leave the validated destination for diagnosis."""
     validate_inputs(artifact_id, source, repetitions)
-    idle()
     artifact = api(f'actions/artifacts/{artifact_id}')
     require(isinstance(artifact, dict) and isinstance(artifact.get('workflow_run'), dict),
             'Missing artifact producer identity')
@@ -302,7 +276,6 @@ def main():
     consumer.add_argument('--source', required=True)
     consumer.add_argument('--repetitions', required=True)
     consumer.add_argument('--destination', required=True, type=Path)
-    commands.add_parser('idle')
     commands.add_parser('locale')
     commands.add_parser('offline')
     args = parser.parse_args()
@@ -311,8 +284,6 @@ def main():
             stage(args.apk, args.destination)
         elif args.command == 'fetch':
             fetch(args.artifact_id, args.source, args.repetitions, args.destination)
-        elif args.command == 'idle':
-            idle()
         elif args.command == 'offline':
             offline()
         else:

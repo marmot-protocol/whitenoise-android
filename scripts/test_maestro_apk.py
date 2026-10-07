@@ -71,15 +71,6 @@ class MaestroArtifactTest(unittest.TestCase):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 pilot.validate_inputs(*values)
 
-    def test_busy_and_incomplete_capacity_fail_closed(self):
-        """Require complete capacity evidence and reject another active CI run."""
-        pilot.check_idle_runs({'total_count': 1, 'workflow_runs': [{'id': 99, 'path': 'pilot.yml'}]}, '99')
-        for payload in [{'total_count': 100, 'workflow_runs': []}, {},
-                        {'total_count': 1, 'workflow_runs': [{'id': 98, 'path': pilot.WORKFLOW}]},
-                        {'total_count': 1, 'workflow_runs': [{'id': 98}]}]:
-            with self.subTest(payload=payload), self.assertRaises(ValueError):
-                pilot.check_idle_runs(payload, '99')
-
     def make_archive(self, directory, *, arm64=False, manifest_changes=None, extra=None):
         """Write a tiny APK and manifest ZIP fixture with optional contract violations."""
         apk = directory / 'fixture.apk'
@@ -146,7 +137,7 @@ class MaestroArtifactTest(unittest.TestCase):
             self.assertEqual((directory / 'stage/app.apk').read_bytes(), (directory / 'fixture.apk').read_bytes())
 
     def test_fetch_records_identity_and_rejects_wrong_archive_size(self):
-        """Verify quarantined download admission and retained pilot/source identity."""
+        """Admit verified APKs without querying unrelated CI, rejecting incorrect size."""
         for wrong_size in (False, True):
             with self.subTest(wrong_size=wrong_size), tempfile.TemporaryDirectory() as temporary:
                 directory = Path(temporary)
@@ -160,8 +151,7 @@ class MaestroArtifactTest(unittest.TestCase):
                     self.assertEqual(timeout, 120)
                     stdout.write(archive.read_bytes())
                 with mock.patch.dict(os.environ, {'GITHUB_SHA': 'e' * 40, 'GITHUB_RUN_ID': '999'}), \
-                        mock.patch.object(pilot, 'idle') as idle, \
-                        mock.patch.object(pilot, 'api', side_effect=[selected, producer()]), \
+                        mock.patch.object(pilot, 'api', side_effect=[selected, producer()]) as metadata, \
                         mock.patch.object(pilot.subprocess, 'run', side_effect=download):
                     if wrong_size:
                         with self.assertRaisesRegex(ValueError, 'archive size'):
@@ -174,7 +164,8 @@ class MaestroArtifactTest(unittest.TestCase):
                         self.assertEqual(evidence['artifact_digest'], selected['digest'])
                         self.assertEqual(evidence['pilot_sha'], 'e' * 40)
                         self.assertEqual(evidence['repetitions'], 20)
-                    idle.assert_called_once_with()
+                    self.assertEqual(metadata.call_args_list, [
+                        mock.call('actions/artifacts/456'), mock.call('actions/runs/123')])
 
 
 class MaestroLocaleTest(unittest.TestCase):
@@ -299,7 +290,8 @@ class MaestroWorkflowTest(unittest.TestCase):
         self.assertIn("cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.maestro_pilot) }}", self.workflow)
         self.assertIn('if: always()', job)
         self.assertIn('retention-days: 7', job)
-        self.assertIn('python3 scripts/maestro_apk.py idle', job)
+        self.assertIn('timeout-minutes: 15', job)
+        self.assertNotIn('maestro_apk.py idle', job)
 
     def test_real_journey_and_negative_control_keep_assertions(self):
         """Check real UI assertions, offline installation and observable failure control."""

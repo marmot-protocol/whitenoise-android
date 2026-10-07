@@ -260,7 +260,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Validate selection, spare capacity and retained APK provenance
+      - name: Validate selection and retained APK provenance
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_ID: ${{ inputs.maestro_artifact_id }}
@@ -311,11 +311,6 @@ jobs:
           echo '5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a  '"$RUNNER_TEMP/maestro.zip" | sha256sum -c -
           unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro-cli"
           printf '%s\n' "$RUNNER_TEMP/maestro-cli/maestro/bin" >> "$GITHUB_PATH"
-
-      - name: Recheck spare capacity before emulator startup
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/maestro_apk.py idle
 
       - name: Enable KVM
         shell: bash
