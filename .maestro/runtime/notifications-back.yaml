@@ -1,6 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: notifications-back
 ---
+- runFlow: ../fixtures/notification-ready.yaml
 - assertVisible: "Allow Maestro Test Lab to send you notifications[?]"
 - back
 - assertVisible: "Maestro group"
