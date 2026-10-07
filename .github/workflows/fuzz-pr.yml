@@ -1,6 +1,8 @@
 name: Fuzz PR gate
 
 on:
+  merge_group:
+    types: [checks_requested]
   pull_request:
     paths:
       - 'fuzz/**'
@@ -33,6 +35,8 @@ on:
       - '.github/workflows/fuzz-scheduled.yml'
       - 'scripts/fuzz-triage.sh'
       - 'scripts/fuzz-run-campaign.sh'
+      - 'scripts/check_queue_fuzz_scope.py'
+      - 'scripts/test_check_queue_fuzz_scope.py'
       - 'scripts/check_fuzz_pr_triggers.py'
       - 'scripts/test_check_fuzz_pr_triggers.py'
       - 'scripts/test_android_ci_gate.py'
@@ -44,8 +48,8 @@ on:
       - 'settings.gradle.kts'
 
 concurrency:
-  group: fuzz-pr-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: fuzz-pr-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'merge_group' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 permissions:
   contents: read
@@ -62,27 +66,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select queue fuzz scope
+        id: scope
+        env:
+          CI_EVENT: ${{ github.event_name }}
+          CI_BASE: ${{ github.event.merge_group.base_sha }}
+          CI_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: python3 scripts/check_queue_fuzz_scope.py
+
       - name: Set up JDK 17
+        if: steps.scope.outputs.should_fuzz == 'true'
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Gradle
+        if: steps.scope.outputs.should_fuzz == 'true'
         uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
         with:
           # Same-repository PR iterations can reuse their own ref-scoped outputs.
           # Fork jobs retain the default read-only behavior.
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: ${{ github.event_name == 'merge_group' || github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       # Activate the task-output cache restored by setup-gradle.
       - name: Lint, compile, and replay fuzz regression corpus
+        if: steps.scope.outputs.should_fuzz == 'true'
         run: ./gradlew :fuzz:ktlintCheck :fuzz:replayAllFuzzRegression --build-cache --profile --no-daemon
 
       # Keep task timings on successful runs too; wall-clock timeouts alone do
       # not show whether compilation, tests, or analysis is doing extra work.
       - name: Upload Gradle timing reports
-        if: always()
+        if: always() && steps.scope.outputs.should_fuzz == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: fuzz-pr-gradle-profiles
