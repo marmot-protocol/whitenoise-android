@@ -170,6 +170,7 @@ internal object DmCreationDiagnostics {
     @Synchronized
     fun setEnabled(enabled: Boolean) {
         this.enabled = false
+        if (!enabled) synchronized(pendingFrames) { pendingFrames.clear() }
         recorder?.setEnabled(enabled)
         this.enabled = enabled && recorder != null
     }
@@ -193,8 +194,12 @@ internal object DmCreationDiagnostics {
     /** Called by the existing user-approved archive exporter on its IO dispatcher. */
     fun snapshot(): Map<String, ByteArray> = recorder?.snapshot().orEmpty()
 
-    /** Clear invalidates queued records before removing the bounded history. */
-    fun clear(): Boolean = recorder?.clear() ?: false
+    /** Clear retires pending frame tickets and queued records before removing the bounded history. */
+    fun clear(): Boolean =
+        synchronized(pendingFrames) {
+            pendingFrames.clear()
+            recorder?.clear() ?: false
+        }
 
     /** A bounded navigation ticket correlates only the matching first frame, without serializing identities. */
     fun awaitFrame(
@@ -236,18 +241,14 @@ internal object DmCreationDiagnostics {
         generation: Int,
         attempt: DmCreationAttempt,
     ) {
-        val matched =
-            synchronized(pendingFrames) {
-                pruneFrames()
-                val destination = Destination(account, group, generation)
-                if (pendingFrames[destination]?.attempt !== attempt) {
-                    false
-                } else {
-                    pendingFrames.remove(destination)
-                    true
-                }
+        synchronized(pendingFrames) {
+            pruneFrames()
+            val destination = Destination(account, group, generation)
+            if (pendingFrames[destination]?.attempt === attempt) {
+                pendingFrames.remove(destination)
+                attempt.record(DmCreationPhase.FIRST_FRAME, DmCreationOutcome.SUCCESS)
             }
-        if (matched) attempt.record(DmCreationPhase.FIRST_FRAME, DmCreationOutcome.SUCCESS)
+        }
     }
 
     /** Expires only in-memory first-frame tickets; trace retention is enforced by the disk store. */

@@ -38,12 +38,14 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -510,10 +512,15 @@ class ConversationDraftRestoreRemovalTest {
 
     /** Stops IO continuations owned by these fixtures before the process-wide Main dispatcher is reset. */
     private suspend fun closeFixtureJobs() {
-        for (app in fixtureApps) {
-            app.mutationsScope.coroutineContext[Job]?.cancelAndJoin()
+        withContext(NonCancellable) {
+            try {
+                for (app in fixtureApps) {
+                    app.mutationsScope.coroutineContext[Job]?.cancelAndJoin()
+                }
+            } finally {
+                fixtureApps.clear()
+            }
         }
-        fixtureApps.clear()
     }
 
     /** Records the app-scoped jobs created by each isolated native-draft fixture for deterministic teardown. */
