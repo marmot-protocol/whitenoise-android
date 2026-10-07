@@ -114,13 +114,13 @@ class ChatsScreenFolderSelectionRecompositionTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("chat.row.g1").performSemanticsAction(SemanticsActions.OnLongClick)
+        composeRule.onNodeWithTag("chat.row.g1").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
         val old = composeRule.onNodeWithTag("chat.action.ExcludeFolder").captureClickCallbackForReplay()
         composeRule.runOnIdle { selected = second.id }
         composeRule.runOnIdle { old() }
         assertEquals(emptySet<String>(), store.excludedChats(ACCOUNT_REF, first.id))
         assertEquals(emptySet<String>(), store.excludedChats(ACCOUNT_REF, second.id))
-        composeRule.onNodeWithTag("chat.row.g1").performSemanticsAction(SemanticsActions.OnLongClick)
+        composeRule.onNodeWithTag("chat.row.g1").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
         composeRule.onNodeWithTag("chat.action.ExcludeFolder").performClick()
         assertEquals(setOf("g1"), store.excludedChats(ACCOUNT_REF, second.id))
         composeRule.onNodeWithTag("chat.row.g1").assertDoesNotExist()

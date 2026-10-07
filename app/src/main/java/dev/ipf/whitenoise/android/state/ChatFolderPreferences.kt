@@ -147,7 +147,7 @@ class ChatFolderPreferences(
                     name = trimmedName ?: existing.name,
                     description = description.trim(),
                     showWhenEmpty = visibleWhenEmpty,
-                    sort = sort ?: ChatFolderSort.RECENT,
+                    sort = sort ?: existing.sort,
                 ) ?: ChatFolder(
                     id = UUID.randomUUID().toString(),
                     name = requireNotNull(trimmedName),
@@ -155,7 +155,7 @@ class ChatFolderPreferences(
                     order = (current.folders.maxOfOrNull { it.order } ?: -1) + 1,
                     systemKind = null,
                     showWhenEmpty = visibleWhenEmpty,
-                    sort = sort ?: existing?.sort ?: ChatFolderSort.RECENT,
+                    sort = sort ?: ChatFolderSort.RECENT,
                 )
             persistFolderDraft(account, current, folder, existing == null, manualChatIds, rule)
             folder

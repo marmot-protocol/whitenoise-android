@@ -103,6 +103,8 @@ class ChatFolderDraftCommitTest {
         store.commitFolderDraft(A, folder.id, null, "", setOf("G1"), null)
         assertEquals(1, preferences.writes)
         assertEquals(setOf("g2"), ChatFolderPreferences(context, preferences).excludedChats(A, folder.id))
+        val reloadedFolder = ChatFolderPreferences(context, preferences).foldersFor(A).first { it.id == folder.id }
+        assertEquals(ChatFolderSort.NAME, reloadedFolder.sort)
     }
 
     /** Empty membership and rule removal use the same transaction as the edited text. */

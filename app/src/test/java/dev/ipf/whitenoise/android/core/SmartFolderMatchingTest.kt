@@ -281,6 +281,17 @@ class SmartFolderMatchingTest {
         )
     }
 
+    @Test fun exactExclusionsOverrideValidAutomaticAndManualMatches() {
+        val title = condition(FolderField.TITLE, FolderMode.CONTAINS, setOf("team"))
+        val root = SmartFolderFilter.Group(children = listOf(title))
+        val rows = listOf(item("automatic"), item("included"))
+        val rule = ChatFolderRule(smartFilter = SmartFolderCodec.encode(root))
+        assertEquals(
+            setOf("included"),
+            chatFolderChatIds(rows, setOf("manual"), rule, null, { false }, { "Team" }, setOf("automatic", "manual")),
+        )
+    }
+
     @Test fun sourceUnionAndManualMembershipUseTheSameCanonicalIdentity() {
         val active = item("G", archived = false)
         val archived = item("other", archived = true)
