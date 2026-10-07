@@ -1,10 +1,19 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 class ChatsScreenSelectionActionsCoverageTest {
+    @Test
+    fun pendingBodySearchNeverMeasuresAShortTitleOnlyReplacementList() {
+        val source = chatsScreenSource().readText()
+        assertTrue("pending search always keeps the loading fence", "bodySearchLoading ->" in source)
+        assertFalse("title hits cannot remove that fence", "bodySearchLoading && visibleItems.isEmpty()" in source)
+        assertTrue("the viewport expires off-window return focus", "globalSearchReturnFocusExpiryEffect(" in source)
+    }
+
     /** Single selection overflow wires mark read. */
     @Test
     fun singleSelectionOverflowWiresMarkRead() {

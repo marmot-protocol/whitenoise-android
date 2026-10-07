@@ -105,6 +105,14 @@ internal fun GlobalAttachmentBrowser(
     val days = remember(items, zoneId) { groupGlobalAttachmentsByDay(items, zoneId) }
     val visual = globalAttachmentGridIsVisual(kinds)
     val returnedSelection = rememberReturnedSearchSelection(selectionOwner)
+    globalSearchReturnFocusExpiryEffect(selectionOwner, ready = !loading) {
+        val selected = returnedSelection?.takeIf { it == selectionOwner?.selected }
+        val item =
+            items.firstOrNull { selected?.matches(it.groupIdHex, it.messageIdHex, it.attachmentIndex) == true }
+        item != null &&
+            !gridState.isScrollInProgress &&
+            gridState.layoutInfo.visibleItemsInfo.any { it.key == globalLibraryItemTag(item) }
+    }
     Column(modifier.fillMaxSize().testTag(GLOBAL_LIBRARY_TAG)) {
         if (loading) {
             LinearProgressIndicator(Modifier.fillMaxWidth().testTag(GLOBAL_LIBRARY_LOADING_TAG))
@@ -192,39 +200,44 @@ private fun GlobalAttachmentGrid(
                     GridItemSpan(if (tile) 1 else maxLineSpan)
                 },
             ) { item ->
-                val returnedRow =
-                    layout.returnedSelection == layout.selectionOwner?.selected &&
-                        layout.returnedSelection?.matches(
-                            item.groupIdHex,
-                            item.messageIdHex,
-                            item.attachmentIndex,
-                        ) == true
-                val returnFocus =
-                    globalSearchReturnFocusModifier(
-                        restoredSelection = returnedRow,
-                        returnGeneration = layout.selectionOwner?.returnGeneration ?: 0L,
-                        consumeReturn = {
-                            layout.selectionOwner?.let { it.consumeReturnFocus(it.returnGeneration) } == true
-                        },
-                    ) {
-                        !layout.state.isScrollInProgress &&
-                            layout.state.layoutInfo.visibleItemsInfo
-                                .any { it.key == globalLibraryItemTag(item) }
-                    }
-                GlobalAttachmentCard(
-                    item = item,
-                    thumbnail = thumbnail(item),
-                    onClick = {
-                        layout.selectionOwner?.selected =
-                            GlobalSearchSelectedResult(item.groupIdHex, item.messageIdHex, item.attachmentIndex)
-                        onOpenMessage(item.groupIdHex, item.messageIdHex)
-                    },
-                    selected = returnedRow,
-                    modifier = returnFocus,
-                )
+                GlobalAttachmentGridCard(item, layout, onOpenMessage, thumbnail)
             }
         }
     }
+}
+
+/** The grid's real clickable card owns selection and its single-use return focus. */
+@Composable
+private fun GlobalAttachmentGridCard(
+    item: GlobalAttachmentItem,
+    layout: GlobalAttachmentGridLayout,
+    onOpenMessage: (groupIdHex: String, messageIdHex: String) -> Unit,
+    thumbnail: (GlobalAttachmentItem) -> ImageBitmap?,
+) {
+    val returnedRow =
+        layout.returnedSelection == layout.selectionOwner?.selected &&
+            layout.returnedSelection?.matches(item.groupIdHex, item.messageIdHex, item.attachmentIndex) == true
+    val returnFocus =
+        globalSearchReturnFocusModifier(
+            restoredSelection = returnedRow,
+            returnGeneration = layout.selectionOwner?.returnGeneration ?: 0L,
+            consumeReturn = { layout.selectionOwner?.let { it.consumeReturnFocus(it.returnGeneration) } == true },
+        ) {
+            !layout.state.isScrollInProgress &&
+                layout.state.layoutInfo.visibleItemsInfo
+                    .any { it.key == globalLibraryItemTag(item) }
+        }
+    GlobalAttachmentCard(
+        item = item,
+        thumbnail = thumbnail(item),
+        onClick = {
+            layout.selectionOwner?.selected =
+                GlobalSearchSelectedResult(item.groupIdHex, item.messageIdHex, item.attachmentIndex)
+            onOpenMessage(item.groupIdHex, item.messageIdHex)
+        },
+        selected = returnedRow,
+        modifier = returnFocus,
+    )
 }
 
 /** One library card: a square thumbnail for visual media, then the chat and time it came from. */

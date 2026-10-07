@@ -1336,6 +1336,20 @@ internal fun ChatsScreen(
     }
 
     val returnedSearchSelection = rememberReturnedSearchSelection(searchViewport?.selection)
+    globalSearchReturnFocusExpiryEffect(
+        owner = searchViewport?.selection,
+        ready = searchActive && !browsingAttachments && !bodySearchLoading,
+    ) {
+        val selected = returnedSearchSelection
+        val rowId = selected?.groupId?.let(::canonicalChatListGroupId)
+        !selectionMode &&
+            rowId != null &&
+            selected != null &&
+            selected == searchViewport?.selection?.selected &&
+            bodyMatches[rowId]?.messageIdHex == selected.messageId &&
+            !chatListState.isScrollInProgress &&
+            chatListState.layoutInfo.visibleItemsInfo.any { it.key == rowId }
+    }
     val chatRowContent: @Composable LazyItemScope.(ChatListItem, Int, MessageBodyMatch?) -> Unit =
         { item, targetIndex, bodyMatch ->
             val rowId = visibleRowId(item)
@@ -1841,9 +1855,9 @@ internal fun ChatsScreen(
                             requireNotNull(controller.error),
                             onRetry = controller::retryLoad,
                         )
-                    bodySearchLoading && visibleItems.isEmpty() ->
-                        // Do not measure an empty replacement list while refreshing results on Back:
-                        // that would clamp the retained viewport to zero before matching rows arrive.
+                    bodySearchLoading ->
+                        // Even nonempty title-only rows would clamp a deep message-results position
+                        // before the current body lookup publishes. Wait without measuring a replacement list.
                         LoadingScreen(message = stringResource(R.string.conversation_search_loading))
                     sourceList.isEmpty() && showArchived -> EmptyArchivedChats()
                     sourceList.isEmpty() ->

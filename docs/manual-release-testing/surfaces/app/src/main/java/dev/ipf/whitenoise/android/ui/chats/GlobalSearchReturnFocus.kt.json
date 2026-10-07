@@ -4,6 +4,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "globalSearchReturnFocusExpiryEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchReturnFocus.kt",
+        "anchor": "fun globalSearchReturnFocusExpiryEffect(",
+        "test_ids": ["FIND-013"]
+      },
+      {
         "surface": "Visible search-result return focus",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchReturnFocus.kt",
         "anchor": "fun globalSearchReturnFocusModifier(",

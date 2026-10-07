@@ -49,7 +49,7 @@ class GlobalSearchReturnFocusTest {
                     selectionMode = false,
                     selected = true,
                     leadingContent = {},
-                    supportingContent = {},
+                    supportingContent = { Text("Matching message preview") },
                     supportingMetadata = null,
                     modifier = globalSearchReturnFocusModifier(selected.value) { true }.testTag("result-row"),
                 )
@@ -154,6 +154,42 @@ class GlobalSearchReturnFocusTest {
         assertFalse(owner.consumeReturnFocus(0L))
         assertTrue(owner.consumeReturnFocus(1L))
         assertFalse(owner.consumeReturnFocus(1L))
+    }
+
+    @Test
+    fun neverComposedReturnedRowCannotAcquireFocusWhenScrolledIntoViewLater() {
+        val mounted = mutableStateOf(false)
+        val ready = mutableStateOf(false)
+        val owner = GlobalSearchSelectionOwner(mutableStateOf(GlobalSearchSelectedResult("group", "message")))
+        composeRule.setContent {
+            inputModeManager = LocalInputModeManager.current
+            globalSearchReturnFocusExpiryEffect(owner, ready.value) { mounted.value }
+            WhiteNoiseTheme {
+                Column {
+                    if (mounted.value) {
+                        Button(
+                            onClick = {},
+                            modifier =
+                                globalSearchReturnFocusModifier(
+                                    restoredSelection = true,
+                                    returnGeneration = owner.returnGeneration,
+                                    consumeReturn = { owner.consumeReturnFocus(owner.returnGeneration) },
+                                ) { true }.testTag("late-row"),
+                        ) { Text("Old selected result") }
+                    }
+                    Button(onClick = {}, modifier = Modifier.testTag("current")) { Text("Current control") }
+                }
+            }
+        }
+        composeRule.runOnIdle {
+            assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard))
+            ready.value = true
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("current").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.runOnIdle { mounted.value = true }
+        composeRule.onNodeWithTag("current").assertIsFocused()
+        composeRule.onNodeWithTag("late-row").assertIsNotFocused()
     }
 
     @Test

@@ -59,6 +59,8 @@ class GlobalSearchOptionsTest {
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(1, calls.get()) }
         composeRule.runOnIdle { revision.value = ProfilePresentationRevision(1, 0) }
+        // Drain the recomposition that launches projection before polling its background work.
+        composeRule.waitForIdle()
         composeRule.waitUntil(OPTIONS_TIMEOUT_MILLIS) { calls.get() == 2 }
         composeRule.runOnIdle {
             assertTrue(visible.loading)
@@ -96,6 +98,7 @@ class GlobalSearchOptionsTest {
         composeRule.runOnIdle { enabled.value = false }
         composeRule.waitForIdle()
         composeRule.runOnIdle { enabled.value = true }
+        composeRule.waitForIdle()
         composeRule.waitUntil(OPTIONS_TIMEOUT_MILLIS) { calls.get() == 2 }
         composeRule.runOnIdle { assertTrue(visible.loading && visible.senders.isEmpty()) }
         finishRefresh.complete(Unit)

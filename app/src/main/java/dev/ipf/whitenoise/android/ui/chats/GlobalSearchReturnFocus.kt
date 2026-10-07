@@ -9,6 +9,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 
+/** Ends an off-window return at the viewport, even when its lazy item was never composed. */
+@Composable
+internal fun globalSearchReturnFocusExpiryEffect(
+    owner: GlobalSearchSelectionOwner?,
+    ready: Boolean,
+    isVisible: () -> Boolean,
+) {
+    val visible = rememberUpdatedState(isVisible)
+    val generation = owner?.returnGeneration
+    LaunchedEffect(owner, generation, ready) {
+        if (owner == null || generation == null || !ready) return@LaunchedEffect
+        withFrameNanos { }
+        if (!visible.value()) owner.consumeReturnFocus(generation)
+    }
+}
+
 /** Restores an already-visible result's focus once; never scrolls or traps later user focus. */
 @Composable
 internal fun globalSearchReturnFocusModifier(

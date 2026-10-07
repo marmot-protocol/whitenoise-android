@@ -61,11 +61,12 @@ class MainShellGlobalSearchStateRestorationTest {
         }
     }
 
-    /** Returning waits for fresh native rows without measuring an empty list or replaying a top reset. */
+    /** Pending body matches must not measure a shorter title-only list or replay a top reset. */
     @Test
     fun conversationBackAndRotationKeepCoordinatesAndAppliedReset() {
         val showSearch = mutableStateOf(true)
         val resultsReady = mutableStateOf(true)
+        val titleHits = listOf("Title hit one", "Title hit two")
         var holder: MainShellGlobalSearchStateHolder? = null
         val restoration = StateRestorationTester(composeRule)
         restoration.setContent {
@@ -76,8 +77,12 @@ class MainShellGlobalSearchStateRestorationTest {
                 ChatListSearchTopResetEffect(list, dataset(owner.scopedState), true, owner.viewport.resetState(false))
                 if (resultsReady.value) {
                     LazyColumn(state = list) {
+                        items(titleHits.size, key = { "title-$it" }) { Text(titleHits[it], Modifier.height(48.dp)) }
                         items(50, key = { "result-$it" }) { Text("Result $it", Modifier.height(48.dp)) }
                     }
+                } else {
+                    // These title hits already exist, but measuring only them would clamp index 12.
+                    Text("Waiting for message results (${titleHits.size} title hits)")
                 }
             }
         }
@@ -91,6 +96,7 @@ class MainShellGlobalSearchStateRestorationTest {
             showSearch.value = true
         }
         composeRule.waitForIdle()
+        assertListCoordinates({ holder }, 12, 13)
         composeRule.runOnIdle { resultsReady.value = true }
         composeRule.waitForIdle()
         assertListCoordinates({ holder }, 12, 13)

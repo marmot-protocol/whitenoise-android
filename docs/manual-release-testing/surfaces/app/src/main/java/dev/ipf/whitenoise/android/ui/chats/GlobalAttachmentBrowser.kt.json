@@ -4,6 +4,12 @@
   "categories": {
     "composable_surfaces": [
       {
+        "surface": "GlobalAttachmentGridCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "fun GlobalAttachmentGridCard(",
+        "test_ids": ["NCH-002", "ACC-017", "FIND-012", "FIND-013"]
+      },
+      {
         "surface": "Authored emoji prompt: GlobalAttachmentBrowser",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
         "anchor": "EmojiLabel(",
