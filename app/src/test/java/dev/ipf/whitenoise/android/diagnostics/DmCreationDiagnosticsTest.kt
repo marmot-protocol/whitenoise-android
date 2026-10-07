@@ -2,14 +2,21 @@ package dev.ipf.whitenoise.android.diagnostics
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AppBlobEndpointFfi
+import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticRecorder
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticStore
+import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.clearAuditAndDictationLogShares
 import dev.ipf.whitenoise.android.state.prepareAuditAndDictationLogArchive
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageRecipientPreparationCoordinator
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageRecipientPreparationKey
+import dev.ipf.whitenoise.android.ui.chats.newchat.StartChatAttemptResult
+import dev.ipf.whitenoise.android.ui.chats.newchat.attemptOpenOrStartProfileChat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runCurrent
@@ -44,7 +51,13 @@ class DmCreationDiagnosticsTest {
                 val preparation =
                     coordinator.prepare(
                         this,
-                        NewMessageRecipientPreparationKey("private-account", 1, "private-query", "private-recipient", 0),
+                        NewMessageRecipientPreparationKey(
+                            accountRef = "private-account",
+                            runtimeGeneration = 1,
+                            query = "private-query",
+                            targetReference = "private-recipient",
+                            retryKey = 0,
+                        ),
                         prewarm = {
                             finishPrewarm.await()
                             throw MarmotKitException.MissingKeyPackage(PRIVATE)
@@ -53,52 +66,12 @@ class DmCreationDiagnosticsTest {
                         diagnosticAttempt = interaction.preparation(),
                     )
                 runCurrent()
-                val failures =
-                    listOf(
-                        MarmotKitException.MissingKeyPackage(PRIVATE),
-                        MarmotKitException.MissingMemberInboxRoute(PRIVATE),
-                        MarmotKitException.InvalidKeyPackageEvent(PRIVATE),
-                        MarmotKitException.Publish(PRIVATE),
-                        IllegalStateException(PRIVATE),
-                    )
-                failures.forEach { error ->
-                    val attempt = interaction.nextAttempt()
-                    attempt.record(DmCreationPhase.CREATE, DmCreationOutcome.START)
-                    attempt.failed(DmCreationPhase.CREATE, error)
+                exerciseCreateRetries(interaction) {
+                    finishPrewarm.complete(Unit)
+                    preparation.awaitCompletion()
                 }
-                finishPrewarm.complete(Unit)
-                preparation.awaitCompletion()
-                val sixth = interaction.nextAttempt()
-                sixth.record(DmCreationPhase.CREATE, DmCreationOutcome.START)
-                sixth.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
-                sixth.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS)
                 val archive = requireNotNull(prepareAuditAndDictationLogArchive(context, emptyList(), null))
-                ZipFile(archive).use { zip ->
-                    val text = zip.getInputStream(zip.getEntry("dm-create-current.jsonl")).bufferedReader().readText()
-                    assertFalse(text.contains("PRIVATE"))
-                    assertFalse(text.contains("private-"))
-                    val records =
-                        text
-                            .lineSequence()
-                            .filter(String::isNotBlank)
-                            .map(::JSONObject)
-                            .toList()
-                    assertEquals(1, records.map { it.getString("interaction") }.distinct().size)
-                    assertEquals((0..6).toSet(), records.map { it.getInt("attempt") }.toSet())
-                    assertEquals(
-                        listOf("missing_key_package", "missing_inbox", "invalid_key_package", "publish", "unknown"),
-                        records.filter { it.getString("phase") == "create" && it.getString("outcome") == "failure" }.map { it.getString("failure") },
-                    )
-                    assertTrue(
-                        records.any { it.getInt("attempt") == 0 && it.getString("phase") == "prewarm" && it.getString("failure") == "missing_key_package" },
-                    )
-                    records.forEach {
-                        listOf("app_version", "app_version_code", "app_revision", "distribution", "android_api", "mdk_revision").forEach { field ->
-                            assertTrue(it.has(field))
-                        }
-                        assertEquals("unavailable", it.getString("native_phase_detail"))
-                    }
-                }
+                verifyArchive(archive)
             } finally {
                 DmCreationDiagnostics.setEnabled(false)
                 clearAuditAndDictationLogShares(context.cacheDir)
@@ -131,6 +104,13 @@ class DmCreationDiagnosticsTest {
             runCurrent()
             coordinator.clear()
             val oldToken = records.first().getValue("interaction")
+            assertTrue(
+                records.any {
+                    it["interaction"] == oldToken &&
+                        it["outcome"] == "replaced" &&
+                        it["failure"] == "owner_replaced"
+                },
+            )
             assertEquals(2, records.count { it["interaction"] == oldToken && it["outcome"] == "cancelled" })
             val stale = old.nextAttempt()
             val current = replacement.nextAttempt()
@@ -150,7 +130,14 @@ class DmCreationDiagnosticsTest {
     fun dmStoreRetentionDisabledAndClearAreBounded() {
         var now = 1000L
         val store =
-            DictationDiagnosticStore(folder.newFolder(), "abcdef012", nowMillis = { now }, maxBytes = 1600, retentionMillis = 100, filePrefix = "dm-create")
+            DictationDiagnosticStore(
+                folder.newFolder(),
+                "abcdef012",
+                nowMillis = { now },
+                maxBytes = 1600,
+                retentionMillis = 100,
+                filePrefix = "dm-create",
+            )
         DictationDiagnosticRecorder(store).use { recorder ->
             val interaction = DmCreationInteraction(recorder::recordFields)
             interaction.nextAttempt().failed(DmCreationPhase.CREATE, IllegalArgumentException(PRIVATE))
@@ -170,6 +157,135 @@ class DmCreationDiagnosticsTest {
             interaction.nextAttempt().failed(DmCreationPhase.CREATE, CancellationException(PRIVATE))
             assertEquals(setOf("dm-create-manifest.json"), recorder.snapshot().keys)
         }
+    }
+
+    /** Calls the production lookup/create/projection machine while preparation is genuinely overlapping. */
+    private suspend fun exerciseCreateRetries(
+        interaction: DmCreationInteraction,
+        beforeSuccess: suspend () -> Unit,
+    ) {
+        val failures =
+            listOf(
+                MarmotKitException.MissingKeyPackage(PRIVATE),
+                MarmotKitException.MissingMemberInboxRoute(PRIVATE),
+                MarmotKitException.InvalidKeyPackageEvent(PRIVATE),
+                MarmotKitException.Publish(PRIVATE),
+                IllegalStateException(PRIVATE),
+            )
+        failures.forEach { error ->
+            val result =
+                attemptOpenOrStartProfileChat(
+                    npub = "private-recipient",
+                    progressHex = "private-identity",
+                    recipientName = "private-name",
+                    resolveDirectChat = { NewMessageDirectChatResolution(null, true) },
+                    createGroup = { throw error },
+                    loadCreatedChatListItem = { error("pre-return failure must not read a group") },
+                    displayName = { it },
+                    diagnosticAttempt = interaction.nextAttempt(),
+                )
+            assertTrue(result is StartChatAttemptResult.Failed)
+        }
+        beforeSuccess()
+        val sixth = interaction.nextAttempt()
+        val opened =
+            attemptOpenOrStartProfileChat(
+                npub = "private-recipient",
+                progressHex = "private-identity",
+                recipientName = "private-name",
+                resolveDirectChat = { NewMessageDirectChatResolution(null, true) },
+                createGroup = { "private-group" },
+                loadCreatedChatListItem = { ChatListItem(group(""), null, null, 0) },
+                displayName = { it },
+                diagnosticAttempt = sixth,
+            )
+        assertTrue(opened is StartChatAttemptResult.Open)
+    }
+
+    /** Inspects the existing archive exporter, never a synthetic diagnostic map or exception sentence. */
+    private fun verifyArchive(archive: java.io.File) {
+        ZipFile(archive).use { zip ->
+            val text = zip.getInputStream(zip.getEntry("dm-create-current.jsonl")).bufferedReader().readText()
+            assertFalse(text.contains("PRIVATE"))
+            assertFalse(text.contains("private-"))
+            val records =
+                text
+                    .lineSequence()
+                    .filter(String::isNotBlank)
+                    .map(::JSONObject)
+                    .toList()
+            assertEquals(1, records.map { it.getString("interaction") }.distinct().size)
+            assertEquals((0..6).toSet(), records.map { it.getInt("attempt") }.toSet())
+            assertEquals(
+                listOf("missing_key_package", "missing_inbox", "invalid_key_package", "publish", "unknown"),
+                records
+                    .filter { it.getString("phase") == "create" && it.getString("outcome") == "failure" }
+                    .map { it.getString("failure") },
+            )
+            assertTrue(
+                records.any {
+                    it.getInt("attempt") == 0 &&
+                        it.getString("phase") == "prewarm" &&
+                        it.getString("failure") == "missing_key_package"
+                },
+            )
+            records.forEach {
+                listOf(
+                    "app_version",
+                    "app_version_code",
+                    "app_revision",
+                    "distribution",
+                    "android_api",
+                    "mdk_revision",
+                ).forEach { field ->
+                    assertTrue(it.has(field))
+                }
+                assertEquals("unavailable", it.getString("native_phase_detail"))
+            }
+        }
+    }
+
+    private fun group(name: String) =
+        AppGroupRecordFfi(
+            selfMembership = SelfMembershipFfi.MEMBER,
+            groupIdHex = "group",
+            protocolProfile = dev.ipf.marmotkit.AppProtocolProfileFfi.LEGACY,
+            profilePresent = false,
+            endpoint = "endpoint",
+            name = name,
+            description = "A group",
+            admins = emptyList(),
+            relays = listOf("wss://relay.example"),
+            nostrGroupIdHex = "nostr",
+            avatarUrl = null,
+            avatarDim = null,
+            avatarThumbhash = null,
+            imageHashHex = null,
+            encryptedMedia = encryptedMedia(),
+            archived = false,
+            pendingConfirmation = false,
+            unrecoverable = false,
+            welcomerAccountIdHex = null,
+            viaWelcomeMessageIdHex = null,
+            disappearingMessageSecs = 0uL,
+            leaveRequestPending = false,
+            leaveRequestedAtMs = null,
+            disbanding = false,
+            disbanded = false,
+            disbandRequest = null,
+        )
+
+    private fun encryptedMedia(): AppGroupEncryptedMediaComponentFfi {
+        val endpoint = AppBlobEndpointFfi("blossom-v1", "https://blossom.primal.net")
+        return AppGroupEncryptedMediaComponentFfi(
+            componentId = 0x8008u,
+            component = "marmot.group.encrypted-media.v1",
+            required = true,
+            version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
+            mediaFormat = "encrypted-media-v1",
+            allowedLocatorKinds = listOf("blossom-v1"),
+            defaultBlobEndpoints = listOf(endpoint),
+        )
     }
 
     private companion object {

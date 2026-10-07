@@ -153,7 +153,8 @@ internal fun startChatErrorUiState(
  * important: a successful MLS create must retry by group id rather than
  * creating a second direct chat when projection is merely delayed (#1729).
  */
-@Suppress("TooGenericExceptionCaught", "LongParameterList") // Injectable native and diagnostic boundaries share one retry state machine.
+// Injectable native and diagnostic boundaries share one retry state machine.
+@Suppress("TooGenericExceptionCaught", "LongParameterList")
 internal suspend fun attemptStartProfileChat(
     npub: String,
     progressHex: String,
@@ -213,15 +214,7 @@ internal suspend fun attemptStartProfileChat(
             diagnosticAttempt?.failed(DmCreationPhase.PROJECTION, error)
             abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_FAILED)
             StartChatAttemptResult.Failed(
-                StartChatErrorUiState(
-                    npub = npub,
-                    progressHex = progressHex,
-                    detail = startProfileChatFailureDetail(error, displayName),
-                    diagnosticReport = startChatFailureReport(error),
-                    recipientName = recipientName,
-                    title = AppText.Resource(R.string.couldnt_load_chats),
-                    retryGroupIdHex = groupIdHex,
-                ),
+                projectionFailureUi(npub, progressHex, recipientName, groupIdHex, error, displayName),
             )
         }
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -231,7 +224,27 @@ internal suspend fun attemptStartProfileChat(
     }
 }
 
-@Suppress("LongParameterList", "TooGenericExceptionCaught") // Trace any native boundary failure, then preserve its existing propagation.
+/** Retains the committed group for read-only retry while preserving the existing failure UI. */
+private fun projectionFailureUi(
+    npub: String,
+    progressHex: String,
+    recipientName: String?,
+    groupIdHex: String,
+    error: Throwable,
+    displayName: (String) -> String,
+): StartChatErrorUiState =
+    StartChatErrorUiState(
+        npub = npub,
+        progressHex = progressHex,
+        detail = startProfileChatFailureDetail(error, displayName),
+        diagnosticReport = startChatFailureReport(error),
+        recipientName = recipientName,
+        title = AppText.Resource(R.string.couldnt_load_chats),
+        retryGroupIdHex = groupIdHex,
+    )
+
+// Trace any native boundary failure, then preserve its existing propagation.
+@Suppress("LongParameterList", "TooGenericExceptionCaught")
 internal suspend fun attemptOpenOrStartProfileChat(
     npub: String,
     progressHex: String,
@@ -257,7 +270,9 @@ internal suspend fun attemptOpenOrStartProfileChat(
                     resolveDirectChat()
                 } catch (failure: Exception) {
                     diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, failure)
-                    if (failure is kotlinx.coroutines.CancellationException) abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
+                    if (failure is kotlinx.coroutines.CancellationException) {
+                        abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
+                    }
                     throw failure
                 }
             if (!directChatLookupAlreadyStarted) {
@@ -265,12 +280,24 @@ internal suspend fun attemptOpenOrStartProfileChat(
             }
             diagnosticAttempt?.record(
                 DmCreationPhase.EXISTING_LOOKUP,
-                if (resolution.item != null || resolution.createRequired) DmCreationOutcome.SUCCESS else DmCreationOutcome.FAILURE,
-                if (resolution.item != null || resolution.createRequired) DmCreationFailure.NONE else DmCreationFailure.UNKNOWN,
+                if (resolution.item != null || resolution.createRequired) {
+                    DmCreationOutcome.SUCCESS
+                } else {
+                    DmCreationOutcome.FAILURE
+                },
+                if (resolution.item != null || resolution.createRequired) {
+                    DmCreationFailure.NONE
+                } else {
+                    DmCreationFailure.UNKNOWN
+                },
             )
             when {
                 resolution.item != null ->
-                    StartChatAttemptResult.Open(item = resolution.item, newlyCreated = false, diagnosticAttempt = diagnosticAttempt)
+                    StartChatAttemptResult.Open(
+                        item = resolution.item,
+                        newlyCreated = false,
+                        diagnosticAttempt = diagnosticAttempt,
+                    )
                 !resolution.createRequired -> {
                     abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_FAILED)
                     StartChatAttemptResult.Failed(
@@ -572,7 +599,10 @@ private fun NewMessageAccountScreen(
                 },
                 lookup = {
                     session.currentValue {
-                        appState.resolveExistingDirectChat(key.targetReference, diagnosticAttempt = diagnosticPreparation)
+                        appState.resolveExistingDirectChat(
+                            key.targetReference,
+                            diagnosticAttempt = diagnosticPreparation,
+                        )
                     }
                 },
                 markStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
@@ -641,12 +671,20 @@ private fun NewMessageAccountScreen(
                                             existingDmGroupIdHex = existingDmGroupIdHex,
                                             provenanceDirectChat = { provenance, target ->
                                                 session.currentValue {
-                                                    appState.resolveProvenanceDirectChat(provenance, target, diagnosticAttempt)
+                                                    appState.resolveProvenanceDirectChat(
+                                                        provenance,
+                                                        target,
+                                                        diagnosticAttempt,
+                                                    )
                                                 }
                                             },
                                             existingDirectChat = { target ->
                                                 session.currentValue {
-                                                    appState.resolveExistingDirectChat(target, existingDmGroupIdHex, diagnosticAttempt)
+                                                    appState.resolveExistingDirectChat(
+                                                        target,
+                                                        existingDmGroupIdHex,
+                                                        diagnosticAttempt,
+                                                    )
                                                 }
                                             },
                                         )
@@ -671,7 +709,12 @@ private fun NewMessageAccountScreen(
                     is StartChatAttemptResult.Open ->
                         if (session.isCurrent()) {
                             accountRef?.let {
-                                DmCreationDiagnostics.awaitFrame(it, result.item.group.groupIdHex, runtimeGeneration, result.diagnosticAttempt)
+                                DmCreationDiagnostics.awaitFrame(
+                                    it,
+                                    result.item.group.groupIdHex,
+                                    runtimeGeneration,
+                                    result.diagnosticAttempt,
+                                )
                             }
                             openedConversation = true
                             session.dispose()
@@ -683,7 +726,11 @@ private fun NewMessageAccountScreen(
                 if (!openedConversation &&
                     !session.isCurrent()
                 ) {
-                    diagnosticAttempt.record(DmCreationPhase.OWNER, DmCreationOutcome.REPLACED, DmCreationFailure.OWNER_REPLACED)
+                    diagnosticAttempt.record(
+                        DmCreationPhase.OWNER,
+                        DmCreationOutcome.REPLACED,
+                        DmCreationFailure.OWNER_REPLACED,
+                    )
                 }
                 creatingHex = null
             }

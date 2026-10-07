@@ -171,7 +171,8 @@ internal object DmCreationDiagnostics {
         attempt.record(DmCreationPhase.FIRST_FRAME, DmCreationOutcome.START)
         synchronized(pendingFrames) {
             pruneFrames()
-            pendingFrames[Destination(account, group, generation)] = PendingFrame(attempt, SystemClock.elapsedRealtime())
+            pendingFrames[Destination(account, group, generation)] =
+                PendingFrame(attempt, SystemClock.elapsedRealtime())
             while (pendingFrames.size > MAX_PENDING_FRAMES) pendingFrames.remove(pendingFrames.keys.first())
         }
     }
@@ -215,7 +216,10 @@ internal object DmCreationDiagnostics {
     }
 
     /** Compile metadata is a small token rather than an arbitrary string from a provider or exception. */
-    private fun safeBuildToken(value: String): String = value.takeIf { it.matches(Regex("[A-Za-z0-9._-]{1,80}")) } ?: "unknown"
+    private fun safeBuildToken(value: String): String {
+        val allowed = value.matches(Regex("[A-Za-z0-9._-]{1,80}"))
+        return if (allowed) value else "unknown"
+    }
 
     private data class Destination(
         val account: String,
@@ -229,7 +233,17 @@ internal object DmCreationDiagnostics {
     )
 
     private val TRACE_FIELDS =
-        setOf("operation", "interaction", "attempt", "phase", "outcome", "failure", "elapsed_ms", "phase_duration_ms", "native_phase_detail")
+        setOf(
+            "operation",
+            "interaction",
+            "attempt",
+            "phase",
+            "outcome",
+            "failure",
+            "elapsed_ms",
+            "phase_duration_ms",
+            "native_phase_detail",
+        )
     private const val MAX_PENDING_FRAMES = 8
     private const val FRAME_TTL_MS = 30_000L
 }

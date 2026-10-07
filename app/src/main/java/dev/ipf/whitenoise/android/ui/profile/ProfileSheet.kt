@@ -725,7 +725,12 @@ internal fun ProfileSheet(
                     is StartChatAttemptResult.Open ->
                         owner.leave {
                             accountAtOpen?.let {
-                                DmCreationDiagnostics.awaitFrame(it, result.item.group.groupIdHex, appState.runtimeGeneration, result.diagnosticAttempt)
+                                DmCreationDiagnostics.awaitFrame(
+                                    it,
+                                    result.item.group.groupIdHex,
+                                    appState.runtimeGeneration,
+                                    result.diagnosticAttempt,
+                                )
                             }
                             openedConversation = true
                             onOpenGroup(result.item, result.newlyCreated)
@@ -734,7 +739,11 @@ internal fun ProfileSheet(
                 }
             } finally {
                 if (!openedConversation && !owner.canAct()) {
-                    diagnosticAttempt.record(DmCreationPhase.OWNER, DmCreationOutcome.REPLACED, DmCreationFailure.OWNER_REPLACED)
+                    diagnosticAttempt.record(
+                        DmCreationPhase.OWNER,
+                        DmCreationOutcome.REPLACED,
+                        DmCreationFailure.OWNER_REPLACED,
+                    )
                 }
                 creatingChat = false
             }

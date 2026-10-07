@@ -37,7 +37,11 @@ internal fun clearAuditAndDictationLogShares(cacheDir: File): Boolean {
     val dmCreation = runCatchingCancellable { DmCreationDiagnostics.clear() }
     val performance = runCatchingCancellable { PerformanceDiagnostics.clearStoredLog() }
     val prepared = runCatchingCancellable { clearPreparedAuditLogShares(cacheDir) }
-    val failure = dictation.exceptionOrNull() ?: dmCreation.exceptionOrNull() ?: performance.exceptionOrNull() ?: prepared.exceptionOrNull()
+    val failure =
+        dictation.exceptionOrNull()
+            ?: dmCreation.exceptionOrNull()
+            ?: performance.exceptionOrNull()
+            ?: prepared.exceptionOrNull()
     if (failure != null) {
         dmCreation.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)
         performance.exceptionOrNull()?.takeIf { it !== failure }?.let(failure::addSuppressed)

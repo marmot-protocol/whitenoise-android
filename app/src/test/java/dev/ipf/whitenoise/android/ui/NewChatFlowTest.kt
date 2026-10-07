@@ -576,7 +576,13 @@ class NewChatFlowTest {
             assertTrue(opened is StartChatAttemptResult.Open)
             assertEquals(1, creates)
             assertTrue(records.any { it["attempt"] == 1 && it["phase"] == "create" && it["outcome"] == "success" })
-            assertTrue(records.any { it["attempt"] == 1 && it["phase"] == "projection" && it["failure"] == "hydration_pending" })
+            assertTrue(
+                records.any {
+                    it["attempt"] == 1 &&
+                        it["phase"] == "projection" &&
+                        it["failure"] == "hydration_pending"
+                },
+            )
             assertFalse(records.any { it["attempt"] == 2 && it["phase"] == "create" })
             assertFalse(records.toString().contains("private-"))
         }

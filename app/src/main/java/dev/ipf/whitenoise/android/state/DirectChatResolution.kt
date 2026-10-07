@@ -105,7 +105,8 @@ private suspend fun WhiteNoiseAppState.readExistingDirectConversation(
         withTimeoutOrNull(DIRECT_LOOKUP_TIMEOUT_MS) {
             ExistingDirectRead.Completed(marmotIo { existingDirectConversation(account, peer) })
         } ?: ExistingDirectRead.Failed(DirectLookup.Unavailable).also {
-            diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, IllegalStateException())
+            val deadline = IllegalStateException("Native lookup deadline exceeded")
+            diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, deadline)
         }
     } catch (cancel: CancellationException) {
         diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, cancel)

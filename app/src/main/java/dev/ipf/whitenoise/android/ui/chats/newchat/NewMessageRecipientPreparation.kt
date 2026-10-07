@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
+import dev.ipf.whitenoise.android.diagnostics.DmCreationFailure
 import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
 import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
@@ -33,6 +34,7 @@ internal class NewMessageRecipientPreparation internal constructor(
     val key: NewMessageRecipientPreparationKey,
     private val prewarm: Deferred<Result<Unit>>,
     private val lookup: Deferred<Result<NewMessageDirectChatResolution>>,
+    private val diagnosticAttempt: DmCreationAttempt? = null,
 ) {
     /** An uncertain lookup fails closed so tapping cannot create a duplicate DM. */
     suspend fun directChatResolution(): NewMessageDirectChatResolution =
@@ -42,7 +44,15 @@ internal class NewMessageRecipientPreparation internal constructor(
         joinAll(prewarm, lookup)
     }
 
-    fun cancel() {
+    /** Explicit cancellation and owner replacement have distinct trace outcomes without changing cancellation. */
+    fun cancel(replaced: Boolean = false) {
+        if (replaced) {
+            diagnosticAttempt?.record(
+                DmCreationPhase.OWNER,
+                DmCreationOutcome.REPLACED,
+                DmCreationFailure.OWNER_REPLACED,
+            )
+        }
         prewarm.cancel()
         lookup.cancel()
     }
@@ -77,7 +87,7 @@ internal class NewMessageRecipientPreparationCoordinator {
         diagnosticAttempt: DmCreationAttempt? = null,
     ): NewMessageRecipientPreparation {
         current?.takeIf { it.key == key }?.let { return it }
-        current?.cancel()
+        current?.cancel(replaced = true)
         val prewarmResult =
             scope.async {
                 diagnosticAttempt?.record(DmCreationPhase.PREWARM, DmCreationOutcome.START)
@@ -116,7 +126,7 @@ internal class NewMessageRecipientPreparationCoordinator {
                     )
                 }
             }
-        return NewMessageRecipientPreparation(key, prewarmResult, lookupResult).also { current = it }
+        return NewMessageRecipientPreparation(key, prewarmResult, lookupResult, diagnosticAttempt).also { current = it }
     }
 
     fun current(key: NewMessageRecipientPreparationKey): NewMessageRecipientPreparation? {
@@ -125,7 +135,7 @@ internal class NewMessageRecipientPreparationCoordinator {
     }
 
     fun clear() {
-        current?.cancel()
+        current?.cancel(replaced = true)
         current = null
     }
 }
