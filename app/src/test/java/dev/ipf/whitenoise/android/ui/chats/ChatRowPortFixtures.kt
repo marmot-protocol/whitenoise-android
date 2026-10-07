@@ -43,6 +43,7 @@ internal object ChatRowPortFixtures {
         delivery: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
         pending: Boolean = false,
         deletedLastMessage: Boolean = false,
+        muted: Boolean = false,
     ): ChatListItem {
         val group =
             groupRecord(membership).copy(
@@ -56,6 +57,7 @@ internal object ChatRowPortFixtures {
                 title = TITLE,
                 groupName = TITLE,
                 pinned = pinned,
+                muted = muted,
                 unreadCount = if (unread) 3uL else 0uL,
                 hasUnread = unread,
                 pendingConfirmation = pending,

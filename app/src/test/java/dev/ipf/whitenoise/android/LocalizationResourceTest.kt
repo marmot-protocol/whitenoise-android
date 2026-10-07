@@ -277,23 +277,19 @@ class LocalizationResourceTest {
             agentConnectorCopyRequirements[requireNotNull(file.parentFile).name]
                 ?: return listOf("${file.path}: missing localized copy requirements")
         return buildList {
-            val disclosure = strings["ai_agents_clipboard_disclosure"]
-            if (disclosure == null) {
-                add("${file.path}: missing ai_agents_clipboard_disclosure")
-            } else {
-                if (!disclosure.startsWith(requirements.disclosurePrefix)) {
-                    add("${file.path}: disclosure does not identify installation prompts first")
-                }
-                if (!disclosure.contains(requirements.disclosureFlow)) {
-                    add("${file.path}: disclosure does not explain choose-copy-paste flow")
-                }
-            }
+            addAll(agentConnectorDisclosureOffenders(file, strings["ai_agents_clipboard_disclosure"], requirements))
             agentConnectorPromptKeys.forEach { key ->
                 val value = strings[key]
                 if (value == null) {
                     add("${file.path}: missing $key")
                 } else {
-                    val violations = agentConnectorPromptViolations(value, requirements)
+                    val violations =
+                        agentConnectorPromptViolations(value, requirements) +
+                            if (key == AGENT_CONNECTOR_HERMES_PROMPT_KEY) {
+                                hermesConnectorPromptTokenViolations(value)
+                            } else {
+                                emptyList()
+                            }
                     if (violations.isNotEmpty()) {
                         add("${file.path}: $key (${violations.joinToString(", ")})")
                     }
@@ -317,7 +313,44 @@ class LocalizationResourceTest {
                     add("${file.path}: $AGENT_CONNECTOR_CODEX_PROMPT_KEY (${codexTokenViolations.joinToString(", ")})")
                 }
             }
+            val claudePrompt = strings[AGENT_CONNECTOR_CLAUDE_PROMPT_KEY]
+            if (claudePrompt == null) {
+                add("${file.path}: missing $AGENT_CONNECTOR_CLAUDE_PROMPT_KEY")
+            } else {
+                val violations =
+                    agentConnectorPromptViolations(claudePrompt, requirements, AgentConnectorPromptGuardMode.Claude) +
+                        claudeConnectorPromptTokenViolations(claudePrompt)
+                if (violations.isNotEmpty()) {
+                    add("${file.path}: $AGENT_CONNECTOR_CLAUDE_PROMPT_KEY (${violations.joinToString(", ")})")
+                }
+            }
         }
+    }
+
+    private fun agentConnectorDisclosureOffenders(
+        file: File,
+        disclosure: String?,
+        requirements: AgentConnectorCopyRequirements,
+    ): List<String> =
+        buildList {
+            if (disclosure == null) {
+                add("${file.path}: missing ai_agents_clipboard_disclosure")
+            } else {
+                if (!disclosure.startsWith(requirements.disclosurePrefix)) {
+                    add("${file.path}: disclosure does not identify installation prompts first")
+                }
+                if (!disclosure.contains(requirements.disclosureFlow)) {
+                    add("${file.path}: disclosure does not explain choose-copy-paste flow")
+                }
+            }
+        }
+
+    @Test
+    fun hermesPromptGuardRejectsMissingOrAmbiguousHarnessGuides() {
+        val prompt = "Read the Hermes harness guide at $HERMES_HARNESS_README_URL."
+        assertTrue(hermesConnectorPromptTokenViolations(prompt).isEmpty())
+        assertTrue(hermesConnectorPromptTokenViolations(prompt.replace(HERMES_HARNESS_README_URL, "")).isNotEmpty())
+        assertTrue(hermesConnectorPromptTokenViolations("$prompt $HERMES_HARNESS_README_URL").isNotEmpty())
     }
 
     @Test
@@ -704,6 +737,26 @@ class LocalizationResourceTest {
     private enum class AgentConnectorPromptGuardMode {
         Generic,
         Codex,
+        Claude,
+    }
+
+    private fun hermesConnectorPromptTokenViolations(prompt: String): List<String> =
+        if (prompt.windowed(HERMES_HARNESS_README_URL.length).count { it == HERMES_HARNESS_README_URL } == 1) {
+            emptyList()
+        } else {
+            listOf("missing single Hermes harness README URL")
+        }
+
+    private fun claudeConnectorPromptTokenViolations(prompt: String): List<String> {
+        val required = listOf(CLAUDE_HARNESS_README_URL, CLAUDE_INSTALLER_SCRIPT, "wn-claude --version", "wn-agent")
+        val violations = required.filterNot(prompt::contains).map { "missing $it" }.toMutableList()
+        if (prompt.windowed(CLAUDE_HARNESS_README_URL.length).count { it == CLAUDE_HARNESS_README_URL } != 1) {
+            violations += "missing single Claude harness README URL"
+        }
+        if (Regex("""\bwn-claude\b""").findAll(prompt).count() < 2) {
+            violations += "missing connector round-trip verification"
+        }
+        return violations
     }
 
     private fun codexConnectorPromptTokenViolations(prompt: String): List<String> {
@@ -740,13 +793,15 @@ class LocalizationResourceTest {
         if (!prompt.startsWith(requirements.promptPrefix)) {
             violations += "missing installation-prompt introduction"
         }
+        val approvedInstaller =
+            if (mode == AgentConnectorPromptGuardMode.Claude) CLAUDE_INSTALLER_SCRIPT else CODEX_INSTALLER_SCRIPT
         val orderedSegments =
-            if (mode == AgentConnectorPromptGuardMode.Codex) {
+            if (mode != AgentConnectorPromptGuardMode.Generic) {
                 listOf(
                     "plain-language explanation" to requirements.explanation,
                     "prerequisite confirmation" to CODEX_PREREQUISITES_MARKER,
                     "pre-change approval" to requirements.approval,
-                    "approved install and verification" to CODEX_INSTALLER_SCRIPT,
+                    "approved install and verification" to approvedInstaller,
                 )
             } else {
                 listOf(
@@ -765,7 +820,9 @@ class LocalizationResourceTest {
         val forbiddenPatterns =
             when (mode) {
                 AgentConnectorPromptGuardMode.Generic -> agentConnectorForbiddenPatterns
-                AgentConnectorPromptGuardMode.Codex -> agentConnectorCodexForbiddenPatterns
+                AgentConnectorPromptGuardMode.Codex,
+                AgentConnectorPromptGuardMode.Claude,
+                -> agentConnectorCodexForbiddenPatterns
             }
         forbiddenPatterns.forEach { (label, pattern) ->
             if (pattern.containsMatchIn(prompt)) {
@@ -799,7 +856,11 @@ class LocalizationResourceTest {
                 "values-b+zh+Hant" to "恢復跟隨朗讀",
             )
 
+        const val AGENT_CONNECTOR_HERMES_PROMPT_KEY = "agent_connector_hermes_prompt"
+        const val HERMES_HARNESS_README_URL =
+            "https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md"
         const val AGENT_CONNECTOR_CODEX_PROMPT_KEY = "agent_connector_codex_prompt"
+        const val AGENT_CONNECTOR_CLAUDE_PROMPT_KEY = "agent_connector_claude_prompt"
         const val AGENT_CONNECTOR_NPUB_PLACEHOLDER = "%1\$s"
         const val AGENT_CONNECTOR_DOCS_URL =
             "https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md"
@@ -807,6 +868,9 @@ class LocalizationResourceTest {
             "https://github.com/marmot-protocol/mdk/blob/master/integrations/codex/marmot/README.md"
         const val CODEX_PREREQUISITES_MARKER = "PATH"
         const val CODEX_INSTALLER_SCRIPT = "install-codex-marmot.sh"
+        const val CLAUDE_HARNESS_README_URL =
+            "https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md"
+        const val CLAUDE_INSTALLER_SCRIPT = "install-claude-marmot.sh"
 
         val agentConnectorPromptKeys =
             listOf(

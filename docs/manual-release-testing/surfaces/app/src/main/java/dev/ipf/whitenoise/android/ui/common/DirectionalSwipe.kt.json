@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DirectionalSwipe.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DirectionalSwipeIntent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DirectionalSwipe.kt",
+        "anchor": "class DirectionalSwipeIntent(",
+        "test_ids": [
+          "SET-032"
+        ]
+      },
+      {
+        "surface": "directionalSwipe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/DirectionalSwipe.kt",
+        "anchor": "fun Modifier.directionalSwipe(",
+        "test_ids": [
+          "SET-032"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

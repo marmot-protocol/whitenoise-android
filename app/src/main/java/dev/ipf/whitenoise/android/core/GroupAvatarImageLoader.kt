@@ -63,7 +63,10 @@ internal object GroupAvatarImageLoader {
         ByteSizeLruCache<String, ImageBitmap>(
             maxBytes = CACHE_SIZE_BYTES.toLong(),
             sizeOf = { image -> image.asAndroidBitmap().byteCount.coerceAtLeast(1) },
-            onEvicted = { AvatarCacheDiagnostics.evicted(AvatarCacheKind.GROUP) },
+            onEvicted = {
+                AvatarCacheDiagnostics.evicted(AvatarCacheKind.GROUP)
+                AvatarCacheChanges.published()
+            },
         )
     private val inFlight = mutableMapOf<String, CompletableDeferred<ImageBitmap?>>()
     private val cacheLifetime = StalenessGuard()
@@ -85,6 +88,7 @@ internal object GroupAvatarImageLoader {
         if (cacheKey.isEmpty()) return
         synchronized(lock) {
             cache.put(cacheKey, image)
+            AvatarCacheChanges.published()
         }
     }
 
@@ -129,6 +133,7 @@ internal object GroupAvatarImageLoader {
                         val current = isCurrentGeneration(launchedGeneration, launchedRequest)
                         if (current && image != null) {
                             cache.put(key, image)
+                            AvatarCacheChanges.published()
                         }
                         inFlight.remove(key, deferred)
                         deferred.complete(if (current) image else null)
@@ -166,6 +171,7 @@ internal object GroupAvatarImageLoader {
             cacheLifetime.advance()
             scope.coroutineContext.cancelChildren()
             cache.clear()
+            AvatarCacheChanges.published()
             retireRequestsLocked()
         }
     }

@@ -418,8 +418,12 @@ class NotificationStreamForegroundService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = BackgroundConnectionNotification.NOTIFICATION_ID
+        internal const val DICTATION_NOTIFICATION_ID = 1003
         private var activeHost: NotificationStreamForegroundService? = null
         private val connectionStartEpoch = AtomicLong()
+
+        /** Teardown uses the current Android record, rather than a separate presentation pointer. */
+        internal fun releaseCompletedDictation(): Boolean = activeHost?.dictation?.releaseIfCompleted() == true
 
         /** Reconcile the existing host without creating a service or reopening a microphone. */
         internal fun onAppForegrounded(controller: ConversationDictationController?) {
@@ -435,7 +439,18 @@ class NotificationStreamForegroundService : Service() {
         }
 
         internal var foregroundPublisher: (NotificationStreamForegroundService, Notification, Int) -> Unit =
-            { service, notification, type -> service.startForeground(NOTIFICATION_ID, notification, type) }
+            { service, notification, type ->
+                service.startForeground(foregroundNotificationId(notification), notification, type)
+            }
+
+        /** Changing the presentation ID lets Android retire the old foreground card atomically. */
+        internal fun foregroundNotificationId(notification: Notification): Int =
+            if (notification.channelId == ConversationDictationForegroundService.CHANNEL_ID) {
+                DICTATION_NOTIFICATION_ID
+            } else {
+                NOTIFICATION_ID
+            }
+
         internal var foregroundRemover: (NotificationStreamForegroundService) -> Unit =
             { service -> service.stopForeground(STOP_FOREGROUND_REMOVE) }
 

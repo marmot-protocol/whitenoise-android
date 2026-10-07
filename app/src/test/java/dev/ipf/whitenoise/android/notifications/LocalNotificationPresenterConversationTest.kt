@@ -13,6 +13,7 @@ import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.drawable.IconCompat
+import androidx.core.graphics.drawable.toBitmap
 import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -84,6 +85,139 @@ class LocalNotificationPresenterConversationTest {
             )
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
     }
+
+    /** Ordinary public publication records its contact before a first private Save refreshes an old cached entry. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun firstPrivatePictureRefreshesAnOrdinaryPublishedShortcut() =
+        runBlocking {
+            presenter =
+                LocalNotificationPresenter(
+                    context = context,
+                    groupReconciliation = {},
+                    contactAvatarOverride = { _, _ -> false to null },
+                    shortcutPublisher = { publishedShortcut = it },
+                )
+            presenter.ensureChannels()
+            presenter.show(update(false).copy(isDm = true), previewTextOverride = "Original", shortNpub = { "Maya" })
+            val posted = checkNotNull(manager.activeNotifications.firstOrNull()).notification
+            assertEquals(
+                conversationShortcutAccountScope("account-a"),
+                posted.extras.getString("dev.ipf.whitenoise.android.notify.contact_picture_account_scope"),
+            )
+            assertFalse(posted.extras.containsKey("dev.ipf.whitenoise.android.notify.contact_picture_account"))
+            var cached = checkNotNull(publishedShortcut)
+            val platform =
+                object : ContactPictureShortcutPlatform(context) {
+                    /** Serves the cached conversation shortcut. */
+                    override fun read() = listOf(cached)
+
+                    /** Stores the single rewritten shortcut. */
+                    override fun update(shortcuts: List<ShortcutInfoCompat>) {
+                        cached = shortcuts.single()
+                    }
+                }
+            val red = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+            refreshContactPictureShortcuts(
+                context,
+                "account-a",
+                DEFAULT_NOTIFICATION_SENDER_ID,
+                { red },
+                { true },
+                platform,
+            )
+            assertEquals(Color.RED, checkNotNull(cached.icon?.loadDrawable(context)).toBitmap().getPixel(0, 0))
+        }
+
+    /** The final card/shortcut write uses current private pixels, and a silent clear replaces captured history. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun privateContactPixelsWinAndClearSilentlyRefreshesExistingCards() =
+        runBlocking {
+            var pixels: Bitmap? = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+            val public = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
+            presenter =
+                LocalNotificationPresenter(
+                    context = context,
+                    groupReconciliation = {},
+                    contactAvatarOverride = { account, contact ->
+                        assertEquals(conversationShortcutAccountScope("account-a"), account)
+                        assertEquals(DEFAULT_NOTIFICATION_SENDER_ID, contact)
+                        true to pixels
+                    },
+                    shortcutPublisher = { publishedShortcut = it },
+                )
+            presenter.ensureChannels()
+            presenter.show(
+                update(false).copy(isDm = true),
+                previewTextOverride = "First",
+                senderAvatarBitmap = public,
+                conversationAvatarBitmap = public,
+                shortNpub = { "Maya" },
+            )
+            presenter.show(
+                update(false, timestampMs = 2345, messageIdHex = "second").copy(isDm = true),
+                previewTextOverride = "Second",
+                senderAvatarBitmap = public,
+                conversationAvatarBitmap = public,
+                shortNpub = { "Maya" },
+            )
+
+            /** Reads the top-left pixel of the sender Person icon on the live card. */
+            fun senderPixels(): Int {
+                val card =
+                    manager.activeNotifications
+                        .single {
+                            (it.notification.flags and Notification.FLAG_GROUP_SUMMARY) == 0
+                        }.notification
+                val style =
+                    checkNotNull(
+                        NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
+                            card,
+                        ),
+                    )
+                return checkNotNull(
+                    style.messages
+                        .last()
+                        .person
+                        ?.icon
+                        ?.loadDrawable(context),
+                ).toBitmap().getPixel(0, 0)
+            }
+            assertEquals(Color.RED, senderPixels())
+            assertEquals(
+                Color.RED,
+                checkNotNull(publishedShortcut?.icon?.loadDrawable(context)).toBitmap().getPixel(0, 0),
+            )
+            pixels = public
+            presenter.refreshContactSenderName("account-a", DEFAULT_NOTIFICATION_SENDER_ID, "Maya")
+            assertEquals(Color.BLUE, senderPixels())
+        }
+
+    /** A member's private face changes its Person only; the group's shortcut retains the group's own image. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun privateContactDoesNotReplaceTheGroupShortcutImage() =
+        runBlocking {
+            val private = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+            val group = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }
+            presenter =
+                LocalNotificationPresenter(
+                    context = context,
+                    groupReconciliation = {},
+                    contactAvatarOverride = { _, _ -> true to private },
+                    shortcutPublisher = { publishedShortcut = it },
+                )
+            presenter.ensureChannels()
+            presenter.show(
+                update(false),
+                previewTextOverride = "Group message",
+                conversationAvatarBitmap = group,
+                shortNpub = { "Maya" },
+            )
+            val icon = checkNotNull(publishedShortcut?.icon?.loadDrawable(context)).toBitmap()
+            assertEquals(Color.GREEN, icon.getPixel(0, 0))
+        }
 
     @Test
     fun conversationShortcutRepublishPreservesDirectShareCategory() {

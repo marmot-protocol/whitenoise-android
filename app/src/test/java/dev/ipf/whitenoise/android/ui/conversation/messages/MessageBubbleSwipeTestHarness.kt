@@ -82,6 +82,8 @@ internal fun SwipeTestBubbleHost(
     surface: SwipeTestSurface,
     rtl: Boolean = false,
     amoled: Boolean = false,
+    readOnly: Boolean = false,
+    selecting: Boolean = false,
 ) {
     val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
     CompositionLocalProvider(LocalLayoutDirection provides direction) {
@@ -94,7 +96,8 @@ internal fun SwipeTestBubbleHost(
                     showSenderAvatar = surface.item.record.direction != "sent",
                     composerTextState = ComposerTextState(TextFieldValue("")),
                     highlighted = false,
-                    selectionMode = false,
+                    readOnly = readOnly,
+                    selectionMode = selecting,
                     textSelectionMode = false,
                     onTextSelectionModeChange = {},
                     onTextSelectionBoundsChange = {},

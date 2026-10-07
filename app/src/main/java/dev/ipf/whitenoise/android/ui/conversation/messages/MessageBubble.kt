@@ -4,7 +4,6 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,11 +13,11 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -48,7 +47,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.layout.boundsInRoot
@@ -95,7 +93,6 @@ import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
-import dev.ipf.whitenoise.android.core.ReplySwipeGesture
 import dev.ipf.whitenoise.android.core.TimelineInvalidationPresentation
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.core.timelineInvalidationPresentation
@@ -108,6 +105,8 @@ import dev.ipf.whitenoise.android.state.ConversationNoticeDestination
 import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.ReportOutcome
+import dev.ipf.whitenoise.android.state.SwipeAction
+import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
@@ -124,6 +123,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayout
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
+import dev.ipf.whitenoise.android.ui.common.directionalSwipe
 import dev.ipf.whitenoise.android.ui.common.longPressOrVerticalDrag
 import dev.ipf.whitenoise.android.ui.common.rememberDurableAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberMessageTextCopy
@@ -163,9 +163,12 @@ import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
+import dev.ipf.whitenoise.android.ui.conversation.share.isBareLocationShare
+import dev.ipf.whitenoise.android.ui.conversation.share.isContactShareCaption
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
+import dev.ipf.whitenoise.android.ui.conversation.share.rememberLocalVCardContact
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
@@ -538,12 +541,30 @@ internal fun MessageBubble(
                     bottom = bounds.bottom.roundToInt(),
                 )
         }
-    val replySwipe = rememberMessageReplySwipeState(record.messageIdHex)
-    // Physical drag deltas run right-to-left in an RTL layout, so they are
-    // folded onto the gesture's semantic "forward" axis before measurement. The
-    // bubble's own translation stays unsigned because `Modifier.offset {}`
-    // mirrors placement for the layout direction on its own.
-    val replySwipeDirection = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1f else -1f
+    val swipeSettings = appState.swipePreferences.state
+    val swipeRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val swipeAccount = controller.boundAccountRef
+    val swipeGroup = controller.group.groupIdHex
+    val swipeRuntime = appState.runtimeGeneration
+    val swipeOwner =
+        listOf(
+            controller,
+            record,
+            swipeAccount,
+            swipeRuntime,
+            selectionMode,
+            textSelectionMode,
+            actionsReadOnly,
+        )
+    val replySwipe = rememberMessageReplySwipeState(record.messageIdHex, listOf(swipeOwner, swipeSettings, swipeRtl))
+    var swipeDirection by remember(replySwipe) { mutableIntStateOf(if (swipeRtl) -1 else 1) }
+    val swipeMounted = remember(replySwipe) { booleanArrayOf(true) }
+    DisposableEffect(replySwipe) {
+        onDispose {
+            swipeMounted[0] = false
+            replySwipe.cancel()
+        }
+    }
     val clipboard = LocalClipboardManager.current
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
@@ -1452,11 +1473,53 @@ internal fun MessageBubble(
                 maxWidth = bubbleColumnMaxWidth,
             )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
-        val replySwipeUnavailable = deleted || actionsReadOnly || textSelectionMode
+        val replySwipeUnavailable = deleted || actionsReadOnly || textSelectionMode || selectionMode
 
-        // Drawn under the row so the bubble uncovers it as it slides away.
+        /** An unavailable menu command must not claim a swipe or show a misleading cue. */
+        fun availableSwipe(action: SwipeAction): SwipeAction =
+            when {
+                replySwipeUnavailable -> SwipeAction.Off
+                action == SwipeAction.Forward && forwardPayload == null -> SwipeAction.Off
+                else -> action
+            }
+        val leftSwipe = availableSwipe(swipeSettings.resolved(SwipeBinding.MessageLeft, swipeRtl))
+        val rightSwipe = availableSwipe(swipeSettings.resolved(SwipeBinding.MessageRight, swipeRtl))
+        val swipeAction = if (swipeDirection < 0) leftSwipe else rightSwipe
+
+        /** Re-resolves the retained row and owner before reusing the normal reply/chooser handlers. */
+        @Suppress("ReturnCount") // Separate missing target, owner and eligibility rejection boundaries.
+        fun commitSwipe(direction: Int) {
+            val current = controller.currentActionTimelineItem(record.messageIdHex) ?: return
+            val gestureCurrent = swipeMounted[0] && appState.swipePreferences.state == swipeSettings
+            val ownerCurrent =
+                appState.runtimeGeneration == swipeRuntime &&
+                    appState.activeAccountRef == swipeAccount &&
+                    controller.acceptsConversationActionOwner(swipeAccount, swipeGroup)
+            val targetCurrent =
+                current.projected?.deleted != true &&
+                    !MessageProjector.isDeleted(record.messageIdHex, controller.deletedMessageIds) &&
+                    current.record == record
+            if (!gestureCurrent || !ownerCurrent) return
+            if (!targetCurrent || replySwipeUnavailable) return
+            when (if (direction < 0) leftSwipe else rightSwipe) {
+                SwipeAction.Reply -> beginReply()
+                SwipeAction.Forward -> beginForward()
+                SwipeAction.React -> {
+                    onActionMenuOpenChange(false)
+                    emojiPickerOpen = true
+                }
+                else -> Unit
+            }
+        }
+
+        // The cue describes the chosen action; reaction chrome translates with the same bubble container.
         if (!replySwipeUnavailable) {
-            MessageReplySwipeGlyph(state = replySwipe, messageIdHex = record.messageIdHex)
+            MessageReplySwipeGlyph(
+                state = replySwipe,
+                messageIdHex = record.messageIdHex,
+                physicalDirection = swipeDirection,
+                action = swipeAction,
+            )
         }
 
         Row(
@@ -1595,42 +1658,18 @@ internal fun MessageBubble(
                         selectionMode = selectionMode,
                         selected = selected,
                     ).then(
-                        // A deleted or selection-mode message has no actionable
-                        // reply gesture; taps are owned by the selection row. Keep
-                        // the originating row's detector mounted while its range
-                        // drag is active so recomposition cannot break ownership
-                        // of the pointer that is already down.
-                        if (replySwipeUnavailable || longPressBlockedBySelection) {
-                            Modifier
-                        } else {
-                            Modifier.pointerInput(record.messageIdHex, replySwipeDirection) {
-                                var gesture = ReplySwipeGesture()
-                                detectHorizontalDragGestures(
-                                    onDragStart = {
-                                        gesture = ReplySwipeGesture()
-                                    },
-                                    onHorizontalDrag = { change, dragAmount ->
-                                        val forward = dragAmount * replySwipeDirection
-                                        gesture =
-                                            gesture.dragBy(
-                                                deltaX = forward,
-                                                deltaY = change.position.y - change.previousPosition.y,
-                                            )
-                                        val raw = gesture.forwardReplySwipeDistance()
-                                        if (forward > 0f || raw > 0f) change.consume()
-                                        replySwipe.dragTo(raw)
-                                    },
-                                    onDragEnd = {
-                                        replySwipe.release { beginReply() }
-                                        gesture = ReplySwipeGesture()
-                                    },
-                                    onDragCancel = {
-                                        replySwipe.cancel()
-                                        gesture = ReplySwipeGesture()
-                                    },
-                                )
-                            }
-                        },
+                        Modifier.directionalSwipe(
+                            owner = swipeOwner,
+                            settings = listOf(swipeSettings, swipeRtl),
+                            left = leftSwipe != SwipeAction.Off,
+                            right = rightSwipe != SwipeAction.Off,
+                            onDistance = { distance, direction ->
+                                swipeDirection = direction
+                                replySwipe.dragTo(distance)
+                            },
+                            onRelease = { direction -> replySwipe.release { commitSwipe(direction) } },
+                            onCancel = replySwipe::cancel,
+                        ),
                     ).then(
                         Modifier.observeMessageTextDoubleTap(
                             enabled = !deleted && !selectionMode && !textSelectionMode && canSpeakAloud,
@@ -1703,7 +1742,7 @@ internal fun MessageBubble(
                     showSenderAvatar = showSenderAvatar,
                     title = appState.displayName(record.sender),
                     seed = record.sender,
-                    pictureUrl = appState.avatarUrl(record.sender),
+                    pictureUrl = appState.contactAvatarSource(record.sender),
                     picture =
                         if (showSenderAvatar) {
                             rememberDurableAvatar(
@@ -1740,7 +1779,7 @@ internal fun MessageBubble(
                             } else {
                                 Modifier
                             },
-                        ).offset { IntOffset(replySwipe.displayedDistance.roundToInt(), 0) }
+                        ).absoluteOffset { IntOffset((replySwipe.displayedDistance * swipeDirection).roundToInt(), 0) }
                         .onGloballyPositioned {
                             if (replySwipe.atRest) replySwipe.bubbleBoundsInRoot = it.boundsInRoot()
                         },
@@ -1842,16 +1881,6 @@ internal fun MessageBubble(
                 // image/video; a file card or caption owns the footer instead.
                 // The prototype keeps time and status below the media, inside the bubble, never overlaid on it.
                 val footerOnVisualMedia = false
-                // A caption is the message's last line, so it carries the time and
-                // delivery state the way a text bubble does; the file card keeps the
-                // footer only when there is no caption to carry it.
-                val confirmedFileFooterInCard =
-                    fileCardOwnsFooter(
-                        deleted = deleted,
-                        fileCount = fileAttachments.size,
-                        visualOwnsFooter = footerOnVisualMedia,
-                        hasCaption = mediaCaption != null,
-                    )
                 // Share-message recognition (app-side rich rendering). A contact
                 // ships as a text/vcard attachment with a name/phone caption, so
                 // its card draws from the caption without fetching the blob; a
@@ -1870,7 +1899,7 @@ internal fun MessageBubble(
                     canRenderSharedContent &&
                         !anyConfirmedMedia &&
                         record.kind == 9uL
-                val sharedContact =
+                val captionContact =
                     remember(vcardAttachment, shareBodyText, canRenderSharedContent) {
                         if (vcardAttachment != null && canRenderSharedContent) {
                             parseSharedContactFromText(shareBodyText)
@@ -1878,6 +1907,41 @@ internal fun MessageBubble(
                             null
                         }
                     }
+                // The vCard itself is the authority once its bytes are on this
+                // device, which also covers a raw .vcf sent without the caption.
+                // Reading it never starts a download.
+                val fileContact =
+                    rememberLocalVCardContact(
+                        controller = controller,
+                        appState = appState,
+                        messageIdHex = record.messageIdHex,
+                        attachment = vcardAttachment.takeIf { canRenderSharedContent },
+                        mine = mine,
+                    )
+                val sharedContact = fileContact ?: captionContact
+                // The card replaces the caption only when the caption is the
+                // generated name/phone text. Once the file is local, anything
+                // else, such as "Call Ada" above the number, is the sender's own
+                // words and stays visible.
+                val captionIsContactText =
+                    remember(fileContact, captionContact, shareBodyText) {
+                        if (fileContact == null) {
+                            captionContact != null
+                        } else {
+                            isContactShareCaption(shareBodyText, fileContact)
+                        }
+                    }
+                // A caption is the message's last line, so it carries the time and
+                // delivery state the way a text bubble does; the file card keeps the
+                // footer only when there is no caption to carry it. A contact card
+                // replaces its .vcf file card, so that file cannot own the footer.
+                val confirmedFileFooterInCard =
+                    fileCardOwnsFooter(
+                        deleted = deleted,
+                        fileCount = fileAttachments.size - if (sharedContact != null) 1 else 0,
+                        visualOwnsFooter = footerOnVisualMedia,
+                        hasCaption = mediaCaption != null,
+                    )
                 val sharedLocation =
                     remember(shareBodyText, canRenderStructuredShare) {
                         if (canRenderStructuredShare) {
@@ -1885,6 +1949,12 @@ internal fun MessageBubble(
                         } else {
                             null
                         }
+                    }
+                // A maps link inside prose draws the card with the prose as its
+                // caption; only a bare link lets the card replace the text.
+                val sharedLocationOwnsBody =
+                    remember(shareBodyText, sharedLocation) {
+                        sharedLocation != null && isBareLocationShare(shareBodyText)
                     }
                 val sharedUser =
                     remember(shareBodyText, canRenderStructuredShare) {
@@ -1976,8 +2046,8 @@ internal fun MessageBubble(
                         deleted = deleted,
                         persistedFailure = persistedFailure,
                         structuredShareOwnsBody =
-                            sharedContact != null ||
-                                sharedLocation != null ||
+                            captionIsContactText ||
+                                sharedLocationOwnsBody ||
                                 sharedUser != null ||
                                 remoteGiphyMedia != null,
                         hasPendingMediaName = mediaPendingName != null,
@@ -2798,7 +2868,7 @@ internal fun MessageBubble(
                     MessageFullScreenView(
                         senderDisplayName = appState.displayName(record.sender),
                         senderSeed = record.sender,
-                        senderAvatarUrl = appState.avatarUrl(record.sender),
+                        senderAvatarUrl = appState.contactAvatarSource(record.sender),
                         body = expandedBody,
                         bodyMarkdownDocument = displayedMarkdownDocument,
                         mentionDisplayName =
@@ -3049,7 +3119,7 @@ internal fun MessageBubble(
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
                         senderNpub = appState.npubForDisplay(record.sender),
-                        senderAvatarUrl = appState.avatarUrl(record.sender),
+                        senderAvatarUrl = appState.contactAvatarSource(record.sender),
                         reactions = controller.reactions[record.messageIdHex].orEmpty(),
                         recipients = messageDetailsRecipients(controller, appState, mine),
                         attachmentLabels = mediaReferences.map { it.fileName.ifBlank { it.mediaType } },

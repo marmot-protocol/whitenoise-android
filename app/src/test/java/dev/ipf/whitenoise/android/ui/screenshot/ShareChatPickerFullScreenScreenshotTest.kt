@@ -3,9 +3,15 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.state.AppText
@@ -138,8 +144,53 @@ class ShareChatPickerFullScreenScreenshotTest {
             .captureRoboImage("src/test/snapshots/share_chat_picker_account_sheet_dark_large.png")
     }
 
+    /** Light filtering keeps only the two explicitly included destinations. */
+    @Test
+    fun folderPickerLight() {
+        renderMultiAccountPicker(darkTheme = false, filtered = true)
+        composeRule
+            .onNodeWithTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/share_picker_folder_light.png")
+    }
+
+    /** AMOLED uses the same selected pill contrast as the home folder row. */
+    @Test
+    fun folderPickerAmoled() {
+        renderMultiAccountPicker(amoled = true, filtered = true)
+        composeRule
+            .onNodeWithTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/share_picker_folder_amoled.png")
+    }
+
+    /** Narrow RTL retains full accessibility labels while visible long names ellipsize at 200% text. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w320dp-h780dp-mdpi")
+    fun folderPickerRtlLarge() {
+        renderMultiAccountPicker(fontScale = 2f, rtl = true, filtered = true)
+        composeRule
+            .onNodeWithTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/share_picker_folder_rtl_large.png")
+    }
+
+    /** Wide, short layouts share the search row with filters instead of consuming the destination viewport. */
+    @Test
+    @Config(sdk = [36], qualifiers = "w780dp-h360dp-land-mdpi")
+    fun folderPickerLandscapeLarge() {
+        renderMultiAccountPicker(fontScale = 2f, filtered = true)
+        composeRule.onNodeWithTag("share.destinations").performScrollToNode(hasText("Person 1"))
+        composeRule
+            .onNodeWithTag(SHARE_CHAT_PICKER_SCREEN_TEST_TAG)
+            .captureRoboImage("src/test/snapshots/share_picker_folder_landscape_large.png")
+    }
+
     /** Renders the populated multi-account surface at one deterministic density. */
-    private fun renderMultiAccountPicker(fontScale: Float = 1f) {
+    private fun renderMultiAccountPicker(
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
+        darkTheme: Boolean = true,
+        amoled: Boolean = false,
+        filtered: Boolean = false,
+    ) {
         val chats =
             (0 until 10).map { index ->
                 hexId(0x20 + index) to hexId(0x40 + index)
@@ -160,9 +211,17 @@ class ShareChatPickerFullScreenScreenshotTest {
                     ),
             )
 
+        val store = appState.chatFolderPreferences
+        store.foldersFor(ACCOUNT_REF)
+        val label = if (rtl) "تنسيق إصدار المشروع ومراجعات التصميم" else "Release coordination and design reviews"
+        val included = setOf(chats.first().first, chats.last().first)
+        val folder = requireNotNull(store.commitFolderDraft(ACCOUNT_REF, null, label, "", included, null))
         composeRule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = fontScale)) {
-                WhiteNoiseTheme(darkTheme = true) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = 1f, fontScale = fontScale),
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                     Surface {
                         ShareChatPickerFullScreenContent(
                             appState = appState,
@@ -179,6 +238,11 @@ class ShareChatPickerFullScreenScreenshotTest {
                     }
                 }
             }
+        }
+        if (filtered) {
+            val filterTag = "destination.filter.${folder.id}"
+            composeRule.onNodeWithTag("destination.filters").performScrollToNode(hasTestTag(filterTag))
+            composeRule.onNodeWithTag(filterTag).performClick()
         }
     }
 

@@ -48,9 +48,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 internal const val TTS_TRANSPORT_BODY_TAG = "tts-transport-body"
 
 /**
- * Read-aloud transport strip rendered beneath the conversation's top bar in
- * every top-bar state (default, selection, search): speech continues through
- * all of them, so the controls must too. Sentence and message navigation are
+ * Shared read-aloud controls hosted by the app shell, normal chat-list flow,
+ * or the modal text reader. Sentence and message navigation are
  * separate compact actions above message progress. The controls scroll
  * horizontally at narrow widths or large font scales without making the
  * transport taller. No scrub gesture, since the framework offers no

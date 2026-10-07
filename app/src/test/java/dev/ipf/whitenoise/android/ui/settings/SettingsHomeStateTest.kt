@@ -96,6 +96,7 @@ class SettingsHomeStateTest {
                     rows =
                         listOf(
                             SettingsHomeRow.Appearance,
+                            SettingsHomeRow.Gestures,
                             SettingsHomeRow.ChatFolders,
                             SettingsHomeRow.Notifications,
                             SettingsHomeRow.ReadAloud,

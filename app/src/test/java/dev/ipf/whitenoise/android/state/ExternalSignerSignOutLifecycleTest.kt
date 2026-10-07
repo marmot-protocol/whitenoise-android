@@ -1,13 +1,18 @@
 package dev.ipf.whitenoise.android.state
 
 import android.app.Application
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
 import androidx.core.content.pm.ShortcutManagerCompat
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.LocalCleanupReportFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SignOutOutcomeFfi
 import dev.ipf.marmotkit.WipeOutcomeFfi
+import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationOverridePreferences
+import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
 import kotlinx.coroutines.runBlocking
@@ -21,6 +26,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
@@ -34,6 +40,7 @@ import kotlin.coroutines.resumeWithException
  * mode or clearing the active session after an unfinished engine teardown.
  */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34])
 class ExternalSignerSignOutLifecycleTest {
     private val context: Application = RuntimeEnvironment.getApplication()
@@ -59,7 +66,9 @@ class ExternalSignerSignOutLifecycleTest {
             localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
         )
     private var engineWiped = false
+    private var beforeListAccounts: () -> Unit = {}
 
+    /** Builds a signed-in external-signer identity without private key material for the real teardown path. */
     private fun externalSignerAccount(
         signedOut: Boolean = false,
         running: Boolean = !signedOut,
@@ -78,6 +87,7 @@ class ExternalSignerSignOutLifecycleTest {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
+            /** Creates a failed native future so lifecycle tests exercise their production error handling. */
             fun suspendFailure(failure: Throwable): Any {
                 (arguments!!.last() as Continuation<Any?>).resumeWithException(failure)
                 return COROUTINE_SUSPENDED
@@ -94,6 +104,7 @@ class ExternalSignerSignOutLifecycleTest {
                     wipeOutcome.also { engineWiped = it.localCleanup.completed }
                 }
                 "listAccounts" -> {
+                    beforeListAccounts()
                     listAccountsCalls.incrementAndGet()
                     listAccountsFailure?.let(::suspendFailure)
                     if (engineWiped) emptyList() else listOf(externalSignerAccount(signedOut = engineSignedOut))
@@ -115,18 +126,52 @@ class ExternalSignerSignOutLifecycleTest {
             }
         } as MarmotInterface
 
+    /** Removes prior dynamic launcher inventory so each account-cleanup assertion owns its fixture state. */
     @Before
     fun setUp() {
         ShortcutManagerCompat.removeAllDynamicShortcuts(context)
     }
 
-    private fun appState(context: android.content.Context = this.context): WhiteNoiseAppState =
+    /** Seed distinct private records beside the existing lifecycle fixture's account state. */
+    private fun retainContactPictures(state: WhiteNoiseAppState) {
+        listOf(ACCOUNT_REF, OTHER_ACCOUNT_REF).forEach { account ->
+            state.contactPictureStore.save(
+                account,
+                "private-contact",
+                "",
+                "",
+                ContactPictureChange.Replace(contactPicturePng(android.graphics.Color.RED)),
+            ) { true }
+        }
+    }
+
+    /** Recreate the store to prove cleanup is durable and the other account's file remains readable. */
+    private fun assertContactPicturesRemovedOnlyForThisAccount(state: WhiteNoiseAppState) {
+        val recreated =
+            ContactPictureStore(
+                context.getSharedPreferences("whitenoise", android.content.Context.MODE_PRIVATE),
+                context.noBackupFilesDir.resolve("contact-pictures"),
+            )
+        assertNull(recreated.reference(ACCOUNT_REF, "private-contact"))
+        val retained = checkNotNull(state.contactPictureStore.reference(OTHER_ACCOUNT_REF, "private-contact"))
+        assertTrue(checkNotNull(recreated.read(retained)).isNotEmpty())
+    }
+
+    /**
+     * Installs the scripted native runtime into a real app state using the supplied preference-failure context
+     * and, when given, a scripted push token store in place of the Keystore-backed default.
+     */
+    private fun appState(
+        ownerContext: Context = context,
+        pushTokenStore: PushTokenStore? = null,
+    ): WhiteNoiseAppState =
         WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore.forContext(context),
+            context = ownerContext,
+            draftStore = DraftStore.forContext(ownerContext),
             accountIdHexResolver = { null },
             accounts = listOf(externalSignerAccount()),
             activeAccountRef = ACCOUNT_REF,
+            pushTokenStore = pushTokenStore,
         ).also { state ->
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
@@ -139,6 +184,7 @@ class ExternalSignerSignOutLifecycleTest {
     fun successfulExternalSignerSignOutUsesTheNormalCompletionPath() =
         runBlocking {
             val appState = appState()
+            retainContactPictures(appState)
             retainComposerExpansion(appState)
 
             val completion = appState.signOutActiveAccount(deleteKeyPackages = true)
@@ -152,6 +198,7 @@ class ExternalSignerSignOutLifecycleTest {
                 appState.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
             )
             assertNull(appState.activeAccountRef)
+            assertContactPicturesRemovedOnlyForThisAccount(appState)
             assertTrue(appState.phase is AppPhase.Onboarding)
         }
 
@@ -272,6 +319,9 @@ class ExternalSignerSignOutLifecycleTest {
             assertEquals(phaseBefore, appState.phase)
         }
 
+    /**
+     * Verifies thrown native sign-out retains the established local fallback without changing the completion contract.
+     */
     @Test
     fun transientEngineFailureRetainsTheExistingLocalSignOutFallback() =
         runBlocking {
@@ -286,6 +336,7 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(appState.phase is AppPhase.Onboarding)
         }
 
+    /** A failed account refresh after native completion must not revive the removed active session. */
     @Test
     fun successfulSignOutRefreshFailureStillClearsTheActiveSession() =
         runBlocking {
@@ -309,6 +360,7 @@ class ExternalSignerSignOutLifecycleTest {
         runBlocking {
             val shortcutId = publishConversationShortcut()
             val appState = appState()
+            retainContactPictures(appState)
             retainComposerExpansion(appState)
 
             val outcome = appState.signOutAndWipeActiveAccount()
@@ -323,9 +375,151 @@ class ExternalSignerSignOutLifecycleTest {
                 appState.composerExpansionStateRetention.preferenceFor(OTHER_ACCOUNT_REF, GROUP_ID),
             )
             assertNull(appState.activeAccountRef)
+            assertContactPicturesRemovedOnlyForThisAccount(appState)
             assertTrue(appState.phase is AppPhase.Onboarding)
             assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).none { it.id == shortcutId })
         }
+
+    /** A failed pre-native credential write returns a visible incomplete result and permits a later retry. */
+    @Test
+    fun credentialRevocationFailureRetainsSessionAndReturnsAnIncompleteResult() =
+        runBlocking {
+            var failWrites = true
+            val owner = CredentialFailureContext(context) { failWrites }
+            val state = appState(owner)
+            retainComposerExpansion(state)
+            val phaseBefore = state.phase
+
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(0, signOutCalls.get())
+            assertEquals(ACCOUNT_REF, state.activeAccountRef)
+            assertFalse(state.accounts.single().signedOut)
+            assertEquals(phaseBefore, state.phase)
+            assertEquals(COMPOSER_EXPANSION, state.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+            assertTrue(owner.failedWrites > 0)
+
+            failWrites = false
+            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            assertEquals(1, signOutCalls.get())
+            assertNull(state.activeAccountRef)
+        }
+
+    /** A post-admission exception must propagate instead of being reported as an unattempted sign-out. */
+    @Test
+    fun signOutFailureAfterNativeAdmissionStillPropagates() =
+        runBlocking {
+            val original = context.getSharedPreferences("sign-out-push-corruption", Context.MODE_PRIVATE)
+            val corruptAfterSignOut =
+                object : SharedPreferences by original {
+                    override fun getStringSet(
+                        key: String?,
+                        defValues: MutableSet<String>?,
+                    ): MutableSet<String>? {
+                        check(!engineSignedOut) { "scripted encrypted push value corruption" }
+                        return original.getStringSet(key, defValues)
+                    }
+                }
+            val state = appState(pushTokenStore = PushTokenStore(corruptAfterSignOut))
+
+            assertTrue(runCatching { state.signOutActiveAccount() }.isFailure)
+            assertEquals(1, signOutCalls.get())
+            assertTrue(engineSignedOut)
+            assertTrue(state.accounts.single().signedOut)
+        }
+
+    /** A completed native sign-out cannot be interrupted by a second credential write during platform cleanup. */
+    @Test
+    fun signOutPublishesCompletionWhenPostNativeCredentialWritesWouldFail() =
+        runBlocking {
+            val owner = CredentialFailureContext(context) { engineSignedOut }
+            val state = appState(owner)
+            beforeListAccounts = {
+                assertTrue(state.accounts.single().signedOut)
+                assertNull(PinnedConversationTokens.create(owner).issue(ACCOUNT_REF, "ab".repeat(16)))
+            }
+            assertEquals(SignOutCompletion.Complete, state.signOutActiveAccount())
+            assertTrue(listAccountsCalls.get() > 0)
+            assertTrue(state.accounts.single().signedOut)
+            assertNull(state.activeAccountRef)
+            assertTrue(state.phase is AppPhase.Onboarding)
+            assertEquals(0, owner.failedWrites)
+        }
+
+    /** Wipe removes Android ownership and launcher presentation without another fallible credential flush. */
+    @Test
+    fun wipePublishesCompletionWhenPostNativeCredentialWritesWouldFail() =
+        runBlocking {
+            val owner = CredentialFailureContext(context) { engineWiped }
+            val state = appState(owner)
+            beforeListAccounts = {
+                assertTrue(state.accounts.isEmpty())
+                assertNull(PinnedConversationTokens.create(owner).issue(ACCOUNT_REF, "ab".repeat(16)))
+            }
+            assertEquals(wipeOutcome, state.signOutAndWipeActiveAccount())
+            assertTrue(listAccountsCalls.get() > 0)
+            assertTrue(state.accounts.isEmpty())
+            assertNull(state.activeAccountRef)
+            assertTrue(state.phase is AppPhase.Onboarding)
+            assertEquals(0, owner.failedWrites)
+        }
+
+    /** Corrupt push values after a successful native wipe cannot restore the removed account's pin eligibility. */
+    @Test
+    fun completedWipePublishesRemovedOwnershipBeforePushCleanupCanThrow() =
+        runBlocking {
+            val original = context.getSharedPreferences("wipe-push-corruption", Context.MODE_PRIVATE)
+            val corruptAfterWipe =
+                object : SharedPreferences by original {
+                    override fun getStringSet(
+                        key: String?,
+                        defValues: MutableSet<String>?,
+                    ): MutableSet<String>? {
+                        check(!engineWiped) { "scripted encrypted push value corruption" }
+                        return original.getStringSet(key, defValues)
+                    }
+                }
+            val state = appState(pushTokenStore = PushTokenStore(corruptAfterWipe))
+            assertTrue(runCatching { state.signOutAndWipeActiveAccount() }.isFailure)
+            assertTrue(engineWiped)
+            assertTrue(state.accounts.isEmpty())
+        }
+
+    /** Fails only credential commits at the scripted boundary while keeping other stores operational. */
+    private class CredentialFailureContext(
+        base: Context,
+        private val shouldFail: () -> Boolean,
+    ) : ContextWrapper(base) {
+        var failedWrites = 0
+            private set
+
+        override fun getApplicationContext(): Context = this
+
+        override fun getSharedPreferences(
+            name: String,
+            mode: Int,
+        ): SharedPreferences {
+            val original = super.getSharedPreferences(name, mode)
+            if (!name.startsWith("pinned_conversation_token")) return original
+            return object : SharedPreferences by original {
+                override fun edit(): SharedPreferences.Editor {
+                    val editor = original.edit()
+                    return object : SharedPreferences.Editor by editor {
+                        override fun remove(key: String?): SharedPreferences.Editor = apply { editor.remove(key) }
+
+                        override fun clear(): SharedPreferences.Editor = apply { editor.clear() }
+
+                        override fun commit(): Boolean {
+                            if (shouldFail()) {
+                                failedWrites++
+                                return false
+                            }
+                            return editor.commit()
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /** An unfinished destructive wipe restores the active session without dropping its geometry. */
     @Test
@@ -359,6 +553,7 @@ class ExternalSignerSignOutLifecycleTest {
             assertTrue(ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == shortcutId })
         }
 
+    /** Seeds real Android shortcut extras so account-scoped cleanup can be verified through the platform adapter. */
     private fun publishConversationShortcut(): String {
         val shortcut =
             checkNotNull(

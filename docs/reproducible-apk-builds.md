@@ -22,15 +22,23 @@ reproducibility and what remains out of scope.
 - The exact MarmotKit Android archive is pinned by immutable URL, source SHA,
   and SHA-256. Each isolated build verifies and extracts that same archive
   through Gradle before compiling its Kotlin and JNI payload.
+- The prebuilt `libjnidispatch.so` (JNA) and `libmarmot_uniffi.so` (MarmotKit)
+  are packaged without stripping, preserving their dependency bytes.
+  Independent runners previously produced stripped and unstripped copies with
+  identical loadable code but different ELF
+  metadata. Other native libraries retain their existing packaging settings.
 - The two resulting APK files must be **byte-identical**.
 - Each APK must be **unsigned** (`apksigner verify` must exit 1 with output
   beginning `DOES NOT VERIFY`).
 
 CI workflow [`.github/workflows/android-repro-verify.yml`](../.github/workflows/android-repro-verify.yml)
 runs two independent builds on separate runners through `scripts/repro-ci.sh`,
-using the same build helpers as the local script, on tag pushes, every pull
-request to `master`, and manual dispatch. A required comparison job checks source
-identity, matching recorded toolchain inputs, unsignedness, and APK bytes.
+using the same build helpers as the local script, on tag pushes, nightly,
+manual dispatch, and pull requests touching build/packaging/CI or unknown inputs.
+Known ordinary source/prose PRs defer these supplemental builds. When they run,
+the required comparison job checks source identity, matching recorded toolchain
+inputs, unsignedness, and APK bytes. See [CI request policy](ci-request-policy.md)
+for conservative whole-diff classification and nightly failure handling.
 Production and staging release lint run once each in separate required jobs.
 APK assembly in this verifier and PR runtime builds excludes those duplicate
 lint tasks; the reproducibility gate also requires both lint jobs to succeed.

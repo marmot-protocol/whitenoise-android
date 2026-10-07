@@ -137,6 +137,10 @@ import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelinePage
 import dev.ipf.whitenoise.android.notifications.NotificationReplyTimelineRecord
 import dev.ipf.whitenoise.android.notifications.NotificationStreamForegroundService
 import dev.ipf.whitenoise.android.notifications.PUSH_WAKE_MAX_ATTEMPTS
+import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
+import dev.ipf.whitenoise.android.notifications.PinnedConversationPresentation
+import dev.ipf.whitenoise.android.notifications.PinnedConversationShortcuts
+import dev.ipf.whitenoise.android.notifications.PinnedConversationTokens
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
 import dev.ipf.whitenoise.android.notifications.PushTokenStore
 import dev.ipf.whitenoise.android.notifications.PushWakeAdmission
@@ -146,6 +150,7 @@ import dev.ipf.whitenoise.android.notifications.PushWakeDiagnostics
 import dev.ipf.whitenoise.android.notifications.PushWakeEvent
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.notifications.conversationShortcutId
+import dev.ipf.whitenoise.android.notifications.hasLegacyContactShortcuts
 import dev.ipf.whitenoise.android.notifications.normalizeNotificationReaction
 import dev.ipf.whitenoise.android.notifications.notificationReactionOutcome
 import dev.ipf.whitenoise.android.notifications.notificationReplyRecoveryBoundary
@@ -1040,6 +1045,7 @@ class WhiteNoiseAppState private constructor(
     private val pushServerConfigProvider: () -> PushServerConfig?,
     private val nativePushCapabilityResolver: (PushServerConfig?) -> NativePushCapability,
     preferencesOverride: SharedPreferences?,
+    pushTokenStoreOverride: PushTokenStore?,
     initialAccounts: List<AccountSummaryFfi>,
     initialActiveAccountRef: String?,
 ) {
@@ -1096,6 +1102,7 @@ class WhiteNoiseAppState private constructor(
             pushServerConfigProvider = PushServerConfig::current,
             nativePushCapabilityResolver = { nativePushCapabilityForContext(context.applicationContext, it) },
             preferencesOverride = null,
+            pushTokenStoreOverride = null,
             initialAccounts = emptyList(),
             initialActiveAccountRef = null,
         )
@@ -1134,6 +1141,7 @@ class WhiteNoiseAppState private constructor(
             nativePushCapabilityForContext(context.applicationContext, it)
         },
         preferences: SharedPreferences? = null,
+        pushTokenStore: PushTokenStore? = null,
     ) : this(
         context = context,
         draftStore = draftStore,
@@ -1163,6 +1171,7 @@ class WhiteNoiseAppState private constructor(
         pushServerConfigProvider = pushServerConfigProvider,
         nativePushCapabilityResolver = nativePushCapabilityResolver,
         preferencesOverride = preferences,
+        pushTokenStoreOverride = pushTokenStore,
         initialAccounts = accounts,
         initialActiveAccountRef = activeAccountRef,
     )
@@ -1172,11 +1181,18 @@ class WhiteNoiseAppState private constructor(
     /** Emoji images already uploaded for the current epoch, so sends and retries never upload one twice. */
     internal val emojiUploads = EmojiUploadCache()
     private val preferences = preferencesOverride ?: appContext.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+    internal val contactPictureStore =
+        ContactPictureStore(preferences, appContext.noBackupFilesDir.resolve("contact-pictures"))
+            .also {
+                dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+                    .attach(it) { activeAccountRef }
+            }
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
     internal val localGroupDeleteCleanupMutex = Mutex()
     internal val defaultDisappearingMessagesPreferences =
         DefaultDisappearingMessagesPreferences(appContext, preferences)
+    internal val swipePreferences = SwipePreferences(preferences)
     internal val conversationDictationPreferences = ConversationDictationPreferences(appContext)
     internal val microphoneCaptureCoordinator = MicrophoneCaptureCoordinator()
     private val dictationMicrophoneOwner = Any()
@@ -1486,7 +1502,11 @@ class WhiteNoiseAppState private constructor(
     internal val conversationVibrationPreferences = ConversationVibrationPreferences(appContext)
     internal val conversationNotificationRouting by lazy { ConversationNotificationRouting(appContext) }
     internal val notificationPreviewSettings by lazy { NotificationPreviewSettings.forContext(appContext) }
-    private val localNotificationPresenter = LocalNotificationPresenter(appContext)
+    private val localNotificationPresenter =
+        LocalNotificationPresenter(
+            appContext,
+            contactAvatarOverride = ::contactAvatarOverrideForScope,
+        )
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
     private val appUpdateRepository = AppUpdateRepository(appContext)
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
@@ -1524,6 +1544,8 @@ class WhiteNoiseAppState private constructor(
     // Manual speech deliberately has no auto-read session key, but it still
     // owns decrypted text that must stop when its account is removed.
     private var ttsSpeechAccountRef: String? = null
+    internal val attachmentSpeechDestination =
+        MutableStateFlow<dev.ipf.whitenoise.android.audio.AttachmentSpeechDestination?>(null)
 
     /** Reader controls may only address speech owned by the current local account. */
     internal fun ownsCurrentAccountSpeech(): Boolean = ttsSpeechAccountRef?.let { it == activeAccountRef } == true
@@ -1551,6 +1573,7 @@ class WhiteNoiseAppState private constructor(
             ttsSpeechAccountRef = activeAccountRef
             ttsAutoReadSessionKey = null
             ttsHistorySession.onSessionCleared()
+            attachmentSpeechDestination.value = null
             // The session now exists, so the mediaPlayback service must too:
             // it mirrors the controller, keeps playback alive across app
             // switches, and stops itself when the controller goes terminal.
@@ -1584,6 +1607,7 @@ class WhiteNoiseAppState private constructor(
      * Prepares reader text off the controller lock, preserving caller/account ownership through playback commit.
      * Account-switch generation prevents an A-B-A return from reviving old work. Cleanup is session-scoped so
      * a revoked or cancelled request cannot clear a replacement queue's ownership.
+     * Accepting a new queue also revokes prior history/attachment source ownership.
      */
     suspend fun speakAloudPrepared(
         entries: List<TtsSpeakableEntry>,
@@ -1629,6 +1653,7 @@ class WhiteNoiseAppState private constructor(
                     ttsSpeechAccountRef = null
                     ttsAutoReadSessionKey = null
                     ttsHistorySession.onSessionCleared()
+                    attachmentSpeechDestination.value = null
                 }
             }
         }
@@ -1748,12 +1773,14 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Stops an owned conversation auto-read queue and revokes its account/history navigation ownership. */
     internal fun stopOwnedTtsAutoReadSession() {
         if (ttsAutoReadSessionKey == null) return
         ttsController.stop()
         ttsSpeechAccountRef = null
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
+        attachmentSpeechDestination.value = null
     }
 
     /** Account removal ends any owned speech so its decrypted text stops being spoken. */
@@ -1764,6 +1791,7 @@ class WhiteNoiseAppState private constructor(
         ttsSpeechAccountRef = null
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
+        attachmentSpeechDestination.value = null
     }
 
     /** Live continuation for auto-read: extends an active read-aloud queue. */
@@ -1778,11 +1806,13 @@ class WhiteNoiseAppState private constructor(
         return ttsController.appendSpeech(entry, locale)
     }
 
+    /** Stops the active speech queue and immediately revokes every transient source-navigation credential. */
     fun stopSpeaking() {
         ttsController.stop()
         ttsSpeechAccountRef = null
         ttsAutoReadSessionKey = null
         ttsHistorySession.onSessionCleared()
+        attachmentSpeechDestination.value = null
     }
 
     fun setTtsRateOverride(rate: Float?) {
@@ -1822,7 +1852,9 @@ class WhiteNoiseAppState private constructor(
         get() = ttsResolution != null
     val ttsHasUsableEngine: Boolean
         get() = ttsResolution?.hasUsableEngine == true
-    private val pushTokenStore = PushTokenStore.create(appContext)
+
+    /** Tests inject a scripted store; production seals push state in the Keystore-backed default. */
+    private val pushTokenStore = pushTokenStoreOverride ?: PushTokenStore.create(appContext)
 
     private fun pushWakeAttemptBudget() =
         PushWakeAttemptBudget(
@@ -2327,7 +2359,17 @@ class WhiteNoiseAppState private constructor(
             shareStaging = shareStaging,
             resolveMime = { context, uri -> shareResolveMime(context, uri) },
         )
-    private val shareShortcutPublisher = ShareShortcutPublisher(appContext)
+    private val shareShortcutPublisher =
+        ShareShortcutPublisher(appContext, avatarOverride = { account, item ->
+            val peer =
+                GroupProjector
+                    .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+                    ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
+            peer?.let { contactAvatarOverride(account, it) } ?: (false to null)
+        })
+    private var shareShortcutPublishJob: Job? = null
+    private var pinnedShortcutRefreshJob: Job? = null
+    private val pinnedShortcutPresentationRevision = AtomicLong()
 
     /**
      * `SupervisorJob` isolates siblings but does not swallow exceptions — an
@@ -3498,7 +3540,7 @@ class WhiteNoiseAppState private constructor(
     fun forwardTargets(): List<ChatListItem> = chatsController?.forwardTargets().orEmpty()
 
     /** Account-wide forward targets beyond the active controller's window (#2618); null when none is attached. */
-    internal suspend fun loadAccountWideForwardTargets(): List<ChatListItem>? {
+    internal suspend fun loadAccountWideForwardTargets(): AccountWideForwardTargets? {
         val controller = chatsController ?: return null
         return controller.loadAccountWideForwardTargets()
     }
@@ -3651,11 +3693,168 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
+    /** Publishes Direct Share, then refreshes pinned labels, replacing any earlier publication still in flight. */
     fun publishShareShortcuts(chats: List<ChatListItem>) {
         val accountRef = activeAccountRef ?: return
+        val runtime = runtimeGeneration
+        val publicationGeneration = PinnedConversationTokens.captureRequest()
+        val presentationRevision = pinnedShortcutPresentationRevision.incrementAndGet()
         val titleCopy = notificationGroupTitleCopy(appContext)
-        shareShortcutPublisher.publish(accountRef, chats) { item ->
-            chatListItemDisplayTitle(item, this, titleCopy)
+        val shareTitles =
+            chats
+                .filterNot { it.group.pendingConfirmation }
+                .take(dev.ipf.whitenoise.android.share.MAX_SHARE_SHORTCUTS)
+                .associate { item -> item.group.groupIdHex to chatListItemDisplayTitle(item, this, titleCopy) }
+        shareShortcutPublishJob?.cancel()
+        shareShortcutPublishJob =
+            mutationsScope.launch {
+                runCatchingCancellable {
+                    withContext(Dispatchers.IO) {
+                        shareShortcutPublisher.publish(
+                            accountRef,
+                            chats,
+                            {
+                                val ownsRuntime =
+                                    isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
+                                val ownsPublication =
+                                    PinnedConversationTokens.isPublicationCurrent(publicationGeneration)
+                                ownsRuntime && ownsPublication
+                            },
+                        ) { item -> shareTitles[item.group.groupIdHex].orEmpty() }
+                    }
+                    refreshPinnedConversationPresentation(
+                        accountRef,
+                        runtime,
+                        publicationGeneration,
+                        presentationRevision,
+                        chats,
+                        titleCopy,
+                    )
+                }.onFailure { failure -> appStateDebug(failure) { "share shortcut publication failed" } }
+            }
+    }
+
+    /**
+     * Decoded avatar pixels change only pin presentation, so they never re-issue the Direct Share inventory;
+     * a newer refresh replaces an older one still waiting for the launcher.
+     */
+    fun refreshPinnedShortcuts(chats: List<ChatListItem>) {
+        val accountRef = activeAccountRef ?: return
+        val runtime = runtimeGeneration
+        val publicationGeneration = PinnedConversationTokens.captureRequest()
+        val presentationRevision = pinnedShortcutPresentationRevision.incrementAndGet()
+        val titleCopy = notificationGroupTitleCopy(appContext)
+        pinnedShortcutRefreshJob?.cancel()
+        pinnedShortcutRefreshJob =
+            mutationsScope.launch {
+                runCatchingCancellable {
+                    refreshPinnedConversationPresentation(
+                        accountRef,
+                        runtime,
+                        publicationGeneration,
+                        presentationRevision,
+                        chats,
+                        titleCopy,
+                    )
+                }.onFailure { failure -> appStateDebug(failure) { "pinned shortcut presentation refresh failed" } }
+            }
+    }
+
+    /** Resolves private contact pixels at the final launcher write; group-owned pictures retain precedence. */
+    internal fun pinnedConversationPresentation(
+        account: String,
+        item: ChatListItem,
+        title: String,
+    ): PinnedConversationPresentation {
+        val peer =
+            GroupProjector
+                .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
+                ?.takeUnless { GroupProjector.ownsGroupPicture(item) }
+        return PinnedConversationPresentation(
+            title = title,
+            contact = peer,
+            currentAvatar = {
+                val available = accounts.any { it.label == account && !it.signedOut }
+                if (!available || appLockScreenVisible || isContactRefBeingCleared(account)) {
+                    null
+                } else {
+                    peer?.let { contactAvatarOverride(account, it).second }
+                        ?: firstFrameGroupAvatarSeed(item, account, ::avatarUrl)?.image?.asAndroidBitmap()
+                }
+            },
+        )
+    }
+
+    /**
+     * Approval may outlive a private-picture edit and the bounded chat projection. Re-read its exact native row;
+     * failed lookup, account changes and cold approval leave the scrubbed pin generic until a later refresh.
+     * Existing broad jobs finish first; this narrow update never invalidates another pin's queued presentation.
+     */
+    internal suspend fun refreshApprovedPinnedShortcut(capability: PinnedConversationCapability) {
+        val account = capability.accountRef
+        val runtime = runtimeGeneration
+        if (!canRefreshApprovedPin(account, runtime)) return
+        val revision = pinnedShortcutPresentationRevision.get()
+        shareShortcutPublishJob?.join()
+        pinnedShortcutRefreshJob?.join()
+        if (pinnedShortcutPresentationRevision.get() != revision) return
+        val item = preloadNotificationChatListItem(account, capability.groupIdHex)
+        val available = item.group.selfMembership == SelfMembershipFfi.MEMBER && !item.group.pendingConfirmation
+        if (available && canRefreshApprovedPin(account, runtime)) {
+            val title = chatListItemDisplayTitle(item, this, notificationGroupTitleCopy(appContext))
+            val presentation = pinnedConversationPresentation(account, item, title)
+            withContext(Dispatchers.IO) {
+                val tokens = PinnedConversationTokens.create(appContext)
+                PinnedConversationShortcuts(appContext).refresh(account, mapOf(capability.groupIdHex to presentation)) {
+                    isActive &&
+                        canRefreshApprovedPin(account, runtime) &&
+                        pinnedShortcutPresentationRevision.get() == revision &&
+                        tokens.isValid(capability)
+                }
+            }
+        }
+    }
+
+    /** A background callback never switches accounts or publishes through an undecided or showing App Lock. */
+    private fun canRefreshApprovedPin(
+        account: String,
+        runtime: Int,
+    ): Boolean =
+        activeAccountRef == account &&
+            runtimeGeneration == runtime &&
+            !appLockScreenVisible &&
+            !appUnlockEvaluationPending &&
+            accounts.any { it.label == account && it.isSignedInSigningAccount() }
+
+    /** Rebuilds approved pins' labels and cached pixels for one captured account/runtime; no pins means no work. */
+    private suspend fun refreshPinnedConversationPresentation(
+        accountRef: String,
+        runtime: Int,
+        publicationGeneration: Long,
+        presentationRevision: Long,
+        chats: List<ChatListItem>,
+        titleCopy: dev.ipf.whitenoise.android.core.GroupTitleCopy,
+    ) {
+        val shortcuts = withContext(Dispatchers.IO) { PinnedConversationShortcuts(appContext) }
+        val hasPins = withContext(Dispatchers.IO) { shortcuts.hasPinnedConversations(accountRef) }
+        val ownsRuntime =
+            currentCoroutineContext().isActive && activeAccountRef == accountRef && runtimeGeneration == runtime
+        val ownsPublication =
+            withContext(Dispatchers.IO) { PinnedConversationTokens.isPublicationCurrent(publicationGeneration) }
+        if (!hasPins || !ownsRuntime || !ownsPublication) return
+        if (pinnedShortcutPresentationRevision.get() != presentationRevision) return
+        val presentations =
+            chats.associate { item ->
+                item.group.groupIdHex.lowercase(Locale.ROOT) to
+                    pinnedConversationPresentation(accountRef, item, chatListItemDisplayTitle(item, this, titleCopy))
+            }
+        withContext(Dispatchers.IO) {
+            shortcuts.refresh(accountRef, presentations) {
+                isActive &&
+                    activeAccountRef == accountRef &&
+                    runtimeGeneration == runtime &&
+                    pinnedShortcutPresentationRevision.get() == presentationRevision
+            }
         }
     }
 
@@ -6179,14 +6378,19 @@ class WhiteNoiseAppState private constructor(
     // Durable (commit-backed) but off the main thread: the writes must land
     // before sign-out/wipe completes, and the blocking flush must not stall
     // the UI. The revision bump stays on the caller's (main) context.
+
+    /**
+     * Commits private-field and picture removal off main before account teardown completes, then invalidates
+     * display revisions.
+     */
     private suspend fun clearContactPrivateDetailsForAccount(accountRef: String) {
         val normalized = accountRef.trim()
         if (normalized.isEmpty()) return
         synchronized(contactClearGuard) { contactRefsBeingCleared.add(normalized) }
         val nicknamesCleared =
             withContext(Dispatchers.IO) {
-                val cleared = ContactNicknamePreferences.clearAllForAccount(preferences, normalized)
-                ContactNotesPreferences.clearAllForAccount(preferences, normalized)
+                val cleared = clearContactPrivateDetails(preferences, normalized, contactPictureStore)
+                AvatarImageLoader.clearStoredAvatars()
                 // Folder state is account-private UI organization; it must not
                 // survive the account it belongs to.
                 chatFolderPreferences.clearAllForAccount(normalized)
@@ -6205,7 +6409,7 @@ class WhiteNoiseAppState private constructor(
     }
 
     /** Local alert write failures are retryable; completed native removal must still reconcile the active account. */
-    private suspend fun clearConversationShortcutsForAccount(
+    private suspend fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
     ) {
@@ -6214,7 +6418,7 @@ class WhiteNoiseAppState private constructor(
             if (!cleared) {
                 appStateDebug { "profile alert preference cleanup will retry after an authoritative account refresh" }
             }
-            localNotificationPresenter.clearConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
+            localNotificationPresenter.clearRevokedConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
         }
     }
 
@@ -6259,17 +6463,36 @@ class WhiteNoiseAppState private constructor(
     /**
      * Non-destructive MDK sign-out (#349, #2132). A thrown engine call keeps
      * the established local fail-open behavior; a structured unfinished-local
-     * outcome retains the active session. Returns null when no account is active.
+     * outcome retains the active session. Credential revocation failure returns an incomplete result before
+     * native admission; errors after admission retain their established propagation.
+     * Returns null when no account is active.
      */
     @Suppress("ReturnCount") // No account, retained engine session, or completed local sign-out.
     suspend fun signOutActiveAccount(deleteKeyPackages: Boolean = true): SignOutCompletion? {
         val signedOutRef = activeAccountRef ?: return null
         val draftsSaved = draftWriter.flushAccount(signedOutRef)
-        // MDK 0.9.15 handles local and external signers through the same call.
-        val engineResult =
-            runCatchingCancellable {
-                marmotIo { signOut(signedOutRef, deleteKeyPackages) }
+        var admitted = false
+        return runCatchingCancellable {
+            withRevokedPinnedTarget(signedOutRef) {
+                admitted = true
+                finishRevokedAccountSignOut(signedOutRef, deleteKeyPackages, draftsSaved)
             }
+        }.getOrElse { failure ->
+            if (admitted) throw failure
+            appStateDebug(failure) { "account sign-out credential revocation failed before native work" }
+            SignOutCompletion.AccountCleanupIncomplete
+        }
+    }
+
+    /** Keeps launcher issuance fenced until native completion and Android account ownership agree. */
+    @Suppress("ReturnCount", "LongMethod")
+    private suspend fun finishRevokedAccountSignOut(
+        signedOutRef: String,
+        deleteKeyPackages: Boolean,
+        draftsSaved: Boolean,
+    ): SignOutCompletion {
+        // Credential persistence failures never enter the native-error fail-open path.
+        val engineResult = runCatchingCancellable { marmotIo { signOut(signedOutRef, deleteKeyPackages) } }
         val engineOutcome = engineResult.getOrNull()
         if (engineOutcome?.localCleanup?.completed == false) {
             appStateDebug {
@@ -6283,6 +6506,10 @@ class WhiteNoiseAppState private constructor(
             }
         }
         if (engineOutcome != null) {
+            // Publish known native completion before any fallible/suspending cleanup can release the fence.
+            accountListLifetime.advance {
+                accounts = reconcileCachedAccountsAfterSignOut(accounts, signedOutRef)
+            }
             // MDK deactivated push; discard stale retries and registration cache.
             pushTokenStore.clearPendingDisable(signedOutRef)
             nativePushSyncMutex.withLock { perAccountSyncedFingerprints.remove(signedOutRef) }
@@ -6303,7 +6530,7 @@ class WhiteNoiseAppState private constructor(
         clearInMemoryMediaCaches()
         AvatarImageLoader.clear()
         clearCrossAccountCaches()
-        clearConversationShortcutsForAccount(
+        clearRevokedConversationShortcutsForAccount(
             accountRef = signedOutRef,
             includeUnscopedLegacy = accounts.none { it.label != signedOutRef && it.isSignedInSigningAccount() },
         )
@@ -6351,6 +6578,22 @@ class WhiteNoiseAppState private constructor(
     // One cancellation-safe bracket owns wipe, editor purge, account switch, and recovery.
     suspend fun signOutAndWipeActiveAccount(): WipeOutcomeFfi? {
         val wipedRef = activeAccountRef ?: return null
+        var admitted = false
+        return runCatchingCancellable {
+            withRevokedPinnedTarget(wipedRef) {
+                admitted = true
+                finishRevokedAccountWipe(wipedRef)
+            }
+        }.getOrElse { failure ->
+            if (admitted) throw failure
+            appStateDebug(failure) { "account wipe credential revocation failed before native work" }
+            null
+        }
+    }
+
+    /** The caller holds launcher revocation through cleanup; completed native ownership is published first. */
+    @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
+    private suspend fun finishRevokedAccountWipe(wipedRef: String): WipeOutcomeFfi? {
         val wipedShareAccount = accounts.firstOrNull { it.label == wipedRef }?.accountIdHex
         conversationDictation.onAccountUnavailable(wipedRef)
         clearInMemoryMediaCaches()
@@ -6361,6 +6604,8 @@ class WhiteNoiseAppState private constructor(
                     runCatching { marmotIo { signOutAndWipe(wipedRef) } }
                         .onSuccess { outcome ->
                             if (outcome.localCleanup.completed) {
+                                // Publish native removal before encrypted push cleanup can throw.
+                                accountListLifetime.advance { accounts = accounts.filterNot { it.label == wipedRef } }
                                 pushTokenStore.clearPendingDisable(wipedRef)
                                 // The wipe invalidates server-side registration state for this account.
                                 // withSerializedNativePushWipe already holds nativePushSyncMutex here.
@@ -6397,7 +6642,7 @@ class WhiteNoiseAppState private constructor(
             pendingMessageEditHandoff.removeAccount(wipedRef)
             notificationReplyDraftHandoff.removeAccount(wipedRef)
             draftWriter.removeAccount(wipedRef)
-            clearConversationShortcutsForAccount(
+            clearRevokedConversationShortcutsForAccount(
                 accountRef = wipedRef,
                 includeUnscopedLegacy = accounts.none { it.label != wipedRef && it.isSignedInSigningAccount() },
             )
@@ -10072,6 +10317,164 @@ class WhiteNoiseAppState private constructor(
         return profile
     }
 
+    /** Pure cache snapshot used at the final Android write, including a cleared private choice. */
+    @Suppress("ReturnCount") // Reject ineligible or revoked owners before accessing private pixels.
+    private fun contactAvatarOverride(
+        account: String,
+        contact: String,
+    ): Pair<Boolean, android.graphics.Bitmap?> {
+        if (isContactRefBeingCleared(account)) return true to null
+        if (contactNicknameAccountRefForAccess(account, accounts, contact) == null ||
+            !contactPictureStore.hasChoice(account, contact)
+        ) {
+            return false to null
+        }
+        if (appLockScreenVisible) return true to null
+        val private = contactPictureStore.reference(account, contact)?.cacheKey?.let(AvatarImageLoader::cachedImage)
+        val published = synchronized(profilePresentationLock) { profilePresentations[contact]?.avatarUrl }
+        return true to (private?.asAndroidBitmap() ?: AvatarImageLoader.peekBitmap(published))
+    }
+
+    /** Bounded local file decode shares the first-post deadline; it can never acquire a public URL. */
+    private suspend fun warmPrivateContactAvatar(
+        account: String,
+        contact: String,
+    ) {
+        val eligible = contactNicknameAccountRefForAccess(account, accounts, contact) != null
+        if (!eligible || isContactRefBeingCleared(account)) return
+        val ref = contactPictureStore.reference(account, contact) ?: return
+        val lifetime = AvatarImageLoader.currentCacheLifetime()
+        runCatchingCancellable {
+            AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
+                withContext(Dispatchers.IO) { contactPictureStore.read(ref) }
+            }
+        }
+    }
+
+    /** Display-only private avatar handle; public profile and export callers keep using [avatarUrl]. */
+    @Suppress("ReturnCount") // Every ineligible/private-missing state preserves the public identity fallback.
+    fun contactAvatarSource(
+        accountIdHex: String,
+        accountRef: String? = activeAccountRef,
+    ): String? {
+        contactNicknameRevision
+        val publicUrl = avatarUrl(accountIdHex)
+        val account = contactNicknameAccountRefForAccess(accountRef, accounts, accountIdHex) ?: return publicUrl
+        if (isContactRefBeingCleared(account) || accounts.none { it.label == account && !it.signedOut }) {
+            return publicUrl
+        }
+        val picture = contactPictureStore.reference(account, accountIdHex) ?: return publicUrl
+        return dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+            .source(picture, publicUrl)
+    }
+
+    /** Resolves platform-owned opaque metadata only against currently signed-in local identities. */
+    private fun contactAvatarOverrideForScope(
+        scope: String,
+        contact: String,
+    ): Pair<Boolean, android.graphics.Bitmap?> {
+        val owner =
+            accounts.firstOrNull {
+                !it.signedOut &&
+                    dev.ipf.whitenoise.android.notifications
+                        .conversationShortcutAccountScope(it.label) == scope
+            } ?: return false to null
+        return contactAvatarOverride(owner.label, contact)
+    }
+
+    /** Commits one captured editor atomically and invalidates every account-owned identity presentation. */
+    internal suspend fun saveContactPrivateDetails(
+        account: String,
+        contact: String,
+        nickname: String,
+        notes: String,
+        picture: ContactPictureChange,
+        ownerIsCurrent: () -> Boolean,
+    ): Boolean {
+        val saved =
+            withContext(Dispatchers.IO) {
+                contactPictureStore.save(account, contact, nickname, notes, picture) {
+                    ownerIsCurrent() &&
+                        activeAccountRef == account &&
+                        !signOutInProgress &&
+                        !wipeInProgress &&
+                        !isContactRefBeingCleared(account) &&
+                        !isLocalAccount(contact)
+                }
+            }
+        if (saved) {
+            // The editor's scope may already be cancelled by a configuration change while the record has landed.
+            withContext(NonCancellable) {
+                // A nickname-only Save changes no pixels, so every cached avatar stays decoded.
+                if (picture !is ContactPictureChange.Keep) AvatarImageLoader.clearStoredAvatars()
+                warmPrivateContactAvatar(account, contact)
+                contactNicknameRevision += 1
+                bumpProfileAccountRevision(contact)
+                mutationsScope.launch { refreshPrivateContactPresentation(account, contact, adoptLegacy = true) }
+            }
+        }
+        return saved
+    }
+
+    /** Reconciles existing platform pixels from the current cache without starting a public image fetch. */
+    private suspend fun refreshPrivateContactPresentation(
+        account: String,
+        contact: String,
+        adoptLegacy: Boolean = false,
+    ) {
+        notificationNicknameRefresh.refresh(account, contact)
+        // An evicted private bitmap must not downgrade a current platform icon to its monogram.
+        warmPrivateContactAvatar(account, contact)
+        withContext(Dispatchers.IO) {
+            runCatchingCancellable {
+                val platform =
+                    dev.ipf.whitenoise.android.notifications
+                        .ContactPictureShortcutPlatform(appContext)
+                val legacy =
+                    if (adoptLegacy && platform.hasLegacyContactShortcuts(account)) {
+                        withTimeoutOrNull(1_500L) { legacyPrivatePictureConversation(account, contact) }
+                    } else {
+                        null
+                    }
+                dev.ipf.whitenoise.android.notifications.refreshContactPictureShortcuts(
+                    appContext,
+                    account,
+                    contact,
+                    currentAvatar = { contactAvatarOverride(account, contact).second },
+                    isCurrent = {
+                        val signedIn = accounts.any { it.label == account && !it.signedOut }
+                        signedIn && !isContactRefBeingCleared(account)
+                    },
+                    platform = platform,
+                    legacyConversationId = legacy?.first,
+                    legacyConversationIcon = legacy?.second ?: false,
+                )
+            }
+        }
+    }
+
+    /** At most two local native reads adopt the canonical DM without scanning or caching the account's chats. */
+    @Suppress("ReturnCount") // Fail closed at each unavailable or mismatched native ownership boundary.
+    private suspend fun legacyPrivatePictureConversation(
+        account: String,
+        contact: String,
+    ): Pair<String, Boolean>? {
+        val existing = marmotIo { existingDirectConversation(account, contact) }?.takeIf { it.reusable } ?: return null
+        val row = marmotIo { presentedChatListRow(account, existing.groupIdHex) } ?: return null
+        val item = chatListItemFromProjection(row.row, row.presentation, row.avatarAsset)
+        val peer =
+            GroupProjector.avatarAccount(
+                item.group,
+                item.presentationOtherMemberAccount,
+                item.presentationMemberCount,
+            )
+        if (peer != contact || row.row.groupIdHex != existing.groupIdHex) return null
+        val contactIcon =
+            !GroupProjector.ownsGroupPicture(item.group, row.avatarAsset, row.presentation.avatarSource.isPeerSourced())
+        return existing.groupIdHex to contactIcon
+    }
+
+    /** Public profile picture URL for display, requesting the profile once when no avatar is known yet. */
     fun avatarUrl(accountIdHex: String): String? {
         val avatar = profilePresentation(accountIdHex).avatarUrl
         if (avatar == null) requestProfile(accountIdHex)
@@ -11215,6 +11618,7 @@ class WhiteNoiseAppState private constructor(
         val result =
             if (shouldPost && !appLockScreenVisible) {
                 notificationFirstPostContentCoordinator.resolve(stage) {
+                    warmPrivateContactAvatar(update.accountRef, update.sender.accountIdHex)
                     notificationContentResolution.firstPost.resolve(update, localOnly = true)
                 }
             } else {
@@ -11613,9 +12017,14 @@ class WhiteNoiseAppState private constructor(
             bumpProfileAccountRevision(accountIdHex)
             scheduleInviteNotificationIdentityRefresh(accountIdHex, presentation)
             refreshProfileNotificationChannelLabels(accountIdHex, presentation.displayName)
+            val viewers = accounts.filter { !it.signedOut && contactPictureStore.hasChoice(it.label, accountIdHex) }
+            viewers.forEach { account ->
+                mutationsScope.launch { refreshPrivateContactPresentation(account.label, accountIdHex) }
+            }
         }
     }
 
+    /** Drops every cached profile presentation so each surface re-reads identity from the engine. */
     private fun notifyProfilesChanged() {
         assertMainThread { "notifyProfilesChanged" }
         synchronized(profilePresentationLock) {
@@ -11651,6 +12060,7 @@ class WhiteNoiseAppState private constructor(
             // Wipe pre-encryption cache entries promptly after upgrade without doing
             // directory I/O in this main-thread constructor.
             mutationsScope.launch(Dispatchers.IO) { diskMediaCache.prepare() }
+            mutationsScope.launch(Dispatchers.IO) { contactPictureStore.cleanOrphans() }
             // Load the persisted per-chat channel scopes before the settings UI
             // can request them, without blocking the main-thread constructor.
             mutationsScope.launch(Dispatchers.IO) { conversationNotificationRouting }

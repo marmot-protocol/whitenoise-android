@@ -28,6 +28,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.lifecycleScope
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
@@ -39,6 +40,8 @@ import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationRouteTrace
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
+import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapGate
+import dev.ipf.whitenoise.android.notifications.PinnedShortcutTapState
 import dev.ipf.whitenoise.android.notifications.inboundNotificationHandledMatchesCurrent
 import dev.ipf.whitenoise.android.notifications.routeInboundIntent
 import dev.ipf.whitenoise.android.share.ShareRequest
@@ -80,6 +83,12 @@ class MainActivity : AppCompatActivity() {
             notificationInboundState.requestId = value
         }
     private var inboundAppUpdateTap by mutableIntStateOf(0)
+
+    /** Pending launcher capabilities belong to this task's retained owner, never saved instance state. */
+    private val pendingPinTapState: PinnedShortcutTapState by viewModels()
+
+    /** Holds pin taps while the App Lock decision loads and parses them under the decided state. */
+    private val pinTapGate by lazy { PinnedShortcutTapGate(appState, pendingPinTapState) }
     private lateinit var appUnlockPrompt: BiometricPrompt
     private val appUnlockCryptoGate by lazy(::AppUnlockCryptoGate)
     private var attachedAppUnlockSessionId: Long? = null
@@ -170,6 +179,7 @@ class MainActivity : AppCompatActivity() {
             intent = intent,
             retainPendingShareOnRecreation = savedInstanceState != null,
         )
+        pinTapGate.replayWhenDecided(lifecycleScope, ::consumeIntent)
         installAppUnlockPrompt()
         enableEdgeToEdge()
         applyPreComposeWindowBackground(appState.themeMode, initialSystemDarkTheme)
@@ -378,18 +388,26 @@ class MainActivity : AppCompatActivity() {
         retainPendingShareOnRecreation: Boolean = false,
     ) {
         if (AppUpdateNavigation.isUpdateTap(intent)) {
+            pinTapGate.supersede()
             inboundAppUpdateTap += 1
             // One-shot, like the notification tap below: clear the stored intent so
             // activity recreation cannot replay the same update tap.
             setIntent(Intent(this, MainActivity::class.java))
             return
         }
+        // Retained state preserves an unresolved tap across recreation; clear the launch intent to avoid replay
+        // after the gate has consumed or superseded it.
+        if (pinTapGate.hold(intent)) {
+            setIntent(Intent(this, MainActivity::class.java))
+            return
+        }
+        val pinTarget = pinTapGate.target(this, intent)
         val retainNotification = retainPendingShareOnRecreation && inboundNotificationTarget != null
         val parsedTarget =
             if (retainNotification) {
                 null
             } else {
-                NotificationNavigation.parse(
+                pinTarget ?: NotificationNavigation.parse(
                     intent,
                     importReplyDraft = !retainPendingShareOnRecreation,
                     isTrustedTargetSignature = notificationTapTokens::isValidTarget,
@@ -403,11 +421,12 @@ class MainActivity : AppCompatActivity() {
             } else {
                 parseShareRequest(intent)
             }
+        val profileData = intent?.dataString.takeUnless { retainNotification }
         val routing =
             routeInboundIntent(
                 parsedTarget = parsedTarget,
                 shareRequest = parsedShare,
-                dataString = intent?.dataString.takeUnless { retainNotification },
+                dataString = profileData,
                 current =
                     InboundIntentRouting(
                         notificationTarget = inboundNotificationTarget,
@@ -416,6 +435,7 @@ class MainActivity : AppCompatActivity() {
                         notificationRequestId = inboundNotificationRequestId,
                     ),
             )
+        pinTapGate.supersedeForRoute(parsedTarget != null, parsedShare != null, profileData)
         if (parsedTarget != null) {
             foregroundConversationDismissal.onNotificationRouteObserved()
             NotificationRouteTrace.startRequest(routing.notificationRequestId)

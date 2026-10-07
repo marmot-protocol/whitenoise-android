@@ -6,7 +6,7 @@
     <string name="notification_channel_dictation">Dikte</string>
     <string name="notification_channel_dictation_description">Mesaj düzenleyicideki etkin dikte oturumunu denetler</string>
     <string name="dictation_settings_title">Dikte</string>
-    <string name="dictation_settings_explainer">Bu cihazda yüklü konuşma hizmeti sesi işler ve sağlayıcısına gönderebilir. White Noise, döndürülen metni yalnızca siz yapıştırana veya gönderene kadar saklar.</string>
+    <string name="dictation_settings_explainer">Bu cihazda yüklü konuşma hizmeti sesi işler ve sağlayıcısına gönderebilir. Kurtarılan metin özgün taslakta kalır.</string>
     <string name="dictation_ostt_recommendation_title">Offline Speech to Text’i edinin</string>
     <string name="dictation_ostt_recommendation_summary">Özel, cihaz üzerinde dikte için önerilen yazıya dökme uygulaması. Zapstore’da mevcuttur, Google Play’de değildir.</string>
     <string name="dictation_ostt_recommendation_open_failed">Zapstore’daki Offline Speech to Text sayfası açılamadı.</string>
@@ -18,7 +18,7 @@
     <string name="dictation_result_paste_description">Göndermeden önce metni gözden geçirin veya düzenleyin</string>
     <string name="dictation_result_send">Mesaj gönder</string>
     <string name="dictation_result_send_description">Yalnızca sohbet ve taslak değişmediyse gönderir</string>
-    <string name="dictation_send_safety_note">Sohbet veya taslak gönderimden önce değişirse dikte gönderilmeden korunur. Yeniden göndermeyi deneyin veya metni gözden geçirmek için Yapıştır seçeneğini kullanın.</string>
+    <string name="dictation_send_safety_note">Gönderim engellenirse kullanılabilir tanınan metin özgün taslağa kurtarılır. Yeniden göndermeden önce gözden geçirin.</string>
     <string name="dictation_send_blocked">Gönderilmedi</string>
     <string name="dictation_retry_send">Yeniden gönder</string>
     <string name="dictation_recovery_title">Dikte için işlem gerekiyor</string>
@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">Dikte kurtarma süresi doldu</string>
     <string name="dictation_recovery_expired_text">Tamamlanmamış dikte bu cihazdan temizlendi.</string>
     <string name="dictation_incomplete_title">Eksik dikte</string>
-    <string name="dictation_incomplete_text">Yazıya dönüştürme tamamlanmadan durdu. Tanınan metni gönderebilir veya incelemek için yapıştırabilirsiniz.</string>
+    <string name="dictation_incomplete_text">Metne dönüştürme tamamlanmadan durdu. Göndermeden önce taslaktaki tanınan metni gözden geçirin.</string>
     <string name="dictation_send_recognized_text">Tanınan metni gönder</string>
 </resources>

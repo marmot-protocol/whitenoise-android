@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -15,25 +16,35 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.audio.VoicePlaybackSource
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
 import dev.ipf.whitenoise.android.ui.common.dispatchNativePopupBack
+import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
+import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Actual native rows, menu anchors and selection owner share one pointer lifecycle and canonical action targets. */
 @RunWith(RobolectricTestRunner::class)
@@ -164,6 +175,65 @@ class ChatContextMenuFlowTest {
             assertEquals(0, opens())
         }
 
+    /** The actual New Message replacement retains the source strip and returns to its preserved Chats list. */
+    @Test fun newMessageFlowRetainsPlaybackControls() =
+        withScreen(playback = true) { opens, _, _ ->
+            composeRule.onNodeWithContentDescription(context.getString(R.string.new_message)).performClick()
+            composeRule.onNodeWithTag("chat.row.a").assertDoesNotExist()
+            returnFromPlayback(opens)
+        }
+
+    /** Folder management replaces the list but must retain the same retained-player controls. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun folderManagerRetainsPlaybackControls() =
+        withScreen(playback = true) { opens, _, _ ->
+            composeRule.onNodeWithTag("chats.folders").performScrollToNode(hasTestTag("chats.manageFolders"))
+            composeRule.onNodeWithTag("chats.manageFolders").performClick()
+            composeRule.onNodeWithTag("chat.row.a").assertDoesNotExist()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/shell_playback_folder_manager.png")
+            returnFromPlayback(opens)
+        }
+
+    /** Direct chip editing takes the third early-return path; a clean editor may leave without a confirmation. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun directFolderEditorRetainsPlaybackControls() =
+        withScreen(playback = true) { opens, _, app ->
+            val folder =
+                composeRule.runOnIdle {
+                    checkNotNull(
+                        app.chatFolderPreferences.commitFolderDraft(
+                            accountRef = checkNotNull(app.activeAccountRef),
+                            folderId = null,
+                            name = "Playback folder",
+                            description = "",
+                            manualChatIds = emptySet(),
+                            rule = null,
+                            showWhenEmpty = true,
+                        ),
+                    )
+                }
+            val chip = chatListFilterChipTag(folder.id)
+            composeRule.onNodeWithTag("chats.folders").performScrollToNode(hasTestTag(chip))
+            composeRule.onNodeWithTag(chip).performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+            composeRule.onNodeWithTag("folder.name").assertIsDisplayed()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/shell_playback_folder_editor.png")
+            returnFromPlayback(opens)
+        }
+
+    /** Tests the visible source action, not a direct navigation callback or fabricated transport-only layout. */
+    private fun returnFromPlayback(opens: () -> Int) {
+        composeRule.onNodeWithTag("voice-transport").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.voice_message_play)).assertIsDisplayed()
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.tts_playback_action_stop))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("Playback source").performClick()
+        composeRule.onNodeWithTag("chat.row.a").assertIsDisplayed()
+        assertEquals(1, opens())
+    }
+
     /** Opens the row menu under test. */
     private fun openMenu() {
         composeRule.onNodeWithTag("chat.row.a").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
@@ -171,7 +241,10 @@ class ChatContextMenuFlowTest {
     }
 
     /** Runs the block with the screen composed. */
-    private fun withScreen(assertions: (() -> Int, (Boolean) -> Unit, WhiteNoiseAppState) -> Unit) {
+    private fun withScreen(
+        playback: Boolean = false,
+        assertions: (() -> Int, (Boolean) -> Unit, WhiteNoiseAppState) -> Unit,
+    ) {
         context
             .getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)
             .edit()
@@ -186,14 +259,37 @@ class ChatContextMenuFlowTest {
         val controller = leftScopeController(app, rows)
         var visible by mutableStateOf(true)
         var opens = 0
+        val host = ShellPlaybackHost(app) { opens++ }
+        if (playback) {
+            val field = VoicePlaybackController::class.java.getDeclaredField("_state").apply { isAccessible = true }
+
+            @Suppress("UNCHECKED_CAST")
+            val flow = field.get(VoicePlaybackController) as MutableStateFlow<VoicePlaybackController.PlaybackState>
+            flow.value =
+                VoicePlaybackController.PlaybackState(
+                    key = "voice",
+                    ready = true,
+                    sessionId = 10,
+                    source =
+                        VoicePlaybackSource(
+                            checkNotNull(app.activeAccountRef),
+                            "group",
+                            "message",
+                            "Playback source",
+                        ),
+                )
+        }
         try {
             composeRule.setContent {
                 WhiteNoiseTheme {
-                    if (visible) ChatsScreen(app, controller, {}, { _, _, _, _ -> opens++ })
+                    CompositionLocalProvider(LocalShellPlaybackHost provides host.takeIf { playback }) {
+                        if (visible) ChatsScreen(app, controller, {}, { _, _, _, _ -> opens++ })
+                    }
                 }
             }
             assertions({ opens }, { visible = it }, app)
         } finally {
+            if (playback) VoicePlaybackController.stop()
             controller.onCleared()
             app.mutationsScope.cancel()
         }

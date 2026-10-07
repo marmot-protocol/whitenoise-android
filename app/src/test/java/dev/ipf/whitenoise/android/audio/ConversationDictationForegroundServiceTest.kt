@@ -208,7 +208,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
         shadowOf(android.os.Looper.getMainLooper()).idle()
         assertTrue(
             service.getSystemService(NotificationManager::class.java).activeNotifications.any {
-                it.id == BackgroundConnectionNotification.NOTIFICATION_ID
+                it.id == NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID
             },
         )
 
@@ -217,9 +217,64 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
 
         assertFalse(
             service.getSystemService(NotificationManager::class.java).activeNotifications.any {
-                it.id == BackgroundConnectionNotification.NOTIFICATION_ID
+                it.id == NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID
             },
         )
+    }
+
+    /** Keep connected off must retire completed controls without relying on asynchronous destruction. */
+    @Test
+    fun pasteCompletionWithoutConnectionRemovesControlsImmediately() {
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        harness.conversationDictation.paste()
+        harness.platform.listener.onResult("completed transcript")
+        assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+        assertTrue(shadowOf(service as Service).isForegroundStopped)
+        assertNull(ConversationDictationForegroundService.activeNotificationOrNull())
+        assertFalse(
+            service.getSystemService(NotificationManager::class.java).activeNotifications.any {
+                it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+            },
+        )
+        lifecycle.destroy()
+    }
+
+    /** Losing a presentation cache cannot strand the foreground record Android still owns. */
+    @Test
+    fun completionUsesCurrentHostWhenThePresentationOwnerIsMissing() {
+        listOf(false, true).forEach { connected ->
+            val harness = installHost()
+            val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+            val service = lifecycle.get()
+            try {
+                if (connected) service.foreground.promoteConnection(ForegroundStartTrigger.PushWake)
+                service.onStartCommand(startIntent(service, harness), 0, 1)
+                // A stale completion must preserve a controller that is still recording.
+                ConversationDictationForegroundService.stop(service)
+                assertTrue(harness.conversationDictation.hasDurableSession)
+                assertFalse(shadowOf(service as Service).isForegroundStopped)
+
+                ConversationDictationForegroundService::class.java.getDeclaredField("activeService").apply {
+                    isAccessible = true
+                    set(null, null)
+                }
+                harness.conversationDictation.paste()
+                harness.platform.listener.onResult("completed transcript")
+
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
+                assertEquals(!connected, shadowOf(service as Service).isForegroundStopped)
+                assertFalse(
+                    service.getSystemService(NotificationManager::class.java).activeNotifications.any {
+                        it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+                    },
+                )
+            } finally {
+                lifecycle.destroy()
+            }
+        }
     }
 
     /** A completed result removes controls without waiting for a service-destruction callback. */
@@ -326,7 +381,8 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
                 val notification = manager.activeNotifications.single().notification
                 // Android invokes no cancellation callback when the user hides an ongoing card.
                 assertNull(notification.deleteIntent)
-                manager.cancel(BackgroundConnectionNotification.NOTIFICATION_ID)
+                manager.cancel(NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID)
+                assertTrue(manager.activeNotifications.isEmpty())
                 assertTrue(harness.conversationDictation.hasDurableSession)
                 assertTrue(harness.conversationDictation.ownsMicrophone)
                 if (send) harness.conversationDictation.send() else harness.conversationDictation.paste()
@@ -603,7 +659,7 @@ internal class ConversationDictationForegroundServiceStartTest : ConversationDic
             newService
                 .getSystemService(NotificationManager::class.java)
                 .activeNotifications
-                .single { it.id == BackgroundConnectionNotification.NOTIFICATION_ID }
+                .single { it.id == NotificationStreamForegroundService.DICTATION_NOTIFICATION_ID }
                 .notification
         assertEquals(
             "Dictation active",

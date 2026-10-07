@@ -76,7 +76,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -125,6 +124,7 @@ import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
@@ -542,7 +542,7 @@ internal fun ProfileSheet(
     // the "name from profile" section and the nickname dialog deliberately keep
     // the real profile name (`title`) so the user sees what they're renaming.
     val displayTitle = contactNickname ?: title
-    val pictureUrl = profile.pictureUrl
+    val pictureUrl = hex?.let { appState.contactAvatarSource(it) } ?: profile.pictureUrl
     val bannerUrl = profile.bannerUrl
     val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
     val about = profile.about
@@ -563,6 +563,7 @@ internal fun ProfileSheet(
     var notificationEntry by remember(npub) { mutableStateOf(Any()) }
     var pickerParent by remember(npub) { mutableStateOf(ProfileSheetPage.PROFILE) }
     var showContactEditorDialog by remember(npub) { mutableStateOf(false) }
+    var contactEditorEntry by remember(npub) { mutableStateOf(Any()) }
     var addingToGroups by remember(npub) { mutableStateOf(false) }
     var promotingAdmin by remember(npub) { mutableStateOf(false) }
     // UI guard covers both profile actions, including "Start new group". The
@@ -660,21 +661,22 @@ internal fun ProfileSheet(
             appState.requestProfileGroupMembers(pendingGroupIds)
         }
     }
-    if (showContactEditorDialog && hex != null && !targetIsSelf) {
-        ContactPrivateDetailsDialog(
-            profileName = title,
-            initialNickname = contactNickname.orEmpty(),
-            initialNotes = contactNotes.orEmpty(),
-            onDismiss = { showContactEditorDialog = false },
-            onSave = { nickname, notes ->
-                if (owner.canAct()) {
-                    appState.setContactNickname(hex!!, nickname)
-                    appState.setContactNotes(hex!!, notes)
-                    showContactEditorDialog = false
-                }
-            },
-            securePolicy = securePolicy,
-        )
+    val editorAccount = accountAtOpen?.takeIf { showContactEditorDialog && hex != null && !targetIsSelf }
+    if (editorAccount != null) {
+        val entry = contactEditorEntry
+        key(entry) {
+            ContactPrivateDetailsRoot(
+                appState = appState,
+                account = editorAccount,
+                contact = hex!!,
+                profileName = title,
+                nickname = contactNickname.orEmpty(),
+                notes = contactNotes.orEmpty(),
+                ownerIsCurrent = { owner.canAct() && showContactEditorDialog && contactEditorEntry === entry },
+                onDismiss = { showContactEditorDialog = false },
+                securePolicy = securePolicy,
+            )
+        }
     }
 
     /** Opens the direct chat with this profile or creates it. */
@@ -882,7 +884,12 @@ internal fun ProfileSheet(
                     }
                 }
             },
-            onPrivateDetails = { if (owner.canAct()) showContactEditorDialog = true },
+            onPrivateDetails = {
+                if (owner.canAct()) {
+                    contactEditorEntry = Any()
+                    showContactEditorDialog = true
+                }
+            },
             onStartGroup = {
                 if (owner.canAct()) {
                     hex?.let { target ->
@@ -953,7 +960,11 @@ internal fun ProfileSheet(
         )
     }
 
-    Dialog(
+    PlaybackDialog(
+        onSourceDismiss =
+            ({ owner.leave { currentDismiss() } }).takeUnless {
+                creatingChat || addingToGroups || promotingAdmin
+            },
         onDismissRequest = {
             if (!creatingChat && !addingToGroups && !promotingAdmin) owner.leave { currentDismiss() }
         },
@@ -1215,6 +1226,12 @@ internal fun ContactPrivateDetailsDialog(
     onDismiss: () -> Unit,
     onSave: (nickname: String, notes: String) -> Unit,
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
+    pictureState: ContactPictureEditorState? = null,
+    pictureSource: String? = null,
+    pictureSeed: String? = null,
+    onPickPicture: () -> Unit = {},
+    onRepositionPicture: () -> Unit = {},
+    onClearPicture: () -> Unit = {},
 ) {
     val nickname =
         remember(initialNickname) {
@@ -1246,14 +1263,27 @@ internal fun ContactPrivateDetailsDialog(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     EmojiLabel(stringResource(R.string.profile_name_from_profile, profileName))
+                    pictureState?.let { state ->
+                        ContactPictureControls(
+                            state,
+                            pictureSource,
+                            profileName,
+                            pictureSeed ?: profileName,
+                            onPickPicture,
+                            onRepositionPicture,
+                            onClearPicture,
+                        )
+                    }
                     dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
                         state = nickname,
+                        enabled = pictureState?.busy != true,
                         label = { Text(stringResource(R.string.profile_contact_name_hint)) },
                         lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.SingleLine,
                         modifier = Modifier.fillMaxWidth().testTag("person_profile.nickname"),
                     )
                     dev.ipf.whitenoise.android.ui.common.WhiteNoiseTextField(
                         state = notes,
+                        enabled = pictureState?.busy != true,
                         label = { Text(stringResource(R.string.profile_contact_notes_hint)) },
                         lineLimits =
                             androidx.compose.foundation.text.input.TextFieldLineLimits.MultiLine(
@@ -1270,12 +1300,17 @@ internal fun ContactPrivateDetailsDialog(
             },
             confirmButton = {
                 TextButton(
+                    enabled = pictureState?.busy != true,
                     onClick = { onSave(nickname.text.toString(), notes.text.toString()) },
                     modifier = Modifier.testTag("person_profile.private_save"),
                 ) { Text(stringResource(R.string.save)) }
             },
             dismissButton = {
-                TextButton(onDismiss, Modifier.testTag("person_profile.private_cancel")) {
+                TextButton(
+                    onDismiss,
+                    Modifier.testTag("person_profile.private_cancel"),
+                    enabled = pictureState?.busy != true,
+                ) {
                     Text(stringResource(R.string.cancel))
                 }
             },

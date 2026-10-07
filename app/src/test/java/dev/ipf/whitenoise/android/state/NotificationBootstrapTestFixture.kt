@@ -56,6 +56,7 @@ import dev.ipf.marmotkit.UsageDiagnosticsDecisionFfi
 import dev.ipf.marmotkit.UsageDiagnosticsSettingsFfi
 import dev.ipf.marmotkit.UsageDiagnosticsStatusFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
+import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.notifications.PushServerConfig
@@ -156,6 +157,7 @@ internal class NotificationBootstrapTestFixture(
     notificationDispatcher: CoroutineDispatcher = Dispatchers.IO,
     pushWakeStorageDispatcher: CoroutineDispatcher = Dispatchers.IO,
     schedulePushWakeRecovery: () -> Boolean = { true },
+    groupIdHex: String = "group-a",
 ) {
     private val appContext = context.applicationContext
     private val updates = Channel<NotificationUpdateFfi>(Channel.UNLIMITED)
@@ -217,13 +219,13 @@ internal class NotificationBootstrapTestFixture(
 
     val update =
         NotificationUpdateFfi(
-            notificationKey = "startup:account-a:message-a",
-            conversationKey = "conversation:account-a:group-a",
+            notificationKey = "startup:account-a:$messageIdHex",
+            conversationKey = "conversation:account-a:$groupIdHex",
             trigger = NotificationTriggerFfi.NEW_MESSAGE,
             trafficClass = NotificationTrafficClassFfi.STANDARD,
             accountRef = "account-a",
             accountIdHex = "account-a",
-            groupIdHex = "group-a",
+            groupIdHex = groupIdHex,
             groupName = "General".takeUnless { isDm },
             isDm = isDm,
             isMention = false,
@@ -246,6 +248,10 @@ internal class NotificationBootstrapTestFixture(
             timestampMs = 1_982L,
             isFromSelf = false,
         )
+
+    /** Identifies only this fixture's platform card, including scenarios that isolate their conversation. */
+    val notificationCardKey
+        get() = LocalNotificationFormatter.conversationDismissalKey(update.accountRef, update.groupIdHex)
 
     private val marmot =
         Proxy.newProxyInstance(
@@ -790,7 +796,11 @@ internal class NotificationBootstrapTestFixture(
     suspend fun awaitNotificationPosted(advanceMainClock: Boolean = true) {
         val manager = appContext.getSystemService(NotificationManager::class.java)
         withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
-            while (manager.activeNotifications.none { it.tag == "account-a|group-a" }) {
+            while (
+                manager.activeNotifications.none {
+                    it.tag == notificationCardKey.tag && it.id == notificationCardKey.id
+                }
+            ) {
                 val mainLooper = shadowOf(Looper.getMainLooper())
                 if (advanceMainClock) {
                     mainLooper.idleFor(Duration.ofMillis(1L))
@@ -808,7 +818,7 @@ internal class NotificationBootstrapTestFixture(
         withTimeout(FIXTURE_AWAIT_TIMEOUT_MS) {
             while (
                 manager.activeNotifications
-                    .firstOrNull { it.tag == "account-a|group-a" }
+                    .firstOrNull { it.tag == notificationCardKey.tag && it.id == notificationCardKey.id }
                     ?.notification
                     ?.extras
                     ?.getCharSequence(android.app.Notification.EXTRA_TEXT)

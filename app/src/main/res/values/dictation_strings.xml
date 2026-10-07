@@ -18,6 +18,6 @@
     <string name="dictation_recovery_expired_title">Dictation recovery expired</string>
     <string name="dictation_recovery_expired_text">Unfinished dictation was cleared from this device.</string>
     <string name="dictation_incomplete_title">Incomplete dictation</string>
-    <string name="dictation_incomplete_text">Transcription stopped before it finished. You can send the recognized text, or paste it to review.</string>
+    <string name="dictation_incomplete_text">Transcription stopped before it finished. Review the recognized text in the draft before sending.</string>
     <string name="dictation_send_recognized_text">Send recognized text</string>
 </resources>

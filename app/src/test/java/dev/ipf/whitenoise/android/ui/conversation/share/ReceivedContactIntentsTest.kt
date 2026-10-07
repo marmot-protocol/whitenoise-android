@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.state.PendingAttachment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -57,6 +58,35 @@ class ReceivedContactIntentsTest {
         assertEquals(uri, intent.clipData!!.getItemAt(0).uri)
         assertTrue(intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertFalse(intent.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION != 0)
+    }
+
+    /** A raw contacts-app VCF yields a caption that draws the same card as a picker share. */
+    @Test fun rawVCardAttachmentRendersAsContactCard() {
+        val export =
+            listOf(
+                "BEGIN:VCARD",
+                "VERSION:2.1",
+                "N:Example;Ada;;;",
+                "FN:Ada Example",
+                "TEL;CELL:+1 555 0100",
+                "END:VCARD",
+            ).joinToString("\r\n", postfix = "\r\n")
+        val raw = PendingAttachment(export.toByteArray(), "text/x-vcard", "Ada Example.vcf")
+        val contact = attachedVCardContact(raw)
+        assertEquals(SharedContact("Ada Example", "+1 555 0100", null), contact)
+        assertEquals(contact, parseSharedContactFromText(formatContactShareText(contact!!)))
+
+        // Octet-stream providers still match by name; other files and name-only cards stay plain files.
+        assertEquals(contact, attachedVCardContact(raw.copy(mediaType = "application/octet-stream")))
+        assertNull(attachedVCardContact(raw.copy(mediaType = "text/plain", fileName = "notes.txt")))
+        val nameOnly = "BEGIN:VCARD\nVERSION:3.0\nFN:Ada\nEND:VCARD\n".toByteArray()
+        assertNull(attachedVCardContact(raw.copy(plaintextBytes = nameOnly)))
+
+        // A caption that would parse back to other fields is never generated: the card would lie.
+        val numberInName = "BEGIN:VCARD\nVERSION:3.0\nFN:Ada\\n+1 555 9999\nTEL:+1 555 0100\nEND:VCARD\n"
+        assertNull(attachedVCardContact(raw.copy(plaintextBytes = numberInName.toByteArray())))
+        val shortNumber = "BEGIN:VCARD\nVERSION:3.0\nFN:Emergency\nTEL:911\nEND:VCARD\n"
+        assertNull(attachedVCardContact(raw.copy(plaintextBytes = shortNumber.toByteArray())))
     }
 
     /** Add gives the editor validated fields and the VCF read grant without writing Contacts directly. */

@@ -143,8 +143,11 @@ class ConversationDictationCoordinatorTest {
             assertEquals("Keep", fixture.draft.text)
             assertEquals(0, fixture.writes)
             assertEquals(1, fixture.releases)
-            assertEquals(0, session.cancelCalls)
+            // A terminal provider error cancels the recognizer retained for its real close callback.
+            // Permission recovery has already torn down that generation before publishing failure.
+            assertEquals(if (failure == ConversationDictationFailure.Unknown) 1 else 0, session.cancelCalls)
             assertEquals(1, session.destroyCalls)
+            assertFalse(fixture.controller.foregroundMicrophoneRequired)
         }
     }
 

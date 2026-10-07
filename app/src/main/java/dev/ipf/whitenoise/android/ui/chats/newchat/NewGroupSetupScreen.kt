@@ -466,7 +466,7 @@ private fun NewGroupSetupAccountScreen(
                         GroupCreationPerson(
                             member.copy(displayName = selectedMemberDisplayName(member, appState)),
                             appState.shortNpub(member.accountIdHex).takeIf { it.isNotBlank() },
-                            selectedMemberAvatarUrl(member, appState.avatarUrl(member.accountIdHex)),
+                            selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
                         )
                     },
                 imagePreview = imagePreview,

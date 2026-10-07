@@ -81,9 +81,16 @@ class AccountSwitchFirstFrameDurableAvatarTest {
                 )
             try {
                 fixture.bootstrap()
+                // This regression owns switch publication, not the best-effort 250ms cold-decode budget.
+                for (accountRef in listOf(ACCOUNT_A, ACCOUNT_B)) {
+                    assertNotNull(fixture.appState.durableAvatar(asset(accountRef), accountRef, acquireMissing = false))
+                }
                 val keyA = checkNotNull(asset(ACCOUNT_A).cacheKey(ACCOUNT_A))
                 val keyB = checkNotNull(asset(ACCOUNT_B).cacheKey(ACCOUNT_B))
-                assertNotNull("the cold start must already hold A's stored avatar", AvatarImageLoader.cachedImage(keyA))
+                assertNotNull(
+                    "the source account must hold its stored avatar before switching",
+                    AvatarImageLoader.cachedImage(keyA),
+                )
 
                 var snapshot: AccountSwitchLocalSnapshot? = null
                 var destinationCached = false
