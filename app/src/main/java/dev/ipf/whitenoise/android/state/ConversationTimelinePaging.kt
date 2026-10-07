@@ -92,12 +92,9 @@ internal suspend fun ConversationController.loadOlderPageInternal(
     if (automatic && automaticPaging.older.blocked) return ConversationPageLoad.NO_PROGRESS
     val subscription = timelineSubscription ?: return ConversationPageLoad.INACTIVE
     val priorMessageIds = timelineRecords.keys.toSet()
-    // A previous loadOlderPage failure leaves `error` set; clear it now
-    // that we're actually retrying, otherwise the stale banner sits over
-    // a successful retry and a developer can't distinguish "still broken"
-    // from "we forgot to clear it".
-    pageError = null
-    pageLoadInFlight = ConversationSearchPageDirection.OLDER
+    val priorOldestId = timeline.firstOrNull()?.id
+    // Opportunistic work must not dismiss an unrelated explicit navigation failure.
+    beginPageLoad(ConversationSearchPageDirection.OLDER, origin)
     val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
     val startedMs = SystemClock.elapsedRealtime()
     val hostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_PAGE)
@@ -106,12 +103,11 @@ internal suspend fun ConversationController.loadOlderPageInternal(
         // materialized window backwards by `count` and returns the new
         // authoritative window — already deduped, sorted, head-anchored,
         // and cap-trimmed. We render it by extending the current window.
-        val outcome = pageOlderIfActive(subscription, anchorId, trace)
+        val outcome = pageOlderIfActive(subscription, anchorId, trace, origin)
         when (outcome) {
             null -> ConversationPageLoad.INACTIVE
-            // Reported without the origin on purpose: a deadline or not-ready older page arms the
-            // header's visible retry row whoever asked for it, unlike the quiet forward recovery.
-            is TimelinePageOutcome.Unchanged -> unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER)
+            is TimelinePageOutcome.Unchanged ->
+                unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER, origin, priorOldestId)
             is TimelinePageOutcome.Advanced -> {
                 val appliedAtMs = SystemClock.elapsedRealtime()
                 var committed = false
@@ -134,7 +130,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
                     ConversationPageLoad.INACTIVE
                 } else {
                     hasLoadedOlderPages = true
-                    failedPageDirection = null
+                    clearRecoveredPageFailure(ConversationSearchPageDirection.OLDER)
                     protectedTimelineMessageIds.clear()
                     protectedTimelineMessageIds.addAll(timelineRecords.keys)
                     trace.recordPhase(
@@ -159,7 +155,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
     } catch (throwable: Throwable) {
         trace.recordCompletion(ConversationPageLoad.FAILED, startedMs)
         hostAttempt.failure()
-        reportPageFailure(ConversationSearchPageDirection.OLDER, throwable)
+        reportPageFailure(ConversationSearchPageDirection.OLDER, throwable, origin)
         ConversationPageLoad.FAILED
     } finally {
         pageLoadInFlight = null
@@ -169,7 +165,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
 /**
  * Feeds one older page to the automatic prefetch guard: rows that arrived release it in every
  * case, while an automatic page the engine answered with a window holding nothing older counts
- * against it. A superseded page that exhausted its retries arms the visible retry row instead.
+ * against it. Automatic failures use the same quiet guard; explicit navigation retains its retry.
  */
 private fun ConversationController.settleOlderPrefetchGuard(
     load: ConversationPageLoad,
@@ -177,7 +173,8 @@ private fun ConversationController.settleOlderPrefetchGuard(
 ) {
     when {
         load == ConversationPageLoad.ADVANCED -> automaticPaging.older.reset()
-        answeredAutomatically && load == ConversationPageLoad.NO_PROGRESS -> automaticPaging.older.recordFailure()
+        answeredAutomatically && load == ConversationPageLoad.NO_PROGRESS ->
+            automaticPaging.older.recordFailure(timelineSubscription?.latestWindowFrame()?.revision)
     }
 }
 
@@ -201,8 +198,7 @@ internal suspend fun ConversationController.loadNewerPageInternal(origin: Paging
     val priorMessageIds = timelineRecords.keys.toSet()
     // An opportunistic page must not clear a failure the reader can still act on; it clears only
     // the matching newer-page failure, and only once newer rows have actually arrived.
-    if (!automatic) pageError = null
-    pageLoadInFlight = ConversationSearchPageDirection.NEWER
+    beginPageLoad(ConversationSearchPageDirection.NEWER, origin)
     val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
     val startedMs = SystemClock.elapsedRealtime()
     val hostAttempt = appState.beginHostPerformance(HostPerformanceOperationFfi.TIMELINE_PAGE)
@@ -272,7 +268,7 @@ private suspend fun ConversationController.applyNewerPage(
         }
     }
     if (!committed) return ConversationPageLoad.INACTIVE
-    clearRecoveredNewerPageFailure()
+    clearRecoveredPageFailure(ConversationSearchPageDirection.NEWER)
     automaticPaging.newer.reset()
     protectedTimelineMessageIds.clear()
     if (hasLoadedOlderPages) {
@@ -280,18 +276,6 @@ private suspend fun ConversationController.applyNewerPage(
     }
     trace.recordPhase(phase = PerformancePhase.PAGE_APPLY, startedMs = appliedAtMs, count = page.messages.size)
     return progressPageLoad(priorMessageIds)
-}
-
-/**
- * Retires a newer-page failure once newer rows have arrived.
- *
- * Only the matching direction is cleared, so an older-page failure the reader still has a retry row
- * for, and any unrelated subscription error, survive a forward recovery.
- */
-private fun ConversationController.clearRecoveredNewerPageFailure() {
-    if (failedPageDirection != ConversationSearchPageDirection.NEWER) return
-    failedPageDirection = null
-    pageError = null
 }
 
 /**
@@ -316,6 +300,7 @@ private suspend fun ConversationController.pageOlderIfActive(
     handle: PagingHandle,
     anchorId: String?,
     trace: PerformanceTrace? = null,
+    origin: PagingOrigin = PagingOrigin.EXPLICIT,
 ): TimelinePageOutcome? =
     timelineSubscriptionActiveCallMutex.withLock {
         if (!retainsSubscription(handle)) return@withLock null
@@ -344,7 +329,9 @@ private suspend fun ConversationController.pageOlderIfActive(
         // Time the window command from here, not from the caller's start: page_window is documented
         // as the engine answering, and anchoring is already its own phase.
         timedWindowCommand(trace) {
-            pageWithRetryBudget(handle) { it.paginateBackwards(ConversationTimelinePageLimit) }
+            pageWithRetryBudget(handle, waitForNotReady = origin != PagingOrigin.AUTOMATIC) {
+                it.paginateBackwards(ConversationTimelinePageLimit)
+            }
         }
     }
 
@@ -363,24 +350,25 @@ private suspend fun ConversationController.pageNewerIfActive(
 /**
  * Runs one page, waiting out not-ready and superseded windows for bounded budgets.
  *
- * Not-ready is MDK repairing itself in the background, so asking again shortly usually succeeds; the
- * budget is what keeps that from becoming the scroll-frame retry loop this replaces. Teardown is
- * re-checked between attempts so a closing account does not wait out the whole budget.
+ * Automatic older prefetch returns not-ready immediately and waits for a successful replacement,
+ * as MDK requires. Existing explicit/newer callers retain their bounded retry policy. Every IO
+ * return checks ownership, including the final attempt, so a retired handle cannot commit rows.
  */
 private suspend fun ConversationController.pageWithRetryBudget(
     handle: PagingHandle,
+    waitForNotReady: Boolean = true,
     page: suspend (PagingHandle) -> TimelinePageOutcome,
 ): TimelinePageOutcome? {
     var outcome = withContext(Dispatchers.IO) { page(handle) }
     var notReadyAttempts = 0
     var supersededAttempts = 0
-    while (outcome is TimelinePageOutcome.Unchanged) {
+    while (retainsSubscription(handle) && outcome is TimelinePageOutcome.Unchanged) {
         val retryDelayMs =
             when (outcome.reason) {
                 NOT_READY -> {
                     notReadyAttempts += 1
                     CONVERSATION_WINDOW_NOT_READY_RETRY_MS.takeIf {
-                        notReadyAttempts < CONVERSATION_PAGE_NOT_READY_ATTEMPTS
+                        waitForNotReady && notReadyAttempts < CONVERSATION_PAGE_NOT_READY_ATTEMPTS
                     }
                 }
                 SUPERSEDED -> {
@@ -393,10 +381,11 @@ private suspend fun ConversationController.pageWithRetryBudget(
             }
         if (retryDelayMs == null) break
         delay(retryDelayMs)
-        if (!retainsSubscription(handle)) return null
-        outcome = withContext(Dispatchers.IO) { page(handle) }
+        if (retainsSubscription(handle)) {
+            outcome = withContext(Dispatchers.IO) { page(handle) }
+        }
     }
-    return outcome
+    return outcome.takeIf { retainsSubscription(handle) }
 }
 
 /** Whether this subscription is still the controller's live one and the account is not tearing down. */

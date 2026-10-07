@@ -9,6 +9,8 @@ import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -18,8 +20,8 @@ import org.robolectric.annotation.Config
 import java.time.Duration
 
 /**
- * A page that the engine never answers must leave the reader a retry affordance rather than a
- * spinner the scroll-prefetch effect re-issues on every frame.
+ * Automatic history paging recovers quietly with bounded demand; explicit navigation keeps its
+ * actionable retry. Neither may spin on layout frames or alter unread/navigation state.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -409,9 +411,9 @@ class ConversationTimelinePagingTest {
             }
         }
 
-    /** A deadline on an automatic older page keeps arming the visible retry row rather than the quiet guard. */
+    /** A deadline keeps the transcript and stands automatic paging down without a retry banner. */
     @Test
-    fun automaticOlderDeadlineStillArmsTheRetryRow() =
+    fun automaticOlderDeadlineRecoversQuietly() =
         runBlocking {
             val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.TIMED_OUT))
             withController(subscription) { controller ->
@@ -420,8 +422,13 @@ class ConversationTimelinePagingTest {
                 val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
 
                 assertEquals(ConversationPageLoad.TIMED_OUT, load)
-                assertTrue(controller.olderPageBlocked)
-                assertFalse(controller.automaticOlderPagingBlocked)
+                assertFalse(controller.olderPageBlocked)
+                assertTrue(controller.automaticOlderPagingBlocked)
+                assertNull(controller.error)
+                assertTrue(controller.hasMoreBefore)
+                assertFalse(controller.isLoadingOlder)
+                repeat(5) { controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC) }
+                assertEquals(1, subscription.backwardsCallCount)
             }
         }
 
@@ -441,9 +448,9 @@ class ConversationTimelinePagingTest {
             }
         }
 
-    /** Persistent revision churn stops automatic paging and shows the existing retry row. */
+    /** Persistent revision churn stops automatic paging quietly until recovery or a new drag. */
     @Test
-    fun exhaustedSupersededAutomaticOlderPageArmsRetry() =
+    fun exhaustedSupersededAutomaticOlderPageStandsDownQuietly() =
         runBlocking {
             val stale =
                 Array(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS) {
@@ -455,7 +462,9 @@ class ConversationTimelinePagingTest {
 
                 val load = controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
                 assertEquals(ConversationPageLoad.FAILED, load)
-                assertTrue(controller.olderPageBlocked)
+                assertFalse(controller.olderPageBlocked)
+                assertTrue(controller.automaticOlderPagingBlocked)
+                assertNull(controller.error)
                 assertEquals(CONVERSATION_PAGE_SUPERSEDED_ATTEMPTS, subscription.backwardsCallCount)
             }
         }
@@ -499,6 +508,89 @@ class ConversationTimelinePagingTest {
             }
         }
 
+    /** Not-ready waits for the receive loop, including across drags; it never polls MDK on a timer. */
+    @Test
+    fun automaticNotReadyWaitsForReplacementThenResumes() =
+        runBlocking {
+            val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.NOT_READY), olderPage())
+            withController(subscription) { controller ->
+                val before = controller.timeline.map { it.id }
+                assertEquals(
+                    ConversationPageLoad.NOT_READY,
+                    controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC),
+                )
+                controller.onOlderPagingGestureStarted()
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertEquals(1, subscription.backwardsCallCount)
+                assertEquals(before, controller.timeline.map { it.id })
+                assertNull(controller.error)
+                emitWindowAndDrain(subscription, page(listOf(record(SEED_ID, 200uL)), hasMoreBefore = true))
+                awaitRecoveryCondition { !controller.automaticOlderPagingBlocked }
+
+                assertEquals(
+                    ConversationPageLoad.ADVANCED,
+                    controller.loadOlderPageInternal(anchorId = SEED_ID, origin = ConversationPagingOrigin.AUTOMATIC),
+                )
+                assertEquals(2, subscription.backwardsCallCount)
+                assertEquals(listOf(SEED_ID), subscription.anchorReports)
+                assertNull(controller.error)
+            }
+        }
+
+    /** One fresh drag can retry a no-progress edge; layout passes cannot. */
+    @Test
+    fun newDragReleasesAQuietNoProgressPage() =
+        runBlocking {
+            val subscription = subscriptionWith(sameWindow(), olderPage())
+            withController(subscription) { controller ->
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+                assertTrue(controller.automaticOlderPagingBlocked)
+                controller.onOlderPagingGestureStarted()
+
+                assertEquals(
+                    ConversationPageLoad.ADVANCED,
+                    controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC),
+                )
+                assertEquals(2, subscription.backwardsCallCount)
+                assertNull(controller.error)
+            }
+        }
+
+    /** A recovered older edge cannot dismiss an explicit failure navigating toward newer messages. */
+    @Test
+    fun olderRecoveryPreservesUnrelatedNewerFailure() =
+        runBlocking {
+            val subscription = subscriptionWith(olderPage())
+            withController(subscription) { controller ->
+                controller.reportPageFailure(ConversationSearchPageDirection.NEWER, IllegalStateException())
+                val failure = controller.pageError
+
+                controller.loadOlderPageInternal(origin = ConversationPagingOrigin.AUTOMATIC)
+
+                assertSame(failure, controller.pageError)
+                assertEquals(ConversationSearchPageDirection.NEWER, controller.failedPageDirection)
+            }
+        }
+
+    /** A late successful older window removes only its obsolete retry; newer arrivals do not. */
+    @Test
+    fun liveOlderProgressClearsAnExplicitOlderFailure() =
+        runBlocking {
+            val subscription = subscriptionWith(outcome(ConversationWindowUnchangedReason.TIMED_OUT))
+            withController(subscription) { controller ->
+                controller.loadOlderPageInternal()
+                assertTrue(controller.olderPageBlocked)
+                emitWindowAndDrain(subscription, page(listOf(record(SEED_ID, 200uL), record(TARGET_ID, 300uL)), true))
+                awaitRecoveryCondition { controller.timeline.any { it.record.messageIdHex == TARGET_ID } }
+                assertTrue(controller.olderPageBlocked)
+
+                emitWindowAndDrain(subscription, page(listOf(record(OLDER_ID, 100uL), record(SEED_ID, 200uL)), true))
+                awaitRecoveryCondition { !controller.olderPageBlocked }
+                assertNull(controller.pageError)
+                assertNull(controller.failedPageDirection)
+            }
+        }
+
     /**
      * Every phase a history page can emit is part of the closed WNPerf vocabulary, so a diagnostics
      * session on a tester's device cannot be asked to log a name the schema does not define.
@@ -519,6 +611,25 @@ class ConversationTimelinePagingTest {
             phases.map { it.wireName },
         )
         assertEquals("chat_history_page", PerformanceOperation.CHAT_HISTORY_PAGE.wireName)
+    }
+
+    /** Advances the paused Android clock while background preparation hands the replacement back. */
+    private fun awaitRecoveryCondition(condition: () -> Boolean) {
+        awaitConversationCondition {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
+            condition()
+        }
+    }
+
+    /** Delivers a replacement and advances the controller's short live-window batching delay. */
+    private fun emitWindowAndDrain(
+        subscription: ScriptedConversationTimelineSubscription,
+        replacement: TimelinePageFfi,
+    ) {
+        val callsBefore = subscription.nextWindowCallCount
+        subscription.emitWindow(replacement)
+        awaitConversationCondition { subscription.nextWindowCallCount > callsBefore }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
     }
 
     /** Builds a subscription seeded with one row that still has older history behind it. */

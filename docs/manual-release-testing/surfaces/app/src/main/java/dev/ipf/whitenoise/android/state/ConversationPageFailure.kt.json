@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationPageFailure.kt",
+  "legacy_sha256": "82df45c841381a311b9c7d9a0403126cf80d1941ca506573efefb638ddd24d43",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "string:error_loaded_content_kept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationPageFailure.kt",
+        "anchor": "R.string.error_loaded_content_kept",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "An older timeout or not-ready reply cannot restore a retry after older rows already committed; unrelated replacements and navigation errors stay actionable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationPageFailure.kt",
+        "anchor": "fun ConversationController.unchangedPageLoad(",
+        "test_ids": [
+          "CON-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
