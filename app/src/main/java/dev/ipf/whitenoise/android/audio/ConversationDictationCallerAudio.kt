@@ -290,6 +290,12 @@ internal class ConversationDictationCallerAudio internal constructor(
         }
     }
 
+    /** An explicit sealed-audio Retry accepts an existing recorder failure, not a future one. */
+    @Synchronized
+    internal fun acknowledgeRetainedFailure() {
+        if (finishing.get() && !recording.get()) pendingFailure = null
+    }
+
     /** The feeder shares the capture's monotonic clock, including deterministic stall tests. */
     internal fun elapsedRealtimeMillis(): Long = elapsedRealtime()
 
@@ -335,8 +341,8 @@ internal class ConversationDictationCallerAudio internal constructor(
                     }
                 }
             }
-        } catch (error: RuntimeException) {
-            progress.stopReason = "exception=${error.javaClass.simpleName}"
+        } catch (_: RuntimeException) {
+            progress.stopReason = "exception=RuntimeException"
             failure = unexpectedCaptureFailure()
         } finally {
             samples.fill(0)
@@ -612,20 +618,20 @@ internal class ConversationDictationCallerAudioStream(
             Thread.currentThread().interrupt()
             settle(requeue = true)
         } catch (failure: ErrnoException) {
-            reportFeedFailure(failure)
+            reportFeedFailure(failure.javaClass.simpleName)
         } catch (failure: IOException) {
-            reportFeedFailure(failure)
-        } catch (failure: RuntimeException) {
-            reportFeedFailure(failure)
+            reportFeedFailure(failure.javaClass.simpleName)
+        } catch (_: RuntimeException) {
+            reportFeedFailure("RuntimeException")
         } finally {
             closePipe()
         }
     }
 
     /** Requeues exact PCM before notifying the controller, even if settlement changed no buffer bytes. */
-    private fun reportFeedFailure(failure: Exception) {
+    private fun reportFeedFailure(failureType: String) {
         conversationDictationDiagnostic(
-            "event=caller_audio_feed_failed type=${failure.javaClass.simpleName} action=requeue",
+            "event=caller_audio_feed_failed type=$failureType action=requeue",
         )
         settle(requeue = true) {
             reportFailure(ConversationDictationCallerAudioFailure.PipeFailed)
@@ -655,7 +661,7 @@ internal class ConversationDictationCallerAudioStream(
                     conversationDictationDiagnostic(
                         "event=caller_audio_write_stalled chunk=${owned.chunkId} bytes=$offset",
                     )
-                    reportFeedFailure(IOException("provider audio pipe stalled"))
+                    reportFeedFailure("PipeStalled")
                     return
                 }
                 Thread.sleep(PIPE_RETRY_MILLIS)

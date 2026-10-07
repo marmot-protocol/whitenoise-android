@@ -43,11 +43,12 @@ internal fun ConversationDictationFailureAction(
     val recoveredSendAvailable =
         controller.hasUnrecoveredTranscript(state) ||
             controller.canRetryRetainedAudio || controller.canRetryRecoveredSend
+    val settingsRecoveryAvailable = state.recognitionIncomplete && recovery != ConversationDictationRecovery.Retry
     IconButton(
         enabled =
             !retrySend ||
                 recoveredSendAvailable ||
-                state.recognitionIncomplete,
+                settingsRecoveryAvailable,
         onClick = dictationFailureAction(state, controller, recovery, context) { confirmPartialSend = true },
         modifier = Modifier.size(48.dp),
     ) {

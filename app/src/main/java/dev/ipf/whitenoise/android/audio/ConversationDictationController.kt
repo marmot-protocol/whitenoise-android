@@ -390,6 +390,9 @@ internal interface ConversationDictationPlatform {
     /** Whether capture still owns sealed, partial, or in-flight caller audio for the logical session. */
     fun callerAudioHasPending(): Boolean = false
 
+    /** Explicit Retry accepts an existing capture failure without hiding later faults or proving closure. */
+    fun acknowledgeRetainedCallerAudioFailure() = Unit
+
     /** Capture-side quiet time, or null when the provider owns microphone capture. */
     fun callerAudioSilenceMillis(): Long? = null
 
@@ -1388,6 +1391,7 @@ internal class ConversationDictationController internal constructor(
 
     /** Retranscribes the sealed audio while preserving its original completion intent. */
     private fun retryRetainedCallerAudio(failed: ConversationDictationState.Failed) {
+        platform.acknowledgeRetainedCallerAudioFailure()
         state = ConversationDictationState.Starting(failed.sessionId, failed.target)
         armCallerAudioDrainTimeout(failed.sessionId, failed.target)
         retainedCallerAudioRetries = 0
@@ -2928,20 +2932,26 @@ internal class ConversationDictationController internal constructor(
                 retainedTranscript = transcript,
             )
         } else if (draftRecovery.owns(sessionId, target)) {
-            clearRecognitionSession(cancel = true, releaseDurableSession = false)
-            if (recoverRecognizedDraft(sessionId, target, transcript)) {
-                complete(target)
-            } else {
-                fail(
-                    sessionId,
-                    target,
-                    failureCause ?: ConversationDictationFailure.Unknown,
-                    retainedTranscript = transcript,
-                )
-            }
+            preserveRecoveredTranscript(sessionId, target, transcript, failureCause)
         } else {
             clearRecognitionSession(cancel = true)
             appendTranscriptAtEndOrFail(sessionId, target, transcript)
+        }
+    }
+
+    /** User edits settle saved text only after any unrecognized PCM has been retained separately. */
+    private fun preserveRecoveredTranscript(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+        failureCause: ConversationDictationFailure?,
+    ) {
+        val failure = failureCause ?: ConversationDictationFailure.Unknown
+        if (runCatching(platform::callerAudioHasPending).getOrDefault(true)) {
+            failWithRetainedCallerAudio(sessionId, target, failure, recognizedTranscript = transcript)
+        } else {
+            clearRecognitionSession(cancel = true, releaseDurableSession = false)
+            completeRecoveredPaste(sessionId, target, transcript, failure)
         }
     }
 
@@ -3258,6 +3268,7 @@ internal class ConversationDictationController internal constructor(
         sessionId: Long,
         target: ConversationDictationTarget,
         transcript: String,
+        failure: ConversationDictationFailure = ConversationDictationFailure.Unknown,
     ) {
         when (recoverRecognizedDraftResult(sessionId, target, transcript)) {
             ConversationDictationDraftRecovery.Result.Written,
@@ -3265,7 +3276,7 @@ internal class ConversationDictationController internal constructor(
             ConversationDictationDraftRecovery.Result.Superseded,
             -> if (state.sessionId == sessionId) complete(target)
             ConversationDictationDraftRecovery.Result.Unavailable ->
-                fail(sessionId, target, ConversationDictationFailure.Unknown, retainedTranscript = transcript)
+                fail(sessionId, target, failure, retainedTranscript = transcript)
         }
     }
 
@@ -4268,6 +4279,8 @@ internal class AndroidConversationDictationPlatform(
 
     /** Reports retained audio even after microphone closure. */
     override fun callerAudioHasPending(): Boolean = callerAudio.hasPending()
+
+    override fun acknowledgeRetainedCallerAudioFailure() = callerAudio.acknowledgeRetainedFailure()
 
     /** Uses capture activity rather than recognizer callbacks delayed by chunk buffering. */
     override fun callerAudioSilenceMillis(): Long? = callerAudio.silenceMillis()

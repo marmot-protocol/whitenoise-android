@@ -3146,6 +3146,32 @@ class ConversationDictationControllerTest {
             }
         }
 
+    /** An involuntary replay teardown respects saved edits while protecting any unrecognized PCM. */
+    @Test
+    fun serviceTeardownCompletesSupersededPasteOnlyWithoutPendingAudio() {
+        for (audioPending in listOf(false, true)) {
+            val platform = FakePlatform().apply { pendingCallerAudio = true }
+            val f = fixture(draft = TextFieldValue("Draft"), platform = platform)
+            f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+            platform.listener.onResult("recognized prefix")
+            f.scheduler.advanceBy(500L)
+            f.controller.paste()
+            platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+            assertTrue(f.controller.state is ConversationDictationState.Failed)
+            assertEquals("Draft recognized prefix", f.drafts.getValue(key()).text)
+            f.edit(key(), TextFieldValue("Edited saved text"))
+            f.controller.retry()
+            val token = checkNotNull(f.controller.notificationSessionToken)
+            platform.pendingCallerAudio = audioPending
+            f.controller.onDurableServiceDestroyed(token)
+            assertEquals(!audioPending, f.controller.state is ConversationDictationState.Idle)
+            assertEquals(audioPending, f.controller.canRetryRetainedAudio)
+            assertEquals("Edited saved text", f.drafts.getValue(key()).text)
+            assertEquals(1, f.writes)
+            f.controller.cancel()
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun neverWrittenTextRetainsRecoveryProtectionAndExpiryWarning() =
@@ -6098,7 +6124,6 @@ class ConversationDictationControllerTest {
         assertTrue(platform.session.started)
     }
 
-    /** A typed capture overflow must destroy the recognizer and surface its cause in the visible session. */
     /** The production main-queue bridge cannot consume a failure from an expired generation. */
     @Test
     fun queuedCaptureFailureWaitsForTheCurrentGenerationToAcceptIt() {
@@ -6127,6 +6152,34 @@ class ConversationDictationControllerTest {
         reportCurrent(ConversationDictationCallerAudioFailure.CaptureFailed)
         shadowOf(Looper.getMainLooper()).idle()
         assertTrue(fixture.controller.state === replacement)
+    }
+
+    /** Explicit Retry clears the existing receipt before attaching a replay, without restarting capture. */
+    @Test
+    fun retainedAudioRetryAcceptsExistingReceiptBeforeReplayingItsFirstGeneration() {
+        val platform = FakePlatform().apply { pendingCallerAudio = true }
+        var terminalReceipt = true
+        var acknowledged = 0
+        platform.onRetainedCallerAudioRetry = {
+            terminalReceipt = false
+            acknowledged++
+        }
+        val fixture = fixture(draft = TextFieldValue("Draft"), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        assertTrue(fixture.controller.canRetryRetainedAudio)
+        fixture.controller.retry()
+        assertEquals(1, acknowledged)
+        assertEquals(1, platform.captureSessionsStarted)
+        val replay = platform.listener
+        val report = mainThreadDictationCallerAudioFailure(replay) { terminalReceipt }
+        report(ConversationDictationCallerAudioFailure.CaptureFailed)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        platform.pendingCallerAudio = false
+        replay.onResult("recovered on first retry")
+        assertEquals("Draft recovered on first retry", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
     /** A recorder fault after Send keeps PCM and text recoverable until actual microphone closure. */
@@ -6168,7 +6221,7 @@ class ConversationDictationControllerTest {
         assertEquals(0, sends)
         checkNotNull(platform.callerAudioFinishCallback).invoke()
         assertFalse(fixture.controller.foregroundMicrophoneRequired)
-        fixture.controller.cancelSession()
+        fixture.controller.cancel()
     }
 
     /** Pipe failures use the existing logical-session retry budget and reject the dead provider's final. */
@@ -6197,7 +6250,7 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.canRetryRetainedAudio)
         assertTrue(platform.pendingCallerAudio)
         assertEquals(0, fixture.writes)
-        fixture.controller.cancelSession()
+        fixture.controller.cancel()
     }
 
     /** A provider recovered on the next generation may still commit its recognized text. */
@@ -6216,6 +6269,7 @@ class ConversationDictationControllerTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Idle)
     }
 
+    /** A typed capture overflow must destroy the recognizer and surface its cause in the visible session. */
     @Test
     fun callerAudioBufferOverflowFailsTheVisibleSession() {
         val platform = FakePlatform(callerAudio = ConversationDictationCallerAudioRequirement.Supported)
@@ -6858,6 +6912,7 @@ class ConversationDictationControllerTest {
         var discardCaptureFailure: RuntimeException? = null
         var callerAudioStateFailure: RuntimeException? = null
         var captureSessionsStarted = 0
+        var onRetainedCallerAudioRetry: () -> Unit = {}
 
         override fun beginCaptureSession() {
             captureSessionsStarted += 1
@@ -6909,6 +6964,8 @@ class ConversationDictationControllerTest {
             callerAudioStateFailure?.let { throw it }
             return pendingCallerAudio
         }
+
+        override fun acknowledgeRetainedCallerAudioFailure() = onRetainedCallerAudioRetry()
 
         /** Supplies capture activity independently of provider callbacks. */
         override fun callerAudioSilenceMillis(): Long? = capturedSilenceMillis

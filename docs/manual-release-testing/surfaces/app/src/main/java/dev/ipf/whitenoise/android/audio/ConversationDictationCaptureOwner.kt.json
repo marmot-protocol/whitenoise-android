@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCaptureOwner.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Explicit sealed-audio Retry consumes only the current recorder’s existing failure receipt without claiming native closure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCaptureOwner.kt",
+        "anchor": "fun acknowledgeRetainedFailure()",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

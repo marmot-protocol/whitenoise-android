@@ -494,6 +494,23 @@ class ConversationDictationPersistentControlTest {
         composeRule.onNodeWithText("Send recognized text").assertIsDisplayed()
     }
 
+    /** Edited saved text without retained audio has no confirmation action to offer. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun supersededTextOnlyFailureCannotOpenAnEmptyRetryDialog() =
+        runTest {
+            val fixture = fixture(TextFieldValue("Draft"), deliveryScope = this)
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+            fixture.controller.send()
+            fixture.platform.listener.onResult("recognized")
+            runCurrent()
+            val failed = fixture.controller.state as ConversationDictationState.Failed
+            fixture.edit(TextFieldValue("Edited"))
+            render(fixture, displayedState = failed.copy(recognitionIncomplete = true))
+            composeRule.onNodeWithContentDescription("Retry Send").assertIsDisplayed().assertIsNotEnabled()
+            composeRule.onNodeWithTag("dictation-partial-send-dialog").assertDoesNotExist()
+        }
+
     private fun render(
         fixture: Fixture,
         fontScale: Float = 1f,

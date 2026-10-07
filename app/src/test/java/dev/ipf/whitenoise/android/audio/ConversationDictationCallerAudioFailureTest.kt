@@ -69,6 +69,73 @@ class ConversationDictationCallerAudioFailureTest {
         }
     }
 
+    /** Explicit Retry consumes a terminal receipt without claiming that blocked native release finished. */
+    @Test
+    fun retainedRetryConsumesOnlyTheExistingCaptureFailure() {
+        val f = RecorderFaultFixture(ReadFault(-6))
+        with(f) {
+            try {
+                assertTrue(capture.start())
+                assertTrue(readEntered.await(2, TimeUnit.SECONDS))
+                continueRead.countDown()
+                assertTrue(releaseEntered.await(2, TimeUnit.SECONDS))
+                capture.acknowledgeRetainedFailure()
+                stream.cancel()
+                stream.closeProviderEnd()
+                val next = checkNotNull(capture.openProviderStream { throw AssertionError("old failure replayed") })
+                try {
+                    shadowOf(Looper.getMainLooper()).idle()
+                    assertTrue(failures.isEmpty())
+                    assertEquals(1L, closed.count)
+                    assertFalse(capture.acknowledgeFailure(ConversationDictationCallerAudioFailure.CaptureFailed))
+                    val fed = CountDownLatch(1)
+                    next.onFeedClosed(fed::countDown)
+                    assertTrue(next.start())
+                    assertTrue(fed.await(2, TimeUnit.SECONDS))
+                    assertTrue(next.fullyFed())
+                    assertTrue(next.acknowledge())
+                    assertFalse(buffer.hasPending)
+                    assertEquals(1, starts.get())
+                } finally {
+                    next.cancel()
+                    next.closeProviderEnd()
+                }
+            } finally {
+                continueRead.countDown()
+                continueRelease.countDown()
+                stream.cancel()
+                stream.closeProviderEnd()
+                capture.discard {}
+            }
+        }
+    }
+
+    /** A recorder failure occurring after Retry's receipt check still reaches recovery. */
+    @Test
+    fun retainedRetryDoesNotSuppressAFutureTailReadFailure() {
+        val f = RecorderFaultFixture(ReadFault(-6, finishRequested = true))
+        with(f) {
+            try {
+                assertTrue(capture.start())
+                assertTrue(readEntered.await(2, TimeUnit.SECONDS))
+                capture.finish {}
+                capture.acknowledgeRetainedFailure()
+                continueRead.countDown()
+                assertTrue(releaseEntered.await(2, TimeUnit.SECONDS))
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(listOf(ConversationDictationFailure.Unknown), failures)
+                assertArrayEquals(byteArrayOf(1, 0, 2, 0), checkNotNull(buffer.poll()).pcm)
+                assertEquals(1L, closed.count)
+            } finally {
+                continueRead.countDown()
+                continueRelease.countDown()
+                stream.cancel()
+                stream.closeProviderEnd()
+                capture.discard {}
+            }
+        }
+    }
+
     private inner class RecorderFaultFixture(private val fault: ReadFault) {
         val readEntered = CountDownLatch(1)
         val continueRead = CountDownLatch(1)
