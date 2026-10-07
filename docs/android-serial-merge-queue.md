@@ -34,11 +34,18 @@ There are two separate authorization transitions:
 
 1. Reviewed source `H` receives source admission before enqueueing, pinned by
    `expectedHeadOid`. Source review, applicable CI, signatures, resolved
-   discussion, and required device/human proof must pass.
+   discussion, and required device/human proof must pass. Before source
+   authorization or enqueue, the trusted host validator checks the complete
+   workflow inventories of H and H integrated into current B. Queue workflows
+   cannot use repository secrets, publish authorization checks, or grant
+   status/check write permissions. A workflow check that impersonates the
+   authorization name holds the candidate.
 2. Integration `G` receives merge authorization only after its exact PR, source
    `H`, current base `B`, native entry ID, tree mapping, compatibility review and
    applicable CI are verified again. A source admission status cannot authorize
-   `G`. All expected queue workflows must register and complete before release.
+   `G`. All expected queue workflows must register and complete before release;
+   trusted workflow classifications may skip inapplicable jobs. The Android
+   aggregate and campaign classification must succeed.
 
 The watchdog writes `Android merge authorization`; the ruleset requires it on
 both source admission and queue integration. Shared authentication is an
@@ -54,7 +61,11 @@ branch writer or advance another PR. Obsolete integration authorization is
 revoked before reassessment. Final squash signature, parent and tree must match
 before releasing the slot. A known timeout/refusal can receive a new
 logged admission generation from the original source owner after fresh proof;
-this never replays an uncertain effect.
+this never replays an uncertain effect. Known pre-send guard/quota refusals
+carry a fixed marker and remain distinct from lost network responses. The
+CLI child verifies the journal intent and its actual ancestor producer lock.
+Queue holds, their age, uncertain effects and API budget are exposed through
+the existing watchdog health report.
 
 ## Controlled activation
 

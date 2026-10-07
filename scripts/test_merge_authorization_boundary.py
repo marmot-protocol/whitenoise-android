@@ -31,4 +31,23 @@ class AuthorizationBoundaryTest(unittest.TestCase):
             with self.assertRaises(ValueError):validate('normal.yml',{'permissions':{},'jobs':{'test':{'name':name}}})
 
 
+    def test_queue_workflows_cannot_use_privileged_secrets(self):
+        for event in [{'merge_group':{}},['pull_request','merge_group'],'merge_group',{'push':{}},'pull_request_target']:
+            for job in [{'steps':[{'env':{'TOKEN':'${{ secrets.MERGE_TOKEN }}'}}]},
+                        {'uses':'organization/repo/.github/workflows/build.yml@main','secrets':'inherit'}]:
+                with self.assertRaisesRegex(ValueError,'secrets'):
+                    validate('normal.yml',{'on':event,'permissions':{'contents':'read'},'jobs':{'test':job}})
+        # Release/signing workflows that never run queue candidates retain their
+        # existing secrets and reviewed non-status publishing permissions.
+        validate('normal.yml',{'on':{'workflow_dispatch':{}},'permissions':{},'jobs':{'test':{
+            'steps':[{'env':{'KEY':'${{ secrets.SIGNING_KEY }}'}}]}}})
+
+    def test_candidate_jobs_cannot_escape_through_reusable_jobs_or_environments(self):
+        for job in [{'uses':'organization/repo/.github/workflows/build.yml@main'},
+                    {'environment':'production','steps':[]}]:
+            with self.assertRaisesRegex(ValueError,'delegate'):
+                validate('normal.yml',{'on':{'merge_group':{}},'permissions':{},'jobs':{'test':job}})
+        validate('normal.yml',{'on':{'push':{'branches':['master']}},'permissions':{},'jobs':{'test':{
+            'steps':[{'env':{'KEY':'${{ secrets.SIGNING_KEY }}'}}]}}})
+
 if __name__ == '__main__':unittest.main()
