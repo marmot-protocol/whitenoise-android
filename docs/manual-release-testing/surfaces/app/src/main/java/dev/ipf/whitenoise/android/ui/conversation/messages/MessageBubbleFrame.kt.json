@@ -1,0 +1,52 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
+  "legacy_sha256": "36ffad43392d205fa9b28dcadfeda827e6c1156d08f07c81c99b1a8daf687c3a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MediaCaptionFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
+        "anchor": "fun MediaCaptionFrame(",
+        "test_ids": [
+          "MED-003",
+          "MED-007",
+          "CON-011",
+          "SET-005",
+          "FIND-013",
+          "FIND-014"
+        ]
+      },
+      {
+        "surface": "MediaSupplementEnvelope",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
+        "anchor": "fun MediaSupplementEnvelope(",
+        "test_ids": [
+          "MED-003",
+          "MED-017"
+        ]
+      },
+      {
+        "surface": "MessageBubbleFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
+        "anchor": "fun MessageBubbleFrame(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-002",
+          "CON-011",
+          "SET-005",
+          "FIND-013",
+          "FIND-014"
+        ]
+      },
+      {
+        "surface": "MessageBubbleInvalidationWarning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFrame.kt",
+        "anchor": "fun MessageBubbleInvalidationWarning(",
+        "test_ids": [
+          "CON-016"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

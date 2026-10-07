@@ -6,18 +6,20 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,6 +33,33 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36])
 class GlobalSearchReturnFocusTest {
     @get:Rule val composeRule = createComposeRule()
+    private lateinit var inputModeManager: InputModeManager
+
+    @Test
+    fun returnedFocusTargetsTheActualClickableChatRow() {
+        val selected = mutableStateOf(false)
+        composeRule.setContent {
+            inputModeManager = LocalInputModeManager.current
+            WhiteNoiseTheme {
+                ChatRowLayout(
+                    title = "Found message",
+                    timestampAt = 0uL,
+                    rowHasUnread = false,
+                    selectionMode = false,
+                    selected = true,
+                    leadingContent = {},
+                    supportingContent = {},
+                    supportingMetadata = null,
+                    modifier = globalSearchReturnFocusModifier(selected.value) { true }.testTag("result-row"),
+                )
+            }
+        }
+        composeRule.runOnIdle {
+            assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard))
+            selected.value = true
+        }
+        composeRule.onNodeWithTag("result-row").assertIsFocused()
+    }
 
     @Test
     fun quickBackRefreshesSelectionWithoutDisposingSearch() {
@@ -49,23 +78,30 @@ class GlobalSearchReturnFocusTest {
 
     @Test
     fun visibleReturnedResultReceivesFocusWithoutTrappingIt() {
-        val selected = mutableStateOf(true)
+        val selected = mutableStateOf(false)
         composeRule.setContent {
+            inputModeManager = LocalInputModeManager.current
             WhiteNoiseTheme {
-                val next = remember { FocusRequester() }
                 Column {
-                    Box(globalSearchReturnFocusModifier(selected.value) { true }) {
-                        Button(onClick = {}, modifier = Modifier.testTag("returned")) { Text("Returned result") }
-                    }
                     Button(
-                        onClick = { next.requestFocus() },
-                        modifier = Modifier.focusRequester(next).testTag("next"),
+                        onClick = {},
+                        modifier = globalSearchReturnFocusModifier(selected.value) { true }.testTag("returned"),
+                    ) { Text("Returned result") }
+                    Button(
+                        onClick = {},
+                        modifier = Modifier.testTag("next"),
                     ) { Text("Next result") }
                 }
             }
         }
+        // SystemDefined Material focus targets intentionally reject keyboard focus in Touch mode.
+        composeRule.runOnIdle {
+            assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard))
+            selected.value = true
+        }
         composeRule.onNodeWithTag("returned").assertIsFocused()
-        composeRule.onNodeWithTag("next").performClick().assertIsFocused()
+        composeRule.onNodeWithTag("next").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.onNodeWithTag("next").assertIsFocused()
         composeRule.runOnIdle { selected.value = false }
         composeRule.onNodeWithTag("returned").assertIsNotFocused()
     }

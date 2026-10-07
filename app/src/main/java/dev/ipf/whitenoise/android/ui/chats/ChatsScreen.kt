@@ -1356,7 +1356,7 @@ internal fun ChatsScreen(
                         Modifier
                     } else {
                         chatListRowMotion(targetIndex, rowPlacementDurationMillis)
-                    }.then(returnFocus),
+                    },
             ) {
                 val menuAccount = appState.activeAccountRef
                 val menuRuntime = appState.runtimeGeneration
@@ -1428,6 +1428,7 @@ internal fun ChatsScreen(
                     },
                 ) {
                     ChatListRow(
+                        modifier = returnFocus,
                         item = item,
                         appState = appState,
                         accountRef = controller.boundAccountRef,

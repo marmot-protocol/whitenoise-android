@@ -269,6 +269,7 @@ private class ConversationNavigationState(
     var initialTimelineBackfillRetryGeneration by mutableLongStateOf(0L)
     val targetHighlight = MessageTargetHighlightLifecycle()
     val targetNavigation = MessageTargetNavigationOwner()
+    val focusTargetRetry = SearchTargetRetryState()
     var navigateReplyJob by mutableStateOf<Job?>(null)
     var searchOpen by surfaceState.searchOpen
     var searchQuery by mutableStateOf("")
@@ -3110,7 +3111,13 @@ internal fun ConversationScreen(
     // between the search and the tap) just toasts and leaves the user at the
     // normal anchor. Local-only: loadUntilMessageAvailable paginates the
     // already-persisted store, never a relay fetch.
-    LaunchedEffect(controller, focusMessageId, focusMessageRequestId, ttsFocusSessionId) {
+    LaunchedEffect(
+        controller,
+        focusMessageId,
+        focusMessageRequestId,
+        ttsFocusSessionId,
+        navigationState.focusTargetRetry.generation,
+    ) {
         /** Reads the latest route- and account-scoped focus target for this effect generation. */
         fun latestFocusMessageId(): String? {
             val sessionId = ttsFocusSessionId ?: return focusMessageId
@@ -3125,6 +3132,7 @@ internal fun ConversationScreen(
         }
 
         var focus = latestFocusMessageId() ?: return@LaunchedEffect
+        navigationState.focusTargetRetry.clear()
         val navigationRequest = navigationState.targetNavigation.begin()
         // Let the initial unread/newest anchor run first so our scroll isn't
         // immediately overwritten by it.
@@ -3146,6 +3154,7 @@ internal fun ConversationScreen(
         }
         if (ttsFocusSessionId != null && latestFocusMessageId() != focus) return@LaunchedEffect
         if (target == null) {
+            if (controller.error != null) navigationState.focusTargetRetry.failed(navigationRequest)
             appState.present(R.string.toast_original_message_unavailable)
             return@LaunchedEffect
         }
@@ -3154,6 +3163,7 @@ internal fun ConversationScreen(
                 .filterNot { MessageProjector.isEdit(it.record) }
                 .indexOfFirst { it.record.messageIdHex == target }
         if (timelineIndex < 0) {
+            if (controller.error != null) navigationState.focusTargetRetry.failed(navigationRequest)
             appState.present(R.string.toast_original_message_unavailable)
             return@LaunchedEffect
         }
@@ -3866,6 +3876,7 @@ internal fun ConversationScreen(
                             onRetry = {
                                 scope.launch {
                                     controller.retryLoadFailure()
+                                    navigationState.focusTargetRetry.retry()
                                     navigationState.initialTimelineBackfillRetryGeneration += 1L
                                 }
                             },
@@ -4008,7 +4019,12 @@ internal fun ConversationScreen(
                                     placement = loadFailurePlacement,
                                     errorEdge = controller.errorEdge,
                                     targetEdge = ConversationLoadFailureEdge.BOTTOM,
-                                    onRetry = { scope.launch { controller.retryLoadFailure() } },
+                                    onRetry = {
+                                        scope.launch {
+                                            controller.retryLoadFailure()
+                                            navigationState.focusTargetRetry.retry()
+                                        }
+                                    },
                                 )
                                 controller.pendingMembershipActivity?.let { activity ->
                                     item(key = "pending-membership:${activity.id}", contentType = "pendingMembership") {
@@ -4204,7 +4220,12 @@ internal fun ConversationScreen(
                                     placement = loadFailurePlacement,
                                     errorEdge = controller.errorEdge,
                                     targetEdge = ConversationLoadFailureEdge.TOP,
-                                    onRetry = { scope.launch { controller.retryLoadFailure() } },
+                                    onRetry = {
+                                        scope.launch {
+                                            controller.retryLoadFailure()
+                                            navigationState.focusTargetRetry.retry()
+                                        }
+                                    },
                                 )
                                 if (controller.conversationGroupRecoveryRowVisible()) {
                                     item(key = "group-recovery") {

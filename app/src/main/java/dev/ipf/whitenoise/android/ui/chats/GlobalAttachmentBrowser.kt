@@ -128,7 +128,15 @@ internal fun GlobalAttachmentBrowser(
         }
         GlobalAttachmentGrid(
             days = days,
-            layout = GlobalAttachmentGridLayout(visual, formatter, bottomPadding, gridState, selectionOwner, returnedSelection),
+            layout =
+                GlobalAttachmentGridLayout(
+                    visual,
+                    formatter,
+                    bottomPadding,
+                    gridState,
+                    selectionOwner,
+                    returnedSelection,
+                ),
             onOpenMessage = onOpenMessage,
             thumbnail = thumbnail,
         )
@@ -186,7 +194,11 @@ private fun GlobalAttachmentGrid(
             ) { item ->
                 val returnedRow =
                     layout.returnedSelection == layout.selectionOwner?.selected &&
-                        layout.returnedSelection?.matches(item.groupIdHex, item.messageIdHex, item.attachmentIndex) == true
+                        layout.returnedSelection?.matches(
+                            item.groupIdHex,
+                            item.messageIdHex,
+                            item.attachmentIndex,
+                        ) == true
                 val returnFocus =
                     globalSearchReturnFocusModifier(returnedRow, layout.selectionOwner?.returnGeneration ?: 0L) {
                         !layout.state.isScrollInProgress &&

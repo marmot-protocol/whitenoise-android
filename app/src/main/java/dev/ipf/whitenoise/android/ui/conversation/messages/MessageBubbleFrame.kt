@@ -24,7 +24,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
@@ -77,7 +80,7 @@ internal fun MessageBubbleFrame(
         )
 
     Surface(
-        modifier = modifier.then(highlightModifier).then(mentionModifier),
+        modifier = modifier.then(highlightModifier).then(mentionModifier).then(messageTargetAccessibility(highlighted)),
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = shape,
@@ -140,7 +143,7 @@ internal fun MediaCaptionFrame(
             integratedWithBorder = amoled,
         )
     Surface(
-        modifier = modifier.then(highlightModifier).then(mentionModifier),
+        modifier = modifier.then(highlightModifier).then(mentionModifier).then(messageTargetAccessibility(highlighted)),
         color = colorFromArgb(presentation.backgroundArgb),
         contentColor = colorFromArgb(presentation.contentArgb),
         shape = shape,
@@ -149,6 +152,17 @@ internal fun MediaCaptionFrame(
         MediaCaptionContent(alignEnd, contentModifier, media, caption)
     }
 }
+
+/** Exposes the temporary destination cue without moving focus or merging away child actions. */
+internal fun messageTargetAccessibility(highlighted: Boolean): Modifier =
+    if (highlighted) {
+        Modifier.semantics {
+            selected = true
+            liveRegion = LiveRegionMode.Polite
+        }
+    } else {
+        Modifier
+    }
 
 /**
  * Measures media first, then lets a wider supplement establish a capped shared width.

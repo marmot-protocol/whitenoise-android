@@ -1792,6 +1792,23 @@ class ConversationScrollCoordinatorTest {
     }
 
     @Test
+    fun failedFocusTargetSharesExistingLocalizedRetryActions() {
+        val screen = sourceFile("ConversationScreen.kt").readText()
+        val focus =
+            screen
+                .substringAfter("// Scroll-to-message for a chat-list")
+                .substringBefore("// A settled visible anchor")
+        assertTrue("explicit Retry must restart the focus effect", "focusTargetRetry.generation" in focus)
+        assertTrue("a newer target must clear the earlier failed request", "focusTargetRetry.clear()" in focus)
+        assertEquals(2, Regex("focusTargetRetry.failed\\(navigationRequest\\)").findAll(focus).count())
+        assertEquals(3, Regex("focusTargetRetry.retry\\(\\)").findAll(screen).count())
+        assertTrue(
+            "unavailable targets keep the existing localized notice",
+            "toast_original_message_unavailable" in focus,
+        )
+    }
+
+    @Test
     fun conversationScreenReResolvesMessageBackedTargetsBeforeTheFinalAnimation() {
         val screen = sourceFile("ConversationScreen.kt").readText()
 
