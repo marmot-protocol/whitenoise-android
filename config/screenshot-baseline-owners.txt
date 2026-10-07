@@ -142,3 +142,5 @@
 # Persistent playback across actual Chats folder destinations.
 *.ChatContextMenuFlowTest.folderManagerRetainsPlaybackControls
 *.ChatContextMenuFlowTest.directFolderEditorRetainsPlaybackControls
+
+*.ComposerDraftTopSettlementTest.clearingScrolledManualDraftRemovesTopAction
