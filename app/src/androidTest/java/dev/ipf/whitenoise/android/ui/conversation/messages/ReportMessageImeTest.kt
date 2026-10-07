@@ -66,7 +66,12 @@ class ReportMessageImeTest {
         composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometry() != null }
         assertActionAboveIme()
         composeRule.onNodeWithTag("message.report.send").performClick()
-        composeRule.runOnIdle { assertEquals(listOf(ReportReasonFfi.IMPERSONATION to explanation.take(REPORT_EXPLANATION_LIMIT).trim()), submissions) }
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf(ReportReasonFfi.IMPERSONATION to explanation.take(REPORT_EXPLANATION_LIMIT).trim()),
+                submissions,
+            )
+        }
     }
 
     /** Uses the focused sheet window, rather than assuming the Activity receives its dialog's IME insets. */
