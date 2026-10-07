@@ -98,6 +98,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -4193,15 +4194,17 @@ class WhiteNoiseAppState private constructor(
     internal suspend fun resolveProvenanceDirectChat(
         provenanceGroupIdHex: String?,
         targetReference: String,
+        diagnosticAttempt: dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt? = null,
     ): NewMessageDirectChatResolution =
-        chatsController?.resolveProvenanceDirectChat(provenanceGroupIdHex, targetReference)
+        chatsController?.resolveProvenanceDirectChat(provenanceGroupIdHex, targetReference, diagnosticAttempt)
             ?: NewMessageDirectChatResolution(item = null, createRequired = false)
 
     internal suspend fun resolveExistingDirectChat(
         targetReference: String,
         excludingGroupIdHex: String? = null,
+        diagnosticAttempt: dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt? = null,
     ): NewMessageDirectChatResolution =
-        chatsController?.resolveExistingDirectChat(targetReference, excludingGroupIdHex)
+        chatsController?.resolveExistingDirectChat(targetReference, excludingGroupIdHex, diagnosticAttempt)
             ?: NewMessageDirectChatResolution(item = null, createRequired = false)
 
     private val marmotBridgeTracer = MarmotBridgeTracer()
@@ -7139,6 +7142,7 @@ class WhiteNoiseAppState private constructor(
             runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()?.let {
                 auditLogSettings = it
                 DictationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
+                DmCreationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
             }
         }
     }
@@ -7168,6 +7172,7 @@ class WhiteNoiseAppState private constructor(
         runCatching {
             // Stop the local sink before a revoke/save, including a failed native update.
             DictationDiagnostics.setEnabled(false)
+            DmCreationDiagnostics.setEnabled(false)
             // setAuditLogSettings now applies the switch to every live session
             // in place via a recorder hot-swap (enable → live recorder,
             // disable → flush + close); no session reopen or runtime restart
@@ -7178,6 +7183,7 @@ class WhiteNoiseAppState private constructor(
                 storeCachedSettings = {
                     auditLogSettings = it
                     DictationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
+                    DmCreationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
                 },
                 loadFromEngine = { marmotIo { auditLogSettings() } },
                 transform = { it.copy(enabled = enabled) },

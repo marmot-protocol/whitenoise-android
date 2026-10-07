@@ -3931,6 +3931,7 @@ class ChatsController private constructor(
     internal suspend fun resolveProvenanceDirectChat(
         provenanceGroupIdHex: String?,
         targetReference: String,
+        diagnosticAttempt: dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt? = null,
     ): NewMessageDirectChatResolution {
         val unavailable = NewMessageDirectChatResolution(item = null, createRequired = false)
         val account = accountRef ?: return unavailable
@@ -3941,6 +3942,7 @@ class ChatsController private constructor(
             groupIdHex = provenanceGroupIdHex,
             targetReference = targetReference,
             chatItemForGroup = ::chatItemForGroup,
+            diagnosticAttempt = diagnosticAttempt,
         )
     }
 

@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.chats.newchat
 
+import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
+import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
+import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.state.ChatCreateOpenTiming
 import dev.ipf.whitenoise.android.state.MarmotTraceSection
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -71,13 +74,20 @@ internal class NewMessageRecipientPreparationCoordinator {
         prewarm: suspend () -> Unit,
         lookup: suspend () -> NewMessageDirectChatResolution,
         markStage: (String) -> Unit = {},
+        diagnosticAttempt: DmCreationAttempt? = null,
     ): NewMessageRecipientPreparation {
         current?.takeIf { it.key == key }?.let { return it }
         current?.cancel()
         val prewarmResult =
             scope.async {
+                diagnosticAttempt?.record(DmCreationPhase.PREWARM, DmCreationOutcome.START)
                 markStage(ChatCreateOpenTiming.STAGE_KEY_PACKAGE_PREWARM_START)
-                runCatchingCancellable { prewarm() }.also {
+                diagnosticBoundary(diagnosticAttempt, DmCreationPhase.PREWARM) { prewarm() }.also {
+                    if (it.isSuccess) {
+                        diagnosticAttempt?.record(DmCreationPhase.PREWARM, DmCreationOutcome.SUCCESS)
+                    } else {
+                        diagnosticAttempt?.failed(DmCreationPhase.PREWARM, requireNotNull(it.exceptionOrNull()))
+                    }
                     markStage(
                         if (it.isSuccess) {
                             ChatCreateOpenTiming.STAGE_KEY_PACKAGE_PREWARM_RETURN
@@ -89,8 +99,14 @@ internal class NewMessageRecipientPreparationCoordinator {
             }
         val lookupResult =
             scope.async {
+                diagnosticAttempt?.record(DmCreationPhase.EXISTING_LOOKUP, DmCreationOutcome.START)
                 markStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_START)
-                runCatchingCancellable { lookup() }.also {
+                diagnosticBoundary(diagnosticAttempt, DmCreationPhase.EXISTING_LOOKUP) { lookup() }.also {
+                    if (it.isSuccess) {
+                        diagnosticAttempt?.record(DmCreationPhase.EXISTING_LOOKUP, DmCreationOutcome.SUCCESS)
+                    } else {
+                        diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, requireNotNull(it.exceptionOrNull()))
+                    }
                     markStage(
                         if (it.isSuccess) {
                             ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_RETURN
@@ -123,3 +139,16 @@ internal suspend fun WhiteNoiseAppState.prewarmNewMessageRecipient(
         prewarmGroupMemberKeyPackages(accountRef, listOf(targetReference))
     }
 }
+
+/** Captures cancellation before the cancellable-result helper rethrows it unchanged. */
+private suspend fun <T> diagnosticBoundary(
+    attempt: DmCreationAttempt?,
+    phase: DmCreationPhase,
+    block: suspend () -> T,
+): Result<T> =
+    try {
+        runCatchingCancellable { block() }
+    } catch (cancelled: CancellationException) {
+        attempt?.failed(phase, cancelled)
+        throw cancelled
+    }

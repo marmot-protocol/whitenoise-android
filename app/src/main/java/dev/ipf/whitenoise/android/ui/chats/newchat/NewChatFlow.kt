@@ -43,6 +43,12 @@ import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
+import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
+import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.DmCreationFailure
+import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
+import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
+import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.share.QrShareCardRenderer
 import dev.ipf.whitenoise.android.share.QrShareCardSpec
 import dev.ipf.whitenoise.android.share.launchInviteShare
@@ -108,6 +114,7 @@ internal sealed interface StartChatAttemptResult {
     data class Open(
         val item: ChatListItem,
         val newlyCreated: Boolean = true,
+        val diagnosticAttempt: DmCreationAttempt? = null,
     ) : StartChatAttemptResult
 
     data class Failed(
@@ -146,7 +153,7 @@ internal fun startChatErrorUiState(
  * important: a successful MLS create must retry by group id rather than
  * creating a second direct chat when projection is merely delayed (#1729).
  */
-@Suppress("TooGenericExceptionCaught")
+@Suppress("TooGenericExceptionCaught", "LongParameterList") // Injectable native and diagnostic boundaries share one retry state machine.
 internal suspend fun attemptStartProfileChat(
     npub: String,
     progressHex: String,
@@ -157,20 +164,29 @@ internal suspend fun attemptStartProfileChat(
     displayName: (String) -> String,
     markCreateOpenStage: (String) -> Unit = {},
     abandonCreateOpenTiming: (String) -> Unit = {},
+    diagnosticAttempt: DmCreationAttempt? = null,
 ): StartChatAttemptResult {
     val groupIdHex: String =
         try {
             retryGroupIdHex
                 ?: run {
+                    diagnosticAttempt?.record(DmCreationPhase.CREATE, DmCreationOutcome.START)
                     markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_START)
-                    createGroup(npub).also { markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN) }
+                    createGroup(npub).also {
+                        diagnosticAttempt?.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
+                        markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN)
+                    }
                 }
         } catch (error: Throwable) {
+            val committedGroupId = createdGroupIdAfterProjectionUnavailable(error)
+            if (committedGroupId == null) diagnosticAttempt?.failed(DmCreationPhase.CREATE, error)
             if (error is kotlinx.coroutines.CancellationException) {
                 abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
                 throw error
             }
-            createdGroupIdAfterProjectionUnavailable(error)?.also {
+            committedGroupId?.also {
+                diagnosticAttempt?.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
+                diagnosticAttempt?.failed(DmCreationPhase.PROJECTION, error)
                 markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN)
             } ?: run {
                 abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CREATE_FAILED)
@@ -187,8 +203,14 @@ internal suspend fun attemptStartProfileChat(
         }
     return try {
         runCatchingCancellable {
-            StartChatAttemptResult.Open(loadCreatedChatListItem(groupIdHex))
+            diagnosticAttempt?.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
+            StartChatAttemptResult
+                .Open(
+                    loadCreatedChatListItem(groupIdHex),
+                    diagnosticAttempt = diagnosticAttempt,
+                ).also { diagnosticAttempt?.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS) }
         }.getOrElse { error ->
+            diagnosticAttempt?.failed(DmCreationPhase.PROJECTION, error)
             abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_FAILED)
             StartChatAttemptResult.Failed(
                 StartChatErrorUiState(
@@ -203,12 +225,13 @@ internal suspend fun attemptStartProfileChat(
             )
         }
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        diagnosticAttempt?.failed(DmCreationPhase.PROJECTION, cancelled)
         abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
         throw cancelled
     }
 }
 
-@Suppress("LongParameterList") // Shared create/open state machine exposes injectable native boundaries.
+@Suppress("LongParameterList", "TooGenericExceptionCaught") // Trace any native boundary failure, then preserve its existing propagation.
 internal suspend fun attemptOpenOrStartProfileChat(
     npub: String,
     progressHex: String,
@@ -221,25 +244,33 @@ internal suspend fun attemptOpenOrStartProfileChat(
     markCreateOpenStage: (String) -> Unit = {},
     abandonCreateOpenTiming: (String) -> Unit = {},
     directChatLookupAlreadyStarted: Boolean = false,
+    diagnosticAttempt: DmCreationAttempt? = null,
 ): StartChatAttemptResult {
     val existingChatResult =
         if (retryGroupIdHex == null) {
+            diagnosticAttempt?.record(DmCreationPhase.EXISTING_LOOKUP, DmCreationOutcome.START)
             if (!directChatLookupAlreadyStarted) {
                 markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_START)
             }
             val resolution =
                 try {
                     resolveDirectChat()
-                } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                    abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
-                    throw cancelled
+                } catch (failure: Exception) {
+                    diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, failure)
+                    if (failure is kotlinx.coroutines.CancellationException) abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
+                    throw failure
                 }
             if (!directChatLookupAlreadyStarted) {
                 markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_RETURN)
             }
+            diagnosticAttempt?.record(
+                DmCreationPhase.EXISTING_LOOKUP,
+                if (resolution.item != null || resolution.createRequired) DmCreationOutcome.SUCCESS else DmCreationOutcome.FAILURE,
+                if (resolution.item != null || resolution.createRequired) DmCreationFailure.NONE else DmCreationFailure.UNKNOWN,
+            )
             when {
                 resolution.item != null ->
-                    StartChatAttemptResult.Open(item = resolution.item, newlyCreated = false)
+                    StartChatAttemptResult.Open(item = resolution.item, newlyCreated = false, diagnosticAttempt = diagnosticAttempt)
                 !resolution.createRequired -> {
                     abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_FAILED)
                     StartChatAttemptResult.Failed(
@@ -267,6 +298,7 @@ internal suspend fun attemptOpenOrStartProfileChat(
         displayName = displayName,
         markCreateOpenStage = markCreateOpenStage,
         abandonCreateOpenTiming = abandonCreateOpenTiming,
+        diagnosticAttempt = diagnosticAttempt,
     )
 }
 
@@ -503,6 +535,10 @@ private fun NewMessageAccountScreen(
     SideEffect { contactsLoadAttempt.success() }
 
     val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
+    val identifierDiagnostic = remember(accountRef, runtimeGeneration, resolvedHex) { DmCreationInteraction() }
+    var tappedDiagnostic by remember(accountRef, runtimeGeneration, resolvedHex) {
+        mutableStateOf<Pair<String, DmCreationInteraction>?>(null)
+    }
     val identifierPreparationKey =
         if (identifierQuery && accountRef != null && resolvedHex != null) {
             NewMessageRecipientPreparationKey(
@@ -524,6 +560,7 @@ private fun NewMessageAccountScreen(
             return@LaunchedEffect
         }
         appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_RECIPIENT_ROW_READY)
+        val diagnosticPreparation = identifierDiagnostic.preparation()
         val preparation =
             preparationCoordinator.prepare(
                 scope = this,
@@ -535,10 +572,11 @@ private fun NewMessageAccountScreen(
                 },
                 lookup = {
                     session.currentValue {
-                        appState.resolveExistingDirectChat(key.targetReference)
+                        appState.resolveExistingDirectChat(key.targetReference, diagnosticAttempt = diagnosticPreparation)
                     }
                 },
                 markStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
+                diagnosticAttempt = diagnosticPreparation,
             )
         preparation.awaitCompletion()
     }
@@ -566,6 +604,11 @@ private fun NewMessageAccountScreen(
         creatingHex = hexForProgress
         scannerSession = null
         appState.beginChatCreateOpenTiming()
+        val interaction =
+            tappedDiagnostic?.takeIf { it.first == npub }?.second
+                ?: if (resolvedHex == hexForProgress) identifierDiagnostic else DmCreationInteraction()
+        tappedDiagnostic = npub to interaction
+        val diagnosticAttempt = interaction.nextAttempt()
         val preparationKeyForTap =
             identifierPreparationKey?.takeIf {
                 retryGroupIdHex == null &&
@@ -575,6 +618,7 @@ private fun NewMessageAccountScreen(
             }
         val preparedLookup = preparationKeyForTap?.let(preparationCoordinator::current)
         appState.launchMutation {
+            var openedConversation = false
             try {
                 session.ensureCurrent()
                 when (
@@ -597,12 +641,12 @@ private fun NewMessageAccountScreen(
                                             existingDmGroupIdHex = existingDmGroupIdHex,
                                             provenanceDirectChat = { provenance, target ->
                                                 session.currentValue {
-                                                    appState.resolveProvenanceDirectChat(provenance, target)
+                                                    appState.resolveProvenanceDirectChat(provenance, target, diagnosticAttempt)
                                                 }
                                             },
                                             existingDirectChat = { target ->
                                                 session.currentValue {
-                                                    appState.resolveExistingDirectChat(target, existingDmGroupIdHex)
+                                                    appState.resolveExistingDirectChat(target, existingDmGroupIdHex, diagnosticAttempt)
                                                 }
                                             },
                                         )
@@ -621,16 +665,26 @@ private fun NewMessageAccountScreen(
                                 if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)
                             },
                             directChatLookupAlreadyStarted = preparedLookup != null,
+                            diagnosticAttempt = diagnosticAttempt,
                         )
                 ) {
                     is StartChatAttemptResult.Open ->
                         if (session.isCurrent()) {
+                            accountRef?.let {
+                                DmCreationDiagnostics.awaitFrame(it, result.item.group.groupIdHex, runtimeGeneration, result.diagnosticAttempt)
+                            }
+                            openedConversation = true
                             session.dispose()
                             onOpenConversation(result.item, result.newlyCreated)
                         }
                     is StartChatAttemptResult.Failed -> if (session.isCurrent()) startChatError = result.error
                 }
             } finally {
+                if (!openedConversation &&
+                    !session.isCurrent()
+                ) {
+                    diagnosticAttempt.record(DmCreationPhase.OWNER, DmCreationOutcome.REPLACED, DmCreationFailure.OWNER_REPLACED)
+                }
                 creatingHex = null
             }
         }

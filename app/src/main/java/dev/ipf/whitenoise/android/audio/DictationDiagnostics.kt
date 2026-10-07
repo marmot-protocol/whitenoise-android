@@ -88,11 +88,18 @@ internal class DictationDiagnosticRecorder(
                 return
             }
         filtered.addAndGet(parsed.filteredFields)
+        recordFields(parsed.fields)
+    }
+
+    /** Queues an already allowlisted host diagnostic record without performing IO on its caller. */
+    @Synchronized
+    internal fun recordFields(fields: Map<String, Any>) {
+        if (!enabled) return
         val capturedEpoch = epoch.get()
         runCatching {
             executor.execute {
                 if (enabled && epoch.get() == capturedEpoch) {
-                    runCatching { store.append(parsed.fields) }.onFailure { dropped.incrementAndGet() }
+                    runCatching { store.append(fields) }.onFailure { dropped.incrementAndGet() }
                 }
             }
         }.onFailure { dropped.incrementAndGet() }

@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
@@ -536,6 +537,49 @@ class NewChatFlowTest {
             ),
         )
     }
+
+    /** A committed group is retried by projection only, and diagnostics never serialize its identifier. */
+    @Test
+    fun projectionFailureTraceRetainsCanonicalRetryWithoutDuplicateCreation() =
+        runTest {
+            val records = mutableListOf<Map<String, Any>>()
+            val interaction = DmCreationInteraction(records::add)
+            var creates = 0
+            val failed =
+                attemptStartProfileChat(
+                    npub = "private-recipient",
+                    progressHex = "private-identity",
+                    recipientName = "private-name",
+                    createGroup = {
+                        creates++
+                        "private-group"
+                    },
+                    loadCreatedChatListItem = { throw MarmotKitException.GroupHydrationPending("private-group") },
+                    displayName = { it },
+                    diagnosticAttempt = interaction.nextAttempt(),
+                ) as StartChatAttemptResult.Failed
+            assertEquals("private-group", failed.error.retryGroupIdHex)
+            val opened =
+                attemptStartProfileChat(
+                    npub = "private-recipient",
+                    progressHex = "private-identity",
+                    recipientName = "private-name",
+                    retryGroupIdHex = failed.error.retryGroupIdHex,
+                    createGroup = {
+                        creates++
+                        error("duplicate create")
+                    },
+                    loadCreatedChatListItem = { chatListItem(group(""), null, emptyList()) },
+                    displayName = { it },
+                    diagnosticAttempt = interaction.nextAttempt(),
+                )
+            assertTrue(opened is StartChatAttemptResult.Open)
+            assertEquals(1, creates)
+            assertTrue(records.any { it["attempt"] == 1 && it["phase"] == "create" && it["outcome"] == "success" })
+            assertTrue(records.any { it["attempt"] == 1 && it["phase"] == "projection" && it["failure"] == "hydration_pending" })
+            assertFalse(records.any { it["attempt"] == 2 && it["phase"] == "create" })
+            assertFalse(records.toString().contains("private-"))
+        }
 
     private fun chatListItem(
         group: AppGroupRecordFfi,
