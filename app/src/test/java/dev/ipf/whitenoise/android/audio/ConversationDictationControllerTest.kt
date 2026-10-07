@@ -6169,8 +6169,11 @@ class ConversationDictationControllerTest {
         fixture.controller.paste()
         platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
         assertTrue(fixture.controller.canRetryRetainedAudio)
+        val failedGeneration = platform.listener
         fixture.controller.retry()
         assertEquals(1, acknowledged)
+        fixture.scheduler.advanceBy(500L)
+        assertFalse(platform.listener === failedGeneration)
         assertEquals(1, platform.captureSessionsStarted)
         val replay = platform.listener
         val report = mainThreadDictationCallerAudioFailure(replay) { terminalReceipt }
