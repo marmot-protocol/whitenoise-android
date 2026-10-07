@@ -59,7 +59,8 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun replacementKeepsSessionWhenFinalUtteranceCompletesDuringOldProjectionCancellation() =
         runTest {
-            val harness = SessionHarness(
+            val harness =
+                SessionHarness(
                     this,
                     UnconfinedTestDispatcher(testScheduler),
                     preparationDispatcher = StandardTestDispatcher(testScheduler),
@@ -100,7 +101,11 @@ class TtsRenderedTargetSeekTest {
             committed.await()
             assertTrue(cancellationCompletedSpeech)
             assertEquals(sessionId, harness.controller.state.value.sessionId)
-            assertEquals("m3", harness.controller.state.value.passage?.messageIdHex)
+            assertEquals(
+                "m3",
+                harness.controller.state.value.passage
+                    ?.messageIdHex,
+            )
             harness.engine.complete(harness.engine.spoken.lastIndex)
             runCurrent()
             assertTrue(harness.controller.state.value is TtsState.Idle)
