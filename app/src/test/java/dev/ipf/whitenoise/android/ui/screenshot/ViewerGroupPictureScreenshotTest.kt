@@ -2,9 +2,7 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
