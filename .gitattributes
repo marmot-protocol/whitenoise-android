@@ -2,3 +2,6 @@
 # script, so don't whitespace-lint them (the generator emits trailing spaces)
 # and mark them generated so reviews collapse the diff.
 app/src/main/java/dev/ipf/marmotkit/marmot_uniffi.kt -whitespace linguist-generated
+
+# Preserve blank context lines in the verbatim upstream unified patch.
+third_party/compose-ui/*.patch text eol=lf whitespace=-blank-at-eol,-blank-at-eof

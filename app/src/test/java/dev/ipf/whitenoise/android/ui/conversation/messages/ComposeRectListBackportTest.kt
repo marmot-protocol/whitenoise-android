@@ -1,0 +1,38 @@
+package dev.ipf.whitenoise.android.ui.conversation.messages
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.util.Properties
+
+/** Runs the shared regressions on both distribution classpaths and verifies backport identity. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class ComposeRectListBackportTest : ComposeRectListReuseFixture() {
+    /** Guards against tests silently resolving an unpatched UI jar on either distribution. */
+    @Test
+    fun runtimeContainsTheReviewedSourceBackport() {
+        val markerPath = "META-INF/whitenoise-compose-rectlist-backport.properties"
+        val stream = javaClass.classLoader?.getResourceAsStream(markerPath)
+        assertNotNull("the Compose source backport must be on the test runtime classpath", stream)
+        val properties = Properties()
+        requireNotNull(stream).use(properties::load)
+        assertEquals("1.12.1", properties.getProperty("base"))
+        assertEquals("fd550bed793b66378c83091532e29c18fdef44cc", properties.getProperty("upstream"))
+        val owner = Class.forName("androidx.compose.ui.node.AlignmentLinesOwner")
+        val setter = owner.getDeclaredMethod("setPlacingForAlignment", Boolean::class.javaPrimitiveType)
+        assertEquals(Void.TYPE, setter.returnType)
+        listOf("MeasurePassDelegate", "LookaheadPassDelegate").forEach { name ->
+            val implementation = Class.forName("androidx.compose.ui.node.$name")
+            assertTrue(owner.isAssignableFrom(implementation))
+            val implementedSetter = implementation.getDeclaredMethod(setter.name, Boolean::class.javaPrimitiveType)
+            assertEquals(Void.TYPE, implementedSetter.returnType)
+        }
+    }
+}
