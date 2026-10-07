@@ -9,6 +9,7 @@ reports=build/maestro-pilot
 mkdir -p "$reports/suite"
 
 finish() {
+  # Preserve the original result, end timestamp and bounded emulator logs.
   result=$?
   printf 'finished_at=%s\nexit_code=%s\n' "$(date +%s)" "$result" >> "$reports/timings.env"
   adb -s emulator-5554 logcat -d -t 1000 > "$reports/logcat.txt" 2>&1 || true
@@ -20,11 +21,9 @@ printf 'emulator_ready_at=%s\n' "$(date +%s)" >> "$reports/timings.env"
 [[ "$(adb -s emulator-5554 shell getprop ro.product.cpu.abi | tr -d '\r')" == x86_64 ]]
 # Check Android's locale properties, including a fresh image's product default.
 python3 scripts/maestro_apk.py locale > "$reports/locale.txt"
+python3 scripts/maestro_apk.py offline > "$reports/network-state.txt"
 # The pilot intentionally uses a dev benchmark APK; -t is confined to this emulator.
 adb -s emulator-5554 install -r -t "$reports/apk/app.apk"
-adb -s emulator-5554 shell settings put global airplane_mode_on 1
-adb -s emulator-5554 shell svc wifi disable
-adb -s emulator-5554 shell svc data disable
 
 python3 - <<'PY'
 import os

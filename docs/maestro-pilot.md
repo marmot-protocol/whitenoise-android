@@ -5,6 +5,9 @@ private-key screen → Android Back → welcome. It enters no key, creates no
 account and uses no relays. The disposable API 34 x86_64 emulator runs offline
 with runtime permissions denied. Each journey clears only that emulator's dev
 app data and declines the optional diagnostics sheet without enabling sharing.
+Before launch, the runner applies airplane mode through Android's connectivity
+service, disables Wi-Fi and mobile data, and requires no active default network.
+The bounded check retains its connectivity dump as `network-state.txt`.
 
 Use this to try installed-app UI automation before adding more journeys. It is
 manually requested, is not a required PR check and has no automatic Maestro
@@ -30,6 +33,9 @@ a successful internal PR or master-push run of `android-ci.yml`; fork artifacts,
 expired artifacts and outputs from other workflows are rejected. When CI uses
 a PR merge checkout, the provenance records both the PR source and integration
 checkout SHA. The pilot separately records its own flow revision.
+The artifact must belong to the producer's current successful run attempt.
+Re-running only failed jobs can leave an older APK that is rejected; choose a
+successful attempt that also ran the Baseline Profile job.
 
 ## Request one journey
 
