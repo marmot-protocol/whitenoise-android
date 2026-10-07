@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: chats-bulk-delete-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn:
+    text: "Maestro group"
+    longPress: true
+- assertVisible: "Pin"
+- tapOn: "Select"
+- assertVisible:
+    id: "chats.selectionControls"
+- tapOn: "Delete"
+- assertVisible: "Delete from this device"
+- tapOn: "Cancel"
+- assertVisible: "Maestro group"
+- back
+- assertNotVisible:
+    id: "chats.selectionControls"

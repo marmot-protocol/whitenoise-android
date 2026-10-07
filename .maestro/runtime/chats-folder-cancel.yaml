@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: chats-folder-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn:
+    text: "Maestro group"
+    longPress: true
+- assertVisible: "Pin"
+- tapOn: "Add to folder"
+- assertVisible: "New folder"
+- tapOn: "Cancel"
+- assertVisible: "Maestro group"

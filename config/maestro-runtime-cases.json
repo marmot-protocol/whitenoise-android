@@ -794,6 +794,183 @@
       ],
       "assertions": "Support receiving-relay guidance opens Relays and Back returns to Support without publishing or starting a chat.",
       "postcondition": "none"
+    },
+    "ballots-open-back": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Published poll displays its question, options and single-choice type; Back does not cast a vote.",
+      "postcondition": "poll-no-vote",
+      "fixture": "poll-single"
+    },
+    "ballots-single-vote": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "UI selection casts one Tea vote; both real native accounts must show one participant and matching tally.",
+      "postcondition": "poll-single-vote",
+      "fixture": "poll-single"
+    },
+    "ballots-change-vote": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Replacing Tea with Coffee retains one voter and transfers the tally, verified on both native accounts.",
+      "postcondition": "poll-change-vote",
+      "fixture": "poll-single"
+    },
+    "ballots-multiple-vote": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Multiple choice retains Tea and Coffee for one voter; both native accounts must agree on options and tally.",
+      "postcondition": "poll-multiple-vote",
+      "fixture": "poll-multiple"
+    },
+    "ballots-votes-sheet-back": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021",
+        "MSG-032"
+      ],
+      "assertions": "View votes shows the actual Alice voter and chosen Tea option; Back returns to the poll without changing the native tally.",
+      "postcondition": "poll-single-vote",
+      "fixture": "poll-single"
+    },
+    "ballots-publish": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "UI publishes a valid two-option poll; both native accounts must receive exactly one matching published poll without a vote.",
+      "postcondition": "poll-published",
+      "fixture": "basic"
+    },
+    "profiles-member-back": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-001"
+      ],
+      "assertions": "Bob member profile shows native identity and private-detail entry; Back restores the same group details.",
+      "postcondition": "none"
+    },
+    "profiles-private-cancel": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007"
+      ],
+      "assertions": "Cancelling private nickname and notes leaves Bob unchanged and discards the unsaved values on reopen.",
+      "postcondition": "none"
+    },
+    "profiles-private-rotation": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007",
+        "NAV-009"
+      ],
+      "assertions": "Private nickname and notes survive Activity rotation while editing, then explicit Cancel discards them.",
+      "postcondition": "none"
+    },
+    "profiles-add-group-back": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-008"
+      ],
+      "assertions": "The Add-to-group picker can be dismissed without changing existing membership.",
+      "postcondition": "none"
+    },
+    "profiles-shared-groups": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-001"
+      ],
+      "assertions": "Groups in Common shows the actual generated shared group and Back restores Bob profile.",
+      "postcondition": "none"
+    },
+    "profiles-admin-picker-back": {
+      "suite": "profiles",
+      "manual_ids": [
+        "GRP-007"
+      ],
+      "assertions": "The group admin picker is reachable for Alice and Back cancels without promoting Bob.",
+      "postcondition": "none"
+    },
+    "profiles-start-group-back": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-002"
+      ],
+      "assertions": "Start group uses Bob as the intended recipient; Back leaves the unsubmitted setup without creating a group.",
+      "postcondition": "none"
+    },
+    "chats-menu-back": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-002"
+      ],
+      "assertions": "Back cancels the row menu and preserves the generated conversation.",
+      "postcondition": "none"
+    },
+    "chats-delete-cancel": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-010"
+      ],
+      "assertions": "Cancel dismisses device-local deletion confirmation and preserves accessible history.",
+      "postcondition": "none"
+    },
+    "chats-folder-cancel": {
+      "suite": "chats",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Cancelling Add-to-folder with no custom folders does not create a folder or remove the chat.",
+      "postcondition": "folder-absent"
+    },
+    "chats-select-back": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-011"
+      ],
+      "assertions": "Back leaves selection mode and preserves the selected chat.",
+      "postcondition": "none"
+    },
+    "chats-bulk-delete-cancel": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-011",
+        "CHL-012"
+      ],
+      "assertions": "Cancel from selection deletion preserves the row and permits normal navigation.",
+      "postcondition": "none"
+    },
+    "chatstate-pin": {
+      "suite": "chatstate",
+      "manual_ids": [
+        "CHL-006"
+      ],
+      "assertions": "Pin changes the row command to Unpin and the real native row is pinned.",
+      "postcondition": "chat-pinned"
+    },
+    "chatstate-pin-round-trip": {
+      "suite": "chatstate",
+      "manual_ids": [
+        "CHL-006"
+      ],
+      "assertions": "Pin then Unpin restores the initial native row state without changing the peer row.",
+      "postcondition": "chat-unpinned"
+    },
+    "chatstate-delete-confirm": {
+      "suite": "chatstate",
+      "manual_ids": [
+        "CHL-010"
+      ],
+      "assertions": "Confirmed local deletion removes only Alice row while Bob retains his actual group.",
+      "postcondition": "chat-deleted"
     }
   }
 }

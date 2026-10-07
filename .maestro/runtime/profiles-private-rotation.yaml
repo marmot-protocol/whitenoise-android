@@ -1,0 +1,31 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-private-rotation
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Bob"
+    direction: DOWN
+- tapOn: "Maestro Bob"
+- assertVisible: "Nickname & notes"
+- scrollUntilVisible:
+    element:
+      text: "Nickname & notes"
+    direction: DOWN
+- tapOn: "Nickname & notes"
+- tapOn: "Name"
+- inputText: "Maestro unsaved nickname"
+- tapOn: "Notes"
+- inputText: "Maestro unsaved note"
+- hideKeyboard
+- setOrientation: LANDSCAPE
+- assertVisible: "Maestro unsaved nickname"
+- setOrientation: PORTRAIT
+- assertVisible: "Maestro unsaved note"
+- tapOn: "Cancel"
+- assertVisible: "Maestro Bob"

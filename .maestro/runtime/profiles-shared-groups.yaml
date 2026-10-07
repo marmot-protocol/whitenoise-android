@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-shared-groups
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Bob"
+    direction: DOWN
+- tapOn: "Maestro Bob"
+- assertVisible: "Nickname & notes"
+- scrollUntilVisible:
+    element:
+      text: "Groups in Common"
+    direction: DOWN
+- tapOn: "Groups in Common"
+- assertVisible: "Maestro group"
+- back
+- assertVisible: "Nickname & notes"

@@ -19,7 +19,8 @@ internal suspend fun awaitMaestroFixtureWindow(directory: File) {
             if (root?.hasVisibleFixtureText("Help Improve White Noise") == true) {
                 if (!consentCloseRequested) consentCloseRequested = root.closeDefaultOffConsent()
             } else if (
-                root != null && root.packageName?.toString() == MaestroFixtureRunner.FIXTURE_PACKAGE &&
+                root != null &&
+                root.packageName?.toString() == MaestroFixtureRunner.FIXTURE_PACKAGE &&
                 root.hasVisibleFixtureText("Maestro group")
             ) {
                 return
@@ -45,7 +46,12 @@ private fun AccessibilityNodeInfo.closeDefaultOffConsent(): Boolean {
     var count = 0
     while (queue.isNotEmpty() && count++ < 256) {
         val node = queue.removeFirst()
-        if (node.isVisibleToUser && node.isEnabled && node.contentDescription?.toString() == "Close") {
+        if (
+            node.isVisibleToUser &&
+            node.isEnabled &&
+            node.isClickable &&
+            node.contentDescription?.toString() in listOf("Close", "Close sheet")
+        ) {
             return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         }
         repeat(minOf(node.childCount, 128)) { index -> node.getChild(index)?.let(queue::add) }

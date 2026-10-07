@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: ballots-publish
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Add attachment"
+- scrollUntilVisible:
+    element:
+      text: "Create poll"
+    direction: DOWN
+- tapOn: "Create poll"
+- tapOn: "Question"
+- inputText: "Maestro published poll"
+- tapOn: "Option 1"
+- inputText: "Maestro Tea"
+- tapOn: "Option 2"
+- inputText: "Maestro Coffee"
+- hideKeyboard
+- tapOn: "Post poll"
+- assertVisible: "Maestro published poll"
+- assertNotVisible: "Post poll"

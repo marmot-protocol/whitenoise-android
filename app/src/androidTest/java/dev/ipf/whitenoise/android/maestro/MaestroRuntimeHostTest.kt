@@ -31,6 +31,26 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
+private val MAESTRO_POSTCONDITIONS =
+    setOf(
+        "none",
+        "send",
+        "dark",
+        "light",
+        "amoled",
+        "font-large",
+        "folder-saved",
+        "folder-absent",
+        "poll-no-vote",
+        "poll-single-vote",
+        "poll-change-vote",
+        "poll-multiple-vote",
+        "poll-published",
+        "chat-deleted",
+        "chat-pinned",
+        "chat-unpinned",
+    )
+
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
@@ -186,10 +206,13 @@ class MaestroRuntimeHostTest {
         group: String,
     ) {
         val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
-        require(
-            postcondition in
-                listOf("none", "send", "dark", "light", "amoled", "font-large", "folder-saved", "folder-absent"),
-        )
+        require(postcondition in MAESTRO_POSTCONDITIONS)
+        if (postcondition.startsWith("poll-")) {
+            verifyMaestroPoll(native, checkNotNull(state?.activeAccountRef), peerLabel, group, postcondition)
+        }
+        if (postcondition.startsWith("chat-")) {
+            verifyMaestroChatList(native, checkNotNull(state?.activeAccountRef), peerLabel, group, postcondition)
+        }
         if (postcondition.startsWith("folder-")) {
             val app = checkNotNull(state)
             val folders = app.chatFolderPreferences.foldersFor(checkNotNull(app.activeAccountRef))

@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-add-group-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Bob"
+    direction: DOWN
+- tapOn: "Maestro Bob"
+- assertVisible: "Nickname & notes"
+- scrollUntilVisible:
+    element:
+      text: "Add to a group"
+    direction: DOWN
+- tapOn: "Add to a group"
+- assertVisible: "Add to a group"
+- back
+- assertVisible: "Nickname & notes"

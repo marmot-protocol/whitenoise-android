@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: chatstate-pin-round-trip
+---
+- assertVisible: "Maestro group"
+- tapOn:
+    text: "Maestro group"
+    longPress: true
+- assertVisible: "Pin"
+- tapOn: "Pin"
+- tapOn:
+    text: "Maestro group"
+    longPress: true
+- tapOn: "Unpin"
+- tapOn:
+    text: "Maestro group"
+    longPress: true
+- assertVisible: "Pin"
+- back

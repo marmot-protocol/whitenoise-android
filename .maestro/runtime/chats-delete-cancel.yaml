@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: chats-delete-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn:
+    text: "Maestro group"
+    longPress: true
+- assertVisible: "Pin"
+- tapOn: "Delete from this device"
+- assertVisible: "Delete from this device"
+- tapOn: "Cancel"
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"

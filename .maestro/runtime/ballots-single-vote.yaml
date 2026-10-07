@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: ballots-single-vote
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Maestro fixture poll"
+- tapOn: "Maestro Tea"
+- assertVisible:
+    id: "poll-view-votes"

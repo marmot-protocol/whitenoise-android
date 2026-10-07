@@ -1,0 +1,35 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-private-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Bob"
+    direction: DOWN
+- tapOn: "Maestro Bob"
+- assertVisible: "Nickname & notes"
+- scrollUntilVisible:
+    element:
+      text: "Nickname & notes"
+    direction: DOWN
+- tapOn: "Nickname & notes"
+- tapOn: "Name"
+- inputText: "Maestro unsaved nickname"
+- tapOn: "Notes"
+- inputText: "Maestro unsaved note"
+- hideKeyboard
+- tapOn: "Cancel"
+- assertVisible: "Maestro Bob"
+- scrollUntilVisible:
+    element:
+      text: "Nickname & notes"
+    direction: DOWN
+- tapOn: "Nickname & notes"
+- assertNotVisible: "Maestro unsaved nickname"
+- assertNotVisible: "Maestro unsaved note"
+- tapOn: "Cancel"

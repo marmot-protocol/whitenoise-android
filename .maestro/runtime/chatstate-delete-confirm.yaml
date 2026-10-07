@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: chatstate-delete-confirm
+---
+- assertVisible: "Maestro group"
+- tapOn:
+    text: "Maestro group"
+    longPress: true
+- assertVisible: "Pin"
+- tapOn: "Delete from this device"
+- assertVisible: "Delete from this device"
+- tapOn: "Delete"
+- assertNotVisible: "Maestro group"
+- assertVisible: "Chats"

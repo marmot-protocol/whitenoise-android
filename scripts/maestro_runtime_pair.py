@@ -20,9 +20,15 @@ def pair(directory, mode, environ=os.environ):
     source = environ.get('GITHUB_SHA', '')
     if environ.get('GITHUB_ACTIONS') != 'true' or not re.fullmatch('[0-9a-f]{40}', source):
         raise ValueError('Exact GitHub workflow source required')
+    current_attempt = environ['GITHUB_RUN_ATTEMPT']
+    producer_attempt = environ.get('MAESTRO_PAIR_PRODUCER_ATTEMPT', current_attempt) if mode == 'verify' else current_attempt
+    if any(not re.fullmatch('[1-9][0-9]{0,8}', attempt) for attempt in (current_attempt, producer_attempt)):
+        raise ValueError('Positive bounded workflow attempt required')
+    if int(producer_attempt) > int(current_attempt):
+        raise ValueError('APK producer cannot be a future attempt')
     expected = {'schema': 1, 'source_sha': source, 'distribution': 'Zapstore',
                 'package': 'dev.ipf.whitenoise.android.maestrolab',
-                'run_id': environ['GITHUB_RUN_ID'], 'run_attempt': environ['GITHUB_RUN_ATTEMPT'],
+                'run_id': environ['GITHUB_RUN_ID'], 'run_attempt': producer_attempt,
                 'apk_sha256': digest(directory / 'app.apk'), 'test_apk_sha256': digest(directory / 'test.apk')}
     if mode == 'stage':
         if (directory / 'pair.json').exists():

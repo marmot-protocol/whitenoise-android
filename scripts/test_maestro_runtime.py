@@ -16,6 +16,23 @@ from scripts.manual_test_fragments import definitions, load_guide
 
 
 class RuntimeEvidenceTest(unittest.TestCase):
+    def test_retry_reuses_only_an_explicit_same_source_producer(self):
+        """A UI-only retry can use its original pair while rejecting stale and future identities."""
+        env = {'GITHUB_ACTIONS': 'true', 'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '1', 'GITHUB_RUN_ATTEMPT': '1'}
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / 'app.apk').write_bytes(b'app')
+            (directory / 'test.apk').write_bytes(b'test')
+            pair(directory, 'stage', env)
+            retry = {**env, 'GITHUB_RUN_ATTEMPT': '2', 'MAESTRO_PAIR_PRODUCER_ATTEMPT': '1'}
+            self.assertEqual(pair(directory, 'verify', retry)['run_attempt'], '1')
+            for producer in ('', '0', '-1', '3', 'invalid', '1000000000'):
+                with self.subTest(producer=producer), self.assertRaises(ValueError):
+                    pair(directory, 'verify', {**retry, 'MAESTRO_PAIR_PRODUCER_ATTEMPT': producer})
+            for key, value in [('GITHUB_SHA', 'b' * 40), ('GITHUB_RUN_ID', '2')]:
+                with self.subTest(key=key), self.assertRaises(ValueError):
+                    pair(directory, 'verify', {**retry, key: value})
+
     def test_every_settings_route_has_named_cases(self):
         """Reject silent coverage drift when a new Settings destination has no named journey."""
         path = runtime.ROOT / 'config/maestro-screen-coverage.json'
@@ -189,6 +206,10 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(jobs['maestro-runtime']['needs'], 'maestro-runtime-build')
         self.assertNotIn('gradlew', json.dumps(jobs['maestro-runtime']))
         self.assertEqual(jobs['maestro-runtime']['strategy']['max-parallel'], 2)
+        self.assertEqual(jobs['maestro-runtime']['env']['MAESTRO_PAIR_PRODUCER_ATTEMPT'],
+                         '${{ needs.maestro-runtime-build.outputs.pair_attempt }}')
+        download = next(step for step in jobs['maestro-runtime']['steps'] if 'download-artifact' in step.get('uses', ''))
+        self.assertEqual(download['with']['name'], '${{ needs.maestro-runtime-build.outputs.pair_artifact }}')
         self.assertIn('include', jobs['maestro-runtime']['strategy']['matrix'])
         emulator = next(step for step in jobs['maestro-runtime']['steps'] if 'android-emulator-runner' in step.get('uses', ''))
         self.assertEqual(emulator['with']['emulator-boot-timeout'], 300)

@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-member-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Bob"
+    direction: DOWN
+- tapOn: "Maestro Bob"
+- assertVisible: "Nickname & notes"
+- assertVisible: "Maestro Bob"
+- back
+- assertVisible:
+    id: "chat_info.list"
