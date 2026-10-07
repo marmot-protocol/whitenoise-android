@@ -568,10 +568,16 @@ internal fun ComposerPill(
                         val offsetMapping =
                             object : OffsetMapping {
                                 /** Maps the source caret into the bounded mention-chip text. */
-                                override fun originalToTransformed(offset: Int): Int = visual.originalToTransformed(offset).coerceIn(0, visualLength)
+                                override fun originalToTransformed(offset: Int): Int =
+                                    visual
+                                        .originalToTransformed(offset)
+                                        .coerceIn(0, visualLength)
 
                                 /** Maps chip selections into the current source draft bounds. */
-                                override fun transformedToOriginal(offset: Int): Int = visual.transformedToOriginal(offset).coerceIn(0, text.text.length)
+                                override fun transformedToOriginal(offset: Int): Int =
+                                    visual
+                                        .transformedToOriginal(offset)
+                                        .coerceIn(0, text.text.length)
                             }
                         TransformedText(styled, offsetMapping)
                     }.getOrElse {
