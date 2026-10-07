@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.state.projectedTimelineMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -23,6 +24,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 internal class SessionHarness(
     testScope: TestScope,
     dispatcher: CoroutineDispatcher = StandardTestDispatcher(testScope.testScheduler),
+    preparationDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     val engine = FakeSessionEngine()
     val focus = FakeSessionFocus()
@@ -30,6 +32,7 @@ internal class SessionHarness(
         TtsController(
             audioFocus = focus,
             maxChunkLength = 4_000,
+            preparationDispatcher = preparationDispatcher,
         )
     val pager = FakeHistoryPager()
     var pagerAvailable = true

@@ -31,8 +31,9 @@ internal fun Modifier.fadingVerticalScroll(
     flingBehavior: FlingBehavior? = null,
     reverseScrolling: Boolean = false,
     overscrollEffect: OverscrollEffect? = rememberOverscrollEffect(),
+    fadeEnabled: Boolean = true,
 ): Modifier =
-    scrollEdgeFade(state, reverseScrolling)
+    scrollEdgeFade(state, reverseScrolling, fadeEnabled)
         .verticalScroll(state, overscrollEffect, enabled, flingBehavior, reverseScrolling)
 
 /** Standard lazy list with fades applied to scrolling content rather than the screen's fixed chrome. */

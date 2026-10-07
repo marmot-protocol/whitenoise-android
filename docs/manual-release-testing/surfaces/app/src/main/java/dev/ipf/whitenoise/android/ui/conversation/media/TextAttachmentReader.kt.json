@@ -185,6 +185,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Readable active document speech at scroll edge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fadeEnabled = playback == null",
+        "test_ids": [
+          "MED-010"
+        ]
       }
     ]
   },

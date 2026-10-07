@@ -72,26 +72,32 @@ internal fun readStagedDocument(
             if (!prepareStagingDirectory(directory)) {
                 StagedDocumentRead.Unreadable
             } else {
-                open()?.use { input ->
-                    val output =
-                        Files.createTempFile(
-                            directory.toPath(),
-                            "upload-source-",
-                            ".part",
-                            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")),
-                        ).toFile()
-                    partial = output
-                    val total = output.outputStream().use { copyStagedDocument(input, it, maxBytes, checkCancellation) }
-                    checkCancellation()
-                    when (total) {
-                        null -> StagedDocumentRead.TooLarge
-                        0L -> StagedDocumentRead.Empty
-                        else -> {
-                            Files.setPosixFilePermissions(output.toPath(), PosixFilePermissions.fromString("r--------"))
-                            StagedDocumentRead.Success(StagedUploadSource(output, total))
+                open()
+                    ?.use { input ->
+                        val output =
+                            Files.createTempFile(
+                                directory.toPath(),
+                                "upload-source-",
+                                ".part",
+                                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")),
+                            )
+                                .toFile()
+                        partial = output
+                        val total =
+                            output.outputStream().use { copyStagedDocument(input, it, maxBytes, checkCancellation) }
+                        checkCancellation()
+                        when (total) {
+                            null -> StagedDocumentRead.TooLarge
+                            0L -> StagedDocumentRead.Empty
+                            else -> {
+                                Files.setPosixFilePermissions(
+                                    output.toPath(),
+                                    PosixFilePermissions.fromString("r--------"),
+                                )
+                                StagedDocumentRead.Success(StagedUploadSource(output, total))
+                            }
                         }
-                    }
-                }?.also { if (it is StagedDocumentRead.Success) partial = null } ?: StagedDocumentRead.Unreadable
+                    }?.also { if (it is StagedDocumentRead.Success) partial = null } ?: StagedDocumentRead.Unreadable
             }
         } catch (cancel: CancellationException) {
             throw cancel

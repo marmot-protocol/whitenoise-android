@@ -4,7 +4,9 @@ import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekResolver
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekTarget
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -18,7 +20,7 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun finalUtteranceCanFinishWhileRenderedSeekPreparesWithoutLosingItsIntent() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.speakConversation("m1")
             val session = harness.controller.state.value.sessionId
             val preparation = CompletableDeferred<Unit>()
@@ -57,7 +59,11 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun replacementKeepsSessionWhenFinalUtteranceCompletesDuringOldProjectionCancellation() =
         runTest {
-            val harness = SessionHarness(this, UnconfinedTestDispatcher(testScheduler))
+            val harness = SessionHarness(
+                    this,
+                    UnconfinedTestDispatcher(testScheduler),
+                    preparationDispatcher = StandardTestDispatcher(testScheduler),
+                )
             harness.speakConversation("m1")
             val sessionId = harness.controller.state.value.sessionId
             val source = harness.session.conversationSource.value!!
@@ -103,7 +109,7 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun renderedHitInstallsSecondRepeatedSentenceInTheSameSession() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.speakConversation("m1")
             val session = harness.controller.state.value.sessionId
             assertTrue(harness.controller.installRenderedSeekTarget(request(harness, "m2"), session) { true })
@@ -119,7 +125,7 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun staleSourceLeavesOriginalCursorAndSpeechUntouched() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.speakConversation("m1")
             val state = harness.controller.state.value
             val spoken = harness.spokenTexts()
@@ -138,7 +144,7 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun pausedSeekKeepsExistingDirectSeekPlaybackIntent() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.speakConversation("m1")
             harness.controller.pause()
             val session = harness.controller.state.value.sessionId
@@ -152,7 +158,7 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun newerIntentCancelsOlderProjectionBeforeItCanReachPlayback() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.speakConversation("m1")
             val state = harness.controller.state.value
             val gate = CompletableDeferred<Unit>()
@@ -189,7 +195,7 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun unresolvedRenderedTapSettlesAnInterruptedEdgeWalk() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.loadTimeline("m1")
             val pageGate = CompletableDeferred<Unit>()
             harness.pager.newerPages.addLast(listOf(harness.record("m2")))
@@ -212,13 +218,15 @@ class TtsRenderedTargetSeekTest {
             assertEquals(null, harness.session.edgeState.value)
             pageGate.complete(Unit)
             advanceUntilIdle()
-            assertEquals(listOf("m1"), harness.controller.queuedMessageIds())
+            // Finishing speech releases the queue; the cancelled page must not resurrect it.
+            assertTrue(harness.controller.queuedMessageIds().isEmpty())
+            assertTrue(harness.controller.state.value is TtsState.Idle)
         }
 
     @Test
     fun foreignConversationCannotCancelOrReplaceTheActiveSession() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.speakConversation("m1")
             val state = harness.controller.state.value
             val owner = harness.session.conversationSource.value!!
@@ -245,7 +253,7 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun transportNavigationCancelsPendingRenderedProjection() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.speakEntries(listOf(harness.entry("m1", sentences = 2)))
             val gate = CompletableDeferred<Unit>()
             var projectionFinished = false
@@ -273,7 +281,7 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun transportAtFirstSentenceCancelsDeferralWithoutMovingTheCursor() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.speakConversation("m1")
             val gate = CompletableDeferred<Unit>()
             harness.session.requestRenderedSentenceSeek(
@@ -290,7 +298,8 @@ class TtsRenderedTargetSeekTest {
             harness.session.previousSentence()
             runCurrent()
             assertEquals(0, harness.controller.state.value.sentenceIndexWithinMessage)
-            assertEquals(null, harness.session.edgeState.value)
+            // Previous at the first sentence still attempts the existing older-history edge.
+            assertEquals(TtsHistoryEdgeState.Failed(TtsHistoryDirection.Older), harness.session.edgeState.value)
             harness.engine.complete(harness.engine.spoken.lastIndex)
             runCurrent()
             assertTrue(harness.controller.state.value is TtsState.Idle)
@@ -302,7 +311,7 @@ class TtsRenderedTargetSeekTest {
     @Test
     fun unmappableRenderedSeekDoesNotLoseALiveArrivalDuringPreparation() =
         runTest {
-            val harness = SessionHarness(this)
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
             harness.loadTimeline("m1")
             harness.speakConversation("m1")
             val gate = CompletableDeferred<Unit>()
@@ -324,12 +333,45 @@ class TtsRenderedTargetSeekTest {
             gate.complete(Unit)
             advanceUntilIdle()
             assertEquals(listOf("m1", "m2"), harness.controller.queuedMessageIds())
-            assertEquals(
-                "m1",
-                harness.controller.state.value.passage
-                    ?.messageIdHex,
-            )
+            // This fixture has no rendered spans, so passage is deliberately null.
+            val state = harness.controller.state.value
+            assertTrue(state is TtsState.Speaking)
+            assertEquals(0, state.messageIndex)
+            assertEquals(0, state.sentenceIndexWithinMessage)
+            assertEquals("Text m1.", state.messagePreview)
             assertEquals(null, harness.session.edgeState.value)
+        }
+
+    @Test
+    fun stalledRenderedProjectionReleasesFinalSpeechAtTheDeadline() =
+        runTest {
+            val harness = SessionHarness(this, preparationDispatcher = StandardTestDispatcher(testScheduler))
+            harness.speakConversation("m1")
+            val gate = CompletableDeferred<Unit>()
+            assertTrue(
+                harness.session.requestRenderedSentenceSeek(
+                    "m2",
+                    2uL,
+                    harness.session.conversationSource.value!!,
+                    {
+                        gate.await()
+                        request(harness, "m2")
+                    },
+                    { error("A timed-out projection must not commit") },
+                ),
+            )
+            runCurrent()
+            harness.engine.complete(0)
+            runCurrent()
+            assertFalse(harness.controller.state.value is TtsState.Idle)
+            advanceTimeBy(5_000)
+            runCurrent()
+            assertTrue(harness.controller.state.value is TtsState.Idle)
+            assertEquals(null, harness.session.edgeState.value)
+            gate.complete(Unit)
+            advanceUntilIdle()
+            assertTrue(harness.controller.queuedMessageIds().isEmpty())
+            assertTrue(harness.controller.state.value is TtsState.Idle)
         }
 
     private fun request(

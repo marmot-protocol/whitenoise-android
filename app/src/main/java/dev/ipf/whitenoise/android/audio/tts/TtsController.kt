@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekResolver
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekTarget
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.StateFlow
@@ -101,6 +102,7 @@ class TtsController internal constructor(
     private val isMediaPlaybackActive: () -> Boolean = { true },
     private val timingStore: TtsTimingStore? = null,
     private val wordTicker: TtsEstimatedWordTicker = TtsEstimatedWordTicker(),
+    private val preparationDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) {
     private companion object {
@@ -403,7 +405,7 @@ class TtsController internal constructor(
         isCurrent: () -> Boolean,
     ): Boolean {
         val preparedStart =
-            withContext(Dispatchers.Default) {
+            withContext(preparationDispatcher) {
                 val job = currentCoroutineContext()
                 val messages =
                     with(preparation) {
@@ -682,7 +684,7 @@ class TtsController internal constructor(
         locale: Locale,
         isCurrent: () -> Boolean,
     ): TtsQueuedMessage? =
-        withContext(Dispatchers.Default) {
+        withContext(preparationDispatcher) {
             val job = currentCoroutineContext()
             with(preparation) {
                 request.entry.toQueuedMessage(locale) { !job.isActive || !isCurrent() }

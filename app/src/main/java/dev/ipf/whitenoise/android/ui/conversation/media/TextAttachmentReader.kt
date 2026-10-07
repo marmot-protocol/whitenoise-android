@@ -319,7 +319,8 @@ internal fun TextAttachmentReaderScreen(
     ) { padding ->
         BoxWithConstraints(Modifier.fillMaxSize().padding(padding).then(speech.viewportModifier)) {
             val trailingHeight = maxHeight
-            Column(Modifier.fillMaxSize().fadingVerticalScroll(scroll)) {
+            // Follow can place the active sentence at the viewport edge; keep its highlight legible.
+            Column(Modifier.fillMaxSize().fadingVerticalScroll(scroll, fadeEnabled = playback == null)) {
                 TextAttachmentMetadata(candidate = candidate, byteCount = preview?.byteCount, onCopy = onCopy)
                 HorizontalDivider()
                 TextAttachmentReaderContent(

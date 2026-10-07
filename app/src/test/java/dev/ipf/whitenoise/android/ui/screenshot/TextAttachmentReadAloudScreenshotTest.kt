@@ -169,7 +169,7 @@ class TextAttachmentReadAloudScreenshotTest {
 
     /** Direct dragging suspends follow for the current passage; later progression reveals the next sentence. */
     @Test
-    fun manualDragYieldsThenNextSentenceResumesFollow() {
+    fun manualDragKeepsBrowsingUntilExplicitResume() {
         val longPreview = plainPreview.copy(text = (1..60).joinToString("\n\n") { "Sentence number $it continues." })
         render(longPreview)
         composeRule
@@ -177,6 +177,7 @@ class TextAttachmentReadAloudScreenshotTest {
             .performTouchInput { swipeUp() }
         composeRule.onNodeWithContentDescription(string(R.string.tts_resume_follow)).assertIsDisplayed()
         composeRule.runOnIdle { harness.engine.complete(0) }
+        composeRule.onNodeWithContentDescription(string(R.string.tts_resume_follow)).assertIsDisplayed().performClick()
         composeRule.onNodeWithContentDescription(string(R.string.tts_resume_follow)).assertDoesNotExist()
     }
 

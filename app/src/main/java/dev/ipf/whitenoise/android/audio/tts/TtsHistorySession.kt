@@ -401,8 +401,6 @@ class TtsHistorySession internal constructor(
                 }
             }
     }
-
-
 }
 
 /**
