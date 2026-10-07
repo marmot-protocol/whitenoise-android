@@ -69,6 +69,8 @@ class ComposerDraftTopSettlementTest {
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnUiThread { windowHeight = 280 }
         composeRule.mainClock.advanceTimeByFrame()
+        // Android measure/draw is separate from the stopped Compose animation clock.
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.autoAdvance = true
@@ -92,11 +94,15 @@ class ComposerDraftTopSettlementTest {
             moveBy(Offset(0f, -60f), delayMillis = FRAME_STEP_MS.toLong())
         }
         composeRule.mainClock.advanceTimeByFrame()
+        // Android measure/draw is separate from the stopped Compose animation clock.
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
             moveBy(Offset(0f, 30f), delayMillis = FRAME_STEP_MS.toLong())
         }
         composeRule.mainClock.advanceTimeByFrame()
+        // Android measure/draw is separate from the stopped Compose animation clock.
+        composeRule.waitForIdle()
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput { cancel() }
         composeRule.mainClock.autoAdvance = true

@@ -142,7 +142,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composerPreImeBackAction
 import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOrNull
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
@@ -671,23 +670,33 @@ internal fun ComposerPill(
             hasUserShare ||
             hasContactShare
     var multilineControls by remember { mutableStateOf(false) }
-    var draftTopGeometrySettled by remember(
-        scrollOwnerKey,
-        textFieldValue,
-        geometryAvailableHeight,
-        transformedText,
-        compactMeasurementWidth,
-        compactOuterEndInset,
-        expandedTrailingActionInset,
-        expansionMode,
-        composerFocused,
-        forceEditingLayout,
-        dismissInProgress,
-        multilineControlsSuppressed,
-        density,
-    ) { mutableStateOf(false) }
+    val draftTopGeometryState =
+        remember(
+            scrollOwnerKey,
+            textFieldValue,
+            geometryTransitionActive,
+            geometryAvailableHeight,
+            transformedText,
+            compactMeasurementWidth,
+            compactOuterEndInset,
+            expandedTrailingActionInset,
+            expansionMode,
+            composerFocused,
+            forceEditingLayout,
+            dismissInProgress,
+            multilineControlsSuppressed,
+            dictationControls != null,
+            onDictation != null,
+            hasAttachmentAction,
+            trailingAction != null,
+            sendAccessoryContent != null,
+            accessoryContent != null,
+            compactMeasurementReservesTrailingAction,
+            density,
+        ) { mutableStateOf(false) }
+    var draftTopGeometrySettled by draftTopGeometryState
     val draftStartOffscreen by remember(composerScrollState) {
-        derivedStateOf { composerScrollState.viewportSize > 0 && composerScrollState.value > 0 }
+        derivedStateOf { composerScrollState.value > 0 }
     }
     val leadingControlsWidth = if (hasAttachmentAction) 80.dp else 40.dp
     val primaryTrailingWidth =
@@ -929,6 +938,7 @@ internal fun ComposerPill(
         latestOnSendCollapseApplied()
     }
     LaunchedEffect(
+        draftTopGeometryState,
         geometryTransitionActive,
         geometryAvailableHeight,
         transformedText,
@@ -959,23 +969,26 @@ internal fun ComposerPill(
                     it.sourceText == textFieldValue.text && it.transformedText == transformedText
                 } == true
 
-        snapshotFlow { layoutSettled() }.collectLatest { settled ->
-            draftTopGeometrySettled = false
-            if (settled) {
-                // Await actual measure/layout frames so caret correction sees the final viewport.
-                var previousViewport = composerScrollState.viewportSize
-                var previousLayout = textLayoutSnapshot?.result?.size
-                var stableFrames = 0
-                while (stableFrames < 2 && layoutSettled()) {
-                    withFrameNanos { }
-                    val viewport = composerScrollState.viewportSize
-                    val layout = textLayoutSnapshot?.result?.size
-                    stableFrames = if (viewport == previousViewport && layout == previousLayout) stableFrames + 1 else 0
-                    previousViewport = viewport
-                    previousLayout = layout
-                }
-                draftTopGeometrySettled = stableFrames >= 2 && layoutSettled()
+        // Admission belongs to the external geometry keys above. Mounting an optional row can briefly
+        // reduce the viewport before its parent accepts that row's height; it must not revoke its own admission.
+        if (!draftTopGeometrySettled) {
+            var stableFrames = 0
+            while (stableFrames < 2) {
+                snapshotFlow { layoutSettled() }.first { it }
+                val previousViewport = composerScrollState.viewportSize
+                val previousLayout = textLayoutSnapshot?.result?.size
+                withFrameNanos { }
+                stableFrames =
+                    if (layoutSettled() &&
+                        composerScrollState.viewportSize == previousViewport &&
+                        textLayoutSnapshot?.result?.size == previousLayout
+                    ) {
+                        stableFrames + 1
+                    } else {
+                        0
+                    }
             }
+            draftTopGeometrySettled = true
         }
     }
     val toggleDescription =
