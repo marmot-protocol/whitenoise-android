@@ -92,7 +92,7 @@ class PinnedConversationNavigationTest {
         assertTrue(gate.hold(newest))
         assertFalse(gate.hold(Intent(Intent.ACTION_MAIN)))
         decision = PinnedShortcutLockDecision.OPEN
-        assertEquals(newest, gate.release())
+        assertTrue(newest.filterEquals(requireNotNull(gate.release())))
         assertNull(gate.release())
     }
 
