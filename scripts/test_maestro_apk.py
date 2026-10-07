@@ -266,9 +266,10 @@ class MaestroWorkflowTest(unittest.TestCase):
     def enabled(self, name, event, selected):
         """Evaluate the trusted job condition with restricted event/input fixtures."""
         expression = re.search(r'^    if: (.+)$', self.job(name), re.MULTILINE).group(1)
-        expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.')
+        expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
         return eval(expression, {'__builtins__': {}},
-                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected)})
+                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding'),
+                     'startsWith': lambda value, prefix: value.startswith(prefix)})
 
     def test_pilot_and_normal_jobs_are_exclusive_for_every_event(self):
         """Ensure only a selected manual pilot skips the normal instrumented jobs."""

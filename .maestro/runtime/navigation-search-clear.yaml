@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: navigation-search-clear
+---
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- tapOn: "Search chats"
+- tapOn:
+    id: "chats.searchField"
+- inputText: "Maestro group"
+- hideKeyboard
+- assertVisible: "Maestro group"
+- tapOn:
+    id: "chats.searchField"
+- eraseText
+- inputText: "MAESTRO_UNIQUE_NO_MATCH_3164"
+- hideKeyboard
+- assertNotVisible: "Maestro group"
+- back
+- assertVisible: "Maestro group"

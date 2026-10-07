@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: conversation-send
+---
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Message"
+- inputText: "Maestro verified send"
+- tapOn: "Send"
+- assertVisible: "Maestro verified send"
+- hideKeyboard
+- back
+- assertVisible: "Maestro verified send"

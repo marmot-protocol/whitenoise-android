@@ -1,0 +1,12 @@
+// Opt-in disposable test build. No fixture entry points enter ordinary APKs.
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        project.plugins.withId('com.android.application') {
+            project.androidComponents.finalizeDsl { android ->
+                android.productFlavors.getByName('dev').applicationIdSuffix = '.maestrolab'
+                android.productFlavors.getByName('dev').manifestPlaceholders['appName'] = 'Maestro Test Lab'
+                android.defaultConfig.testInstrumentationRunner = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
+            }
+        }
+    }
+}

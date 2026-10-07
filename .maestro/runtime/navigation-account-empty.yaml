@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: navigation-account-empty
+---
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- tapOn:
+    id: "settings.switch_profile"
+- tapOn: "Maestro Carol"
+- assertVisible: "Maestro Carol"
+- tapOn: "Back"
+- assertNotVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Maestro Carol"
+- tapOn:
+    id: "settings.switch_profile"
+- tapOn: "Maestro Alice"
+- tapOn: "Back"
+- assertVisible: "Maestro group"

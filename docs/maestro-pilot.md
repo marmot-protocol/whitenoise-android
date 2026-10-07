@@ -10,8 +10,7 @@ service, disables Wi-Fi and mobile data, and requires no active default network.
 The bounded check retains its connectivity dump as `network-state.txt`.
 
 Select `onboarding`, the original six-case `offline` suite, or the focused
-`offline-signin` (nine cases) and `offline-signup` (seven cases) suites. Together
-the focused suites cover all sixteen distinct journeys. The pilot is
+`offline-signin` (nine cases) and `offline-signup` (seven cases) suites. The focused suites retain their original sixteen distinct journeys; `offline-edge` adds six cases. See [the complete campaign guide](automated-testing.md) for generated-account suites and full coverage accounting. The pilot is
 manually requested, is not a required PR check and has no automatic Maestro
 trigger. Normal instrumented tests remain unchanged. There is no Maestro Cloud
 account, API key, shared-phone access or local app build.
@@ -45,9 +44,7 @@ The existing test tags are exposed by the retained benchmark APK. [Maestro state
 
 ## What to add next
 
-First require the offline suite and its intentional assertion failure to produce complete hosted evidence. Then add a separate opt-in prepared-account suite with disposable test identities, explicit setup/reset, no real keys in YAML or logs, and controlled relay prerequisites. Start with opening an existing conversation, draft entry/cancellation and settings navigation. Only after that fixture is reliable add two-peer messaging, media and lifecycle checks. Keep normal PR CI and required native integration checks unchanged; use the optional suite for focused checks when its surfaces change.
-
-A failed flow is a failure to investigate, not permission to loosen assertions. Inspect the hierarchy/debug output and determine whether the APK behavior regressed or a selector is wrong. Reuse the same verified APK for tooling-only corrections; obtain a new producer APK when application behavior changes.
+The generated-account suites now live in the same testing change. They launch the real activity with disposable loopback-native accounts and run separate bounded navigation, settings, preferences and conversation slices. See [the campaign guide](automated-testing.md) for selection, fixture ownership, postconditions, cleanup and remaining native/physical requirements. Runtime execution evidence must be reported separately from the completed offline runs.
 
 ## Select an APK already built by CI
 

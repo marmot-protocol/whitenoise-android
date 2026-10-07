@@ -27,10 +27,10 @@ on:
         required: false
         type: string
       maestro_suite:
-        description: Offline coverage to execute against the retained APK
+        description: Offline retained-APK coverage or opt-in generated-account runtime slice
         required: false
         type: choice
-        options: [onboarding, offline, offline-signin, offline-signup]
+        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-all]
         default: onboarding
       maestro_repetitions:
         description: Suite repetitions (onboarding 1–20, offline 1–3, focused suites 1)
@@ -253,7 +253,7 @@ jobs:
 
   maestro-pilot:
     name: Optional Maestro onboarding pilot
-    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !startsWith(inputs.maestro_suite, 'runtime-')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -356,5 +356,129 @@ jobs:
             build/maestro-pilot/*.env
             build/maestro-pilot/debug/
             build/maestro-pilot/screenshots/
+          if-no-files-found: warn
+          retention-days: 7
+
+  maestro-runtime-build:
+    name: Build isolated Maestro fixture pair
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && startsWith(inputs.maestro_suite, 'runtime-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      slices: ${{ steps.selection.outputs.slices }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Validate explicit fixture selection
+        id: selection
+        env:
+          SELECTED: ${{ inputs.maestro_suite }}
+          REPEATS: ${{ inputs.maestro_repetitions }}
+          NEGATIVE: ${{ inputs.maestro_negative_control }}
+          DEMO: ${{ inputs.review_demo_e2e }}
+          DOCUMENTS: ${{ inputs.document_provider_matrix }}
+        run: |
+          [[ "$REPEATS" == 1 && "$NEGATIVE" == false && "$DEMO" == false && "$DOCUMENTS" == false ]] || exit 2
+          python3 -m scripts.maestro_runtime_selection "$SELECTED" >> "$GITHUB_OUTPUT"
+          python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_suite.py scripts/test_maestro_apk.py
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - name: Build app and test APK once for this source revision
+        run: |
+          ./gradlew --init-script scripts/maestro-runtime.init.gradle :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon
+          mkdir -p build/maestro-runtime-pair
+          app_apks=(app/build/outputs/apk/devZapstore/debug/*-universal-debug.apk)
+          test_apks=(app/build/outputs/apk/androidTest/devZapstore/debug/*.apk)
+          [[ ${#app_apks[@]} == 1 && ${#test_apks[@]} == 1 ]]
+          cp "${app_apks[0]}" build/maestro-runtime-pair/app.apk
+          cp "${test_apks[0]}" build/maestro-runtime-pair/test.apk
+          python3 scripts/maestro_runtime_pair.py stage build/maestro-runtime-pair
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: maestro-runtime-pair-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/maestro-runtime-pair/
+          if-no-files-found: error
+          retention-days: 7
+
+  maestro-runtime:
+    name: Maestro generated accounts (${{ matrix.slice }})
+    needs: maestro-runtime-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        slice: ${{ fromJSON(needs.maestro-runtime-build.outputs.slices) }}
+    env:
+      MAESTRO_CLI_NO_ANALYTICS: 'true'
+      MAESTRO_DISABLE_UPDATE_CHECK: 'true'
+      MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: maestro-runtime-pair-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/maestro-runtime-pair
+      - name: Verify the matching app and instrumentation pair
+        run: python3 scripts/maestro_runtime_pair.py verify build/maestro-runtime-pair
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Reuse the checksummed Maestro distribution
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/maestro.zip
+          key: maestro-cli-${{ runner.os }}-2.11.0-5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
+
+      - name: Install the pinned Maestro CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RUNNER_TEMP/maestro.zip" ]]; then
+            curl --fail --location --retry 2 --max-time 120 \
+              https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.11.0/maestro.zip \
+              --output "$RUNNER_TEMP/maestro.zip"
+          fi
+          echo '5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a  '"$RUNNER_TEMP/maestro.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro-cli"
+          printf '%s\n' "$RUNNER_TEMP/maestro-cli/maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Enable KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run generated native-account UI cases
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            python3 scripts/maestro_apk.py locale
+            python3 scripts/maestro_apk.py offline
+            adb -s emulator-5554 install -r -t build/maestro-runtime-pair/app.apk
+            adb -s emulator-5554 install -r -t build/maestro-runtime-pair/test.apk
+            python3 scripts/maestro_runtime.py --suite "${{ matrix.slice }}" --reports "build/maestro-runtime-${{ matrix.slice }}"
+      - name: Retain runtime results, including failed or incomplete cases
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: maestro-runtime-${{ matrix.slice }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/maestro-runtime-${{ matrix.slice }}/
+            build/maestro-runtime-pair/pair.json
           if-no-files-found: warn
           retention-days: 7

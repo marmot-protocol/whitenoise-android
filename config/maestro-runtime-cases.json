@@ -1,0 +1,214 @@
+{
+  "schema": 1,
+  "coverage": "Partial assertions only; permanent manual checklist remains unchecked.",
+  "cases": {
+    "settings-appearance": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Appearance opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-notifications": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Notifications opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-read-aloud": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Read Aloud opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-data": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001",
+        "SET-010"
+      ],
+      "assertions": "Data Usage opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-privacy": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Privacy & Security opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-connectors": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "AI Agents opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-help": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "Help opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "navigation-settings-back": {
+      "suite": "navigation",
+      "manual_ids": [
+        "NAV-001",
+        "NAV-002"
+      ],
+      "assertions": "Settings opens through the accessible avatar and System Back restores Chats.",
+      "postcondition": "none"
+    },
+    "navigation-selector-cancel": {
+      "suite": "navigation",
+      "manual_ids": [
+        "NAV-004"
+      ],
+      "assertions": "Profile selector dismissal preserves active Alice.",
+      "postcondition": "none"
+    },
+    "navigation-account-empty": {
+      "suite": "navigation",
+      "manual_ids": [
+        "NAV-004",
+        "NAV-005",
+        "CHL-001"
+      ],
+      "assertions": "Carol has no Alice conversation; returning to Alice restores her group.",
+      "postcondition": "none"
+    },
+    "navigation-search-clear": {
+      "suite": "navigation",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-002"
+      ],
+      "assertions": "Title search finds the generated group, excludes it for a unique query, and Back clears search.",
+      "postcondition": "none"
+    },
+    "navigation-help-about": {
+      "suite": "navigation",
+      "manual_ids": [
+        "SET-018",
+        "SET-019"
+      ],
+      "assertions": "About shows app/version information and System Back returns to Help; no external browser is opened.",
+      "postcondition": "none"
+    },
+    "conversation-history-back": {
+      "suite": "conversation",
+      "manual_ids": [
+        "CON-001",
+        "CON-002"
+      ],
+      "assertions": "Generated native history renders in the conversation and Back restores the chat list.",
+      "postcondition": "none"
+    },
+    "conversation-draft-return": {
+      "suite": "conversation",
+      "manual_ids": [
+        "CON-008"
+      ],
+      "assertions": "An unsent composer draft appears in the list and survives leaving and reopening its conversation.",
+      "postcondition": "none"
+    },
+    "conversation-send": {
+      "suite": "conversation",
+      "manual_ids": [
+        "CON-005"
+      ],
+      "assertions": "UI send clears the composer, renders the outgoing text, updates the list, and reaches Bob exactly once in native history.",
+      "postcondition": "send"
+    },
+    "conversation-selection-cancel": {
+      "suite": "conversation",
+      "manual_ids": [
+        "MSG-004"
+      ],
+      "assertions": "Long-press message actions can be dismissed without removing the selected message.",
+      "postcondition": "none"
+    },
+    "conversation-landscape": {
+      "suite": "conversation",
+      "manual_ids": [
+        "NAV-009",
+        "AXY-004"
+      ],
+      "assertions": "Conversation history stays accessible across landscape and portrait rotation.",
+      "postcondition": "none"
+    },
+    "settings-profile-keys": {
+      "suite": "settings",
+      "manual_ids": [
+        "ACC-009"
+      ],
+      "assertions": "Private key remains concealed when opening and leaving Profile Keys; no reveal or clipboard export.",
+      "postcondition": "none"
+    },
+    "navigation-profile-edit-cancel": {
+      "suite": "navigation",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Back discards an edited profile name without publishing it.",
+      "postcondition": "none"
+    },
+    "preferences-dark": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-002"
+      ],
+      "assertions": "Dark selection survives leaving/reopening Appearance; fixture verifies the selected theme.",
+      "postcondition": "dark"
+    },
+    "preferences-font-large": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-006"
+      ],
+      "assertions": "Large font selection remains displayed after returning to Appearance; fixture verifies the selected font scale.",
+      "postcondition": "font-large"
+    },
+    "preferences-font-cancel": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-024"
+      ],
+      "assertions": "System Back dismisses the font-size picker and retains the default choice.",
+      "postcondition": "none"
+    },
+    "preferences-language-cancel": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-008"
+      ],
+      "assertions": "Language picker is reachable and Back returns to Appearance without a language change.",
+      "postcondition": "none"
+    },
+    "conversation-emoji-cancel": {
+      "suite": "conversation",
+      "manual_ids": [
+        "CON-010"
+      ],
+      "assertions": "Emoji picker opens and dismisses without sending or removing history.",
+      "postcondition": "none"
+    },
+    "conversation-attachment-cancel": {
+      "suite": "conversation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Attachment menu opens and dismisses without starting a media send.",
+      "postcondition": "none"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+package dev.ipf.whitenoise.android.maestro
+
+import android.app.Application
+import android.content.Context
+import androidx.test.runner.AndroidJUnitRunner
+import dev.ipf.whitenoise.android.WhiteNoiseApplication
+import dev.ipf.whitenoise.android.audio.DictationDiagnostics
+import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+
+/** Selected only by maestro-runtime.init.gradle; ordinary instrumentation is unchanged. */
+class MaestroFixtureRunner : AndroidJUnitRunner() {
+    override fun newApplication(
+        cl: ClassLoader,
+        className: String,
+        context: Context,
+    ): Application {
+        check(context.packageName == FIXTURE_PACKAGE) { "Isolated Maestro package required" }
+        return super.newApplication(cl, MaestroFixtureApplication::class.java.name, context)
+    }
+
+    companion object {
+        const val FIXTURE_PACKAGE = "dev.ipf.whitenoise.android.maestrolab"
+    }
+}
+
+/** Keeps production workers and public-relay bootstrap out of the test process. */
+class MaestroFixtureApplication : WhiteNoiseApplication() {
+    internal lateinit var fixtureState: WhiteNoiseAppState
+
+    override val appState: WhiteNoiseAppState
+        get() = fixtureState
+
+    // Intentionally omit WhiteNoiseApplication.onCreate: it schedules production work.
+    override fun onCreate() {
+        DictationDiagnostics.attach(this)
+        PerformanceDiagnostics.bind(this)
+        VoicePlaybackController.attach(this)
+    }
+}

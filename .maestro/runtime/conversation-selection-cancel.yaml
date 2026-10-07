@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: conversation-selection-cancel
+---
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn:
+    text: "Generated fixture message"
+    longPress: true
+- back
+- assertVisible: "Generated fixture message"

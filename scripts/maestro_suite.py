@@ -33,9 +33,21 @@ CASES.update({
 SUITES = {
     'onboarding': ('onboarding',),
     'offline': OFFLINE_BASELINE,
-    'offline-signin': ('onboarding',) + tuple(key for key in CASES if key.startswith('signin-')),
-    'offline-signup': tuple(key for key in CASES if key.startswith('signup-')),
+    'offline-signin': ('onboarding', 'signin-invalid', 'signin-public', 'signin-back', 'signin-clear',
+                       'signin-edit-error', 'signin-whitespace', 'signin-qr-denied', 'signin-warm-resume'),
+    'offline-signup': ('signup-cancel', 'signup-offline-retry', 'signup-system-back', 'signup-warm-resume',
+                       'signup-edit-retry', 'signup-rotation', 'signup-empty-offline'),
+    'offline-edge': ('signup-suggest-name', 'signup-photo-cancel', 'signup-picker-cancel',
+                     'signin-rotation', 'signin-ime-back', 'signin-long-invalid'),
 }
+CASES.update({
+    'signup-suggest-name': ('signup-suggest-name.yaml', ['ONB-025']),
+    'signup-photo-cancel': ('signup-photo-cancel.yaml', ['ONB-002']),
+    'signup-picker-cancel': ('signup-picker-cancel.yaml', ['ONB-002']),
+    'signin-rotation': ('signin-rotation.yaml', ['ONB-004', 'NAV-009']),
+    'signin-ime-back': ('signin-ime-back.yaml', ['ONB-004']),
+    'signin-long-invalid': ('signin-long-invalid.yaml', ['ONB-005']),
+})
 NEGATIVE_ASSERTION = 'MAESTRO_NEGATIVE_CONTROL_IMPOSSIBLE_3141'
 
 
@@ -45,7 +57,7 @@ def selection(suite, repetitions, negative):
         raise ValueError('Select an allowlisted suite and 1 through 20 repetitions')
     if negative not in ('true', 'false'):
         raise ValueError('Negative control must be true or false')
-    if suite in ('offline-signin', 'offline-signup') and repetitions != '1':
+    if suite in ('offline-signin', 'offline-signup', 'offline-edge') and repetitions != '1':
         raise ValueError('Focused expanded suites permit one repetition within the ten-minute CLI budget')
     count = len(SUITES[suite]) * int(repetitions)
     if count > 20:

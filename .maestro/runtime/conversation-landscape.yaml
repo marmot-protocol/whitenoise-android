@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: conversation-landscape
+---
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible: "Generated fixture message"
+- setOrientation: PORTRAIT
+- assertVisible: "Generated fixture message"
+- back
+- assertVisible: "Maestro group"

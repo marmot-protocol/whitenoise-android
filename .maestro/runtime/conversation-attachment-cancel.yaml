@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: conversation-attachment-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Add attachment"
+- assertVisible:
+    id: "conversation.attachment.menu"
+- back
+- assertNotVisible:
+    id: "conversation.attachment.menu"
+- assertVisible: "Generated fixture message"

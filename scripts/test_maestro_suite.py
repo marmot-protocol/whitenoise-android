@@ -24,14 +24,15 @@ class MaestroSuiteTest(unittest.TestCase):
 
     def test_signup_dismisses_name_keyboard_before_scrolling_to_about(self):
         """Regress the observed hosted failure on the small emulator viewport."""
-        for key in ('signup-cancel', 'signup-offline-retry'):
+        for key in ('signup-cancel', 'signup-offline-retry', 'signup-system-back', 'signup-warm-resume', 'signup-edit-retry', 'signup-rotation'):
             with self.subTest(flow=key):
                 flow = (suite.ROOT / '.maestro' / suite.CASES[key][0]).read_text()
                 after_name = flow.split('- inputText: "Maestro Offline Draft"', 1)[1]
                 before_about = after_name.split('id: "onboarding.sign_up.about"', 1)[0]
-                self.assertIn('- hideKeyboard', before_about)
+                dismiss = '- back' if key == 'signup-system-back' else '- hideKeyboard'
+                self.assertIn(dismiss, before_about)
                 self.assertIn('- scrollUntilVisible:', before_about)
-                self.assertLess(before_about.index('- hideKeyboard'), before_about.index('- scrollUntilVisible:'))
+                self.assertLess(before_about.index(dismiss), before_about.index('- scrollUntilVisible:'))
 
     def test_allowlist_and_budget_before_setup(self):
         self.assertEqual(suite.selection('onboarding', '20', 'false')[1], 20)
@@ -46,7 +47,8 @@ class MaestroSuiteTest(unittest.TestCase):
         signin, signup = set(suite.SUITES['offline-signin']), set(suite.SUITES['offline-signup'])
         self.assertEqual((len(signin), len(signup)), (9, 7))
         self.assertFalse(signin & signup)
-        self.assertEqual(signin | signup, set(suite.CASES))
+        self.assertEqual(signin | signup | set(suite.SUITES['offline-edge']), set(suite.CASES))
+        self.assertEqual(len(suite.SUITES['offline-edge']), 6)
         for key in ('offline-signin', 'offline-signup'):
             self.assertEqual(suite.selection(key, '1', 'true')[1], 1)
             with self.assertRaises(ValueError):
