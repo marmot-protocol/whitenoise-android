@@ -1419,7 +1419,7 @@ internal fun ComposerBar(
                             if (reviewedClip != null) voiceReview?.send(reviewedClip) else submitMessage()
                         },
                         geometryTransitionActive = composerHeightDragActive || composerHeightTransitionActive,
-                        geometryAvailableHeight = maxHeight,
+                        geometryAvailableHeight = maximumComposerHeight,
                         expansionMode = composerExpansion.mode,
                         onExpansionToggle = {
                             composerHeightDragActive = false

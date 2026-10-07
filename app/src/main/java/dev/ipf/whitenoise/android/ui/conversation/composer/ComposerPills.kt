@@ -963,18 +963,16 @@ internal fun ComposerPill(
                 // Await actual measure/layout frames so caret correction sees the final viewport.
                 var previousViewport = composerScrollState.viewportSize
                 var previousLayout = textLayoutSnapshot?.result?.size
-                do {
+                var stableFrames = 0
+                while (stableFrames < 2 && layoutSettled()) {
                     withFrameNanos { }
                     val viewport = composerScrollState.viewportSize
                     val layout = textLayoutSnapshot?.result?.size
-                    val unchanged = viewport == previousViewport && layout == previousLayout
+                    stableFrames = if (viewport == previousViewport && layout == previousLayout) stableFrames + 1 else 0
                     previousViewport = viewport
                     previousLayout = layout
-                } while (!unchanged && layoutSettled())
-                withFrameNanos { }
-                draftTopGeometrySettled = layoutSettled() &&
-                    previousViewport == composerScrollState.viewportSize &&
-                    previousLayout == textLayoutSnapshot?.result?.size
+                }
+                draftTopGeometrySettled = stableFrames >= 2 && layoutSettled()
             }
         }
     }
