@@ -388,21 +388,6 @@ class ComposerDragAndReadingTest {
         assertEquals(0f, scroll(), 1f)
     }
 
-    /** Clearing a scrolled manual draft must hide navigation even when its scroll owner retains an offset. */
-    @Test
-    fun clearingScrolledManualDraftRemovesTopAction() {
-        render(longDraft, dark = true)
-        drag(600f)
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
-        composeRule.onNode(hasSetTextAction()).performClick().performTextReplacement("")
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
-        assertEquals("", observed.text)
-        assertEquals(TextRange.Zero, observed.selection)
-        assertEquals(0, sends)
-        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_cleared_manual_dark.png")
-    }
-
     @Test
     fun narrowLargeRtlDraftRetainsUsableMinimumAndTopAction() {
         render(longDraft, width = 280, rtl = true, fontScale = 2f)

@@ -17,12 +17,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -106,6 +108,21 @@ class ComposerDraftTopSettlementTest {
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
     }
 
+    /** Clearing a scrolled manual draft must hide navigation even when its scroll owner retains an offset. */
+    @Test
+    fun clearingScrolledManualDraftRemovesTopAction() {
+        render(longDraft, dark = true)
+        drag(600f)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        composeRule.onNode(hasSetTextAction()).performClick().performTextReplacement("")
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
+        assertEquals("", observed.text)
+        assertEquals(TextRange.Zero, observed.selection)
+        assertEquals(0, sends)
+        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_cleared_manual_dark.png")
+    }
+
     /** Publish external/pointer snapshot writes before ticking; draw completion does not tick another frame. */
     private fun advanceRenderedFrame() {
         composeRule.runOnUiThread { Snapshot.sendApplyNotifications() }
@@ -114,11 +131,14 @@ class ComposerDraftTopSettlementTest {
     }
 
     /** Uses the production bar so its animation/IME/window constraints own the editor. */
-    private fun render(draft: String) {
+    private fun render(
+        draft: String,
+        dark: Boolean = false,
+    ) {
         observed = TextFieldValue(draft, TextRange(draft.length))
         composeRule.setContent {
             var value by remember { mutableStateOf(observed) }
-            WhiteNoiseTheme {
+            WhiteNoiseTheme(darkTheme = dark) {
                 Surface(Modifier.width(360.dp).height(windowHeight.dp)) {
                     Box(contentAlignment = Alignment.BottomCenter) {
                         ComposerBar(

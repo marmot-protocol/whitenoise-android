@@ -567,8 +567,10 @@ internal fun ComposerPill(
                             }
                         val offsetMapping =
                             object : OffsetMapping {
+                                /** Maps the editor caret into mention-chip text, bounded by the current visual text. */
                                 override fun originalToTransformed(offset: Int): Int = visual.originalToTransformed(offset).coerceIn(0, visualLength)
 
+                                /** Maps a chip selection back to the source draft without exposing stale span offsets. */
                                 override fun transformedToOriginal(offset: Int): Int = visual.transformedToOriginal(offset).coerceIn(0, text.text.length)
                             }
                         TransformedText(styled, offsetMapping)
@@ -959,6 +961,7 @@ internal fun ComposerPill(
         multilineControlsSuppressed,
         density,
     ) {
+        /** Admits navigation only after the owner geometry and the current draft layout reach their endpoints. */
         fun layoutSettled(): Boolean =
             !geometryTransitionActive &&
                 animatedTextHeight.value == textHeightTarget &&
