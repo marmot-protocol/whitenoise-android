@@ -34,7 +34,12 @@ private fun MarkdownPreviewBuilder.appendPreviewInline(
 ) {
     when (inline) {
         is MarkdownInlineFfi.Text -> appendPreviewLeaf(inline.content, maxLength)
-        is MarkdownInlineFfi.Timestamp -> appendPreviewLeaf(markdownTimestampLiteral(inline), maxLength)
+        is MarkdownInlineFfi.Timestamp -> {
+            val style = inline.style.code()
+            withStyle(MarkdownPreviewStyle.Timestamp, markdownTimestampToken(inline.unixSeconds, style)) {
+                appendPreviewLeaf("◷ " + markdownTimestampLabel(inline.unixSeconds, style), maxLength)
+            }
+        }
         // One-line preview: the author's line breaks flatten to spaces
         // (unlike the bubble renderer, which preserves them).
         MarkdownInlineFfi.SoftBreak, MarkdownInlineFfi.HardBreak -> append(' ')
