@@ -109,6 +109,9 @@ components and scroll writer for far jumps and off-screen edited-row reactivatio
 They assert that scroll jobs complete without cancellation, reach the requested
 row, and lay out the edited body at the preserved row size. The unkeyed cases
 exercise pooled reuse; the keyed cases model the shipped row wrapper.
+Both full unit suites upload these cases' XML as
+`compose-backport-regressions-Play` and `compose-backport-regressions-Zapstore`,
+including failures, so execution counts and skips can be checked independently.
 
 For PRs changing the backport, the baseline CI job runs
 `scripts/verify_compose_backport_control.py` in a disposable clone of its checkout.
@@ -120,6 +123,15 @@ assertions, skipped tests and unrelated exceptions cannot qualify the control.
 Per-case XML, source identity and logs are uploaded as
 `compose-backport-verification-baseline`. A passing coverage case on unpatched UI
 is recorded as such, not claimed as a demonstrated reproducer.
+
+The first recorded control at PR head `fb977979cdf22ac9e51215977fa92d306c31dd78`
+([CI run 37599046300](https://github.com/marmot-protocol/whitenoise-android/actions/runs/37599046300))
+confirmed five RectList failures: upstream reuse, Row alignment, unkeyed far snap,
+unkeyed centering and shipped-key edited-row reactivation. Lookahead, shipped-key
+far snap and shipped-key reactivation without an edit passed on unpatched UI;
+these three are coverage checks, not demonstrated crash reproducers. Original-class
+identity passed and no case was skipped. Subsequent candidates must rerun the
+control and patched suites instead of relying on this historical result alone.
 
 Build-logic unit tests compare archive bytes across UTC, New York and Tokyo and
 exercise the real Git command under hostile global CRLF settings. Independent

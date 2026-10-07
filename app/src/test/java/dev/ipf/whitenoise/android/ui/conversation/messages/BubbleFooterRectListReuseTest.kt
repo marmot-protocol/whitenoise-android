@@ -128,16 +128,17 @@ class BubbleFooterRectListReuseTest {
     /** Mirrors ConversationScrollCommandScope.animateScrollToItem: snap near a far target, then animate. */
     private fun centringJumps(timeline: Timeline) {
         FAR_TARGETS.forEach { target ->
-            val job = composeRule.runOnIdle {
-                timeline.scope.launch {
-                    val current = timeline.writer.firstVisibleItemIndex
-                    if (abs(target - current) > APPROACH_ROWS) {
-                        val approach = if (target > current) target - APPROACH_ROWS else target + APPROACH_ROWS
-                        timeline.writer.scrollToItem(approach, 0)
+            val job =
+                composeRule.runOnIdle {
+                    timeline.scope.launch {
+                        val current = timeline.writer.firstVisibleItemIndex
+                        if (abs(target - current) > APPROACH_ROWS) {
+                            val approach = if (target > current) target - APPROACH_ROWS else target + APPROACH_ROWS
+                            timeline.writer.scrollToItem(approach, 0)
+                        }
+                        timeline.writer.animateScrollToItem(target, 0)
                     }
-                    timeline.writer.animateScrollToItem(target, 0)
                 }
-            }
             assertScrollReached(timeline, target, job)
         }
     }
@@ -228,10 +229,11 @@ class BubbleFooterRectListReuseTest {
         val maxBodyHeight = with(density) { maxBodyHeightPx.toDp() }
         val contentColor = MaterialTheme.colorScheme.onSurface
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp)
-                .onSizeChanged { rowSizes[id] = it },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp)
+                    .onSizeChanged { rowSizes[id] = it },
             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start,
         ) {
             Column(Modifier.widthIn(max = 300.dp)) {
