@@ -11266,13 +11266,17 @@ class ConversationController(
                         .withGroupCommitLock(account, capturedGroupId) {
                             val admission = admitViewerGroupImageMutation(appState, change, account, capturedGroupId)
                             if (!admission.allowed) return@withGroupCommitLock false
-                            if (!admission.alreadyCommitted &&
-                                shouldCommitPrimaryGroupImageMutation(
-                                    requestedMutationKey = requestedMutationKey,
-                                    pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
-                                    hasProjectedEncryptedImage = group.imageHashHex != null,
-                                )
-                            ) {
+                            val needsPrimary =
+                                if (change.viewerPermissionCheck) {
+                                    !admission.alreadyCommitted
+                                } else {
+                                    shouldCommitPrimaryGroupImageMutation(
+                                        requestedMutationKey = requestedMutationKey,
+                                        pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
+                                        hasProjectedEncryptedImage = group.imageHashHex != null,
+                                    )
+                                }
+                            if (needsPrimary) {
                                 commitGroupImageBytes(account, capturedGroupId, draft, change)
                             }
 
@@ -11294,7 +11298,13 @@ class ConversationController(
                             }
                             true
                         }.also { if (!it) return@runCatchingCancellable false }
-                    refreshMembers()
+                    if (change.viewerPermissionCheck) {
+                        if (!refreshViewerGroupImageDetails(account, capturedGroupId, change)) {
+                            return@runCatchingCancellable false
+                        }
+                    } else {
+                        refreshMembers()
+                    }
                     if (!change.viewerPermissionCheck || change.isActive()) {
                         presentConversationTransient(R.string.toast_group_updated)
                     }
@@ -11306,6 +11316,19 @@ class ConversationController(
                 }.getOrDefault(false)
             committed && (!change.viewerPermissionCheck || change.isActive())
         }
+    }
+
+    /** Publish the current native group image/roster through the normal conversation and chat-list state path. */
+    private suspend fun refreshViewerGroupImageDetails(
+        account: String,
+        groupId: String,
+        change: ScopedGroupImageMutation<ImageUploadDraft?>,
+    ): Boolean {
+        if (!change.isActive()) return false
+        val details = appState.marmotIo { groupDetails(account, groupId) }
+        if (!change.isActive() || !details.group.groupIdHex.equals(groupId, ignoreCase = true)) return false
+        applyMutationDetails(account, details)
+        return true
     }
 
     /** Native command entry rechecks viewer ownership after dispatcher/lock suspension. */

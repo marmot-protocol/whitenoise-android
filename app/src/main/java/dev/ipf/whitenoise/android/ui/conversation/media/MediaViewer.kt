@@ -438,6 +438,10 @@ internal fun FullScreenMediaViewer(
             controller.group.groupIdHex,
             appState.runtimeGeneration,
         )
+    var pictureNotice by remember(actionOwner) {
+        mutableStateOf<dev.ipf.whitenoise.android.state.ToastMessage?>(null)
+    }
+    ViewerGroupPictureFailureNotice(pictureNotice, snackbarHostState)
     val pictureFailures =
         remember(actionOwner) {
             GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
@@ -483,7 +487,11 @@ internal fun FullScreenMediaViewer(
                 }.forViewer(reconcile),
             )
 
-        if (!updated && controller.lastMutationError != null) pictureFailures.captureFailure(attempt)
+        if (!updated && controller.lastMutationError != null && pictureSession.isCurrent()) {
+            pictureFailures.captureFailure(attempt)
+            pictureNotice = appState.toast
+        }
+        if (updated) pictureNotice = null
         return updated
     }
 
@@ -498,6 +506,7 @@ internal fun FullScreenMediaViewer(
             detail = groupImageFailureDetail(error),
         )
         pictureFailures.captureFailure(attempt)
+        pictureNotice = appState.toast
     }
     actionGate.currentPage = currentPage
     DisposableEffect(actionGate) { onDispose { actionGate.close() } }
@@ -577,6 +586,7 @@ internal fun FullScreenMediaViewer(
                     {
                         actionGate.dispatch(currentPage, currentActionOwner()) { page ->
                             scope.launch {
+                                pictureNotice = null
                                 pictureSession.choose(page, read = { selected ->
                                     val bytes =
                                         attachmentBytes(
@@ -764,6 +774,7 @@ internal fun FullScreenMediaViewer(
             onDismiss = {
                 pictureSession.cancel()
                 pictureFailures.clear()
+                pictureNotice = null
             },
             onConfirm = { crop ->
                 scope.launch {
@@ -782,6 +793,7 @@ internal fun FullScreenMediaViewer(
             onDismissRequest = {
                 pictureSession.cancel()
                 pictureFailures.clear()
+                pictureNotice = null
             },
             title = { Text(stringResource(R.string.toast_couldnt_update_group)) },
             text = { Text(stringResource(R.string.error_try_again)) },
@@ -794,6 +806,7 @@ internal fun FullScreenMediaViewer(
                 TextButton(onClick = {
                     pictureSession.cancel()
                     pictureFailures.clear()
+                    pictureNotice = null
                 }) { Text(stringResource(R.string.cancel)) }
             },
         )

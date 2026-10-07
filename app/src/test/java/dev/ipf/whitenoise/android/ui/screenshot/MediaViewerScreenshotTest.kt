@@ -176,6 +176,47 @@ class MediaViewerScreenshotTest {
         composeRule.onNodeWithText(context.getString(R.string.media_set_group_picture)).assertIsNotEnabled()
     }
 
+    /** Source preparation failures remain readable in the fullscreen viewer rather than the covered Activity. */
+    @Test
+    fun groupPictureFailureInViewerWindow() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val presentation =
+            dev.ipf.whitenoise.android.state.privacySafeErrorPresentation(
+                "VIEWER_GROUP_IMAGE",
+                dev.ipf.whitenoise.android.media.ImageUploadPreparationException.UnsupportedSvg,
+                dev.ipf.whitenoise.android.ui.group.groupImageFailureDetail(
+                    dev.ipf.whitenoise.android.media.ImageUploadPreparationException.UnsupportedSvg,
+                ),
+            )
+        val notice =
+            dev.ipf.whitenoise.android.state.ToastMessage(
+                dev.ipf.whitenoise.android.state.AppText
+                    .Resource(R.string.group_photo_error),
+                presentation.message,
+                copyable = true,
+                diagnosticReport = presentation.report,
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                val host = remember { SnackbarHostState() }
+                dev.ipf.whitenoise.android.ui.conversation.media
+                    .ViewerGroupPictureFailureNotice(notice, host)
+                MediaViewerFrame(
+                    senderLabel = "Alex",
+                    recordedAtLabel = "Oct 7, 2026",
+                    onDismiss = {},
+                    onSave = {},
+                    onShare = {},
+                    snackbarHostState = host,
+                ) {}
+            }
+        }
+        composeRule
+            .onNodeWithText(context.getString(R.string.group_svg_rejected_detail), substring = true)
+            .assertIsDisplayed()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/media_viewer_group_picture_failure_dark.png")
+    }
+
     /** Media viewer default frame. */
     @Test
     fun mediaViewerDefaultFrame() {
