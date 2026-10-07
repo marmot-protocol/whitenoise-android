@@ -21,6 +21,7 @@ name: signup-offline-retry
     id: "onboarding.sign_up.name"
 - eraseText
 - inputText: "Maestro Offline Draft"
+- hideKeyboard
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.about"

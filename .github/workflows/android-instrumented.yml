@@ -285,6 +285,7 @@ jobs:
           mkdir -p build/maestro-pilot
           printf 'setup_started_at=%s\n' "$(date +%s)" > build/maestro-pilot/timings.env
           [[ "$REVIEW_DEMO" != true && "$DOCUMENT_MATRIX" != true ]] || { echo 'Select only the Maestro pilot'; exit 2; }
+          python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py
           python3 scripts/maestro_suite.py validate --suite "$MAESTRO_SUITE" \
             --repetitions "$MAESTRO_REPETITIONS" --negative "$MAESTRO_NEGATIVE_CONTROL"
           python3 scripts/maestro_apk.py fetch --artifact-id "$ARTIFACT_ID" --source "$SOURCE_SHA" \
