@@ -13,10 +13,10 @@ import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
-import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.MainActivity
-import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.state.AppFontScale
+import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
@@ -49,7 +49,8 @@ class MaestroRuntimeHostTest {
             val context = instrumentation.targetContext
             check(context.packageName == MaestroFixtureRunner.FIXTURE_PACKAGE)
             val qemu = instrumentation.uiAutomation.executeShellCommand("getprop ro.kernel.qemu")
-            val emulator = android.os.ParcelFileDescriptor.AutoCloseInputStream(qemu).bufferedReader().use { it.readText().trim() }
+            val emulator =
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(qemu).bufferedReader().use { it.readText().trim() }
             check(emulator == "1") { "Disposable emulator required" }
             val generation = checkNotNull(InstrumentationRegistry.getArguments().getString("fixtureGeneration"))
             require(generation.matches(Regex("[a-f0-9]{32}")))
@@ -127,13 +128,19 @@ class MaestroRuntimeHostTest {
                     app.bootstrap()
                     activity = ActivityScenario.launch(MainActivity::class.java)
                     compose.waitUntil(30_000L) {
-                        if (runCatching { compose.onNodeWithText("Help Improve White Noise").assertIsDisplayed() }.isSuccess) {
+                        val consentVisible =
+                            runCatching { compose.onNodeWithText("Help Improve White Noise").assertIsDisplayed() }.isSuccess
+                        if (consentVisible) {
                             instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
                         }
                         runCatching { compose.onNodeWithText("Maestro group").assertIsDisplayed() }.isSuccess
                     }
                     File(directory, "ready.json").writeText(
-                        JSONObject().put("generation", generation).put("accounts", accounts.size).put("ready", true).toString(),
+                        JSONObject()
+                            .put("generation", generation)
+                            .put("accounts", accounts.size)
+                            .put("ready", true)
+                            .toString(),
                     )
                 }
                 // The controller writes only this generation's finish file; no arbitrary commands.
@@ -141,7 +148,9 @@ class MaestroRuntimeHostTest {
                     while (!File(directory, "finish").exists()) delay(100L)
                 }
                 checkNotNull(verifyNative).invoke()
-                File(directory, "verified.json").writeText(JSONObject().put("generation", generation).put("verified", true).toString())
+                File(directory, "verified.json").writeText(
+                    JSONObject().put("generation", generation).put("verified", true).toString(),
+                )
             } finally {
                 activity?.close()
                 state?.stopNotificationListenerForAccountTeardown()
@@ -150,7 +159,9 @@ class MaestroRuntimeHostTest {
                 relay.close()
                 context.deleteSharedPreferences(directory.name)
                 check(root.deleteRecursively()) { "Fixture runtime cleanup failed" }
-                File(directory, "closed.json").writeText(JSONObject().put("generation", generation).put("closed", true).toString())
+                File(directory, "closed.json").writeText(
+                    JSONObject().put("generation", generation).put("closed", true).toString(),
+                )
             }
         }
 }
