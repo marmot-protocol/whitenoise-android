@@ -45,20 +45,36 @@ name: signup-edit-retry
     element:
       id: "onboarding.sign_up.name"
     direction: UP
-- tapOn:
+# Tap placement can leave the cursor in the middle; eraseText alone backspaces only.
+- longPressOn:
     id: "onboarding.sign_up.name"
-- eraseText
+- runFlow:
+    when:
+      notVisible: "(?i)select all"
+    commands:
+      - tapOn: "More options"
+- tapOn: "(?i)select all"
+- eraseText: 1
 - inputText: "Maestro Edited Draft"
 - hideKeyboard
+- assertVisible: "Maestro Edited Draft"
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.about"
     direction: DOWN
-- tapOn:
+# Tap placement can leave the cursor in the middle; eraseText alone backspaces only.
+- longPressOn:
     id: "onboarding.sign_up.about"
-- eraseText
+- runFlow:
+    when:
+      notVisible: "(?i)select all"
+    commands:
+      - tapOn: "More options"
+- tapOn: "(?i)select all"
+- eraseText: 1
 - inputText: "Edited after offline failure"
 - hideKeyboard
+- assertVisible: "Edited after offline failure"
 - scrollUntilVisible:
     element:
       text: "Retry"
