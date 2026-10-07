@@ -30,7 +30,7 @@ on:
         description: Offline retained-APK coverage or opt-in generated-account runtime slice
         required: false
         type: choice
-        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-advanced, runtime-connectors, runtime-groups, runtime-creation, runtime-actions, runtime-all]
+        options: [onboarding, offline, offline-signin, offline-signup, offline-edge, runtime-navigation, runtime-settings, runtime-conversation, runtime-preferences, runtime-advanced, runtime-connectors, runtime-groups, runtime-creation, runtime-actions, runtime-polls, runtime-folders, runtime-all]
         default: onboarding
       maestro_repetitions:
         description: Suite repetitions (onboarding 1–20, offline 1–3, focused suites 1)
@@ -407,7 +407,7 @@ jobs:
           retention-days: 7
 
   maestro-runtime:
-    name: Maestro generated accounts (${{ matrix.slice }})
+    name: Maestro generated accounts (${{ matrix.slice }} ${{ matrix.partition }}/${{ matrix.partitions }})
     needs: maestro-runtime-build
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -415,7 +415,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        slice: ${{ fromJSON(needs.maestro-runtime-build.outputs.slices) }}
+        include: ${{ fromJSON(needs.maestro-runtime-build.outputs.slices) }}
     env:
       MAESTRO_CLI_NO_ANALYTICS: 'true'
       MAESTRO_DISABLE_UPDATE_CHECK: 'true'
@@ -463,6 +463,7 @@ jobs:
       - name: Run generated native-account UI cases
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
+          emulator-boot-timeout: 300
           api-level: 34
           target: google_apis
           arch: x86_64
@@ -473,14 +474,14 @@ jobs:
             python3 scripts/maestro_apk.py offline
             adb -s emulator-5554 install -r -t build/maestro-runtime-pair/app.apk
             adb -s emulator-5554 install -r -t build/maestro-runtime-pair/test.apk
-            python3 scripts/maestro_runtime.py --suite "${{ matrix.slice }}" --reports "build/maestro-runtime-${{ matrix.slice }}"
+            python3 scripts/maestro_runtime.py --suite "${{ matrix.slice }}" --partition "${{ matrix.partition }}" --reports "build/maestro-runtime-${{ matrix.slice }}-${{ matrix.partition }}"
       - name: Retain runtime results, including failed or incomplete cases
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: maestro-runtime-${{ matrix.slice }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: maestro-runtime-${{ matrix.slice }}-${{ matrix.partition }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            build/maestro-runtime-${{ matrix.slice }}/
+            build/maestro-runtime-${{ matrix.slice }}-${{ matrix.partition }}/
             build/maestro-runtime-pair/pair.json
           if-no-files-found: warn
           retention-days: 7

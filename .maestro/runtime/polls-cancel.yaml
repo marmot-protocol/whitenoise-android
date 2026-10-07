@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: polls-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Add attachment"
+- scrollUntilVisible:
+    element:
+      text: "Create poll"
+    direction: DOWN
+- tapOn: "Create poll"
+- assertVisible: "Question"
+- tapOn: "Question"
+- inputText: "Maestro cancelled poll"
+- hideKeyboard
+- tapOn: "Cancel"
+- assertNotVisible: "Post poll"
+- assertVisible: "Generated fixture message"

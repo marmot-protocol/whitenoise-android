@@ -427,6 +427,134 @@
       ],
       "assertions": "Conversation notification settings opens through group details and Back restores that group.",
       "postcondition": "none"
+    },
+    "polls-cancel": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Cancel a typed poll draft without publishing it.",
+      "postcondition": "none"
+    },
+    "polls-question-required": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Empty question submission stays in the dialog with its inline validation error.",
+      "postcondition": "none"
+    },
+    "polls-two-options-required": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "One nonempty option is rejected without closing the draft.",
+      "postcondition": "none"
+    },
+    "polls-duplicate-options": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Case-equivalent options show the duplicate validation error.",
+      "postcondition": "none"
+    },
+    "polls-question-boundary": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "A 1025-byte question is rejected at the 1024-byte limit.",
+      "postcondition": "none"
+    },
+    "polls-option-boundary": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "A 257-byte option is rejected at the 256-byte limit.",
+      "postcondition": "none"
+    },
+    "polls-add-remove-option": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Add and remove a third option while retaining the two required option fields.",
+      "postcondition": "none"
+    },
+    "polls-custom-zero": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Custom zero duration is rejected inline instead of starting a deadline.",
+      "postcondition": "none"
+    },
+    "folders-create-reopen": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Save a named folder, reopen its editor and retain the saved name.",
+      "postcondition": "folder-saved"
+    },
+    "folders-empty-name": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Empty name keeps Save disabled and Back leaves without a discard prompt.",
+      "postcondition": "folder-absent"
+    },
+    "folders-whitespace-name": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Whitespace name keeps Save disabled; explicit discard leaves no custom folder.",
+      "postcondition": "folder-absent"
+    },
+    "folders-keep-editing": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Keep Editing preserves an unsaved name; subsequent explicit discard removes the draft.",
+      "postcondition": "folder-absent"
+    },
+    "folders-delete-cancel": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Cancel the folder-specific delete confirmation and retain the saved folder.",
+      "postcondition": "folder-saved"
+    },
+    "folders-delete-confirm": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Confirm deletion of the generated custom folder; fixture checks it was removed.",
+      "postcondition": "folder-absent"
+    },
+    "preferences-light": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-002"
+      ],
+      "assertions": "Light theme survives leaving and reopening Appearance; fixture checks the state projection.",
+      "postcondition": "light"
+    },
+    "preferences-amoled": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-002"
+      ],
+      "assertions": "AMOLED theme survives leaving and reopening Appearance; fixture checks the state projection.",
+      "postcondition": "amoled"
     }
   }
 }

@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: polls-question-required
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Add attachment"
+- scrollUntilVisible:
+    element:
+      text: "Create poll"
+    direction: DOWN
+- tapOn: "Create poll"
+- assertVisible: "Question"
+- tapOn: "Post poll"
+- assertVisible: "Enter a question."
+- tapOn: "Cancel"
+- assertNotVisible: "Post poll"
+- assertVisible: "Generated fixture message"

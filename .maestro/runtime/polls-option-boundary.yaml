@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: polls-option-boundary
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Add attachment"
+- scrollUntilVisible:
+    element:
+      text: "Create poll"
+    direction: DOWN
+- tapOn: "Create poll"
+- assertVisible: "Question"
+- tapOn: "Question"
+- inputText: "Maestro question"
+- hideKeyboard
+- tapOn: "Option 1"
+- inputText: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+- hideKeyboard
+- tapOn: "Option 2"
+- inputText: "Other"
+- hideKeyboard
+- tapOn: "Post poll"
+- assertVisible: "One of the options is too long."
+- tapOn: "Cancel"
+- assertNotVisible: "Post poll"
+- assertVisible: "Generated fixture message"

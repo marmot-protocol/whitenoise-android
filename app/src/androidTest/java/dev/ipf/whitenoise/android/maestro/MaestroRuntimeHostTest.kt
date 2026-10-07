@@ -1,11 +1,7 @@
 package dev.ipf.whitenoise.android.maestro
 
 import android.content.Context
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.printToString
+import android.os.ParcelFileDescriptor.AutoCloseInputStream
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -31,7 +27,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -40,9 +35,6 @@ import java.io.File
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class MaestroRuntimeHostTest {
-    @get:Rule
-    val compose = createEmptyComposeRule()
-
     /** The host publishes readiness only after the real shell is accessible, then waits for bounded UI work. */
     @Test
     @Suppress("LongMethod") // One fixture generation owns setup, UI handoff and teardown.
@@ -53,7 +45,9 @@ class MaestroRuntimeHostTest {
             check(context.packageName == MaestroFixtureRunner.FIXTURE_PACKAGE)
             val qemu = instrumentation.uiAutomation.executeShellCommand("getprop ro.kernel.qemu")
             val emulator =
-                android.os.ParcelFileDescriptor.AutoCloseInputStream(qemu).bufferedReader().use { it.readText().trim() }
+                AutoCloseInputStream(qemu)
+                    .bufferedReader()
+                    .use { it.readText().trim() }
             check(emulator == "1") { "Disposable emulator required" }
             val generation = checkNotNull(InstrumentationRegistry.getArguments().getString("fixtureGeneration"))
             require(generation.matches(Regex("[a-f0-9]{32}")))
@@ -63,11 +57,12 @@ class MaestroRuntimeHostTest {
             val relay = LoopbackNostrRelay()
             val relays = listOf(relay.url)
             MarmotAndroid.initialize(context)
-            var native = Marmot.newWithConfiguration(
-                root.absolutePath,
-                relays,
-                MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
-            )
+            var native =
+                Marmot.newWithConfiguration(
+                    root.absolutePath,
+                    relays,
+                    MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
+                )
             var state: WhiteNoiseAppState? = null
             var activity: ActivityScenario<MainActivity>? = null
             var peerLabel: String? = null
@@ -75,51 +70,55 @@ class MaestroRuntimeHostTest {
             try {
                 withTimeout(90_000L) {
                     native.start()
-                    val accounts = listOf("Maestro Alice", "Maestro Bob", "Maestro Carol").map { name ->
-                        native.createIdentity(relays, relays).also {
-                            native.publishUserProfile(
-                                it.label,
-                                UserProfileMetadataFfi(name, name, "Disposable test profile", null, null, null, null),
-                                relays,
-                                relays,
-                            )
+                    val accounts =
+                        listOf("Maestro Alice", "Maestro Bob", "Maestro Carol").map { name ->
+                            native.createIdentity(relays, relays).also {
+                                native.publishUserProfile(
+                                    it.label,
+                                    UserProfileMetadataFfi(name, name, "Disposable test profile", null, null, null, null),
+                                    relays,
+                                    relays,
+                                )
+                            }
                         }
-                    }
                     val owner = accounts.first()
                     val group = native.createGroup(owner.label, "Maestro group", listOf(accounts[1].accountIdHex), null)
                     while (runCatching { native.acceptGroupInvite(accounts[1].label, group) }.isFailure) delay(100L)
                     native.sendText(owner.label, group, "Generated fixture message")
                     // Let app bootstrap own start/subscription ordering on a freshly opened runtime.
                     native.shutdownAndClose()
-                    native = Marmot.newWithConfiguration(
-                        root.absolutePath,
-                        relays,
-                        MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
-                    )
+                    native =
+                        Marmot.newWithConfiguration(
+                            root.absolutePath,
+                            relays,
+                            MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
+                        )
                     peerLabel = accounts[1].label
                     groupId = group
-                    val app = withContext(Dispatchers.Main.immediate) {
-                        WhiteNoiseAppState(
-                            context = context,
-                            draftStore = DraftStore.forContext(context),
-                            accountIdHexResolver = { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex },
-                            accounts = accounts,
-                            activeAccountRef = owner.label,
-                            profileReader = { id -> withContext(Dispatchers.IO) { native.userProfile(id) } },
-                            profileRefreshRequest = { id ->
-                                withContext(Dispatchers.IO) { native.refreshProfile(id, relays) }
-                            },
-                            marmotRuntimeFactory = { AppMarmotRuntime(root.absolutePath, native) },
-                            schedulePushWakeRecovery = { false },
-                            preferences = context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
-                        ).also { state = it }
-                    }
+                    val app =
+                        withContext(Dispatchers.Main.immediate) {
+                            WhiteNoiseAppState(
+                                context = context,
+                                draftStore = DraftStore.forContext(context),
+                                accountIdHexResolver = { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex },
+                                accounts = accounts,
+                                activeAccountRef = owner.label,
+                                profileReader = { id -> withContext(Dispatchers.IO) { native.userProfile(id) } },
+                                profileRefreshRequest = { id ->
+                                    withContext(Dispatchers.IO) { native.refreshProfile(id, relays) }
+                                },
+                                marmotRuntimeFactory = { AppMarmotRuntime(root.absolutePath, native) },
+                                schedulePushWakeRecovery = { false },
+                                preferences = context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
+                            ).also { state = it }
+                        }
                     (context.applicationContext as MaestroFixtureApplication).fixtureState = app
                     app.bootstrap()
                     check(app.phase == AppPhase.Ready) { "Generated app bootstrap did not reach Ready: ${app.phase}" }
-                    val nativeRow = checkNotNull(native.presentedChatListRow(owner.label, group)) {
-                        "Generated group missing from native presentation"
-                    }
+                    val nativeRow =
+                        checkNotNull(native.presentedChatListRow(owner.label, group)) {
+                            "Generated group missing from native presentation"
+                        }
                     File(directory, "setup.json").writeText(
                         JSONObject()
                             .put("generation", generation)
@@ -129,7 +128,7 @@ class MaestroRuntimeHostTest {
                             .toString(),
                     )
                     activity = ActivityScenario.launch(MainActivity::class.java)
-                    awaitVisibleFixture(directory)
+                    awaitMaestroFixtureWindow(directory)
                     File(directory, "ready.json").writeText(
                         JSONObject()
                             .put("generation", generation)
@@ -167,26 +166,6 @@ class MaestroRuntimeHostTest {
             }
         }
 
-    /** Never turn a setup timeout into a missing or successful UI case. */
-    private fun awaitVisibleFixture(directory: File) {
-        runCatching {
-            compose.waitUntil(30_000L) {
-                val consentVisible =
-                    runCatching {
-                        compose.onNodeWithText("Help Improve White Noise").assertIsDisplayed()
-                    }.isSuccess
-                if (consentVisible) {
-                    InstrumentationRegistry.getInstrumentation()
-                        .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
-                }
-                runCatching { compose.onNodeWithText("Maestro group").assertIsDisplayed() }.isSuccess
-            }
-        }.onFailure {
-            val tree = runCatching { compose.onRoot(useUnmergedTree = true).printToString() }
-            File(directory, "setup-tree.txt").writeText(tree.getOrElse { it.toString() })
-        }.getOrThrow()
-    }
-
     /** Validate the actual native peer result and preference projection independently of UI text. */
     private suspend fun verifyNativeState(
         native: Marmot,
@@ -195,16 +174,32 @@ class MaestroRuntimeHostTest {
         group: String,
     ) {
         val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
-        require(postcondition in listOf("none", "send", "dark", "font-large"))
+        require(
+            postcondition in listOf("none", "send", "dark", "light", "amoled", "font-large", "folder-saved", "folder-absent"),
+        )
+        if (postcondition.startsWith("folder-")) {
+            val app = checkNotNull(state)
+            val folders = app.chatFolderPreferences.foldersFor(checkNotNull(app.activeAccountRef))
+            val custom = folders.filter { it.systemKind == null }
+            if (postcondition == "folder-saved") {
+                check(custom.size == 1 && custom.single().name == "Maestro saved folder")
+            } else {
+                check(custom.isEmpty()) { "Canceled or deleted custom folder remains in the store" }
+            }
+        }
+        if (postcondition == "light") check(state?.themeMode == AppThemeMode.Light)
+        if (postcondition == "amoled") check(state?.themeMode == AppThemeMode.Amoled)
         if (postcondition == "dark") check(state?.themeMode == AppThemeMode.Dark)
         if (postcondition == "font-large") check(state?.fontScale == AppFontScale.Large)
         if (postcondition == "send") {
             withTimeout(30_000L) {
                 while (true) {
-                    val messages = native.timelineMessages(
-                        peerLabel,
-                        TimelineMessageQueryFfi(group, null, null, null, null, null, 100u),
-                    ).messages
+                    val messages =
+                        native
+                            .timelineMessages(
+                                peerLabel,
+                                TimelineMessageQueryFfi(group, null, null, null, null, null, 100u),
+                            ).messages
                     val received = messages.count { it.plaintext == "Maestro verified send" }
                     check(received <= 1) { "Duplicate peer delivery" }
                     if (received == 1) break
@@ -213,5 +208,4 @@ class MaestroRuntimeHostTest {
             }
         }
     }
-
 }

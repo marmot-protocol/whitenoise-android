@@ -15,7 +15,10 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions')
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders')
+MAX_CASES_PER_SHARD = 4
+CAMPAIGN_SECONDS = 900
+CASE_RESERVE_SECONDS = 600
 CASES = json.loads((ROOT / 'config/maestro-runtime-cases.json').read_text())['cases']
 
 
@@ -56,6 +59,8 @@ def run_case(name, reports):
     def read(flag):
         """Read only the current generated fixture receipt from the isolated package."""
         return command(adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/{flag}.json'])
+    if command(adb + ['shell', 'pm', 'clear', PACKAGE]).strip() != 'Success':
+        raise ValueError('Isolated fixture data reset failed before instrumentation')
     record = {'case': name, 'generation': generation, 'passed': False, 'cleanup_safe': False, **CASES[name]}
     failure = None
     with (directory / 'instrumentation.txt').open('w') as log:
@@ -94,8 +99,8 @@ def run_case(name, reports):
                 try:
                     diagnostic = command(adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/{filename}'])
                     (directory / filename).write_text(diagnostic[:256000])
-                except subprocess.CalledProcessError:
-                    pass
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as error:
+                    record.setdefault('diagnostic_failures', []).append(f'{filename}: {type(error).__name__}')
             # Stop only this generated host; do not reset an installed user package.
             try:
                 if process.poll() is None:
@@ -116,11 +121,31 @@ def run_case(name, reports):
                 record['passed'] = False
             finally:
                 if process.poll() is None:
-                    command(adb + ['shell', 'am', 'force-stop', PACKAGE])
-                    process.terminate()
-                    process.wait(timeout=10)
+                    record['passed'] = False
+                    record['cleanup_safe'] = False
+                    try:
+                        command(adb + ['shell', 'am', 'force-stop', PACKAGE])
+                    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as error:
+                        record['stop_failure'] = f'{type(error).__name__}: {error}'
+                    finally:
+                        process.terminate()
+                        try:
+                            process.wait(timeout=10)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait(timeout=10)
                 (directory / 'result.json').write_text(json.dumps(record, indent=2) + '\n')
     return record
+
+
+def case_selection(suite, partition):
+    """Partition a logical suite into disjoint slices with a maximum of four cases."""
+    selected = [name for name, case in CASES.items() if case['suite'] == suite]
+    partitions = (len(selected) + MAX_CASES_PER_SHARD - 1) // MAX_CASES_PER_SHARD
+    if suite not in SUITES or not 1 <= partition <= partitions:
+        raise ValueError('Unknown runtime suite partition')
+    start = (partition - 1) * MAX_CASES_PER_SHARD
+    return selected[start:start + MAX_CASES_PER_SHARD]
 
 
 def main():
@@ -128,18 +153,27 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--suite', choices=SUITES, required=True)
     parser.add_argument('--reports', type=Path, required=True)
+    parser.add_argument('--partition', type=int, default=1)
     args = parser.parse_args()
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         parser.error('Disposable GitHub Actions emulator required')
     if command(['adb', '-s', 'emulator-5554', 'shell', 'getprop', 'ro.kernel.qemu']).strip() != '1':
         parser.error('Disposable emulator required')
-    selected = [name for name, case in CASES.items() if case['suite'] == args.suite]
-    if not 1 <= len(selected) <= 8 or any(not re.fullmatch(r'[a-z]+(?:-[a-z]+)+', name) for name in selected):
+    try:
+        selected = case_selection(args.suite, args.partition)
+    except ValueError as error:
+        parser.error(str(error))
+    if not 1 <= len(selected) <= MAX_CASES_PER_SHARD or any(not re.fullmatch(r'[a-z]+(?:-[a-z]+)+', name) for name in selected):
         parser.error('Suite case budget or allowlist invalid')
     args.reports.mkdir(parents=True, exist_ok=False)
     results = []
+    deadline = time.monotonic() + CAMPAIGN_SECONDS
+    stop_reason = 'Prior fixture teardown did not certify safe continuation'
     try:
         for name in selected:
+            if time.monotonic() + CASE_RESERVE_SECONDS > deadline:
+                stop_reason = 'Campaign budget cannot admit another complete setup, UI and teardown'
+                break
             result = run_case(name, args.reports)
             results.append(result)
             if not result['cleanup_safe']:
@@ -147,9 +181,9 @@ def main():
     finally:
         completed = {result['case'] for result in results}
         results.extend({'case': name, 'passed': False, 'not_run': True,
-                        'failure': 'Prior fixture teardown did not certify safe continuation'}
+                        'failure': stop_reason}
                        for name in selected if name not in completed)
-        summary = {'suite': args.suite, 'expected': selected, 'results': results,
+        summary = {'suite': args.suite, 'partition': args.partition, 'expected': selected, 'results': results,
                    'evidence_complete': len(results) == len(selected) and all(case['passed'] for case in results)}
         (args.reports / 'results.json').write_text(json.dumps(summary, indent=2) + '\n')
     if not summary['evidence_complete']:

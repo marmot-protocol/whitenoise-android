@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: polls-duplicate-options
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Add attachment"
+- scrollUntilVisible:
+    element:
+      text: "Create poll"
+    direction: DOWN
+- tapOn: "Create poll"
+- assertVisible: "Question"
+- tapOn: "Question"
+- inputText: "Maestro question"
+- hideKeyboard
+- tapOn: "Option 1"
+- inputText: "Same"
+- hideKeyboard
+- tapOn: "Option 2"
+- inputText: "same"
+- hideKeyboard
+- tapOn: "Post poll"
+- assertVisible: "Each option must be different."
+- tapOn: "Cancel"
+- assertNotVisible: "Post poll"
+- assertVisible: "Generated fixture message"

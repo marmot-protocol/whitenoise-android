@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: polls-two-options-required
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Add attachment"
+- scrollUntilVisible:
+    element:
+      text: "Create poll"
+    direction: DOWN
+- tapOn: "Create poll"
+- assertVisible: "Question"
+- tapOn: "Question"
+- inputText: "Maestro question"
+- hideKeyboard
+- tapOn: "Option 1"
+- inputText: "Only one"
+- hideKeyboard
+- tapOn: "Post poll"
+- assertVisible: "Add at least two options."
+- tapOn: "Cancel"
+- assertNotVisible: "Post poll"
+- assertVisible: "Generated fixture message"

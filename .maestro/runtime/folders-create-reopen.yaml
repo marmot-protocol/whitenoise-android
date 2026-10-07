@@ -1,5 +1,5 @@
 appId: dev.ipf.whitenoise.android.maestrolab
-name: advanced-folder-create-cancel
+name: folders-create-reopen
 ---
 - assertVisible: "Maestro group"
 - tapOn: "Open settings.*"
@@ -9,16 +9,23 @@ name: advanced-folder-create-cancel
       text: "Folders"
     direction: DOWN
 - tapOn: "Folders"
+- assertVisible:
+    id: "chat-folders-content"
 - tapOn: "New Folder"
 - assertVisible:
     id: "folder.name"
 - tapOn:
     id: "folder.name"
-- inputText: "Maestro cancelled folder"
+- inputText: "Maestro saved folder"
 - hideKeyboard
-- back
-- assertVisible: "Discard changes[?]"
-- tapOn: "Discard Changes"
+- tapOn:
+    id: "folder.save"
 - assertVisible:
     id: "chat-folders-content"
-- assertNotVisible: "Maestro cancelled folder"
+- assertVisible: "Maestro saved folder"
+- tapOn: "Maestro saved folder"
+- assertVisible:
+    id: "folder.name"
+    text: "Maestro saved folder"
+- back
+- assertVisible: "Maestro saved folder"

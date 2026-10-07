@@ -19,7 +19,7 @@ Keep the original checklist and its subcases available during a release campaign
 |---|---|---|
 | Core CI | Unit, state, screenshots, both distributions, lint, contracts, packaging and security | Existing exact-head Android CI jobs and their reports |
 | Offline Maestro | Onboarding validation, cancellation, warm resume, rotation, denied QR, name generation and photo-picker cancellation | Retained dev APK, disposable offline emulator; selected manifest reconciled with actual JUnit |
-| Generated-account Maestro | Real activity, account switching, search, settings pages, profile editing cancellation, composer drafts, actions, rotation and peer-verified sending | Matching isolated app/test APK pair; fresh loopback-native fixture per journey; UI JUnit plus generation-bound setup, postcondition and cleanup receipts |
+| Generated-account Maestro | Real activity, account switching, search, settings pages, profile editing cancellation, composer drafts, actions, poll draft validation, rotation and peer-verified sending | Matching isolated app/test APK pair; fresh loopback-native fixture and isolated app data per journey; UI JUnit plus generation-bound setup, postcondition and cleanup receipts |
 | Native/controlled integration | Durable state, account isolation, cold start, relay behavior, media transfer/recovery, sharing, attachment acquisition and installer boundaries | Existing connected Android tests and controlled attachment fixtures; use their exact case manifests/reports |
 | Physical/human | Signers, biometrics, push/background delivery, actual microphone/speakers, camera scanning, TalkBack traversal and release identity | Focused disposable-account device campaigns with recorded artifact identity and results |
 
@@ -39,7 +39,7 @@ A failure-control run still fails its GitHub job. Read `suite-results.json` to d
 
 ## Generated-account suites
 
-Request the existing Android Instrumented Tests workflow manually against the intended flow revision:
+Request the existing Android Instrumented Tests workflow manually against the intended flow revision. Run one manual campaign at a time: GitHub concurrency keeps one running and one pending run, and a newer dispatch replaces the older pending run even when cancellation of running work is disabled. Wait for a terminal result before dispatching the next campaign:
 
 ```sh
 gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-android \
@@ -48,13 +48,13 @@ gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-andro
   -f review_demo_e2e=false -f document_provider_matrix=false
 ```
 
-For a focused run select `runtime-navigation`, `runtime-settings`, `runtime-conversation`, `runtime-preferences`, `runtime-advanced`, `runtime-connectors`, `runtime-groups`, `runtime-creation` or `runtime-actions`. Runtime mode rejects repetitions, the offline negative-control option and mixed demo/document requests. APK artifact inputs are used only in offline mode.
+For a focused run select `runtime-navigation`, `runtime-settings`, `runtime-conversation`, `runtime-preferences`, `runtime-advanced`, `runtime-connectors`, `runtime-groups`, `runtime-creation` `runtime-actions`, `runtime-polls` or `runtime-folders`. Runtime mode rejects repetitions, the offline negative-control option and mixed demo/document requests. APK artifact inputs are used only in offline mode.
 
-The build produces one checksummed Zapstore debug app/test pair at the exact selected revision. Each shard reuses those bytes. The isolated application ID is `dev.ipf.whitenoise.android.maestrolab`; fixture classes and the custom runner reside only in the test APK. No fixture classes enter normal app APKs. The controller accepts only the disposable GitHub emulator, checks a fresh random fixture generation, and runs at most eight journeys per shard. At most two shards run concurrently.
+The build produces one checksummed Zapstore debug app/test pair at the exact selected revision. Each shard reuses those bytes. The isolated application ID is `dev.ipf.whitenoise.android.maestrolab`; fixture classes and the custom runner reside only in the test APK. No fixture classes enter normal app APKs. The controller accepts only the disposable GitHub emulator, checks a fresh random fixture generation, and runs at most four journeys per partition. Logical suites split into disjoint partitions with a 15-minute controller budget and a reserved setup/UI/cleanup window. A case that cannot fit is reported as unexecuted and fails the campaign. Emulator boot is bounded at five minutes. At most two shards run concurrently.
 
-Each journey generates Alice, Bob and Carol, publishes synthetic profiles to an in-process loopback relay, creates a group and a stored message, reopens the native runtime and launches the real `MainActivity`. Native drafts use the normal MDK repository. Maestro acts on actual accessible controls; its flows never launch, stop or clear the live host. The fixture controller cannot declare a UI result successful.
+Before each journey the controller clears only the isolated fixture package on the disposable emulator, preventing global preferences, permissions and stores from leaking between cases. Each journey generates Alice, Bob and Carol, publishes synthetic profiles to an in-process loopback relay, creates a group and a stored message, reopens the native runtime and launches the real `MainActivity`. Native drafts use the normal MDK repository. Maestro acts on actual accessible controls; its flows never launch, stop or clear the live host. The fixture controller cannot declare a UI result successful.
 
-The send case requires exactly one matching message in Bob's native timeline. Preference cases verify the resulting state separately. After UI work, the host closes the activity, notification listener and native runtime, removes its generated runtime and isolated preferences, and publishes a matching cleanup receipt. Missing or stale receipts, wrong case names, skipped tests, an incomplete suite, timeout or failed cleanup fail the campaign. Inspect each case's JUnit and instrumentation output, plus the shard's `results.json` and APK `pair.json`.
+The send case requires exactly one matching message in Bob's native timeline. Preference and folder mutation cases verify the resulting state separately. Poll drafts exercise cancellation, required fields, duplicate choices, byte-limit overflow, add/remove option controls and invalid custom duration; peer voting and published poll lifecycle remain separate requirements. After UI work, the host closes the activity, notification listener and native runtime, removes its generated runtime and isolated preferences, and publishes a matching cleanup receipt. Missing or stale receipts, wrong case names, skipped tests, an incomplete suite, timeout or failed cleanup fail the campaign. Inspect each case's JUnit and instrumentation output, plus the shard's `results.json` and APK `pair.json`.
 
 ## Required edge-case matrix
 

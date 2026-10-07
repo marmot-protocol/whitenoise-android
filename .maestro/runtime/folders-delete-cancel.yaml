@@ -1,0 +1,33 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-delete-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Folders"
+    direction: DOWN
+- tapOn: "Folders"
+- assertVisible:
+    id: "chat-folders-content"
+- tapOn: "New Folder"
+- assertVisible:
+    id: "folder.name"
+- tapOn:
+    id: "folder.name"
+- inputText: "Maestro saved folder"
+- hideKeyboard
+- tapOn:
+    id: "folder.save"
+- assertVisible:
+    id: "chat-folders-content"
+- assertVisible: "Maestro saved folder"
+- longPressOn: "Maestro saved folder"
+- tapOn: "Delete"
+- assertVisible:
+    id: "folder.delete_dialog"
+- tapOn: "Cancel"
+- assertNotVisible:
+    id: "folder.delete_dialog"
+- assertVisible: "Maestro saved folder"

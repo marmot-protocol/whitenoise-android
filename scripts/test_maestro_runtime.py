@@ -10,7 +10,7 @@ import yaml
 
 from scripts import maestro_runtime as runtime
 from scripts.maestro_runtime_pair import pair
-from scripts.maestro_runtime_selection import selection
+from scripts.maestro_runtime_selection import selection, matrix_selection
 from scripts.manual_test_fragments import definitions, load_guide
 
 
@@ -60,11 +60,11 @@ class RuntimeEvidenceTest(unittest.TestCase):
 
     def test_clean_ui_failure_does_not_hide_later_cases(self):
         """Continue after safe teardown while preserving the failed overall verdict."""
-        self.campaign_result(cleanup_safe=True, expected_calls=6)
+        self.campaign_result(cleanup_safe=True, expected_calls=4)
 
     def campaign_result(self, cleanup_safe, expected_calls):
         """Exercise failure continuation and inspect the persisted complete case ledger."""
-        selected = [name for name, value in runtime.CASES.items() if value['suite'] == 'navigation']
+        selected = runtime.case_selection('navigation', 1)
         with tempfile.TemporaryDirectory() as temporary:
             reports = Path(temporary) / 'report'
             def execute(name, _reports):
@@ -81,7 +81,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
             summary = json.loads((reports / 'results.json').read_text())
             self.assertFalse(summary['evidence_complete'])
             self.assertEqual([result['case'] for result in summary['results']], selected)
-            self.assertEqual(sum(bool(result.get('not_run')) for result in summary['results']), 6 - expected_calls)
+            self.assertEqual(sum(bool(result.get('not_run')) for result in summary['results']), len(selected) - expected_calls)
 
     def test_pair_rejects_stale_source_wrong_run_and_changed_apk(self):
         """Prevent mismatched source revisions and substituted APKs from sharing evidence."""
@@ -98,6 +98,14 @@ class RuntimeEvidenceTest(unittest.TestCase):
             (directory / 'test.apk').write_bytes(b'changed')
             with self.assertRaises(ValueError):
                 pair(directory, 'verify', env)
+
+    def test_failed_fixture_data_reset_never_launches_a_host(self):
+        """Prevent a fresh-generation claim when Android did not clear isolated global stores."""
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.object(runtime, 'command', return_value='Failed'), \
+                 patch.object(runtime.subprocess, 'Popen') as start, self.assertRaises(ValueError):
+                runtime.run_case('navigation-settings-back', Path(temporary))
+            start.assert_not_called()
 
     def test_runtime_cases_never_kill_or_replace_the_instrumentation_host(self):
         """Keep UI flows inside their native host lifetime and permanent acceptance scope."""
@@ -127,6 +135,37 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for name in runtime.SUITES:
             self.assertTrue(1 <= sum(case['suite'] == name for case in runtime.CASES.values()) <= 8)
 
+    def test_partitions_cover_every_logical_case_once(self):
+        """Bound each execution shard without dropping or duplicating any selected journey."""
+        expected = list(runtime.CASES)
+        actual = []
+        for item in matrix_selection('runtime-all'):
+            cases = runtime.case_selection(item['slice'], item['partition'])
+            self.assertTrue(1 <= len(cases) <= 4)
+            actual.extend(cases)
+        self.assertCountEqual(actual, expected)
+        self.assertEqual(len(actual), len(set(actual)))
+        for part in (0, -1, 99):
+            with self.subTest(partition=part), self.assertRaises(ValueError):
+                runtime.case_selection('navigation', part)
+
+    def test_campaign_budget_refuses_a_case_without_a_cleanup_window(self):
+        """Fail with explicit unexecuted cases before a CI timeout can interrupt teardown."""
+        with tempfile.TemporaryDirectory() as temporary:
+            reports = Path(temporary) / 'report'
+            with patch.dict('os.environ', {'GITHUB_ACTIONS': 'true'}), \
+                 patch('sys.argv', ['runtime', '--suite', 'navigation', '--reports', str(reports)]), \
+                 patch.object(runtime, 'command', return_value='1'), \
+                 patch.object(runtime.time, 'monotonic', side_effect=[0, 900]), \
+                 patch.object(runtime, 'run_case') as runner, self.assertRaises(SystemExit):
+                runtime.main()
+            runner.assert_not_called()
+            summary = json.loads((reports / 'results.json').read_text())
+            self.assertFalse(summary['evidence_complete'])
+            self.assertEqual(len(summary['results']), 4)
+            self.assertTrue(all(result['not_run'] for result in summary['results']))
+            self.assertTrue(all('budget' in result['failure'] for result in summary['results']))
+
     def test_fixture_code_and_builds_remain_opt_in(self):
         """Keep native fixture builds manual and fixture code outside production APK source."""
         workflow = yaml.safe_load((runtime.ROOT / '.github/workflows/android-instrumented.yml').read_text())
@@ -136,6 +175,9 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(jobs['maestro-runtime']['needs'], 'maestro-runtime-build')
         self.assertNotIn('gradlew', json.dumps(jobs['maestro-runtime']))
         self.assertEqual(jobs['maestro-runtime']['strategy']['max-parallel'], 2)
+        self.assertIn('include', jobs['maestro-runtime']['strategy']['matrix'])
+        emulator = next(step for step in jobs['maestro-runtime']['steps'] if 'android-emulator-runner' in step.get('uses', ''))
+        self.assertEqual(emulator['with']['emulator-boot-timeout'], 300)
         fixture_build = (runtime.ROOT / 'scripts/maestro-runtime.init.gradle').read_text()
         self.assertIn("'ENABLE_PERFORMANCE_TEST_SELECTORS', 'true'", fixture_build)
         for path in (runtime.ROOT / 'app/src/main').rglob('*MaestroFixture*'):

@@ -25,7 +25,7 @@ class MaestroFixtureRunner : AndroidJUnitRunner() {
     }
 }
 
-/** Keeps production workers and public-relay bootstrap out of the test process. */
+/** Supplies generated state without running the ordinary Application bootstrap. */
 class MaestroFixtureApplication : WhiteNoiseApplication() {
     internal lateinit var fixtureState: WhiteNoiseAppState
 
