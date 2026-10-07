@@ -104,7 +104,10 @@ class BubbleFooterRectListReuseTest {
         composeRule.runOnIdle { assertEquals(0, timeline.state.firstVisibleItemIndex) }
     }
 
-    private class Timeline(val state: LazyListState, val scope: CoroutineScope) {
+    private class Timeline(
+        val state: LazyListState,
+        val scope: CoroutineScope,
+    ) {
         val writer = LazyListConversationScrollWriter(state)
     }
 
@@ -194,7 +197,8 @@ class BubbleFooterRectListReuseTest {
         var lastLineLayout by remember(id) { mutableStateOf<TextLayoutResult?>(null) }
         val density = LocalDensity.current
         val lineHeightPx = with(density) { MaterialTheme.typography.bodyLarge.lineHeight.toPx() }
-        val maxBodyHeight = with(density) { (lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT).toDp() }
+        val maxBodyHeightPx = lineHeightPx * MESSAGE_COLLAPSE_LINE_LIMIT
+        val maxBodyHeight = with(density) { maxBodyHeightPx.toDp() }
         val contentColor = MaterialTheme.colorScheme.onSurface
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
