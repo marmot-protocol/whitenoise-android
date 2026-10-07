@@ -110,7 +110,7 @@ class ConversationOlderPageReplyRaceTest {
                 withTimeout(5_000) { requested.await() }
                 emitWindowAndDrain(subscription, replacement)
                 awaitRecoveryCondition {
-                    controller.timeline.map { it.record.messageIdHex } == replacement.messages.map { it.messageIdHex } &&
+                    timelineMessageIds(controller) == replacement.messages.map { it.messageIdHex } &&
                         controller.timeline.map { it.record.plaintext } == replacement.messages.map { it.plaintext }
                 }
                 reply.complete(Unit)
