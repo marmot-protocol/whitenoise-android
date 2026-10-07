@@ -82,7 +82,8 @@ def report(destination, maestro_exit):
                       'passed': not problems and case.get('status') == 'SUCCESS', 'deliberate_failure': deliberate})
     positives_pass = all(case['passed'] for case in cases if case['name'] not in controls)
     controls_match = all(case['deliberate_failure'] for case in cases if case['name'] in controls)
-    exit_matches = maestro_exit != 0 if controls else maestro_exit == 0
+    # GNU timeout uses 124/137; these must never certify the control.
+    exit_matches = maestro_exit == 1 if controls else maestro_exit == 0
     summary = {'suite': expected['suite'], 'positive_count': expected['positive_count'],
                'positive_passed': sum(case['passed'] for case in cases if case['name'] not in controls),
                'negative_control_verified': bool(controls) and controls_match,

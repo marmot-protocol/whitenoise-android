@@ -106,7 +106,7 @@ class MaestroSuiteTest(unittest.TestCase):
                     suite.report(destination, 0)
 
     def test_setup_failure_or_unexpected_exit_is_not_negative_proof(self):
-        for fault in ('driver_error', 'skipped', 'unexpected_exit'):
+        for fault in ('driver_error', 'skipped', 'unexpected_exit', 'timeout', 'killed'):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
                 destination = Path(temporary)
                 document, report = self.write_results(destination, negative=True)
@@ -117,7 +117,7 @@ class MaestroSuiteTest(unittest.TestCase):
                     case[0].tag = 'skipped'
                 ET.ElementTree(document).write(destination / 'junit.xml')
                 with self.assertRaises(ValueError):
-                    suite.report(destination, 0 if fault == 'unexpected_exit' else 1)
+                    suite.report(destination, {'unexpected_exit': 0, 'timeout': 124, 'killed': 137}.get(fault, 1))
                 saved = json.loads((destination / 'suite-results.json').read_text())
                 self.assertFalse(saved['evidence_complete'])
 
