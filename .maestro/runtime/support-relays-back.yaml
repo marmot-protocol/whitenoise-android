@@ -1,6 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: support-relays-back
 ---
+- runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Open settings.*"
 - assertVisible: "Settings"

@@ -1216,6 +1216,75 @@
       "assertions": "Settings Notifications opens after system denial without silently granting permission.",
       "postcondition": "notification-denied",
       "fixture": "notifications"
+    },
+    "actions-delete-cancel": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Outgoing message deletion offers local/everyone choices; Cancel dismisses confirmation and retains the original message.",
+      "postcondition": "none"
+    },
+    "actions-delete-back": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Outgoing message deletion offers local/everyone choices; Android Back dismisses confirmation and retains the original message.",
+      "postcondition": "none"
+    },
+    "actions-delete-rotate": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Outgoing message deletion offers local/everyone choices; landscape/portrait recreation and Cancel dismisses confirmation and retains the original message.",
+      "postcondition": "none"
+    },
+    "actions-batch-delete-cancel": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-004",
+        "MSG-008"
+      ],
+      "assertions": "Select one real message, open batch-delete confirmation, cancel, leave selection, and retain its transcript.",
+      "postcondition": "none"
+    },
+    "reports-back": {
+      "suite": "reports",
+      "manual_ids": [
+        "MSG-016"
+      ],
+      "assertions": "Incoming-message reporting states who receives it, offers a send action, and Android Back retains the transcript without submission.",
+      "postcondition": "none",
+      "fixture": "incoming"
+    },
+    "reports-other-cancel": {
+      "suite": "reports",
+      "manual_ids": [
+        "MSG-016"
+      ],
+      "assertions": "The final reason remains selectable after scrolling; closing reporting retains the incoming message.",
+      "postcondition": "none",
+      "fixture": "incoming"
+    },
+    "reports-explanation-cancel": {
+      "suite": "reports",
+      "manual_ids": [
+        "MSG-016"
+      ],
+      "assertions": "Report explanation input accepts disposable text; dismissing the keyboard and sheet returns to the incoming message without submission.",
+      "postcondition": "none",
+      "fixture": "incoming"
+    },
+    "reports-rotation-cancel": {
+      "suite": "reports",
+      "manual_ids": [
+        "MSG-016"
+      ],
+      "assertions": "Reporting remains reachable through landscape/portrait recreation and can be canceled without sending.",
+      "postcondition": "none",
+      "fixture": "incoming"
     }
   }
 }

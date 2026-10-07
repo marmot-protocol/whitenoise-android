@@ -1,6 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: navigation-help-about
 ---
+- runFlow: ../fixtures/runtime-ready.yaml
 # The instrumentation host owns launch, reset and disposal.
 - assertVisible: "Maestro group"
 - tapOn: "Open settings.*"

@@ -31,7 +31,11 @@ internal suspend fun verifyMaestroPoll(
                 remote != null
             ) {
                 val tallyMatches = matchesMaestroTally(local, labels) && matchesMaestroTally(remote, labels)
-                val selection = local.options.filter { it.id in local.localSelection }.map { it.label }.toSet()
+                val selection =
+                    local.options
+                        .filter { it.id in local.localSelection }
+                        .map { it.label }
+                        .toSet()
                 if (tallyMatches && selection == labels) return@withTimeout
             }
             delay(100L)

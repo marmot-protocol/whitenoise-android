@@ -1,6 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: creation-search-invalid
 ---
+- runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "New Message"
 - assertVisible:

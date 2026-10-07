@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions')
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports')
 MAX_CASES_PER_SHARD = 4
 CASE_RESERVE_SECONDS = 600
 CAMPAIGN_SECONDS = MAX_CASES_PER_SHARD * CASE_RESERVE_SECONDS
@@ -61,6 +61,10 @@ def run_case(name, reports):
         return command(adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/{flag}.json'])
     if command(adb + ['shell', 'pm', 'clear', PACKAGE]).strip() != 'Success':
         raise ValueError('Isolated fixture data reset failed before instrumentation')
+    # Restore Android's fresh-install permission state after a preceding grant or denial.
+    permission = 'android.permission.POST_NOTIFICATIONS'
+    command(adb + ['shell', 'pm', 'revoke', PACKAGE, permission])
+    command(adb + ['shell', 'pm', 'clear-permission-flags', PACKAGE, permission, 'user-set', 'user-fixed'])
     fixture = CASES[name].get('fixture', 'basic')
     record = {'case': name, 'generation': generation, 'passed': False, 'cleanup_safe': False, **CASES[name]}
     failure = None
@@ -77,7 +81,7 @@ def run_case(name, reports):
                     raise ValueError('Fixture instrumentation ended before readiness')
                 try:
                     ready = receipt(read('ready'), generation, 'ready')
-                    if ready.get('accounts') != 3 or ready.get('fixture') != fixture:
+                    if ready.get('accounts') != 3 or ready.get('fixture') != fixture or ready.get('uiObserver') != 'maestro':
                         raise ValueError('Fixture account inventory mismatch')
                     break
                 except (subprocess.CalledProcessError, json.JSONDecodeError):
@@ -97,9 +101,13 @@ def run_case(name, reports):
             record['failure'] = f'{type(error).__name__}: {error}'
         finally:
             # Preserve readiness diagnostics even when Maestro never started.
-            for filename in ('setup.json', 'setup-tree.txt'):
+            diagnostics = [
+                ('setup.json', adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/setup.json']),
+                ('emulator-errors.txt', adb + ['logcat', '-d', '-t', '200', '*:E']),
+            ]
+            for filename, arguments in diagnostics:
                 try:
-                    diagnostic = command(adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/{filename}'])
+                    diagnostic = command(arguments)
                     (directory / filename).write_text(diagnostic[:256000])
                 except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as error:
                     record.setdefault('diagnostic_failures', []).append(f'{filename}: {type(error).__name__}')

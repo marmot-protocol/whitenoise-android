@@ -1,6 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: search-date-today
 ---
+- runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Search chats"
 - hideKeyboard

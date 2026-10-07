@@ -1,6 +1,7 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 name: advanced-folder-create-cancel
 ---
+- runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
 - tapOn: "Open settings.*"
 - assertVisible: "Settings"

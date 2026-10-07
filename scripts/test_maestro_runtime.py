@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -171,6 +172,17 @@ class RuntimeEvidenceTest(unittest.TestCase):
                  patch.object(runtime.subprocess, 'Popen') as start, self.assertRaises(ValueError):
                 runtime.run_case('navigation-settings-back', Path(temporary))
             start.assert_not_called()
+
+    def test_failed_notification_reset_never_launches_a_host(self):
+        """A preceding permission decision must not silently leak into the next generation."""
+        for reset_step in (1, 2):
+            with self.subTest(reset_step=reset_step), tempfile.TemporaryDirectory() as temporary:
+                results = ['Success'] + [''] * (reset_step - 1)
+                results.append(subprocess.CalledProcessError(1, 'permission reset'))
+                with patch.object(runtime, 'command', side_effect=results), \
+                     patch.object(runtime.subprocess, 'Popen') as start, self.assertRaises(subprocess.CalledProcessError):
+                    runtime.run_case('navigation-settings-back', Path(temporary))
+                start.assert_not_called()
 
     def test_runtime_cases_never_kill_or_replace_the_instrumentation_host(self):
         """Keep UI flows inside their native host lifetime and permanent acceptance scope."""

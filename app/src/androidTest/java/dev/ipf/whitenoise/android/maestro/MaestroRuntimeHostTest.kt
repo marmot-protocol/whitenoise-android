@@ -116,7 +116,7 @@ class MaestroRuntimeHostTest {
                     val group = native.createGroup(owner.label, "Maestro group", listOf(accounts[1].accountIdHex), null)
                     while (runCatching { native.acceptGroupInvite(accounts[1].label, group) }.isFailure) delay(100L)
                     val fixture = InstrumentationRegistry.getArguments().getString("fixtureScenario", "basic")
-                    seedMaestroFixtureMessages(native, owner.label, group, fixture)
+                    seedMaestroFixtureMessages(native, owner.label, accounts[1].label, group, fixture)
                     // Let app bootstrap own start/subscription ordering on a freshly opened runtime.
                     native.shutdownAndClose()
                     native =
@@ -162,16 +162,13 @@ class MaestroRuntimeHostTest {
                             .toString(),
                     )
                     activity = ActivityScenario.launch(MainActivity::class.java)
-                    awaitMaestroFixtureWindow(
-                        directory,
-                        requireConsent = fixture == "consent",
-                        requireNotificationPermission = fixture == "notifications",
-                    )
+                    // Maestro alone owns Android accessibility; this receipt certifies native handoff only.
                     File(directory, "ready.json").writeText(
                         JSONObject()
                             .put("generation", generation)
                             .put("accounts", accounts.size)
                             .put("fixture", fixture)
+                            .put("uiObserver", "maestro")
                             .put("ready", true)
                             .toString(),
                     )

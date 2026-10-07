@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reports-rotation-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- assertVisible: Generated incoming fixture message
+- tapOn:
+    text: Generated incoming fixture message
+    longPress: true
+- tapOn: Report
+- assertVisible: Report this message
+- assertVisible:
+    text: Send report
+    enabled: true
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible: Report this message
+- assertVisible:
+    text: Send report
+    enabled: true
+- setOrientation: PORTRAIT
+- assertVisible: Report this message
+- back: null
+- assertNotVisible: Report this message
+- assertVisible: Generated incoming fixture message

@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: actions-batch-delete-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn:
+    text: "Generated fixture message"
+    longPress: true
+- tapOn: "Select"
+- assertVisible: "Select messages"
+- tapOn: "Delete selected messages"
+- assertVisible: "Delete 1 message\\?"
+- tapOn: "Cancel"
+- assertNotVisible: "Delete 1 message\\?"
+- assertVisible: "Select messages"
+- back
+- assertVisible: "Generated fixture message"

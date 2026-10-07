@@ -7,12 +7,17 @@ import dev.ipf.marmotkit.PollTypeFfi
 internal suspend fun seedMaestroFixtureMessages(
     native: Marmot,
     account: String,
+    peer: String,
     group: String,
     fixture: String,
 ) {
-    require(fixture in listOf("basic", "reader", "links", "poll-single", "poll-multiple", "consent", "notifications"))
+    require(
+        fixture in
+            listOf("basic", "reader", "links", "poll-single", "poll-multiple", "consent", "notifications", "incoming"),
+    )
     native.sendText(account, group, "Generated fixture message")
     when (fixture) {
+        "incoming" -> native.sendText(peer, group, "Generated incoming fixture message")
         "reader" -> native.sendText(account, group, maestroReaderMessage())
         "links" -> native.sendText(account, group, "Maestro link https://example.invalid/maestro")
         "poll-single", "poll-multiple" ->

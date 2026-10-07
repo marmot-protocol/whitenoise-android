@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: actions-delete-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn:
+    text: "Generated fixture message"
+    longPress: true
+- tapOn: "Delete"
+- assertVisible: "Delete message\\?"
+- assertVisible: "Delete for me"
+- assertVisible: "Delete for everyone"
+- back
+- assertNotVisible: "Delete message\\?"
+- assertVisible: "Generated fixture message"
