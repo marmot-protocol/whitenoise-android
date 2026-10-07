@@ -3203,6 +3203,21 @@ class ConversationDictationControllerTest {
             }
         }
 
+    private fun assertUnreadableRecoveryIsProtected(
+        f: Fixture,
+        sessionId: Long,
+    ) {
+        val protected = f.controller.state as ConversationDictationState.Failed
+        assertFalse(protected.draftRecovered)
+        assertFalse(protected.draftSuperseded)
+        assertEquals(sessionId, protected.sessionId)
+        assertEquals("retained", protected.retainedTranscript)
+        assertTrue(f.controller.hasUnrecoveredTranscript)
+        assertTrue(f.controller.hasDurableSession)
+        assertFalse(f.controller.foregroundMicrophoneRequired)
+        assertFalse(f.controller.canRetryRecoveredSend)
+    }
+
     /** Retry keeps unreadable historical saves protected without resending or extending their deadline. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -3244,15 +3259,7 @@ class ConversationDictationControllerTest {
                     readUnavailable = true
                     repeat(2) { f.controller.retry() }
                     advanceUntilIdle()
-                    val protected = f.controller.state as ConversationDictationState.Failed
-                    assertFalse(protected.draftRecovered)
-                    assertFalse(protected.draftSuperseded)
-                    assertEquals(saved.sessionId, protected.sessionId)
-                    assertEquals("retained", protected.retainedTranscript)
-                    assertTrue(f.controller.hasUnrecoveredTranscript)
-                    assertTrue(f.controller.hasDurableSession)
-                    assertFalse(f.controller.foregroundMicrophoneRequired)
-                    assertFalse(f.controller.canRetryRecoveredSend)
+                    assertUnreadableRecoveryIsProtected(f, saved.sessionId)
                     assertEquals(if (leaseReleased) 2 else 1, starts)
                     assertEquals(recognizers, f.platform.sessions.size)
                     if (readRecovers) {
