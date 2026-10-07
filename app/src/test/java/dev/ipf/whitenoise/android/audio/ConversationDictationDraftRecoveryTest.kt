@@ -106,7 +106,11 @@ internal class ConversationDictationDraftRecoveryTest {
         f.recovery.updateDispatch(1, f.target, clearedRevision = f.draft.revision)
         f.edit(saved)
         f.recovery.updateDispatch(1, f.target, restoredRevision = f.draft.revision)
-        f.recovery.recover(1, f.target, "first")
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.AlreadyPresent,
+            f.recovery.recoverWithResult(1, f.target, "first"),
+        )
+        assertEquals(1, f.writes)
         assertEquals(saved, f.draft.value.text)
         assertEquals(f.draft.revision, f.recovery.sendTarget(1, f.target)?.capturedDraftRevision)
     }
@@ -139,6 +143,27 @@ internal class ConversationDictationDraftRecoveryTest {
                         restoreCapturedPrefix = true,
                         ownedEmptyRevision = empty,
                     ),
+            ),
+        )
+        assertEquals("Draft first", f.draft.value.text)
+        assertNotNull(f.recovery.sendTarget(1, f.target))
+    }
+
+    @Test
+    fun ownedEmptyRecoveryBypassesTheSameTranscriptShortcut() {
+        val f = Fixture()
+        assertTrue(f.recovery.recover(1, f.target, "first"))
+        f.edit("")
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.Written,
+            f.recovery.recoverWithResult(
+                1,
+                f.target,
+                "first",
+                ConversationDictationDraftRecovery.Options(
+                    restoreCapturedPrefix = true,
+                    ownedEmptyRevision = f.draft.revision,
+                ),
             ),
         )
         assertEquals("Draft first", f.draft.value.text)

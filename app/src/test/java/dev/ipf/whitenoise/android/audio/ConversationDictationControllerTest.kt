@@ -3920,6 +3920,35 @@ class ConversationDictationControllerTest {
             }
         }
 
+    @Test
+    fun repeatedFinalNoMatchKeepsEditedDraftAndUnresolvedRecovery() {
+        val f = fixture(draft = TextFieldValue(""))
+        f.platform.pendingCallerAudio = true
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.platform.listener.onResult("first")
+        f.scheduler.runDelay(500L)
+        f.controller.send()
+        f.platform.session.callerAudioFinalChunk = true
+        f.platform.listener.onError(ConversationDictationFailure.NoMatch)
+        assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
+        f.edit(key(), TextFieldValue("New draft"))
+        f.controller.retry()
+        f.scheduler.runDelay(500L)
+        f.platform.session.callerAudioFinalChunk = true
+        f.platform.listener.onError(ConversationDictationFailure.NoMatch)
+        val failed = f.controller.state as ConversationDictationState.Failed
+        assertFalse(failed.draftRecovered)
+        assertEquals("first", failed.retainedTranscript)
+        assertEquals("New draft", f.drafts.getValue(key()).text)
+        assertTrue(f.controller.canRetryRetainedAudio)
+        assertFalse(f.controller.canRetryRecoveredSend)
+        assertEquals(1, f.writes)
+        assertEquals(1, f.controller.completionRevision(ACCOUNT, GROUP))
+        f.controller.cancel()
+        assertTrue(f.controller.state is ConversationDictationState.Idle)
+        assertEquals("New draft", f.drafts.getValue(key()).text)
+    }
+
     /** Unsealed, nonfinal, incompletely supplied and timed-out input still gets bounded retries. */
     @Test
     fun finalNoMatchPolicyDoesNotReplaceExistingTransientRetries() {
@@ -6240,6 +6269,7 @@ class ConversationDictationControllerTest {
             advanceUntilIdle()
             assertEquals("Draft recognized", f.drafts.getValue(key()).text)
             assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
+            assertEquals(1, f.controller.completionRevision(ACCOUNT, GROUP))
             assertTrue(f.controller.hasDurableSession)
             accept = true
             f.controller.retry()
@@ -6444,6 +6474,34 @@ class ConversationDictationControllerTest {
             }
         }
 
+    @Test
+    fun failedRecoveryPublishesOnlyWhenTheOriginWriteIsAccepted() {
+        var allowWrite = false
+        val f = fixture(draft = TextFieldValue("Draft", TextRange(5)), allowDraftWrite = { allowWrite })
+        val other = ACCOUNT to "another-group"
+        f.edit(other, TextFieldValue("Other draft"))
+        f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+        f.controller.send()
+        f.platform.listener.onResult("recognized")
+        f.controller.onAppForegrounded()
+        assertFalse((f.controller.state as ConversationDictationState.Failed).draftRecovered)
+        assertEquals("recognized", (f.controller.state as ConversationDictationState.Failed).retainedTranscript)
+        assertEquals(0, f.controller.completionRevision(ACCOUNT, GROUP))
+        assertEquals(0, f.writes)
+        allowWrite = true
+        f.controller.onAppForegrounded()
+        assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
+        assertEquals("Draft recognized", f.drafts.getValue(key()).text)
+        assertEquals(1, f.controller.completionRevision(ACCOUNT, GROUP))
+        assertEquals("Other draft", f.drafts.getValue(other).text)
+        assertEquals(0, f.controller.completionRevision(ACCOUNT, other.second))
+        f.controller.onAppBackgrounded()
+        f.controller.onAppForegrounded()
+        assertEquals(1, f.writes)
+        f.controller.cancel()
+        assertEquals("Draft recognized", f.drafts.getValue(key()).text)
+    }
+
     /** Builds a deterministic controller harness with injectable ownership, validation, and delivery seams. */
     private fun fixture(
         draft: TextFieldValue,
@@ -6471,6 +6529,7 @@ class ConversationDictationControllerTest {
         onReadinessEvent: (ConversationDictationReadinessEvent) -> Unit = {},
         onRecoveryExpired: () -> Unit = {},
         onDraftRead: () -> Unit = {},
+        allowDraftWrite: () -> Boolean = { true },
     ): Fixture {
         val scheduler = FakeTimeoutScheduler()
         val drafts = mutableMapOf(key() to draft)
@@ -6488,7 +6547,7 @@ class ConversationDictationControllerTest {
                 },
                 writeDraft = { account, group, expectedRevision, value ->
                     val target = account to group
-                    if ((revisions[target] ?: 0L) != expectedRevision) {
+                    if (!allowDraftWrite() || (revisions[target] ?: 0L) != expectedRevision) {
                         null
                     } else {
                         drafts[target] = value

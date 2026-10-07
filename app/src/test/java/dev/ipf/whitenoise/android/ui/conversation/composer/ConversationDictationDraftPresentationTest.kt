@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
@@ -80,9 +81,13 @@ class ConversationDictationDraftPresentationTest {
             fixture.controller.onAppForegrounded()
             assertEquals(1, fixture.controller.completionRevision(ACCOUNT, GROUP))
             assertSame(recoveredEditor, editor)
-            writers.getValue(1)(TextFieldValue("Draft recognized edited", TextRange(23)))
+        }
+        composeRule.onNodeWithTag("recovery-editor").performTextReplacement("Draft recognized edited")
+        composeRule.runOnIdle {
             assertEquals("Draft recognized edited", fixture.draft.text)
             assertEquals(1, fixture.editorWrites)
+            fixture.controller.cancel()
+            assertEquals("Draft recognized edited", fixture.draft.text)
         }
     }
 
