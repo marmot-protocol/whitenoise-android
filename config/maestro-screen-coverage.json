@@ -39,7 +39,7 @@
       "keys-cancel-clears",
       "keys-back-clears",
       "keys-correct-mismatch",
-      "keys-rotation-clears"
+      "keys-rotation-cancel"
     ],
     "Relays": [
       "advanced-relays"

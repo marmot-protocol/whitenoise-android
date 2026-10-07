@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: acquisition-document-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- assertVisible: Generated fixture message
+- tapOn: Add attachment
+- assertVisible:
+    id: conversation.attachment.menu
+- tapOn: Files
+- assertVisible: Recent
+- back
+- assertVisible: Generated fixture message
+- assertNotVisible:
+    id: conversation.attachment.menu

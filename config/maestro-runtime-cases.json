@@ -1028,7 +1028,7 @@
         "SEC-012",
         "SEC-016"
       ],
-      "assertions": "Usage disclosure stays expanded across landscape and portrait recreation without recording consent.",
+      "assertions": "Usage disclosure stays expanded across landscape and portrait configuration changes without recording consent.",
       "postcondition": "consent-pending",
       "fixture": "consent"
     },
@@ -1103,15 +1103,6 @@
         "ACC-011"
       ],
       "assertions": "Correcting confirmation enables both destinations and clears mismatch feedback.",
-      "postcondition": "none"
-    },
-    "keys-rotation-clears": {
-      "suite": "keys",
-      "manual_ids": [
-        "ACC-009",
-        "ACC-011"
-      ],
-      "assertions": "Activity recreation clears transient export passphrases and leaves the raw key hidden.",
       "postcondition": "none"
     },
     "search-date-cancel": {
@@ -1238,7 +1229,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Outgoing message deletion offers local/everyone choices; landscape/portrait recreation and Cancel dismisses confirmation and retains the original message.",
+      "assertions": "Outgoing message deletion offers local/everyone choices; landscape/portrait configuration changes and Cancel dismisses confirmation and retains the original message.",
       "postcondition": "none"
     },
     "actions-batch-delete-cancel": {
@@ -1282,9 +1273,50 @@
       "manual_ids": [
         "MSG-016"
       ],
-      "assertions": "Reporting remains reachable through landscape/portrait recreation and can be canceled without sending.",
+      "assertions": "Reporting remains reachable through landscape/portrait configuration changes and can be canceled without sending.",
       "postcondition": "none",
       "fixture": "incoming"
+    },
+    "acquisition-camera-deny": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "MED-004"
+      ],
+      "assertions": "Open real Camera acquisition, deny the request, retain the transcript without selecting or sending media. Verify Android CAMERA remains denied.",
+      "postcondition": "camera-denied"
+    },
+    "acquisition-camera-back": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "MED-004"
+      ],
+      "assertions": "Open real Camera acquisition, cancel with Android Back, retain the transcript without selecting or sending media. Verify Android CAMERA remains denied.",
+      "postcondition": "camera-denied"
+    },
+    "acquisition-gallery-cancel": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "MED-003"
+      ],
+      "assertions": "Open real Photos and videos acquisition, cancel with Android Back, retain the transcript without selecting or sending media.",
+      "postcondition": "none"
+    },
+    "acquisition-document-cancel": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "MED-009"
+      ],
+      "assertions": "Open real Files acquisition, cancel with Android Back, retain the transcript without selecting or sending media.",
+      "postcondition": "none"
+    },
+    "keys-rotation-cancel": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Encrypted-backup passphrase dialog remains usable during handled landscape/portrait changes; explicit Cancel clears its fields on reopen and the raw key remains hidden.",
+      "postcondition": "none"
     }
   }
 }

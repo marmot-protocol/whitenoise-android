@@ -1,5 +1,5 @@
 appId: dev.ipf.whitenoise.android.maestrolab
-name: keys-rotation-clears
+name: keys-rotation-cancel
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
@@ -21,9 +21,15 @@ name: keys-rotation-clears
     text: "Export"
     enabled: true
 - setOrientation: LANDSCAPE_LEFT
+- assertVisible: "Encrypted Private Key"
+- assertVisible:
+    text: "View backup"
+    enabled: true
+- setOrientation: PORTRAIT
+- assertVisible: "Encrypted Private Key"
+- tapOn: "Cancel"
 - assertVisible: "Private key hidden"
 - assertNotVisible: "Encrypted Private Key"
-- setOrientation: PORTRAIT
 - tapOn: "Export Encrypted Private Key"
 - assertVisible: "Encrypted Private Key"
 - hideKeyboard

@@ -12,3 +12,10 @@ internal fun verifyMaestroNotificationPermission(postcondition: String) {
         context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
     check(granted == (postcondition == "notification-granted")) { "Unexpected Android notification permission" }
 }
+
+/** Camera denial and dismiss do not grant capture authority, even when the conversation remains usable. */
+internal fun verifyMaestroCameraDenied() {
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    check(context.packageName == MaestroFixtureRunner.FIXTURE_PACKAGE)
+    check(context.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
+}

@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.maestro
 
 import android.content.Context
-import android.os.ParcelFileDescriptor.AutoCloseInputStream
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -52,13 +51,14 @@ private val MAESTRO_POSTCONDITIONS =
         "consent-declined",
         "notification-denied",
         "notification-granted",
+        "camera-denied",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
 @ManualDeviceFixture
 @RunWith(AndroidJUnit4::class)
 class MaestroRuntimeHostTest {
-    /** The host publishes readiness only after the real shell is accessible, then waits for bounded UI work. */
+    /** Prepare the real native runtime and activity, hand UI observation to Maestro, then verify and dispose. */
     @Test
     @Suppress("LongMethod") // One fixture generation owns setup, UI handoff and teardown.
     fun hostGeneratedAccounts() =
@@ -66,12 +66,7 @@ class MaestroRuntimeHostTest {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val context = instrumentation.targetContext
             check(context.packageName == MaestroFixtureRunner.FIXTURE_PACKAGE)
-            val qemu = instrumentation.uiAutomation.executeShellCommand("getprop ro.kernel.qemu")
-            val emulator =
-                AutoCloseInputStream(qemu)
-                    .bufferedReader()
-                    .use { it.readText().trim() }
-            check(emulator == "1") { "Disposable emulator required" }
+            requireMaestroEmulator()
             val generation = checkNotNull(InstrumentationRegistry.getArguments().getString("fixtureGeneration"))
             require(generation.matches(Regex("[a-f0-9]{32}")))
             val directory = File(context.filesDir, "maestro-$generation")
@@ -218,19 +213,11 @@ class MaestroRuntimeHostTest {
             verifyMaestroChatList(native, checkNotNull(state?.activeAccountRef), peerLabel, group, postcondition)
         }
         if (postcondition.startsWith("notification-")) verifyMaestroNotificationPermission(postcondition)
+        if (postcondition == "camera-denied") verifyMaestroCameraDenied()
         if (postcondition.startsWith("consent-")) {
             verifyMaestroConsent(native, checkNotNull(state), postcondition)
         }
-        if (postcondition.startsWith("folder-")) {
-            val app = checkNotNull(state)
-            val folders = app.chatFolderPreferences.foldersFor(checkNotNull(app.activeAccountRef))
-            val custom = folders.filter { it.systemKind == null }
-            if (postcondition == "folder-saved") {
-                check(custom.size == 1 && custom.single().name == "Maestro saved folder")
-            } else {
-                check(custom.isEmpty()) { "Canceled or deleted custom folder remains in the store" }
-            }
-        }
+        if (postcondition.startsWith("folder-")) verifyMaestroFolder(checkNotNull(state), postcondition)
         if (postcondition == "light") check(state?.themeMode == AppThemeMode.Light)
         if (postcondition == "amoled") check(state?.themeMode == AppThemeMode.Amoled)
         if (postcondition == "dark") check(state?.themeMode == AppThemeMode.Dark)

@@ -18,6 +18,6 @@ name: reports-other-cancel
       text: Something else
     direction: DOWN
 - tapOn: Something else
-- back: null
+- back
 - assertNotVisible: Report this message
 - assertVisible: Generated incoming fixture message

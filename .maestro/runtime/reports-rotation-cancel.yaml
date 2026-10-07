@@ -20,6 +20,6 @@ name: reports-rotation-cancel
     enabled: true
 - setOrientation: PORTRAIT
 - assertVisible: Report this message
-- back: null
+- back
 - assertNotVisible: Report this message
 - assertVisible: Generated incoming fixture message

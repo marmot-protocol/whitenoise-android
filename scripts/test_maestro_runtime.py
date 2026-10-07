@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -12,12 +13,193 @@ import yaml
 
 from scripts import maestro_runtime as runtime
 from scripts.maestro_coverage import inventory, screen_catalog
+from scripts.maestro_runtime_summary import campaign
 from scripts.maestro_runtime_pair import pair
 from scripts.maestro_runtime_selection import selection, matrix_selection
 from scripts.manual_test_fragments import definitions, load_guide
 
 
+class CampaignSummaryTest(unittest.TestCase):
+    def prepare(self, root):
+        """Create six independently identified synthetic success leaves for reconciler boundary tests."""
+        identity = {'schema': 1, 'source_sha': 'a' * 40, 'run_id': '123', 'run_attempt': '1',
+                    'distribution': 'Zapstore', 'package': runtime.PACKAGE,
+                    'apk_sha256': 'b' * 64, 'test_apk_sha256': 'c' * 64}
+        leaves, pairs = [], []
+        for partition in (1, 2):
+            artifact = root / f'maestro-runtime-results-navigation-{partition}-123-1'
+            pair_path = artifact / 'maestro-runtime-pair/pair.json'
+            pair_path.parent.mkdir(parents=True)
+            pair_path.write_text(json.dumps(identity))
+            pairs.append(pair_path)
+            reports = artifact / f'maestro-runtime-navigation-{partition}'
+            names = runtime.case_selection('navigation', partition)
+            rows = []
+            for name in names:
+                leaf = reports / name
+                leaf.mkdir(parents=True)
+                generation = f'{len(leaves) + 1:032x}'
+                row = {'case': name, 'generation': generation, 'passed': True, 'cleanup_safe': True}
+                rows.append(row)
+                (leaf / 'result.json').write_text(json.dumps(row))
+                for flag in ('ready', 'verified', 'closed'):
+                    record = {'generation': generation, flag: True}
+                    if flag == 'ready':
+                        record.update(accounts=3, fixture='basic', uiObserver='maestro')
+                    (leaf / f'{flag}.json').write_text(json.dumps(record))
+                (leaf / 'junit.xml').write_text(
+                    f'<testsuite><testcase name="{name}" status="SUCCESS" time="1"/></testsuite>')
+                (leaf / 'instrumentation.txt').write_text('OK (1 test)')
+                leaves.append(leaf)
+            (reports / 'results.json').write_text(json.dumps(
+                {'suite': 'navigation', 'partition': partition, 'expected': names, 'results': rows, 'evidence_complete': True}))
+        return leaves, pairs
+
+    def result(self, root):
+        """Reconcile the same source/run selection after a controlled evidence mutation."""
+        return campaign(root, 'runtime-navigation', 'a' * 40, '123', '1')
+
+    def test_complete_campaign_requires_six_leaves_and_keeps_release_gap(self):
+        """All requested UI leaves can pass without becoming complete release certification."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.prepare(root)
+            result = self.result(root)
+            self.assertTrue(result['evidence_complete'])
+            self.assertEqual(result['passed_count'], 6)
+            self.assertFalse(result['full_release_coverage'])
+
+    def test_ui_only_retry_reuses_matching_prior_successful_shards(self):
+        """Failed-job retries can retain successful same-run shards and the unchanged build producer."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.prepare(root)
+            result = campaign(root, 'runtime-navigation', 'a' * 40, '123', '2')
+            self.assertTrue(result['evidence_complete'])
+            self.assertEqual(result['passed_count'], 6)
+
+    def test_new_failed_leaf_overrides_older_pass(self):
+        """A rerun failure cannot be hidden by selecting an earlier green artifact."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.prepare(root)
+            source = root / 'maestro-runtime-results-navigation-1-123-1'
+            target = root / 'maestro-runtime-results-navigation-1-123-2'
+            shutil.copytree(source, target)
+            leaf = target / 'maestro-runtime-navigation-1' / runtime.case_selection('navigation', 1)[0]
+            (leaf / 'junit.xml').unlink()
+            result = campaign(root, 'runtime-navigation', 'a' * 40, '123', '2')
+            self.assertFalse(result['evidence_complete'])
+            self.assertEqual(result['passed_count'], 5)
+
+    def test_future_shard_attempt_cannot_certify_current_run(self):
+        """A future artifact is invalid even when older matching evidence passes."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.prepare(root)
+            (root / 'maestro-runtime-results-navigation-1-123-2').mkdir()
+            self.assertFalse(self.result(root)['evidence_complete'])
+
+    def test_missing_shards_remain_named_unexecuted_cases(self):
+        """An empty artifact download cannot silently shorten the requested campaign."""
+        with tempfile.TemporaryDirectory() as temporary:
+            result = self.result(Path(temporary))
+            self.assertFalse(result['evidence_complete'])
+            self.assertEqual(result['expected_count'], 6)
+            self.assertTrue(all(row['not_run'] for row in result['results']))
+
+    def test_native_success_without_junit_never_certifies_ui(self):
+        """Even success-labelled native receipts and ledgers need an actual UI leaf."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            (leaves[0] / 'junit.xml').unlink()
+            result = self.result(root)
+            self.assertFalse(result['evidence_complete'])
+            self.assertEqual(result['passed_count'], 5)
+
+    def test_cleanup_receipt_cannot_belong_to_another_generation(self):
+        """A stale teardown cannot certify a fresh fixture even if its UI passed."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            (leaves[0] / 'closed.json').write_text(json.dumps({'generation': 'f' * 32, 'closed': True}))
+            self.assertFalse(self.result(root)['evidence_complete'])
+
+    def test_foreign_source_rejects_its_shard(self):
+        """UI leaves from another revision cannot be counted in this selected run."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _, pairs = self.prepare(root)
+            data = json.loads(pairs[0].read_text())
+            data['source_sha'] = 'd' * 40
+            pairs[0].write_text(json.dumps(data))
+            result = self.result(root)
+            self.assertFalse(result['evidence_complete'])
+            self.assertEqual(result['expected_count'], 6)
+
+    def test_different_apk_pairs_cannot_share_one_campaign(self):
+        """Source equality alone cannot reconcile different test APK bytes across shards."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            _, pairs = self.prepare(root)
+            data = json.loads(pairs[1].read_text())
+            data['test_apk_sha256'] = 'd' * 64
+            pairs[1].write_text(json.dumps(data))
+            self.assertFalse(self.result(root)['evidence_complete'])
+
+    def test_skipped_ui_leaf_is_not_a_success(self):
+        """An aggregate passed flag never overrides a skipped UI assertion."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            path = leaves[0] / 'junit.xml'
+            path.write_text(path.read_text().replace('/>', '><skipped/></testcase>'))
+            self.assertFalse(self.result(root)['evidence_complete'])
+
+    def test_malformed_ui_preserves_other_case_results(self):
+        """A corrupted leaf fails explicitly while the remaining selected leaves stay visible."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            (leaves[0] / 'junit.xml').write_text('<broken')
+            result = self.result(root)
+            self.assertEqual(result['expected_count'], 6)
+            self.assertEqual(result['passed_count'], 5)
+            self.assertFalse(result['evidence_complete'])
+
+    def test_unexpected_shard_artifact_invalidates_the_campaign(self):
+        """Extra artifacts cannot quietly masquerade as selected coverage."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.prepare(root)
+            (root / 'foreign-shard').mkdir()
+            result = self.result(root)
+            self.assertFalse(result['evidence_complete'])
+            self.assertTrue(result['errors'])
+
+    def test_duplicate_case_ledger_keeps_requested_cases_unexecuted(self):
+        """Duplicating one case cannot conceal a different missing case in the shard."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            leaves, _ = self.prepare(root)
+            path = leaves[0].parent / 'results.json'
+            data = json.loads(path.read_text())
+            data['results'][1] = data['results'][0]
+            path.write_text(json.dumps(data))
+            result = self.result(root)
+            self.assertFalse(result['evidence_complete'])
+            self.assertEqual(result['expected_count'], 6)
+
+
 class RuntimeEvidenceTest(unittest.TestCase):
+    def test_native_host_never_claims_the_maestro_ui_connection(self):
+        """An indirect safety probe must not compete with the driver's single accessibility owner."""
+        root = runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro'
+        for path in root.glob('*.kt'):
+            with self.subTest(source=path.name):
+                self.assertNotRegex(path.read_text(), r'\.\s*uiAutomation|\bgetUiAutomation\s*\(|\bUiDevice\b')
+
     def test_rotation_commands_use_supported_pinned_cli_orientations(self):
         """Reject flow parse failures before requesting an emulator; include every offline and runtime flow."""
         # https://docs.maestro.dev/reference/commands-available/setorientation

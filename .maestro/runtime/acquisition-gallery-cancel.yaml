@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: acquisition-gallery-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- assertVisible: Generated fixture message
+- tapOn: Add attachment
+- assertVisible:
+    id: conversation.attachment.menu
+- tapOn: Photos and videos
+- assertVisible: Albums
+- back
+- assertVisible: Generated fixture message
+- assertNotVisible:
+    id: conversation.attachment.menu

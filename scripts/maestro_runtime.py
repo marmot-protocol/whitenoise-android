@@ -15,9 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports')
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition')
 MAX_CASES_PER_SHARD = 4
-CASE_RESERVE_SECONDS = 600
+CASE_RESERVE_SECONDS = 660
 CAMPAIGN_SECONDS = MAX_CASES_PER_SHARD * CASE_RESERVE_SECONDS
 CASES = json.loads((ROOT / 'config/maestro-runtime-cases.json').read_text())['cases']
 
@@ -65,6 +65,10 @@ def run_case(name, reports):
     permission = 'android.permission.POST_NOTIFICATIONS'
     command(adb + ['shell', 'pm', 'revoke', PACKAGE, permission])
     command(adb + ['shell', 'pm', 'clear-permission-flags', PACKAGE, permission, 'user-set', 'user-fixed'])
+    if CASES[name]['postcondition'] == 'camera-denied':
+        camera = 'android.permission.CAMERA'
+        command(adb + ['shell', 'pm', 'revoke', PACKAGE, camera])
+        command(adb + ['shell', 'pm', 'clear-permission-flags', PACKAGE, camera, 'user-set', 'user-fixed'])
     fixture = CASES[name].get('fixture', 'basic')
     record = {'case': name, 'generation': generation, 'passed': False, 'cleanup_safe': False, **CASES[name]}
     failure = None
@@ -103,12 +107,14 @@ def run_case(name, reports):
             # Preserve readiness diagnostics even when Maestro never started.
             diagnostics = [
                 ('setup.json', adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/setup.json']),
-                ('emulator-errors.txt', adb + ['logcat', '-d', '-t', '200', '*:E']),
+                ('emulator-errors.txt', adb + ['logcat', '-d', '-v', 'brief', 'AndroidRuntime:E', 'TestRunner:V',
+                                              'UiAutomation:V', 'UiAutomationConnection:V', 'AccessibilityManagerService:V',
+                                              'ActivityManager:I', 'Maestro:V', '*:S']),
             ]
             for filename, arguments in diagnostics:
                 try:
                     diagnostic = command(arguments)
-                    (directory / filename).write_text(diagnostic[:256000])
+                    (directory / filename).write_text(diagnostic[-256000:])
                 except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as error:
                     record.setdefault('diagnostic_failures', []).append(f'{filename}: {type(error).__name__}')
             # Stop only this generated host; do not reset an installed user package.

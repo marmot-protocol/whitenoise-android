@@ -21,7 +21,7 @@ name: reports-explanation-cancel
     id: message.report.explanation
 - inputText: Maestro disposable explanation
 - assertVisible: Maestro disposable explanation
-- hideKeyboard: null
-- back: null
+- hideKeyboard
+- back
 - assertNotVisible: Report this message
 - assertVisible: Generated incoming fixture message
