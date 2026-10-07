@@ -70,11 +70,54 @@ class ViewerGroupImageControllerTest {
             }
         }
 
+    /** Rejected post-commit roster projection retains failure and retry reconciles without another upload. */
+    @Test
+    fun rejectedProjectionDoesNotReportSuccessAndValidRetryAppliesCommittedPicture() =
+        runTest {
+            val native =
+                NativeImageFixture().apply {
+                    failCleanup = false
+                    rejectCommittedProjection = true
+                }
+            val state =
+                WhiteNoiseAppState(
+                    context = ApplicationProvider.getApplicationContext(),
+                    draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
+                    accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
+                    accounts =
+                        listOf(
+                            AccountSummaryFfi(
+                                label = ACCOUNT,
+                                accountIdHex = ConversationTimelineTestIds.ACCOUNT_ID,
+                                localSigning = true,
+                                externalSigning = false,
+                                signedOut = false,
+                                running = true,
+                            ),
+                        ),
+                    activeAccountRef = ACCOUNT,
+                    initialMarmotRuntime = AppMarmotRuntime("test", native.proxy()),
+                    marmotIoDispatcher = StandardTestDispatcher(testScheduler),
+                )
+            val controller = ConversationController(state, native.group, conversationTimelineMemberSnapshot())
+            val draft = ImageUploadDraft(PICTURE, "image/jpeg", null, "20x20", null)
+            assertFalse(controller.updateGroupImage(ScopedGroupImageMutation(draft) { true }.forViewer(false)))
+            assertTrue(controller.lastMutationError != null)
+            assertEquals(1, native.uploads)
+            assertEquals(null, controller.group.imageHashHex)
+            native.rejectCommittedProjection = false
+            assertTrue(controller.updateGroupImage(ScopedGroupImageMutation(draft) { true }.forViewer(true)))
+            assertEquals(1, native.uploads)
+            assertEquals(native.group, controller.group)
+            assertEquals(null, controller.lastMutationError)
+        }
+
     /** Holds authoritative native state and injects only the legacy-cleanup failure. */
     private class NativeImageFixture {
         var group = conversationTimelineTestGroup().copy(avatarUrl = "https://example.test/legacy.jpg")
         var current: ByteArray? = null
         var failCleanup = true
+        var rejectCommittedProjection = false
         var uploads = 0
         var cleanups = 0
 
@@ -105,7 +148,12 @@ class ViewerGroupImageControllerTest {
                                     null,
                                 ),
                             group = group,
-                            members = conversationTimelineGroupRoster().members,
+                            members =
+                                if (rejectCommittedProjection && uploads > 0) {
+                                    emptyList()
+                                } else {
+                                    conversationTimelineGroupRoster().members
+                                },
                         )
                     "downloadGroupBlossomImage" -> requireNotNull(current)
                     "updateGroupImage" -> {

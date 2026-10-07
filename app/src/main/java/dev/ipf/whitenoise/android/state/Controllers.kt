@@ -11327,7 +11327,7 @@ class ConversationController(
         if (!change.isActive()) return false
         val details = appState.marmotIo { groupDetails(account, groupId) }
         if (!change.isActive() || !details.group.groupIdHex.equals(groupId, ignoreCase = true)) return false
-        applyMutationDetails(account, details)
+        check(applyMutationDetails(account, details)) { "Authoritative group image projection unavailable" }
         return true
     }
 
@@ -13995,14 +13995,15 @@ class ConversationController(
         )
     }
 
-    /** Applies committed group details and invalidates any roster refresh launched earlier. */
+    /** Returns whether committed details were applied, invalidating any roster refresh launched earlier. */
     private fun applyMutationDetails(
         account: String,
         details: GroupDetailsFfi,
-    ) {
+    ): Boolean {
         memberRosterRefreshGeneration.advance()
-        val applied = applyGroupDetails(account, details) ?: return
+        val applied = applyGroupDetails(account, details) ?: return false
         appState.applyLocalGroupDetails(account, applied.group, applied.members)
+        return true
     }
 
     private suspend fun watchAgentTextStream(

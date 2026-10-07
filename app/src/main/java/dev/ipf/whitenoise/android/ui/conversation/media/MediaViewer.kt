@@ -471,7 +471,11 @@ internal fun FullScreenMediaViewer(
         }
     }
     LaunchedEffect(currentActionOwner(), controller.isSelfMember, controller.isSelfAdmin) {
-        if (!pictureSession.isCurrent()) pictureSession.close()
+        if (!pictureSession.isCurrent()) {
+            pictureSession.close()
+            pictureFailures.clear()
+            pictureNotice = null
+        }
     }
 
     /** Prepare and commit within the captured viewer's account/group; retries reconcile native image bytes. */
