@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reactions-details-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- assertVisible: Generated fixture message
+- tapOn:
+    id: conversation.reaction.pill:0
+- assertVisible: All · 2
+- assertVisible: You
+- assertVisible: Maestro Bob
+- back
+- assertNotVisible: All · 2
+- assertVisible: Generated fixture message

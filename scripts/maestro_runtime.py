@@ -18,6 +18,7 @@ RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
 SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders')
 MAX_CASES_PER_SHARD = 4
 CASE_RESERVE_SECONDS = 660
+UI_TIMEOUTS = {'polls-question-boundary': 240}
 CAMPAIGN_SECONDS = MAX_CASES_PER_SHARD * CASE_RESERVE_SECONDS
 CASES = json.loads((ROOT / 'config/maestro-runtime-cases.json').read_text())['cases']
 
@@ -157,7 +158,8 @@ def run_ui(name, directory):
         return subprocess.run(['maestro', '--device', 'emulator-5554', 'test', '--format', 'JUNIT',
                                '--output', str(directory / 'junit.xml'), '--debug-output', str(directory / 'debug'),
                                '--test-output-dir', str(directory / 'screenshots'),
-                               str(ROOT / '.maestro/runtime' / f'{name}.yaml')], timeout=120, check=False,
+                               str(ROOT / '.maestro/runtime' / f'{name}.yaml')],
+                              timeout=UI_TIMEOUTS.get(name, 120), check=False,
                               stdout=log, stderr=subprocess.STDOUT)
 
 

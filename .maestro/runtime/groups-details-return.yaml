@@ -9,6 +9,12 @@ name: groups-details-return
 - assertVisible:
     id: "chat_info.list"
 - assertVisible:
-    id: "chat_info.header_identity"
+    id: "chat_info.name"
+- assertVisible: "Group · 2 members"
+- scrollUntilVisible:
+    element:
+      id: "chat_info.header_identity"
+    direction: DOWN
+- assertVisible: "Maestro group"
 - back
 - assertVisible: "Generated fixture message"

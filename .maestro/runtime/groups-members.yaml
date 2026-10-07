@@ -13,4 +13,4 @@ name: groups-members
       id: "chat_info.members"
     direction: DOWN
 - assertVisible: "Maestro Bob"
-- assertVisible: "Maestro Alice"
+- assertVisible: "You"

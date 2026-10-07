@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reactions-details-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- assertVisible: Generated fixture message
+- tapOn:
+    id: conversation.reaction.pill:0
+- assertVisible: All · 2
+- assertVisible: You
+- assertVisible: Maestro Bob
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible: All · 2
+- setOrientation: PORTRAIT
+- assertVisible: Maestro Bob
+- assertVisible: You
+- back
+- assertNotVisible: All · 2
+- assertVisible: Generated fixture message

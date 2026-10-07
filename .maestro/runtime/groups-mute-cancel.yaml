@@ -10,8 +10,8 @@ name: groups-mute-cancel
     id: "chat_info.list"
 - tapOn: "Mute"
 - assertVisible:
-    id: "mute.duration.dialog"
+    text: "Mute for"
 - back
 - assertNotVisible:
-    id: "mute.duration.dialog"
+    text: "Mute for"
 - assertVisible: "Mute"

@@ -16,9 +16,9 @@ name: nested-default-retention
     direction: DOWN
 - tapOn: "Default disappearing messages"
 - assertVisible:
-    id: "disappearing.picker"
+    text: "Disappearing messages"
 - back
 - assertNotVisible:
-    id: "disappearing.picker"
+    text: "Disappearing messages"
 - assertVisible:
     id: "privacy.default_disappearing.group"

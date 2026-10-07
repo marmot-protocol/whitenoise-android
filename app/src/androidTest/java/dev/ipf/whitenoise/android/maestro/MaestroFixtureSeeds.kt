@@ -13,10 +13,29 @@ internal suspend fun seedMaestroFixtureMessages(
 ) {
     require(
         fixture in
-            listOf("basic", "reader", "links", "poll-single", "poll-multiple", "consent", "notifications", "incoming"),
+            listOf(
+                "basic",
+                "reader",
+                "links",
+                "poll-single",
+                "poll-multiple",
+                "consent",
+                "notifications",
+                "incoming",
+                "reactions",
+                "creation",
+            ),
     )
     native.sendText(account, group, "Generated fixture message")
+    if (fixture == "creation") {
+        // Declare navigation metadata through MDK, publishing only via the existing loopback bootstrap.
+        // This reserved hostname is not a functioning receiver and never proves network delivery.
+        val declared = listOf("wss://maestro-inbox.example.invalid")
+        val status = native.setAccountInboxRelays(account, declared, native.accountRelayLists(account).nip65.relays)
+        check(status.inbox.relays.map { it.trimEnd('/') } == declared)
+    }
     when (fixture) {
+        "reactions" -> seedMaestroReactions(native, account, peer, group)
         "incoming" -> native.sendText(peer, group, "Generated incoming fixture message")
         "reader" -> native.sendText(account, group, maestroReaderMessage())
         "links" -> native.sendText(account, group, "Maestro link https://example.invalid/maestro")

@@ -19,10 +19,9 @@ name: polls-custom-zero
 - tapOn: "Custom time"
 - scrollUntilVisible:
     element:
-      id: "poll-custom-duration"
+      text: "Duration"
     direction: DOWN
-- tapOn:
-    id: "poll-custom-duration"
+- tapOn: "Duration"
 - inputText: "0"
 - hideKeyboard
 - scrollUntilVisible:

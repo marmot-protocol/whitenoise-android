@@ -209,6 +209,17 @@ class CampaignSummaryTest(unittest.TestCase):
 
 
 class RuntimeEvidenceTest(unittest.TestCase):
+    def test_long_input_timeout_fits_existing_fixture_and_cleanup_reserves(self):
+        """A measured typing overrun cannot silently enlarge the host lifetime or shard allowance."""
+        self.assertEqual(set(runtime.UI_TIMEOUTS), {'polls-question-boundary'})
+        for name, seconds in runtime.UI_TIMEOUTS.items():
+            self.assertIn(name, runtime.CASES)
+            self.assertLess(seconds + 30, 300)  # Native host's existing handoff deadline.
+            self.assertLess(120 + seconds + 60 + 60 + 30 + 30 + 30 + 20, runtime.CASE_RESERVE_SECONDS)
+        with tempfile.TemporaryDirectory() as temporary, patch.object(runtime.subprocess, 'run') as run:
+            runtime.run_ui('polls-question-boundary', Path(temporary))
+            self.assertEqual(run.call_args.kwargs['timeout'], 240)
+
     def test_every_surface_gets_every_edge_without_automatic_pass_or_na(self):
         """A discovered dialog cannot silently omit lifecycle, accessibility or input qualification."""
         result = inventory()
@@ -303,7 +314,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
             root = Path(temporary)
             path = root / 'app/src/main/java/dev/ipf/whitenoise/android/ui/new/NewScreen.kt'
             path.parent.mkdir(parents=True)
-            path.write_text('internal fun NewScreen() {}')
+            path.write_text('@Composable internal fun NewScreen() {}')
             with self.assertRaisesRegex(ValueError, 'no maintained source'):
                 screen_catalog(root, {}, {})
 
@@ -319,6 +330,21 @@ class RuntimeEvidenceTest(unittest.TestCase):
                       '- **INT-010 repeat:** First\n- **INT-010 repeat:** Second'):
             with self.subTest(guide=guide), self.assertRaises(ValueError):
                 named_edges(guide, {'INT-010': 'existing'})
+
+    def test_screen_discovery_handles_generics_receivers_and_ignores_non_code(self):
+        """Real generic dialogs must be catalogued; commented, quoted and non-Compose names are not screens."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = 'app/src/main/java/dev/ipf/whitenoise/android/ui/Choices.kt'
+            path = root / source
+            path.parent.mkdir(parents=True)
+            path.write_text('@Composable fun <T> ColumnScope.GenericDialog(value: T) {}\n'
+                            '// @Composable fun PhantomScreen() {}\n'
+                            'val example = "@Composable fun QuotedSheet() {}"\n'
+                            'fun FormatDialog() {}\n')
+            screens = screen_catalog(root, {'ui': [{'source': source, 'test_ids': ['INT-001']}]}, {})
+            self.assertEqual([screen['symbol'] for screen in screens], ['ColumnScope.GenericDialog'])
+            self.assertEqual(len(screens[0]['edge_plan']), len(EDGE_DIMENSIONS))
 
     def test_campaign_plan_covers_all_requirements_and_original_flow_filenames(self):
         """Every permanent point receives layer prerequisites and every journey links to its actual source."""
@@ -369,7 +395,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
             source = 'app/src/main/java/dev/ipf/whitenoise/android/ui/Nested.kt'
             path = root / source
             path.parent.mkdir(parents=True)
-            path.write_text('fun ParentContent() {}\nprivate fun HiddenDialog() {}')
+            path.write_text('@Composable fun ParentContent() {}\n@Composable private fun HiddenDialog() {}')
             test = root / 'app/src/test/NestedTest.kt'
             test.parent.mkdir(parents=True)
             test.write_text('fun render() { ParentContent() }')

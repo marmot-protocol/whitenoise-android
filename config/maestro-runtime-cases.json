@@ -329,7 +329,8 @@
         "NCH-001"
       ],
       "assertions": "New Message opens its recipient screen and Back restores the chat list.",
-      "postcondition": "none"
+      "postcondition": "none",
+      "fixture": "creation"
     },
     "creation-search-invalid": {
       "suite": "creation",
@@ -338,7 +339,8 @@
         "NCH-001"
       ],
       "assertions": "Malformed recipient input stays in the picker; no conversation is opened automatically.",
-      "postcondition": "none"
+      "postcondition": "none",
+      "fixture": "creation"
     },
     "creation-group-back": {
       "suite": "creation",
@@ -346,7 +348,8 @@
         "NCH-002"
       ],
       "assertions": "Group recipient picker Back restores New Message.",
-      "postcondition": "none"
+      "postcondition": "none",
+      "fixture": "creation"
     },
     "creation-group-setup-cancel": {
       "suite": "creation",
@@ -354,7 +357,8 @@
         "NCH-002"
       ],
       "assertions": "An entered group name can be canceled before native submission.",
-      "postcondition": "none"
+      "postcondition": "none",
+      "fixture": "creation"
     },
     "creation-group-name-retained": {
       "suite": "creation",
@@ -362,7 +366,8 @@
         "NCH-002"
       ],
       "assertions": "Unsubmitted setup name survives Back to the recipient picker and return.",
-      "postcondition": "none"
+      "postcondition": "none",
+      "fixture": "creation"
     },
     "actions-edit-cancel": {
       "suite": "actions",
@@ -1494,7 +1499,7 @@
       "manual_ids": [
         "NTF-033"
       ],
-      "assertions": "Bob’s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "assertions": "Bob\u2019s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
       "postcondition": "none"
     },
     "alerts-chat-sounds-back": {
@@ -1592,6 +1597,50 @@
       ],
       "assertions": "A typed title keyword enables condition Save, but Cancel leaves the folder form unchanged. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
       "postcondition": "folder-absent"
+    },
+    "reactions-details-back": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005"
+      ],
+      "assertions": "The genuine native two-reactor sheet shows owner and Bob, then Back closes it without removing either reaction.",
+      "postcondition": "reactions-retained",
+      "fixture": "reactions"
+    },
+    "reactions-details-filter-return": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005"
+      ],
+      "assertions": "Filtering to the owner\u2019s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
+      "postcondition": "reactions-retained",
+      "fixture": "reactions"
+    },
+    "reactions-details-rotation": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005"
+      ],
+      "assertions": "The genuine reactor sheet and both identities remain visible through portrait/landscape, then Back preserves both native reactions.",
+      "postcondition": "reactions-retained",
+      "fixture": "reactions"
+    },
+    "reactions-details-reopen": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005"
+      ],
+      "assertions": "Reopening a filtered reactor sheet resets to All and restores both identities while native reactions remain unchanged.",
+      "postcondition": "reactions-retained",
+      "fixture": "reactions"
+    },
+    "creation-relays-required": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-001"
+      ],
+      "assertions": "Missing usable receiving relays expose Check relays and open real relay settings; Back preserves the existing chat.",
+      "postcondition": "none"
     }
   }
 }

@@ -10,9 +10,9 @@ name: groups-retention-cancel
     id: "chat_info.list"
 - tapOn: "Disappearing"
 - assertVisible:
-    id: "disappearing.picker"
+    text: "Disappearing messages"
 - tapOn: "Cancel"
 - assertNotVisible:
-    id: "disappearing.picker"
+    text: "Disappearing messages"
 - assertVisible:
     id: "chat_info.list"

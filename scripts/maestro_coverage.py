@@ -9,10 +9,12 @@ try:
     from scripts.manual_test_fragments import definitions, load_guide, load_inventory
     from scripts.maestro_suite import CASES as OFFLINE
     from scripts.maestro_runtime import CASES as RUNTIME
+    from scripts.check_manual_test_guide import composable_names
 except ModuleNotFoundError:
     from manual_test_fragments import definitions, load_guide, load_inventory
     from maestro_suite import CASES as OFFLINE
     from maestro_runtime import CASES as RUNTIME
+    from check_manual_test_guide import composable_names
 
 ROOT = Path(__file__).resolve().parents[1]
 LAYERS = {'core-ci', 'offline-ui', 'native-runtime-ui', 'controlled-integration', 'physical-human', 'release-audit'}
@@ -90,8 +92,10 @@ def screen_catalog(root, surfaces, cases, include_companions=False):
     for path in sorted((root / 'app/src/main/java/dev/ipf/whitenoise/android/ui').rglob('*.kt')):
         source = path.relative_to(root).as_posix()
         text = path.read_text()
-        names = re.findall(r'\bfun\s+([A-Z]\w*(?:Screen|Sheet|Dialog|FullScreen))\s*\(', text)
+        composables = composable_names(text)
+        names = {name for name in composables if name.endswith(('Screen', 'Sheet', 'Dialog', 'FullScreen'))}
         source_symbols = set(re.findall(r'\bfun\s+([A-Z]\w*)\s*\(', text))
+        source_symbols.update(name.rsplit('.', 1)[-1] for name in composables)
         companion_paths = sorted({path for symbol in source_symbols for path in companions.get(symbol, [])})
         if names and not source_ids.get(source):
             raise ValueError(f'UI surface has no maintained source/requirement mapping: {source}')
@@ -101,7 +105,7 @@ def screen_catalog(root, surfaces, cases, include_companions=False):
             result.append({'source': source, 'symbol': symbol, 'manual_ids': ids,
                            'related_ui_cases_by_requirement': related,
                            'companion_test_source_references': [
-                               {'source': path, 'direct_surface_reference': path in companions.get(symbol, [])}
+                               {'source': path, 'direct_surface_reference': path in companions.get(symbol.rsplit('.', 1)[-1], [])}
                                for path in companion_paths],
                            'execution_verified': False,
                            'edge_plan': [{'dimension': dimension, 'required_check': EDGE_CHECKS[dimension],
