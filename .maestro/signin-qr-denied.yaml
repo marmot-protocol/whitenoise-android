@@ -32,18 +32,30 @@ name: signin-qr-denied
       visible: "Don't allow"
     commands:
       - tapOn: "Don't allow"
+- assertVisible: "Camera Access Needed"
 - assertVisible: "Allow camera access to scan a Private Key QR code."
-- tapOn:
-    id: "qr_scanner.close"
+- assertVisible: "Close"
+- tapOn: "Close"
 - assertVisible: "Private key"
 - tapOn:
     id: "onboarding.sign_in.action"
 - assertVisible: "That doesn't look like a valid nsec or npub key."
 - tapOn:
     id: "onboarding.sign_in.scan"
+- runFlow:
+    when:
+      visible: "Don’t allow"
+    commands:
+      - tapOn: "Don’t allow"
+- runFlow:
+    when:
+      visible: "Don't allow"
+    commands:
+      - tapOn: "Don't allow"
+- assertVisible: "Camera Access Needed"
 - assertVisible: "Allow camera access to scan a Private Key QR code."
-- tapOn:
-    id: "qr_scanner.close"
+- assertVisible: "Close"
+- tapOn: "Close"
 - tapOn: "Back"
 - assertVisible: "Sign Up"
 - assertVisible: "Sign In"

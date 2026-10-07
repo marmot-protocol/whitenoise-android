@@ -1,6 +1,6 @@
 # On-demand Maestro onboarding tests
 
-This pilot checks an installed White Noise dev APK: welcome → Sign In →
+The original `onboarding` pilot checks an installed White Noise dev APK: welcome → Sign In →
 private-key screen → Android Back → welcome. It enters no key, creates no
 account and uses no relays. The disposable API 34 x86_64 emulator runs offline
 with runtime permissions denied. Each journey clears only that emulator's dev
@@ -41,7 +41,7 @@ Each allowlisted flow restores portrait orientation, clears only the disposable 
 
 The malformed nsec fixture has invalid shape and checksum; it never enters native login. These checks do **not** validate checksum-only rejection of an otherwise shaped secret key, import a secret, create an account, establish native account counts, or prove peer delivery. The public fixture encodes synthetic zero public bytes and is not an account credential. Warm resume keeps the same process; it does not test process death or private-key persistence. Camera access is never granted and no QR code is scanned. Rotation checks two orientations on this one emulator, not comprehensive layout/accessibility coverage. Real signer, authenticated-account, relay, physical-device and release checks remain separate.
 
-The existing test tags are exposed by the retained benchmark APK. [Maestro state selectors](https://docs.maestro.dev/reference/selectors/state-selectors) check enabled state; [hideKeyboard](https://docs.maestro.dev/reference/commands-available/hidekeyboard) dismisses the IME before the separate navigation assertion. [launchApp](https://docs.maestro.dev/reference/commands-available/launchapp) with `stopApp: false` and `clearState: false` resumes the app after Home; permissions remain explicitly denied because the command otherwise defaults to granting them. [setOrientation](https://docs.maestro.dev/reference/commands-available/setorientation) checks landscape and portrait. No fixed sleeps or coordinate taps are needed.
+The existing test tags are exposed by the retained benchmark APK. [Maestro state selectors](https://docs.maestro.dev/reference/selectors/state-selectors) check enabled state; [hideKeyboard](https://docs.maestro.dev/reference/commands-available/hidekeyboard) dismisses the IME before the separate navigation assertion. [launchApp](https://docs.maestro.dev/reference/commands-available/launchapp) with `stopApp: false` and `clearState: false` resumes the app after Home; permissions remain explicitly denied because the command otherwise defaults to granting them. [setOrientation](https://docs.maestro.dev/reference/commands-available/setorientation) checks landscape and portrait. The denied-camera sheet uses the observed accessibility label `Close`: the retained APK does not export its modal button test tag as a resource ID. Both openings handle a permission-denial prompt if Android displays one. No fixed sleeps or coordinate taps are needed.
 
 ## What to add next
 
