@@ -67,20 +67,17 @@ before installing it. It uses checksummed Maestro CLI 2.11.0 and the existing
 SHA-pinned emulator runner. Its token has read-only permissions and is exposed
 only to metadata/download steps, not the emulator/test step.
 
-## Preserve spare CI capacity
+## Run alongside normal CI
 
-Request a pilot after normal CI finishes. A bounded check rejects other queued
-or active repository runs before setup and rechecks just before emulator boot.
-It fails closed when metadata is unavailable and never waits in a polling loop
-or cancels another run. Pilot dispatches have a separate concurrency group with
-cancellation disabled. This check detects existing work; it cannot reserve
-capacity against CI that starts later. The only excluded workflow is the
-lightweight PR screenshot-description updater.
-The concurrency group protects an active pilot but keeps only one pending
-dispatch: another dispatch can replace that pending run. Request one at a time.
+The pilot can start while other repository CI is queued or running. It reuses
+an existing APK and occupies one GitHub-hosted runner for at most 15 minutes;
+this can affect runner queue time. It never cancels another workflow or waits
+for the whole repository to become idle.
 
-If the capacity check fails, reuse the same artifact in a new manual request
-after CI becomes idle. Do not rebuild the app or make an empty commit.
+Pilot dispatches have a separate concurrency group with cancellation disabled.
+The group protects one active pilot but keeps only one pending dispatch:
+another dispatch can replace that pending run. Request one at a time. Normal
+push and PR checks retain their existing concurrency and execution behavior.
 
 ## Repetition, failure proof and results
 
