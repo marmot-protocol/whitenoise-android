@@ -9,14 +9,16 @@ Before launch, the runner applies airplane mode through Android's connectivity
 service, disables Wi-Fi and mobile data, and requires no active default network.
 The bounded check retains its connectivity dump as `network-state.txt`.
 
-Select the original `onboarding` journey or the six-case `offline` suite. It is
+Select `onboarding`, the original six-case `offline` suite, or the focused
+`offline-signin` (nine cases) and `offline-signup` (seven cases) suites. Together
+the focused suites cover all sixteen distinct journeys. The pilot is
 manually requested, is not a required PR check and has no automatic Maestro
 trigger. Normal instrumented tests remain unchanged. There is no Maestro Cloud
 account, API key, shared-phone access or local app build.
 
 ## Offline coverage and limits
 
-Each allowlisted flow clears only the disposable dev app state, denies permissions and dismisses the known optional diagnostics sheet. Case names and screenshots are unique across repetitions. `suite-manifest.json` records the exact selected cases and their partial manual-checklist mappings; `suite-results.json` reconciles actual JUnit against that selection. Missing, extra, duplicated, skipped or failed cases cannot be reported as passing. The intentional negative control is recorded separately and still leaves the job failed.
+Each allowlisted flow restores portrait orientation, clears only the disposable dev app state, denies permissions and dismisses the known optional diagnostics sheet. Case names and screenshots are unique across repetitions. `suite-manifest.json` records the exact selected cases and their partial manual-checklist mappings; `suite-results.json` reconciles actual JUnit against that selection. Missing, extra, duplicated, skipped or failed cases cannot be reported as passing. The intentional negative control is recorded separately and still leaves the job failed.
 
 | Flow | Assertions | Partial checklist coverage |
 |---|---|---|
@@ -26,10 +28,20 @@ Each allowlisted flow clears only the disposable dev app state, denies permissio
 | `signin-back` | Amber action absent; toolbar and Android Back work after typing | `ONB-004`, `ONB-010` |
 | `signup-cancel` | Synthetic Name/About edits; cancellation and reopening | `ONB-002` |
 | `signup-offline-retry` | Offline notice, Retry, retained edits, cancellation and reopening | `ONB-002` |
+| `signin-clear` | Clear a rejected value; error disappears and empty action disables | `ONB-004`, `ONB-005` |
+| `signin-edit-error` | Editing clears a stale validation error; submitting the new invalid value rejects it | `ONB-005` |
+| `signin-whitespace` | Spaces leave the action disabled; padded public npub is classified after trimming | `ONB-005` |
+| `signin-qr-denied` | Denied camera explains private-key scanning; close/reopen preserves entered input | `ONB-004`, `ONB-006` |
+| `signin-warm-resume` | Background/foreground preserves synthetic input and validation remains usable | `ONB-004`, `ONB-005` |
+| `signup-system-back` | Android Back dismisses the keyboard before leaving; reopening discards draft | `ONB-002` |
+| `signup-warm-resume` | Background/foreground retains Name/About draft | `ONB-002` |
+| `signup-edit-retry` | Edits after an offline failure survive another Retry | `ONB-002` |
+| `signup-rotation` | Landscape/portrait retains draft and leaves the action reachable | `ONB-001`, `ONB-002` |
+| `signup-empty-offline` | Blank draft reaches offline notice; Retry and cancellation remain usable | `ONB-002` |
 
-The malformed nsec fixture has invalid shape and checksum; it never enters native login. These checks do **not** validate checksum-only rejection of an otherwise shaped secret key, import a secret, create an account, establish native account counts, or prove peer delivery. The public fixture encodes synthetic zero public bytes and is not an account credential. Real signer, authenticated-account, relay, layout, accessibility, device and release checks remain separate.
+The malformed nsec fixture has invalid shape and checksum; it never enters native login. These checks do **not** validate checksum-only rejection of an otherwise shaped secret key, import a secret, create an account, establish native account counts, or prove peer delivery. The public fixture encodes synthetic zero public bytes and is not an account credential. Warm resume keeps the same process; it does not test process death or private-key persistence. Camera access is never granted and no QR code is scanned. Rotation checks two orientations on this one emulator, not comprehensive layout/accessibility coverage. Real signer, authenticated-account, relay, physical-device and release checks remain separate.
 
-The existing test tags are exposed by the retained benchmark APK. [Maestro state selectors](https://docs.maestro.dev/reference/selectors/state-selectors) check enabled state; [hideKeyboard](https://docs.maestro.dev/reference/commands-available/hidekeyboard) dismisses the IME before the separate navigation assertion. No fixed sleeps or coordinate taps are needed.
+The existing test tags are exposed by the retained benchmark APK. [Maestro state selectors](https://docs.maestro.dev/reference/selectors/state-selectors) check enabled state; [hideKeyboard](https://docs.maestro.dev/reference/commands-available/hidekeyboard) dismisses the IME before the separate navigation assertion. [launchApp](https://docs.maestro.dev/reference/commands-available/launchapp) with `stopApp: false` and `clearState: false` resumes the app after Home; permissions remain explicitly denied because the command otherwise defaults to granting them. [setOrientation](https://docs.maestro.dev/reference/commands-available/setorientation) checks landscape and portrait. No fixed sleeps or coordinate taps are needed.
 
 ## What to add next
 
@@ -64,7 +76,7 @@ successful attempt that also ran the Baseline Profile job.
 
 In **Actions → Android Instrumented Tests → Run workflow**, select the flow
 branch, enable `maestro_pilot`, and fill `maestro_artifact_id` and
-`maestro_source_sha`. Leave the demo/provider options off. Select `maestro_suite=offline` for the expanded checks, or leave `onboarding` selected for the original navigation check. Keep repetitions at `1` and negative control off for the first run.
+`maestro_source_sha`. Leave the demo/provider options off. Select `offline-signin`, collect its result, then separately request `offline-signup` for all expanded checks. Select `offline` for the original six-case regression slice, or `onboarding` for the original navigation check. Keep repetitions at `1` and negative control off for the first run.
 
 The equivalent CLI request is:
 
@@ -104,7 +116,7 @@ push and PR checks retain their existing concurrency and execution behavior.
 
 ## Repetition, failure proof and results
 
-The original `onboarding` suite permits 1–20 repetitions. The `offline` suite permits 1–3 repetitions: six distinct cases run once, twice or three times (6, 12 or 18 journeys). A request exceeding 20 positive journeys fails before APK download or emulator setup. All cases share one boot and CLI invocation. The emulator and Maestro driver stay warm; app state is fresh
+The original `onboarding` suite permits 1–20 repetitions. The `offline` suite permits 1–3 repetitions: six distinct cases run once, twice or three times (6, 12 or 18 journeys). The focused suites permit **one repetition** each: nine sign-in/navigation cases or seven Sign Up cases. Run them separately; combining all sixteen or repeating the longer lifecycle cases could exhaust the ten-minute CLI deadline. Unsupported repetitions and requests exceeding 20 positive journeys fail before APK download or emulator setup. All cases share one boot and CLI invocation. The emulator and Maestro driver stay warm; app state is fresh
 for each journey. This checks consistency rather than production performance.
 
 To check failure reporting, enable `maestro_negative_control`. An additional

@@ -1,5 +1,5 @@
 appId: dev.ipf.whitenoise.android.dev
-name: signup-offline-retry
+name: signup-edit-retry
 ---
 # Stop the previous foreground process before Android clears its data.
 - stopApp
@@ -8,6 +8,7 @@ name: signup-offline-retry
     clearState: true
     permissions:
       all: deny
+# Back closes this known optional sheet and records declined sharing choices.
 - runFlow:
     when:
       visible: "Help Improve White Noise"
@@ -33,8 +34,6 @@ name: signup-offline-retry
     id: "onboarding.sign_up.about"
 - inputText: "Synthetic offline test only"
 - hideKeyboard
-- assertVisible: "Maestro Offline Draft"
-- assertVisible: "Synthetic offline test only"
 - tapOn:
     id: "onboarding.sign_up.action"
 - scrollUntilVisible:
@@ -42,20 +41,45 @@ name: signup-offline-retry
       text: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
     direction: DOWN
 - assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
-- tapOn: "Retry"
-- assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
-- scrollUntilVisible:
-    element:
-      text: "Maestro Offline Draft"
-    direction: UP
-- assertVisible: "Maestro Offline Draft"
-- assertVisible: "Synthetic offline test only"
-- tapOn: "Back"
-- assertVisible: "Sign In"
-- tapOn: "Sign Up"
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.name"
+    direction: UP
+- tapOn:
+    id: "onboarding.sign_up.name"
+- eraseText
+- inputText: "Maestro Edited Draft"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.about"
     direction: DOWN
-- assertVisible: "Name"
-- takeScreenshot: signup-offline-retry
+- tapOn:
+    id: "onboarding.sign_up.about"
+- eraseText
+- inputText: "Edited after offline failure"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Retry"
+    direction: DOWN
+- tapOn: "Retry"
+- scrollUntilVisible:
+    element:
+      text: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+    direction: DOWN
+- assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+- scrollUntilVisible:
+    element:
+      text: "Maestro Edited Draft"
+    direction: UP
+- assertVisible: "Maestro Edited Draft"
+- scrollUntilVisible:
+    element:
+      text: "Edited after offline failure"
+    direction: DOWN
+- assertVisible: "Edited after offline failure"
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- takeScreenshot: signup-edit-retry

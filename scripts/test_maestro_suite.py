@@ -16,7 +16,8 @@ class MaestroSuiteTest(unittest.TestCase):
             with self.subTest(flow=filename):
                 flow = (suite.ROOT / '.maestro' / filename).read_text()
                 self.assertIn('clearState: true', flow)
-                self.assertLess(flow.index('- stopApp'), flow.index('- launchApp:'))
+                self.assertLess(flow.index('- stopApp'), flow.index('- setOrientation: PORTRAIT'))
+                self.assertLess(flow.index('- setOrientation: PORTRAIT'), flow.index('- launchApp:'))
                 self.assertIn('all: deny', flow)
                 self.assertNotIn('openLink:', flow)
                 self.assertNotIn('point:', flow)
@@ -40,6 +41,25 @@ class MaestroSuiteTest(unittest.TestCase):
                        ('onboarding', '21', 'false'), ('offline', '1\n', 'false')]:
             with self.subTest(values=values), self.assertRaises(ValueError):
                 suite.selection(*values)
+
+    def test_focused_slices_cover_all_cases_with_bounded_runtime(self):
+        signin, signup = set(suite.SUITES['offline-signin']), set(suite.SUITES['offline-signup'])
+        self.assertEqual((len(signin), len(signup)), (9, 7))
+        self.assertFalse(signin & signup)
+        self.assertEqual(signin | signup, set(suite.CASES))
+        for key in ('offline-signin', 'offline-signup'):
+            self.assertEqual(suite.selection(key, '1', 'true')[1], 1)
+            with self.assertRaises(ValueError):
+                suite.selection(key, '2', 'false')
+
+    def test_background_resume_retains_state_and_denies_permissions(self):
+        for key in ('signin-warm-resume', 'signup-warm-resume'):
+            flow = (suite.ROOT / '.maestro' / suite.CASES[key][0]).read_text()
+            resume = flow.split('- pressKey: Home', 1)[1]
+            self.assertIn('stopApp: false', resume)
+            self.assertIn('clearState: false', resume)
+            self.assertIn('all: deny', resume)
+            self.assertNotIn('clearState: true', resume)
 
     def test_every_selected_case_is_unique_and_mapped(self):
         with tempfile.TemporaryDirectory() as temporary:

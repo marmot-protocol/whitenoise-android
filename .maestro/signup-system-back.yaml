@@ -1,5 +1,5 @@
 appId: dev.ipf.whitenoise.android.dev
-name: signup-cancel
+name: signup-system-back
 ---
 # Stop the previous foreground process before Android clears its data.
 - stopApp
@@ -8,6 +8,7 @@ name: signup-cancel
     clearState: true
     permissions:
       all: deny
+# Back closes this known optional sheet and records declined sharing choices.
 - runFlow:
     when:
       visible: "Help Improve White Noise"
@@ -24,7 +25,8 @@ name: signup-cancel
     id: "onboarding.sign_up.name"
 - eraseText
 - inputText: "Maestro Offline Draft"
-- hideKeyboard
+- back
+- assertVisible: "Maestro Offline Draft"
 - scrollUntilVisible:
     element:
       id: "onboarding.sign_up.about"
@@ -32,15 +34,14 @@ name: signup-cancel
 - tapOn:
     id: "onboarding.sign_up.about"
 - inputText: "Synthetic offline test only"
-- hideKeyboard
-- assertVisible: "Maestro Offline Draft"
+- back
 - assertVisible: "Synthetic offline test only"
-- tapOn: "Back"
+- back
 - assertVisible: "Sign In"
 - tapOn: "Sign Up"
-- scrollUntilVisible:
-    element:
-      id: "onboarding.sign_up.name"
-    direction: DOWN
-- assertVisible: "Name"
-- takeScreenshot: signup-cancel
+- assertNotVisible: "Maestro Offline Draft"
+- assertNotVisible: "Synthetic offline test only"
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- takeScreenshot: signup-system-back

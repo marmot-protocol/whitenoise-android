@@ -17,16 +17,36 @@ CASES = {
     'signup-cancel': ('signup-cancel.yaml', ['ONB-002']),
     'signup-offline-retry': ('signup-offline-retry.yaml', ['ONB-002']),
 }
-SUITES = {'onboarding': ('onboarding',), 'offline': tuple(CASES)}
+OFFLINE_BASELINE = tuple(CASES)
+CASES.update({
+    'signin-clear': ('signin-clear.yaml', ['ONB-004', 'ONB-005']),
+    'signin-edit-error': ('signin-edit-error.yaml', ['ONB-005']),
+    'signin-whitespace': ('signin-whitespace.yaml', ['ONB-005']),
+    'signin-qr-denied': ('signin-qr-denied.yaml', ['ONB-004', 'ONB-006']),
+    'signin-warm-resume': ('signin-warm-resume.yaml', ['ONB-004', 'ONB-005']),
+    'signup-system-back': ('signup-system-back.yaml', ['ONB-002']),
+    'signup-warm-resume': ('signup-warm-resume.yaml', ['ONB-002']),
+    'signup-edit-retry': ('signup-edit-retry.yaml', ['ONB-002']),
+    'signup-rotation': ('signup-rotation.yaml', ['ONB-001', 'ONB-002']),
+    'signup-empty-offline': ('signup-empty-offline.yaml', ['ONB-002']),
+})
+SUITES = {
+    'onboarding': ('onboarding',),
+    'offline': OFFLINE_BASELINE,
+    'offline-signin': ('onboarding',) + tuple(key for key in CASES if key.startswith('signin-')),
+    'offline-signup': tuple(key for key in CASES if key.startswith('signup-')),
+}
 NEGATIVE_ASSERTION = 'MAESTRO_NEGATIVE_CONTROL_IMPOSSIBLE_3141'
 
 
 def selection(suite, repetitions, negative):
     """Fail before emulator setup for unknown suites or an excessive case budget."""
     if suite not in SUITES or not re.fullmatch(r'([1-9]|1[0-9]|20)', repetitions):
-        raise ValueError('Select onboarding/offline and 1 through 20 repetitions')
+        raise ValueError('Select an allowlisted suite and 1 through 20 repetitions')
     if negative not in ('true', 'false'):
         raise ValueError('Negative control must be true or false')
+    if suite in ('offline-signin', 'offline-signup') and repetitions != '1':
+        raise ValueError('Focused expanded suites permit one repetition within the ten-minute CLI budget')
     count = len(SUITES[suite]) * int(repetitions)
     if count > 20:
         raise ValueError('At most 20 positive journeys; offline permits 1 through 3 repetitions')

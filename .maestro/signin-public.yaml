@@ -3,6 +3,7 @@ name: signin-public
 ---
 # Stop the previous foreground process before Android clears its data.
 - stopApp
+- setOrientation: PORTRAIT
 - launchApp:
     clearState: true
     permissions:

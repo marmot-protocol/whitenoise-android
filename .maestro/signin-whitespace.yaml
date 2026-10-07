@@ -1,5 +1,5 @@
 appId: dev.ipf.whitenoise.android.dev
-name: signin-invalid
+name: signin-whitespace
 ---
 # Stop the previous foreground process before Android clears its data.
 - stopApp
@@ -8,6 +8,7 @@ name: signin-invalid
     clearState: true
     permissions:
       all: deny
+# Back closes this known optional sheet and records declined sharing choices.
 - runFlow:
     when:
       visible: "Help Improve White Noise"
@@ -16,31 +17,22 @@ name: signin-invalid
 - assertVisible: "Sign Up"
 - assertVisible: "Sign In"
 - tapOn: "Sign In"
-- assertVisible: "Private key"
+- tapOn: "Private key"
+- inputText: "   "
+- hideKeyboard
 - assertVisible:
     id: "onboarding.sign_in.action"
     enabled: false
-- tapOn: "Private key"
-- inputText: "not-a-key"
-- hideKeyboard
-- tapOn:
-    id: "onboarding.sign_in.action"
-- assertVisible: "That doesn't look like a valid nsec or npub key."
+- assertNotVisible: "That doesn't look like a valid nsec or npub key."
+- assertVisible: "Enter your Nostr secret key to use an existing identity on this device."
 - tapOn: "Clear"
 - tapOn: "Private key"
-# Invalid shape AND checksum; does not test native checksum validation.
-- inputText: "nsec1invalid-checksum!"
+- inputText: "  npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzqujme  "
 - hideKeyboard
 - tapOn:
     id: "onboarding.sign_in.action"
-- assertVisible: "That doesn't look like a valid nsec or npub key."
+- assertVisible: "That's a public key. Enter your secret key (nsec) to sign in."
 - tapOn: "Back"
 - assertVisible: "Sign Up"
 - assertVisible: "Sign In"
-- assertNotVisible: "Private key"
-- tapOn: "Sign In"
-- assertVisible: "Private key"
-- takeScreenshot: signin-invalid
-- tapOn: "Back"
-- assertVisible: "Sign Up"
-- assertVisible: "Sign In"
+- takeScreenshot: signin-whitespace
