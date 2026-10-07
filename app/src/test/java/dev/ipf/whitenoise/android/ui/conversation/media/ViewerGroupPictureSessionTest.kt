@@ -191,7 +191,9 @@ class ViewerGroupPictureSessionTest {
     private fun png(): ByteArray =
         ByteArrayOutputStream()
             .also {
-                Bitmap.createBitmap(40, 20, Bitmap.Config.ARGB_8888).compress(Bitmap.CompressFormat.PNG, 100, it)
+                val bitmap = Bitmap.createBitmap(192, 96, Bitmap.Config.ARGB_8888)
+                bitmap.eraseColor(android.graphics.Color.RED)
+                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
             }.toByteArray()
 
     private fun reference() =

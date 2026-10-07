@@ -2289,4 +2289,5 @@
     <string name="pinned_shortcut_finish">Confirmez dans votre lanceur pour ajouter cette discussion.</string>
     <string name="pinned_shortcut_unavailable">Cette discussion n’est plus disponible.</string>
     <string name="pinned_shortcut_failed">Impossible de demander un raccourci. Réessayez.</string>
+    <string name="media_set_group_picture">Définir comme photo du groupe</string>
 </resources>

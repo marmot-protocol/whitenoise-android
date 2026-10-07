@@ -2289,4 +2289,5 @@
     <string name="pinned_shortcut_finish">Confirme no iniciador para adicionar esta conversa.</string>
     <string name="pinned_shortcut_unavailable">Esta conversa já não está disponível.</string>
     <string name="pinned_shortcut_failed">Não foi possível solicitar um atalho. Tente novamente.</string>
+    <string name="media_set_group_picture">Definir como foto do grupo</string>
 </resources>

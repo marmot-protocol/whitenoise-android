@@ -2306,4 +2306,5 @@
     <string name="pinned_shortcut_finish">Bestätige im Launcher, um diese Unterhaltung hinzuzufügen.</string>
     <string name="pinned_shortcut_unavailable">Diese Unterhaltung ist nicht mehr verfügbar.</string>
     <string name="pinned_shortcut_failed">Die Verknüpfung konnte nicht angefordert werden. Versuche es erneut.</string>
+    <string name="media_set_group_picture">Als Gruppenbild festlegen</string>
 </resources>

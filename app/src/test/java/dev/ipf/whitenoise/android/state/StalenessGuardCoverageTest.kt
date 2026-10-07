@@ -275,6 +275,8 @@ class StalenessGuardCoverageTest {
                 "Controllers.kt:updateGroupAvatarUrl" to "conversation mutation mutex",
                 // The conversation mutation mutex serializes public/encrypted image replacement.
                 "Controllers.kt:updateGroupImage" to "conversation mutation mutex",
+                // Called only inside updateGroupImage's mutation mutex; native entry rechecks the captured viewer owner.
+                "Controllers.kt:commitGroupImageMutation" to "serialized group command with captured owner checks",
                 // Retention update and its timeline refresh are one serialized group mutation.
                 "Controllers.kt:updateMessageRetention" to "conversation mutation mutex",
                 // Export returns a temporary file and does not publish controller state.
