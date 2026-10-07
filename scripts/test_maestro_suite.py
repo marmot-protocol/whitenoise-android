@@ -34,7 +34,39 @@ class MaestroSuiteTest(unittest.TestCase):
                 self.assertIn('- scrollUntilVisible:', before_about)
                 self.assertLess(before_about.index(dismiss), before_about.index('- scrollUntilVisible:'))
 
+    def test_checksum_case_reaches_native_validation_with_only_checksum_changed(self):
+        """Keep the checksum fixture secret-shaped and invalid without using a live credential."""
+        valid = 'nsec1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsmhltgl'
+        corrupted = valid[:-1] + 'q'
+        alphabet = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'
+        self.assertEqual(len(corrupted), 63)
+        self.assertTrue(all(char in alphabet for char in corrupted[5:]))
+        self.assertEqual(valid[:-6], corrupted[:-6])
+        self.assertEqual(sum(a != b for a, b in zip(valid, corrupted)), 1)
+        self.assertEqual(self.checksum(valid, alphabet), 1)
+        self.assertNotEqual(self.checksum(corrupted, alphabet), 1)
+        flow = (suite.ROOT / '.maestro/signin-invalid.yaml').read_text()
+        self.assertIn('- inputText: "' + corrupted + '"', flow)
+        self.assertIn("Couldn't sign in with that key. Check it and try again.", flow)
+
+    @staticmethod
+    def checksum(value, alphabet):
+        """Check only fixture integrity using the public Bech32 checksum polynomial."""
+        hrp, data = value.rsplit('1', 1)
+        values = [ord(char) >> 5 for char in hrp] + [0] + [ord(char) & 31 for char in hrp]
+        values += [alphabet.index(char) for char in data]
+        result = 1
+        generators = (0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
+        for entry in values:
+            top = result >> 25
+            result = (result & 0x1ffffff) << 5 ^ entry
+            for bit, generator in enumerate(generators):
+                if top >> bit & 1:
+                    result ^= generator
+        return result
+
     def test_allowlist_and_budget_before_setup(self):
+        """Reject unknown suites and excessive repetitions before setup can create artifacts."""
         self.assertEqual(suite.selection('onboarding', '20', 'false')[1], 20)
         self.assertEqual(len(suite.selection('offline', '3', 'false')[0]) * 3, 18)
         for values in [('offline', '4', 'false'), ('../other', '1', 'false'),
@@ -44,6 +76,7 @@ class MaestroSuiteTest(unittest.TestCase):
                 suite.selection(*values)
 
     def test_focused_slices_cover_all_cases_with_bounded_runtime(self):
+        """Keep expanded slices disjoint and complete while preserving original suite budgets."""
         signin, signup = set(suite.SUITES['offline-signin']), set(suite.SUITES['offline-signup'])
         self.assertEqual((len(signin), len(signup)), (9, 7))
         self.assertFalse(signin & signup)
@@ -55,6 +88,7 @@ class MaestroSuiteTest(unittest.TestCase):
                 suite.selection(key, '2', 'false')
 
     def test_background_resume_retains_state_and_denies_permissions(self):
+        """Preserve only intended warm-resume state with permissions explicitly denied."""
         for key in ('signin-warm-resume', 'signup-warm-resume'):
             flow = (suite.ROOT / '.maestro' / suite.CASES[key][0]).read_text()
             resume = flow.split('- pressKey: Home', 1)[1]
@@ -64,6 +98,7 @@ class MaestroSuiteTest(unittest.TestCase):
             self.assertNotIn('clearState: true', resume)
 
     def test_every_selected_case_is_unique_and_mapped(self):
+        """Keep names and permanent checklist mappings unique across repetitions."""
         with tempfile.TemporaryDirectory() as temporary:
             destination = Path(temporary)
             manifest = suite.prepare('offline', '3', 'true', destination)
@@ -78,6 +113,7 @@ class MaestroSuiteTest(unittest.TestCase):
                 suite.prepare('onboarding', '1', 'false', destination)
 
     def test_missing_flow_cannot_leave_partial_suite(self):
+        """Reject absent flow sources before writing any partial prepared suite."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             with self.assertRaises(FileNotFoundError):
@@ -98,6 +134,7 @@ class MaestroSuiteTest(unittest.TestCase):
         return document, report
 
     def test_completed_positive_and_intentional_failure_have_distinct_results(self):
+        """Accept only complete positives and the exact deliberate assertion as control evidence."""
         for control in (False, True):
             with self.subTest(control=control), tempfile.TemporaryDirectory() as temporary:
                 destination = Path(temporary)
@@ -108,6 +145,7 @@ class MaestroSuiteTest(unittest.TestCase):
                 self.assertTrue(result['evidence_complete'])
 
     def test_missing_duplicate_unexpected_skipped_failed_cases_do_not_pass(self):
+        """Reject mismatched discovery and skipped or failed selected assertions."""
         for fault in ('missing', 'duplicate', 'unexpected', 'skipped', 'failed', 'non_success'):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
                 destination = Path(temporary)
@@ -128,6 +166,7 @@ class MaestroSuiteTest(unittest.TestCase):
                     suite.report(destination, 0)
 
     def test_setup_failure_or_unexpected_exit_is_not_negative_proof(self):
+        """Prevent setup errors and timeout exits from masquerading as a deliberate control."""
         for fault in ('driver_error', 'skipped', 'unexpected_exit', 'timeout', 'killed'):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
                 destination = Path(temporary)
@@ -144,6 +183,7 @@ class MaestroSuiteTest(unittest.TestCase):
                 self.assertFalse(saved['evidence_complete'])
 
     def test_absent_junit_is_not_success(self):
+        """Require an actual UI report rather than a successful-looking command exit."""
         with tempfile.TemporaryDirectory() as temporary:
             destination = Path(temporary)
             suite.prepare('offline', '1', 'false', destination)

@@ -5,6 +5,7 @@ gradle.beforeProject { project ->
             project.androidComponents.finalizeDsl { android ->
                 android.productFlavors.getByName('dev').applicationIdSuffix = '.maestrolab'
                 android.productFlavors.getByName('dev').manifestPlaceholders['appName'] = 'Maestro Test Lab'
+                android.buildTypes.getByName('debug').buildConfigField('boolean', 'ENABLE_PERFORMANCE_TEST_SELECTORS', 'true')
                 android.defaultConfig.testInstrumentationRunner = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
             }
         }

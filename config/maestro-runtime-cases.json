@@ -209,6 +209,224 @@
       ],
       "assertions": "Attachment menu opens and dismisses without starting a media send.",
       "postcondition": "none"
+    },
+    "advanced-dictation": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-027"
+      ],
+      "assertions": "Dictation opens its own content and System Back returns to Settings.",
+      "postcondition": "none"
+    },
+    "advanced-gestures": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-032"
+      ],
+      "assertions": "Swipe actions opens its own content and System Back returns to Settings.",
+      "postcondition": "none"
+    },
+    "advanced-folders": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Folders opens its own content and System Back returns to Settings.",
+      "postcondition": "none"
+    },
+    "advanced-relays": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-001"
+      ],
+      "assertions": "Relays opens its own content and System Back returns to Settings.",
+      "postcondition": "none"
+    },
+    "advanced-folder-create-cancel": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Back cancels an entered folder name and no new folder appears.",
+      "postcondition": "none"
+    },
+    "advanced-custom-emoji": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-030"
+      ],
+      "assertions": "Custom emoji management opens with photo/file actions and Back returns to Appearance.",
+      "postcondition": "none"
+    },
+    "connectors-hermes": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "hermes setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "connectors-openclaw": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "openclaw setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "connectors-opencode": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "opencode setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "connectors-codex": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "codex setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "connectors-claude": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "claude setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "groups-details-return": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-001",
+        "NAV-008"
+      ],
+      "assertions": "Conversation header opens real group details and Back restores its history.",
+      "postcondition": "none"
+    },
+    "groups-members": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Native group roster displays both generated members.",
+      "postcondition": "none"
+    },
+    "groups-relays": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Group relay details can be opened and dismissed without editing or publishing relay configuration.",
+      "postcondition": "none"
+    },
+    "creation-message-back": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-001"
+      ],
+      "assertions": "New Message opens its recipient screen and Back restores the chat list.",
+      "postcondition": "none"
+    },
+    "creation-search-invalid": {
+      "suite": "creation",
+      "manual_ids": [
+        "FIND-006",
+        "NCH-001"
+      ],
+      "assertions": "Malformed recipient input stays in the picker; no conversation is opened automatically.",
+      "postcondition": "none"
+    },
+    "creation-group-back": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-002"
+      ],
+      "assertions": "Group recipient picker Back restores New Message.",
+      "postcondition": "none"
+    },
+    "creation-group-setup-cancel": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-002"
+      ],
+      "assertions": "An entered group name can be canceled before native submission.",
+      "postcondition": "none"
+    },
+    "creation-group-name-retained": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-002"
+      ],
+      "assertions": "Unsubmitted setup name survives Back to the recipient picker and return.",
+      "postcondition": "none"
+    },
+    "actions-edit-cancel": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-007"
+      ],
+      "assertions": "Editing an outgoing fixture message can be canceled with its original text retained.",
+      "postcondition": "none"
+    },
+    "actions-forward-cancel": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-010"
+      ],
+      "assertions": "Forward destination picker opens then cancels without sending.",
+      "postcondition": "none"
+    },
+    "actions-selection-back": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-012"
+      ],
+      "assertions": "Explicit Select mode can be dismissed while keeping the transcript.",
+      "postcondition": "none"
+    },
+    "actions-info-back": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-013"
+      ],
+      "assertions": "Message information opens and Back restores its source transcript.",
+      "postcondition": "none"
+    },
+    "groups-mute-cancel": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-015"
+      ],
+      "assertions": "Mute duration dialog cancels without activating a mute.",
+      "postcondition": "none"
+    },
+    "groups-retention-cancel": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-017"
+      ],
+      "assertions": "Disappearing-message picker opens and cancels before a native mutation.",
+      "postcondition": "none"
+    },
+    "groups-edit-cancel": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-002"
+      ],
+      "assertions": "Admin group editor opens and cancels with the existing group title retained.",
+      "postcondition": "none"
+    },
+    "groups-notifications-back": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-016"
+      ],
+      "assertions": "Conversation notification settings opens through group details and Back restores that group.",
+      "postcondition": "none"
     }
   }
 }

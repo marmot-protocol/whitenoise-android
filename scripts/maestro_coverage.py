@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def inventory(root=ROOT):
+    """Assemble fragment-aware requirements and partial mappings without claiming execution."""
     requirements = definitions(load_guide(root))
     surfaces = load_inventory(root)['categories']
     cases = {name: {'manual_ids': values[1], 'layer': 'offline-ui'} for name, values in OFFLINE.items()}
@@ -35,6 +36,7 @@ def inventory(root=ROOT):
 
 
 def main():
+    """Write the coverage inventory; reject a full-proof request while mappings remain partial."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--require-full', action='store_true')

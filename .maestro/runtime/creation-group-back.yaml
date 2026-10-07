@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: creation-group-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "New Message"
+- assertVisible:
+    id: "new_message.screen"
+- tapOn: "New Group"
+- assertVisible:
+    id: "new_group.screen"
+- back
+- assertVisible:
+    id: "new_message.screen"

@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: connectors-codex
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "AI Agents"
+    direction: DOWN
+- tapOn: "AI Agents"
+- tapOn:
+    id: "ai_agents.connector.codex"
+- assertVisible:
+    id: "ai_agents.prompt.codex"
+- assertVisible:
+    id: "ai_agents.copy.codex"
+- back
+- assertNotVisible:
+    id: "ai_agents.setup_content"
+- assertVisible:
+    id: "ai_agents.connectors"

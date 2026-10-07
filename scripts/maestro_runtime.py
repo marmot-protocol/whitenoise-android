@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -14,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences')
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions')
 CASES = json.loads((ROOT / 'config/maestro-runtime-cases.json').read_text())['cases']
 
 
@@ -27,16 +28,21 @@ def receipt(text, generation, flag):
 
 
 def ui_result(path, name):
+    """Require one named successful UI assertion and a finite nonnegative duration."""
     cases = list(ET.parse(path).getroot().iter('testcase'))
     if len(cases) != 1 or cases[0].get('name') != name:
         raise ValueError('Missing, duplicate or unexpected Maestro case')
     case = cases[0]
     if case.get('status') != 'SUCCESS' or any(child.tag in ('failure', 'error', 'skipped') for child in case):
         raise ValueError('Maestro case did not pass')
-    return float(case.get('time', '0'))
+    seconds = float(case.get('time', '0'))
+    if not math.isfinite(seconds) or seconds < 0:
+        raise ValueError('Invalid Maestro duration')
+    return seconds
 
 
 def command(arguments, **kwargs):
+    """Run a bounded device command and propagate transport or nonzero-exit failures."""
     return subprocess.run(arguments, check=True, timeout=30, capture_output=True, text=True, **kwargs).stdout
 
 
@@ -48,8 +54,10 @@ def run_case(name, reports):
     relative = f'files/maestro-{generation}'
     adb = ['adb', '-s', 'emulator-5554']
     def read(flag):
+        """Read only the current generated fixture receipt from the isolated package."""
         return command(adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/{flag}.json'])
-    record = {'case': name, 'generation': generation, 'passed': False, **CASES[name]}
+    record = {'case': name, 'generation': generation, 'passed': False, 'cleanup_safe': False, **CASES[name]}
+    failure = None
     with (directory / 'instrumentation.txt').open('w') as log:
         process = subprocess.Popen(adb + ['shell', 'am', 'instrument', '-w', '-r',
                                          '-e', 'class', HOST, '-e', 'fixtureGeneration', generation,
@@ -77,29 +85,46 @@ def run_case(name, reports):
             if result.returncode != 0:
                 raise ValueError(f'Maestro exit {result.returncode}')
             record['seconds'] = ui_result(directory / 'junit.xml', name)
+        except Exception as error:
+            failure = error
+            record['failure'] = f'{type(error).__name__}: {error}'
         finally:
+            # Preserve readiness diagnostics even when Maestro never started.
+            for filename in ('setup.json', 'setup-tree.txt'):
+                try:
+                    diagnostic = command(adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/{filename}'])
+                    (directory / filename).write_text(diagnostic[:256000])
+                except subprocess.CalledProcessError:
+                    pass
             # Stop only this generated host; do not reset an installed user package.
             try:
-                command(adb + ['shell', 'run-as', PACKAGE, 'touch', f'{relative}/finish'])
-                process.wait(timeout=60)
+                if process.poll() is None:
+                    command(adb + ['shell', 'run-as', PACKAGE, 'touch', f'{relative}/finish'])
+                    process.wait(timeout=60)
+                closed = receipt(read('closed'), generation, 'closed')
+                (directory / 'closed.json').write_text(json.dumps(closed, indent=2) + '\n')
+                record['cleanup_safe'] = True
+                verified = receipt(read('verified'), generation, 'verified')
+                (directory / 'verified.json').write_text(json.dumps(verified, indent=2) + '\n')
+                if process.returncode != 0 or 'OK (1 test)' not in (directory / 'instrumentation.txt').read_text():
+                    raise ValueError('Fixture instrumentation or cleanup failed')
+                if failure is None:
+                    record['passed'] = True
+                command(adb + ['shell', 'run-as', PACKAGE, 'rm', '-r', relative])
+            except Exception as error:
+                record['cleanup_failure'] = f'{type(error).__name__}: {error}'
+                record['passed'] = False
             finally:
                 if process.poll() is None:
                     command(adb + ['shell', 'am', 'force-stop', PACKAGE])
                     process.terminate()
                     process.wait(timeout=10)
-        # am instrument may exit zero despite a test failure. Both receipts are mandatory.
-        verified = receipt(read('verified'), generation, 'verified')
-        closed = receipt(read('closed'), generation, 'closed')
-        if process.returncode != 0 or 'OK (1 test)' not in (directory / 'instrumentation.txt').read_text():
-            raise ValueError('Fixture instrumentation or cleanup failed')
-        (directory / 'verified.json').write_text(json.dumps(verified, indent=2) + '\n')
-        (directory / 'closed.json').write_text(json.dumps(closed, indent=2) + '\n')
-        command(adb + ['shell', 'run-as', PACKAGE, 'rm', '-r', relative])
-        record['passed'] = True
+                (directory / 'result.json').write_text(json.dumps(record, indent=2) + '\n')
     return record
 
 
 def main():
+    """Run an admitted emulator slice, persist every outcome and fail incomplete campaigns."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--suite', choices=SUITES, required=True)
     parser.add_argument('--reports', type=Path, required=True)
@@ -115,11 +140,20 @@ def main():
     results = []
     try:
         for name in selected:
-            results.append(run_case(name, args.reports))
+            result = run_case(name, args.reports)
+            results.append(result)
+            if not result['cleanup_safe']:
+                break
     finally:
+        completed = {result['case'] for result in results}
+        results.extend({'case': name, 'passed': False, 'not_run': True,
+                        'failure': 'Prior fixture teardown did not certify safe continuation'}
+                       for name in selected if name not in completed)
         summary = {'suite': args.suite, 'expected': selected, 'results': results,
                    'evidence_complete': len(results) == len(selected) and all(case['passed'] for case in results)}
         (args.reports / 'results.json').write_text(json.dumps(summary, indent=2) + '\n')
+    if not summary['evidence_complete']:
+        parser.exit(1, 'Runtime campaign contains failed or unexecuted cases\n')
 
 
 if __name__ == '__main__':

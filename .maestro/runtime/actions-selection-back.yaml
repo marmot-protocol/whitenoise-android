@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: actions-selection-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn:
+    text: "Generated fixture message"
+    longPress: true
+- tapOn: "Select"
+- assertVisible: "Select messages"
+- back
+- assertNotVisible: "Select messages"
+- assertVisible: "Generated fixture message"

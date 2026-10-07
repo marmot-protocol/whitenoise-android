@@ -41,6 +41,9 @@ name: signin-qr-denied
     id: "onboarding.sign_in.action"
 - assertVisible: "That doesn't look like a valid nsec or npub key."
 - tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That doesn't look like a valid nsec or npub key."
+- tapOn:
     id: "onboarding.sign_in.scan"
 - runFlow:
     when:
@@ -56,6 +59,9 @@ name: signin-qr-denied
 - assertVisible: "Allow camera access to scan a Private Key QR code."
 - assertVisible: "Close"
 - tapOn: "Close"
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That doesn't look like a valid nsec or npub key."
 - tapOn: "Back"
 - assertVisible: "Sign Up"
 - assertVisible: "Sign In"

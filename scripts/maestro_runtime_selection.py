@@ -6,6 +6,7 @@ from scripts.maestro_runtime import SUITES
 
 
 def selection(value):
+    """Accept only maintained runtime slices before admitting a fixture build."""
     if value == 'runtime-all':
         return list(SUITES)
     if value.startswith('runtime-') and value[8:] in SUITES:

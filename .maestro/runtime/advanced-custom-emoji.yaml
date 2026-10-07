@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: advanced-custom-emoji
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: DOWN
+- tapOn: "Appearance"
+- scrollUntilVisible:
+    element:
+      text: "Custom emoji"
+    direction: DOWN
+- tapOn: "Custom emoji"
+- assertVisible:
+    id: "custom-emoji-content"
+- assertVisible:
+    id: "custom_emoji.add"
+- back
+- assertVisible:
+    id: "appearance.custom_emoji.group"

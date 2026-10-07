@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: groups-mute-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- tapOn: "Mute"
+- assertVisible:
+    id: "mute.duration.dialog"
+- back
+- assertNotVisible:
+    id: "mute.duration.dialog"
+- assertVisible: "Mute"

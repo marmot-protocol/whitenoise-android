@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: connectors-opencode
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "AI Agents"
+    direction: DOWN
+- tapOn: "AI Agents"
+- tapOn:
+    id: "ai_agents.connector.opencode"
+- assertVisible:
+    id: "ai_agents.prompt.opencode"
+- assertVisible:
+    id: "ai_agents.copy.opencode"
+- back
+- assertNotVisible:
+    id: "ai_agents.setup_content"
+- assertVisible:
+    id: "ai_agents.connectors"

@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: groups-retention-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- tapOn: "Disappearing"
+- assertVisible:
+    id: "disappearing.picker"
+- tapOn: "Cancel"
+- assertNotVisible:
+    id: "disappearing.picker"
+- assertVisible:
+    id: "chat_info.list"

@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: groups-notifications-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Sounds & notifications"
+    direction: DOWN
+- tapOn: "Sounds & notifications"
+- assertVisible: "Sounds & notifications"
+- back
+- assertVisible:
+    id: "chat_info.list"

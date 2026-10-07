@@ -34,6 +34,16 @@ name: signin-invalid
 - tapOn:
     id: "onboarding.sign_in.action"
 - assertVisible: "That doesn't look like a valid nsec or npub key."
+# Correct 63-character nsec shape; only the synthetic fixture checksum is changed.
+- tapOn: "Clear"
+- tapOn: "Private key"
+- inputText: "nsec1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsmhltgq"
+- hideKeyboard
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "Couldn't sign in with that key. Check it and try again."
+- assertVisible: "Private key"
+- assertNotVisible: "Setting up your account"
 - tapOn: "Back"
 - assertVisible: "Sign Up"
 - assertVisible: "Sign In"

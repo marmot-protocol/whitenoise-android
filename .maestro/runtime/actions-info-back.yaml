@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: actions-info-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn:
+    text: "Generated fixture message"
+    longPress: true
+- tapOn: "Info"
+- assertVisible: "Message info"
+- assertVisible: "Message ID"
+- back
+- assertNotVisible: "Message info"
+- assertVisible: "Generated fixture message"

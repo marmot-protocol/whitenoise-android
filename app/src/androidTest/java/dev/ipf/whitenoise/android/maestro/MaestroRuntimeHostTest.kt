@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -17,6 +19,7 @@ import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.LoopbackNostrRelay
@@ -67,7 +70,8 @@ class MaestroRuntimeHostTest {
             )
             var state: WhiteNoiseAppState? = null
             var activity: ActivityScenario<MainActivity>? = null
-            var verifyNative: (suspend () -> Unit)? = null
+            var peerLabel: String? = null
+            var groupId: String? = null
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -92,26 +96,8 @@ class MaestroRuntimeHostTest {
                         relays,
                         MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
                     )
-                    verifyNative = {
-                        val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
-                        require(postcondition in listOf("none", "send", "dark", "font-large"))
-                        if (postcondition == "dark") check(state?.themeMode == AppThemeMode.Dark)
-                        if (postcondition == "font-large") check(state?.fontScale == AppFontScale.Large)
-                        if (postcondition == "send") {
-                            withTimeout(30_000L) {
-                                while (true) {
-                                    val messages = native.timelineMessages(
-                                        accounts[1].label,
-                                        TimelineMessageQueryFfi(group, null, null, null, null, null, 100u),
-                                    ).messages
-                                    val received = messages.count { it.plaintext == "Maestro verified send" }
-                                    check(received <= 1) { "Duplicate peer delivery" }
-                                    if (received == 1) break
-                                    delay(100L)
-                                }
-                            }
-                        }
-                    }
+                    peerLabel = accounts[1].label
+                    groupId = group
                     val app = withContext(Dispatchers.Main.immediate) {
                         WhiteNoiseAppState(
                             context = context,
@@ -119,6 +105,10 @@ class MaestroRuntimeHostTest {
                             accountIdHexResolver = { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex },
                             accounts = accounts,
                             activeAccountRef = owner.label,
+                            profileReader = { id -> withContext(Dispatchers.IO) { native.userProfile(id) } },
+                            profileRefreshRequest = { id ->
+                                withContext(Dispatchers.IO) { native.refreshProfile(id, relays) }
+                            },
                             marmotRuntimeFactory = { AppMarmotRuntime(root.absolutePath, native) },
                             schedulePushWakeRecovery = { false },
                             preferences = context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
@@ -126,15 +116,20 @@ class MaestroRuntimeHostTest {
                     }
                     (context.applicationContext as MaestroFixtureApplication).fixtureState = app
                     app.bootstrap()
-                    activity = ActivityScenario.launch(MainActivity::class.java)
-                    compose.waitUntil(30_000L) {
-                        val consentVisible =
-                            runCatching { compose.onNodeWithText("Help Improve White Noise").assertIsDisplayed() }.isSuccess
-                        if (consentVisible) {
-                            instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
-                        }
-                        runCatching { compose.onNodeWithText("Maestro group").assertIsDisplayed() }.isSuccess
+                    check(app.phase == AppPhase.Ready) { "Generated app bootstrap did not reach Ready: ${app.phase}" }
+                    val nativeRow = checkNotNull(native.presentedChatListRow(owner.label, group)) {
+                        "Generated group missing from native presentation"
                     }
+                    File(directory, "setup.json").writeText(
+                        JSONObject()
+                            .put("generation", generation)
+                            .put("phase", app.phase.toString())
+                            .put("kind", nativeRow.row.conversationKind.toString())
+                            .put("title", nativeRow.presentation.title.toString())
+                            .toString(),
+                    )
+                    activity = ActivityScenario.launch(MainActivity::class.java)
+                    awaitVisibleFixture(directory)
                     File(directory, "ready.json").writeText(
                         JSONObject()
                             .put("generation", generation)
@@ -147,7 +142,7 @@ class MaestroRuntimeHostTest {
                 withTimeout(300_000L) {
                     while (!File(directory, "finish").exists()) delay(100L)
                 }
-                checkNotNull(verifyNative).invoke()
+                verifyNativeState(native, state, checkNotNull(peerLabel), checkNotNull(groupId))
                 File(directory, "verified.json").writeText(
                     JSONObject().put("generation", generation).put("verified", true).toString(),
                 )
@@ -171,4 +166,52 @@ class MaestroRuntimeHostTest {
                 )
             }
         }
+
+    /** Never turn a setup timeout into a missing or successful UI case. */
+    private fun awaitVisibleFixture(directory: File) {
+        runCatching {
+            compose.waitUntil(30_000L) {
+                val consentVisible =
+                    runCatching {
+                        compose.onNodeWithText("Help Improve White Noise").assertIsDisplayed()
+                    }.isSuccess
+                if (consentVisible) {
+                    InstrumentationRegistry.getInstrumentation()
+                        .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+                }
+                runCatching { compose.onNodeWithText("Maestro group").assertIsDisplayed() }.isSuccess
+            }
+        }.onFailure {
+            val tree = runCatching { compose.onRoot(useUnmergedTree = true).printToString() }
+            File(directory, "setup-tree.txt").writeText(tree.getOrElse { it.toString() })
+        }.getOrThrow()
+    }
+
+    /** Validate the actual native peer result and preference projection independently of UI text. */
+    private suspend fun verifyNativeState(
+        native: Marmot,
+        state: WhiteNoiseAppState?,
+        peerLabel: String,
+        group: String,
+    ) {
+        val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
+        require(postcondition in listOf("none", "send", "dark", "font-large"))
+        if (postcondition == "dark") check(state?.themeMode == AppThemeMode.Dark)
+        if (postcondition == "font-large") check(state?.fontScale == AppFontScale.Large)
+        if (postcondition == "send") {
+            withTimeout(30_000L) {
+                while (true) {
+                    val messages = native.timelineMessages(
+                        peerLabel,
+                        TimelineMessageQueryFfi(group, null, null, null, null, null, 100u),
+                    ).messages
+                    val received = messages.count { it.plaintext == "Maestro verified send" }
+                    check(received <= 1) { "Duplicate peer delivery" }
+                    if (received == 1) break
+                    delay(100L)
+                }
+            }
+        }
+    }
+
 }

@@ -48,7 +48,7 @@ gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-andro
   -f review_demo_e2e=false -f document_provider_matrix=false
 ```
 
-For a focused run select `runtime-navigation`, `runtime-settings`, `runtime-conversation` or `runtime-preferences`. Runtime mode rejects repetitions, the offline negative-control option and mixed demo/document requests. APK artifact inputs are used only in offline mode.
+For a focused run select `runtime-navigation`, `runtime-settings`, `runtime-conversation`, `runtime-preferences`, `runtime-advanced`, `runtime-connectors`, `runtime-groups`, `runtime-creation` or `runtime-actions`. Runtime mode rejects repetitions, the offline negative-control option and mixed demo/document requests. APK artifact inputs are used only in offline mode.
 
 The build produces one checksummed Zapstore debug app/test pair at the exact selected revision. Each shard reuses those bytes. The isolated application ID is `dev.ipf.whitenoise.android.maestrolab`; fixture classes and the custom runner reside only in the test APK. No fixture classes enter normal app APKs. The controller accepts only the disposable GitHub emulator, checks a fresh random fixture generation, and runs at most eight journeys per shard. At most two shards run concurrently.
 
@@ -63,3 +63,7 @@ For every applicable surface, assess initial/empty/loading/populated/error state
 Some states require dedicated fixtures. External signer success/cancellation, biometric enrollment, notification permission and background delivery, microphone/camera behavior, controlled attachment corruption/recovery, low storage, process death, stale membership and release packaging must retain their native or physical campaigns. A hidden-key navigation case does not prove secret export. Rotation does not prove process death. Emoji/menu cancellation does not prove media upload. An emulator UI playback control does not prove sound quality.
 
 A release result must distinguish passed assertions, failed assertions, unexecuted requirements and fixture-dependent requirements. One PR can deliver the suite and guide while these execution layers remain independently runnable. Keep performance measurements and failures alongside the exact flow, app, test APK, runtime, device configuration and source identities.
+
+## Campaign failures and continuation
+
+The controller records each requested case explicitly. A UI assertion failure with certified native teardown allows the remaining cases to run, while the overall campaign fails. Uncertified teardown stops the shard; all remaining cases are listed as unexecuted. Inspect `result.json` and instrumentation output in the failed case directory. A missing UI report after failed fixture readiness is a setup failure, never a UI pass.

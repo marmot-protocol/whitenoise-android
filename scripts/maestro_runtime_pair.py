@@ -9,12 +9,14 @@ import sys
 
 
 def digest(path):
+    """Hash a regular APK file while rejecting symlinks and missing files."""
     if path.is_symlink() or not path.is_file():
         raise ValueError('Regular APK required')
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def pair(directory, mode, environ=os.environ):
+    """Stage or verify app/test identity against the exact hosted source, run and attempt."""
     source = environ.get('GITHUB_SHA', '')
     if environ.get('GITHUB_ACTIONS') != 'true' or not re.fullmatch('[0-9a-f]{40}', source):
         raise ValueError('Exact GitHub workflow source required')

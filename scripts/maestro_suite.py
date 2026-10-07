@@ -128,6 +128,7 @@ def report(destination, maestro_exit):
 
 
 def main():
+    """Dispatch validation, flow preparation or report reconciliation; return errors without false proof."""
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     for name in ('validate', 'prepare'):

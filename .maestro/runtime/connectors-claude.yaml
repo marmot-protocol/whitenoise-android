@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: connectors-claude
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "AI Agents"
+    direction: DOWN
+- tapOn: "AI Agents"
+- tapOn:
+    id: "ai_agents.connector.claude"
+- assertVisible:
+    id: "ai_agents.prompt.claude"
+- assertVisible:
+    id: "ai_agents.copy.claude"
+- back
+- assertNotVisible:
+    id: "ai_agents.setup_content"
+- assertVisible:
+    id: "ai_agents.connectors"

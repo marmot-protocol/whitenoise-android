@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: groups-relays
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      id: "chat_info.relays"
+    direction: DOWN
+- tapOn:
+    id: "chat_info.relays"
+- assertVisible: "Relays"
+- back
+- assertVisible:
+    id: "chat_info.list"
