@@ -23,6 +23,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.safeDocumentDisplayName
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedContact
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
+import dev.ipf.whitenoise.android.ui.conversation.share.attachedVCardContact
 import dev.ipf.whitenoise.android.ui.conversation.share.buildVCard
 import dev.ipf.whitenoise.android.ui.conversation.share.contactVCardFileName
 import dev.ipf.whitenoise.android.ui.conversation.share.formatContactShareText
@@ -703,10 +704,16 @@ internal class ConversationMediaSender(
         }
         val captionConsumedByImages = prepared.images.isNotEmpty()
         prepared.documents.attachments.forEachIndexed { index, attachment ->
-            val itemCaption = if (!captionConsumedByImages && index == 0) caption else null
+            val userCaption = if (!captionConsumedByImages && index == 0) caption else null
+            // A raw .vcf goes out like the contact picker's share: text/vcard
+            // plus a name/phone caption, so every bubble draws the same card.
+            // A caption the user typed wins over the generated one.
+            val contact = withContext(Dispatchers.Default) { attachedVCardContact(attachment) }
+            val itemAttachment = if (contact == null) attachment else attachment.copy(mediaType = VCARD_MIME_TYPE)
+            val itemCaption = userCaption ?: contact?.let(::formatContactShareText)
             controller
                 .queueAttachments(
-                    attachments = listOf(attachment),
+                    attachments = listOf(itemAttachment),
                     caption = itemCaption,
                     outboundVisibleStartedAtElapsedMs = outboundVisibleStartedAtElapsedMs,
                 )?.let(seeded::add)

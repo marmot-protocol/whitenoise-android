@@ -11,13 +11,13 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 
-private const val MAX_RECEIVED_VCARD_BYTES = 1_048_576
+private const val MAX_VCARD_BYTES = 1_048_576
 
 /** Rejects oversized, malformed or multi-contact files before handing decrypted bytes to another app. */
-@Suppress("ComplexCondition", "ReturnCount") // Explicit rejection keeps malformed vCard boundaries auditable.
+@Suppress("ReturnCount") // Size and read failures stop before any parse.
 internal fun validatedReceivedVCard(file: File): SharedContact? {
     val declaredSize = file.length()
-    if (!file.isFile || declaredSize !in 1..MAX_RECEIVED_VCARD_BYTES.toLong()) return null
+    if (!file.isFile || declaredSize !in 1..MAX_VCARD_BYTES.toLong()) return null
     val bytes =
         runCatching {
             DataInputStream(file.inputStream().buffered()).use { input ->
@@ -26,6 +26,13 @@ internal fun validatedReceivedVCard(file: File): SharedContact? {
                 if (input.read() != -1) null else content
             }
         }.getOrNull() ?: return null
+    return parseSingleVCard(bytes)
+}
+
+/** Parses one complete UTF-8 vCard; oversized, malformed and multi-contact bytes yield null. */
+@Suppress("ComplexCondition", "ReturnCount") // Explicit rejection keeps malformed vCard boundaries auditable.
+internal fun parseSingleVCard(bytes: ByteArray): SharedContact? {
+    if (bytes.size !in 1..MAX_VCARD_BYTES) return null
     val body =
         runCatching {
             Charsets.UTF_8
