@@ -1,0 +1,145 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+  "legacy_sha256": "ef896e5afba282b6b85f5c643312378aa510c7a1a61f1a283ac76718cf678693",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Destination folder picker: R.string.forward_search_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.forward_search_chats",
+        "test_ids": [
+          "FLD-001",
+          "SYS-004",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Destination folder picker: R.string.forward_start_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.forward_start_failed",
+        "test_ids": [
+          "FLD-001",
+          "SYS-004",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ForwardEmptyTargets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardEmptyTargets(",
+        "test_ids": [
+          "FLD-001",
+          "SYS-004",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Forwarding folder section label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.forward_select_by_folder",
+        "test_ids": [
+          "FLD-001",
+          "MSG-010",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ForwardFolderChips",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardFolderChips(",
+        "test_ids": [
+          "FLD-001",
+          "FLD-002",
+          "MSG-010",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ForwardMessagePickerContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardMessagePickerContent(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-030",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ForwardMessagePickerFullScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardMessagePickerFullScreen(",
+        "test_ids": [
+          "MSG-010",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ForwardSelectionSummary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardSelectionSummary(",
+        "test_ids": [
+          "MSG-001",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ForwardTargetList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardTargetList(",
+        "test_ids": [
+          "MSG-010",
+          "MSG-030",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ForwardTargetRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardTargetRow(",
+        "test_ids": [
+          "MSG-010",
+          "PRO-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Stored group-avatar surface: R.string.couldnt_load_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.couldnt_load_chats",
+        "test_ids": [
+          "CHL-017",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.forward_no_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.forward_no_chats",
+        "test_ids": [
+          "CHL-017",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.forward_no_matches",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.forward_no_matches",
+        "test_ids": [
+          "CHL-017",
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.recent_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "R.string.recent_chats",
+        "test_ids": [
+          "CHL-017",
+          "PRO-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

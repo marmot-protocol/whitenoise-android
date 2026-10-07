@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
+  "legacy_sha256": "3f5e0b243219dd4bf14951a1adb2ee59540886c3bb1a3b78f34782d56d027602",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "private_contact_avatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
+        "anchor": "fun Avatar(",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "Avatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
+        "anchor": "fun Avatar(",
+        "test_ids": [
+          "AXY-001",
+          "INT-011",
+          "PRO-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

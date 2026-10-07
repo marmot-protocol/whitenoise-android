@@ -46,6 +46,430 @@
         "test_ids": ["MED-010"]
       },
       {
+        "surface": "Authored emoji prompt: ShareChatPickerChrome",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: GlobalAttachmentBrowser",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: RouteTransitionSurfaces",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: RelaysScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: GroupRecoveryCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupRecoveryCard.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: ProfileSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: GroupDetailsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: ChatFoldersScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: KeptMessageCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: ForwardOperationStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardOperationStatus.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: WhiteNoiseEntityPickerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: ProfileQrSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileQrSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: MediaLibrary",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/medialibrary/MediaLibrary.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: AccountSetupContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/setup/AccountSetupContent.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: NewMessagePresentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: OnboardingSavedAccountUi",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/OnboardingSavedAccountUi.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: GroupCreationPeople",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupCreationPeople.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: ChatFolderPickerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: SettingsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: ShareConnectScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: AgentOperationRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: MessageActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageActions.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Authored emoji label: MessageFullScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageFullScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Referenced event local emoji: NostrEventCards.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCards.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037",
+          "RDR-002",
+          "RDR-003"
+        ]
+      },
+      {
+        "surface": "Referenced event local emoji: NostrEventViewers.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037",
+          "RDR-002",
+          "RDR-003"
+        ]
+      },
+      {
+        "surface": "NostrEventReaderBlock",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventReaderEmoji.kt",
+        "anchor": "fun NostrEventReaderBlock(",
+        "test_ids": [
+          "MSG-037",
+          "RDR-002",
+          "RDR-003"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: InvitePreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/InvitePreview.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: PollTimelineRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollTimelineRow.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: PollVotesSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PollVotesSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: MessageDetailsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDetailsScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: ContactPreviewScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactPreviewScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Emoji picker source isolation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
+        "anchor": "EmojiShortcodes.art(emoji, LocalCustomEmoji.current, emptyMap())",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: ProfileSwitcherSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/account/ProfileSwitcherSheet.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: ChatRowLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: ChatFlowComponents",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: SelectedMembersComponents",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/SelectedMembersComponents.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: ConversationTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: PendingGroupMembershipRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/PendingGroupMembershipRow.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: MentionPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/MentionPicker.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: FocusedMessagePreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: MessageBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: Reactions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/Reactions.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: ReplyPreviewCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: ContactBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/ContactBubble.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: GroupDetailsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: GroupMembers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMembers.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Custom emoji authored labels: PersonProfileContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "EmojiLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiLabel.kt",
+        "anchor": "fun EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Exact available reply emoji context",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReceivedMessageEmoji.kt",
+        "anchor": "fun rememberReplyReceivedEmoji(",
+        "test_ids": [
+          "MSG-037",
+          "MSG-024"
+        ]
+      },
+      {
+        "surface": "Reply composer artwork",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "replyingToEmoji",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Main reply composer artwork",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationBottomBar.kt",
+        "anchor": "replyingToEmoji",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "Reaction artwork source isolation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/ReactionPills.kt",
+        "anchor": "ReceivedEmoji.None",
+        "test_ids": [
+          "MSG-037",
+          "MSG-024"
+        ]
+      },
+      {
         "surface": "Unread mention reading-start navigation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionNavigation.kt",
         "anchor": "jumpToMentionReadingStart(",
@@ -304,6 +728,64 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackQueue.kt",
         "anchor": "private fun announceChunk(",
         "test_ids": ["MED-010"]
+      },
+      {
+        "surface": "Pending message action menu delivery handoff",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TextSendReconciliation.kt",
+        "anchor": "fun reconcileSuccessfulTextSend(",
+        "test_ids": ["MSG-004"]
+      },
+      {"surface": "Compact sending account accessibility label", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt", "anchor": "R.string.share_sending_as_value", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.forward_search_chats", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt", "anchor": "R.string.forward_search_chats", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.forward_start_failed", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt", "anchor": "R.string.forward_start_failed", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_incomplete", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFilterIncomplete.kt", "anchor": "R.string.destination_filter_incomplete", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.retry", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFilterIncomplete.kt", "anchor": "R.string.retry", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_all", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "R.string.destination_filter_all", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_label", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "R.string.destination_filter_label", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_selected", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "R.string.destination_filter_selected", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: fun destinationFolderInputsComplete(", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "fun destinationFolderInputsComplete(", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.share_search_chats", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt", "anchor": "R.string.share_search_chats", "test_ids": ["FLD-001", "SYS-004"]},
+      {
+        "surface": "ForwardEmptyTargets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardEmptyTargets(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationFilterIncomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFilterIncomplete.kt",
+        "anchor": "fun DestinationFilterIncomplete(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "FolderPillLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "fun FolderPillLabel(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "rememberDestinationFolderRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt",
+        "anchor": "fun rememberDestinationFolderRows(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationFolderFilters",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt",
+        "anchor": "fun DestinationFolderFilters(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationPickerSearch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationPickerSearch.kt",
+        "anchor": "fun DestinationPickerSearch(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationSearchField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationPickerSearch.kt",
+        "anchor": "fun DestinationSearchField(",
+        "test_ids": ["FLD-001", "SYS-004"]
       },
       {
         "surface": "rememberShareChatPickerActions",
@@ -1062,6 +1544,18 @@
         "test_ids": ["DIC-001"]
       },
       {
+        "surface": "Updated draft-recovery disclosure acceptance after upgrade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "DISCLOSURE_ACCEPTED_KEY",
+        "test_ids": ["DIC-001"]
+      },
+      {
+        "surface": "Updated offline draft-recovery disclosure acceptance after upgrade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "OFFLINE_DISCLOSURE_ACCEPTED_KEY",
+        "test_ids": ["DIC-001"]
+      },
+      {
         "surface": "Offline dictation settings explainer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt",
         "anchor": "R.string.dictation_settings_explainer_offline",
@@ -1154,7 +1648,7 @@
       {
         "surface": "content",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
-        "anchor": "fun content(): Map<String, InlineTextContent>",
+        "anchor": "fun content(",
         "test_ids": ["MSG-022", "MSG-023", "MSG-024"]
       },
       {
@@ -2725,7 +3219,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsNewMessageFab.kt",
         "anchor": "fun ChatsNewMessageFab(",
         "test_ids": [
-          "NCH-001"
+          "NCH-001",
+          "SET-004"
         ]
       },
       {
@@ -4756,7 +5251,8 @@
           "CON-013",
           "CON-020",
           "CON-021",
-          "CON-024"
+          "CON-024",
+          "SET-004"
         ]
       },
       {
@@ -4785,6 +5281,18 @@
           "CON-013",
           "CON-017"
         ]
+      },
+      {
+        "surface": "Modifier.composerResizeGestures",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerResizeInput.kt",
+        "anchor": "fun Modifier.composerResizeGestures(",
+        "test_ids": ["CON-007", "CON-013", "CON-017"]
+      },
+      {
+        "surface": "ComposerResizeStripHeight",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerResizeInput.kt",
+        "anchor": "internal val ComposerResizeStripHeight = 12.dp",
+        "test_ids": ["CON-013", "CON-017"]
       },
       {
         "surface": "ComposerResizeGestureStrip",
@@ -6210,7 +6718,7 @@
       {
         "surface": "Forwarding folder section label",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
-        "anchor": "R.string.chat_folders_title",
+        "anchor": "R.string.forward_select_by_folder",
         "test_ids": [
           "FLD-001",
           "MSG-010"
@@ -10758,7 +11266,8 @@
         "anchor": "fun WhiteNoiseTheme(",
         "test_ids": [
           "INT-001",
-          "SET-002"
+          "SET-002",
+          "SET-004"
         ]
       },
       {
@@ -11772,12 +12281,6 @@
         "surface": "string:notification_channel_dictation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
         "anchor": "R.string.notification_channel_dictation",
-        "test_ids": ["DIC-002"]
-      },
-      {
-        "surface": "string:paste",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationRecoveryActions.kt",
-        "anchor": "R.string.paste",
         "test_ids": ["DIC-002"]
       },
       {
@@ -14512,7 +15015,8 @@
         "anchor": "R.string.send",
         "test_ids": [
           "MSG-004",
-          "MSG-007"
+          "MSG-007",
+          "SET-004"
         ]
       },
       {
@@ -20515,6 +21019,36 @@
         ]
       },
       {
+        "surface": "string:ai_agents_project_groups_tip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_project_groups_tip",
+        "test_ids": ["SET-016"]
+      },
+      {
+        "surface": "string:agent_connector_claude_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_name",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_claude_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_subtitle",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_claude_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_prompt",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_hermes_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_hermes_prompt",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
         "surface": "string:ai_agents_manual_setup_body",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
         "anchor": "R.string.ai_agents_manual_setup_body",
@@ -26363,6 +26897,31 @@
     ],
     "source_coverage": [
       {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationEmojiLeases.kt",
+        "anchor": "fun retainNotificationEmojiHistoryArtwork(",
+        "test_ids": [
+          "NTF-034"
+        ]
+      },
+      {
+        "surface": "Composer reading boundary reversal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerReadingAnchor.kt",
+        "anchor": "fun PointerInputScope.composerEditorReadingScrollGestures(",
+        "test_ids": ["CON-017"]
+      },
+      {
+        "surface": "Composer compact draft navigation icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.drawable.ic_text_start",
+        "test_ids": ["CON-017"]
+      },
+      {
+        "surface": "Composer draft top navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "R.string.scroll_to_top",
+        "test_ids": ["CON-017"]
+      },
+      {
         "surface": "Prepared attachment speech account-switch ownership",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
         "anchor": "fun speakAloudPrepared(",
@@ -31832,6 +32391,12 @@
         ]
       },
       {
+        "surface": "Automatic dictation draft recovery and retry fence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+        "anchor": "internal class ConversationDictationDraftRecovery(",
+        "test_ids": ["DIC-002"]
+      },
+      {
         "surface": "Inbound share recovery: cancel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareImportStatus.kt",
         "anchor": "R.string.cancel",
@@ -31998,6 +32563,49 @@
       }
     ],
     "notification_content_contracts": [
+      {
+        "surface": "localized notification emoji fallback label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "R.string.custom_emoji",
+        "test_ids": [
+          "NTF-034"
+        ]
+      },
+      {
+        "surface": "bounded local emoji notification artwork",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationEmojiArtwork.kt",
+        "anchor": "internal suspend fun notificationEmojiArtwork(",
+        "test_ids": [
+          "NTF-034",
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "notification emoji logical history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationEmojiHistory.kt",
+        "anchor": "internal fun notificationEmojiMessages(",
+        "test_ids": [
+          "NTF-034"
+        ]
+      },
+      {
+        "surface": "notification emoji artifact cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupReconciler.kt",
+        "anchor": "private fun reconcileArtwork(",
+        "test_ids": [
+          "NTF-034",
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "private notification artwork export root",
+        "source": "app/src/main/res/xml/file_paths.xml",
+        "anchor": "name=\"notification_emoji\"",
+        "test_ids": [
+          "NTF-034",
+          "NTF-030"
+        ]
+      },
       {
         "surface": "Automatic unsent reply handoff",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NotificationReplyDraftHandoff.kt",

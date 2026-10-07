@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.flow.filter
@@ -176,7 +177,7 @@ internal fun TransferAdminSheet(
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
+                                    EmojiLabel(
                                         controller.memberDisplayName(member),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -252,11 +253,11 @@ internal fun SoleAdminDeletePicker(
                             title = appState.displayName(member.memberIdHex),
                             seed = member.memberIdHex,
                             size = 40.dp,
-                            pictureUrl = appState.avatarUrl(member.memberIdHex),
+                            pictureUrl = appState.contactAvatarSource(member.memberIdHex),
                         )
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
+                            EmojiLabel(
                                 appState.displayName(member.memberIdHex),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,

@@ -1,0 +1,95 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+  "legacy_sha256": "e9a5550cf7c4932c7b1fc07ceff954e1f14f4446e0c6daf596291f52cae09c1c",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Referenced event local emoji: NostrEventViewers.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037",
+          "RDR-002",
+          "RDR-003"
+        ]
+      },
+      {
+        "surface": "NostrEventReaderContext",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "fun NostrEventReaderContext(",
+        "test_ids": [
+          "RDR-002",
+          "RDR-003",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "R.string.nostr_event_play_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "R.string.nostr_event_play_video",
+        "test_ids": [
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "NostrEventReaderBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "fun NostrEventReaderBody(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "NostrEventReaderDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "fun NostrEventReaderDialog(",
+        "test_ids": [
+          "RDR-001",
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "NostrEventReaderHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "fun NostrEventReaderHeader(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "NostrEventReaderScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "fun NostrEventReaderScreen(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "NostrVideoPlaybackFailure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "fun NostrVideoPlaybackFailure(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "NostrVideoPlayerDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "fun NostrVideoPlayerDialog(",
+        "test_ids": [
+          "RDR-001",
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "NostrVideoPlayerSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "fun NostrVideoPlayerSurface(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

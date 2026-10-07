@@ -140,6 +140,12 @@ class LocalNotificationPresenter(
     private val alertBudget: NotificationAlertBudget = NotificationAlertBudget(),
     private val dismissalRetryDelay: suspend () -> Unit = { delay(CONVERSATION_DISMISSAL_RETRY_DELAY_MS) },
     private val groupReconciliation: () -> Unit = { NotificationGroupReconciler.shared(context).request() },
+    private val emojiArtworkPreparer: suspend (String, String?) -> NotificationEmojiArtifact? = { text, source ->
+        notificationEmojiArtwork(context, text, source)
+    },
+    private val emojiArtworkTimeoutMs: Long = NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS,
+    // First argument is opaque account scope, never the local account label stored in a system payload.
+    private val contactAvatarOverride: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
     // Kept last so callers may still pass it as a trailing lambda.
     private val activeNotificationsProvider: (NotificationManager) -> Array<StatusBarNotification> = { manager ->
         manager.activeNotifications
@@ -244,7 +250,11 @@ class LocalNotificationPresenter(
                                 NotificationManagerCompat.from(context),
                                 live.tag.orEmpty(),
                                 live.id,
-                                renamed,
+                                NotificationCompat
+                                    .Builder(context, renamed)
+                                    .addExtras(
+                                        contactPictureAccountExtras(accountRef),
+                                    ).build(),
                                 recordedAtMs = dismissalTime(live),
                                 mustBeLive = true,
                             ) == NotificationCardWriteResult.WRITTEN
@@ -644,6 +654,9 @@ class LocalNotificationPresenter(
             }
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
+        var emojiArtifact: NotificationEmojiArtifact? = null
+        var carriedArtworkLease: AutoCloseable? = null
+        var emojiPreparationAttempted = false
         try {
             written =
                 ConversationCardPostSynchronizer.withRegisteredShow(
@@ -651,6 +664,17 @@ class LocalNotificationPresenter(
                     notificationContent.notificationId,
                     ConversationCardScope(update.accountRef, update.groupIdHex),
                 ) { showToken ->
+                    // Capture dismissal ownership before optional image I/O can suspend.
+                    if (!redactContent && decision.style == NotificationStyleChoice.Messaging) {
+                        emojiPreparationAttempted = true
+                        emojiArtifact =
+                            prepareNotificationEmojiArtwork(
+                                emojiArtworkPreparer,
+                                notificationContent.body,
+                                update.previewText,
+                                emojiArtworkTimeoutMs,
+                            )
+                    }
                     val showGenerationAllowsPost = {
                         if (replaceCurrentMessage) {
                             ConversationCardPostSynchronizer.isShowCurrent(showToken)
@@ -800,6 +824,7 @@ class LocalNotificationPresenter(
                         stampConversationCardMessageId(builder, update.messageIdHex)
                     }
 
+                    builder.addExtras(contactPictureAccountExtras(update.accountRef))
                     var messagingPost: MessagingPostContext? = null
                     when (val style = decision.style) {
                         // Reactions get their own self-contained card (own tag/id on the
@@ -939,14 +964,19 @@ class LocalNotificationPresenter(
                                         if (redactContent) {
                                             null
                                         } else {
-                                            existingConversationMessages(
-                                                notificationContent.notificationTag,
-                                                notificationContent.notificationId,
-                                                replacingMessageIdHex =
-                                                    update.messageIdHex
-                                                        ?.takeIf(String::isNotBlank)
-                                                        ?.takeIf { replaceCurrentMessage },
-                                            )
+                                            synchronized(UserEventNotificationGroup.mutationLock) {
+                                                existingConversationMessages(
+                                                    notificationContent.notificationTag,
+                                                    notificationContent.notificationId,
+                                                    replacingMessageIdHex =
+                                                        update.messageIdHex
+                                                            ?.takeIf(String::isNotBlank)
+                                                            ?.takeIf { replaceCurrentMessage },
+                                                )?.also { history ->
+                                                    carriedArtworkLease =
+                                                        retainNotificationEmojiHistoryArtwork(context, history)
+                                                }
+                                            }
                                         }
                                     ConversationCardPostSynchronizer.awaitTestBarrier(
                                         ConversationCardOp.SHOW_NOTIFY,
@@ -961,7 +991,8 @@ class LocalNotificationPresenter(
                                             body = notificationContent.body,
                                             carriedMessageCount = carried.orEmpty().size,
                                             redactContent = redactContent,
-                                        )
+                                        ) &&
+                                        emojiArtifact == null
                                     ) {
                                         builder
                                             .setContentTitle(notificationContent.title)
@@ -998,6 +1029,7 @@ class LocalNotificationPresenter(
                                                 carried,
                                                 messaging.sender,
                                                 presentationTimestampMs,
+                                                emojiArtifact?.uri,
                                             ),
                                         )
                                     }
@@ -1054,7 +1086,7 @@ class LocalNotificationPresenter(
                                             notificationContent.notificationTag,
                                             notificationContent.notificationId,
                                         )
-                                        if (carried.isNullOrEmpty()) {
+                                        if (carried.isNullOrEmpty() && emojiArtifact == null) {
                                             false
                                         } else {
                                             if (!profileAllowsPost() || !showGenerationAllowsPost()) {
@@ -1068,6 +1100,7 @@ class LocalNotificationPresenter(
                                                     carriedHistory = null,
                                                     sender = messaging.sender,
                                                     newMessageTimestampMs = presentationTimestampMs,
+                                                    emojiArtwork = null,
                                                 ),
                                             )
                                             val cleanNotification =
@@ -1216,6 +1249,12 @@ class LocalNotificationPresenter(
                     true
                 }
         } finally {
+            carriedArtworkLease?.close()
+            emojiArtifact?.close()
+            // Plain-text cards create no exports; their normal write observer already reconciles the summary.
+            if (emojiPreparationAttempted && runCatching { hasNotificationEmojiArtwork(context) }.getOrDefault(false)) {
+                groupReconciliation()
+            }
             rewriteLease?.let(NotificationCardGenerations::release)
             if (!written) heldAlert?.release()
         }
@@ -1528,6 +1567,59 @@ class LocalNotificationPresenter(
             .setSilent(!replaceCurrentMessage)
     }
 
+    /** Platform metadata carries only the existing opaque ownership scope, never a local account label. */
+    private fun contactPictureAccountExtras(account: String): Bundle =
+        Bundle().apply {
+            putString(CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA, conversationShortcutAccountScope(account))
+        }
+
+    /** The same scoped callback serves initial publication and later platform-card reconciliation. */
+    private fun currentContactAvatar(
+        account: String,
+        contact: String,
+    ): Pair<Boolean, Bitmap?> {
+        val scope = conversationShortcutAccountScope(account) ?: return false to null
+        return contactAvatarOverride(scope, contact)
+    }
+
+    /** Refresh private Person pixels at the final write so a concurrent clear cannot revive an older snapshot. */
+    @Suppress("ReturnCount") // Missing or redacted payloads must exit before reading private identity.
+    private fun withCurrentContactAvatars(notification: Notification): Notification {
+        if (notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) return notification
+        val account =
+            notification.extras?.getString(
+                CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA,
+            ) ?: return notification
+        var style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
+        if (style != null) {
+            var changedAny = false
+            val people = (style.messages + style.historicMessages).mapNotNull { it.person }.distinctBy { it.key }
+            people.forEach { person ->
+                val (changed, bitmap) = person.key?.let { contactAvatarOverride(account, it) } ?: (false to null)
+                if (changed) {
+                    changedAny = true
+                    style = copiedMessagingStyle(checkNotNull(style), contactAvatarPerson(person, bitmap))
+                }
+            }
+            return if (changedAny) {
+                NotificationCompat.Builder(context, notification).setStyle(style).build()
+            } else {
+                notification
+            }
+        }
+        val sender = notification.extras?.getBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER)?.let(Person::fromBundle)
+        val key = sender?.key ?: return notification
+        val (changed, bitmap) = contactAvatarOverride(account, key)
+        if (!changed) return notification
+        return NotificationCompat
+            .Builder(context, notification)
+            .addExtras(
+                Bundle().apply {
+                    putBundle(EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER, contactAvatarPerson(sender, bitmap).toBundle())
+                },
+            ).build()
+    }
+
     /** Writes one card and reports success without allowing observer failures to alter delivery. */
     private fun postNotificationSafely(
         manager: NotificationManagerCompat,
@@ -1570,7 +1662,7 @@ class LocalNotificationPresenter(
                         }
                     },
                 ) {
-                    val payload = previewPayload(notification, tag, id, hiddenShortcut)
+                    val payload = previewPayload(withCurrentContactAvatars(notification), tag, id, hiddenShortcut)
                     notificationPoster(manager, tag, id, payload)
                 }
             if (written) {
@@ -2003,6 +2095,7 @@ class LocalNotificationPresenter(
         carriedHistory: List<NotificationCompat.MessagingStyle.Message>?,
         sender: Person,
         newMessageTimestampMs: Long,
+        emojiArtwork: android.net.Uri? = null,
     ): NotificationCompat.MessagingStyle {
         val self =
             Person
@@ -2012,8 +2105,16 @@ class LocalNotificationPresenter(
                 .build()
         // Cap carried-forward history; the extracted style is otherwise re-serialized unbounded across Binder on every post.
         val style = NotificationCompat.MessagingStyle(self)
+        val newMessages =
+            notificationEmojiMessages(
+                content.body,
+                newMessageTimestampMs,
+                sender,
+                emojiArtwork,
+                context.getString(R.string.custom_emoji),
+            )
         carriedHistory
-            ?.let { capNotificationHistory(it, historyCap) }
+            ?.let { capNotificationLogicalHistory(it, historyCap, MAX_NOTIFICATION_MESSAGE_HISTORY - newMessages.size) }
             ?.forEach { message ->
                 style.addMessage(
                     copiedMessage(
@@ -2027,7 +2128,7 @@ class LocalNotificationPresenter(
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.
         (conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let { style.conversationTitle = it }
-        style.addMessage(content.body, newMessageTimestampMs, sender)
+        newMessages.forEach(style::addMessage)
         return style
     }
 
@@ -2062,7 +2163,7 @@ class LocalNotificationPresenter(
             replacingMessageIdHex != null &&
             conversationCardMessageIdHex(existing) == replacingMessageIdHex
         ) {
-            messages?.dropLast(1)
+            messages?.let(::dropLastNotificationLogicalMessage)
         } else {
             messages
         }
@@ -2086,6 +2187,26 @@ class LocalNotificationPresenter(
             }
         }
 
+    /** Cached private pixels replace the protocol-sourced bitmaps; when none are cached, the public ones stay. */
+    private fun ownedShortcutAvatars(
+        update: NotificationUpdateFfi,
+        conversationAvatarBitmap: Bitmap?,
+        senderAvatarBitmap: Bitmap?,
+        sender: Person,
+    ): Triple<Bitmap?, Bitmap?, Person> {
+        val (override, currentAvatar) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
+        if (!override) return Triple(conversationAvatarBitmap, senderAvatarBitmap, sender)
+        val senderAvatar = currentAvatar ?: senderAvatarBitmap
+        val conversationAvatar =
+            if (update.isDm) currentAvatar ?: conversationAvatarBitmap else conversationAvatarBitmap
+        return Triple(conversationAvatar, senderAvatar, contactAvatarPerson(sender, senderAvatar))
+    }
+
+    /**
+     * Revalidates account-private icon overrides at the serialized shortcut write while retaining route and
+     * preview ownership.
+     */
+    @Suppress("LongMethod") // One serialized platform write retains its alert, routing and privacy snapshot.
     private fun publishConversationShortcut(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
@@ -2100,6 +2221,8 @@ class LocalNotificationPresenter(
         isPublishAllowed: () -> Boolean,
     ) {
         runCatching {
+            val (ownedConversationAvatar, ownedSenderAvatar, ownedSender) =
+                ownedShortcutAvatars(update, conversationAvatarBitmap, senderAvatarBitmap, sender)
             val candidateTitle = content.conversationTitle ?: content.title
             val existingTitle =
                 shortcutSnapshots[shortcutId]?.longLabel
@@ -2120,9 +2243,9 @@ class LocalNotificationPresenter(
                     senderName = content.senderName,
                     senderKey = content.senderKey,
                     avatarUrl = conversationAvatarUrl,
-                    avatarGenerationId = conversationAvatarBitmap?.generationId,
+                    avatarGenerationId = ownedConversationAvatar?.generationId,
                     senderAvatarUrl = senderAvatarUrl,
-                    senderAvatarGenerationId = senderAvatarBitmap?.generationId,
+                    senderAvatarGenerationId = ownedSenderAvatar?.generationId,
                     directShareEligible = directShareEligible,
                     previewRevision = NotificationPreviewPreferences.capture(context).revision,
                 )
@@ -2140,14 +2263,33 @@ class LocalNotificationPresenter(
                     snapshot = snapshot,
                     intent = intent,
                     locusId = locusId,
-                    sender = sender,
-                    conversationAvatarBitmap = conversationAvatarBitmap,
+                    sender = ownedSender,
+                    conversationAvatarBitmap = ownedConversationAvatar,
                     directShareEligible = directShareEligible,
                 )
             synchronized(UserEventNotificationGroup.mutationLock) {
                 if (isPublishAllowed()) {
                     pruneConversationShortcutsBeforePublish(shortcutId)
-                    shortcutPublisher(shortcut)
+                    val (currentChoice, pixels) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
+                    val preview = NotificationPreviewPreferences.capture(context)
+                    shortcut.extras?.let { stampShortcutPreview(preview, it) }
+                    stampContactPictureShortcut(shortcut, update.sender.accountIdHex, update.isDm)
+                    val currentShortcut =
+                        if (!shortcutPreviewAllowed(context, shortcut)) {
+                            genericNotificationShortcut(context, shortcut)
+                        } else if (currentChoice) {
+                            withContactPictureIcon(
+                                context,
+                                shortcut,
+                                update.sender.accountIdHex,
+                                pixels,
+                                initialConversationIcon =
+                                    notificationConversationIcon(title, shortcutId, ownedConversationAvatar),
+                            )
+                        } else {
+                            shortcut
+                        }
+                    shortcutPublisher(currentShortcut)
                     shortcutSnapshots[shortcutId] = snapshot
                     ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
                 }
@@ -2440,6 +2582,7 @@ private val notificationEnrichmentScope =
             CoroutineName("notification-card-enrichment"),
     )
 
+/** Resolves a public avatar URL to notification pixels, bounding the optional rich-card fetch. */
 private suspend fun resolveNotificationAvatarBitmap(url: String?): Bitmap? {
     val normalizedUrl = url?.takeUnless(String::isBlank)
     return normalizedUrl?.let { avatarUrl ->
@@ -2455,3 +2598,6 @@ private suspend fun resolveNotificationAvatarBitmap(url: String?): Bitmap? {
 private inline fun notificationDebug(message: () -> String) {
     if (BuildConfig.DEBUG) Log.i("DMLocalNotify", message())
 }
+
+private const val CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA =
+    "dev.ipf.whitenoise.android.notify.contact_picture_account_scope"

@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.state.pollProjectionTouched
 import dev.ipf.whitenoise.android.state.pollVoteRows
 import dev.ipf.whitenoise.android.state.pollVotesPage
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.design.KeyboardPreservingBottomSheet
 import kotlinx.coroutines.Dispatchers
@@ -95,7 +96,7 @@ internal fun PollVotesSheet(
         PollVotesContent(
             rows = rows,
             displayName = appState::displayName,
-            avatarUrl = appState::avatarUrl,
+            avatarUrl = { appState.contactAvatarSource(it, owner.accountRef) },
             // Reading the mirror's observable list subscribes the sheet to live block changes.
             isBlocked = { id -> blockedUsers.users.isNotEmpty() && blockedUsers.isBlocked(id) },
             phase = pager.phase,
@@ -248,13 +249,13 @@ private fun PollVoterItem(
     val choices = remember(row.choices, locale) { ListFormatter.getInstance(locale).format(row.choices) }
     ListItem(
         headlineContent = {
-            Text(
+            EmojiLabel(
                 name,
                 style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
             )
         },
         supportingContent = {
-            Text(
+            EmojiLabel(
                 choices,
                 style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
             )

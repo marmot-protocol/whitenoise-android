@@ -1749,7 +1749,7 @@
     <string name="ai_agents_connector_docs_subtitle">Скрипты установки, проверки состояния и устранение неполадок</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Терминальный агент Nous Research</string>
-    <string name="agent_connector_hermes_prompt">Это запрос на установку для подключения этой установки Hermes к White Noise через Marmot. Прочитайте актуальное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения установите и проверьте коннектор, а затем ответьте npub вашего агента.</string>
+    <string name="agent_connector_hermes_prompt">Это запрос на установку для подключения этой установки Hermes к White Noise через Marmot. Прочитайте актуальное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md / https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения установите и проверьте коннектор, а затем ответьте npub вашего агента. До предложения изменений уточни нужный профиль Hermes, его каталог, каталог и сокет Marmot, учётную запись и службу агента, а также экземпляр шлюза. Не выбирай профиль по умолчанию без подтверждения и не перезаписывай другую установку. Используй установщик Hermes с проверенной контрольной суммой. Различай разрешения на приглашения и на отправку сообщений. Помоги с приглашением и тестовым сообщением с телефона; подтверди ответ выбранного профиля в White Noise, прежде чем считать подключение завершённым.</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">Личный ИИ-ассистент на своём сервере</string>
     <string name="agent_connector_openclaw_prompt">Это запрос на установку для подключения этого экземпляра OpenClaw к White Noise через Marmot. Прочитайте актуальное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения установите и проверьте коннектор, а затем ответьте npub вашего агента.</string>
@@ -1917,7 +1917,7 @@
     <string name="discard">Удалить</string>
     <string name="open_app_settings">Открыть настройки приложения</string>
     <string name="dictation_disclosure_title">Внешнее распознавание речи</string>
-    <string name="dictation_disclosure_message">Установленная на этом устройстве служба распознавания речи обрабатывает сказанное и может отправлять звук своему поставщику. White Noise хранит полученный текст только до того, как вы вставите или отправите его. Автоматическая отправка выключена, пока вы не включите её в настройках диктовки.</string>
+    <string name="dictation_disclosure_message">Установленная на этом устройстве служба распознавания речи обрабатывает сказанное и может отправлять звук своему поставщику. После сбоя распознанный текст может быть автоматически сохранён в исходном черновике. Автоматическая отправка выключена, пока вы не включите её в настройках диктовки.</string>
     <string name="dictation_continue">Продолжить</string>
     <string name="dictation_microphone_muted">Доступ к микрофону отключён</string>
     <string name="dictation_microphone_muted_help">Включите доступ к микрофону в настройках конфиденциальности Android или на панели быстрых настроек, затем повторите диктовку.</string>
@@ -2299,6 +2299,9 @@
     <string name="profile_readiness_added">Добавлено</string>
     <string name="profile_readiness_recommended">Рекомендуется</string>
     <string name="profile_readiness_field_optional">Необязательно</string>
+    <string name="agent_connector_claude_subtitle">Агент для программирования Claude Code CLI</string>
+    <string name="agent_connector_claude_prompt">Это запрос на установку для подключения этой конфигурации Claude Code к White Noise через Marmot. Прочитайте авторитетное руководство по harness Claude Code: https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md и постоянное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Подтвердите предварительные требования: CLI Claude Code установлена, аутентифицирована и доступна в PATH, а эта машина использует тот же набор публичных релеев, что и мой телефон. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения используйте релизный поток install-claude-marmot.sh с проверкой контрольной суммы, выполните bootstrap wn-agent для этой npub с разрешенным welcomer и проверьте wn-claude --version. Затем ответьте npub вашего агента и попросите меня пригласить его из White Noise и отправить тестовое сообщение с этой разрешенной npub через настроенные реле. Не сообщайте о завершении настройки, пока wn-claude не ответит через White Noise; если этот обмен нельзя проверить автоматически, явно укажите, что требуется проверка на устройстве.</string>
+    <string name="ai_agents_project_groups_tip">Используй отдельную группу для каждого проекта и начинай с его расположения и контекста. Команды сеанса зависят от коннектора; проверь руководство перед возобновлением сеанса или созданием ветки.</string>
     <string name="nostr_event_view_image">Показать изображение</string>
     <string name="nostr_event_image_failed">Не удалось загрузить изображение. Попробуйте ещё раз.</string>
     <string name="nostr_event_type_image">Изображение</string>
@@ -2324,4 +2327,29 @@
     <string name="profile_notification_scope_detail">Применяется к сообщениям этого человека во всех беседах этого аккаунта. Доставка и счётчик непрочитанных сообщений не меняются.</string>
     <string name="profile_notification_precedence">Сначала действуют правила отключения уведомлений чата и уведомлений только об упоминаниях. Затем — отключение уведомлений или свои настройки Android для этого человека. Настройки по умолчанию возвращают настройки чата и общие настройки. Существующие уведомления сохраняют исходный канал.</string>
     <string name="profile_notification_channel_name">%1$s · Сообщения во всех чатах</string>
+    <string name="destination_filter_all">Все чаты</string>
+    <string name="destination_filter_selected">Проверить выбранные (%1$d)</string>
+    <string name="destination_filter_label">Фильтр чатов</string>
+    <string name="forward_select_by_folder">Выбрать по папке</string>
+    <string name="destination_filter_incomplete">Некоторые чаты могут отсутствовать. Повторите попытку или выберите все чаты.</string>
+    <string name="gestures_title">Действия по смахиванию</string>
+    <string name="gestures_physical_hint">Влево и вправо — направления движения пальца. Выбранные действия не меняются при смене языка. По умолчанию направление ответа зависит от языка. Жесты для чатов по умолчанию отключены.</string>
+    <string name="gestures_messages">Сообщения</string>
+    <string name="gestures_left">Смахнуть влево</string>
+    <string name="gestures_right">Смахнуть вправо</string>
+    <string name="gestures_default">По умолчанию</string>
+    <string name="gestures_default_summary">По умолчанию: %1$s</string>
+    <string name="gestures_off">Выкл.</string>
+    <string name="gestures_react">Реакция</string>
+    <string name="gestures_read_unread">Прочитано / не прочитано</string>
+    <string name="gestures_mute_unmute">Выключить / включить звук</string>
+    <string name="gestures_pin_unpin">Закрепить / открепить</string>
+
+    <string name="contact_private_picture">Личное изображение</string>
+    <string name="contact_picture_pick">Выбрать фото</string>
+    <string name="contact_picture_replace">Заменить фото</string>
+    <string name="contact_picture_reposition">Переместить / обрезать</string>
+    <string name="contact_picture_clear">Убрать личное изображение</string>
+    <string name="contact_picture_local_only">Только для этого аккаунта на этом устройстве. Не публикуется и не загружается.</string>
+    <string name="contact_picture_failed">Не удалось использовать это изображение или сохранить изменения. Предыдущий выбор не изменился. Попробуйте ещё раз.</string>
 </resources>

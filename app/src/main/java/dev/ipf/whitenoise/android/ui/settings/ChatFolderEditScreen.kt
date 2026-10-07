@@ -144,6 +144,7 @@ private fun ChatFolderEditSession(
     }
     var picker by rememberSaveable { mutableStateOf<FolderPicker?>(null) }
     var discard by rememberSaveable { mutableStateOf(false) }
+    var pendingPlaybackSource by remember { mutableStateOf<(() -> Unit)?>(null) }
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     var failed by rememberSaveable { mutableStateOf(false) }
     var deleteFailed by rememberSaveable { mutableStateOf(false) }
@@ -188,6 +189,14 @@ private fun ChatFolderEditSession(
         }
     }
 
+    dev.ipf.whitenoise.android.ui.conversation.PlaybackSourceLeaveGuard { proceed ->
+        if (dirty) {
+            pendingPlaybackSource = proceed
+            discard = true
+        } else {
+            proceed()
+        }
+    }
     BackHandler(onBack = ::back)
 
     /** Saves the folder, failing if it vanished meanwhile. */
@@ -275,7 +284,7 @@ private fun ChatFolderEditSession(
                     id = candidate.accountIdHex.lowercase(Locale.ROOT),
                     title = candidate.displayName,
                     avatarSeed = candidate.accountIdHex,
-                    avatarUrl = appState.avatarUrl(candidate.accountIdHex),
+                    avatarUrl = appState.contactAvatarSource(candidate.accountIdHex),
                 )
             }
         }
@@ -410,12 +419,25 @@ private fun ChatFolderEditSession(
 
     if (discard) {
         WhiteNoiseAlertDialog(
-            onDismissRequest = { discard = false },
+            onDismissRequest = {
+                discard = false
+                pendingPlaybackSource = null
+            },
             title = { Text(stringResource(R.string.folder_discard_title)) },
             text = { Text(stringResource(R.string.folder_discard_detail)) },
-            confirmButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.folder_discard)) } },
+            confirmButton = {
+                TextButton(onClick = {
+                    val proceed = pendingPlaybackSource
+                    pendingPlaybackSource = null
+                    discard = false
+                    if (proceed != null) proceed() else onClose()
+                }) { Text(stringResource(R.string.folder_discard)) }
+            },
             dismissButton = {
-                TextButton(onClick = { discard = false }) { Text(stringResource(R.string.folder_keep_editing)) }
+                TextButton(onClick = {
+                    discard = false
+                    pendingPlaybackSource = null
+                }) { Text(stringResource(R.string.folder_keep_editing)) }
             },
         )
     }

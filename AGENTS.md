@@ -35,9 +35,12 @@ operations and recovery. Follow [MDK's host boundary](https://github.com/marmot-
   require explicit authorization.
 - For user-visible changes, update permanent IDs in the [manual checklist](docs/manual-release-testing.md)
   and [surface inventory](docs/manual-release-testing-surfaces.json) in the same PR.
+  Prefer [small scenario and source files](docs/manual-release-testing/README.md)
+  instead of editing the two shared files. Both formats are validated together;
+  generated aggregates are CI artifacts and must not be committed.
   Never reuse/renumber IDs; keep boxes unchecked. Run
   `python3 scripts/check_manual_test_guide.py` and
-  `python3 -m unittest scripts/test_check_manual_test_guide.py`.
+  `python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py`.
 - For rendering changes, follow [Screenshot tests](README.md#screenshot-tests): cover
   relevant themes, RTL, font scales and UI states, regenerate/commit PNG baselines,
   and verify both distributions. The PR's **Visual changes** must show current-head

@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -50,6 +51,59 @@ class AvatarViewerLocalAssetTest {
     fun clearLoader() {
         AvatarImageLoader.resetProfileImageFetcherForTests()
         AvatarImageLoader.clear()
+    }
+
+    /** Private display pixels are view-only, and changing their owner revokes even a captured warm image. */
+    @Test
+    fun privatePictureCannotExportAndAccountChangeDismissesViewer() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val store =
+            dev.ipf.whitenoise.android.state.ContactPictureStore(
+                context.getSharedPreferences("viewer-private", 0),
+                java.io.File(context.noBackupFilesDir, "viewer-private"),
+            )
+        var account = "a"
+        dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+            .attach(store) { account }
+        store.save(
+            "a",
+            "contact",
+            "",
+            "",
+            dev.ipf.whitenoise.android.state.ContactPictureChange.Replace(
+                dev.ipf.whitenoise.android.state
+                    .contactPicturePng(android.graphics.Color.RED),
+            ),
+        ) { true }
+        val source =
+            dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+                .source(checkNotNull(store.reference("a", "contact")), null)
+        val warm = kotlinx.coroutines.runBlocking { AvatarImageLoader.load(source) }
+        val dismissed = AtomicBoolean(false)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                AvatarFullScreenViewer(
+                    "Contact",
+                    "contact",
+                    source,
+                    warm,
+                    onDismiss = { dismissed.set(true) },
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.actions)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.media_save)).assertIsNotEnabled()
+        composeRule.runOnIdle {
+            account = "b"
+            AvatarImageLoader.clearStoredAvatars()
+        }
+        org.junit.Assert.assertNull(AvatarImageLoader.peek(source))
+        org.junit.Assert.assertFalse(
+            dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+                .belongsToActiveAccount(source),
+        )
+        composeRule.waitForIdle()
+        composeRule.waitUntil(5_000) { dismissed.get() }
     }
 
     @Test

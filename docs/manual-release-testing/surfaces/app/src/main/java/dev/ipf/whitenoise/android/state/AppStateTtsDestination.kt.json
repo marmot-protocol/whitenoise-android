@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateTtsDestination.kt",
+  "legacy_sha256": "8e72a7b0b603ecae3f3538f98c596f1ebc4dc9204d4f25761d0cdae48a006ec9",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "WhiteNoiseAppState.observeTtsConversationDestination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateTtsDestination.kt",
+        "anchor": "fun WhiteNoiseAppState.observeTtsConversationDestination(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseAppState.observePlaybackTransportVisible",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateTtsDestination.kt",
+        "anchor": "fun WhiteNoiseAppState.observePlaybackTransportVisible(",
+        "test_ids": [
+          "MED-028"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseAppState.observePlaybackConversationDestination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppStateTtsDestination.kt",
+        "anchor": "fun WhiteNoiseAppState.observePlaybackConversationDestination(",
+        "test_ids": [
+          "MED-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

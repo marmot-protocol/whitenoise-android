@@ -54,6 +54,7 @@ import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -128,6 +129,13 @@ internal enum class SettingsHomeRow(
         R.drawable.ic_settings_contrast,
         "appearance",
         SettingsDetail.Appearance,
+    ),
+    Gestures(
+        SettingsHomeSection.AppPreferences,
+        R.string.gestures_title,
+        R.drawable.ic_settings_front_hand,
+        "gestures",
+        SettingsDetail.Gestures,
     ),
     ChatFolders(
         SettingsHomeSection.AppPreferences,
@@ -494,6 +502,7 @@ private fun SettingsDetailRoute(
         SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
         SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Gestures -> GestureSettingsScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })
         SettingsDetail.Help ->
             HelpScreen(
@@ -801,7 +810,7 @@ private fun SettingsProfileRow(
     ) {
         ListItem(
             headlineContent = {
-                Text(
+                EmojiLabel(
                     text = account.title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

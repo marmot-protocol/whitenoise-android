@@ -1,0 +1,81 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "contact_picture_clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+        "anchor": "R.string.contact_picture_clear",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "contact_picture_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+        "anchor": "R.string.contact_picture_failed",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "contact_picture_local_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+        "anchor": "R.string.contact_picture_local_only",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "contact_picture_pick",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+        "anchor": "R.string.contact_picture_pick",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "contact_picture_replace",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+        "anchor": "R.string.contact_picture_replace",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "contact_picture_reposition",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+        "anchor": "R.string.contact_picture_reposition",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "contact_private_picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+        "anchor": "R.string.contact_private_picture",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ContactPictureControls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+        "anchor": "fun ContactPictureControls(",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "ContactPictureEditorPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ContactPictureControls.kt",
+        "anchor": "fun ContactPictureEditorPreview(",
+        "test_ids": [
+          "PRO-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

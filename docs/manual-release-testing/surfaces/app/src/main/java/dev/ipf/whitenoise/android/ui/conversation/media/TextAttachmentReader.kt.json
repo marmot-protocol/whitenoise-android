@@ -1,0 +1,181 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+  "legacy_sha256": "e8da73032d022e3b027d14d857aa1f6518c2bdc7908b37f7dae6468eacf95419",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Attachment toolbar document-top playback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.read_aloud",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "TextAttachmentFilenameDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentFilenameDialog(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "TextAttachmentLoading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentLoading(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "TextAttachmentMetadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentMetadata(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "TextAttachmentReaderBottomBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentReaderBottomBar(",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "TextAttachmentReaderContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentReaderContent(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "TextAttachmentReaderDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentReaderDialog(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "TextAttachmentReaderScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentReaderScreen(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "TextAttachmentReaderTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentReaderTopBar(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "TextAttachmentReadyBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentReadyBody(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "TextAttachmentTruncatedNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "fun TextAttachmentTruncatedNotice(",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:bytes_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.bytes_count",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "string:save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.save",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "string:tts_bar_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.tts_bar_stop",
+        "test_ids": [
+          "MED-010"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "R.string.copy_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.copy_text",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "R.string.more_options",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.more_options",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "R.string.speak_aloud",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.speak_aloud",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "R.string.text_attachment_open_external",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.text_attachment_open_external",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "R.string.text_attachment_reader_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.text_attachment_reader_title",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentReader.kt",
+        "anchor": "R.string.tts_bar_error",
+        "test_ids": [
+          "MED-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

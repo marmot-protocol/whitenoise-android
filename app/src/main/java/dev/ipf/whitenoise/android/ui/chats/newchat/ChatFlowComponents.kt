@@ -51,6 +51,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.onboarding.PublicIdentifierFieldTrailingAction
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -189,7 +190,7 @@ internal fun ContactRow(
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
-            Text(
+            EmojiLabel(
                 title,
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,

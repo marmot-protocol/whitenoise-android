@@ -6,7 +6,7 @@
     <string name="notification_channel_dictation">Dictée</string>
     <string name="notification_channel_dictation_description">Contrôle une session de dictée active dans le champ de rédaction</string>
     <string name="dictation_settings_title">Dictée</string>
-    <string name="dictation_settings_explainer">Le service vocal installé sur cet appareil traite l’audio et peut l’envoyer à son fournisseur. White Noise ne conserve le texte renvoyé que jusqu’à ce que vous le colliez ou l’envoyiez.</string>
+    <string name="dictation_settings_explainer">Le service vocal installé sur cet appareil traite l’audio et peut l’envoyer à son fournisseur. Le texte récupéré reste dans le brouillon d’origine.</string>
     <string name="dictation_ostt_recommendation_title">Obtenir Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Application de transcription recommandée pour une dictée privée sur l’appareil. Disponible sur Zapstore, pas sur Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Impossible d’ouvrir la page d’Offline Speech to Text sur Zapstore.</string>
@@ -18,7 +18,7 @@
     <string name="dictation_result_paste_description">Relire ou modifier le texte avant l’envoi</string>
     <string name="dictation_result_send">Envoyer le message</string>
     <string name="dictation_result_send_description">N’envoie que si la discussion et le brouillon sont inchangés</string>
-    <string name="dictation_send_safety_note">Si la discussion ou le brouillon change avant l’envoi, la dictée reste non envoyée. Réessayez l’envoi ou choisissez Coller pour relire le texte.</string>
+    <string name="dictation_send_safety_note">Si l’envoi est bloqué, le texte reconnu disponible est récupéré dans le brouillon d’origine. Relisez-le avant de l’envoyer à nouveau.</string>
     <string name="dictation_send_blocked">Non envoyé</string>
     <string name="dictation_retry_send">Réessayer l’envoi</string>
     <string name="dictation_recovery_title">La dictée nécessite votre attention</string>
@@ -27,6 +27,6 @@
     <string name="dictation_recovery_expired_title">La récupération de la dictée a expiré</string>
     <string name="dictation_recovery_expired_text">La dictée inachevée a été effacée de cet appareil.</string>
     <string name="dictation_incomplete_title">Dictée incomplète</string>
-    <string name="dictation_incomplete_text">La transcription s’est arrêtée avant la fin. Vous pouvez envoyer le texte reconnu ou le coller pour le vérifier.</string>
+    <string name="dictation_incomplete_text">La transcription s’est arrêtée avant la fin. Vérifiez le texte reconnu dans le brouillon avant de l’envoyer.</string>
     <string name="dictation_send_recognized_text">Envoyer le texte reconnu</string>
 </resources>

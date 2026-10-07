@@ -6,7 +6,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +32,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.SwipeAction
+import dev.ipf.whitenoise.android.ui.settings.actionTitle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -145,13 +147,16 @@ internal class MessageReplySwipeState(
 
 /** Remembers one [MessageReplySwipeState] per message, resolving the thresholds in pixels. */
 @Composable
-internal fun rememberMessageReplySwipeState(messageIdHex: String): MessageReplySwipeState {
+internal fun rememberMessageReplySwipeState(
+    messageIdHex: String,
+    owner: Any? = messageIdHex,
+): MessageReplySwipeState {
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
     val thresholdPx = with(density) { MessageReplySwipeMetrics.Threshold.toPx() }
     val maximumPx = with(density) { MessageReplySwipeMetrics.Maximum.toPx() }
-    return remember(messageIdHex, thresholdPx, maximumPx) {
+    return remember(messageIdHex, owner, thresholdPx, maximumPx) {
         MessageReplySwipeState(
             scope = scope,
             haptics = haptics,
@@ -171,29 +176,31 @@ internal fun rememberMessageReplySwipeState(messageIdHex: String): MessageReplyS
 internal fun BoxScope.MessageReplySwipeGlyph(
     state: MessageReplySwipeState,
     messageIdHex: String,
+    physicalDirection: Int = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1,
+    action: SwipeAction = SwipeAction.Reply,
 ) {
     val rowBounds = state.rowBoundsInRoot
     val bubbleBounds = state.bubbleBoundsInRoot
     val progress = state.progress
     if (rowBounds == null || bubbleBounds == null || state.displayedDistance <= 0f) return
     val layoutDirection = LocalLayoutDirection.current
-    val directionMultiplier = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f
+    val directionMultiplier = physicalDirection.toFloat()
     val density = LocalDensity.current
     val travelPx = with(density) { MessageReplySwipeMetrics.IconTravel.toPx() }
     val targetSizePx = with(density) { MessageReplySwipeMetrics.IconTargetSize.toPx() }
     val baseScale = replySwipeIconScale(progress)
     val leadingOffset =
-        if (layoutDirection == LayoutDirection.Ltr) {
+        if (physicalDirection > 0) {
             bubbleBounds.left - rowBounds.left
         } else {
-            rowBounds.right - bubbleBounds.right
+            bubbleBounds.right - rowBounds.left - targetSizePx
         }
     val topOffset = bubbleBounds.center.y - rowBounds.top - (targetSizePx / 2f)
     Box(
         modifier =
             Modifier
-                .align(Alignment.TopStart)
-                .offset { IntOffset(leadingOffset.roundToInt(), topOffset.roundToInt()) }
+                .align(if (layoutDirection == LayoutDirection.Ltr) Alignment.TopStart else Alignment.TopEnd)
+                .absoluteOffset { IntOffset(leadingOffset.roundToInt(), topOffset.roundToInt()) }
                 .size(MessageReplySwipeMetrics.IconTargetSize)
                 .graphicsLayer {
                     alpha = replySwipeIconAlpha(progress)
@@ -204,8 +211,15 @@ internal fun BoxScope.MessageReplySwipeGlyph(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter = painterResource(R.drawable.ic_reply_swipe),
-            contentDescription = null,
+            painter =
+                painterResource(
+                    when (action) {
+                        SwipeAction.Forward -> R.drawable.ic_forward
+                        SwipeAction.React -> R.drawable.ic_emoji_smileys
+                        else -> R.drawable.ic_reply_swipe
+                    },
+                ),
+            contentDescription = actionTitle(action),
             modifier = Modifier.size(MessageReplySwipeMetrics.IconSize),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

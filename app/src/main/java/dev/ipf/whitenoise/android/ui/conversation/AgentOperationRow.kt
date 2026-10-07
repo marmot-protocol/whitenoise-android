@@ -52,6 +52,7 @@ import dev.ipf.whitenoise.android.state.MessageDeleteCapability
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDeleteDialog
@@ -72,6 +73,7 @@ internal data class AgentOperationSenderPresentation(
     val avatarUrl: String?,
 )
 
+/** Renders the native operation with the viewer's actor presentation without changing its operation data. */
 @Composable
 internal fun AgentOperationTimelineRow(
     item: TimelineMessage,
@@ -101,7 +103,7 @@ internal fun AgentOperationTimelineRow(
                 AgentOperationSenderPresentation(
                     name = senderName,
                     seed = record.sender,
-                    avatarUrl = appState.avatarUrl(record.sender),
+                    avatarUrl = appState.contactAvatarSource(record.sender),
                 )
             } else {
                 null
@@ -212,7 +214,7 @@ internal fun AgentOperationRow(
             }
             Column(modifier = Modifier.weight(1f)) {
                 if (sender != null) {
-                    Text(
+                    EmojiLabel(
                         text = sender.name,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

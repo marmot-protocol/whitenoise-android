@@ -1,0 +1,146 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+  "legacy_sha256": "8624107aeb573d5a56c4e6817f5211dceca992d7eb2c818ff6c8d3469285eae5",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "share_import_recovered_limit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.share_import_recovered_limit",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Jump-to-newest badge count owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "rememberConversationUnreadBadgeCount(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "ConversationLoadErrorContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "fun ConversationLoadErrorContent(",
+        "test_ids": [
+          "CON-001",
+          "NTF-009"
+        ]
+      },
+      {
+        "surface": "ConversationScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "fun ConversationScreen(",
+        "test_ids": [
+          "CON-001",
+          "NTF-009",
+          "GRP-021",
+          "DIC-002",
+          "CON-023"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "string:conversation_jump_to_mention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.conversation_jump_to_mention",
+        "test_ids": [
+          "CON-028"
+        ]
+      },
+      {
+        "surface": "Retryable exact-message jump notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.error_loaded_content_kept",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Authoritative missing reply-target notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "string:refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.refresh",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "string:you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.you",
+        "test_ids": [
+          "MED-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Share-owned attachment discard storage recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Settled visible-read retry on resume and manual-reminder changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "observeConversationVisibleReads(",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Wave sends a mention without changing the composer draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "onWave =",
+        "test_ids": [
+          "CON-019"
+        ]
+      },
+      {
+        "surface": "R.string.send_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.send_failed",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "R.string.voice_message_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.voice_message_failed",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "Initial loading waits for conversation route settlement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "routeTransitionInProgress = routeTransitionInProgress,",
+        "test_ids": [
+          "MED-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

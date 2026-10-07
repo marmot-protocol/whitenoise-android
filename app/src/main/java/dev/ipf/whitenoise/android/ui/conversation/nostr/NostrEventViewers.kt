@@ -49,7 +49,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -66,7 +65,8 @@ import androidx.media3.ui.PlayerView
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
-import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
+import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import kotlinx.coroutines.launch
 
 /** Parses a verified event body and presents it without starting another event-resolution layer. */
@@ -86,7 +86,7 @@ internal fun NostrEventReaderDialog(
     val eventUri = authoredReference?.let(::nostrEventUri)
     val prepared = rememberNostrReaderPreparation(card, parseMarkdown)
     var playing by remember(card.eventIdHex) { mutableStateOf(false) }
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
@@ -120,10 +120,14 @@ internal fun NostrEventReaderDialog(
             onPlayVideo = { playing = true },
             preparation = prepared,
         )
-    }
-    if (playing) {
-        card.mediaUrl?.let { url ->
-            NostrVideoPlayerDialog(mediaUrl = url, mediaMimeType = card.mediaMimeType, onDismiss = { playing = false })
+        if (playing) {
+            card.mediaUrl?.let { url ->
+                NostrVideoPlayerDialog(
+                    mediaUrl = url,
+                    mediaMimeType = card.mediaMimeType,
+                    onDismiss = { playing = false },
+                )
+            }
         }
     }
 }
@@ -247,21 +251,15 @@ private fun NostrEventReaderBody(
             item("parsing") { CircularProgressIndicator(Modifier.testTag(NOSTR_EVENT_READER_LOADING_TAG)) }
         } else if (blocks.isNotEmpty()) {
             itemsIndexed(blocks, key = { index, _ -> "body:$index" }) { _, block ->
-                MarkdownMessageBody(
-                    document =
-                        MarkdownDocumentFfi(
-                            blocks = listOf(block),
-                            truncated = false,
-                            blankLinesBefore = byteArrayOf(),
-                        ),
+                NostrEventReaderBlock(
+                    block = block,
                     mentionDisplayName = mentionDisplayName,
                     onNostrProfileTap = onNostrProfileTap,
-                    useDecorativeBackgrounds = true,
                 )
             }
         } else {
             itemsIndexed(textChunks) { _, chunk ->
-                Text(chunk, style = MaterialTheme.typography.bodyLarge)
+                EmojiLabel(chunk, style = MaterialTheme.typography.bodyLarge)
             }
         }
     }
@@ -277,9 +275,9 @@ private fun NostrEventReaderContext(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         card.title?.takeIf(String::isNotBlank)?.let { title ->
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            EmojiLabel(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         }
-        Text(
+        EmojiLabel(
             eventByline(card, authorDisplayName),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -293,7 +291,7 @@ private fun NostrEventReaderContext(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        card.metadata.forEach { detail -> Text(detail, style = MaterialTheme.typography.bodyMedium) }
+        card.metadata.forEach { detail -> EmojiLabel(detail, style = MaterialTheme.typography.bodyMedium) }
         if (card.mediaUrl != null && onPlayVideo != null) {
             TextButton(onClick = onPlayVideo) { Text(stringResource(R.string.nostr_event_play_video)) }
         }
@@ -318,6 +316,7 @@ private fun openNostrEvent(
 
 internal const val NOSTR_EVENT_READER_REFERENCE_TAG = "nostr-event-reader-reference"
 
+/** Hosts the referenced video in its own window and uses normal dismissal when returning to a playback source. */
 @Composable
 internal fun NostrVideoPlayerDialog(
     mediaUrl: String,
@@ -326,7 +325,7 @@ internal fun NostrVideoPlayerDialog(
 ) {
     var playbackFailed by remember(mediaUrl) { mutableStateOf(false) }
     val player = rememberNostrVideoPlayer(mediaUrl, mediaMimeType) { playbackFailed = true }
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(

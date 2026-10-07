@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPill
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertTrue
@@ -47,6 +48,7 @@ class ComposerEmojiActionContractTest {
             WhiteNoiseTheme {
                 Surface {
                     ComposerPill(
+                        actionColors = accountActionColors(appState = null),
                         textFieldValue = TextFieldValue("Draft"),
                         composerFocus = remember { FocusRequester() },
                         emojiPickerOpen = pickerOpen,

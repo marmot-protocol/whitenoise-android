@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
@@ -137,7 +138,7 @@ internal fun RetainedProfilesSheet(
         LazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
             items(accounts, key = OnboardingSavedAccountUi::label) { account ->
                 ListItem(
-                    headlineContent = { Text(account.displayName) },
+                    headlineContent = { EmojiLabel(account.displayName) },
                     supportingContent = { Text(account.shortIdentity) },
                     leadingContent = {
                         Avatar(

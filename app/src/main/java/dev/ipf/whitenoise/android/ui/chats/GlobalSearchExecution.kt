@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import java.time.ZoneId
 import java.util.Locale
@@ -94,7 +95,10 @@ internal fun globalSearchFilterOptions(
                     id = canonicalChatListGroupId(item.group.groupIdHex),
                     title = chatListItemDisplayTitle(item, appState, titleCopy),
                     avatarSeed = item.selectedAvatarSeed ?: peer ?: item.group.groupIdHex,
-                    avatarUrl = peer?.let { item.selectedAvatarUrl ?: appState.avatarUrl(it) },
+                    avatarUrl =
+                        peer?.let {
+                            appState.privateContactAvatarSource(it) ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
+                        },
                 )
             },
         senders =
@@ -109,7 +113,7 @@ internal fun globalSearchFilterOptions(
                         id = hex,
                         title = appState.chatMemberTitle(hex),
                         avatarSeed = hex,
-                        avatarUrl = appState.avatarUrl(hex),
+                        avatarUrl = appState.contactAvatarSource(hex),
                     )
                 }.sortedBy { it.title.lowercase(Locale.ROOT) },
     )

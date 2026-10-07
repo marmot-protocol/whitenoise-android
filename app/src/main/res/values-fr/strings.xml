@@ -1687,7 +1687,7 @@
     <string name="ai_agents_connector_docs_subtitle">Scripts d\'installation, vérifications d\'état et dépannage</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Agent terminal par Nous Research</string>
-    <string name="agent_connector_hermes_prompt">Ceci est une invite d’installation pour connecter cette installation Hermes à White Noise via Marmot. Lisez le dernier guide du connecteur à l’adresse https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Expliquez-moi comment le connecteur fonctionne et ce que l’installation va modifier. Proposez ensuite les étapes d’installation pour ma npub publique : %1$s, et demandez mon approbation avant d’apporter la moindre modification. Une fois mon approbation donnée, installez et vérifiez le connecteur, puis répondez avec la npub de votre agent.</string>
+    <string name="agent_connector_hermes_prompt">Ceci est une invite d’installation pour connecter cette installation Hermes à White Noise via Marmot. Lisez le dernier guide du connecteur à l’adresse https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md / https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Expliquez-moi comment le connecteur fonctionne et ce que l’installation va modifier. Proposez ensuite les étapes d’installation pour ma npub publique : %1$s, et demandez mon approbation avant d’apporter la moindre modification. Une fois mon approbation donnée, installez et vérifiez le connecteur, puis répondez avec la npub de votre agent. Avant de proposer des changements, confirme le profil Hermes voulu, son répertoire, le répertoire et le socket Marmot, le compte et le service de l’agent, ainsi que la passerelle concernée. Ne suppose pas le profil par défaut et ne remplace pas une autre installation. Utilise le programme Hermes dont la somme de contrôle est vérifiée. Distingue autorisation des invitations et autorisation des expéditeurs. Guide-moi pour inviter depuis le téléphone et envoyer un test ; vérifie que le profil choisi répond dans White Noise avant de déclarer le jumelage terminé.</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">Assistant IA personnel auto-hébergé</string>
     <string name="agent_connector_openclaw_prompt">Ceci est une invite d’installation pour connecter cette instance OpenClaw à White Noise via Marmot. Lisez le dernier guide du connecteur à l’adresse https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Expliquez-moi comment le connecteur fonctionne et ce que l’installation va modifier. Proposez ensuite les étapes d’installation pour ma npub publique : %1$s, et demandez mon approbation avant d’apporter la moindre modification. Une fois mon approbation donnée, installez et vérifiez le connecteur, puis répondez avec la npub de votre agent.</string>
@@ -1855,7 +1855,7 @@
     <string name="discard">Supprimer</string>
     <string name="open_app_settings">Ouvrir les paramètres de l’application</string>
     <string name="dictation_disclosure_title">Reconnaissance vocale externe</string>
-    <string name="dictation_disclosure_message">Le service vocal installé sur cet appareil traite ce que vous dites et peut envoyer l’audio à son fournisseur. White Noise ne conserve le texte renvoyé que jusqu’à ce que vous le colliez ou l’envoyiez. L’envoi automatique est désactivé tant que vous ne l’activez pas dans les paramètres de Dictée.</string>
+    <string name="dictation_disclosure_message">Le service vocal installé sur cet appareil traite ce que vous dites et peut envoyer l’audio à son fournisseur. Après un échec, le texte reconnu peut être enregistré automatiquement dans le brouillon d’origine. L’envoi automatique est désactivé tant que vous ne l’activez pas dans les paramètres de Dictée.</string>
     <string name="dictation_continue">Continuer</string>
     <string name="dictation_microphone_muted">L’accès au microphone est désactivé</string>
     <string name="dictation_microphone_muted_help">Activez l’accès au microphone dans les paramètres de confidentialité Android ou les paramètres rapides, puis réessayez la dictée.</string>
@@ -2231,6 +2231,9 @@
     <string name="profile_readiness_added">Ajout effectué</string>
     <string name="profile_readiness_recommended">Recommandé</string>
     <string name="profile_readiness_field_optional">Facultatif</string>
+    <string name="agent_connector_claude_subtitle">Agent de programmation Claude Code CLI</string>
+    <string name="agent_connector_claude_prompt">Ceci est une invite d’installation pour connecter cette configuration Claude Code à White Noise via Marmot. Lisez le guide officiel du harness Claude Code à l’adresse https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md et le guide permanent du connecteur à l’adresse https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Expliquez-moi comment le connecteur fonctionne et ce que l’installation va modifier. Confirmez les prérequis : la CLI Claude Code est installée, authentifiée et disponible dans PATH, et cette machine utilise le même ensemble de relais publics que mon téléphone. Proposez ensuite les étapes d’installation pour ma npub publique : %1$s, et demandez mon approbation avant d’apporter la moindre modification. Une fois mon approbation donnée, utilisez le flux de release install-claude-marmot.sh vérifié par somme de contrôle, initialisez wn-agent pour cette npub avec le welcomer autorisé et vérifiez wn-claude --version. Répondez ensuite avec la npub de votre agent et demandez-moi de l’inviter depuis White Noise puis d’envoyer un message de test depuis cette npub autorisée via les relais configurés. Ne déclarez pas la configuration terminée tant que wn-claude n’a pas répondu via White Noise ; si cet aller-retour ne peut pas être vérifié automatiquement, indiquez clairement qu’une vérification sur l’appareil est requise.</string>
+    <string name="ai_agents_project_groups_tip">Utilise un groupe distinct pour chaque projet et commence par son emplacement et son contexte. Les commandes de session varient selon le connecteur ; consulte son guide avant de reprendre une session ou de créer une branche.</string>
     <string name="nostr_event_view_image">Afficher l’image</string>
     <string name="nostr_event_image_failed">Impossible de charger cette image. Réessayez.</string>
     <string name="nostr_event_type_image">Photo</string>
@@ -2254,4 +2257,29 @@
     <string name="profile_notification_scope_detail">Ce réglage concerne les messages de cette personne dans toutes les conversations de ce compte. La réception et le nombre de messages non lus restent inchangés.</string>
     <string name="profile_notification_precedence">Les règles de sourdine du chat et de mentions uniquement sont prioritaires. Viennent ensuite la sourdine ou les réglages Android personnalisés de cette personne. Les réglages par défaut rétablissent ceux du chat et les réglages globaux. Les notifications existantes gardent leur canal initial.</string>
     <string name="profile_notification_channel_name">%1$s · Messages dans tous les chats</string>
+    <string name="destination_filter_all">Toutes les discussions</string>
+    <string name="destination_filter_selected">Voir la sélection (%1$d)</string>
+    <string name="destination_filter_label">Filtrer les discussions</string>
+    <string name="forward_select_by_folder">Sélectionner par dossier</string>
+    <string name="destination_filter_incomplete">Certaines discussions peuvent manquer. Réessayez ou choisissez Toutes les discussions.</string>
+    <string name="gestures_title">Actions de balayage</string>
+    <string name="gestures_physical_hint">Gauche et droite indiquent le mouvement du doigt. Vos choix restent identiques après un changement de langue. Le réglage par défaut suit le sens de réponse de la langue. Les gestes des discussions sont désactivés par défaut.</string>
+    <string name="gestures_messages">Messages du chat</string>
+    <string name="gestures_left">Balayer à gauche</string>
+    <string name="gestures_right">Balayer à droite</string>
+    <string name="gestures_default">Par défaut</string>
+    <string name="gestures_default_summary">Par défaut : %1$s</string>
+    <string name="gestures_off">Désactivé</string>
+    <string name="gestures_react">Réagir</string>
+    <string name="gestures_read_unread">Lu / non lu</string>
+    <string name="gestures_mute_unmute">Couper / activer le son</string>
+    <string name="gestures_pin_unpin">Épingler / désépingler</string>
+
+    <string name="contact_private_picture">Photo privée</string>
+    <string name="contact_picture_pick">Choisir une photo</string>
+    <string name="contact_picture_replace">Remplacer la photo</string>
+    <string name="contact_picture_reposition">Repositionner / recadrer</string>
+    <string name="contact_picture_clear">Supprimer la photo privée</string>
+    <string name="contact_picture_local_only">Uniquement pour ce compte sur cet appareil. Jamais partagée ni envoyée.</string>
+    <string name="contact_picture_failed">Impossible d’utiliser cette photo ou d’enregistrer les modifications. Votre sélection précédente est inchangée. Réessayez.</string>
 </resources>

@@ -14,11 +14,14 @@ on:
     branches: [master]
   push:
     branches: [master]
+  schedule:
+    - cron: '43 2 * * *'
+  workflow_dispatch:
 
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant CI.
 concurrency:
-  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  group: android-ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -31,6 +34,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       docs_only: ${{ steps.classify.outputs.docs_only }}
+      supplemental_campaigns: ${{ steps.classify.outputs.supplemental_campaigns }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -45,7 +49,7 @@ jobs:
         id: classify
         env:
           CI_EVENT: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: python3 scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
 
@@ -61,7 +65,7 @@ jobs:
           persist-credentials: false
 
       - name: Test manual release guide and viewport coverage validators
-        run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_check_viewport_restoration_coverage.py
+        run: python3 -m unittest scripts/test_check_manual_test_guide.py scripts/test_manual_test_fragments.py scripts/test_check_viewport_restoration_coverage.py
 
       # This must run outside the path-filtered fuzz workflow: missing a parser
       # trigger would otherwise also skip the check intended to catch it.
@@ -81,6 +85,23 @@ jobs:
           if [[ -n "$PR_BASE_SHA" ]]; then
             python3 scripts/check_manual_test_guide.py --base "$PR_BASE_SHA"
           fi
+
+      - name: Assemble the source-bound manual testing guide
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 scripts/check_manual_test_guide.py --output-dir build/manual-release-testing
+          git rev-parse HEAD > build/manual-release-testing/source-revision.txt
+          printf 'pr_head=%s\npr_base=%s\n' "$PR_HEAD_SHA" "$PR_BASE_SHA" >> build/manual-release-testing/source-revision.txt
+
+      - name: Retain the assembled manual testing guide
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: manual-release-testing-${{ github.sha }}
+          path: build/manual-release-testing/
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Test PR screenshot renderer
         run: node --test .github/scripts/update-pr-screenshots.test.js .github/scripts/update-pr-preview-links.test.js
@@ -288,7 +309,7 @@ jobs:
 
   compose-compiler:
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.supplemental_campaigns != 'false'
     name: Compose compiler metrics and stability reports
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -327,7 +348,7 @@ jobs:
 
       # Release-mode Compose compiler output identifies unstable classes and
       # restartable/skippable composables using the same optimizations users
-      # receive. Keep it opt-in locally; publish it on every CI build.
+      # receive. Keep it opt-in locally; publish it on full campaign runs.
       # Compiler reports are not cached task outputs, so this compile must execute.
       - name: Compile Compose metrics and stability reports
         run: ./gradlew :app:compileStagingZapstoreReleaseKotlin -Pwhitenoise.enableComposeCompilerReports=true --no-build-cache --profile --no-daemon --stacktrace
@@ -434,90 +455,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  screenshots:
-    needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
-    name: Curated screenshot verification (${{ matrix.flavor }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        flavor: [Zapstore, Play]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Configure MarmotKit cache directory
-        shell: bash
-        run: printf 'WHITENOISE_MARMOTKIT_CACHE_DIR=%s\n' "$RUNNER_TEMP/marmotkit-cache" >> "$GITHUB_ENV"
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
-        with:
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-
-      - name: Read MarmotKit artifact pin
-        id: marmotkit
-        shell: bash
-        run: |
-          sha="$(awk -F= '$1 == "artifact-sha256" { print $2 }' app/src/main/marmotkit/MARMOT_VERSION)"
-          [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "Invalid MarmotKit artifact SHA-256" >&2; exit 1; }
-          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
-
-      - name: Restore MarmotKit artifact
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/marmotkit-cache
-          key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
-
-      # Run only the committed-golden owners in config/screenshot-baseline-owners.txt.
-      # Mixed-purpose classes contribute just their golden-producing methods; the
-      # full unit job already owns their other assertions. Afterwards, require that
-      # every committed PNG was actually compared so no golden goes unverified.
-      - name: Screenshot tests (Roborazzi)
-        run: |
-          owner_filters="$(python3 scripts/check_screenshot_baseline_owners.py --gradle-test-args)"
-          mapfile -t owner_args <<< "$owner_filters"
-          ./gradlew \
-            :app:verifyRoborazziDev${{ matrix.flavor }}Debug \
-            "${owner_args[@]}" \
-            --build-cache --profile --no-daemon \
-            --stacktrace
-          python3 scripts/check_screenshot_baseline_owners.py \
-            --results app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json
-
-      - name: Upload reports
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: android-ci-reports-screenshots-${{ matrix.flavor }}
-          path: |
-            app/build/reports/
-            app/build/test-results/
-            app/build/outputs/roborazzi/
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Upload Gradle timing reports
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: android-ci-gradle-profiles-screenshots-${{ matrix.flavor }}
-          path: build/reports/profile/
-          if-no-files-found: ignore
-          retention-days: 7
-
   tests:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    name: Unit tests and coverage (${{ matrix.flavor }})
+    name: Unit tests, screenshots and coverage (${{ matrix.flavor }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -565,7 +506,12 @@ jobs:
 
       - name: Unit tests
         id: unit_tests
-        run: ./gradlew :app:testDev${{ matrix.flavor }}DebugUnitTest --build-cache --profile --daemon --stacktrace
+        run: ./gradlew :app:testDev${{ matrix.flavor }}DebugUnitTest -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
+
+      - name: Require every committed screenshot golden to be compared
+        run: >-
+          python3 scripts/check_screenshot_baseline_owners.py
+          --results app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json
 
       # Coverage gate (phase 2): fail CI when overall line coverage drops below the
       # ratchet floor in app/build.gradle.kts. DevZapstoreDebug only — the aggregate
@@ -573,7 +519,7 @@ jobs:
       # guard (no signing in CI).
       - name: Coverage gate (Kover)
         if: matrix.flavor == 'Zapstore'
-        run: ./gradlew :app:koverVerifyDevZapstoreDebug --build-cache --profile --daemon --stacktrace
+        run: ./gradlew :app:koverVerifyDevZapstoreDebug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       # Coverage visibility (phase 1): generate HTML/XML reports and publish them as
       # an artifact. Continue to uploads on report errors; Zapstore still requires
@@ -583,7 +529,7 @@ jobs:
         id: coverage_report
         if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' }}
         continue-on-error: true
-        run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug --build-cache --profile --daemon --stacktrace
+        run: ./gradlew :app:koverXmlReportDev${{ matrix.flavor }}Debug :app:koverHtmlReportDev${{ matrix.flavor }}Debug -Proborazzi.test.verify=true --build-cache --profile --daemon --stacktrace
 
       # Reuse the report from the full suite; no extra Gradle invocation or tests.
       # Runtime listener: 16/17 lines (94.1176%), zero eligible branches.
@@ -607,6 +553,15 @@ jobs:
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      - name: Upload full-suite golden comparison evidence
+        if: ${{ !cancelled() && steps.unit_tests.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: android-ci-golden-results-${{ matrix.flavor }}
+          path: app/build/test-results/roborazzi/dev${{ matrix.flavor }}Debug/results-summary.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload coverage report
         if: always()
@@ -647,7 +602,7 @@ jobs:
   # Missing outputs, unexpected skips, failures and cancellations remain red.
   validate:
     name: Compile, test, ktlint, detekt, Android lint
-    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, static-analysis, screenshots, tests]
+    needs: [changes, tooling-contracts, offline-zsp, build-contracts, compose-compiler, static-analysis, tests]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -661,13 +616,16 @@ jobs:
           set -euo pipefail
           printf '%s\n' "$JOB_RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
           printf '%s\n' "$JOB_RESULTS" | jq -e --arg event "$CI_EVENT" '
-            (keys == ["build-contracts", "changes", "compose-compiler", "offline-zsp", "screenshots", "static-analysis", "tests", "tooling-contracts"]) and
+            (keys == ["build-contracts", "changes", "compose-compiler", "offline-zsp", "static-analysis", "tests", "tooling-contracts"]) and
             (.changes.result == "success") and
             (."tooling-contracts".result == "success") and
             (.changes.outputs.docs_only == "true" or .changes.outputs.docs_only == "false") and
-            (if .changes.outputs.docs_only == "true" then
-              $event == "pull_request" and all(to_entries[];
+            (.changes.outputs.supplemental_campaigns == "true" or .changes.outputs.supplemental_campaigns == "false") and
+            (.changes.outputs.supplemental_campaigns as $campaigns | if .changes.outputs.docs_only == "true" then
+              $event == "pull_request" and .changes.outputs.supplemental_campaigns == "false" and all(to_entries[];
                 if .key == "changes" or .key == "tooling-contracts" then .value.result == "success"
                 else .value.result == "skipped" end)
-            else all(.[]; .result == "success") end)
+            else all(to_entries[];
+              if .key == "compose-compiler" and $campaigns == "false" then .value.result == "skipped"
+              else .value.result == "success" end) end)
           ' > /dev/null

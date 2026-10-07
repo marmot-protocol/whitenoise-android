@@ -68,6 +68,7 @@ import dev.ipf.whitenoise.android.state.ForwardTargetProgress
 import dev.ipf.whitenoise.android.state.PendingForwardRequest
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.isForwardOwnerSignedIn
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.chatFolderTriState
 import dev.ipf.whitenoise.android.ui.chats.newchat.SectionHeader
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -292,6 +293,22 @@ internal fun forwardFolderBulkRows(
     groupTitleCopy: GroupTitleCopy,
     ownerAccountRef: String? = appState.activeAccountRef,
     ownerAccountIdHex: String? = appState.activeAccount?.accountIdHex,
+): List<Pair<ChatFolder, List<String>>> =
+    destinationFolderMembershipRows(
+        appState,
+        targets,
+        groupTitleCopy,
+        ownerAccountRef,
+        ownerAccountIdHex,
+    ).filter { (folder, memberIds) -> folder.name.isNotBlank() && memberIds.size >= 2 }
+
+/** Resolves all saved folders against the same bounded, eligible account-owned destinations. */
+internal fun destinationFolderMembershipRows(
+    appState: WhiteNoiseAppState,
+    targets: List<ChatListItem>,
+    groupTitleCopy: GroupTitleCopy,
+    ownerAccountRef: String? = appState.activeAccountRef,
+    ownerAccountIdHex: String? = appState.activeAccount?.accountIdHex,
 ): List<Pair<ChatFolder, List<String>>> {
     val accountRef = ownerAccountRef ?: return emptyList()
     val store = appState.chatFolderPreferences
@@ -306,10 +323,6 @@ internal fun forwardFolderBulkRows(
     val mutedGroupIds = targets.filter(ChatListItem::engineMuted).mapTo(hashSetOf()) { it.group.groupIdHex }
     return store
         .foldersFor(accountRef)
-        // These rows render and query-match the stored name, so folders
-        // without one (un-renamed defaults) have nothing to show here; a
-        // renamed default participates like any other folder.
-        .filter { it.name.isNotBlank() }
         .map { folder ->
             val memberIds =
                 chatFolderChatIds(
@@ -323,7 +336,7 @@ internal fun forwardFolderBulkRows(
                     displayTitle = { forwardTargetDisplayTitle(it, appState, accountRef, groupTitleCopy) },
                 ).mapTo(hashSetOf()) { it.trim().lowercase(Locale.ROOT) }
             folder to eligibleIds.filter(memberIds::contains)
-        }.filter { (_, memberIds) -> memberIds.size >= 2 }
+        }
 }
 
 /**
@@ -389,7 +402,7 @@ private fun LazyListScope.forwardFolderSection(
                 },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             leadingContent = { TriStateCheckbox(state = triState, onClick = null) },
-            headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            headlineContent = { EmojiLabel(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             supportingContent = {
                 Text(pluralStringResource(R.plurals.chat_folder_chat_count, memberIds.size, memberIds.size))
             },
@@ -534,7 +547,7 @@ private fun ForwardTargetProgressRow(
                 stateDescription = supportingText
             },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        headlineContent = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { EmojiLabel(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(supportingText, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         leadingContent = {
             when (progress.phase) {

@@ -22,15 +22,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
+/** Emits the picker's dismiss action through a close control with a localized accessibility label. */
 @Composable
 internal fun ShareChatPickerCloseButton(onClick: () -> Unit) {
     IconButton(onClick = onClick) {
@@ -38,6 +42,11 @@ internal fun ShareChatPickerCloseButton(onClick: () -> Unit) {
     }
 }
 
+/**
+ * Summarizes the pending share without changing its payload. [compact] limits
+ * the preview to one line so the destination list remains usable above the IME;
+ * the regular layout allows three lines and both ellipsize overflow.
+ */
 @Composable
 internal fun ShareChatPickerPreview(
     previewText: String,
@@ -61,6 +70,10 @@ internal fun ShareChatPickerPreview(
     }
 }
 
+/**
+ * Chooses a localized text-and-attachment summary, a pluralized attachment-only
+ * summary, or the supplied text. An empty share yields no preview text.
+ */
 @Composable
 private fun sharePickerPreviewText(
     previewText: String,
@@ -142,8 +155,10 @@ internal fun ShareChatPickerAccountIdentity(
 ) {
     Column(modifier) {
         if (compact) {
-            Text(
-                text = stringResource(R.string.share_sending_as_value, accountTitle),
+            val sendingAs = stringResource(R.string.share_sending_as_value, accountTitle)
+            EmojiLabel(
+                text = accountTitle,
+                modifier = Modifier.semantics { contentDescription = sendingAs },
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

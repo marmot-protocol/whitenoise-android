@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import dev.ipf.whitenoise.android.state.OutgoingMessageIndicator
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.FailedDeliveryBadge
 import dev.ipf.whitenoise.android.ui.common.InvitationBadge
@@ -114,7 +115,7 @@ internal fun ChatRowLayout(
         content = {
             ChatRowTextLayout(
                 title = {
-                    Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    EmojiLabel(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
                 metadata = titleMetadata,
                 timestamp = {

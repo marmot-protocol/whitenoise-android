@@ -4,6 +4,9 @@ import dev.ipf.marmotkit.AppBlobEndpointFfi
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
+import dev.ipf.marmotkit.AvatarAssetFfi
+import dev.ipf.marmotkit.AvatarAvailabilityFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import org.junit.Assert.assertEquals
@@ -1047,6 +1050,26 @@ class GroupProjectorTest {
 
         assertTrue(GroupProjector.isSelfSoleMember(members, activeAccountIdHex = "alice00"))
         assertFalse(GroupProjector.isSelfSoleMember(members, activeAccountIdHex = "bob0000"))
+    }
+
+    /** One ownership rule: a peer-sourced selection or an image-less conversation lends a member's picture. */
+    @Test
+    fun ownsGroupPictureFollowsSelectionAndOwnImages() {
+        val asset =
+            AvatarAssetFfi(
+                target = "group-image",
+                reference = "group-image-reference",
+                availability = AvatarAvailabilityFfi.READY,
+                acquisition = AvatarAcquisitionStateFfi.IDLE,
+                contentRevision = 1uL,
+                byteCount = 1uL,
+            )
+        val withUrl = group().copy(avatarUrl = "https://img.example/group.png")
+        assertFalse(GroupProjector.ownsGroupPicture(group(), selectedAsset = null, peerSourced = false))
+        assertTrue(GroupProjector.ownsGroupPicture(group(), selectedAsset = asset, peerSourced = false))
+        assertTrue(GroupProjector.ownsGroupPicture(withUrl, selectedAsset = null, peerSourced = false))
+        assertTrue(GroupProjector.ownsGroupPicture(group().copy(imageHashHex = "ab"), null, peerSourced = false))
+        assertFalse(GroupProjector.ownsGroupPicture(withUrl, selectedAsset = asset, peerSourced = true))
     }
 
     private fun member(

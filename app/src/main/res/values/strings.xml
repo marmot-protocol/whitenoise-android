@@ -751,7 +751,7 @@
     <string name="ai_agents_connector_docs_subtitle">Install scripts, health checks, and troubleshooting</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Terminal agent by Nous Research</string>
-    <string name="agent_connector_hermes_prompt">This is an installation prompt for connecting this Hermes installation to White Noise through Marmot. Read the latest connector guide at https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explain to me how the connector works and what the installation will change. Then propose the installation steps for my public npub: %1$s, and ask for my approval before making any changes. Once I approve, install and verify the connector, then reply with your agent npub.</string>
+    <string name="agent_connector_hermes_prompt">This is an installation prompt for connecting this Hermes installation to White Noise through Marmot. Read the latest connector guide at https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md / https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explain to me how the connector works and what the installation will change. Then propose the installation steps for my public npub: %1$s, and ask for my approval before making any changes. Once I approve, install and verify the connector, then reply with your agent npub. Before proposing changes, confirm the intended Hermes profile, Hermes home, Marmot home/socket, agent account and service, and gateway instance; do not assume the default profile or overwrite another installation. Use the checksum-verified Hermes installer flow. Distinguish invite authorization from message-sender authorization. Guide me through the phone invitation and a test message, and verify that the selected profile replies in White Noise before calling pairing complete.</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">Self-hosted personal AI assistant</string>
     <string name="agent_connector_openclaw_prompt">This is an installation prompt for connecting this OpenClaw instance to White Noise through Marmot. Read the latest connector guide at https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explain to me how the connector works and what the installation will change. Then propose the installation steps for my public npub: %1$s, and ask for my approval before making any changes. Once I approve, install and verify the connector, then reply with your agent npub.</string>
@@ -1606,15 +1606,15 @@
     <string name="discard">Discard</string>
     <string name="open_app_settings">Open app settings</string>
     <string name="dictation_disclosure_title">External speech recognition</string>
-    <string name="dictation_disclosure_message">The speech service installed on this device processes what you say and may send the audio to its provider. White Noise keeps the text it returns only until you paste or send it. Sending automatically is off unless you turn it on in Dictation settings.</string>
+    <string name="dictation_disclosure_message">The speech service installed on this device processes what you say and may send the audio to its provider. After a failure, recognized text can be saved automatically in the original draft. Sending automatically is off unless you turn it on in Dictation settings.</string>
     <string name="dictation_disclosure_offline_title">Offline speech recognition</string>
-    <string name="dictation_disclosure_offline_message">Offline Speech to Text processes what you say on this device. White Noise keeps the text it returns only until you paste or send it. Sending automatically is off unless you turn it on in Dictation settings.</string>
+    <string name="dictation_disclosure_offline_message">Offline Speech to Text processes what you say on this device. After a failure, recognized text can be saved automatically in the original draft. Sending automatically is off unless you turn it on in Dictation settings.</string>
     <string name="dictation_continue">Continue</string>
     <string name="dictation_settings_title">Dictation</string>
     <string name="dictation_pause_other_audio_title">Pause other audio</string>
     <string name="dictation_pause_other_audio_subtitle">Pause music and podcasts during dictation; they can resume when recording stops. White Noise speech and voice messages always pause for safety.</string>
-    <string name="dictation_settings_explainer">The speech service installed on this device processes the audio and may send it to its provider. White Noise keeps the text it returns only until you paste or send it.</string>
-    <string name="dictation_settings_explainer_offline">Offline Speech to Text processes dictation on this device. White Noise keeps the text it returns only until you paste or send it.</string>
+    <string name="dictation_settings_explainer">The speech service installed on this device processes the audio and may send it to its provider. Recovered text stays in the original draft.</string>
+    <string name="dictation_settings_explainer_offline">Offline Speech to Text processes dictation on this device. Recovered text stays in the original draft.</string>
     <string name="dictation_ostt_recommendation_title">Get Offline Speech to Text</string>
     <string name="dictation_ostt_recommendation_summary">Recommended transcription app for private, on-device dictation. Available from Zapstore, not Google Play.</string>
     <string name="dictation_ostt_recommendation_open_failed">Couldn’t open the Offline Speech to Text page on Zapstore.</string>
@@ -1626,7 +1626,7 @@
     <string name="dictation_result_paste_description">Review or edit the text before sending</string>
     <string name="dictation_result_send">Send message</string>
     <string name="dictation_result_send_description">Sends only if the chat and draft haven’t changed</string>
-    <string name="dictation_send_safety_note">If the chat or draft changes before sending, the dictation stays unsent. Retry Send or choose Paste to review it.</string>
+    <string name="dictation_send_safety_note">If sending is blocked, available recognized text is recovered to the original draft. Review it before sending again.</string>
     <string name="voice_message_play">Play voice message</string>
     <string name="voice_message_pause">Pause voice message</string>
     <string name="voice_message_speed">Playback speed %1$s</string>
@@ -2389,6 +2389,10 @@
     <string name="profile_readiness_recommended">Recommended</string>
     <string name="profile_readiness_field_optional">Optional</string>
     <string name="profile_readiness_field" translatable="false">%1$s · %2$s</string>
+    <string name="agent_connector_claude_name" translatable="false">Claude Code</string>
+    <string name="agent_connector_claude_subtitle">Claude Code CLI coding agent</string>
+    <string name="agent_connector_claude_prompt">This is an installation prompt for connecting this Claude Code setup to White Noise through Marmot. Read the authoritative Claude Code harness guide at https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md and the evergreen connector guide at https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explain to me how the connector works and what the installation will change. Confirm prerequisites: Claude Code CLI is installed, authenticated, and available on PATH, and this machine uses the same public relay set as my phone. Then propose the installation steps for my public npub: %1$s, and ask for my approval before making any changes. Once I approve, use the checksum-verified install-claude-marmot.sh release flow, bootstrap wn-agent for that npub with the allowed welcomer, and verify wn-claude --version. Then reply with your agent npub and ask me to invite it from White Noise and send a test message from this allowed npub over the configured relays. Do not report setup complete until wn-claude returns a reply through White Noise; if that round trip cannot be verified automatically, clearly mark device verification required.</string>
+    <string name="ai_agents_project_groups_tip">Use a separate group for each project and start with its location and context. Session controls vary by connector; check its guide before using resume or branch commands.</string>
     <string name="nostr_event_view_image">View image</string>
     <string name="nostr_event_image_failed">Couldn’t load this image. Try again.</string>
     <string name="nostr_event_type_image">Image</string>
@@ -2412,4 +2416,29 @@
     <string name="profile_notification_scope_detail">Applies to messages from this person in every conversation for this account. Delivery and unread counts are unchanged.</string>
     <string name="profile_notification_precedence">Chat mute and mentions-only rules apply first. This person’s mute or custom Android settings apply next. Use defaults restores chat and global settings. Existing notifications keep their original channel.</string>
     <string name="profile_notification_channel_name">%1$s · Messages across chats</string>
+    <string name="destination_filter_all">All chats</string>
+    <string name="destination_filter_selected">Review selected (%1$d)</string>
+    <string name="destination_filter_label">Filter chats</string>
+    <string name="forward_select_by_folder">Select by folder</string>
+    <string name="destination_filter_incomplete">Some chats may be missing. Retry or choose All chats.</string>
+    <string name="gestures_title">Swipe actions</string>
+    <string name="gestures_physical_hint">Left and right describe finger movement. Explicit choices stay the same when you change language. Default follows the reply direction for your language. Chat swipes are off by default.</string>
+    <string name="gestures_messages">Messages</string>
+    <string name="gestures_left">Swipe left</string>
+    <string name="gestures_right">Swipe right</string>
+    <string name="gestures_default">Default</string>
+    <string name="gestures_default_summary">Default: %1$s</string>
+    <string name="gestures_off">Off</string>
+    <string name="gestures_react">React</string>
+    <string name="gestures_read_unread">Read / unread</string>
+    <string name="gestures_mute_unmute">Mute / unmute</string>
+    <string name="gestures_pin_unpin">Pin / unpin</string>
+
+    <string name="contact_private_picture">Private picture</string>
+    <string name="contact_picture_pick">Pick photo</string>
+    <string name="contact_picture_replace">Replace photo</string>
+    <string name="contact_picture_reposition">Reposition / crop</string>
+    <string name="contact_picture_clear">Clear private picture</string>
+    <string name="contact_picture_local_only">Only for this account on this device. Never shared or uploaded.</string>
+    <string name="contact_picture_failed">Couldn’t use this picture or save your changes. Your previous selection is unchanged. Try again.</string>
 </resources>

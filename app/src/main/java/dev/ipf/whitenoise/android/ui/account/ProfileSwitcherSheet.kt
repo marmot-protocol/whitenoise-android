@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
@@ -108,7 +109,7 @@ internal fun ProfileSwitcherSheet(
                         enabled = enabled && pendingLabel != account.label,
                         shapes = shapes,
                         content = {
-                            Text(displayName(account.accountIdHex), style = MaterialTheme.typography.titleMedium)
+                            EmojiLabel(displayName(account.accountIdHex), style = MaterialTheme.typography.titleMedium)
                         },
                         supportingContent = {
                             Column {

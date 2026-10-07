@@ -40,9 +40,10 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 
 /**
  * Full-screen confirmation for a contact share: the picked contact's name plus
@@ -57,7 +58,7 @@ internal fun ContactPreviewScreen(
     onDismiss: () -> Unit,
     onSend: (SharedContact) -> Unit,
 ) {
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
@@ -98,7 +99,7 @@ internal fun ContactPreviewScreen(
                             )
                         }
                         Spacer(Modifier.width(16.dp))
-                        Text(
+                        EmojiLabel(
                             contact.displayName,
                             style = MaterialTheme.typography.titleLarge,
                             maxLines = 2,

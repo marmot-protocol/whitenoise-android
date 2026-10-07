@@ -41,6 +41,7 @@ internal fun copiedMessage(
             message.timestamp,
             replacement ?: message.person,
         ).also { copy ->
+            copy.extras.putAll(message.extras)
             val mimeType = message.dataMimeType
             val dataUri = message.dataUri
             if (mimeType != null && dataUri != null) copy.setData(mimeType, dataUri)
@@ -60,3 +61,21 @@ internal fun renamedPerson(
         .setImportant(person.isImportant)
         .apply { person.icon?.let(::setIcon) }
         .build()
+
+/** Replaces only contact pixels, preserving routing identity and every non-image Person attribute. */
+internal fun contactAvatarPerson(
+    person: Person,
+    bitmap: android.graphics.Bitmap?,
+): Person =
+    Person
+        .Builder()
+        .setName(person.name)
+        .setKey(person.key)
+        .setUri(person.uri)
+        .setBot(person.isBot)
+        .setImportant(person.isImportant)
+        .setIcon(
+            androidx.core.graphics.drawable.IconCompat.createWithBitmap(
+                bitmap ?: notificationMonogramBitmap(person.name?.toString().orEmpty(), person.key.orEmpty()),
+            ),
+        ).build()

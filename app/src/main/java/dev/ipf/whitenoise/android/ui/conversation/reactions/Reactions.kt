@@ -36,6 +36,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
@@ -188,7 +189,7 @@ private fun ReactionFilterChips(
                 label = {
                     Text(
                         text = EmojiShortcodes.annotate(AnnotatedString("$emoji $count")),
-                        inlineContent = EmojiShortcodes.content(),
+                        inlineContent = EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None),
                     )
                 },
             )
@@ -212,7 +213,7 @@ private fun ReactionParticipantRow(
         }
     val displayName = appState.displayName(participant.sender).ifBlank { shortIdentity }
     val headline: @Composable () -> Unit = {
-        Text(
+        EmojiLabel(
             text = if (mine) stringResource(R.string.you) else displayName,
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 1,
@@ -230,13 +231,13 @@ private fun ReactionParticipantRow(
             title = displayName,
             seed = participant.sender,
             size = 48.dp,
-            pictureUrl = appState.avatarUrl(participant.sender),
+            pictureUrl = appState.contactAvatarSource(participant.sender),
         )
     }
     val trailing: @Composable () -> Unit = {
         Text(
             text = EmojiShortcodes.annotate(AnnotatedString(participant.emoji)),
-            inlineContent = EmojiShortcodes.content(),
+            inlineContent = EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None),
             style = MaterialTheme.typography.headlineSmall,
         )
     }

@@ -1,6 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
-import dev.ipf.whitenoise.android.audio.tts.TtsConversationDestination
+import dev.ipf.whitenoise.android.audio.PlaybackConversationDestination
 
 internal data class TtsDestinationNavigationRequest(
     val requestId: Long,
@@ -58,7 +58,7 @@ internal sealed interface TtsDestinationNavigationStep {
 /** Pure fail-closed routing decision for a transport-body tap. */
 internal fun resolveTtsDestinationNavigation(
     request: TtsDestinationNavigationRequest,
-    currentDestination: TtsConversationDestination?,
+    currentDestination: PlaybackConversationDestination?,
     knownAccountRefs: Set<String>,
     activeAccountRef: String?,
     availableGroupIds: Set<String>,
@@ -80,7 +80,7 @@ internal fun resolveTtsDestinationNavigation(
         groupAvailable ->
             TtsDestinationNavigationStep.OpenConversation(
                 groupIdHex = request.groupIdHex,
-                messageIdHex = destination.passage.messageIdHex,
+                messageIdHex = destination.messageIdHex,
                 sessionId = destination.sessionId,
                 requestId = request.requestId,
             )
@@ -88,7 +88,7 @@ internal fun resolveTtsDestinationNavigation(
             TtsDestinationNavigationStep.LoadConversationDirectly(
                 accountRef = request.accountRef,
                 groupIdHex = request.groupIdHex,
-                messageIdHex = destination.passage.messageIdHex,
+                messageIdHex = destination.messageIdHex,
                 sessionId = destination.sessionId,
                 requestId = request.requestId,
             )
