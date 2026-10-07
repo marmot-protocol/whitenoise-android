@@ -1687,7 +1687,7 @@
     <string name="ai_agents_connector_docs_subtitle">Scripts de instalação, verificações de saúde e solução de problemas</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Agente de terminal da Nous Research</string>
-    <string name="agent_connector_hermes_prompt">Este é um prompt de instalação para conectar esta instalação do Hermes ao White Noise pelo Marmot. Leia o guia mais recente do conector em https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explique como o conector funciona e o que a instalação alterará. Em seguida, proponha as etapas de instalação para minha npub pública: %1$s e peça minha aprovação antes de fazer qualquer alteração. Depois que eu aprovar, instale e verifique o conector e responda com a npub do seu agente.</string>
+    <string name="agent_connector_hermes_prompt">Este é um prompt de instalação para conectar esta instalação do Hermes ao White Noise pelo Marmot. Leia o guia mais recente do conector em https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md / https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explique como o conector funciona e o que a instalação alterará. Em seguida, proponha as etapas de instalação para minha npub pública: %1$s e peça minha aprovação antes de fazer qualquer alteração. Depois que eu aprovar, instale e verifique o conector e responda com a npub do seu agente. Antes de propor mudanças, confirme o perfil Hermes desejado, seu diretório, o diretório e socket Marmot, a conta e serviço do agente e a instância do gateway. Não presuma o perfil padrão nem substitua outra instalação. Use o instalador Hermes com checksum verificado. Diferencie autorização de convites e de remetentes. Oriente-me no convite pelo telefone e na mensagem de teste; confirme que o perfil escolhido responde no White Noise antes de declarar o pareamento concluído.</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">Assistente de IA pessoal auto-hospedado</string>
     <string name="agent_connector_openclaw_prompt">Este é um prompt de instalação para conectar esta instância do OpenClaw ao White Noise pelo Marmot. Leia o guia mais recente do conector em https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explique como o conector funciona e o que a instalação alterará. Em seguida, proponha as etapas de instalação para minha npub pública: %1$s e peça minha aprovação antes de fazer qualquer alteração. Depois que eu aprovar, instale e verifique o conector e responda com a npub do seu agente.</string>
@@ -2231,6 +2231,9 @@
     <string name="profile_readiness_added">Adicionado</string>
     <string name="profile_readiness_recommended">Recomendado</string>
     <string name="profile_readiness_field_optional">Opcional</string>
+    <string name="agent_connector_claude_subtitle">Agente de programação Claude Code CLI</string>
+    <string name="agent_connector_claude_prompt">Este é um prompt de instalação para conectar esta configuração do Claude Code ao White Noise pelo Marmot. Leia o guia oficial do harness Claude Code em https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md e o guia permanente do conector em https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explique como o conector funciona e o que a instalação alterará. Confirme os pré-requisitos: a CLI do Claude Code está instalada, autenticada e disponível no PATH, e esta máquina usa o mesmo conjunto de relays públicos do meu telefone. Em seguida, proponha as etapas de instalação para minha npub pública: %1$s e peça minha aprovação antes de fazer qualquer alteração. Depois que eu aprovar, use o fluxo de release install-claude-marmot.sh verificado por checksum, inicialize wn-agent para essa npub com o welcomer permitido e verifique wn-claude --version. Em seguida, responda com a npub do seu agente e peça que eu o convide pelo White Noise e envie uma mensagem de teste desta npub permitida pelos relays configurados. Não informe que a configuração foi concluída até que o wn-claude responda pelo White Noise; se não for possível verificar esse percurso automaticamente, indique claramente que a verificação no dispositivo é necessária.</string>
+    <string name="ai_agents_project_groups_tip">Use um grupo separado para cada projeto e comece com sua localização e contexto. Os controles de sessão variam por conector; consulte seu guia antes de usar comandos para retomar sessões ou criar ramificações.</string>
     <string name="nostr_event_view_image">Ver imagem</string>
     <string name="nostr_event_image_failed">Não foi possível carregar esta imagem. Tente novamente.</string>
     <string name="nostr_event_type_image">Imagem</string>
@@ -2254,4 +2257,29 @@
     <string name="profile_notification_scope_detail">Aplica-se às mensagens desta pessoa em todas as conversas desta conta. A entrega e a contagem de mensagens não lidas permanecem iguais.</string>
     <string name="profile_notification_precedence">As regras de silenciamento do chat e de apenas menções se aplicam primeiro. Depois, o silenciamento ou as configurações personalizadas do Android desta pessoa. Usar padrões restaura as configurações do chat e globais. As notificações existentes mantêm o canal original.</string>
     <string name="profile_notification_channel_name">%1$s · Mensagens em todos os chats</string>
+    <string name="destination_filter_all">Todas as conversas</string>
+    <string name="destination_filter_selected">Rever seleção (%1$d)</string>
+    <string name="destination_filter_label">Filtrar conversas</string>
+    <string name="forward_select_by_folder">Selecionar por pasta</string>
+    <string name="destination_filter_incomplete">Algumas conversas podem estar em falta. Tente novamente ou escolha Todas as conversas.</string>
+    <string name="gestures_title">Ações de deslizar</string>
+    <string name="gestures_physical_hint">Esquerda e direita indicam o movimento do dedo. As escolhas explícitas permanecem iguais ao mudar de idioma. A opção padrão segue a direção de resposta do idioma. Os gestos nas conversas estão desativados por padrão.</string>
+    <string name="gestures_messages">Mensagens</string>
+    <string name="gestures_left">Deslizar à esquerda</string>
+    <string name="gestures_right">Deslizar à direita</string>
+    <string name="gestures_default">Padrão</string>
+    <string name="gestures_default_summary">Padrão: %1$s</string>
+    <string name="gestures_off">Desativado</string>
+    <string name="gestures_react">Reagir</string>
+    <string name="gestures_read_unread">Lida / não lida</string>
+    <string name="gestures_mute_unmute">Silenciar / ativar som</string>
+    <string name="gestures_pin_unpin">Fixar / desafixar</string>
+
+    <string name="contact_private_picture">Imagem privada</string>
+    <string name="contact_picture_pick">Escolher foto</string>
+    <string name="contact_picture_replace">Substituir foto</string>
+    <string name="contact_picture_reposition">Reposicionar / recortar</string>
+    <string name="contact_picture_clear">Remover imagem privada</string>
+    <string name="contact_picture_local_only">Apenas para esta conta neste dispositivo. Nunca é partilhada nem enviada.</string>
+    <string name="contact_picture_failed">Não foi possível usar esta imagem ou guardar as alterações. A seleção anterior não foi alterada. Tente novamente.</string>
 </resources>

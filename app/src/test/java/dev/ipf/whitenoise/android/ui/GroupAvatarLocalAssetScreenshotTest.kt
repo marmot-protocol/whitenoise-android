@@ -950,6 +950,7 @@ private fun productionSurfaceFixture(
     encrypted: Boolean,
     sourceGroup: AppGroupRecordFfi? = null,
     selectedPresentation: ConversationPresentationFfi? = null,
+    members: List<dev.ipf.marmotkit.AppGroupMemberRecordFfi> = emptyList(),
 ): ProductionSurfaceFixture {
     val selected = asset()
     val record =
@@ -988,7 +989,7 @@ private fun productionSurfaceFixture(
         ConversationController(
             fixture.state,
             initialGroup = record,
-            initialMemberSnapshot = GroupMemberSnapshot(emptyList()),
+            initialMemberSnapshot = GroupMemberSnapshot(members),
         )
     assertNotNull(
         AvatarImageLoader.decodeAndCache(
@@ -1124,3 +1125,182 @@ private const val ACCOUNT_REF = "personal"
 private const val GROUP_NAME = "Stored avatar room"
 private val ACCOUNT_ID = "01" + "00".repeat(31)
 private val GROUP_ID = "04" + "00".repeat(31)
+
+/** Private account images compose with existing MDK public selection without changing its ownership. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+class PrivateContactGroupAvatarTest {
+    @get:Rule val composeRule = createComposeRule()
+
+    /** Resets every avatar cache so no test inherits another test's pixels. */
+    @Before
+    @After
+    fun clearPixels() {
+        AvatarImageLoader.resetProfileImageFetcherForTests()
+        AvatarImageLoader.clear()
+        GroupAvatarImageLoader.clear()
+    }
+
+    /** A native peer selection must not turn a named group into a contact avatar in details or the actual header. */
+    @Test fun namedGroupKeepsItsIdentityWhenNativeSelectionUsesPeerPixels() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        val production =
+            productionSurfaceFixture(
+                fixture,
+                false,
+                group(),
+                selectedPicture(PresentationSourceFfi.PEER_PROFILE),
+            )
+        fixture.state.contactPictureStore.save(
+            ACCOUNT_REF,
+            "peer",
+            "",
+            "",
+            dev.ipf.whitenoise.android.state.ContactPictureChange.Replace(
+                dev.ipf.whitenoise.android.state
+                    .contactPicturePng(Color.RED),
+            ),
+        ) { true }
+        val source = checkNotNull(fixture.state.contactAvatarSource("peer"))
+        val privateImage = kotlinx.coroutines.runBlocking { AvatarImageLoader.load(source) }
+        var detail: ImageBitmap? = null
+        try {
+            composeRule.setContent {
+                val presentation = rememberConversationGroupAvatar(fixture.state, production.controller)
+                SideEffect { detail = presentation.image }
+                dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme {
+                    ProductionAvatarSurface(1, fixture.state, production.item, production.controller)
+                }
+            }
+            composeRule.waitForIdle()
+            assertNotNull(privateImage)
+            org.junit.Assert.assertNotSame(privateImage, detail)
+            val pixels =
+                composeRule
+                    .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)
+                    .captureToImage()
+                    .asAndroidBitmap()
+            org.junit.Assert.assertNotEquals(Color.RED, pixels.getPixel(pixels.width / 2, pixels.height / 2))
+        } finally {
+            production.controller.onCleared()
+            production.chats.onCleared()
+        }
+    }
+
+    /** Rejecting a changed group asset must not reclassify the pair as a private peer picture. */
+    @Test fun unavailableGroupOwnedHeaderNeverUsesPrivatePeerFallback() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        val production =
+            productionSurfaceFixture(
+                fixture,
+                false,
+                group().copy(name = "", avatarUrl = "https://example.invalid/old-group.png"),
+                selectedPicture(PresentationSourceFfi.PEER_PROFILE),
+                members =
+                    listOf(
+                        dev.ipf.marmotkit.AppGroupMemberRecordFfi(ACCOUNT_ID, ACCOUNT_REF, true),
+                        dev.ipf.marmotkit.AppGroupMemberRecordFfi("peer", null, false),
+                    ),
+            )
+        fixture.state.contactPictureStore.save(
+            ACCOUNT_REF,
+            "peer",
+            "",
+            "",
+            dev.ipf.whitenoise.android.state.ContactPictureChange.Replace(
+                dev.ipf.whitenoise.android.state
+                    .contactPicturePng(Color.RED),
+            ),
+        ) { true }
+        runBlocking { AvatarImageLoader.load(checkNotNull(fixture.state.contactAvatarSource("peer"))) }
+        production.controller.window.install(avatarHeaderFrame(selectedPicture(PresentationSourceFfi.GROUP)))
+        assertNull(conversationGroupAvatarAsset(fixture.state, production.controller))
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme { ProductionAvatarSurface(1, fixture.state, production.item, production.controller) }
+            }
+            composeRule.waitForIdle()
+            val pixels =
+                composeRule
+                    .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)
+                    .captureToImage()
+                    .asAndroidBitmap()
+            org.junit.Assert.assertNotEquals(Color.RED, pixels.getPixel(pixels.width / 2, pixels.height / 2))
+        } finally {
+            production.controller.onCleared()
+            production.chats.onCleared()
+        }
+    }
+
+    /** Private pixels override a native peer selection in both real row and conversation resolvers. */
+    @Test
+    @Suppress("LongMethod") // One real avatar traverses the row, actual header and group-owned transition.
+    fun privateContactPictureOverridesPeerRowsAndHeadersButKeepsGroupOwnedPixels() {
+        val fixture = AvatarLocalFixture { emptyList() }
+        val source = group().copy(name = "", avatarUrl = null)
+        val production =
+            productionSurfaceFixture(
+                fixture,
+                false,
+                source,
+                selectedPicture(PresentationSourceFfi.PEER_PROFILE),
+            )
+        val store = fixture.state.contactPictureStore
+        store.save(
+            ACCOUNT_REF,
+            "peer",
+            "",
+            "",
+            dev.ipf.whitenoise.android.state.ContactPictureChange.Replace(
+                dev.ipf.whitenoise.android.state
+                    .contactPicturePng(Color.RED),
+            ),
+        ) { true }
+        val privateSource = checkNotNull(fixture.state.contactAvatarSource("peer"))
+        val privateImage = kotlinx.coroutines.runBlocking { AvatarImageLoader.load(privateSource) }
+        var row: ImageBitmap? = null
+        var header: ImageBitmap? = null
+        var ownGroup: ImageBitmap? = null
+        try {
+            composeRule.setContent {
+                val rowImage =
+                    dev.ipf.whitenoise.android.ui.common
+                        .rememberChatListGroupAvatar(fixture.state, production.item)
+                val headerImage = rememberConversationGroupAvatar(fixture.state, production.controller)
+                val groupImage =
+                    dev.ipf.whitenoise.android.ui.common.rememberGroupAvatarPresentation(
+                        fixture.state,
+                        group(),
+                        asset(),
+                        ACCOUNT_REF,
+                        privateSource,
+                    )
+                SideEffect {
+                    row = rowImage.image
+                    header = headerImage.image
+                    ownGroup = groupImage.image
+                }
+                dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme {
+                    ProductionAvatarSurface(1, fixture.state, production.item, production.controller)
+                }
+            }
+            composeRule.waitForIdle()
+            assertNotNull(privateImage)
+            assertSame(privateImage, row)
+            assertSame(privateImage, header)
+            val pixels =
+                composeRule
+                    .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)
+                    .captureToImage()
+                    .asAndroidBitmap()
+            assertEquals(Color.RED, pixels.getPixel(pixels.width / 2, pixels.height / 2))
+            org.junit.Assert.assertNotSame(privateImage, ownGroup)
+            assertNotNull(ownGroup)
+            assertEquals(0, fixture.legacyDownloads.get())
+        } finally {
+            production.controller.onCleared()
+            production.chats.onCleared()
+        }
+    }
+}

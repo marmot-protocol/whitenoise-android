@@ -3,10 +3,13 @@ package dev.ipf.whitenoise.android.ui.navigation
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
+import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
+import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
 
@@ -20,6 +23,7 @@ internal fun MainShellNoticeLayout(
     appLockScreenVisible: Boolean,
     persistentTopContent: @Composable () -> Unit = {},
     persistentTopContentConsumesStatusBars: Boolean = false,
+    playbackHost: ShellPlaybackHost? = null,
     content: @Composable (ConversationDictationControlOwner) -> Unit,
 ) {
     val dictationControlOwner =
@@ -28,29 +32,31 @@ internal fun MainShellNoticeLayout(
             route = dictationComposerRoute,
             appLockScreenVisible = appLockScreenVisible,
         )
-    ShellTransientNoticeLayout(
-        notice = notice,
-        // Consume once above both the persistent strip and a destination chat's own composer.
-        modifier =
-            if (dictationControlOwner == ConversationDictationControlOwner.Persistent) {
-                Modifier.imePadding()
-            } else {
-                Modifier
-            },
-        persistentTopContent = persistentTopContent,
-        persistentTopContentConsumesStatusBars = persistentTopContentConsumesStatusBars,
-        persistentBottomContent = {
-            if (!appLockScreenVisible) {
-                if (dictationController.hasDurableSession) ConversationDictationNotificationNotice()
+    CompositionLocalProvider(LocalShellPlaybackHost provides playbackHost) {
+        ShellTransientNoticeLayout(
+            notice = notice,
+            // Consume once above both the persistent strip and a destination chat's own composer.
+            modifier =
                 if (dictationControlOwner == ConversationDictationControlOwner.Persistent) {
-                    ConversationDictationPersistentControl(
-                        state = dictationController.state,
-                        controller = dictationController,
-                        modifier = Modifier.navigationBarsPadding(),
-                    )
+                    Modifier.imePadding()
+                } else {
+                    Modifier
+                },
+            persistentTopContent = persistentTopContent,
+            persistentTopContentConsumesStatusBars = persistentTopContentConsumesStatusBars,
+            persistentBottomContent = {
+                if (!appLockScreenVisible) {
+                    if (dictationController.hasDurableSession) ConversationDictationNotificationNotice()
+                    if (dictationControlOwner == ConversationDictationControlOwner.Persistent) {
+                        ConversationDictationPersistentControl(
+                            state = dictationController.state,
+                            controller = dictationController,
+                            modifier = Modifier.navigationBarsPadding(),
+                        )
+                    }
                 }
-            }
-        },
-        content = { content(dictationControlOwner) },
-    )
+            },
+            content = { content(dictationControlOwner) },
+        )
+    }
 }

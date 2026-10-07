@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -37,6 +38,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.SystemFolderKind
@@ -168,6 +171,7 @@ internal fun ChatFolderPill(
     onLongClick: (() -> Unit)? = null,
     trailingCount: Int = 0,
     unreadMessageCount: ULong? = null,
+    labelMaxWidth: Dp? = null,
 ) {
     val interactions = remember { MutableInteractionSource() }
     val resources = LocalContext.current.resources
@@ -192,7 +196,7 @@ internal fun ChatFolderPill(
         FilterChip(
             selected = selected,
             onClick = {},
-            label = { Text(label) },
+            label = { FolderPillLabel(label, labelMaxWidth) },
             interactionSource = interactions,
             shape = CircleShape,
             border = null,
@@ -225,4 +229,19 @@ internal fun ChatFolderPill(
             },
         )
     }
+}
+
+/** Keeps destination filter labels in one bounded line while semantics expose their complete name. */
+@Composable
+@Suppress("FunctionNaming")
+private fun FolderPillLabel(
+    label: String,
+    maxWidth: Dp?,
+) {
+    Text(
+        label,
+        modifier = if (maxWidth == null) Modifier else Modifier.widthIn(max = maxWidth),
+        maxLines = if (maxWidth == null) Int.MAX_VALUE else 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }

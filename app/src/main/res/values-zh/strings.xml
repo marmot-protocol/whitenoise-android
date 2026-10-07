@@ -1658,7 +1658,7 @@
     <string name="ai_agents_connector_docs_subtitle">安装脚本、健康检查与故障排除</string>
     <string name="agent_connector_hermes_name">Hermes</string>
     <string name="agent_connector_hermes_subtitle">Nous Research 的终端代理</string>
-    <string name="agent_connector_hermes_prompt">这是一条安装提示，用于通过 Marmot 将此 Hermes 安装连接到 White Noise。请阅读最新的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请安装并验证连接器，然后回复你的代理 npub。</string>
+    <string name="agent_connector_hermes_prompt">这是一条安装提示，用于通过 Marmot 将此 Hermes 安装连接到 White Noise。请阅读最新的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/hermes/marmot/README.md / https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请安装并验证连接器，然后回复你的代理 npub。 提出更改前，请确认目标 Hermes 配置、Hermes 目录、Marmot 目录和套接字、助手账户与服务，以及网关实例。不要默认选择默认配置，也不要覆盖其他安装。使用校验和已验证的 Hermes 安装程序。区分邀请授权和消息发送者授权。指导我从手机邀请并发送测试消息，确认所选配置在 White Noise 中回复后，才能宣布配对完成。</string>
     <string name="agent_connector_openclaw_name">OpenClaw</string>
     <string name="agent_connector_openclaw_subtitle">自托管个人 AI 助手</string>
     <string name="agent_connector_openclaw_prompt">这是一条安装提示，用于通过 Marmot 将此 OpenClaw 实例连接到 White Noise。请阅读最新的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请安装并验证连接器，然后回复你的代理 npub。</string>
@@ -2199,6 +2199,9 @@
     <string name="profile_readiness_added">已添加</string>
     <string name="profile_readiness_recommended">建议填写</string>
     <string name="profile_readiness_field_optional">选填</string>
+    <string name="agent_connector_claude_subtitle">Claude Code CLI 编程助手</string>
+    <string name="agent_connector_claude_prompt">这是一条安装提示，用于通过 Marmot 将此 Claude Code 设置连接到 White Noise。请阅读权威 Claude Code harness 指南：https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md，以及长期有效的连接器指南：https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md。请向我解释连接器的工作方式以及安装会带来哪些更改。确认前提条件：Claude Code CLI 已安装、已认证并可在 PATH 中使用，且此机器使用与手机相同的公共中继集合。然后针对我的公开 npub 提出安装步骤：%1$s，并在进行任何更改之前请求我的批准。我批准后，请使用经过校验和验证的 install-claude-marmot.sh 发布流程，为该 npub 引导 wn-agent 并使用允许的 welcomer，然后验证 wn-claude --version。接下来回复你的代理 npub，请我在 White Noise 中邀请它，并通过已配置的中继从这个允许的 npub 发送测试消息。在 wn-claude 通过 White Noise 回复之前，不要声称设置已完成；如果无法自动验证这一往返流程，请明确标记仍需设备验证。</string>
+    <string name="ai_agents_project_groups_tip">每个项目使用单独的群组，先说明项目位置和上下文。不同连接器的会话控制不同，使用恢复会话或分支命令前请查看对应指南。</string>
     <string name="nostr_event_view_image">查看图片</string>
     <string name="nostr_event_image_failed">无法加载此图片，请重试。</string>
     <string name="nostr_event_type_image">图片</string>
@@ -2221,4 +2224,29 @@
     <string name="profile_notification_scope_detail">适用于此账号所有对话中此人发送的消息。消息接收和未读数量不变。</string>
     <string name="profile_notification_precedence">先应用聊天静音和仅提及规则，再应用此人的静音或自定义 Android 设置。使用默认设置会恢复聊天和全局设置。现有通知保留原来的渠道。</string>
     <string name="profile_notification_channel_name">%1$s · 所有聊天中的消息</string>
+    <string name="destination_filter_all">全部聊天</string>
+    <string name="destination_filter_selected">查看已选（%1$d）</string>
+    <string name="destination_filter_label">筛选聊天</string>
+    <string name="forward_select_by_folder">按文件夹选择</string>
+    <string name="destination_filter_incomplete">部分聊天可能缺失。请重试或选择所有聊天。</string>
+    <string name="gestures_title">滑动操作</string>
+    <string name="gestures_physical_hint">左和右指手指移动方向。更改语言后，明确选择的操作保持不变。默认设置遵循当前语言的回复方向。聊天滑动操作默认关闭。</string>
+    <string name="gestures_messages">消息</string>
+    <string name="gestures_left">向左滑动</string>
+    <string name="gestures_right">向右滑动</string>
+    <string name="gestures_default">默认</string>
+    <string name="gestures_default_summary">默认：%1$s</string>
+    <string name="gestures_off">关闭</string>
+    <string name="gestures_react">回应</string>
+    <string name="gestures_read_unread">已读 / 未读</string>
+    <string name="gestures_mute_unmute">静音 / 取消静音</string>
+    <string name="gestures_pin_unpin">置顶 / 取消置顶</string>
+
+    <string name="contact_private_picture">私密图片</string>
+    <string name="contact_picture_pick">选择照片</string>
+    <string name="contact_picture_replace">更换照片</string>
+    <string name="contact_picture_reposition">调整位置 / 裁剪</string>
+    <string name="contact_picture_clear">清除私密图片</string>
+    <string name="contact_picture_local_only">仅用于此设备上的此账号。绝不会分享或上传。</string>
+    <string name="contact_picture_failed">无法使用此图片或保存更改。之前的选择未改变，请重试。</string>
 </resources>

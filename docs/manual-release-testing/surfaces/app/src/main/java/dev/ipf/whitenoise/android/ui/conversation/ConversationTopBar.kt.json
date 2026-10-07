@@ -1,0 +1,76 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+  "legacy_sha256": "faf223f35276050425d4c6e72596210cb70f805e7553017c54aa933869d80e47",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: ConversationTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ConversationTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "fun ConversationTopBar(",
+        "test_ids": [
+          "CON-001",
+          "PRO-006"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "surface": "ConversationHeaderFrame",
+        "anchor": "fun ConversationHeaderFrame(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Stored group-avatar surface: R.string.back",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.back",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.disappearing_tooltip_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.disappearing_tooltip_text",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.just_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.just_you",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.members_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.members_count",
+        "test_ids": [
+          "CHL-017"
+        ]
+      },
+      {
+        "surface": "Stored group-avatar surface: R.string.one_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTopBar.kt",
+        "anchor": "R.string.one_member",
+        "test_ids": [
+          "CHL-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

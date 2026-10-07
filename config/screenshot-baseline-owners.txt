@@ -1,15 +1,11 @@
-# Committed Roborazzi golden owners for the "Curated screenshot verification" CI job.
+# Committed Roborazzi golden-owner coverage contract and focused regeneration filters.
 #
-# Each line is one Gradle `--tests` filter. Every PNG under app/src/test/snapshots/
-# must be compared by a test these filters select, and every unit-test class that
-# calls captureRoboImage must be selected here (or listed as `diagnostic:` when it
-# captures without owning a committed golden). scripts/check_screenshot_baseline_owners.py
-# enforces both rules: statically in the tooling job and against the Roborazzi
-# results of each screenshot run.
-#
-# Mixed-purpose classes list only their golden-producing methods. Their other
-# assertions already run in the full unit-test job, so selecting the whole class
-# here would execute them twice.
+# Each line is a Gradle `--tests` filter. Every PNG under app/src/test/snapshots/
+# must have a registered owner; every capturing class must be selected or declared
+# `diagnostic:` when it owns no committed golden. The tooling validator checks
+# ownership, and both full-unit CI suites verify and prove every golden compared.
+# CI runs the complete suites, not these filters. Mixed-purpose classes list only
+# their golden-producing methods to support focused local regeneration.
 
 *ScreenshotTest
 
@@ -113,3 +109,32 @@
 *.ProfileNotificationOverrideScreenTest.customScreenDark
 *.ProfileNotificationOverrideScreenTest.customScreenAmoled
 *.ProfileNotificationOverrideScreenTest.customScreenLargeRtl
+# Configurable swipe settings: themes, physical directions and large RTL text.
+*.GestureSettingsScreenTest.light
+*.GestureSettingsScreenTest.dark
+*.GestureSettingsScreenTest.amoled
+*.GestureSettingsScreenTest.largeRtl
+*.GestureSettingsScreenTest.configured
+
+# Current chat swipe cues.
+*.ChatRowPortGestureTest.readCueDark
+*.ChatRowPortGestureTest.muteCueAmoled
+*.ChatRowPortGestureTest.pinCueLargeRtl
+*.ChatRowPortGestureTest.unreadCueLight
+*.ChatRowPortGestureTest.unmuteCueDark
+*.ChatRowPortGestureTest.unpinCueLight
+*.ContactPictureEditorScreenTest.light
+*.ContactPictureEditorScreenTest.dark
+*.ContactPictureEditorScreenTest.amoled
+*.ContactPictureEditorScreenTest.largeRtl
+*.ContactPictureEditorScreenTest.noPrivatePicture
+
+*.VoiceTransportBarTest.light
+*.VoiceTransportBarTest.dark
+*.VoiceTransportBarTest.amoled
+*.VoiceTransportBarTest.largeRtl
+*.VoiceTransportBarTest.paused
+
+# Persistent playback across actual Chats folder destinations.
+*.ChatContextMenuFlowTest.folderManagerRetainsPlaybackControls
+*.ChatContextMenuFlowTest.directFolderEditorRetainsPlaybackControls

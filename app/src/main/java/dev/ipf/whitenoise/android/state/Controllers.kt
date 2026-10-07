@@ -5329,6 +5329,98 @@ class ChatsController private constructor(
         schedulePendingMemberFetches(groupIds)
     }
 
+    /**
+     * Hydrates the open picker's off-window rows through the existing bounded local roster reader.
+     * These rows never enter the native window. Cancellation and both controller lifetimes guard publication.
+     */
+    internal suspend fun resolveForwardTargetMembers(presented: List<PresentedChatRowFfi>) {
+        val account = accountRef ?: return
+        val epoch = bindEpoch
+        do {
+            val cacheEpoch = memberCacheEpoch
+            val pending =
+                presented.distinctBy { it.row.groupIdHex }.filter {
+                    memberSnapshotNeedsFetch(it.row.groupIdHex) && it.row.groupIdHex !in inFlightMemberFetches
+                }
+            val ids = pending.map { it.row.groupIdHex }
+            inFlightMemberFetches.addAll(ids)
+            try {
+                if (pending.isNotEmpty()) loadForwardTargetMembers(account, pending, epoch, cacheEpoch)
+            } finally {
+                if (isActiveBindEpoch(epoch)) inFlightMemberFetches.removeAll(ids.toSet())
+            }
+            // A live roster invalidation supersedes this read; retry under the same picker-owned coroutine.
+        } while (isActiveBindEpoch(epoch) && !memberCacheLifetime.isCurrent(cacheEpoch))
+    }
+
+    /** Prefers identifier-only local pages; failure falls back to the existing shared permit pool. */
+    private suspend fun loadForwardTargetMembers(
+        account: String,
+        pending: List<PresentedChatRowFfi>,
+        epoch: Long,
+        cacheEpoch: Long,
+    ) {
+        val projections = loadInitialMemberIdProjections(account, pending.map { it.row.groupIdHex })
+        if (projections != null) {
+            val byGroup = projections.associateBy { it.groupIdHex }
+            pending.forEach { presentedRow ->
+                val projection = byGroup[presentedRow.row.groupIdHex] ?: return@forEach
+                applyForwardTargetMembers(
+                    presentedRow.row,
+                    memberRecordsFromIds(projection.memberIdsHex, boundAccountIdHex()),
+                    epoch,
+                    cacheEpoch,
+                )
+            }
+        } else {
+            coroutineScope {
+                pending
+                    .map { presentedRow ->
+                        async {
+                            memberFetchGate.withPermit {
+                                val current = isActiveBindEpoch(epoch) && memberCacheLifetime.isCurrent(cacheEpoch)
+                                if (!current) return@withPermit
+                                val row = presentedRow.row
+                                if (!memberSnapshotNeedsFetch(row.groupIdHex)) return@withPermit
+                                val members =
+                                    runCatchingCancellable { memberSnapshotLoader(account, row.groupIdHex) }.getOrNull()
+                                        ?: return@withPermit
+                                applyForwardTargetMembers(row, members, epoch, cacheEpoch)
+                            }
+                        }
+                    }.awaitAll()
+            }
+        }
+    }
+
+    /** Uses the native snapshot's conversation kind when the retained window has no context for a roster. */
+    private fun applyForwardTargetMembers(
+        row: ChatListRowFfi,
+        members: List<AppGroupMemberRecordFfi>,
+        epoch: Long,
+        cacheEpoch: Long,
+    ) {
+        val count = GroupProjector.uniqueMemberCount(members)
+        val unresolvedDirect =
+            row.conversationKind == ChatConversationKindFfi.UNKNOWN &&
+                count <= 1 &&
+                GroupProjector.isUnnamed(row.groupName)
+        applyFetchedMemberSnapshot(
+            groupIdHex = row.groupIdHex,
+            members = members,
+            epoch = epoch,
+            cacheEpoch = cacheEpoch,
+            directConversationOverride =
+                unresolvedDirect ||
+                    GroupProjector.isDm(
+                        row.conversationKind,
+                        count,
+                        row.groupName,
+                    ),
+            requestProfileRefresh = false,
+        )
+    }
+
     internal fun retryMemberSnapshots(groupIds: Iterable<String>) {
         val targets = groupIds.distinct().toList()
         targets.forEach(::cancelMemberSnapshotRetry)
@@ -5411,11 +5503,17 @@ class ChatsController private constructor(
         epoch: Long,
         cacheEpoch: Long,
         scheduleRecomputeAfterPublish: Boolean = true,
+        directConversationOverride: Boolean? = null,
+        requestProfileRefresh: Boolean = true,
     ) {
         if (!isActiveBindEpoch(epoch) || !memberCacheLifetime.isCurrent(cacheEpoch)) return
         val activeAccountIdHex = boundAccountIdHex() ?: appState.activeAccount?.accountIdHex
         val knownSelfRemoval = knownSelfRemovalFor(groupIdHex)
-        val directConversationCandidate = directConversationCandidateFor(groupIdHex, members)
+        val directConversationCandidate =
+            directConversationOverride ?: directConversationCandidateFor(
+                groupIdHex,
+                members,
+            )
         val selfOnlyDirectRoster =
             isSelfOnlyDirectRoster(
                 members = members,
@@ -5436,10 +5534,9 @@ class ChatsController private constructor(
             scheduleMemberSnapshotRetry(groupIdHex, epoch)
             return
         }
-        members
-            .map { it.memberIdHex }
-            .filter { it.isNotBlank() }
-            .forEach(appState::requestProfile)
+        if (requestProfileRefresh) {
+            members.map { it.memberIdHex }.filter { it.isNotBlank() }.forEach(appState::requestProfile)
+        }
         memberCacheByGroup = memberCacheByGroup + (groupIdHex to members)
         failedMemberFetches.remove(groupIdHex)
         presentationMembersByGroup = presentationMembersByGroup - groupIdHex
@@ -6610,7 +6707,7 @@ class ConversationController(
      * chat-list row instead of showing a blank/initials placeholder (#837).
      */
     val avatarUrl: String?
-        get() = group.avatarUrl ?: avatarAccount?.let { appState.avatarUrl(it) }
+        get() = group.avatarUrl ?: avatarAccount?.let { appState.contactAvatarSource(it, boundAccountRef) }
 
     // Deduped case-insensitively, mirroring the projector's classification —
     // a hex-casing-drifted duplicate must not inflate the visible headcount.
@@ -6971,6 +7068,19 @@ class ConversationController(
     internal fun retainedTimelineItem(messageId: String): TimelineMessage? {
         val itemId = timelineRecords[messageId]?.let(::projectedItemId) ?: "msg:$messageId"
         return timelineItemsById[itemId]
+    }
+
+    /** Resolves a current visible action target, including local sends, without trusting a stale Compose row. */
+    internal fun currentActionTimelineItem(messageId: String): TimelineMessage? {
+        val item =
+            optimisticMessages.values.firstOrNull { it.record.messageIdHex == messageId }
+                ?: retainedTimelineItem(messageId) ?: return null
+        val order = firstMessageOrder(sweepExpiryMessages().map { it.record.messageIdHex })
+        val gone =
+            item.projected?.deleted == true ||
+                MessageProjector.isDeleted(messageId, deletedMessageIds) ||
+                isTimelineRecordLocallyExpired(clockMillis(), item.record, localExpiryRow(item, order))
+        return item.takeUnless { gone }
     }
 
     /** The retained row's expiry input, ordered like the timeline filter and the sweep (optimistic ids first). */
@@ -11689,7 +11799,12 @@ class ConversationController(
 
     fun memberSubtitle(member: AppGroupMemberRecordFfi): String = appState.shortNpub(member.memberIdHex)
 
-    fun memberAvatarUrl(member: AppGroupMemberRecordFfi): String? = appState.avatarUrl(member.memberIdHex)
+    /** Applies account-private member pictures while preserving the native profile URL as fallback. */
+    fun memberAvatarUrl(member: AppGroupMemberRecordFfi): String? =
+        appState.contactAvatarSource(
+            member.memberIdHex,
+            boundAccountRef,
+        )
 
     suspend fun groupMlsState(): AppGroupMlsStateFfi? {
         val account = conversationAccountRef ?: return null

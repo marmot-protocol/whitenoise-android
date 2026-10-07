@@ -18,6 +18,7 @@ import kotlinx.coroutines.ensureActive
 /** Exact parent-owned source actions, revoked when their file row is replaced or detached. */
 internal class TextAttachmentNativeActions(
     private val sourceIsCurrent: () -> Boolean,
+    val playbackSource: dev.ipf.whitenoise.android.audio.AttachmentSpeechOwner? = null,
     private val saveSource: suspend () -> Unit,
 ) {
     private var attached = true
@@ -98,7 +99,14 @@ internal fun rememberTextAttachmentNativeActions(
                     controller.attachmentsFor(item).firstOrNull { it.index == attachmentIndex }?.value == reference
             }
             owned =
-                TextAttachmentNativeActions(::sourceIsCurrent) {
+                TextAttachmentNativeActions(
+                    sourceIsCurrent = ::sourceIsCurrent,
+                    playbackSource =
+                        account?.let {
+                            dev.ipf.whitenoise.android.audio
+                                .AttachmentSpeechOwner(it, group, messageIdHex, attachmentIndex)
+                        },
+                ) {
                     val outcome =
                         runCatchingCancellable {
                             saveOwnedTextAttachment(

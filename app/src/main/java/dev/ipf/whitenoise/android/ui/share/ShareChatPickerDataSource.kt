@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.share.SharePayload
+import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
@@ -20,6 +21,7 @@ internal data class ShareChatPickerDataSource(
     val controller: ChatsController?,
     val targets: List<ChatListItem>,
     val isLoading: Boolean,
+    val targetsComplete: Boolean,
     val error: ErrorPresentation?,
     val memberSnapshotsRevision: Long,
     // Observe projection publication even while the visible chat list is frozen.
@@ -75,6 +77,7 @@ internal fun rememberShareChatPickerSelectionState(
  * controller bound to another account, each merged with the one account-wide read behind the open picker.
  */
 @Composable
+@Suppress("LongMethod") // The three branches assemble the same account-owned source and retry action.
 internal fun rememberShareChatPickerDataSource(
     appState: WhiteNoiseAppState,
     selectedAccountRef: String?,
@@ -95,11 +98,13 @@ internal fun rememberShareChatPickerDataSource(
             controllerBinder(accountController, selectedAccountRef)
         }
     }
+    val retryRevision = remember(appState, selectedAccountRef) { mutableStateOf(0) }
     val accountWideTargets =
         rememberAccountWideForwardTargets(
             appState = appState,
             accountController = accountController,
             selectedAccountRef = selectedAccountRef,
+            retryRevision = retryRevision.value,
         )
 
     return when {
@@ -108,6 +113,7 @@ internal fun rememberShareChatPickerDataSource(
                 controller = null,
                 targets = emptyList(),
                 isLoading = false,
+                targetsComplete = true,
                 error = null,
                 memberSnapshotsRevision = 0L,
                 targetsRevision = 0L,
@@ -116,29 +122,38 @@ internal fun rememberShareChatPickerDataSource(
         accountController != null ->
             ShareChatPickerDataSource(
                 controller = accountController,
-                targets = mergeForwardTargets(accountController.forwardTargets(), accountWideTargets),
+                targets = mergeForwardTargets(accountController.forwardTargets(), accountWideTargets.items()),
                 isLoading = accountController.isLoading,
+                targetsComplete = accountWideTargets.complete && accountWideTargets.snapshot?.isCurrent == true,
                 error = accountController.error,
                 memberSnapshotsRevision = accountController.memberSnapshotsRevision,
                 targetsRevision = accountController.forwardTargetsRevision,
-                retryLoad = accountController::retryLoad,
+                retryLoad = {
+                    retryRevision.value += 1
+                    accountController.retryLoad()
+                },
             )
         else ->
             ShareChatPickerDataSource(
                 controller = null,
-                targets = mergeForwardTargets(appState.forwardTargets(), accountWideTargets),
+                targets = mergeForwardTargets(appState.forwardTargets(), accountWideTargets.items()),
                 isLoading = appState.forwardTargetsLoading,
+                targetsComplete = accountWideTargets.complete && accountWideTargets.snapshot?.isCurrent == true,
                 error = appState.forwardTargetsError,
                 memberSnapshotsRevision = appState.forwardTargetMembersRevision,
                 targetsRevision = appState.forwardTargetsRevision,
-                retryLoad = appState::retryForwardTargets,
+                retryLoad = {
+                    retryRevision.value += 1
+                    appState.retryForwardTargets()
+                },
             )
     }
 }
 
 /**
  * The one account-wide MDK read behind an open picker (#2618): chats beyond the retained window for
- * [selectedAccountRef], or null until it lands or when it is unavailable. The read is keyed to the account
+ * [selectedAccountRef], with explicit completeness. Retry retains the same account's already presented rows
+ * until a successful replacement arrives. The read is keyed to the account
  * the source controller is actually bound to, so switching accounts cancels it and a late result for the
  * previous account is never merged into the next one; the controller rejects a result whose binding
  * changed while the read ran.
@@ -148,22 +163,50 @@ private fun rememberAccountWideForwardTargets(
     appState: WhiteNoiseAppState,
     accountController: ChatsController?,
     selectedAccountRef: String?,
-): List<ChatListItem>? {
+    retryRevision: Int,
+): AccountWidePickerTargets {
     // The controller has no account to read for until its bind has started, which is when it publishes
     // boundAccountRef; the merge prefers retained rows, so reading before the first window frame is safe.
     val boundAccountRef = accountController?.boundAccountRef ?: appState.activeAccountRef
-    val targets = remember(accountController, selectedAccountRef) { mutableStateOf<List<ChatListItem>?>(null) }
-    LaunchedEffect(accountController, selectedAccountRef, boundAccountRef) {
-        targets.value = null
+    val targets =
+        remember(appState, accountController, selectedAccountRef, boundAccountRef) {
+            mutableStateOf(AccountWidePickerTargets())
+        }
+    LaunchedEffect(accountController, selectedAccountRef, boundAccountRef, retryRevision) {
         if (selectedAccountRef == null || boundAccountRef != selectedAccountRef) return@LaunchedEffect
+        targets.value = targets.value.copy(complete = false)
         // A bound controller is authoritative for its account: a null read must not fall back to the active
         // account's rows, which would list another account's chats under this selection.
-        targets.value =
+        val loaded =
             if (accountController != null) {
                 accountController.loadAccountWideForwardTargets()
             } else {
                 appState.loadAccountWideForwardTargets()
             }
+        targets.value = AccountWidePickerTargets(loaded ?: targets.value.snapshot, loaded != null)
+    }
+    val revision = accountController?.memberSnapshotsRevision ?: appState.forwardTargetMembersRevision
+    val targetRevision = accountController?.forwardTargetsRevision ?: appState.forwardTargetsRevision
+    val snapshot = targets.value.snapshot
+    val missingMembers =
+        remember(snapshot, revision, targetRevision) {
+            snapshot
+                ?.items()
+                .orEmpty()
+                .filter { it.memberSnapshot == null }
+                .mapTo(hashSetOf()) { it.group.groupIdHex }
+        }
+    LaunchedEffect(snapshot, missingMembers, retryRevision) {
+        snapshot?.resolveMembers(missingMembers)
     }
     return targets.value
+}
+
+/** Transient picker projection and whether its latest account-wide read completed successfully. */
+private data class AccountWidePickerTargets(
+    val snapshot: AccountWideForwardTargets? = null,
+    val complete: Boolean = false,
+) {
+    /** Reprojects the native snapshot after observed member and target revisions, without another row read. */
+    fun items(): List<ChatListItem>? = snapshot?.items()
 }

@@ -226,7 +226,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
             user = sharedUser,
             onOpen = { appState.presentProfile(sharedUser.npub) },
             displayName = sharedUserAccountIdHex?.let { appState.displayName(it) },
-            pictureUrl = sharedUserAccountIdHex?.let { appState.avatarUrl(it) },
+            pictureUrl = sharedUserAccountIdHex?.let { appState.contactAvatarSource(it) },
         )
     }
     if (remoteGiphyMedia != null) {
@@ -387,6 +387,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                             )
                         },
                     mine = true,
+                    focusPlaybackMessage = false,
                     controller = controller,
                     appState = appState,
                     presentationOwner = presentationOwner,

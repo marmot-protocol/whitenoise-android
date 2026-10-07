@@ -13,8 +13,8 @@ import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasProgressBarRangeInfo
-import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -307,6 +307,18 @@ class ShareChatPickerFullScreenTest {
                 )
             }
         }
+        appState.chatFolderPreferences.foldersFor(ACCOUNT_REF)
+        val folder =
+            requireNotNull(
+                appState.chatFolderPreferences.commitFolderDraft(
+                    ACCOUNT_REF,
+                    null,
+                    "Personal",
+                    "",
+                    setOf(GROUP_A),
+                    null,
+                ),
+            )
         var stagedAccountRef: String? = null
         var stagedGroupIds = emptyList<String>()
         val restorationTester = StateRestorationTester(composeRule)
@@ -330,9 +342,13 @@ class ShareChatPickerFullScreenTest {
 
         composeRule.onNodeWithText(app.getString(R.string.share_sending_as)).assertIsDisplayed()
         composeRule.onNodeWithText("Alice").performClick()
+        val filterTag = "destination.filter.${folder.id}"
+        composeRule.onNodeWithTag("destination.filters").performScrollToNode(hasTestTag(filterTag))
+        composeRule.onNodeWithTag(filterTag).performClick().assertIsSelected()
         composeRule.onNodeWithTag(SHARE_CHAT_PICKER_ACCOUNT_ROW_TEST_TAG).performClick()
         composeRule.onNodeWithText(workAccountRef).performClick()
 
+        composeRule.onNodeWithTag("destination.filter.all").assertIsSelected()
         composeRule.onNodeWithText("Bob").assertIsDisplayed()
         composeRule.onNodeWithText(app.getString(R.string.share)).assertIsNotEnabled()
         composeRule.onNodeWithText("Bob").performClick()
@@ -376,7 +392,7 @@ class ShareChatPickerFullScreenTest {
             }
         }
 
-        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Person 12"))
+        composeRule.onNodeWithTag("share.destinations").performScrollToNode(hasText("Person 12"))
         composeRule.onNodeWithText("Person 12").assertIsDisplayed()
 
         restorationTester.emulateSavedInstanceStateRestore()
@@ -410,7 +426,7 @@ class ShareChatPickerFullScreenTest {
             }
         }
 
-        composeRule.onNode(hasScrollAction()).performScrollToNode(hasText("Person 12"))
+        composeRule.onNodeWithTag("share.destinations").performScrollToNode(hasText("Person 12"))
         composeRule.onNodeWithText("Person 12").assertIsDisplayed()
 
         composeRule.runOnIdle { requestId.value = "request-list-2" }

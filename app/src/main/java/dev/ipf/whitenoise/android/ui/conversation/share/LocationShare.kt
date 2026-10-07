@@ -34,9 +34,16 @@ internal fun formatCoordinate(value: Double): String = String.format(Locale.US, 
 internal fun formatLocationShareText(location: SharedLocation): String =
     "Location: https://maps.google.com/maps?q=${formatCoordinate(location.latitude)},${formatCoordinate(location.longitude)}"
 
-private val MAPS_QUERY_COORDINATE =
+private const val MAPS_QUERY_COORDINATE_PATTERN =
+    """https://maps\.google\.com/(?:maps)?\?q=(-?\d+(?:\.\d+)?)(?:,|%2C)(-?\d+(?:\.\d+)?)"""
+
+// A search must not consume leading whitespace: retrying that prefix at every
+// position in a whitespace run makes ordinary prose expensive to scan.
+private val MAPS_QUERY_COORDINATE = Regex(MAPS_QUERY_COORDINATE_PATTERN, RegexOption.IGNORE_CASE)
+
+private val BARE_MAPS_QUERY_COORDINATE =
     Regex(
-        """\s*(?:Location:\s*)?https://maps\.google\.com/(?:maps)?\?q=(-?\d+(?:\.\d+)?)(?:,|%2C)(-?\d+(?:\.\d+)?)\s*""",
+        """\s*(?:Location:\s*)?$MAPS_QUERY_COORDINATE_PATTERN\s*""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -64,7 +71,7 @@ private fun locationOf(match: MatchResult): SharedLocation? {
 }
 
 /** True when the body is only the maps link, so the map card replaces the text. */
-internal fun isBareLocationShare(text: String): Boolean = MAPS_QUERY_COORDINATE.matches(text)
+internal fun isBareLocationShare(text: String): Boolean = BARE_MAPS_QUERY_COORDINATE.matches(text)
 
 internal fun locationGrantAllowsSharing(grants: Map<String, Boolean>): Boolean =
     grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||

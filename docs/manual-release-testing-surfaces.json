@@ -735,6 +735,58 @@
         "anchor": "fun reconcileSuccessfulTextSend(",
         "test_ids": ["MSG-004"]
       },
+      {"surface": "Compact sending account accessibility label", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerChrome.kt", "anchor": "R.string.share_sending_as_value", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.forward_search_chats", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt", "anchor": "R.string.forward_search_chats", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.forward_start_failed", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt", "anchor": "R.string.forward_start_failed", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_incomplete", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFilterIncomplete.kt", "anchor": "R.string.destination_filter_incomplete", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.retry", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFilterIncomplete.kt", "anchor": "R.string.retry", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_all", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "R.string.destination_filter_all", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_label", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "R.string.destination_filter_label", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.destination_filter_selected", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "R.string.destination_filter_selected", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: fun destinationFolderInputsComplete(", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt", "anchor": "fun destinationFolderInputsComplete(", "test_ids": ["FLD-001", "SYS-004"]},
+      {"surface": "Destination folder picker: R.string.share_search_chats", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerFullScreen.kt", "anchor": "R.string.share_search_chats", "test_ids": ["FLD-001", "SYS-004"]},
+      {
+        "surface": "ForwardEmptyTargets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardEmptyTargets(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationFilterIncomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFilterIncomplete.kt",
+        "anchor": "fun DestinationFilterIncomplete(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "FolderPillLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
+        "anchor": "fun FolderPillLabel(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "rememberDestinationFolderRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt",
+        "anchor": "fun rememberDestinationFolderRows(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationFolderFilters",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationFolderFilters.kt",
+        "anchor": "fun DestinationFolderFilters(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationPickerSearch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationPickerSearch.kt",
+        "anchor": "fun DestinationPickerSearch(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
+      {
+        "surface": "DestinationSearchField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/DestinationPickerSearch.kt",
+        "anchor": "fun DestinationSearchField(",
+        "test_ids": ["FLD-001", "SYS-004"]
+      },
       {
         "surface": "rememberShareChatPickerActions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerScaffoldActions.kt",
@@ -6666,7 +6718,7 @@
       {
         "surface": "Forwarding folder section label",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
-        "anchor": "R.string.chat_folders_title",
+        "anchor": "R.string.forward_select_by_folder",
         "test_ids": [
           "FLD-001",
           "MSG-010"
@@ -20935,6 +20987,36 @@
           "SET-016",
           "SET-017"
         ]
+      },
+      {
+        "surface": "string:ai_agents_project_groups_tip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_project_groups_tip",
+        "test_ids": ["SET-016"]
+      },
+      {
+        "surface": "string:agent_connector_claude_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_name",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_claude_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_subtitle",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_claude_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_prompt",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_hermes_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_hermes_prompt",
+        "test_ids": ["SET-016", "SET-017"]
       },
       {
         "surface": "string:ai_agents_manual_setup_body",

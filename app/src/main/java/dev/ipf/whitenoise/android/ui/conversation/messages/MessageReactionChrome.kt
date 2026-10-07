@@ -74,7 +74,12 @@ internal fun RowScope.MessageSenderAvatarSlot(
                     title = title,
                     seed = seed,
                     size = 30.dp,
-                    pictureUrl = pictureUrl.takeIf { picture == null },
+                    pictureUrl =
+                        pictureUrl.takeIf {
+                            picture == null ||
+                                dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+                                    .isPrivate(it)
+                        },
                     picture = picture,
                 )
             }
