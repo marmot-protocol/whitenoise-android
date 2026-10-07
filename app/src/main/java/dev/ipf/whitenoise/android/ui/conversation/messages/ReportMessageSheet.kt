@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,7 +44,6 @@ import dev.ipf.whitenoise.android.state.REPORT_EXPLANATION_LIMIT
 import dev.ipf.whitenoise.android.state.REPORT_REASONS
 import dev.ipf.whitenoise.android.state.boundedExplanation
 import dev.ipf.whitenoise.android.state.reportReasonLabel
-import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 internal const val REPORT_SHEET_TEST_TAG = "message.report"
 internal const val REPORT_BODY_TEST_TAG = "message.report.body"
@@ -148,7 +148,7 @@ private fun ReportMessageBody(
     modifier: Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()).testTag(REPORT_BODY_TEST_TAG),
+        modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState()).testTag(REPORT_BODY_TEST_TAG),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(R.string.report_message_title), style = MaterialTheme.typography.titleMedium)

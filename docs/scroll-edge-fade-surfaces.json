@@ -44,6 +44,10 @@
     {
       "surface": "Implicit editable text-field scrolling",
       "reason": "Native caret, focus and selection own internal text scrolling. Surrounding app form scrolls get fades; field borders/icons/labels remain unmasked."
+    },
+    {
+      "surface": "ReportMessageSheet IME form",
+      "reason": "Keep its previously tested ordinary scrolling while the added offscreen mask fails the unchanged real-keyboard regression. Other form fades remain covered; this surface is explicitly deferred."
     }
   ],
   "surfaces": [
@@ -613,15 +617,12 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ReportMessageSheet.kt",
       "calls": {
-        "fadingVerticalScroll": 1
+        "verticalScroll": 1
       },
       "family": "conversation/messages",
-      "policy": "ordinary",
+      "policy": "IME form retains ordinary scrolling; added offscreen fade deferred after real-keyboard emulator disconnects. Keep all reasons and pinned Send footer reachable.",
       "test_ids": [
-        "SCR-001",
-        "SCR-002",
-        "SCR-003",
-        "SCR-004"
+        "MSG-016"
       ]
     },
     {

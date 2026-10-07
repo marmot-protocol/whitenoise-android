@@ -226,9 +226,7 @@ jobs:
           target: google_apis
           arch: x86_64
           force-avd-creation: false
-          # Use the supported software backend selector for headless rendering.
-          # swiftshader_indirect was deprecated in emulator 36.4.9.
-          emulator-options: -no-snapshot-save -no-window -gpu software -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           # android-emulator-runner executes this input through /bin/sh. Keep it
           # to one command and delegate conditional selection to the executable.
