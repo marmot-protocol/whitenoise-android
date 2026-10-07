@@ -1,0 +1,344 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+  "legacy_sha256": "331a8a4b0ee360cd236f215328f78a41dbf29498b2ff3f4180a5e2e21a0693f3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Pending edit admission failure feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun failPendingEditAdmission(",
+        "test_ids": [
+          "MSG-007"
+        ]
+      },
+      {
+        "surface": "Pending edit failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_edit_message",
+        "test_ids": [
+          "MSG-007"
+        ]
+      },
+      {
+        "surface": "Loaded chats or messages kept while a refresh failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_loaded_content_may_be_out_of_date",
+        "test_ids": [
+          "CHL-015",
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Chat list or conversation still finishing the MarmotKit update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_not_ready",
+        "test_ids": [
+          "INT-010",
+          "CHL-015",
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Conversation open exceeded the local read budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_restart_app_before_retry",
+        "test_ids": [
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Generic retry copy for a failed chat list or conversation load",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "CHL-015",
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "Pre-admission optimistic send cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun cancelOptimisticSendResult(",
+        "test_ids": [
+          "MSG-019"
+        ]
+      },
+      {
+        "surface": "Conversation window open exceeded its deadline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.error_window_timed_out",
+        "test_ids": [
+          "CON-015"
+        ]
+      },
+      {
+        "surface": "toast chat deleted local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_chat_deleted_local",
+        "test_ids": [
+          "CHL-010",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "R.string.toast_left_chat_delete_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_left_chat_delete_failed",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_leave_not_confirmed_history_kept",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_leave_not_confirmed_history_kept",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_group_needs_admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_needs_admin",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_left_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_left_chat",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.toast_make_another_admin_before_leaving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_make_another_admin_before_leaving",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "explicit single-group leave and delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "suspend fun leaveAndDeleteFromChatList(",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "toast couldnt delete chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_delete_chat",
+        "test_ids": [
+          "CHL-010",
+          "GRP-010"
+        ]
+      },
+      {
+        "surface": "toast couldnt delete pending message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_delete_message",
+        "test_ids": [
+          "MSG-019"
+        ]
+      },
+      {
+        "surface": "toast couldnt reset group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_reset_group",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "toast group reset already waiting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_reset_already_waiting",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "toast group reset done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_reset_done",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "Reaction mutation rejected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_reaction_failed",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "Group history notice dismissal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "suspend fun dismissGroupHistoryNotices(",
+        "test_ids": [
+          "GRP-024"
+        ]
+      },
+      {
+        "surface": "Group history notice dismiss failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.history_notice_dismiss_failed",
+        "test_ids": [
+          "GRP-024"
+        ]
+      },
+      {
+        "surface": "Group avatar update failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_update_group",
+        "test_ids": [
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "Group image cleanup failure notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_group_image_uploaded_cleanup_failed",
+        "test_ids": [
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "Group image mutation failure owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal suspend fun updateGroupImage(",
+        "test_ids": [
+          "GRP-025"
+        ]
+      },
+      {
+        "surface": "Existing conversation group-recovery refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun refreshGroupRecoveryStatus(",
+        "test_ids": [
+          "GRP-021"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:group_rejoin_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.group_rejoin_failed",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:group_rejoin_success",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.group_rejoin_success",
+        "test_ids": [
+          "GRP-021"
+        ]
+      },
+      {
+        "surface": "setting:toast_couldnt_add_members",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_add_members",
+        "test_ids": [
+          "GRP-005"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Failed original send precedence for Retry and Discard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun failedEditForAction(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-007"
+        ]
+      },
+      {
+        "surface": "First settled conversation read at the saved watermark",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private var lastSubmittedReadMessageId: String? = null",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Native manual reminder lookup for visible-read dedupe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal fun hasManualUnreadReminder(groupIdHex: String)",
+        "test_ids": [
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "An off-window read anchor uses the authoritative unread projection instead of counting retained history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "internal fun countUnreadIncoming(",
+        "test_ids": [
+          "CON-003"
+        ]
+      },
+      {
+        "surface": "Token-aware text admission safely retries an interrupted runtime call",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun isRetryableTextAdmissionError(",
+        "test_ids": [
+          "MSG-017"
+        ]
+      },
+      {
+        "surface": "A relay echo that lands before the send call returns replaces the pending bubble instead of joining it",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "fun optimisticMessageIdForProjection(",
+        "test_ids": [
+          "CON-004",
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "An optimistically published chat-list preview carries no deletion evidence for the message just sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun sentPreview(",
+        "test_ids": [
+          "CON-004",
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "An accepted-pending text send settles its chat-list delivery indicator after navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun convergeAcceptedPendingTextSend(",
+        "test_ids": [
+          "CON-004",
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "Conversation replacements deduplicate profile requests and retain completed stream state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "suspend fun applyTimelinePage(",
+        "test_ids": [
+          "CON-002",
+          "CON-004"
+        ]
+      },
+      {
+        "surface": "DM trace attribution and owner-approved diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "diagnosticAttempt = diagnosticAttempt,",
+        "test_ids": [
+          "SEC-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

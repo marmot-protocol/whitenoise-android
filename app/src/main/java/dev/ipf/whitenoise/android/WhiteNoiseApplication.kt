@@ -6,6 +6,7 @@ import androidx.work.Configuration
 import androidx.work.Operation
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
@@ -105,6 +106,7 @@ open class WhiteNoiseApplication :
     override fun onCreate() {
         super.onCreate()
         DictationDiagnostics.attach(this)
+        DmCreationDiagnostics.attach(this)
         PerformanceDiagnostics.bind(this)
         // AppCompat must receive custom-stored locales before MainActivity's
         // onCreate on API 32 and lower so it can wrap the Activity context.

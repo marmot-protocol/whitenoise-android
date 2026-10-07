@@ -86,6 +86,7 @@ import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.core.withAuthoritativeEdits
+import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.GroupMembershipTimings
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
@@ -3931,6 +3932,7 @@ class ChatsController private constructor(
     internal suspend fun resolveProvenanceDirectChat(
         provenanceGroupIdHex: String?,
         targetReference: String,
+        diagnosticAttempt: DmCreationAttempt? = null,
     ): NewMessageDirectChatResolution {
         val unavailable = NewMessageDirectChatResolution(item = null, createRequired = false)
         val account = accountRef ?: return unavailable
@@ -3941,6 +3943,7 @@ class ChatsController private constructor(
             groupIdHex = provenanceGroupIdHex,
             targetReference = targetReference,
             chatItemForGroup = ::chatItemForGroup,
+            diagnosticAttempt = diagnosticAttempt,
         )
     }
 

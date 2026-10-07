@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/DirectChatDiagnosticOwner.kt",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Tap lifecycle attribution after owner replacement or navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/DirectChatDiagnosticOwner.kt",
+        "anchor": "internal suspend fun <T> withDmCreationOwner",
+        "test_ids": [
+          "SEC-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8"
+}

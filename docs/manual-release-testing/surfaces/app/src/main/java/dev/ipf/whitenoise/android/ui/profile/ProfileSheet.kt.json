@@ -379,6 +379,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "DM trace attribution and owner-approved diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "val profileDmDiagnostic =",
+        "test_ids": [
+          "SEC-009"
+        ]
       }
     ]
   },
