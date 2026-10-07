@@ -54,6 +54,31 @@ class ConversationEntryUnreadSnapshotTest {
         )
     }
 
+    /** Quiet failure followed by a prepended page cannot move the entry unread divider. */
+    @Test
+    fun olderRecoveryKeepsTheFrozenEntryUnreadMarker() {
+        val timeline = mutableStateOf(listOf(received("read"), received("unread")))
+        val snapshot = arrayOfNulls<ConversationEntryUnreadSnapshot>(1)
+        composeRule.setContent {
+            snapshot[0] =
+                rememberConversationEntryUnreadSnapshot(
+                    controllerIdentity = this,
+                    projectionUnread = 1,
+                    projectionFirstUnreadMessageId = "unread",
+                    timeline = timeline.value,
+                    readAnchorMessageId = "read",
+                )
+        }
+        composeRule.waitForIdle()
+        val before = snapshot[0]
+        composeRule.runOnUiThread {
+            timeline.value = listOf(received("older"), received("read"), received("unread"))
+        }
+        composeRule.waitForIdle()
+        assertEquals(ConversationEntryUnreadSnapshot(count = 1, firstUnreadMessageId = "unread"), snapshot[0])
+        assertEquals(before, snapshot[0])
+    }
+
     @Test
     fun controllerSwitchRecomputesUnreadSnapshotWhenBothTimelinesAreNonEmpty() {
         val controllerIdentity = mutableStateOf<Any>(Any())

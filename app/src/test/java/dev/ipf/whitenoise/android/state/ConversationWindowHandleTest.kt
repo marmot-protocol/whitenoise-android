@@ -82,6 +82,96 @@ class ConversationWindowHandleTest {
             assertFalse(initial === fallback)
         }
 
+    /** Stream-first delivery acknowledges one successful page without moving history twice. */
+    @Test
+    fun streamFirstPageAcknowledgesTheExactInstalledRevision() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            fake.beforeCommandReply = { replacement ->
+                fake.emit(replacement)
+                handle.nextWindow()
+            }
+
+            val outcome = handle.paginateBackwards(50u)
+
+            assertTrue(outcome is TimelinePageOutcome.Advanced)
+            assertSame(handle.latestInstalledWindow()?.page, outcome.pageOrCurrent())
+            assertEquals(1, fake.pageCalls.size)
+            assertEquals(2uL, handle.latestWindowFrame()?.revision?.sequence)
+        }
+
+    /** A command-first echo is dropped once; the next real update remains deliverable. */
+    @Test
+    fun commandFirstPageDoesNotDeliverItsStreamEchoAgain() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            fake.beforeCommandReply = { fake.emit(it) }
+            assertTrue(handle.paginateBackwards(50u) is TimelinePageOutcome.Advanced)
+            fake.emit(snapshot(sequence = 3uL, messageIds = listOf("next")))
+
+            assertEquals(listOf("next"), handle.nextWindow()?.messages?.map { it.messageIdHex })
+            assertEquals(1, fake.pageCalls.size)
+        }
+
+    /** A later window really does supersede the command; never acknowledge or reinstall the old page. */
+    @Test
+    fun newerStreamRevisionStillSupersedesACommandReply() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            fake.beforeCommandReply = {
+                fake.emit(snapshot(sequence = 3uL, messageIds = listOf("newer-viewport")))
+                handle.nextWindow()
+            }
+
+            val outcome = handle.paginateBackwards(50u) as TimelinePageOutcome.Unchanged
+
+            assertEquals(ConversationWindowUnchangedReason.SUPERSEDED, outcome.reason)
+            assertEquals(listOf("newer-viewport"), outcome.current?.messages?.map { it.messageIdHex })
+            assertEquals(3uL, handle.latestWindowFrame()?.revision?.sequence)
+        }
+
+    /** A foreign generation must never acknowledge or replace the active window. */
+    @Test
+    fun foreignCommandReplyCannotReplaceTheActiveWindow() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1"), generation = "active"))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            val initial = handle.snapshot()
+            // The fake's command replies use generation "gen", distinct from the installed handle.
+            val outcome = handle.paginateBackwards(50u) as TimelinePageOutcome.Unchanged
+
+            assertEquals(ConversationWindowUnchangedReason.SUPERSEDED, outcome.reason)
+            assertSame(initial, outcome.current)
+            assertEquals("active", handle.latestWindowFrame()?.revision?.generation)
+        }
+
+    /** Exact stream echoes also acknowledge anchor, reply/unread jumps and return-to-latest commands. */
+    @Test
+    fun streamFirstNavigationKeepsItsSuccessfulOutcome() =
+        runBlocking {
+            val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+            val handle = FfiConversationWindowHandle(fake, release = fake::release)
+            handle.snapshot()
+            fake.beforeCommandReply = { replacement ->
+                fake.emit(replacement)
+                handle.nextWindow()
+            }
+
+            assertSame(handle.setVisibleAnchor("m1"), handle.latestInstalledWindow()?.page)
+            val jumped = handle.jumpToMessage("m1") as ConversationJumpOutcome.Window
+            assertTrue(jumped.outcome is TimelinePageOutcome.Advanced)
+            assertSame(jumped.outcome.pageOrCurrent(), handle.latestInstalledWindow()?.page)
+            assertSame(handle.returnToLatest(), handle.latestInstalledWindow()?.page)
+            assertEquals(4uL, handle.latestWindowFrame()?.revision?.sequence)
+            assertTrue(fake.pageCalls.isEmpty())
+        }
+
     /** A missing jump target stays distinct from a retryable not-ready window. */
     @Test
     fun jumpDistinguishesMissingTargetFromRetryableDelay() =
@@ -264,6 +354,7 @@ private class FakeConversationWindow(
     private val updates = Channel<ConversationWindowSnapshotFfi>(Channel.UNLIMITED)
     val pageCalls = mutableListOf<Pair<ULong, ConversationPageDirectionFfi>>()
     var failNextCommandWith: Throwable? = null
+    var beforeCommandReply: suspend (ConversationWindowSnapshotFfi) -> Unit = {}
     var failNextReceiveWith: Throwable? = null
     var failNextSnapshotWith: Throwable? = null
     var failCancelWith: Throwable? = null
@@ -299,6 +390,7 @@ private class FakeConversationWindow(
         val existing = current.messages.map { it.timeline.messageIdHex }
         val ids = existing + "${existing.first()}-older"
         current = snapshot(sequence = revision.sequence + 1uL, messageIds = ids)
+        beforeCommandReply(current)
         return current
     }
 
@@ -310,6 +402,7 @@ private class FakeConversationWindow(
         throwScriptedFailure()
         val existing = current.messages.map { it.timeline.messageIdHex }
         current = snapshot(sequence = revision.sequence + 1uL, messageIds = existing)
+        beforeCommandReply(current)
         return current
     }
 

@@ -174,11 +174,11 @@ private class ConversationWindowInstaller {
             page
         }
 
-    // Superseded, not-ready, timed-out, outside-anchor, foreign-generation and malformed-argument results
-    // carry no detail the app can act on: the contract is to reassess from the newest installed replacement,
-    // which the receive loop keeps delivering. Only a missing jump target is surfaced, and only when asked.
-    // Letting any of them escape would take the process down from a scroll-settle effect (seen on device
-    // when an optimistic row's local id reached `setVisibleAnchor`).
+    /**
+     * Runs a revision-quoted command, acknowledging its matching stream echo under the same lock.
+     * Recoverable native errors retain the newest window; only a requested missing jump target
+     * escapes, so delayed reply navigation cannot be confused with an unavailable message.
+     */
     @Suppress("SwallowedException", "ReturnCount")
     suspend fun commandOutcome(
         rethrowMissingTarget: Boolean = false,
@@ -194,12 +194,19 @@ private class ConversationWindowInstaller {
                 if (rethrowMissingTarget) throw missing
                 return unchanged(ConversationWindowUnchangedReason.SUPERSEDED)
             } catch (windowOutcome: MarmotKitException) {
-                return unchanged(windowOutcome.unchangedReason())
+                return unchanged(windowOutcome.unchangedReason(), revision)
             }
-        // A replacement the cursor refuses is one a newer install already overtook.
-        return install(result)
-            ?.let(::Advanced)
-            ?: unchanged(ConversationWindowUnchangedReason.SUPERSEDED)
+        return synchronized(lock) {
+            // MDK publishes to next() before completing the command. Its exact echo acknowledges
+            // this command even when the receive path installed it first; paging again would move
+            // the viewport twice. A genuinely newer or foreign revision remains superseded.
+            val installed = latest
+            if (installed?.frame?.revision == result.revision) {
+                Advanced(installed.page)
+            } else {
+                install(result)?.let(::Advanced) ?: unchanged(ConversationWindowUnchangedReason.SUPERSEDED)
+            }
+        }
     }
 
     /** The newly installed page, or null for every outcome that left the window where it was. */
@@ -209,7 +216,10 @@ private class ConversationWindowInstaller {
     ): TimelinePageFfi? = (commandOutcome(rethrowMissingTarget, block) as? Advanced)?.page
 
     /** Pairs an unchanged reason with the page the handle still holds. */
-    private fun unchanged(reason: ConversationWindowUnchangedReason): TimelinePageOutcome = Unchanged(reason, page)
+    private fun unchanged(
+        reason: ConversationWindowUnchangedReason,
+        requestedRevision: ConversationWindowRevisionFfi? = null,
+    ): TimelinePageOutcome = Unchanged(reason, page, requestedRevision)
 }
 
 /**

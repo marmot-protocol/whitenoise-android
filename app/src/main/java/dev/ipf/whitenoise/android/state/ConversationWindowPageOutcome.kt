@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.ConversationWindowRevisionFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 
 /**
@@ -34,7 +35,7 @@ internal enum class ConversationWindowUnchangedReason {
  * all either install a newer replacement or leave the current one standing.
  */
 internal sealed interface TimelinePageOutcome {
-    /** A newer replacement was installed and [page] is the new authoritative window. */
+    /** The command succeeded; [page] was installed by its reply or the matching stream echo. */
     data class Advanced(
         val page: TimelinePageFfi,
     ) : TimelinePageOutcome
@@ -43,6 +44,8 @@ internal sealed interface TimelinePageOutcome {
     data class Unchanged(
         val reason: ConversationWindowUnchangedReason,
         val current: TimelinePageFfi?,
+        /** Revision quoted by the unsuccessful command, for recovery that races its reply. */
+        val requestedRevision: ConversationWindowRevisionFfi? = null,
     ) : TimelinePageOutcome
 }
 

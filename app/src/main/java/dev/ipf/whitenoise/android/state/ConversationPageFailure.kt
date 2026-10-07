@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.util.Log
+import dev.ipf.marmotkit.ConversationWindowRevisionFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.NOT_READY
 import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.SUPERSEDED
@@ -20,11 +21,11 @@ internal fun ConversationController.unchangedPageLoad(
 ): ConversationPageLoad =
     when (outcome.reason) {
         TIMED_OUT -> {
-            reportPageFailure(direction, MarmotWindowDeadline(direction), origin)
+            reportPageFailure(direction, MarmotWindowDeadline(direction), origin, outcome.requestedRevision)
             ConversationPageLoad.TIMED_OUT
         }
         NOT_READY -> {
-            reportPageFailure(direction, MarmotWindowNotReady(direction), origin)
+            reportPageFailure(direction, MarmotWindowNotReady(direction), origin, outcome.requestedRevision)
             ConversationPageLoad.NOT_READY
         }
         SUPERSEDED -> {
@@ -37,7 +38,7 @@ internal fun ConversationController.unchangedPageLoad(
 /**
  * Records a page failure so the screen's existing retry affordance appears for this direction.
  *
- * An automatic forward prefetch reports nothing to the reader: its content is opportunistic, so it
+ * An automatic prefetch reports nothing to the reader: its content is opportunistic, so it
  * only counts against the recovery budget and leaves a privacy-safe marker — the operation code and
  * the attempt number, never the engine's message — in the log.
  */
@@ -45,10 +46,23 @@ internal fun ConversationController.reportPageFailure(
     direction: ConversationSearchPageDirection,
     cause: Throwable,
     origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT,
+    requestedRevision: ConversationWindowRevisionFfi? = null,
 ) {
     if (origin == ConversationPagingOrigin.AUTOMATIC) {
-        automaticPaging.newer.recordFailure()
-        val attempt = automaticPaging.newer.consecutiveFailures
+        val guard =
+            when (direction) {
+                ConversationSearchPageDirection.OLDER -> automaticPaging.older
+                ConversationSearchPageDirection.NEWER -> automaticPaging.newer
+            }
+        guard.recordFailure(
+            revision = requestedRevision ?: timelineSubscription?.latestWindowFrame()?.revision,
+            waitForReplacement = cause is MarmotWindowNotReady || cause is MarmotWindowDeadline,
+        )
+        val attempt = guard.consecutiveFailures
+        // Recovery may already have committed while the not-ready/deadline reply was in flight.
+        if (direction == ConversationSearchPageDirection.OLDER && requestedRevision != null) {
+            guard.onWindowApplied(window.frame?.revision)
+        }
         Log.w("DMConversation", "automatic_page_failed operation=${pageOperation(direction)} attempt=$attempt")
         return
     }

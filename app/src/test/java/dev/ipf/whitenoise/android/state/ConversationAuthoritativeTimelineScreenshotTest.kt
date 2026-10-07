@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.Looper
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -8,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.GroupRecoveryStatusFfi
 import dev.ipf.marmotkit.GroupSystemEventFfi
@@ -18,15 +22,19 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import java.time.Duration
+import java.util.TimeZone
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.util.TimeZone
 
 /** Compose-level proof that authoritative and unresolved-local row order reaches visible rows. */
 @RunWith(RobolectricTestRunner::class)
@@ -53,6 +61,59 @@ class ConversationAuthoritativeTimelineScreenshotTest {
         }
     }
 
+    /** Automatic older-history timeouts keep the actual transcript visible, without red retry chrome. */
+    @Test
+    fun quietOlderTimeoutLight() = captureQuietOlderTimeout("light", dark = false)
+
+    /** Pins quiet recovery against the dark conversation background. */
+    @Test
+    fun quietOlderTimeoutDark() = captureQuietOlderTimeout("dark", dark = true)
+
+    /** The same recovery must not disturb reading order at RTL and 200% text. */
+    @Test
+    fun quietOlderTimeoutRtlLargeText() =
+        captureQuietOlderTimeout("rtl_200", dark = false, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+
+    /** Drives production prefetch into a timeout and captures the retained conversation. */
+    private fun captureQuietOlderTimeout(
+        suffix: String,
+        dark: Boolean,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ) {
+        val fixture = screenshotFixture()
+        val originalTimeZone = TimeZone.getDefault()
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        try {
+            awaitConversationCondition { fixture.controller.timeline.size == 3 }
+            showConversation(fixture, dark, fontScale, layoutDirection)
+            val row = composeRule.onNodeWithTag(messageBubbleRowTestTag(APP_MESSAGE_ID), useUnmergedTree = true)
+            val topBefore = row.fetchSemanticsNode().boundsInRoot.top
+            fixture.subscription.emitWindow(
+                timelinePage(membershipRecord(), appRecord(), unconfirmedLocalRecord()).copy(hasMoreBefore = true),
+            )
+            awaitConversationCondition { fixture.subscription.nextWindowCallCount >= 2 }
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
+            composeRule.waitUntil(5_000L) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10))
+                fixture.controller.automaticOlderPagingBlocked
+            }
+            composeRule.runOnIdle {
+                assertNull(fixture.controller.error)
+                assertFalse(fixture.controller.isLoadingOlder)
+                assertEquals(3, fixture.controller.timeline.size)
+            }
+            assertEquals("quiet failure must not move the visible row", topBefore, row.fetchSemanticsNode().boundsInRoot.top, 1f)
+            composeRule.onNodeWithText("Couldn't load more", substring = true).assertDoesNotExist()
+            composeRule.onNodeWithText("Retry").assertDoesNotExist()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/conversation_quiet_older_timeout_$suffix.png")
+        } finally {
+            TimeZone.setDefault(originalTimeZone)
+            fixture.controller.onCleared()
+            awaitOpenedTimelineSubscriptionsClosed(fixture.scripted)
+        }
+    }
+
     /** Creates the window subscription and realistic entry projection needed by the reveal gate. */
     private fun screenshotFixture(): ScreenshotFixture {
         val subscription =
@@ -61,6 +122,8 @@ class ConversationAuthoritativeTimelineScreenshotTest {
                 // bucket. Android must merge this old row chronologically while
                 // retaining the authoritative membership/application pair.
                 timelinePage(membershipRecord(), appRecord(), unconfirmedLocalRecord()),
+                backwardsOutcomes =
+                    mutableListOf(TimelinePageOutcome.Unchanged(ConversationWindowUnchangedReason.TIMED_OUT, null)),
             )
         val scripted =
             ScriptedConversationLiveSubscriptions(
@@ -103,19 +166,26 @@ class ConversationAuthoritativeTimelineScreenshotTest {
                 memberSnapshot = conversationTimelineMemberSnapshot(),
                 projection = entryProjection,
             )
-        return ScreenshotFixture(controller, scripted, chat)
+        return ScreenshotFixture(controller, scripted, chat, subscription)
     }
 
     /** Renders the conversation and waits for its production initial-anchor reveal. */
-    private fun showConversation(fixture: ScreenshotFixture) {
+    private fun showConversation(
+        fixture: ScreenshotFixture,
+        dark: Boolean = false,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
-                ConversationScreen(
-                    appState = fixture.controller.appState,
-                    chat = fixture.chat,
-                    controller = fixture.controller,
-                    onBack = {},
-                )
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
+                    ConversationScreen(
+                        appState = fixture.controller.appState,
+                        chat = fixture.chat,
+                        controller = fixture.controller,
+                        onBack = {},
+                    )
+                }
             }
         }
         composeRule.waitForIdle()
@@ -219,6 +289,7 @@ class ConversationAuthoritativeTimelineScreenshotTest {
         val controller: ConversationController,
         val scripted: ScriptedConversationLiveSubscriptions,
         val chat: ChatListItem,
+        val subscription: ScriptedConversationTimelineSubscription,
     )
 
     private companion object {

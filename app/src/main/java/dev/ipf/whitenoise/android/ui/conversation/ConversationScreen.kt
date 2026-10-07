@@ -1475,6 +1475,7 @@ internal fun ConversationScreen(
                     ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
                 )
                 scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+                controller.onOlderPagingGestureStarted()
             },
             awaitScrollSettled = {
                 snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
@@ -2827,35 +2828,26 @@ internal fun ConversationScreen(
             // one of those, resolve no anchor, and page unanchored: the bug this is meant to fix.
             val oldestVisible =
                 listState.layoutInfo.visibleItemsInfo.lastOrNull { conversationAnchorMessageId(it.key) != null }
-            // Read here rather than in the collector: snapshotFlow observes only what this block reads,
-            // and a page that ends without moving the list — a newer page that failed, say — must
-            // re-evaluate the older edge once it no longer blocks it, as must a retry clearing the block.
-            // The two blocks are folded together: a page the engine never answered leaves the reader a
-            // retry row, and a prefetch it answered without older rows stands down until the reader
-            // asks again from the header or a window replacement arrives (#2727).
-            val olderPageBlocked = controller.olderPageBlocked || controller.automaticOlderPagingBlocked
-            Triple(oldestVisible, controller.isLoadingPage, olderPageBlocked)
-        }.collect { (oldestVisible, pageInFlight, olderPageBlocked) ->
+            // Observe the complete demand, including history flags and the initial anchor. A live
+            // recovery may enable paging without changing visible keys or list geometry.
             val liveRenderedSize = controller.timeline.count { !MessageProjector.isEdit(it.record) }
-            if (liveRenderedSize == 0) return@collect
             val oldestMessageListIndex =
                 conversationTimelineListIndex(
                     timelineIndex = 0,
                     timelineSize = liveRenderedSize,
                     trailingRowCount = controller.conversationTrailingRowCount(liveRenderedSize),
                 )
-            val prefetch =
-                shouldPrefetchOlder(
-                    anchored = initialTimelineAnchored,
-                    hasMoreBefore = controller.hasMoreBefore,
-                    pageInFlight = pageInFlight,
-                    // A page the engine never answered leaves the reader a retry row; without this
-                    // the effect would re-issue it on every scroll frame, which is the silent stall
-                    // this screen used to show. The retry, or a live replacement, clears the block.
-                    olderPageBlocked = olderPageBlocked,
-                    oldestVisibleIndex = oldestVisible?.index ?: -1,
-                    oldestMessageListIndex = oldestMessageListIndex,
-                )
+            oldestVisible to
+                (liveRenderedSize > 0 &&
+                    shouldPrefetchOlder(
+                        anchored = initialTimelineAnchored,
+                        hasMoreBefore = controller.hasMoreBefore,
+                        pageInFlight = controller.isLoadingPage,
+                        olderPageBlocked = controller.olderPageBlocked || controller.automaticOlderPagingBlocked,
+                        oldestVisibleIndex = oldestVisible?.index ?: -1,
+                        oldestMessageListIndex = oldestMessageListIndex,
+                    ))
+        }.collect { (oldestVisible, prefetch) ->
             if (!prefetch) return@collect
             val edgeMessageId = controller.timeline.firstOrNull { !MessageProjector.isEdit(it.record) }?.id
             // MDK places a replacement relative to the window's anchor, so tell it which row the
