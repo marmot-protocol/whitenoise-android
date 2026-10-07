@@ -332,6 +332,28 @@ class QueueTest(unittest.TestCase):
         self.assertEqual(self.tick(readback=lambda *_: False), 'unknown-held')
         self.assertEqual(len(self.writes), 1)
 
+    def test_exhaustion_holds_another_candidate_even_with_new_generation(self):
+        self.exhaust_never_sent_budget()
+        other = q.Identity(11, 'other_PR', 'f' * 40, self.identity.base)
+        self.snapshot['candidate'] = asdict(other)
+        self.snapshot['generation'] = 1
+        self.assertEqual(self.tick(candidate=other), 'not-sent-exhausted-held')
+        effect = q.Effect('authorize-source', other, 'c' * 64, 1)
+        self.assertEqual(q.execute(self.journal, effect, self.write,
+                                  self.readback, self.save), 'not-sent-exhausted-held')
+        self.assertFalse(self.writes)
+
+    def test_changed_proof_cannot_reset_exhausted_candidate_budget(self):
+        self.exhaust_never_sent_budget()
+        self.assertEqual(self.tick(verify_source=lambda *_: 'f' * 64), 'not-sent-exhausted-held')
+        self.assertFalse(self.writes)
+
+    def test_exhausted_selection_does_not_become_idle_when_candidate_disappears(self):
+        self.exhaust_never_sent_budget()
+        self.snapshot.pop('candidate')
+        self.assertEqual(self.tick(candidate=None), 'not-sent-exhausted-held')
+        self.assertFalse(self.writes)
+
     def test_corrupt_no_send_proof_cannot_be_retried(self):
         from unittest.mock import patch
         with patch.object(q.time,'time',return_value=1000):

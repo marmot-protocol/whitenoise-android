@@ -69,6 +69,9 @@ backoff and full fresh identity/proof checks. A third never-sent failure persist
 direct execution of the same effect. After repairing the local fault, the
 original owner may explicitly record a new admission generation; the exhausted
 record is retained, and the new effect still requires fresh identity/proof checks.
+The exhausted selection also holds other PRs and changed proof keys. A new
+generation only admits recovery of the same PR identity; it never silently
+advances another candidate.
 Changing generation never releases an uncertain sent write. A remote API refusal stays held for explicit
 recovery; a sent request with a lost response stays uncertain. The CLI child
 verifies the journal intent and its actual ancestor producer lock.

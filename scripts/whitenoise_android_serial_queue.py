@@ -219,6 +219,23 @@ def previous_result(record):
     return None
 
 
+def exhausted_selection_result(journal, effect):
+    """An exhausted selection cannot silently become another PR or proof key."""
+    for record in journal['effects'].values():
+        exhausted = record['state'] == 'not-sent-exhausted' or (
+            record['state'] == 'not-sent'
+            and record['not_sent_attempts'] >= MAX_NOT_SENT_ATTEMPTS)
+        if not exhausted:
+            continue
+        previous = record['payload']
+        identity = previous['identity']
+        if (effect is None or effect.identity.number != identity['number']
+                or effect.identity.pull_request_id != identity['pull_request_id']
+                or effect.generation <= previous['generation']):
+            return 'not-sent-exhausted-held'
+    return None
+
+
 def tick(journal, observe: Callable, candidate, verify_source: Callable,
          verify_integration: Callable, write: Callable, readback: Callable,
          persist: Callable, lease_held: Callable, *, shadow=False):
@@ -242,6 +259,9 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
         return 'lease-held'
     first = validate_snapshot(observe())
     effect = plan(first, candidate, verify_source, verify_integration)
+    held = exhausted_selection_result(journal, effect)
+    if held:
+        return held
     if effect is None:
         return 'idle'
     key = effect.key()
@@ -265,6 +285,9 @@ def execute(journal, effect, write, readback, persist):
     key = effect.key()
     if any(r['state'] in UNCERTAIN for r in journal['effects'].values()):
         return 'unknown-held'
+    held = exhausted_selection_result(journal, effect)
+    if held:
+        return held
     previous=journal['effects'].get(key)
     held = previous_result(previous)
     if held:
