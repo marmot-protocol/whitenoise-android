@@ -3,9 +3,8 @@ name: chats-bulk-delete-cancel
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
-- tapOn:
+- longPressOn:
     text: "Maestro group"
-    longPress: true
 - assertVisible: "Pin"
 - tapOn: "Select"
 - assertVisible:

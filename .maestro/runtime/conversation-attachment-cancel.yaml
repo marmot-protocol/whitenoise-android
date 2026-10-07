@@ -7,8 +7,8 @@ name: conversation-attachment-cancel
 - assertVisible: "Generated fixture message"
 - tapOn: "Add attachment"
 - assertVisible:
-    id: "conversation.attachment.menu"
+    text: "Camera"
 - back
 - assertNotVisible:
-    id: "conversation.attachment.menu"
+    text: "Camera"
 - assertVisible: "Generated fixture message"

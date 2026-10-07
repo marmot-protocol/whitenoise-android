@@ -5,12 +5,11 @@ name: reactions-configure-back
 - assertVisible: Maestro group
 - tapOn: Maestro group
 - assertVisible: Generated fixture message
-- tapOn:
+- longPressOn:
     text: Generated fixture message
-    longPress: true
 - tapOn: Open emoji picker
 - assertVisible:
-    id: emoji.picker
+    id: emoji.picker.grid
 - tapOn: Configure Reactions
 - assertVisible: Tap an emoji to replace it\.
 - back

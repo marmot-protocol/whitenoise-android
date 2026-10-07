@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 import yaml
 
 from scripts import maestro_runtime as runtime
-from scripts.maestro_coverage import EDGE_DIMENSIONS, family_plans, inventory, markdown_inventory, named_edges, screen_catalog
+from scripts.maestro_coverage import EDGE_CHECKS, EDGE_DIMENSIONS, family_plans, inventory, markdown_inventory, named_edges, screen_catalog
 from scripts.maestro_runtime_summary import campaign
 from scripts.maestro_runtime_pair import pair
 from scripts.maestro_runtime_selection import selection, matrix_selection
@@ -209,6 +209,64 @@ class CampaignSummaryTest(unittest.TestCase):
 
 
 class RuntimeEvidenceTest(unittest.TestCase):
+    def test_every_surface_gets_every_edge_without_automatic_pass_or_na(self):
+        """A discovered dialog cannot silently omit lifecycle, accessibility or input qualification."""
+        result = inventory()
+        self.assertEqual(set(EDGE_CHECKS), set(EDGE_DIMENSIONS))
+        self.assertEqual(result['screen_edge_check_count'], len(result['screen_catalog']) * len(EDGE_DIMENSIONS))
+        for screen in result['screen_catalog']:
+            with self.subTest(surface=screen['symbol']):
+                self.assertEqual([edge['dimension'] for edge in screen['edge_plan']], list(EDGE_DIMENSIONS))
+                for edge in screen['edge_plan']:
+                    self.assertTrue(edge['required_check'])
+                    self.assertEqual(edge['status'], 'unexecuted')
+                    self.assertEqual(edge['evidence'], [])
+                    self.assertIsNone(edge['na_reason'])
+        text = markdown_inventory(result)
+        for dimension in EDGE_DIMENSIONS:
+            self.assertEqual(text.count(f'- [ ] **{dimension}**'), len(result['screen_catalog']))
+
+    def test_long_press_uses_a_command_not_an_unsupported_tap_property(self):
+        """Regress the actual CLI parse failure that prevented all contextual-menu journeys."""
+        # https://docs.maestro.dev/reference/commands-available/longpresson
+        long_presses = 0
+        for path in (runtime.ROOT / '.maestro').rglob('*.yaml'):
+            self.assertNotRegex(path.read_text(), r'\blongPress\s*:')
+            for document in yaml.safe_load_all(path.read_text()):
+                if isinstance(document, list):
+                    long_presses += sum(isinstance(command, dict) and 'longPressOn' in command for command in document)
+        self.assertGreater(long_presses, 0)
+
+    def test_observed_popup_children_replace_unexported_container_tags(self):
+        """Real hosted trees expose Camera and emoji grid, while these parent tags are absent."""
+        for path in (runtime.ROOT / '.maestro/runtime').glob('*.yaml'):
+            self.assertNotRegex(path.read_text(), r'(?m)id: "?conversation\.attachment\.menu"?\s*$')
+            self.assertNotRegex(path.read_text(), r'(?m)id: "?emoji\.picker"?\s*$', path.name)
+        emoji = (runtime.ROOT / '.maestro/runtime/conversation-emoji-cancel.yaml').read_text()
+        self.assertIn('emoji.picker.grid', emoji)
+
+    def test_send_hides_keyboard_suggestions_before_selecting_app_button(self):
+        """Gboard's suggestion send must not receive the tap meant for the app's Send control."""
+        _, commands = list(yaml.safe_load_all((runtime.ROOT / '.maestro/runtime/conversation-send.yaml').read_text()))
+        send = commands.index({'tapOn': 'Send'})
+        self.assertEqual(commands[send - 1], 'hideKeyboard')
+        self.assertEqual(runtime.CASES['conversation-send']['postcondition'], 'send')
+
+    def test_cli_parser_output_survives_a_failure_without_junit(self):
+        """Keep the actual parser diagnostic in the failed case artifact instead of only the job log."""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            def parser_failure(arguments, **options):
+                """Model a CLI rejection before any UI result can be produced."""
+                options['stdout'].write('Unknown Property: longPress\n')
+                self.assertIs(options['stderr'], subprocess.STDOUT)
+                self.assertEqual(options['timeout'], 120)
+                return subprocess.CompletedProcess(arguments, 1)
+            with patch.object(runtime.subprocess, 'run', side_effect=parser_failure):
+                self.assertEqual(runtime.run_ui('conversation-selection-cancel', directory).returncode, 1)
+            self.assertIn('Unknown Property', (directory / 'maestro-output.txt').read_text())
+            self.assertFalse((directory / 'junit.xml').exists())
+
     def test_native_host_never_claims_the_maestro_ui_connection(self):
         """An indirect safety probe must not compete with the driver's single accessibility owner."""
         root = runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro'

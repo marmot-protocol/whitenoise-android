@@ -10,6 +10,6 @@ name: conversation-draft-return
 - inputText: "Maestro unsent draft"
 - hideKeyboard
 - back
-- assertVisible: "Maestro unsent draft"
+- assertVisible: "Draft: Maestro unsent draft"
 - tapOn: "Maestro group"
 - assertVisible: "Maestro unsent draft"

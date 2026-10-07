@@ -93,10 +93,7 @@ def run_case(name, reports):
                         raise TimeoutError('Fixture setup deadline exceeded')
                     time.sleep(1)
             (directory / 'ready.json').write_text(json.dumps(ready, indent=2) + '\n')
-            result = subprocess.run(['maestro', '--device', 'emulator-5554', 'test', '--format', 'JUNIT',
-                                     '--output', str(directory / 'junit.xml'), '--debug-output', str(directory / 'debug'),
-                                     '--test-output-dir', str(directory / 'screenshots'),
-                                     str(ROOT / '.maestro/runtime' / f'{name}.yaml')], timeout=120, check=False)
+            result = run_ui(name, directory)
             if result.returncode != 0:
                 raise ValueError(f'Maestro exit {result.returncode}')
             record['seconds'] = ui_result(directory / 'junit.xml', name)
@@ -152,6 +149,16 @@ def run_case(name, reports):
                             process.wait(timeout=10)
                 (directory / 'result.json').write_text(json.dumps(record, indent=2) + '\n')
     return record
+
+
+def run_ui(name, directory):
+    """Retain bounded CLI stdout and stderr, including parse failures that produce no JUnit."""
+    with (directory / 'maestro-output.txt').open('w') as log:
+        return subprocess.run(['maestro', '--device', 'emulator-5554', 'test', '--format', 'JUNIT',
+                               '--output', str(directory / 'junit.xml'), '--debug-output', str(directory / 'debug'),
+                               '--test-output-dir', str(directory / 'screenshots'),
+                               str(ROOT / '.maestro/runtime' / f'{name}.yaml')], timeout=120, check=False,
+                              stdout=log, stderr=subprocess.STDOUT)
 
 
 def case_selection(suite, partition):

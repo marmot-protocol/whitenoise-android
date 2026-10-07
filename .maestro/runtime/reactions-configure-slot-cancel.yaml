@@ -5,19 +5,18 @@ name: reactions-configure-slot-cancel
 - assertVisible: Maestro group
 - tapOn: Maestro group
 - assertVisible: Generated fixture message
-- tapOn:
+- longPressOn:
     text: Generated fixture message
-    longPress: true
 - tapOn: Open emoji picker
 - assertVisible:
-    id: emoji.picker
+    id: emoji.picker.grid
 - tapOn: Configure Reactions
 - assertVisible: Tap an emoji to replace it\.
 - tapOn: Reaction 1, .*Double tap to replace\.
 - assertVisible:
-    id: emoji.picker
+    id: emoji.picker.grid
 - back
 - assertNotVisible:
-    id: emoji.picker
+    id: emoji.picker.grid
 - assertNotVisible: Tap an emoji to replace it\.
 - assertVisible: Generated fixture message

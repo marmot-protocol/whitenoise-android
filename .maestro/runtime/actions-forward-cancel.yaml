@@ -5,9 +5,8 @@ name: actions-forward-cancel
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
 - assertVisible: "Generated fixture message"
-- tapOn:
+- longPressOn:
     text: "Generated fixture message"
-    longPress: true
 - tapOn: "Forward"
 - assertVisible:
     id: "forward_chat_picker_full_screen"

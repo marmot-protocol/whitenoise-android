@@ -8,6 +8,7 @@ name: conversation-send
 - assertVisible: "Generated fixture message"
 - tapOn: "Message"
 - inputText: "Maestro verified send"
+- hideKeyboard
 - tapOn: "Send"
 - assertVisible: "Message"
 - assertNotVisible: "Send"

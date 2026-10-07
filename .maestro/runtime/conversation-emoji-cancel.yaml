@@ -7,8 +7,8 @@ name: conversation-emoji-cancel
 - assertVisible: "Generated fixture message"
 - tapOn: "Open emoji picker"
 - assertVisible:
-    id: "emoji.picker"
+    id: "emoji.picker.grid"
 - back
 - assertNotVisible:
-    id: "emoji.picker"
+    id: "emoji.picker.grid"
 - assertVisible: "Generated fixture message"

@@ -7,10 +7,10 @@ name: acquisition-camera-back
 - assertVisible: Generated fixture message
 - tapOn: Add attachment
 - assertVisible:
-    id: conversation.attachment.menu
+    text: "Camera"
 - tapOn: Camera
 - assertVisible: Allow Maestro Test Lab to take pictures and record video\?
 - back
 - assertVisible: Generated fixture message
 - assertNotVisible:
-    id: conversation.attachment.menu
+    text: "Camera"

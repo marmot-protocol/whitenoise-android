@@ -7,10 +7,10 @@ name: acquisition-document-cancel
 - assertVisible: Generated fixture message
 - tapOn: Add attachment
 - assertVisible:
-    id: conversation.attachment.menu
+    text: "Camera"
 - tapOn: Files
 - assertVisible: Recent
 - back
 - assertVisible: Generated fixture message
 - assertNotVisible:
-    id: conversation.attachment.menu
+    text: "Camera"

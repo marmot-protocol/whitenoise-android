@@ -5,9 +5,8 @@ name: reports-explanation-cancel
 - assertVisible: Maestro group
 - tapOn: Maestro group
 - assertVisible: Generated incoming fixture message
-- tapOn:
+- longPressOn:
     text: Generated incoming fixture message
-    longPress: true
 - tapOn: Report
 - assertVisible: Report this message
 - assertVisible:

@@ -5,9 +5,8 @@ name: actions-batch-delete-cancel
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
 - assertVisible: "Generated fixture message"
-- tapOn:
+- longPressOn:
     text: "Generated fixture message"
-    longPress: true
 - tapOn: "Select"
 - assertVisible: "Select messages"
 - tapOn: "Delete selected messages"

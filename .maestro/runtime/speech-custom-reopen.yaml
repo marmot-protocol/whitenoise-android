@@ -21,19 +21,18 @@ name: speech-custom-reopen
 - eraseText: 100
 - inputText: '2.75'
 - hideKeyboard
-- &id001
-  tapOn: Cancel
-- &id002
-  assertNotVisible:
+- tapOn: Cancel
+- assertNotVisible:
     id: speech.custom_rate
-- &id003
-  assertVisible:
+- assertVisible:
     id: speech.engine.group
 - tapOn: Speech rate
 - tapOn: Custom
 - assertNotVisible:
     id: speech.custom_rate
     text: '2.75'
-- *id001
-- *id002
-- *id003
+- tapOn: Cancel
+- assertNotVisible:
+    id: speech.custom_rate
+- assertVisible:
+    id: speech.engine.group

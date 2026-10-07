@@ -7,10 +7,10 @@ name: acquisition-gallery-cancel
 - assertVisible: Generated fixture message
 - tapOn: Add attachment
 - assertVisible:
-    id: conversation.attachment.menu
+    text: "Camera"
 - tapOn: Photos and videos
 - assertVisible: Albums
 - back
 - assertVisible: Generated fixture message
 - assertNotVisible:
-    id: conversation.attachment.menu
+    text: "Camera"

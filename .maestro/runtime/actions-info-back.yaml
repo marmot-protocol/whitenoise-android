@@ -5,9 +5,8 @@ name: actions-info-back
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
 - assertVisible: "Generated fixture message"
-- tapOn:
+- longPressOn:
     text: "Generated fixture message"
-    longPress: true
 - tapOn: "Info"
 - assertVisible: "Message info"
 - assertVisible: "Message ID"

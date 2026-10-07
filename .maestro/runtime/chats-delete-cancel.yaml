@@ -3,9 +3,8 @@ name: chats-delete-cancel
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
-- tapOn:
+- longPressOn:
     text: "Maestro group"
-    longPress: true
 - assertVisible: "Pin"
 - tapOn: "Delete from this device"
 - assertVisible: "Delete from this device"

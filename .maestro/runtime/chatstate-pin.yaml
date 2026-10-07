@@ -3,13 +3,11 @@ name: chatstate-pin
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
-- tapOn:
+- longPressOn:
     text: "Maestro group"
-    longPress: true
 - assertVisible: "Pin"
 - tapOn: "Pin"
-- tapOn:
+- longPressOn:
     text: "Maestro group"
-    longPress: true
 - assertVisible: "Unpin"
 - back

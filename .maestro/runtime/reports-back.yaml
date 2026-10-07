@@ -5,9 +5,8 @@ name: reports-back
 - assertVisible: Maestro group
 - tapOn: Maestro group
 - assertVisible: Generated incoming fixture message
-- tapOn:
+- longPressOn:
     text: Generated incoming fixture message
-    longPress: true
 - tapOn: Report
 - assertVisible: Report this message
 - assertVisible: "Your report goes to this group's admins, encrypted like any other message[.] They will see who reported it[.]"

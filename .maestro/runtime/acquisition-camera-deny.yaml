@@ -7,11 +7,11 @@ name: acquisition-camera-deny
 - assertVisible: Generated fixture message
 - tapOn: Add attachment
 - assertVisible:
-    id: conversation.attachment.menu
+    text: "Camera"
 - tapOn: Camera
 - assertVisible: Allow Maestro Test Lab to take pictures and record video\?
 - tapOn:
     id: com.android.permissioncontroller:id/permission_deny_button
 - assertVisible: Generated fixture message
 - assertNotVisible:
-    id: conversation.attachment.menu
+    text: "Camera"

@@ -22,6 +22,23 @@ EDGE_DIMENSIONS = (
     'account-and-target-change', 'offline-and-reconnect', 'warm-resume', 'activity-recreation',
     'process-death', 'orientation-and-window-size', 'theme-font-scale-rtl', 'accessibility-and-keyboard',
 )
+EDGE_CHECKS = {
+    'initial-empty-loading-populated-error': 'Open with each supported initial state; verify content, actions and error recovery.',
+    'normal-action': 'Complete each advertised action and verify its resulting state at the owning execution layer.',
+    'cancel-and-back': 'Dismiss through Cancel, toolbar Back and Android Back; verify drafts, selections and parent destination.',
+    'permission-denial': 'Exercise first denial, repeated denial and later grant for each permission this surface requests.',
+    'invalid-and-boundary-input': 'Exercise empty, whitespace, malformed, minimum, maximum, oversized and Unicode input where accepted.',
+    'repeat-and-concurrent-actions': 'Repeat actions and interleave competing operations; verify no duplication, lost input or stale result.',
+    'retry-and-interruption': 'Interrupt an operation, recover and Retry; verify retained intent and the final durable outcome.',
+    'account-and-target-change': 'Change account or target while work is pending; verify private state and late results stay with their owner.',
+    'offline-and-reconnect': 'Open or act offline, then restore connectivity; verify local usability and correct recovery without duplicate effects.',
+    'warm-resume': 'Background and resume the same process with input or work pending; verify the visible state and resumed controls.',
+    'activity-recreation': 'Recreate the Activity with pending state; verify restoration without treating handled rotation as recreation.',
+    'process-death': 'Kill and relaunch the process using its dedicated fixture; verify only durable state returns and work recovers safely.',
+    'orientation-and-window-size': 'Use portrait, landscape and constrained windows; verify reachable controls, dialogs and keyboard geometry.',
+    'theme-font-scale-rtl': 'Check supported themes, large font scales and RTL; verify readable content, ordering and unclipped controls.',
+    'accessibility-and-keyboard': 'Check semantics, focus traversal, TalkBack and keyboard dismissal; verify the intended control receives each action.',
+}
 
 
 def named_edges(guide, requirements):
@@ -87,6 +104,9 @@ def screen_catalog(root, surfaces, cases, include_companions=False):
                                {'source': path, 'direct_surface_reference': path in companions.get(symbol, [])}
                                for path in companion_paths],
                            'execution_verified': False,
+                           'edge_plan': [{'dimension': dimension, 'required_check': EDGE_CHECKS[dimension],
+                                          'status': 'unexecuted', 'evidence': [], 'na_reason': None}
+                                         for dimension in EDGE_DIMENSIONS],
                            'limits': 'A shared requirement ID is a discovery link, not proof this particular surface was exercised.'})
     return result
 
@@ -114,6 +134,7 @@ def inventory(root=ROOT, include_companions=False):
     screens = screen_catalog(root, surfaces, cases, include_companions)
     return {'schema': 1, 'requirements': requirements, 'surfaces': surfaces, 'cases': cases,
             'screen_catalog': screens, 'discovered_screen_count': len(screens),
+            'screen_edge_check_count': sum(len(screen['edge_plan']) for screen in screens),
             'named_edge_cases': edges, 'named_edge_case_count': len(edges),
             'required_edge_dimensions': list(EDGE_DIMENSIONS),
             'unmapped_requirement_ids': sorted(test_id for test_id, case in requirements.items()
@@ -131,7 +152,8 @@ def markdown_inventory(result, source_sha=None):
     lines = ['# Complete testing campaign inventory', '',
              'This is an execution plan. Every acceptance point remains unchecked; partial UI mappings are not full proof.', '',
              f"{result['requirement_count']} permanent requirements; {result['named_edge_case_count']} explicitly named subcases; "
-             f"{result['discovered_screen_count']} named UI surfaces; {result['case_count']} defined UI journeys.", '',
+             f"{result['discovered_screen_count']} named UI surfaces; {result['case_count']} defined UI journeys; "
+             f"{result['screen_edge_check_count']} surface-specific edge checks to qualify.", '',
              'For every applicable surface, record Pass, Fail, unexecuted or a justified N/A for each dimension:', '',
              *[f'- [ ] {dimension}' for dimension in EDGE_DIMENSIONS], '',
              'Activity recreation and process death need separate fixtures: handled rotation proves neither.', '',
@@ -150,12 +172,18 @@ def markdown_inventory(result, source_sha=None):
     lines.extend(['## Screens, sheets and dialogs', '',
                   'Same-ID UI links are discovery hints. They do not prove that this particular surface was opened.', ''])
     for screen in result['screen_catalog']:
-        lines.extend([f"- [ ] [{screen['symbol']}]({base}{screen['source']}) — " + ', '.join(screen['manual_ids']) + '.'])
+        lines.extend([f"### [{screen['symbol']}]({base}{screen['source']})", '',
+                      'Permanent requirements: ' + ', '.join(screen['manual_ids']) + '.', ''])
         if screen['companion_test_source_references']:
             references = [f'[{Path(item["source"]).name}]({base}{item["source"]})'
                           for item in screen['companion_test_source_references']]
-            lines.append('  Existing test references to this source file: ' + ', '.join(references)
-                         + '. A same-file reference may test a shared parent; this surface and its execution remain unverified.')
+            lines.extend(['Existing test references to this source file: ' + ', '.join(references)
+                          + '. A same-file reference may test a shared parent; this surface and its execution remain unverified.', ''])
+        lines.extend(['Record the result and source-bound evidence for each applicable check. '
+                      'A N/A needs a specific reason; no check inherits its outcome from a parent or a related journey.', ''])
+        for edge in screen['edge_plan']:
+            lines.append(f"- [ ] **{edge['dimension']}** — {edge['required_check']} Result: unexecuted; evidence: none.")
+        lines.append('')
     return '\n'.join(lines) + '\n'
 
 

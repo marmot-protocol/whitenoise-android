@@ -5,9 +5,8 @@ name: actions-delete-cancel
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
 - assertVisible: "Generated fixture message"
-- tapOn:
+- longPressOn:
     text: "Generated fixture message"
-    longPress: true
 - tapOn: "Delete"
 - assertVisible: "Delete message\\?"
 - assertVisible: "Delete for me"
