@@ -164,6 +164,40 @@ class ConversationMentionNavigationTest {
         }
 
     @Test
+    fun farMentionTowardNewestReResolvesAfterHeaderChange() =
+        runTest {
+            val writer = RecordingWriter().apply { firstVisibleItemIndex = 90 }
+            var index = 1
+            writer.afterSnap = { index = 2 }
+            assertTrue(
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "end-mention",
+                    resolveTargetIndex = { index },
+                    readLayout = { ConversationMentionJumpLayout(500, 800) },
+                    awaitLayout = {},
+                ),
+            )
+            assertEquals(listOf(Write(false, 11, 0), Write(true, 2, 300), Write(false, 2, 300)), writer.writes)
+        }
+
+    @Test
+    fun continuouslyChangingHeightStopsAtTheCorrectionBudgetWithoutSuccess() =
+        runTest {
+            val writer = RecordingWriter()
+            var height = 800
+            assertFalse(
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "late-media",
+                    resolveTargetIndex = { 5 },
+                    readLayout = { ConversationMentionJumpLayout(500, height) },
+                    awaitLayout = { height += 100 },
+                ),
+            )
+            assertEquals(3, writer.writes.count { !it.animated })
+            assertEquals(4, writer.writes.size)
+        }
+
+    @Test
     fun userDragCancelsThePendingMeasurementCorrection() =
         runTest {
             val writer = RecordingWriter()
@@ -255,6 +289,7 @@ class ConversationMentionNavigationTest {
     private class RecordingWriter : ConversationScrollWriter {
         override var firstVisibleItemIndex = 0
         val writes = mutableListOf<Write>()
+        var afterSnap: (() -> Unit)? = null
 
         override suspend fun scrollToItem(
             index: Int,
@@ -262,6 +297,7 @@ class ConversationMentionNavigationTest {
         ) {
             firstVisibleItemIndex = index
             writes += Write(false, index, scrollOffset)
+            afterSnap?.invoke()
         }
 
         override suspend fun animateScrollToItem(

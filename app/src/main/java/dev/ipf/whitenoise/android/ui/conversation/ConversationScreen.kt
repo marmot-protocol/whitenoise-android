@@ -153,6 +153,7 @@ import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
+import dev.ipf.whitenoise.android.state.tracedPagingSection
 import dev.ipf.whitenoise.android.state.unreadReceivedMentionIds
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.MentionDetectionCache
@@ -2328,48 +2329,53 @@ internal fun ConversationScreen(
         val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.navigateReplyJob =
             scope.launch {
-                if (!navigationRequest.isCurrent()) return@launch
-                val available = controller.loadUntilMessageAvailable(targetMessageId)
-                if (!navigationRequest.isCurrent()) return@launch
-                if (!available) {
-                    appState.present(R.string.toast_original_message_unavailable)
-                    return@launch
+                tracedPagingSection(ConversationMentionJumpTrace.TOTAL) {
+                    if (!navigationRequest.isCurrent()) return@launch
+                    val available =
+                        tracedPagingSection(ConversationMentionJumpTrace.AVAILABILITY) {
+                            controller.loadUntilMessageAvailable(targetMessageId)
+                        }
+                    if (!navigationRequest.isCurrent()) return@launch
+                    if (!available) {
+                        appState.present(R.string.toast_original_message_unavailable)
+                        return@launch
+                    }
+                    val timelineIndex =
+                        controller.timeline
+                            .filterNot { MessageProjector.isEdit(it.record) }
+                            .indexOfFirst { it.record.messageIdHex == targetMessageId }
+                    if (timelineIndex < 0) {
+                        appState.present(R.string.toast_original_message_unavailable)
+                        return@launch
+                    }
+                    if (!navigationRequest.isCurrent()) return@launch
+                    val reached =
+                        scrollCoordinator.jumpToMentionReadingStart(
+                            targetMessageId = targetMessageId,
+                            resolveTargetIndex = { currentTimelineListIndex(targetMessageId) },
+                            readLayout = { index ->
+                                val layout = timelineViewport.readingLayoutInfo()
+                                ConversationMentionJumpLayout(
+                                    viewportEndOffsetPx = layout.viewportEndOffset,
+                                    itemHeightPx =
+                                        layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
+                                    estimatedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
+                                )
+                            },
+                            onCompleted = {
+                                if (navigationRequest.isCurrent()) {
+                                    scrollCoordinator.settleReadingAt(currentScrollAnchor())
+                                }
+                            },
+                        )
+                    if (!reached || !navigationRequest.isCurrent()) return@launch
+                    // Mark read up to the visited mention so the count — and the
+                    // chat-list @-badge — decrement in step; advance the local read
+                    // anchor so the chip's derived count updates immediately.
+                    readAnchorMessageId = targetMessageId
+                    controller.markReadUpTo(targetMessageId)
+                    showTransientMessageHighlight(targetMessageId)
                 }
-                val timelineIndex =
-                    controller.timeline
-                        .filterNot { MessageProjector.isEdit(it.record) }
-                        .indexOfFirst { it.record.messageIdHex == targetMessageId }
-                if (timelineIndex < 0) {
-                    appState.present(R.string.toast_original_message_unavailable)
-                    return@launch
-                }
-                if (!navigationRequest.isCurrent()) return@launch
-                val reached =
-                    scrollCoordinator.jumpToMentionReadingStart(
-                        targetMessageId = targetMessageId,
-                        resolveTargetIndex = { currentTimelineListIndex(targetMessageId) },
-                        readLayout = { index ->
-                            val layout = timelineViewport.readingLayoutInfo()
-                            ConversationMentionJumpLayout(
-                                viewportEndOffsetPx = layout.viewportEndOffset,
-                                itemHeightPx =
-                                    layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-                                estimatedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
-                            )
-                        },
-                        onCompleted = {
-                            if (navigationRequest.isCurrent()) {
-                                scrollCoordinator.settleReadingAt(currentScrollAnchor())
-                            }
-                        },
-                    )
-                if (!reached || !navigationRequest.isCurrent()) return@launch
-                // Mark read up to the visited mention so the count — and the
-                // chat-list @-badge — decrement in step; advance the local read
-                // anchor so the chip's derived count updates immediately.
-                readAnchorMessageId = targetMessageId
-                controller.markReadUpTo(targetMessageId)
-                showTransientMessageHighlight(targetMessageId)
             }
     }
 
@@ -4262,6 +4268,7 @@ internal fun ConversationScreen(
                                             modifier =
                                                 Modifier
                                                     .height(34.dp)
+                                                    .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
                                                     .semantics { contentDescription = jumpToMentionLabel }
                                                     .clickable { jumpToNextUnreadMention() },
                                         ) {

@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionNavigation.kt",
+  "legacy_sha256": "ee7c047d75cf18fb30f5cfe18221cf2a144d87ad28f256d671bb6e53b22162b3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Unread mention reading-start navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMentionNavigation.kt",
+        "anchor": "jumpToMentionReadingStart(",
+        "test_ids": [
+          "CON-028",
+          "CON-030"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
