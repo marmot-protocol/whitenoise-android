@@ -316,7 +316,8 @@ class PinnedConversationShortcutsTest {
         val presentation = PinnedConversationPresentation("Peer", stale, "peer", { current })
         platform.afterInventoryRead = { current = null }
         owner.request(capability, "Peer", null, stale, presentation) { true }
-        val icon = platform.requests.single().icon!!.loadDrawable(context) as BitmapDrawable
+        val requested = platform.requests.single()
+        val icon = requested.icon!!.loadDrawable(context) as BitmapDrawable
         assertNotEquals(Color.MAGENTA, icon.bitmap.getPixel(0, 0))
     }
 
@@ -345,12 +346,16 @@ class PinnedConversationShortcutsTest {
             "peer",
             currentAvatar = { null },
             isCurrent = { true },
-            platform = object : ContactPictureShortcutPlatform(context) {
-                override fun read(): List<ShortcutInfoCompat> = listOf(refreshed)
-                override fun update(shortcuts: List<ShortcutInfoCompat>) {
-                    reconciled += shortcuts
-                }
-            },
+            platform =
+                object : ContactPictureShortcutPlatform(context) {
+                    /** Reads the approved pin even after it leaves the recent projection. */
+                    override fun read(): List<ShortcutInfoCompat> = listOf(refreshed)
+
+                    /** Captures the actual replacement icon and routing metadata for the clear assertion. */
+                    override fun update(shortcuts: List<ShortcutInfoCompat>) {
+                        reconciled += shortcuts
+                    }
+                },
         )
         val cleared = reconciled.single()
         assertEquals(refreshed.intent.data, cleared.intent.data)
@@ -373,7 +378,8 @@ class PinnedConversationShortcutsTest {
         }
         val older = mapOf(GROUP to PinnedConversationPresentation("Old avatar snapshot"))
         assertFalse(owner.refresh(ACCOUNT, older) { revision.get() == 1L })
-        assertEquals("Renamed", platform.updates.single().single().longLabel)
+        val update = platform.updates.single()
+        assertEquals("Renamed", update.single().longLabel)
     }
 
     /** Opted-out publication reveals neither a title nor avatar while keeping an exact account/group intent. */
