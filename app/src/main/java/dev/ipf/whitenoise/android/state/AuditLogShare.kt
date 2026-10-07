@@ -89,7 +89,17 @@ internal fun prepareAuditLogArchive(
                 zip.closeEntry()
             }
             supplementalEntries.forEach { (name, bytes) ->
-                require(name in setOf("dictation-current.jsonl", "dictation-previous.jsonl", "dictation-manifest.json"))
+                require(
+                    name in
+                        setOf(
+                            "dictation-current.jsonl",
+                            "dictation-previous.jsonl",
+                            "dictation-manifest.json",
+                            "dm-create-current.jsonl",
+                            "dm-create-previous.jsonl",
+                            "dm-create-manifest.json",
+                        ),
+                )
                 require(bytes.size <= MAX_DICTATION_EXPORT_ENTRY_BYTES)
                 zip.putNextEntry(ZipEntry(uniqueAuditFileName(name, usedNames)))
                 zip.write(bytes)

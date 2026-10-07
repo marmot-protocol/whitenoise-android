@@ -18,9 +18,15 @@ internal class DictationDiagnosticStore(
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val maxBytes: Int = MAX_DIAGNOSTIC_FILE_BYTES,
     private val retentionMillis: Long = DIAGNOSTIC_RETENTION_MILLIS,
+    private val filePrefix: String = "dictation",
 ) {
     private val process = UUID.randomUUID().toString()
-    private val names = listOf("dictation-current.jsonl", "dictation-previous.jsonl")
+
+    init {
+        require(filePrefix in setOf("dictation", "dm-create"))
+    }
+
+    private val names = listOf("$filePrefix-current.jsonl", "$filePrefix-previous.jsonl")
     private var sequence = 0L
     private var rotations = 0L
     private var expiredFiles = 0L
@@ -78,7 +84,7 @@ internal class DictationDiagnosticStore(
                 .put("app_revision", buildRevision.takeIf { it.matches(Regex("[a-f0-9]{7,40}")) } ?: "unknown")
         return buildMap {
             files.forEach { put(it.name, it.readBytes()) }
-            put("dictation-manifest.json", metadata.put("files", files.size).toString().toByteArray(Charsets.UTF_8))
+            put("$filePrefix-manifest.json", metadata.put("files", files.size).toString().toByteArray(Charsets.UTF_8))
         }
     }
 
@@ -90,7 +96,7 @@ internal class DictationDiagnosticStore(
         filtered: Long = 0,
     ): Map<String, ByteArray> =
         mapOf(
-            "dictation-manifest.json" to
+            "$filePrefix-manifest.json" to
                 JSONObject()
                     .put("schema", 1)
                     .put("collection_enabled", enabled)

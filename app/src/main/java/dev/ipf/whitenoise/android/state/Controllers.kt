@@ -86,6 +86,7 @@ import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.replyMediaKindFromMime
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.core.withAuthoritativeEdits
+import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
 import dev.ipf.whitenoise.android.diagnostics.GroupMembershipTimings
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
@@ -3931,6 +3932,7 @@ class ChatsController private constructor(
     internal suspend fun resolveProvenanceDirectChat(
         provenanceGroupIdHex: String?,
         targetReference: String,
+        diagnosticAttempt: DmCreationAttempt? = null,
     ): NewMessageDirectChatResolution {
         val unavailable = NewMessageDirectChatResolution(item = null, createRequired = false)
         val account = accountRef ?: return unavailable
@@ -3941,6 +3943,7 @@ class ChatsController private constructor(
             groupIdHex = provenanceGroupIdHex,
             targetReference = targetReference,
             chatItemForGroup = ::chatItemForGroup,
+            diagnosticAttempt = diagnosticAttempt,
         )
     }
 
@@ -7834,11 +7837,9 @@ class ConversationController(
                             reconcileNewExtendedRecords = true,
                         )
                     }
-                // An authoritative window is the recovery a stood-down prefetch was waiting
-                // for, so the viewport may ask for more content in either direction (#2764).
-                // A reader parked at the start of history therefore asks once more per live
-                // batch, which is bounded by arrivals rather than by layout passes (#2727).
-                automaticPaging.reset()
+                // Older recovery is revision-gated inside the commit: a queued command echo must
+                // not release its own failed attempt. Preserve forward prefetch's arrival budget.
+                automaticPaging.newer.reset()
                 publishRecoveryTimelineProjection(batch.mapNotNull { it.recoveryGeneration }.maxOrNull())
                 // Scroll-driven mark-read in the UI layer handles
                 // the user-visible read pointer.
@@ -12010,9 +12011,18 @@ class ConversationController(
     val automaticNewerPagingBlocked: Boolean
         get() = automaticPaging.newer.blocked
 
-    /** Whether scroll-driven older prefetch should stand down after a page brought no older rows (#2727). */
+    /** Whether older prefetch is waiting quietly for recovery or fresh touch intent. */
     val automaticOlderPagingBlocked: Boolean
         get() = automaticPaging.older.blocked
+
+    /** Recovery ticket read by the paging collector even when visible geometry did not change. */
+    val olderPagingRecoveryGeneration: Long
+        get() = automaticPaging.older.recoveryGeneration
+
+    /** Releases quiet older prefetch on a new drag; never changes the viewport or unread state. */
+    fun onOlderPagingGestureStarted() {
+        automaticPaging.older.onUserGestureStarted()
+    }
 
     /**
      * Whether an older page failed in a way the reader must retry.
@@ -12187,6 +12197,7 @@ class ConversationController(
         val preparationGeneration = timelineWindowGeneration.advance()
         val installed = timelineSubscription?.latestInstalledWindow()
         val applied = installed?.page ?: page
+        val priorOldestId = timeline.firstOrNull()?.id
         val snapshot = currentWindowApplySnapshot()
         val preparation =
             prepareWindowApplyOn(
@@ -12244,7 +12255,12 @@ class ConversationController(
         }
         // A rebuilt window is a new place in history, so a prefetch that stood down at the old
         // edge gets to ask again from here (#2727).
-        if (replaceWindow || prepared.mode == WindowApplyMode.REPLACE) automaticPaging.reset()
+        if (replaceWindow) {
+            automaticPaging.reset()
+        } else {
+            automaticPaging.older.onWindowApplied(installed?.frame?.revision)
+            if (prepared.mode == WindowApplyMode.REPLACE) automaticPaging.newer.reset()
+        }
         // Rows this page kept skip re-projection, so their projected items still carry the ordinal
         // from where the window used to sit. Display sorts on that ordinal, so re-stamp it before
         // publishing or a slid window would reorder history the reader is looking at.
@@ -12276,6 +12292,7 @@ class ConversationController(
         hasPublishedAuthoritativeTimeline = true
         initialTimelineSeedActive = false
         publishTimelinePageBeforeMarkdownHydration(appliedRecords)
+        clearRecoveredOlderPageFailure(priorOldestId)
         scheduleProfilePresentationWarm(
             records = appliedRecords,
             markInitialPresentationReady = preparingInitialPresentation,

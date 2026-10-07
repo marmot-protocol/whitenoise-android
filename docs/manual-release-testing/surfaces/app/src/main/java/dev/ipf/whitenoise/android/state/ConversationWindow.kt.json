@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+  "legacy_sha256": "0c7585da60348a0354550e786fbb36b6691e0c27e8c4ab29c23ac01050a59f38",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "A bounded history window returns directly to its live newest edge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+        "anchor": "suspend fun ConversationController.returnToLatestWindow()",
+        "test_ids": [
+          "CON-003",
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "Optimistic reaction changes remain scoped to each retained message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+        "anchor": "fun reactionTalliesForWindow(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "Incoming reaction references update the chips of an open conversation live",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+        "anchor": "fun reactionReferenceChanges(",
+        "test_ids": [
+          "MSG-031"
+        ]
+      },
+      {
+        "surface": "Successful paging or navigation stays acknowledged when a stream echo or newer replacement overtakes its reply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationWindow.kt",
+        "anchor": "suspend fun commandOutcome(",
+        "test_ids": [
+          "CON-003",
+          "MSG-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

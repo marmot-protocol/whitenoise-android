@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessageRecipientPreparation.kt",
+  "legacy_sha256": "970d773da3b39f807e4c6c4b8d7be912aefcdaf1a039346b70def776caeb762b",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Pasted npub direct-message preparation keeps recipient display, KeyPackage prewarm, and existing-chat lookup independent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessageRecipientPreparation.kt",
+        "anchor": "internal class NewMessageRecipientPreparationCoordinator",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "DM trace attribution and owner-approved diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessageRecipientPreparation.kt",
+        "anchor": "diagnosticBoundary(diagnosticAttempt,",
+        "test_ids": [
+          "SEC-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

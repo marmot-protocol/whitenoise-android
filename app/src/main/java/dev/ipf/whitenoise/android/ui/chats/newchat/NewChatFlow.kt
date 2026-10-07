@@ -43,6 +43,11 @@ import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.core.WhiteNoiseUrls
+import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
+import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.DmCreationInteraction
+import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
+import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.share.QrShareCardRenderer
 import dev.ipf.whitenoise.android.share.QrShareCardSpec
 import dev.ipf.whitenoise.android.share.launchInviteShare
@@ -146,7 +151,7 @@ internal fun startChatErrorUiState(
  * important: a successful MLS create must retry by group id rather than
  * creating a second direct chat when projection is merely delayed (#1729).
  */
-@Suppress("TooGenericExceptionCaught")
+@Suppress("TooGenericExceptionCaught", "LongParameterList")
 internal suspend fun attemptStartProfileChat(
     npub: String,
     progressHex: String,
@@ -157,20 +162,29 @@ internal suspend fun attemptStartProfileChat(
     displayName: (String) -> String,
     markCreateOpenStage: (String) -> Unit = {},
     abandonCreateOpenTiming: (String) -> Unit = {},
+    diagnosticAttempt: DmCreationAttempt? = null,
 ): StartChatAttemptResult {
     val groupIdHex: String =
         try {
             retryGroupIdHex
                 ?: run {
+                    diagnosticAttempt?.record(DmCreationPhase.CREATE, DmCreationOutcome.START)
                     markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_START)
-                    createGroup(npub).also { markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN) }
+                    createGroup(npub).also {
+                        diagnosticAttempt?.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
+                        markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN)
+                    }
                 }
         } catch (error: Throwable) {
+            val committedGroupId = createdGroupIdAfterProjectionUnavailable(error)
+            if (committedGroupId == null) diagnosticAttempt?.failed(DmCreationPhase.CREATE, error)
             if (error is kotlinx.coroutines.CancellationException) {
                 abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
                 throw error
             }
-            createdGroupIdAfterProjectionUnavailable(error)?.also {
+            committedGroupId?.also {
+                diagnosticAttempt?.record(DmCreationPhase.CREATE, DmCreationOutcome.SUCCESS)
+                diagnosticAttempt?.failed(DmCreationPhase.PROJECTION, error)
                 markCreateOpenStage(ChatCreateOpenTiming.STAGE_MDK_CREATE_RETURN)
             } ?: run {
                 abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CREATE_FAILED)
@@ -187,88 +201,43 @@ internal suspend fun attemptStartProfileChat(
         }
     return try {
         runCatchingCancellable {
-            StartChatAttemptResult.Open(loadCreatedChatListItem(groupIdHex))
+            diagnosticAttempt?.record(DmCreationPhase.PROJECTION, DmCreationOutcome.START)
+            StartChatAttemptResult
+                .Open(
+                    loadCreatedChatListItem(groupIdHex),
+                ).also { diagnosticAttempt?.record(DmCreationPhase.PROJECTION, DmCreationOutcome.SUCCESS) }
         }.getOrElse { error ->
+            diagnosticAttempt?.failed(DmCreationPhase.PROJECTION, error)
             abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_AUTHORITATIVE_READ_FAILED)
             StartChatAttemptResult.Failed(
-                StartChatErrorUiState(
-                    npub = npub,
-                    progressHex = progressHex,
-                    detail = startProfileChatFailureDetail(error, displayName),
-                    diagnosticReport = startChatFailureReport(error),
-                    recipientName = recipientName,
-                    title = AppText.Resource(R.string.couldnt_load_chats),
-                    retryGroupIdHex = groupIdHex,
-                ),
+                projectionFailureUi(npub, progressHex, recipientName, groupIdHex, error, displayName),
             )
         }
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        diagnosticAttempt?.failed(DmCreationPhase.PROJECTION, cancelled)
         abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
         throw cancelled
     }
 }
 
-@Suppress("LongParameterList") // Shared create/open state machine exposes injectable native boundaries.
-internal suspend fun attemptOpenOrStartProfileChat(
+/** Retains the committed group for read-only retry while preserving the existing failure UI. */
+private fun projectionFailureUi(
     npub: String,
     progressHex: String,
     recipientName: String?,
-    retryGroupIdHex: String? = null,
-    resolveDirectChat: suspend () -> NewMessageDirectChatResolution,
-    createGroup: suspend (String) -> String,
-    loadCreatedChatListItem: suspend (String) -> ChatListItem,
+    groupIdHex: String,
+    error: Throwable,
     displayName: (String) -> String,
-    markCreateOpenStage: (String) -> Unit = {},
-    abandonCreateOpenTiming: (String) -> Unit = {},
-    directChatLookupAlreadyStarted: Boolean = false,
-): StartChatAttemptResult {
-    val existingChatResult =
-        if (retryGroupIdHex == null) {
-            if (!directChatLookupAlreadyStarted) {
-                markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_START)
-            }
-            val resolution =
-                try {
-                    resolveDirectChat()
-                } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                    abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_CANCELLED)
-                    throw cancelled
-                }
-            if (!directChatLookupAlreadyStarted) {
-                markCreateOpenStage(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_RETURN)
-            }
-            when {
-                resolution.item != null ->
-                    StartChatAttemptResult.Open(item = resolution.item, newlyCreated = false)
-                !resolution.createRequired -> {
-                    abandonCreateOpenTiming(ChatCreateOpenTiming.STAGE_EXISTING_DM_LOOKUP_FAILED)
-                    StartChatAttemptResult.Failed(
-                        StartChatErrorUiState(
-                            npub = npub,
-                            progressHex = progressHex,
-                            detail = AppText.Resource(R.string.couldnt_load_chats),
-                            diagnosticReport = null,
-                            recipientName = recipientName,
-                        ),
-                    )
-                }
-                else -> null
-            }
-        } else {
-            null
-        }
-    return existingChatResult ?: attemptStartProfileChat(
+): StartChatErrorUiState =
+    StartChatErrorUiState(
         npub = npub,
         progressHex = progressHex,
+        detail = startProfileChatFailureDetail(error, displayName),
+        diagnosticReport = startChatFailureReport(error),
         recipientName = recipientName,
-        retryGroupIdHex = retryGroupIdHex,
-        createGroup = createGroup,
-        loadCreatedChatListItem = loadCreatedChatListItem,
-        displayName = displayName,
-        markCreateOpenStage = markCreateOpenStage,
-        abandonCreateOpenTiming = abandonCreateOpenTiming,
+        title = AppText.Resource(R.string.couldnt_load_chats),
+        retryGroupIdHex = groupIdHex,
     )
-}
 
 /**
  * Full-screen New Message flow: pick a person to open/start a direct chat, or
@@ -503,6 +472,10 @@ private fun NewMessageAccountScreen(
     SideEffect { contactsLoadAttempt.success() }
 
     val resolvedHex = resolution.resolvedHex?.takeUnless { it.equals(activeHex, ignoreCase = true) }
+    val identifierDiagnostic = remember(accountRef, runtimeGeneration, resolvedHex) { DmCreationInteraction() }
+    var tappedDiagnostic by remember(accountRef, runtimeGeneration, resolvedHex) {
+        mutableStateOf<Pair<String, DmCreationInteraction>?>(null)
+    }
     val identifierPreparationKey =
         if (identifierQuery && accountRef != null && resolvedHex != null) {
             NewMessageRecipientPreparationKey(
@@ -524,6 +497,7 @@ private fun NewMessageAccountScreen(
             return@LaunchedEffect
         }
         appState.markChatCreateOpenStage(ChatCreateOpenTiming.STAGE_RECIPIENT_ROW_READY)
+        val diagnosticPreparation = identifierDiagnostic.preparation()
         val preparation =
             preparationCoordinator.prepare(
                 scope = this,
@@ -535,10 +509,14 @@ private fun NewMessageAccountScreen(
                 },
                 lookup = {
                     session.currentValue {
-                        appState.resolveExistingDirectChat(key.targetReference)
+                        appState.resolveExistingDirectChat(
+                            key.targetReference,
+                            diagnosticAttempt = diagnosticPreparation,
+                        )
                     }
                 },
                 markStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
+                diagnosticAttempt = diagnosticPreparation,
             )
         preparation.awaitCompletion()
     }
@@ -566,6 +544,11 @@ private fun NewMessageAccountScreen(
         creatingHex = hexForProgress
         scannerSession = null
         appState.beginChatCreateOpenTiming()
+        val interaction =
+            tappedDiagnostic?.takeIf { it.first == npub }?.second
+                ?: if (resolvedHex == hexForProgress) identifierDiagnostic else DmCreationInteraction()
+        tappedDiagnostic = npub to interaction
+        val diagnosticAttempt = interaction.nextAttempt()
         val preparationKeyForTap =
             identifierPreparationKey?.takeIf {
                 retryGroupIdHex == null &&
@@ -576,59 +559,79 @@ private fun NewMessageAccountScreen(
         val preparedLookup = preparationKeyForTap?.let(preparationCoordinator::current)
         appState.launchMutation {
             try {
-                session.ensureCurrent()
-                when (
-                    val result =
-                        attemptOpenOrStartProfileChat(
-                            npub = npub,
-                            progressHex = hexForProgress,
-                            recipientName = recipientName,
-                            retryGroupIdHex = retryGroupIdHex,
-                            resolveDirectChat = {
-                                session.currentValue {
-                                    preparedLookupOrFresh(
-                                        preparedLookup,
-                                        revisionMatches = {
-                                            preparedLookup?.key?.chatRevision == appState.forwardTargetsRevision
-                                        },
-                                    ) {
-                                        resolveNewMessageDirectChat(
-                                            npub = npub,
-                                            existingDmGroupIdHex = existingDmGroupIdHex,
-                                            provenanceDirectChat = { provenance, target ->
-                                                session.currentValue {
-                                                    appState.resolveProvenanceDirectChat(provenance, target)
-                                                }
+                withDmCreationOwner(diagnosticAttempt, session::isCurrent) { markOpened ->
+                    session.ensureCurrent()
+                    when (
+                        val result =
+                            attemptOpenOrStartProfileChat(
+                                npub = npub,
+                                progressHex = hexForProgress,
+                                recipientName = recipientName,
+                                retryGroupIdHex = retryGroupIdHex,
+                                resolveDirectChat = {
+                                    session.currentValue {
+                                        preparedLookupOrFresh(
+                                            preparedLookup,
+                                            revisionMatches = {
+                                                preparedLookup?.key?.chatRevision == appState.forwardTargetsRevision
                                             },
-                                            existingDirectChat = { target ->
-                                                session.currentValue {
-                                                    appState.resolveExistingDirectChat(target, existingDmGroupIdHex)
-                                                }
-                                            },
-                                        )
+                                        ) {
+                                            resolveNewMessageDirectChat(
+                                                npub = npub,
+                                                existingDmGroupIdHex = existingDmGroupIdHex,
+                                                provenanceDirectChat = { provenance, target ->
+                                                    session.currentValue {
+                                                        appState.resolveProvenanceDirectChat(
+                                                            provenance,
+                                                            target,
+                                                            diagnosticAttempt,
+                                                        )
+                                                    }
+                                                },
+                                                existingDirectChat = { target ->
+                                                    session.currentValue {
+                                                        appState.resolveExistingDirectChat(
+                                                            target,
+                                                            existingDmGroupIdHex,
+                                                            diagnosticAttempt,
+                                                        )
+                                                    }
+                                                },
+                                            )
+                                        }
                                     }
+                                },
+                                createGroup = { target ->
+                                    session.currentValue { appState.createProfileChatGroup(target) }
+                                },
+                                loadCreatedChatListItem = { id ->
+                                    session.currentValue { appState.loadCreatedChatListItem(id) }
+                                },
+                                displayName = appState::displayName,
+                                markCreateOpenStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
+                                abandonCreateOpenTiming = {
+                                    if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)
+                                },
+                                directChatLookupAlreadyStarted = preparedLookup != null,
+                                diagnosticAttempt = diagnosticAttempt,
+                            )
+                    ) {
+                        is StartChatAttemptResult.Open ->
+                            if (session.isCurrent()) {
+                                accountRef?.let {
+                                    DmCreationDiagnostics.awaitFrame(
+                                        it,
+                                        result.item.group.groupIdHex,
+                                        runtimeGeneration,
+                                        diagnosticAttempt,
+                                    )
                                 }
-                            },
-                            createGroup = { target ->
-                                session.currentValue { appState.createProfileChatGroup(target) }
-                            },
-                            loadCreatedChatListItem = { id ->
-                                session.currentValue { appState.loadCreatedChatListItem(id) }
-                            },
-                            displayName = appState::displayName,
-                            markCreateOpenStage = { if (session.isCurrent()) appState.markChatCreateOpenStage(it) },
-                            abandonCreateOpenTiming = {
-                                if (session.isCurrent()) appState.abandonChatCreateOpenTiming(it)
-                            },
-                            directChatLookupAlreadyStarted = preparedLookup != null,
-                        )
-                ) {
-                    is StartChatAttemptResult.Open ->
-                        if (session.isCurrent()) {
-                            session.dispose()
-                            onOpenConversation(result.item, result.newlyCreated)
-                        }
-                    is StartChatAttemptResult.Failed -> if (session.isCurrent()) startChatError = result.error
+                                markOpened()
+                                session.dispose()
+                                onOpenConversation(result.item, result.newlyCreated)
+                            }
+                        is StartChatAttemptResult.Failed -> if (session.isCurrent()) startChatError = result.error
+                    }
                 }
             } finally {
                 creatingHex = null

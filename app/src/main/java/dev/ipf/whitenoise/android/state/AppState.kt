@@ -98,6 +98,8 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
+import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
@@ -3906,11 +3908,15 @@ class WhiteNoiseAppState private constructor(
         // non-modal activity strip and retains terminal failures for explicit
         // retry/dismiss. Its bounded retries preserve the same safe recovery
         // boundary as the session: uncertain publishes converge, never resend.
+        // Main.immediate may deliver terminal completion inside start, so install its trace first.
+        // A rejected start still belongs to the previous operation and must retain that trace.
+        val previousDiagnostics = activeForwardDiagnostics
+        activeForwardDiagnostics = diagnostics
         val started = forwardOperationOwner.start(session)
         if (!started) {
+            activeForwardDiagnostics = previousDiagnostics
             session.release()
         } else {
-            activeForwardDiagnostics = diagnostics
             activeForwardDestinationAccountRef = account
             activeForwardTargetTitles = targetTitles
         }
@@ -4190,18 +4196,22 @@ class WhiteNoiseAppState private constructor(
 
     fun existingDirectChat(reference: String): ChatListItem? = chatsController?.existingDirectChat(reference)
 
+    /** Revalidates picker provenance through the attached native-backed controller and keeps trace attribution. */
     internal suspend fun resolveProvenanceDirectChat(
         provenanceGroupIdHex: String?,
         targetReference: String,
+        diagnosticAttempt: DmCreationAttempt? = null,
     ): NewMessageDirectChatResolution =
-        chatsController?.resolveProvenanceDirectChat(provenanceGroupIdHex, targetReference)
+        chatsController?.resolveProvenanceDirectChat(provenanceGroupIdHex, targetReference, diagnosticAttempt)
             ?: NewMessageDirectChatResolution(item = null, createRequired = false)
 
+    /** Performs the authoritative existing-DM lookup; a missing controller remains unavailable, never a create miss. */
     internal suspend fun resolveExistingDirectChat(
         targetReference: String,
         excludingGroupIdHex: String? = null,
+        diagnosticAttempt: DmCreationAttempt? = null,
     ): NewMessageDirectChatResolution =
-        chatsController?.resolveExistingDirectChat(targetReference, excludingGroupIdHex)
+        chatsController?.resolveExistingDirectChat(targetReference, excludingGroupIdHex, diagnosticAttempt)
             ?: NewMessageDirectChatResolution(item = null, createRequired = false)
 
     private val marmotBridgeTracer = MarmotBridgeTracer()
@@ -7139,6 +7149,7 @@ class WhiteNoiseAppState private constructor(
             runCatchingCancellable { marmotIo { auditLogSettings() } }.getOrNull()?.let {
                 auditLogSettings = it
                 DictationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
+                DmCreationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
             }
         }
     }
@@ -7168,6 +7179,7 @@ class WhiteNoiseAppState private constructor(
         runCatching {
             // Stop the local sink before a revoke/save, including a failed native update.
             DictationDiagnostics.setEnabled(false)
+            DmCreationDiagnostics.setEnabled(false)
             // setAuditLogSettings now applies the switch to every live session
             // in place via a recorder hot-swap (enable → live recorder,
             // disable → flush + close); no session reopen or runtime restart
@@ -7178,6 +7190,7 @@ class WhiteNoiseAppState private constructor(
                 storeCachedSettings = {
                     auditLogSettings = it
                     DictationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
+                    DmCreationDiagnostics.setEnabled(it.enabled && auditUploadConsent.granted)
                 },
                 loadFromEngine = { marmotIo { auditLogSettings() } },
                 transform = { it.copy(enabled = enabled) },

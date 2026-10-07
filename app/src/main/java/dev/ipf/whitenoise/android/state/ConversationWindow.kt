@@ -174,11 +174,11 @@ private class ConversationWindowInstaller {
             page
         }
 
-    // Superseded, not-ready, timed-out, outside-anchor, foreign-generation and malformed-argument results
-    // carry no detail the app can act on: the contract is to reassess from the newest installed replacement,
-    // which the receive loop keeps delivering. Only a missing jump target is surfaced, and only when asked.
-    // Letting any of them escape would take the process down from a scroll-settle effect (seen on device
-    // when an optimistic row's local id reached `setVisibleAnchor`).
+    /**
+     * Runs a revision-quoted command, acknowledging successful work while retaining the newest window.
+     * Recoverable native errors retain the newest window; only a requested missing jump target
+     * escapes, so delayed reply navigation cannot be confused with an unavailable message.
+     */
     @Suppress("SwallowedException", "ReturnCount")
     suspend fun commandOutcome(
         rethrowMissingTarget: Boolean = false,
@@ -194,22 +194,36 @@ private class ConversationWindowInstaller {
                 if (rethrowMissingTarget) throw missing
                 return unchanged(ConversationWindowUnchangedReason.SUPERSEDED)
             } catch (windowOutcome: MarmotKitException) {
-                return unchanged(windowOutcome.unchangedReason())
+                return unchanged(windowOutcome.unchangedReason(), revision)
             }
-        // A replacement the cursor refuses is one a newer install already overtook.
-        return install(result)
-            ?.let(::Advanced)
-            ?: unchanged(ConversationWindowUnchangedReason.SUPERSEDED)
+        return synchronized(lock) {
+            // A successful native command stays acknowledged even if next() already installed its
+            // echo or a later replacement. Keep that newest state; repeating a completed relative
+            // page would move history twice. Native stale errors above remain retryable.
+            val installed = latest
+            val belongsToCommand =
+                result.revision.generation == revision.generation && result.revision.sequence >= revision.sequence
+            if (
+                belongsToCommand && installed != null && result.revision.sequence <= installed.frame.revision.sequence
+            ) {
+                Advanced(installed.page)
+            } else {
+                install(result)?.let(::Advanced) ?: unchanged(ConversationWindowUnchangedReason.SUPERSEDED)
+            }
+        }
     }
 
-    /** The newly installed page, or null for every outcome that left the window where it was. */
+    /** The current page after a successful command, or null when the native command did not succeed. */
     suspend fun command(
         rethrowMissingTarget: Boolean = false,
         block: suspend (ConversationWindowRevisionFfi) -> ConversationWindowSnapshotFfi,
     ): TimelinePageFfi? = (commandOutcome(rethrowMissingTarget, block) as? Advanced)?.page
 
     /** Pairs an unchanged reason with the page the handle still holds. */
-    private fun unchanged(reason: ConversationWindowUnchangedReason): TimelinePageOutcome = Unchanged(reason, page)
+    private fun unchanged(
+        reason: ConversationWindowUnchangedReason,
+        requestedRevision: ConversationWindowRevisionFfi? = null,
+    ): TimelinePageOutcome = Unchanged(reason, page, requestedRevision)
 }
 
 /**
