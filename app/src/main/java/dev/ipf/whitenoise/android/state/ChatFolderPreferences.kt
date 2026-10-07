@@ -142,12 +142,13 @@ class ChatFolderPreferences(
             val existing = folderId?.let { id -> current.folders.firstOrNull { it.id == id } }
             if (folderId != null && existing == null) return@synchronized null
             val visibleWhenEmpty = folderDraftVisibility(showWhenEmpty, existing)
+            val folderSort = folderDraftSort(sort, existing)
             val folder =
                 existing?.copy(
                     name = trimmedName ?: existing.name,
                     description = description.trim(),
                     showWhenEmpty = visibleWhenEmpty,
-                    sort = sort ?: existing.sort,
+                    sort = folderSort,
                 ) ?: ChatFolder(
                     id = UUID.randomUUID().toString(),
                     name = requireNotNull(trimmedName),
@@ -155,7 +156,7 @@ class ChatFolderPreferences(
                     order = (current.folders.maxOfOrNull { it.order } ?: -1) + 1,
                     systemKind = null,
                     showWhenEmpty = visibleWhenEmpty,
-                    sort = sort ?: ChatFolderSort.RECENT,
+                    sort = folderSort,
                 )
             persistFolderDraft(account, current, folder, existing == null, manualChatIds, rule)
             folder
@@ -166,6 +167,11 @@ class ChatFolderPreferences(
         requested: Boolean?,
         existing: ChatFolder?,
     ): Boolean = requested ?: existing?.showWhenEmpty ?: false
+
+    private fun folderDraftSort(
+        requested: ChatFolderSort?,
+        existing: ChatFolder?,
+    ): ChatFolderSort = requested ?: existing?.sort ?: ChatFolderSort.RECENT
 
     /**
      * Persist the entire draft atomically before publishing its single observable projection; caller holds
@@ -328,8 +334,9 @@ class ChatFolderPreferences(
         folderId: String,
         chatId: String,
     ): Boolean {
-        val account = normalizedAccount(accountRef) ?: return false
-        val chat = chatId.trim().lowercase(java.util.Locale.ROOT).takeIf { it.isNotEmpty() } ?: return false
+        val account = normalizedAccount(accountRef)
+        val chat = chatId.trim().lowercase(java.util.Locale.ROOT)
+        if (account == null || chat.isEmpty()) return false
         return synchronized(mutationLock) {
             val current = _state.value[account] ?: return@synchronized false
             if (current.folders.none { it.id == folderId }) return@synchronized false
@@ -672,6 +679,7 @@ class ChatFolderPreferences(
         // so the rule backfill for older accounts runs exactly once.
         private const val RULE_STORE_VERSION = 2
         private const val STORE_VERSION = 3
+        private const val DEFAULT_GROUPS_ORDER = 3
 
         // Stable ids so the chip row and future deep links can reference the
         // absorbed system folders without a per-account lookup.
@@ -685,7 +693,7 @@ class ChatFolderPreferences(
                 systemFolder(SYSTEM_FOLDER_CHATS_ID, 0, SystemFolderKind.CHATS).copy(showWhenEmpty = true),
                 systemFolder(SYSTEM_FOLDER_UNREAD_ID, 1, SystemFolderKind.UNREAD),
                 systemFolder(SYSTEM_FOLDER_ARCHIVED_ID, 2, SystemFolderKind.ARCHIVED),
-                systemFolder(SYSTEM_FOLDER_GROUPS_ID, 3, SystemFolderKind.GROUPS),
+                systemFolder(SYSTEM_FOLDER_GROUPS_ID, DEFAULT_GROUPS_ORDER, SystemFolderKind.GROUPS),
             )
 
         private fun systemFolder(
