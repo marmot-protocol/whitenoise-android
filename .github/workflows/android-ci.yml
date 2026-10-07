@@ -77,6 +77,9 @@ jobs:
       - name: Test attachment fixture HTTP ledger and cancellation contracts
         run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
 
+      - name: Test Maestro artifact and manual-only execution contracts
+        run: python3 -m unittest scripts/test_maestro_apk.py
+
       - name: Validate manual release guide
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -268,6 +271,8 @@ jobs:
 
       - name: Verify packaged Baseline Profile assets
         if: matrix.phase == 'baseline'
+        env:
+          APK_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -282,6 +287,18 @@ jobs:
           ' "$metadata")
           app_apk="$(dirname "$metadata")/$output_file"
           bash scripts/verify-baseline-profile.sh "$app_apk"
+          # Reuse this existing universal APK; no additional assembly task.
+          python3 scripts/maestro_apk.py stage --apk "$app_apk" --destination build/maestro-apk
+
+      - name: Retain the existing APK for optional Maestro testing
+        if: matrix.phase == 'baseline'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: maestro-dev-apk-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/maestro-apk/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
 
       # Preserve failure diagnostics with a unique artifact name per job.
       - name: Upload reports
