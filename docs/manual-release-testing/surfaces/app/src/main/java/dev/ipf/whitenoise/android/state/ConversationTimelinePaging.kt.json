@@ -12,7 +12,7 @@
         ]
       },
       {
-        "surface": "Automatic older history failures wait quietly for native recovery while explicit navigation retains an actionable retry",
+        "surface": "Automatic older history failures recover quietly; delayed retryable replies use the pre-request oldest row to distinguish committed older progress from unrelated replacements",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationTimelinePaging.kt",
         "anchor": "fun ConversationController.loadOlderPageInternal(",
         "test_ids": [

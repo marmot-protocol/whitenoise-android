@@ -156,6 +156,41 @@ class ConversationWindowHandleTest {
             assertEquals(1, fake.pageCalls.size)
         }
 
+    /** A newer stream revision cannot turn a native timeout/not-ready failure into command success. */
+    @Test
+    fun streamReplacementDoesNotAcknowledgeAFailedCommand() =
+        runBlocking {
+            val failures =
+                listOf(
+                    MarmotKitException.ConversationWindowTimedOut() to ConversationWindowUnchangedReason.TIMED_OUT,
+                    MarmotKitException.ConversationWindowNotReady() to ConversationWindowUnchangedReason.NOT_READY,
+                )
+            val replacements =
+                listOf(listOf("m1"), listOf("m1", "newer"), listOf("other-viewport"), listOf("older", "m1"))
+            for ((failure, reason) in failures) {
+                for (messageIds in replacements) {
+                    val fake = FakeConversationWindow(snapshot(sequence = 1uL, messageIds = listOf("m1")))
+                    val handle = FfiConversationWindowHandle(fake, release = fake::release)
+                    handle.snapshot()
+                    fake.beforeCommandReply = {
+                        fake.emit(snapshot(sequence = 3uL, messageIds = messageIds))
+                        handle.nextWindow()
+                        throw failure
+                    }
+
+                    val outcome = handle.paginateBackwards(50u) as TimelinePageOutcome.Unchanged
+
+                    assertEquals(reason, outcome.reason)
+                    assertEquals(ConversationWindowRevisionFfi("gen", 1uL), outcome.requestedRevision)
+                    assertSame(handle.latestInstalledWindow()?.page, outcome.current)
+                    assertEquals(messageIds, outcome.current?.messages?.map { it.messageIdHex })
+                    assertEquals(3uL, handle.latestWindowFrame()?.revision?.sequence)
+                    assertEquals(1, fake.pageCalls.size)
+                    handle.close()
+                }
+            }
+        }
+
     /** A foreign generation must never acknowledge or replace the active window. */
     @Test
     fun foreignCommandReplyCannotReplaceTheActiveWindow() =

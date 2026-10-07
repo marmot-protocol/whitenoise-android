@@ -92,6 +92,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
     if (automatic && automaticPaging.older.blocked) return ConversationPageLoad.NO_PROGRESS
     val subscription = timelineSubscription ?: return ConversationPageLoad.INACTIVE
     val priorMessageIds = timelineRecords.keys.toSet()
+    val priorOldestId = timeline.firstOrNull()?.id
     // Opportunistic work must not dismiss an unrelated explicit navigation failure.
     beginPageLoad(ConversationSearchPageDirection.OLDER, origin)
     val trace = PerformanceDiagnostics.begin(PerformanceOperation.CHAT_HISTORY_PAGE)
@@ -106,7 +107,7 @@ internal suspend fun ConversationController.loadOlderPageInternal(
         when (outcome) {
             null -> ConversationPageLoad.INACTIVE
             is TimelinePageOutcome.Unchanged ->
-                unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER, origin)
+                unchangedPageLoad(outcome, ConversationSearchPageDirection.OLDER, origin, priorOldestId)
             is TimelinePageOutcome.Advanced -> {
                 val appliedAtMs = SystemClock.elapsedRealtime()
                 var committed = false

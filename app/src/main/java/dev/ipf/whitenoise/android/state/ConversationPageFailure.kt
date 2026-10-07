@@ -12,14 +12,26 @@ import dev.ipf.whitenoise.android.state.ConversationWindowUnchangedReason.TIMED_
  * recoverable reasons.
  *
  * A deadline or an exhausted retry budget is not the end of history, so it sets the same retry
- * affordance as a thrown failure. Terminal outcomes leave the reconnect loop to recover.
+ * affordance as a thrown failure. Older rows already committed while the reply was in flight
+ * retire that late failure; a newer revision alone cannot prove older progress. Terminal outcomes
+ * leave the reconnect loop to recover.
  */
 internal fun ConversationController.unchangedPageLoad(
     outcome: TimelinePageOutcome.Unchanged,
     direction: ConversationSearchPageDirection,
     origin: ConversationPagingOrigin = ConversationPagingOrigin.EXPLICIT,
-): ConversationPageLoad =
-    when (outcome.reason) {
+    priorOldestId: String? = null,
+): ConversationPageLoad {
+    val retryableDelay = outcome.reason == TIMED_OUT || outcome.reason == NOT_READY
+    if (
+        direction == ConversationSearchPageDirection.OLDER &&
+        retryableDelay &&
+        hasCommittedOlderRows(priorOldestId)
+    ) {
+        clearRecoveredPageFailure(direction)
+        return ConversationPageLoad.NO_PROGRESS
+    }
+    return when (outcome.reason) {
         TIMED_OUT -> {
             reportPageFailure(direction, MarmotWindowDeadline(direction), origin, outcome.requestedRevision)
             ConversationPageLoad.TIMED_OUT
@@ -34,6 +46,7 @@ internal fun ConversationController.unchangedPageLoad(
         }
         else -> ConversationPageLoad.NO_PROGRESS
     }
+}
 
 /**
  * Records a page failure so the screen's existing retry affordance appears for this direction.
@@ -99,10 +112,14 @@ internal fun ConversationController.clearRecoveredPageFailure(direction: Convers
 /** Clears a stale older retry only when committed rows extend past the previously loaded oldest row. */
 internal fun ConversationController.clearRecoveredOlderPageFailure(priorOldestId: String?) {
     if (failedPageDirection != ConversationSearchPageDirection.OLDER) return
-    if (priorOldestId != null && timeline.indexOfFirst { it.id == priorOldestId } > 0) {
+    if (hasCommittedOlderRows(priorOldestId)) {
         clearRecoveredPageFailure(ConversationSearchPageDirection.OLDER)
     }
 }
+
+/** Only rows before the former oldest row prove older progress; tail updates and recentering do not. */
+private fun ConversationController.hasCommittedOlderRows(priorOldestId: String?): Boolean =
+    priorOldestId != null && timeline.indexOfFirst { it.id == priorOldestId } > 0
 
 /** The release-log operation name for a page in this direction. */
 private fun pageOperation(direction: ConversationSearchPageDirection): String =
