@@ -33,6 +33,22 @@ class StagedDocumentReadTest {
     }
 
     @Test
+    fun diagnosticsOmitDocumentNamesPlaintextAndPrivatePaths() {
+        val root = temporary.newFolder("private-document")
+        val result = readStagedDocument(root, 100) { ByteArrayInputStream(byteArrayOf(42, 99)) }
+        val source = (result as StagedDocumentRead.Success).source
+        val staged = PendingAttachment(byteArrayOf(), "text/plain", "confidential.txt", sourceFile = source)
+        val memory = PendingAttachment(byteArrayOf(42, 99), "text/plain", "confidential.txt")
+        try {
+            assertEquals("StagedUploadSource(byteCount=2)", source.toString())
+            assertEquals("PendingAttachment(byteCount=2, fileBacked=true)", staged.toString())
+            assertEquals("PendingAttachment(byteCount=2, fileBacked=false)", memory.toString())
+        } finally {
+            source.close()
+        }
+    }
+
+    @Test
     fun oversizeStreamStopsAtTheBoundAndRemovesPartial() {
         val root = temporary.newFolder("staged")
         var consumed = 0L

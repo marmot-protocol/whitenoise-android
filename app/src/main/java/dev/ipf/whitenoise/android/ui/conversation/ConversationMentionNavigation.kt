@@ -37,8 +37,8 @@ internal suspend fun ConversationScrollCoordinator.jumpToMentionReadingStart(
                     animateScrollToItem(
                         initialIndex,
                         initialOffset,
-                        resolveTargetIndex,
                         traceMentionJump = true,
+                        resolveIndex = resolveTargetIndex,
                     )
                 }
             if (!approached) return@programmaticJump

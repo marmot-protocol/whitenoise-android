@@ -16,6 +16,8 @@ class StagedUploadSource internal constructor(
     private var closed = false
     private var readers = 0
 
+    override fun toString(): String = "StagedUploadSource(byteCount=$byteCount)"
+
     /** Pins the path until native snapshot preparation has finished. */
     @Synchronized
     internal fun acquire(): AutoCloseable {

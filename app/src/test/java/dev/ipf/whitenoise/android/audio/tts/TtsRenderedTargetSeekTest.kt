@@ -4,6 +4,7 @@ import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekResolver
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekTarget
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -48,6 +49,52 @@ class TtsRenderedTargetSeekTest {
                     ?.messageIdHex,
             )
             assertEquals(1, harness.controller.state.value.sentenceIndexWithinMessage)
+            harness.engine.complete(harness.engine.spoken.lastIndex)
+            runCurrent()
+            assertTrue(harness.controller.state.value is TtsState.Idle)
+        }
+
+    @Test
+    fun replacementKeepsSessionWhenFinalUtteranceCompletesDuringOldProjectionCancellation() =
+        runTest {
+            val harness = SessionHarness(this, UnconfinedTestDispatcher(testScheduler))
+            harness.speakConversation("m1")
+            val sessionId = harness.controller.state.value.sessionId
+            val source = harness.session.conversationSource.value!!
+            val oldGate = CompletableDeferred<Unit>()
+            var cancellationCompletedSpeech = false
+            assertTrue(
+                harness.session.requestRenderedSentenceSeek(
+                    "m2",
+                    2uL,
+                    source,
+                    {
+                        try {
+                            oldGate.await()
+                            request(harness, "m2")
+                        } finally {
+                            // Unconfined cancellation runs this callback before replacement re-arms.
+                            harness.engine.complete(0)
+                            cancellationCompletedSpeech = true
+                        }
+                    },
+                    { error("The cancelled projection must not commit") },
+                ),
+            )
+            val committed = CompletableDeferred<Unit>()
+            assertTrue(
+                harness.session.requestRenderedSentenceSeek(
+                    "m3",
+                    3uL,
+                    source,
+                    { request(harness, "m3") },
+                    { committed.complete(Unit) },
+                ),
+            )
+            committed.await()
+            assertTrue(cancellationCompletedSpeech)
+            assertEquals(sessionId, harness.controller.state.value.sessionId)
+            assertEquals("m3", harness.controller.state.value.passage?.messageIdHex)
             harness.engine.complete(harness.engine.spoken.lastIndex)
             runCurrent()
             assertTrue(harness.controller.state.value is TtsState.Idle)

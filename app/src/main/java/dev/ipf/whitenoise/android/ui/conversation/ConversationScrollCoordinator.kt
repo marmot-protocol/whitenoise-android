@@ -756,8 +756,8 @@ internal class ConversationScrollCoordinator(
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
-            resolveIndex: () -> Int? = { index },
             traceMentionJump: Boolean = false,
+            resolveIndex: () -> Int? = { index },
         ): Boolean {
             ensureCurrent()
             var targetIndex = resolveIndex()?.coerceAtLeast(0)

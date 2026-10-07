@@ -21,6 +21,9 @@ data class PendingAttachment(
     val byteCount: Long get() = sourceFile?.byteCount ?: plaintextBytes.size.toLong()
     val hasContent: Boolean get() = byteCount > 0
 
+    /** Diagnostics must not include plaintext, document names or private snapshot paths. */
+    override fun toString(): String = "PendingAttachment(byteCount=$byteCount, fileBacked=${sourceFile != null})"
+
     /** Compares attachment byte content rather than the backing array's identity. */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

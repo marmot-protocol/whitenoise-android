@@ -591,7 +591,7 @@ internal suspend fun followTtsTargetInViewport(
                             sentenceIndex = target.sentenceIndex,
                             sentenceCount = target.sentenceCount,
                         ).coerceAtMost(0)
-                if (!animateScrollToItem(targetIndex, provisionalOffset, resolveTargetIndex)) {
+                if (!animateScrollToItem(targetIndex, provisionalOffset, resolveIndex = resolveTargetIndex)) {
                     return@programmaticJump
                 }
             }
@@ -624,7 +624,7 @@ internal suspend fun followTtsTargetInViewport(
                 TtsFollowViewportDecision.Stay -> completed = true
                 is TtsFollowViewportDecision.ScrollToItemOffset -> {
                     if (!claimCorrectiveScroll() || !isCurrentTarget()) return@programmaticJump
-                    completed = animateScrollToItem(targetIndex, decision.offset, resolveTargetIndex)
+                    completed = animateScrollToItem(targetIndex, decision.offset, resolveIndex = resolveTargetIndex)
                 }
             }
         }
