@@ -6,7 +6,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-from scripts.check_ci_changes import classify, docs_only_diff, supplemental_campaigns, supplemental_campaigns_diff
+from scripts.check_ci_changes import classify, complete_diff, docs_only_diff, supplemental_campaigns, supplemental_campaigns_diff
 
 
 def entry(path, old='100644', new='100644', status='M'):
@@ -74,6 +74,63 @@ class CiChangesTest(unittest.TestCase):
             raw = subprocess.check_output(['git', '-C', directory, 'diff', '--raw',
                                            '--no-abbrev', '--no-renames', '-z', f'{base}...HEAD'])
             self.assertFalse(docs_only_diff(raw))
+
+
+class MergeGroupDiffTest(unittest.TestCase):
+    def test_queue_diff_requires_ancestor_and_uses_complete_integration(self):
+        with patch('scripts.check_ci_changes.subprocess.run',
+                   return_value=subprocess.CompletedProcess([], 0, entry('README.md'))) as run:
+            self.assertTrue(classify('merge_group', 'a' * 40, 'b' * 40))
+            self.assertEqual(run.call_args_list[0].args[0],
+                             ['git', 'merge-base', '--is-ancestor', 'a' * 40, 'b' * 40])
+            self.assertEqual(run.call_args_list[1].args[0][-1], 'a' * 40 + '..' + 'b' * 40)
+
+    def test_missing_objects_nonancestor_or_timeout_never_skip_validation(self):
+        for error in [OSError('missing git'), subprocess.CalledProcessError(1, 'git'),
+                      subprocess.TimeoutExpired('git', 30)]:
+            with self.subTest(error=error), patch('scripts.check_ci_changes.subprocess.run',
+                                                 side_effect=error):
+                self.assertFalse(classify('merge_group', 'a' * 40, 'b' * 40))
+                self.assertTrue(supplemental_campaigns('merge_group', 'a' * 40, 'b' * 40))
+        with patch('scripts.check_ci_changes.subprocess.run') as run:
+            for base, head in [('', 'b' * 40), ('a' * 40, ''), ('bad', 'b' * 40)]:
+                self.assertIsNone(complete_diff('merge_group', base, head))
+            run.assert_not_called()
+
+    def test_docs_fixup_does_not_hide_earlier_queue_code(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git', '-C', directory, *args], text=True).strip()
+            git('init', '-q')
+            git('config', 'user.name', 'Fixture')
+            git('config', 'user.email', 'fixture@example.invalid')
+            git('config', 'commit.gpgsign', 'false')
+            (root / 'README.md').write_text('base\n')
+            git('add', '.')
+            git('commit', '-qm', 'base')
+            base = git('rev-parse', 'HEAD')
+            (root / 'Source.kt').write_text('code\n')
+            git('add', '.')
+            git('commit', '-qm', 'code')
+            (root / 'README.md').write_text('docs fixup\n')
+            git('commit', '-qam', 'docs fixup')
+            head = git('rev-parse', 'HEAD')
+            original = subprocess.run
+            def in_fixture(args, **kw):
+                return original(['git', '-C', directory, *args[1:]], **kw)
+            with patch('scripts.check_ci_changes.subprocess.run', side_effect=in_fixture):
+                self.assertFalse(classify('merge_group', base, head))
+                self.assertTrue(supplemental_campaigns('merge_group', base, head))
+
+    def test_ordinary_queue_diff_retains_existing_campaign_selection(self):
+        for path, docs, campaigns in [('README.md', True, False),
+                                      ('app/src/main/java/org/example/Screen.kt', False, False),
+                                      ('.github/workflows/android-ci.yml', False, True)]:
+            with self.subTest(path=path), patch('scripts.check_ci_changes.subprocess.run',
+                    return_value=subprocess.CompletedProcess([], 0, entry(path))):
+                self.assertEqual(classify('merge_group', 'a' * 40, 'b' * 40), docs)
+                self.assertEqual(supplemental_campaigns('merge_group', 'a' * 40, 'b' * 40), campaigns)
 
 
 class SupplementalCampaignTest(unittest.TestCase):
