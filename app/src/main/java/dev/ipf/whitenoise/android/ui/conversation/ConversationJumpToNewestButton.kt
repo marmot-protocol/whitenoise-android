@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -64,9 +65,9 @@ internal fun ConversationJumpToNewestButton(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    painterResource(R.drawable.ic_jump_to_bottom),
+                    painterResource(R.drawable.ic_jump_to_edge),
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = 180f },
                 )
             }
         }

@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
@@ -233,11 +234,16 @@ class ComposerDragAndReadingTest {
         assertEquals(original, observed)
     }
 
+    /** The icon-only toolbar button stays accessible and changes scroll without editing or sending. */
     @Test
     fun jumpToTopPreservesTextAndSelectionAndHidesAtTop() {
         render(longDraft, dark = true)
         val original = observed
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        val action = composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        val semantics = action.fetchSemanticsNode().config
+        assertEquals(Role.Button, semantics[SemanticsProperties.Role])
+        assertEquals(listOf("Scroll to top"), semantics[SemanticsProperties.ContentDescription])
+        assertTrue("the toolbar button must not show a text label", !semantics.contains(SemanticsProperties.Text))
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_draft_top_dark.png")
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
         composeRule.waitForIdle()

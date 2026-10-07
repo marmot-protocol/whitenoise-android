@@ -26,7 +26,7 @@
       {
         "surface": "Timeline downward endpoint navigation icon",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationJumpToNewestButton.kt",
-        "anchor": "R.drawable.ic_jump_to_bottom",
+        "anchor": "R.drawable.ic_jump_to_edge",
         "test_ids": [
           "CHL-022"
         ]

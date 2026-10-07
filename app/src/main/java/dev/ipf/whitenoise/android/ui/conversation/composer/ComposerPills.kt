@@ -27,7 +27,6 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -49,11 +48,9 @@ import androidx.compose.foundation.text.contextmenu.modifier.filterTextContextMe
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -126,7 +123,6 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -730,29 +726,10 @@ internal fun ComposerPill(
             !geometryTransitionActive &&
             draftTopGeometrySettled &&
             draftStartOffscreen &&
-            (!multilineControlsSuppressed || navigationRoom >= 48.dp)
+            (!multilineControlsSuppressed || navigationRoom >= 40.dp)
     val textMeasurer = rememberTextMeasurer()
-    val draftTopLabel = stringResource(R.string.scroll_to_top)
-    val draftTopLabelStyle = MaterialTheme.typography.labelMedium
-    val draftTopLabelWidth =
-        remember(textMeasurer, density, draftTopLabel, draftTopLabelStyle) {
-            with(density) {
-                (
-                    textMeasurer
-                        .measure(draftTopLabel, style = draftTopLabelStyle)
-                        .size.width
-                        .toDp() + 40.dp
-                ).coerceAtLeast(64.dp)
-            }
-        }
-    val topOnSeparateRow = showDraftTop && inputContentVisible && navigationRoom < 48.dp
-    val draftTopWidth =
-        when {
-            !showDraftTop || !inputContentVisible -> 0.dp
-            topOnSeparateRow && navigationSurfaceWidth >= draftTopLabelWidth -> draftTopLabelWidth
-            navigationRoom >= draftTopLabelWidth -> draftTopLabelWidth
-            else -> 48.dp
-        }
+    val topOnSeparateRow = showDraftTop && inputContentVisible && navigationRoom < 40.dp
+    val draftTopWidth = if (showDraftTop && inputContentVisible) 40.dp else 0.dp
     val extraControlsHeight = if (topOnSeparateRow) 48.dp else 0.dp
     SideEffect { onExtraControlsHeightChanged(extraControlsHeight) }
     SideEffect { if (accessoryContent == null) onAccessoryHeightChanged(0.dp) }
@@ -1018,36 +995,20 @@ internal fun ComposerPill(
             Modifier.fillMaxHeight()
         }
     val draftTopAction: @Composable () -> Unit = {
-        OutlinedButton(
+        IconButton(
             onClick = {
                 editorScrollJob?.cancel()
                 readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
                 editorScrollJob = editorScrollScope.launch { composerScrollState.scrollTo(0) }
             },
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-            contentPadding = PaddingValues(horizontal = 8.dp),
-            modifier = Modifier.width(draftTopWidth).height(40.dp).testTag(COMPOSER_DRAFT_TOP_TAG),
+            modifier = Modifier.width(draftTopWidth).height(48.dp).testTag(COMPOSER_DRAFT_TOP_TAG),
         ) {
-            if (draftTopWidth > 48.dp) {
-                Icon(
-                    painterResource(R.drawable.ic_jump_to_top),
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = draftTopLabel,
-                    style = draftTopLabelStyle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else {
-                Icon(
-                    painterResource(R.drawable.ic_jump_to_top),
-                    contentDescription = stringResource(R.string.scroll_to_top),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            Icon(
+                painterResource(R.drawable.ic_jump_to_edge),
+                contentDescription = stringResource(R.string.scroll_to_top),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
+            )
         }
     }
 
