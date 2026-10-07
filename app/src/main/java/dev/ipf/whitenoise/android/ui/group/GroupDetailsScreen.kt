@@ -1615,6 +1615,14 @@ internal fun GroupDetailsScreen(
 
                 SettingsSection(stringResource(if (isDm) R.string.chat_actions else R.string.advanced))
                 SettingsGroup(modifier = Modifier.testTag("chat_info.actions")) {
+                    row("pin_shortcut") { rowContext ->
+                        PinConversationAction(
+                            rowContext,
+                            appState,
+                            controller,
+                            conversationTitle,
+                        )
+                    }
                     row("collapse_long_messages") { rowContext ->
                         SettingsSwitch(
                             context = rowContext,

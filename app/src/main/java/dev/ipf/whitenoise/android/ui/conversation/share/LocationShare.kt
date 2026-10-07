@@ -34,9 +34,16 @@ internal fun formatCoordinate(value: Double): String = String.format(Locale.US, 
 internal fun formatLocationShareText(location: SharedLocation): String =
     "Location: https://maps.google.com/maps?q=${formatCoordinate(location.latitude)},${formatCoordinate(location.longitude)}"
 
-private val MAPS_QUERY_COORDINATE =
+private const val MAPS_QUERY_COORDINATE_PATTERN =
+    """https://maps\.google\.com/(?:maps)?\?q=(-?\d+(?:\.\d+)?)(?:,|%2C)(-?\d+(?:\.\d+)?)"""
+
+// A search must not consume leading whitespace: retrying that prefix at every
+// position in a whitespace run makes ordinary prose expensive to scan.
+private val MAPS_QUERY_COORDINATE = Regex(MAPS_QUERY_COORDINATE_PATTERN, RegexOption.IGNORE_CASE)
+
+private val BARE_MAPS_QUERY_COORDINATE =
     Regex(
-        """\s*(?:Location:\s*)?https://maps\.google\.com/(?:maps)?\?q=(-?\d+(?:\.\d+)?)(?:,|%2C)(-?\d+(?:\.\d+)?)\s*""",
+        """\s*(?:Location:\s*)?$MAPS_QUERY_COORDINATE_PATTERN\s*""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -45,15 +52,26 @@ private val MAPS_QUERY_COORDINATE =
  * map. Deliberately lenient — it accepts the `?q=` and `/maps?q=` forms and a
  * `%2C`-encoded comma, so a location shared by an older build (or another
  * client that pasted only a maps link) still renders a map instead of raw
- * text. The whole body must match; prose around a maps URL stays visible.
+ * text. The link may sit anywhere in the body ("Meet me here: <link>");
+ * [isBareLocationShare] decides whether that prose also renders. The first
+ * link with in-range coordinates wins, so a bad link cannot hide a later one.
  */
 internal fun parseSharedLocationFromText(text: String): SharedLocation? {
-    val match = MAPS_QUERY_COORDINATE.matchEntire(text) ?: return null
-    val lat = match.groupValues[1].toDoubleOrNull() ?: return null
-    val lng = match.groupValues[2].toDoubleOrNull() ?: return null
-    if (lat !in -90.0..90.0 || lng !in -180.0..180.0) return null
+    val matches = MAPS_QUERY_COORDINATE.findAll(text)
+    return matches.firstNotNullOfOrNull(::locationOf)
+}
+
+private fun locationOf(match: MatchResult): SharedLocation? {
+    val lat = match.groupValues[1].toDoubleOrNull()?.takeIf { it in -90.0..90.0 }
+    val lng = match.groupValues[2].toDoubleOrNull()?.takeIf { it in -180.0..180.0 }
+    if (lat == null || lng == null) {
+        return null
+    }
     return SharedLocation(latitude = lat, longitude = lng, accuracyMeters = null)
 }
+
+/** True when the body is only the maps link, so the map card replaces the text. */
+internal fun isBareLocationShare(text: String): Boolean = BARE_MAPS_QUERY_COORDINATE.matches(text)
 
 internal fun locationGrantAllowsSharing(grants: Map<String, Boolean>): Boolean =
     grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||

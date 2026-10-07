@@ -2280,4 +2280,11 @@
     <string name="contact_picture_clear">Özel resmi kaldır</string>
     <string name="contact_picture_local_only">Yalnızca bu cihazdaki bu hesap için. Asla paylaşılmaz veya yüklenmez.</string>
     <string name="contact_picture_failed">Bu resim kullanılamadı veya değişiklikler kaydedilemedi. Önceki seçiminiz değişmedi. Tekrar deneyin.</string>
+
+    <string name="add_conversation_to_home_screen">Ana ekrana ekle</string>
+    <string name="pinned_shortcut_unsupported">Başlatıcınız sabitlenmiş kısayolları desteklemiyor.</string>
+    <string name="pinned_shortcut_already_added">Bu sohbet zaten ana ekranınızda.</string>
+    <string name="pinned_shortcut_finish">Bu sohbeti eklemek için başlatıcınızda onaylayın.</string>
+    <string name="pinned_shortcut_unavailable">Bu sohbet artık kullanılamıyor.</string>
+    <string name="pinned_shortcut_failed">Ana ekran kısayolu istenemedi. Tekrar deneyin.</string>
 </resources>

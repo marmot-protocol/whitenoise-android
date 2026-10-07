@@ -21,6 +21,36 @@ class NotificationConversationOpenCoverageTest {
         assertFalse("queued bind must retain its account", bindEffect.contains("appState.activeAccountRef"))
     }
 
+    /** A pin tap waits for the App Lock decision instead of being armed, consumed or routed while it is pending. */
+    @Test
+    fun pinnedShortcutRouteWaitsForThePendingLockDecision() {
+        val source = mainShellSource()
+        val effect = source.substring(source.indexOf("LaunchedEffect(\n        inboundNotificationTarget,"))
+        val keys = effect.substringBefore(") {")
+        assertTrue("the routing effect must re-run on the lock decision", keys.contains("appUnlockEvaluationPending"))
+        val wait =
+            effect.indexOf(
+                "if (target.shortcutCapability != null && appState.appUnlockEvaluationPending) return@LaunchedEffect",
+            )
+        val arm = effect.indexOf("if (routingRequestId != armedNotificationRequestId) {")
+        assertTrue("pins must wait before the request is armed or consumed", wait >= 0 && wait < arm)
+    }
+
+    /** A lock that shows while accounts are still loading consumes the pin before a later unlock could route it. */
+    @Test
+    fun pinnedShortcutRouteFailsClosedWhenTheLockShowsBeforeAccountsLoad() {
+        val source = mainShellSource()
+        val effect = source.substring(source.indexOf("LaunchedEffect(\n        inboundNotificationTarget,"))
+        val keys = effect.substringBefore(") {")
+        assertTrue("the routing effect must re-run when the lock shows", keys.contains("appState.appLockScreenVisible"))
+        val accountsEmpty = effect.indexOf("if (appState.accounts.isEmpty()) {")
+        val block = effect.substring(accountsEmpty).substringBefore("val broadChatListReady")
+        assertTrue(block.contains("pinnedShortcutLockDecision() == PinnedShortcutLockDecision.LOCKED"))
+        val consume = block.indexOf("onNotificationTargetHandled(target, routingRequestId)")
+        val earlyReturn = block.indexOf("return@LaunchedEffect")
+        assertTrue("a locked pin is consumed before the early return", consume >= 0 && consume < earlyReturn)
+    }
+
     /** Route state is published only after the awaited card cancellation has returned. */
     @Test
     fun routeCommitAwaitsDismissalBeforePublishingNavigationState() {
@@ -30,7 +60,7 @@ class NotificationConversationOpenCoverageTest {
         val commit =
             source
                 .substring(start)
-                .substringBefore("fun fallBackToChatList()")
+                .substringBefore("when (step)")
         val dismiss = commit.indexOf("appState.dismissNotificationRouteCards(")
         val navigation = commit.indexOf("sectionName = MainSection.Chats.name")
         val selected = commit.indexOf("selectedChat = chatItem")
@@ -242,6 +272,24 @@ class NotificationConversationOpenCoverageTest {
             directRelease in directFallback until directFallbackEnd,
         )
     }
+
+    /** The Activity holds a pin tap while the App Lock decision loads and re-parses it once the decision exists. */
+    @Test
+    fun pinnedShortcutTapIsHeldInTheActivityUntilTheLockDecisionExists() {
+        val source = mainActivitySource()
+        val hold = source.indexOf("if (pinTapGate.hold(intent)) {")
+        val parse = source.indexOf("val pinTarget = pinTapGate.target(this, intent)")
+        assertTrue("the tap must be held before any target is parsed", hold >= 0 && hold < parse)
+        assertTrue(source.substring(hold).substringBefore("}").contains("return"))
+        assertTrue(source.contains("pinTapGate.replayWhenDecided(lifecycleScope, ::consumeIntent)"))
+    }
+
+    private fun mainActivitySource(): String =
+        listOf(
+            File("src/main/java/dev/ipf/whitenoise/android/MainActivity.kt"),
+            File("app/src/main/java/dev/ipf/whitenoise/android/MainActivity.kt"),
+        ).first(File::exists)
+            .readText()
 
     private fun mainShellSource(): String =
         listOf(

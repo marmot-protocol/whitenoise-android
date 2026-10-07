@@ -2282,4 +2282,11 @@
     <string name="contact_picture_clear">Supprimer la photo privée</string>
     <string name="contact_picture_local_only">Uniquement pour ce compte sur cet appareil. Jamais partagée ni envoyée.</string>
     <string name="contact_picture_failed">Impossible d’utiliser cette photo ou d’enregistrer les modifications. Votre sélection précédente est inchangée. Réessayez.</string>
+
+    <string name="add_conversation_to_home_screen">Ajouter à l’écran d’accueil</string>
+    <string name="pinned_shortcut_unsupported">Votre lanceur ne prend pas en charge les raccourcis épinglés.</string>
+    <string name="pinned_shortcut_already_added">Cette discussion est déjà sur votre écran d’accueil.</string>
+    <string name="pinned_shortcut_finish">Confirmez dans votre lanceur pour ajouter cette discussion.</string>
+    <string name="pinned_shortcut_unavailable">Cette discussion n’est plus disponible.</string>
+    <string name="pinned_shortcut_failed">Impossible de demander un raccourci. Réessayez.</string>
 </resources>

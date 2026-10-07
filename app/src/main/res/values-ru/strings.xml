@@ -2352,4 +2352,11 @@
     <string name="contact_picture_clear">Убрать личное изображение</string>
     <string name="contact_picture_local_only">Только для этого аккаунта на этом устройстве. Не публикуется и не загружается.</string>
     <string name="contact_picture_failed">Не удалось использовать это изображение или сохранить изменения. Предыдущий выбор не изменился. Попробуйте ещё раз.</string>
+
+    <string name="add_conversation_to_home_screen">Добавить на главный экран</string>
+    <string name="pinned_shortcut_unsupported">Ваш лаунчер не поддерживает закреплённые ярлыки.</string>
+    <string name="pinned_shortcut_already_added">Этот чат уже добавлен на главный экран.</string>
+    <string name="pinned_shortcut_finish">Подтвердите добавление чата в лаунчере.</string>
+    <string name="pinned_shortcut_unavailable">Этот чат больше недоступен.</string>
+    <string name="pinned_shortcut_failed">Не удалось запросить ярлык. Повторите попытку.</string>
 </resources>

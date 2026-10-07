@@ -182,11 +182,12 @@ class LocalNotificationPresenter(
         shortcutLastUsed.clear()
     }
 
-    fun clearConversationShortcutsForAccount(
+    /** Clears platform/cache presentation while the caller holds an acknowledged credential-revocation fence. */
+    fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
     ) {
-        clearConversationShortcutsForAccount(context, accountRef, includeUnscopedLegacy)
+        runCatching { clearRevokedConversationShortcutsForAccount(context, accountRef, includeUnscopedLegacy) }
         val accountScope = conversationShortcutAccountScope(accountRef) ?: return
         shortcutSnapshots
             .filterValues { it.accountScope == accountScope }
