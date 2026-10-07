@@ -71,9 +71,11 @@ internal suspend fun loadGroupAttachmentCropSource(
     if (bytes.size > IDENTITY_IMAGE_SOURCE_MAX_BYTES) throw ImageUploadPreparationException.PreparedImageTooLarge
     val source = prepareGroupIdentityImageSource(bytes, mediaType)
     val renderer = PhotoEditorRenderer()
-    val oriented =
-        (renderer.inspect(source) as? PhotoEditorInspectResult.Success)?.source?.orientedSize
-            ?: throw ImageUploadPreparationException.UnsupportedImage
-    val preview = renderer.decodePreview(source) ?: throw ImageUploadPreparationException.UnsupportedImage
-    return IdentityImageCropSource(source, preview, oriented)
+    val oriented = (renderer.inspect(source) as? PhotoEditorInspectResult.Success)?.source?.orientedSize
+    val preview = oriented?.let { renderer.decodePreview(source) }
+    return if (oriented != null && preview != null) {
+        IdentityImageCropSource(source, preview, oriented)
+    } else {
+        throw ImageUploadPreparationException.UnsupportedImage
+    }
 }

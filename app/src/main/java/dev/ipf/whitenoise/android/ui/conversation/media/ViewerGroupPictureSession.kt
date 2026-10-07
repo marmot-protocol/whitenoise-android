@@ -44,7 +44,8 @@ internal class ViewerGroupPictureSession(
         read: suspend (MediaViewerPage) -> IdentityImageCropSource,
         failure: (Throwable) -> Unit,
     ) {
-        if (!isCurrent() || busy || source != null || failedDraft != null) return
+        val hasPendingChoice = source != null || failedDraft != null
+        if (!isCurrent() || busy || hasPendingChoice) return
         val ticket = ++operation
         busy = true
         try {

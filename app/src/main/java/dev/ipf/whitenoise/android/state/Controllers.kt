@@ -11262,42 +11262,11 @@ class ConversationController(
             var attemptedLegacyClear = false
             val committed =
                 runCatchingCancellable {
-                    appState
-                        .withGroupCommitLock(account, capturedGroupId) {
-                            val admission = admitViewerGroupImageMutation(appState, change, account, capturedGroupId)
-                            if (!admission.allowed) return@withGroupCommitLock false
-                            val needsPrimary =
-                                if (change.viewerPermissionCheck) {
-                                    !admission.alreadyCommitted
-                                } else {
-                                    shouldCommitPrimaryGroupImageMutation(
-                                        requestedMutationKey = requestedMutationKey,
-                                        pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
-                                        hasProjectedEncryptedImage = group.imageHashHex != null,
-                                    )
-                                }
-                            if (needsPrimary) {
-                                commitGroupImageBytes(account, capturedGroupId, draft, change)
-                            }
-
-                            // URL avatars win; clear the legacy URL only after the encrypted
-                            // mutation succeeds so a partial failure never removes both images.
-                            if (admission.legacyAvatarPresent ||
-                                !group.avatarUrl.isNullOrBlank() ||
-                                pendingLegacyAvatarClearAfterImageMutationKey != null
-                            ) {
-                                pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
-                                attemptedLegacyClear = true
-                                appState.marmotIo {
-                                    if (change.viewerPermissionCheck && !change.isActive()) {
-                                        throw CancellationException("Viewer owner replaced")
-                                    }
-                                    updateGroupAvatarUrl(account, capturedGroupId, null, null, null)
-                                }
-                                pendingLegacyAvatarClearAfterImageMutationKey = null
-                            }
-                            true
-                        }.also { if (!it) return@runCatchingCancellable false }
+                    val accepted =
+                        commitGroupImageMutation(account, capturedGroupId, change, requestedMutationKey) {
+                            attemptedLegacyClear = true
+                        }
+                    if (!accepted) return@runCatchingCancellable false
                     if (change.viewerPermissionCheck) {
                         if (!refreshViewerGroupImageDetails(account, capturedGroupId, change)) {
                             return@runCatchingCancellable false
@@ -11318,6 +11287,50 @@ class ConversationController(
         }
     }
 
+    /** Serializes permission, primary image publication and legacy cleanup, retaining ambiguous cleanup recovery. */
+    private suspend fun commitGroupImageMutation(
+        account: String,
+        capturedGroupId: String,
+        change: ScopedGroupImageMutation<ImageUploadDraft?>,
+        requestedMutationKey: String,
+        onLegacyClearAttempt: () -> Unit,
+    ): Boolean =
+        appState.withGroupCommitLock(account, capturedGroupId) {
+            val admission = admitViewerGroupImageMutation(appState, change, account, capturedGroupId)
+            if (!admission.allowed) return@withGroupCommitLock false
+            val needsPrimary =
+                if (change.viewerPermissionCheck) {
+                    !admission.alreadyCommitted
+                } else {
+                    shouldCommitPrimaryGroupImageMutation(
+                        requestedMutationKey = requestedMutationKey,
+                        pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
+                        hasProjectedEncryptedImage = group.imageHashHex != null,
+                    )
+                }
+            if (needsPrimary) {
+                commitGroupImageBytes(account, capturedGroupId, change.value, change)
+            }
+
+            // URL avatars win; clear the legacy URL only after the encrypted
+            // mutation succeeds so a partial failure never removes both images.
+            if (admission.legacyAvatarPresent ||
+                !group.avatarUrl.isNullOrBlank() ||
+                pendingLegacyAvatarClearAfterImageMutationKey != null
+            ) {
+                pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
+                onLegacyClearAttempt()
+                appState.marmotIo {
+                    if (change.viewerPermissionCheck && !change.isActive()) {
+                        throw CancellationException("Viewer owner replaced")
+                    }
+                    updateGroupAvatarUrl(account, capturedGroupId, null, null, null)
+                }
+                pendingLegacyAvatarClearAfterImageMutationKey = null
+            }
+            true
+        }
+
     /** Publish the current native group image/roster through the normal conversation and chat-list state path. */
     private suspend fun refreshViewerGroupImageDetails(
         account: String,
@@ -11326,9 +11339,11 @@ class ConversationController(
     ): Boolean {
         if (!change.isActive()) return false
         val details = appState.marmotIo { groupDetails(account, groupId) }
-        if (!change.isActive() || !details.group.groupIdHex.equals(groupId, ignoreCase = true)) return false
-        check(applyMutationDetails(account, details)) { "Authoritative group image projection unavailable" }
-        return true
+        val applicable = change.isActive() && details.group.groupIdHex.equals(groupId, ignoreCase = true)
+        if (applicable) {
+            check(applyMutationDetails(account, details)) { "Authoritative group image projection unavailable" }
+        }
+        return applicable
     }
 
     /** Native command entry rechecks viewer ownership after dispatcher/lock suspension. */

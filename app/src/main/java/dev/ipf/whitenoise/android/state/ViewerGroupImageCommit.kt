@@ -46,23 +46,26 @@ internal suspend fun admitViewerGroupImageMutation(
     groupId: String,
 ): ViewerGroupImageAdmission {
     if (!change.viewerPermissionCheck) return ViewerGroupImageAdmission(allowed = true)
-    if (!change.isActive()) return ViewerGroupImageAdmission(allowed = false)
-    val details = appState.marmotIo { groupDetails(account, groupId) }
-    val group = applyAuthoritativeGroupDetails(details).group
-    if (!change.isActive() ||
-        !group.groupIdHex.equals(groupId, ignoreCase = true) ||
-        GroupProjector.isDm(details.members.size, group.name) ||
-        !canCommitViewerGroupImage(group, appState.activeAccount?.accountIdHex)
-    ) {
-        return ViewerGroupImageAdmission(allowed = false)
+    return if (!change.isActive()) {
+        ViewerGroupImageAdmission(allowed = false)
+    } else {
+        val details = appState.marmotIo { groupDetails(account, groupId) }
+        val group = applyAuthoritativeGroupDetails(details).group
+        val targetMatches =
+            group.groupIdHex.equals(groupId, ignoreCase = true) && !GroupProjector.isDm(details.members.size, group.name)
+        val allowed =
+            change.isActive() && targetMatches && canCommitViewerGroupImage(group, appState.activeAccount?.accountIdHex)
+        if (!allowed) {
+            ViewerGroupImageAdmission(allowed = false)
+        } else {
+            val draft = change.value
+            val committed =
+                change.reconcilePrimary &&
+                    draft != null &&
+                    viewerGroupImageAlreadyCommitted(draft, group.imageHashHex != null) {
+                        appState.marmotIo { downloadGroupBlossomImage(account, groupId) }
+                    }
+            ViewerGroupImageAdmission(change.isActive(), committed, !group.avatarUrl.isNullOrBlank())
+        }
     }
-    val draft = change.value
-    val committed =
-        change.reconcilePrimary &&
-            draft != null &&
-            viewerGroupImageAlreadyCommitted(draft, group.imageHashHex != null) {
-                appState.marmotIo { downloadGroupBlossomImage(account, groupId) }
-            }
-    if (!change.isActive()) return ViewerGroupImageAdmission(allowed = false)
-    return ViewerGroupImageAdmission(true, committed, !group.avatarUrl.isNullOrBlank())
 }
