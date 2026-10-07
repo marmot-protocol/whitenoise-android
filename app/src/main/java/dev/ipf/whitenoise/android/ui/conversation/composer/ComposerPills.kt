@@ -567,10 +567,10 @@ internal fun ComposerPill(
                             }
                         val offsetMapping =
                             object : OffsetMapping {
-                                /** Maps the editor caret into mention-chip text, bounded by the current visual text. */
+                                /** Maps the source caret into the bounded mention-chip text. */
                                 override fun originalToTransformed(offset: Int): Int = visual.originalToTransformed(offset).coerceIn(0, visualLength)
 
-                                /** Maps a chip selection back to the source draft without exposing stale span offsets. */
+                                /** Maps chip selections into the current source draft bounds. */
                                 override fun transformedToOriginal(offset: Int): Int = visual.transformedToOriginal(offset).coerceIn(0, text.text.length)
                             }
                         TransformedText(styled, offsetMapping)
