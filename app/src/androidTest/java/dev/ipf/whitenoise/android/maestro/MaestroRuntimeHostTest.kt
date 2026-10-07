@@ -152,13 +152,20 @@ class MaestroRuntimeHostTest {
                     JSONObject().put("generation", generation).put("verified", true).toString(),
                 )
             } finally {
-                activity?.close()
-                state?.stopNotificationListenerForAccountTeardown()
+                val activityClosed = runCatching { activity?.close() }
+                val listenerStopped =
+                    runCatching { withTimeout(10_000L) { state?.stopNotificationListenerForAccountTeardown() } }
                 state?.mutationsScope?.cancel()
-                native.shutdownAndClose()
-                relay.close()
-                context.deleteSharedPreferences(directory.name)
-                check(root.deleteRecursively()) { "Fixture runtime cleanup failed" }
+                val nativeClosed = runCatching { withTimeout(15_000L) { native.shutdownAndClose() } }
+                val relayClosed = runCatching { relay.close() }
+                val preferencesRemoved = runCatching { context.deleteSharedPreferences(directory.name) }
+                val rootRemoved = nativeClosed.isSuccess && root.deleteRecursively()
+                check(activityClosed.isSuccess && listenerStopped.isSuccess && nativeClosed.isSuccess) {
+                    "Fixture owner teardown failed"
+                }
+                check(relayClosed.isSuccess && preferencesRemoved.isSuccess && rootRemoved) {
+                    "Fixture storage cleanup failed"
+                }
                 File(directory, "closed.json").writeText(
                     JSONObject().put("generation", generation).put("closed", true).toString(),
                 )
