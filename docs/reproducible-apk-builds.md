@@ -22,6 +22,13 @@ reproducibility and what remains out of scope.
 - The exact MarmotKit Android archive is pinned by immutable URL, source SHA,
   and SHA-256. Each isolated build verifies and extracts that same archive
   through Gradle before compiling its Kotlin and JNI payload.
+- Compose UI retains the `ui-android:1.12.1` coordinates but contains 12 classes
+  compiled from four patched sources by the temporary [RectList backport](../third_party/compose-ui/README.md).
+  Its input AAR, source archive and patched sources are hash-checked. The compiler,
+  Compose plugin, language/API version and JDK API target are pinned, and archive
+  ordering and timestamps are fixed. CI also checks the backport marker in both
+  unsigned APKs; matching Maven coordinates alone do not establish their contents.
+  Retrace candidate crashes with that APK's own mapping and the patched sources.
 - The prebuilt `libjnidispatch.so` (JNA) and `libmarmot_uniffi.so` (MarmotKit)
   are packaged without stripping, preserving their dependency bytes.
   Independent runners previously produced stripped and unstripped copies with
