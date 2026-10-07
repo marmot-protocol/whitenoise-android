@@ -195,7 +195,16 @@ class DmCreationDiagnosticsTest {
                 recipientName = "private-name",
                 resolveDirectChat = { NewMessageDirectChatResolution(null, true) },
                 createGroup = { "private-group" },
-                loadCreatedChatListItem = { ChatListItem(group(""), null, null, 0) },
+                loadCreatedChatListItem = {
+                    ChatListItem(
+                        group(""),
+                        null,
+                        null,
+                        0,
+                        dev.ipf.whitenoise.android.state
+                            .GroupMemberSnapshot(emptyList()),
+                    )
+                },
                 displayName = { it },
                 diagnosticAttempt = sixth,
             )
