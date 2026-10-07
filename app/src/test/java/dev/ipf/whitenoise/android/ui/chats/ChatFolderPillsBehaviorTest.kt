@@ -29,7 +29,8 @@ class ChatFolderPillsBehaviorTest {
 
     /** The untouched Chats default shares the scroll strip and can be edited; removed defaults expose All chats. */
     @Test fun editableChatsHomeAndFallbackShareTheStrip() {
-        var chips by mutableStateOf(listOf(ChatFolderChipModel("home", SystemFolderKind.CHATS, "", 0, unfilteredHome = true)) + folders())
+        val home = ChatFolderChipModel("home", SystemFolderKind.CHATS, "", 0, unfilteredHome = true)
+        var chips by mutableStateOf(listOf(home) + folders())
         var edited: String? = null
         var selected by mutableStateOf<String?>(null)
         composeRule.setContent {

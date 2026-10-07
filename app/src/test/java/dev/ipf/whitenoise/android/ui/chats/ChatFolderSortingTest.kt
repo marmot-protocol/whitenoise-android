@@ -15,7 +15,8 @@ class ChatFolderSortingTest {
         val sorted = sortFolderChats(rows, ChatFolderSort.NAME, null) { names.getValue(it.id) }
         assertEquals("id-250", sorted.first().id)
         assertEquals(251, sorted.size)
-        assertEquals(listOf("a", "z"), sortFolderChats(listOf(item("z"), item("a")), ChatFolderSort.NAME, null) { "SAME" }.map { it.id })
+        val tied = sortFolderChats(listOf(item("z"), item("a")), ChatFolderSort.NAME, null) { "SAME" }
+        assertEquals(listOf("a", "z"), tied.map { it.id })
     }
 
     @Test fun unreadSortPreservesPendingPinsAndRecencyWithinEachPartition() {
@@ -36,7 +37,8 @@ class ChatFolderSortingTest {
             listOf("invite", "pin0", "pin1", "unread-new", "unread-old", "read-draft", "read-old"),
             sortFolderChats(rows, ChatFolderSort.UNREAD, null) { it.id }.map { it.id },
         )
-        assertEquals(listOf("invite", "pin0", "pin1"), sortFolderChats(rows, ChatFolderSort.NAME, null) { it.id }.take(3).map { it.id })
+        val named = sortFolderChats(rows, ChatFolderSort.NAME, null) { it.id }
+        assertEquals(listOf("invite", "pin0", "pin1"), named.take(3).map { it.id })
     }
 
     @Test fun recentReturnsTheExistingDraftAwareOrderAndUnreadKeepsItWithinPartitions() {

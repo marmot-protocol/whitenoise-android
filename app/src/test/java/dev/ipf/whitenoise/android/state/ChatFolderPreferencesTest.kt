@@ -45,7 +45,10 @@ class ChatFolderPreferencesTest {
         assertEquals(oldOrder, folders.drop(1).map { it.id })
         assertEquals(ChatFolderRule(keyword = "work"), migrated.folderRule("acct-a", custom.id))
         assertEquals(setOf("g1"), migrated.membershipFor("acct-a", custom.id))
-        assertEquals(ChatFolderRule(includeAll = true, includeMuted = true), migrated.folderRule("acct-a", folders.first().id))
+        assertEquals(
+            ChatFolderRule(includeAll = true, includeMuted = true),
+            migrated.folderRule("acct-a", folders.first().id),
+        )
         migrated.deleteFolder("acct-a", folders.first().id)
         assertEquals(oldOrder, ChatFolderPreferences(context).foldersFor("acct-a").map { it.id })
     }
@@ -83,7 +86,8 @@ class ChatFolderPreferencesTest {
         val preferences = context.getSharedPreferences("whitenoise.chat_folders", Context.MODE_PRIVATE)
         val key = preferences.all.keys.single { it.startsWith("cf:acct-a:") && it.endsWith("folders") }
         preferences.edit().putString(key, preferences.getString(key, "")!!.replace("NAME", "FUTURE")).commit()
-        assertEquals(ChatFolderSort.RECENT, ChatFolderPreferences(context).foldersFor("acct-a").first { it.id == folder.id }.sort)
+        val loadedFolder = ChatFolderPreferences(context).foldersFor("acct-a").first { it.id == folder.id }
+        assertEquals(ChatFolderSort.RECENT, loadedFolder.sort)
     }
 
     @Test

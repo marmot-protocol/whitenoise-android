@@ -232,7 +232,6 @@ private fun ChatFolderEditSession(
                     name = if (renamed || folderId == null) trimmedName else null,
                     description = trimmedDescription,
                     manualChatIds = manualChatIds,
-                    excludedChatIds = folderId?.let { store.excludedChats(accountRef, it) }.orEmpty(),
                     rule = rule.takeIf { it != ChatFolderRule() },
                     showWhenEmpty = showWhenEmpty,
                     sort = sort,

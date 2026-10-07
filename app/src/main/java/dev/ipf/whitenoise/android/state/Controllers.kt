@@ -2876,7 +2876,9 @@ class ChatsController private constructor(
                                             receivedLiveUpdate = true
                                             connectionOwner.noteLiveUpdate(connectionAttempt)
                                             requestGroupProfiles(update)
-                                            chatsDebug { "chat update account=${accountRef.take(8)} ${update.debugSummary()}" }
+                                            chatsDebug {
+                                                "chat update account=${accountRef.take(8)} ${update.debugSummary()}"
+                                            }
                                             foldGroup(update)
                                         }
                                     },

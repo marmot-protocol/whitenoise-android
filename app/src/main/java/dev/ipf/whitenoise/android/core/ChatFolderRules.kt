@@ -50,7 +50,9 @@ internal fun chatFolderChatIds(
 ): Set<String> {
     if (rule == null) return manualChatIds - excludedChatIds
     rule.smartFilter?.let { payload ->
-        val filter = SmartFolderCodec.decode(payload)?.takeIf(SmartFolderCodec::valid) ?: return manualChatIds - excludedChatIds
+        val filter =
+            SmartFolderCodec.decode(payload)?.takeIf(SmartFolderCodec::valid)
+                ?: return manualChatIds - excludedChatIds
         return (
             manualChatIds +
                 items

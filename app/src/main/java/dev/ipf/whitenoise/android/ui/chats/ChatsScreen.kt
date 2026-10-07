@@ -207,7 +207,8 @@ internal fun ChatsScreen(
     val openNewMessageFlow = { showNewChatFlow = true }
     var actionSheetChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
-    val actionMenuOwner = remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId) { ChatContextMenuOwner() }
+    val actionMenuOwner =
+        remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId) { ChatContextMenuOwner() }
     DisposableEffect(actionMenuOwner) {
         onDispose { actionMenuOwner.dispose() }
     }
@@ -1509,7 +1510,11 @@ internal fun ChatsScreen(
                                     {
                                         // The menu admits the action before dismissing its token.
                                         if (menuActionsCurrent() && menuAccount != null) {
-                                            appState.chatFolderPreferences.excludeChat(menuAccount, folder.id, item.group.groupIdHex)
+                                            appState.chatFolderPreferences.excludeChat(
+                                                menuAccount,
+                                                folder.id,
+                                                item.group.groupIdHex,
+                                            )
                                         }
                                     }
                                 },

@@ -41,9 +41,15 @@ class ChatFolderEditContentTest {
     @Test fun sortingAndAllActiveControlsRouteEdits() {
         val selected = mutableListOf<ChatFolderSort>()
         var includeAll = true
-        render(editState("Chats").copy(includeAll = true), onSort = { selected += it }, onIncludeAll = { includeAll = it })
+        render(
+            editState("Chats").copy(includeAll = true),
+            onSort = { selected += it },
+            onIncludeAll = { includeAll = it },
+        )
         ChatFolderSort.entries.forEach { sort ->
-            composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag("folder.sort.${sort.name}"))
+            composeRule
+                .onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG)
+                .performScrollToNode(hasTestTag("folder.sort.${sort.name}"))
             composeRule.onNodeWithTag("folder.sort.${sort.name}").performClick()
         }
         assertEquals(ChatFolderSort.entries, selected)

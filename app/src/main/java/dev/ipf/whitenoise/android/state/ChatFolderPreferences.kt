@@ -468,7 +468,8 @@ class ChatFolderPreferences(
             folders.associate { folder ->
                 folder.id to preferences.getStringSet(exclusionKey(account, folder.id), emptySet()).orEmpty().toSet()
             }
-        val loaded = ChatFolderAccountState(folders = folders, membership = membership, rules = rules, exclusions = exclusions)
+        val loaded =
+            ChatFolderAccountState(folders = folders, membership = membership, rules = rules, exclusions = exclusions)
         _state.value = _state.value + (account to loaded)
         return loaded
     }
@@ -518,7 +519,10 @@ class ChatFolderPreferences(
             }
         val edit = preferences.edit().putString(foldersKey(account), folderListJson(updated))
         if (folders.none { it.id == SYSTEM_FOLDER_CHATS_ID }) {
-            edit.putString(ruleKey(account, SYSTEM_FOLDER_CHATS_ID), ruleJson(defaultRuleFor(SystemFolderKind.CHATS)).toString())
+            edit.putString(
+                ruleKey(account, SYSTEM_FOLDER_CHATS_ID),
+                ruleJson(defaultRuleFor(SystemFolderKind.CHATS)).toString(),
+            )
         }
         edit.putInt(versionKey(account), STORE_VERSION).apply()
         return updated
@@ -636,7 +640,9 @@ class ChatFolderPreferences(
                     order = json.optInt(FIELD_ORDER, 0),
                     systemKind = kind,
                     showWhenEmpty = json.optBoolean(FIELD_SHOW_WHEN_EMPTY, false),
-                    sort = ChatFolderSort.entries.firstOrNull { it.name == json.optString("sort") } ?: ChatFolderSort.RECENT,
+                    sort =
+                        ChatFolderSort.entries.firstOrNull { it.name == json.optString("sort") }
+                            ?: ChatFolderSort.RECENT,
                 )
             }
         }.getOrNull()

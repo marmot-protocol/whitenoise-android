@@ -10,7 +10,10 @@ class ChatListSelectionActionsTest {
     @Test fun folderBackIsTheLastPresentationLayerBeforeRootExit() {
         assertTrue(chatListBackHandlerEnabled(false, false, folderSelected = true))
         assertEquals(ChatListBackDismissal.ClearFolder, chatListBackDismissal(false, GlobalSearchState(), true))
-        assertEquals(ChatListBackDismissal.CloseSearch, chatListBackDismissal(false, GlobalSearchState(isOpen = true), true))
+        assertEquals(
+            ChatListBackDismissal.CloseSearch,
+            chatListBackDismissal(false, GlobalSearchState(isOpen = true), true),
+        )
         assertEquals(ChatListBackDismissal.ClearSelection, chatListBackDismissal(true, GlobalSearchState(), true))
         assertEquals(null, chatListBackDismissal(false, GlobalSearchState(), false))
     }

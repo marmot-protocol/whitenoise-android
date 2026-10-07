@@ -32,12 +32,18 @@ class ChatFolderPillsUnreadTest {
         var selected by mutableStateOf<String?>(null)
         var count by mutableStateOf<ULong?>(0uL)
         val chip = ChatFolderChipModel("work", null, "Work", 2)
+        val home = ChatFolderChipModel("home", SystemFolderKind.CHATS, "", 0, unfilteredHome = true)
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
-                    ChatFolderPills(listOf(ChatFolderChipModel("home", SystemFolderKind.CHATS, "", 0, unfilteredHome = true), chip), selected, {
-                        selected = it
-                    }, {}, {}, chatsUnreadCount = count)
+                    ChatFolderPills(
+                        listOf(home, chip),
+                        selected,
+                        { selected = it },
+                        {},
+                        {},
+                        chatsUnreadCount = count,
+                    )
                 }
             }
         }
