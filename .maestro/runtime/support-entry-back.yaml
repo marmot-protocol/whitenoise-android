@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: support-entry-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Chat with support"
+    direction: DOWN
+- tapOn: "Chat with support"
+- assertVisible: "White Noise Support"
+- assertVisible:
+    id: "support.start"
+- back
+- assertVisible: "Settings"

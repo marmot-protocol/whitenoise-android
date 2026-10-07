@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: nested-diagnostics
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Privacy & Security"
+    direction: DOWN
+- tapOn: "Privacy & Security"
+- scrollUntilVisible:
+    element:
+      text: "Diagnostics & Improvements"
+    direction: DOWN
+- tapOn: "Diagnostics & Improvements"
+- assertVisible:
+    id: "diagnostics.choices.group"
+- back
+- assertVisible:
+    id: "privacy.device_protection.group"

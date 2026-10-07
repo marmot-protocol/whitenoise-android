@@ -75,7 +75,15 @@ class MaestroRuntimeHostTest {
                             native.createIdentity(relays, relays).also {
                                 native.publishUserProfile(
                                     it.label,
-                                    UserProfileMetadataFfi(name, name, "Disposable test profile", null, null, null, null),
+                                    UserProfileMetadataFfi(
+                                        name,
+                                        name,
+                                        "Disposable test profile",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                    ),
                                     relays,
                                     relays,
                                 )
@@ -84,7 +92,8 @@ class MaestroRuntimeHostTest {
                     val owner = accounts.first()
                     val group = native.createGroup(owner.label, "Maestro group", listOf(accounts[1].accountIdHex), null)
                     while (runCatching { native.acceptGroupInvite(accounts[1].label, group) }.isFailure) delay(100L)
-                    native.sendText(owner.label, group, "Generated fixture message")
+                    val fixture = InstrumentationRegistry.getArguments().getString("fixtureScenario", "basic")
+                    seedMaestroFixtureMessages(native, owner.label, group, fixture)
                     // Let app bootstrap own start/subscription ordering on a freshly opened runtime.
                     native.shutdownAndClose()
                     native =
@@ -100,7 +109,9 @@ class MaestroRuntimeHostTest {
                             WhiteNoiseAppState(
                                 context = context,
                                 draftStore = DraftStore.forContext(context),
-                                accountIdHexResolver = { ref -> accounts.firstOrNull { it.label == ref }?.accountIdHex },
+                                accountIdHexResolver = { ref ->
+                                    accounts.firstOrNull { it.label == ref }?.accountIdHex
+                                },
                                 accounts = accounts,
                                 activeAccountRef = owner.label,
                                 profileReader = { id -> withContext(Dispatchers.IO) { native.userProfile(id) } },
@@ -133,6 +144,7 @@ class MaestroRuntimeHostTest {
                         JSONObject()
                             .put("generation", generation)
                             .put("accounts", accounts.size)
+                            .put("fixture", fixture)
                             .put("ready", true)
                             .toString(),
                     )
@@ -175,7 +187,8 @@ class MaestroRuntimeHostTest {
     ) {
         val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
         require(
-            postcondition in listOf("none", "send", "dark", "light", "amoled", "font-large", "folder-saved", "folder-absent"),
+            postcondition in
+                listOf("none", "send", "dark", "light", "amoled", "font-large", "folder-saved", "folder-absent"),
         )
         if (postcondition.startsWith("folder-")) {
             val app = checkNotNull(state)

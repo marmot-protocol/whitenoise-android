@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "scope": "Every SettingsDetail route; mappings are assertions written, not complete or executed release proof.",
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/AppDestinations.kt",
+  "settings_routes": {
+    "ShareConnect": [
+      "nested-share-connect"
+    ],
+    "Appearance": [
+      "settings-appearance",
+      "preferences-light",
+      "preferences-dark",
+      "preferences-amoled"
+    ],
+    "ActionColor": [
+      "nested-action-color"
+    ],
+    "ChatBubbleColors": [
+      "nested-bubble-colors"
+    ],
+    "Language": [
+      "preferences-language-cancel"
+    ],
+    "CustomEmoji": [
+      "advanced-custom-emoji"
+    ],
+    "Data": [
+      "settings-data"
+    ],
+    "Profile": [
+      "navigation-profile-edit-cancel"
+    ],
+    "AccountKeys": [
+      "settings-profile-keys"
+    ],
+    "Relays": [
+      "advanced-relays"
+    ],
+    "Support": [
+      "support-entry-back",
+      "support-relay-guidance"
+    ],
+    "SupportRelays": [
+      "support-relays-back"
+    ],
+    "KeyPackages": [
+      "developer-key-packages"
+    ],
+    "QuarantinedGroups": [
+      "developer-quarantine"
+    ],
+    "Notifications": [
+      "settings-notifications"
+    ],
+    "DevicePrivacy": [
+      "settings-privacy"
+    ],
+    "DiagnosticsImprovements": [
+      "nested-diagnostics"
+    ],
+    "BlockedUsers": [
+      "nested-blocked-empty"
+    ],
+    "AiAgents": [
+      "settings-connectors",
+      "connectors-hermes",
+      "connectors-claude",
+      "connectors-codex",
+      "connectors-opencode",
+      "connectors-openclaw"
+    ],
+    "Donate": [
+      "nested-donate"
+    ],
+    "TextToSpeech": [
+      "settings-read-aloud"
+    ],
+    "Dictation": [
+      "advanced-dictation"
+    ],
+    "ChatFolders": [
+      "advanced-folders",
+      "folders-create-reopen",
+      "folders-delete-confirm"
+    ],
+    "Gestures": [
+      "advanced-gestures"
+    ],
+    "Help": [
+      "settings-help"
+    ],
+    "BugReport": [
+      "nested-bug-report"
+    ],
+    "About": [
+      "navigation-help-about"
+    ],
+    "Developer": [
+      "developer-unlock",
+      "developer-mode-off"
+    ]
+  }
+}

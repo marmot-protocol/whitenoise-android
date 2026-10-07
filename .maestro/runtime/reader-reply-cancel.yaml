@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reader-reply-cancel
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- scrollUntilVisible:
+    element:
+      text: "Read More"
+    direction: UP
+- tapOn: "Read More"
+- assertVisible:
+    id: "message-full-screen"
+- assertVisible: "Maestro reader heading"
+- tapOn: "Message actions"
+- tapOn: "Reply"
+- assertVisible:
+    id: "conversation.reply.bar"
+- tapOn: "Cancel reply"
+- assertNotVisible:
+    id: "conversation.reply.bar"

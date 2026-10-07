@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders')
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support')
 MAX_CASES_PER_SHARD = 4
 CAMPAIGN_SECONDS = 900
 CASE_RESERVE_SECONDS = 600
@@ -61,12 +61,14 @@ def run_case(name, reports):
         return command(adb + ['shell', 'run-as', PACKAGE, 'cat', f'{relative}/{flag}.json'])
     if command(adb + ['shell', 'pm', 'clear', PACKAGE]).strip() != 'Success':
         raise ValueError('Isolated fixture data reset failed before instrumentation')
+    fixture = CASES[name].get('fixture', 'basic')
     record = {'case': name, 'generation': generation, 'passed': False, 'cleanup_safe': False, **CASES[name]}
     failure = None
     with (directory / 'instrumentation.txt').open('w') as log:
         process = subprocess.Popen(adb + ['shell', 'am', 'instrument', '-w', '-r',
                                          '-e', 'class', HOST, '-e', 'fixtureGeneration', generation,
                                          '-e', 'postcondition', CASES[name]['postcondition'],
+                                         '-e', 'fixtureScenario', fixture,
                                          f'{PACKAGE}.test/{RUNNER}'], stdout=log, stderr=subprocess.STDOUT)
         try:
             deadline = time.monotonic() + 120
@@ -75,7 +77,7 @@ def run_case(name, reports):
                     raise ValueError('Fixture instrumentation ended before readiness')
                 try:
                     ready = receipt(read('ready'), generation, 'ready')
-                    if ready.get('accounts') != 3:
+                    if ready.get('accounts') != 3 or ready.get('fixture') != fixture:
                         raise ValueError('Fixture account inventory mismatch')
                     break
                 except (subprocess.CalledProcessError, json.JSONDecodeError):

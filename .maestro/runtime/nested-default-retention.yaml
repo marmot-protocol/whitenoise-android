@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: nested-default-retention
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Privacy & Security"
+    direction: DOWN
+- tapOn: "Privacy & Security"
+- scrollUntilVisible:
+    element:
+      text: "Default disappearing messages"
+    direction: DOWN
+- tapOn: "Default disappearing messages"
+- assertVisible:
+    id: "disappearing.picker"
+- back
+- assertNotVisible:
+    id: "disappearing.picker"
+- assertVisible:
+    id: "privacy.default_disappearing.group"

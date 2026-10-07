@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: composer-expanded-rotation
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Message"
+- inputText: "Maestro expanded draft"
+- tapOn: "Expand message composer"
+- assertVisible: "Collapse message composer"
+- assertVisible: "Maestro expanded draft"
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible: "Maestro expanded draft"
+- setOrientation: PORTRAIT
+- assertVisible: "Maestro expanded draft"
+- tapOn: "Collapse message composer"

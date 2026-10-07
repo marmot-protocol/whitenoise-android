@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: composer-expand-collapse
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Message"
+- inputText: "Maestro expanded draft"
+- tapOn: "Expand message composer"
+- assertVisible: "Collapse message composer"
+- assertVisible: "Maestro expanded draft"
+- tapOn: "Collapse message composer"
+- assertVisible: "Expand message composer"
+- assertVisible: "Maestro expanded draft"

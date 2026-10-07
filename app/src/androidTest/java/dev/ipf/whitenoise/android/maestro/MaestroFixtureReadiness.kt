@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.maestro
 
 import android.app.UiAutomation
 import android.os.SystemClock
-import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.delay
@@ -13,11 +12,12 @@ internal suspend fun awaitMaestroFixtureWindow(directory: File) {
     val instrumentation = InstrumentationRegistry.getInstrumentation()
     val automation = instrumentation.uiAutomation
     val deadline = SystemClock.elapsedRealtime() + 30_000L
+    var consentCloseRequested = false
     try {
         while (SystemClock.elapsedRealtime() < deadline) {
             val root = automation.rootInActiveWindow
             if (root?.hasVisibleFixtureText("Help Improve White Noise") == true) {
-                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+                if (!consentCloseRequested) consentCloseRequested = root.closeDefaultOffConsent()
             } else if (
                 root != null && root.packageName?.toString() == MaestroFixtureRunner.FIXTURE_PACKAGE &&
                 root.hasVisibleFixtureText("Maestro group")
@@ -28,13 +28,30 @@ internal suspend fun awaitMaestroFixtureWindow(directory: File) {
         }
         error("Generated group did not appear in the active accessible app window")
     } finally {
-        File(directory, "setup-tree.txt").writeText(accessibleFixtureWindow(automation))
+        File(directory, "setup-tree.txt").writeText(
+            "Consent close requested=$consentCloseRequested\n" + accessibleFixtureWindow(automation),
+        )
     }
 }
 
 /** Require the exact synthetic label on a visible accessible node, never a native row alone. */
 private fun AccessibilityNodeInfo.hasVisibleFixtureText(text: String): Boolean =
     findAccessibilityNodeInfosByText(text).any { it.isVisibleToUser && it.text?.toString() == text }
+
+/** Use the sheet's explicit close action; injected Back may be consumed by the host Activity. */
+private fun AccessibilityNodeInfo.closeDefaultOffConsent(): Boolean {
+    val queue = ArrayDeque<AccessibilityNodeInfo>()
+    queue.add(this)
+    var count = 0
+    while (queue.isNotEmpty() && count++ < 256) {
+        val node = queue.removeFirst()
+        if (node.isVisibleToUser && node.isEnabled && node.contentDescription?.toString() == "Close") {
+            return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+        repeat(minOf(node.childCount, 128)) { index -> node.getChild(index)?.let(queue::add) }
+    }
+    return false
+}
 
 /** Capture bounded diagnostic nodes from this disposable emulator, including a wrong foreground window. */
 private fun accessibleFixtureWindow(automation: UiAutomation): String =
@@ -48,6 +65,7 @@ private fun accessibleFixtureWindow(automation: UiAutomation): String =
                 val node = queue.removeFirst()
                 appendLine(
                     "${node.packageName} ${node.className} visible=${node.isVisibleToUser} " +
+                        "enabled=${node.isEnabled} clickable=${node.isClickable} " +
                         "id=${node.viewIdResourceName} text=${node.text} description=${node.contentDescription}",
                 )
                 repeat(minOf(node.childCount, 128)) { index -> node.getChild(index)?.let(queue::add) }

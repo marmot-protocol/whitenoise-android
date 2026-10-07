@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -15,6 +16,19 @@ from scripts.manual_test_fragments import definitions, load_guide
 
 
 class RuntimeEvidenceTest(unittest.TestCase):
+    def test_every_settings_route_has_named_cases(self):
+        """Reject silent coverage drift when a new Settings destination has no named journey."""
+        path = runtime.ROOT / 'config/maestro-screen-coverage.json'
+        mapping = json.loads(path.read_text())
+        source = (runtime.ROOT / mapping['source']).read_text()
+        body = re.search(r'internal enum class SettingsDetail\s*\{([^}]+)\}', source).group(1)
+        routes = set(re.findall(r'^\s*(\w+),?\s*$', body, re.MULTILINE))
+        self.assertEqual(routes, set(mapping['settings_routes']))
+        for route, cases in mapping['settings_routes'].items():
+            with self.subTest(route=route):
+                self.assertTrue(cases)
+                self.assertTrue(set(cases) <= set(runtime.CASES))
+
     def test_foreign_or_partial_fixture_receipts_are_rejected(self):
         """Reject stale generations, false flags and incomplete fixture receipts."""
         generation = 'a' * 32

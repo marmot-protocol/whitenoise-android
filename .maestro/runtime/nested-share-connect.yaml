@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: nested-share-connect
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- tapOn:
+    id: "settings.active_profile"
+- assertVisible:
+    id: "share_connect.screen"
+- assertVisible:
+    id: "share_connect.qr_surface"
+- back
+- assertVisible: "Settings"

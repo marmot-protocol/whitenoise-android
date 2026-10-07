@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: nested-bug-report
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Help"
+    direction: DOWN
+- tapOn: "Help"
+- tapOn:
+    id: "help.report_bug"
+- assertVisible:
+    id: "help.bug.destination"
+- assertVisible:
+    id: "help.bug.open"
+- back
+- assertVisible:
+    id: "help.destinations"

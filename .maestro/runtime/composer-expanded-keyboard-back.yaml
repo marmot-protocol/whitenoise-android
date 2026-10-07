@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: composer-expanded-keyboard-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"
+- tapOn: "Message"
+- inputText: "Maestro expanded draft"
+- tapOn: "Expand message composer"
+- assertVisible: "Collapse message composer"
+- assertVisible: "Maestro expanded draft"
+- back
+- assertVisible: "Maestro expanded draft"
+- assertVisible: "Collapse message composer"
+- tapOn: "Collapse message composer"

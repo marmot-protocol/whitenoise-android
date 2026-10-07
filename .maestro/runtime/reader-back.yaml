@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reader-back
+---
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- scrollUntilVisible:
+    element:
+      text: "Read More"
+    direction: UP
+- tapOn: "Read More"
+- assertVisible:
+    id: "message-full-screen"
+- assertVisible: "Maestro reader heading"
+- back
+- assertNotVisible:
+    id: "message-full-screen"
+- assertVisible: "Read More"

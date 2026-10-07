@@ -555,6 +555,245 @@
       ],
       "assertions": "AMOLED theme survives leaving and reopening Appearance; fixture checks the state projection.",
       "postcondition": "amoled"
+    },
+    "nested-action-color": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-004"
+      ],
+      "assertions": "Action-color controls and preview open, then Back returns to Appearance without committing a draft.",
+      "postcondition": "none"
+    },
+    "nested-bubble-colors": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-005"
+      ],
+      "assertions": "Bubble-color editor opens its sent-message controls and preview, then Back returns to Appearance.",
+      "postcondition": "none"
+    },
+    "nested-blocked-empty": {
+      "suite": "nested",
+      "manual_ids": [
+        "SEC-014"
+      ],
+      "assertions": "Fresh native account shows the explicit empty block list; Back returns to Privacy.",
+      "postcondition": "none"
+    },
+    "nested-diagnostics": {
+      "suite": "nested",
+      "manual_ids": [
+        "SEC-007",
+        "SEC-008"
+      ],
+      "assertions": "Sharing choices open and dismiss without granting usage or diagnostic sharing.",
+      "postcondition": "none"
+    },
+    "nested-default-retention": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-028"
+      ],
+      "assertions": "Default retention picker opens and cancels without changing new-chat policy.",
+      "postcondition": "none"
+    },
+    "nested-bug-report": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "Bug-report destination and opening action are visible; Back returns to Help without opening GitHub.",
+      "postcondition": "none"
+    },
+    "nested-share-connect": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-001",
+        "ACC-019"
+      ],
+      "assertions": "Active-profile header opens its public QR card and Back restores Settings without sharing.",
+      "postcondition": "none"
+    },
+    "nested-donate": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-022"
+      ],
+      "assertions": "Donate opens its action and returns without launching a browser or payment flow.",
+      "postcondition": "none"
+    },
+    "reader-back": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Expanded Markdown reader opens its generated heading and returns to the source conversation.",
+      "postcondition": "none"
+    },
+    "reader-scroll-end": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Reader scroll reaches the actual end of a long native message before returning.",
+      "postcondition": "none"
+    },
+    "reader-rotation": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Expanded reader remains open through landscape and portrait configuration changes.",
+      "postcondition": "none"
+    },
+    "reader-actions-cancel": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Reader action menu cancels back to the same expanded message without copying.",
+      "postcondition": "none"
+    },
+    "reader-reply-cancel": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Reply from the expanded message creates a reply target; cancel removes that target without sending.",
+      "postcondition": "none"
+    },
+    "reader-links-library": {
+      "suite": "reader",
+      "fixture": "links",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "A genuine native text link exposes the shared Links destination; Back restores its group without browser navigation.",
+      "postcondition": "none"
+    },
+    "composer-expand-collapse": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017"
+      ],
+      "assertions": "Expand and collapse the composer without dropping an unsent native draft.",
+      "postcondition": "none"
+    },
+    "composer-expanded-rotation": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017"
+      ],
+      "assertions": "Expanded draft text survives landscape and portrait rotation.",
+      "postcondition": "none"
+    },
+    "composer-expanded-keyboard-back": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017"
+      ],
+      "assertions": "Keyboard Back preserves the expanded draft and its collapse control.",
+      "postcondition": "none"
+    },
+    "composer-expanded-route-return": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017"
+      ],
+      "assertions": "Expanded-to-compact draft survives leaving and reopening the conversation.",
+      "postcondition": "none"
+    },
+    "developer-unlock": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-019",
+        "SET-020"
+      ],
+      "assertions": "Seven version taps reveal Developer Tools with its development warning; Back returns to About.",
+      "postcondition": "none"
+    },
+    "developer-mode-off": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-020"
+      ],
+      "assertions": "Turning developer mode off hides debugging controls while leaving Key Packages available.",
+      "postcondition": "none"
+    },
+    "developer-key-packages": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-020"
+      ],
+      "assertions": "Key Packages opens its real native-backed content and Back restores Developer Tools; no package is published.",
+      "postcondition": "none"
+    },
+    "developer-quarantine": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-031"
+      ],
+      "assertions": "Quarantined Groups opens its real content and Back restores Developer Tools; no recovery mutation is submitted.",
+      "postcondition": "none"
+    },
+    "developer-diagnostics": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-020",
+        "SET-021"
+      ],
+      "assertions": "Diagnostics opens Events and actions and Back restores Developer Tools.",
+      "postcondition": "none"
+    },
+    "developer-diagnostics-actions": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-021"
+      ],
+      "assertions": "Opening and dismissing Diagnostics actions retains Events without clearing or submitting native work.",
+      "postcondition": "none"
+    },
+    "developer-diagnostics-health": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-021"
+      ],
+      "assertions": "Health shows its controls; cancelling returns to Events without sending a diagnostic message.",
+      "postcondition": "none"
+    },
+    "support-entry-back": {
+      "suite": "support",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "Support contact information is displayed; Back returns to Settings without contacting Support.",
+      "postcondition": "none"
+    },
+    "support-relay-guidance": {
+      "suite": "support",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "The loopback-only profile needs public receiving relays; Support offers relay guidance and cannot start a support chat.",
+      "postcondition": "none"
+    },
+    "support-relays-back": {
+      "suite": "support",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "Support receiving-relay guidance opens Relays and Back returns to Support without publishing or starting a chat.",
+      "postcondition": "none"
     }
   }
 }
