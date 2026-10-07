@@ -100,7 +100,7 @@ class ConversationOlderPageReplyRaceTest {
             reply.await()
         }
         withController(subscription) { controller ->
-            awaitRecoveryCondition { controller.timeline.firstOrNull()?.record?.messageIdHex == SEED_ID }
+            awaitRecoveryCondition { timelineMessageIds(controller) == listOf(SEED_ID) }
             if (preserveNewerFailure) {
                 controller.reportPageFailure(ConversationSearchPageDirection.NEWER, IllegalStateException())
             }
