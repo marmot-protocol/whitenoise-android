@@ -278,8 +278,8 @@ internal class ConversationDictationCallerAudio internal constructor(
 
     /** Consumes a capture failure only after the controller accepts its owning generation. */
     @Synchronized
-    internal fun acknowledgeFailure(failure: ConversationDictationCallerAudioFailure): Boolean {
-        return when {
+    internal fun acknowledgeFailure(failure: ConversationDictationCallerAudioFailure): Boolean =
+        when {
             discarded.get() -> false
             failure == ConversationDictationCallerAudioFailure.PipeFailed -> true
             pendingFailure == failure -> {
@@ -288,7 +288,6 @@ internal class ConversationDictationCallerAudio internal constructor(
             }
             else -> false
         }
-    }
 
     /** An explicit sealed-audio Retry accepts an existing recorder failure, not a future one. */
     @Synchronized

@@ -3151,7 +3151,7 @@ class ConversationDictationControllerTest {
     fun serviceTeardownCompletesSupersededPasteOnlyWithoutPendingAudio() {
         for (audioPending in listOf(false, true)) {
             val platform = FakePlatform().apply { pendingCallerAudio = true }
-            val f = fixture(draft = TextFieldValue("Draft"), platform = platform)
+            val f = fixture(draft = TextFieldValue("Draft", TextRange(5)), platform = platform)
             f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
             platform.listener.onResult("recognized prefix")
             f.scheduler.advanceBy(500L)
@@ -6164,8 +6164,9 @@ class ConversationDictationControllerTest {
             terminalReceipt = false
             acknowledged++
         }
-        val fixture = fixture(draft = TextFieldValue("Draft"), platform = platform)
+        val fixture = fixture(draft = TextFieldValue("Draft", TextRange(5)), platform = platform)
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        fixture.controller.paste()
         platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
         assertTrue(fixture.controller.canRetryRetainedAudio)
         fixture.controller.retry()
@@ -6191,7 +6192,7 @@ class ConversationDictationControllerTest {
         }
         var sends = 0
         val fixture = fixture(
-            draft = TextFieldValue("Draft"),
+            draft = TextFieldValue("Draft", TextRange(5)),
             platform = platform,
             sendTranscriptIfOriginUnchanged = {
                 sends++
@@ -6256,7 +6257,7 @@ class ConversationDictationControllerTest {
     /** A provider recovered on the next generation may still commit its recognized text. */
     @Test
     fun callerAudioPipeRecoveryCanSucceedBeforeExhaustingItsBudget() {
-        val fixture = fixture(draft = TextFieldValue("Draft"))
+        val fixture = fixture(draft = TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
         val report = mainThreadDictationCallerAudioFailure(fixture.platform.listener) { true }
         report(ConversationDictationCallerAudioFailure.PipeFailed)

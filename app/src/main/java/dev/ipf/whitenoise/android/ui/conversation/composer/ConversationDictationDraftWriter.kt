@@ -10,8 +10,9 @@ internal fun conversationDictationDraftWriter(
     groupIdHex: String,
     presentationRevision: Int,
     write: (TextFieldValue) -> Unit,
-): (TextFieldValue) -> Unit = { value ->
-    if (accountRef != null && dictation.completionRevision(accountRef, groupIdHex) == presentationRevision) {
-        write(value)
+): (TextFieldValue) -> Unit =
+    { value ->
+        if (accountRef != null && dictation.completionRevision(accountRef, groupIdHex) == presentationRevision) {
+            write(value)
+        }
     }
-}

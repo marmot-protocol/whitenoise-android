@@ -41,10 +41,13 @@ internal class ConversationDictationDraftRecovery(
         target: ConversationDictationTarget,
         transcript: String?,
     ): Boolean =
-        !transcript.isNullOrBlank() && receipt?.let {
-            it.session == session && it.target == target && it.transcript == transcript.trim() &&
-                it.emptiedRevision == null
-        } == true
+        !transcript.isNullOrBlank() &&
+            receipt?.let {
+                it.session == session &&
+                    it.target == target &&
+                    it.transcript == transcript.trim() &&
+                    it.emptiedRevision == null
+            } == true
 
     /** Tracks only the clear or restoration actually performed by this session's dispatch. */
     fun updateDispatch(
@@ -74,7 +77,9 @@ internal class ConversationDictationDraftRecovery(
         val appendPayload: Boolean,
     )
 
-    enum class Result(val draftRecovered: Boolean) {
+    enum class Result(
+        val draftRecovered: Boolean,
+    ) {
         Written(true),
         AlreadyPresent(true),
         Superseded(false),

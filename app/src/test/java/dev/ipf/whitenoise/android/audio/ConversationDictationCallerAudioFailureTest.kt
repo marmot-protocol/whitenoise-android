@@ -93,9 +93,11 @@ class ConversationDictationCallerAudioFailureTest {
                     assertTrue(next.start())
                     assertTrue(fed.await(2, TimeUnit.SECONDS))
                     assertTrue(next.fullyFed())
+                    assertArrayEquals(byteArrayOf(1, 0, 2, 0), written.toByteArray())
                     assertTrue(next.acknowledge())
                     assertFalse(buffer.hasPending)
                     assertEquals(1, starts.get())
+                    assertEquals(1L, closed.count)
                 } finally {
                     next.cancel()
                     next.closeProviderEnd()
@@ -171,7 +173,16 @@ class ConversationDictationCallerAudioFailureTest {
                 }
             }
         val buffer = ConversationDictationAudioChunkBuffer(sessionId = 1L, chunkBytes = 8, maxBufferedBytes = 16)
-        val capture = ConversationDictationCallerAudio(device, buffer)
+        val written = CopyOnWriteArrayList<Byte>()
+        val capture =
+            ConversationDictationCallerAudio(
+                device,
+                buffer,
+                pipeWriter = ConversationDictationAudioPipeWriter { _, source, offset, length ->
+                    written.addAll(source.slice(offset until offset + length))
+                    length
+                },
+            )
         val listener = failureListener(failures)
         val stream =
             checkNotNull(

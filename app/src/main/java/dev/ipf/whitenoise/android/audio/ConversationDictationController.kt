@@ -1486,7 +1486,8 @@ internal class ConversationDictationController internal constructor(
         val recoveryPresented =
             failed?.let { pendingForegroundRecoverySessionId == sessionId || it.draftSuperseded } == true
         if (recoveryPresented &&
-            !hasUnrecoveredTranscript && !runCatching(platform::callerAudioHasPending).getOrDefault(true)
+            !hasUnrecoveredTranscript &&
+            !runCatching(platform::callerAudioHasPending).getOrDefault(true)
         ) {
             releaseDurableSessionLease()
         }
@@ -3028,7 +3029,8 @@ internal class ConversationDictationController internal constructor(
             .takeIf { !retainedTranscript.isNullOrBlank() && failure != ConversationDictationFailure.DeliveryUnknown }
             ?.let { failed ->
                 protectRetainedRecovery(failed)
-                if (failed.draftSuperseded && !foregroundMicrophoneRequired &&
+                if (failed.draftSuperseded &&
+                    !foregroundMicrophoneRequired &&
                     !runCatching(platform::callerAudioHasPending).getOrDefault(true)
                 ) {
                     releaseDurableSessionLease()
