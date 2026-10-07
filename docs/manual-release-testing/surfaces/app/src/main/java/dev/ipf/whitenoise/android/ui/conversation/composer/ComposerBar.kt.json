@@ -1,0 +1,89 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+  "legacy_sha256": "23350afd7b3dea124a711ebf7dc8534414b12d3c37ed1a1bdf1a29879afbc388",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Reply composer artwork",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "replyingToEmoji",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ComposerBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "fun ComposerBar(",
+        "test_ids": [
+          "CON-001",
+          "CON-005",
+          "CON-017",
+          "CON-020",
+          "CON-024",
+          "DIC-001",
+          "DIC-002",
+          "DIC-003"
+        ]
+      },
+      {
+        "surface": "Composer IME Send after a text commit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "val submitMessage: () -> Unit = {",
+        "test_ids": [
+          "CON-007",
+          "CON-009",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "RemovedMemberComposerNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "fun RemovedMemberComposerNotice(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.send",
+        "test_ids": [
+          "MSG-004",
+          "MSG-007",
+          "SET-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.reply_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.reply_you",
+        "test_ids": [
+          "MSG-004",
+          "MSG-007"
+        ]
+      },
+      {
+        "surface": "R.string.voice_recording_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.voice_recording_stop",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "Composer resize owner gates draft navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "geometryTransitionActive =",
+        "test_ids": [
+          "CON-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

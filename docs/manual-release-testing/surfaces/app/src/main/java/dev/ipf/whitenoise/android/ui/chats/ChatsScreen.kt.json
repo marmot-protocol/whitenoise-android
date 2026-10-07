@@ -76,6 +76,14 @@
         "test_ids": [
           "FIND-010"
         ]
+      },
+      {
+        "surface": "Chats upward endpoint navigation icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.drawable.ic_jump_to_edge",
+        "test_ids": [
+          "CHL-017"
+        ]
       }
     ]
   },
