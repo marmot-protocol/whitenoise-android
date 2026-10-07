@@ -11927,6 +11927,36 @@
         "test_ids": ["CON-023"]
       },
       {
+        "surface": "Existing member public identity search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)",
+        "test_ids": [
+          "GRP-027"
+        ]
+      },
+      {
+        "surface": "Existing member decoder retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "GRP-027"
+        ]
+      },
+      {
+        "surface": "Accessible local member resolution progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.recipient_preview_resolving",
+        "test_ids": ["GRP-027"]
+      },
+      {
+        "surface": "Local member identity resolution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupMemberIdentitySearch.kt",
+        "anchor": "internal fun rememberGroupMemberSearchResolution(",
+        "test_ids": [
+          "GRP-027"
+        ]
+      },
+      {
         "surface": "Restored attachment shelf after native send cleanup",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaDraft.kt",
         "anchor": "restorePersistedAttachments(",
@@ -21003,6 +21033,36 @@
           "SET-016",
           "SET-017"
         ]
+      },
+      {
+        "surface": "string:ai_agents_project_groups_tip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
+        "anchor": "R.string.ai_agents_project_groups_tip",
+        "test_ids": ["SET-016"]
+      },
+      {
+        "surface": "string:agent_connector_claude_name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_name",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_claude_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_subtitle",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_claude_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_claude_prompt",
+        "test_ids": ["SET-016", "SET-017"]
+      },
+      {
+        "surface": "string:agent_connector_hermes_prompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AgentConnector.kt",
+        "anchor": "R.string.agent_connector_hermes_prompt",
+        "test_ids": ["SET-016", "SET-017"]
       },
       {
         "surface": "string:ai_agents_manual_setup_body",
