@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +35,7 @@ import dev.ipf.whitenoise.android.state.boundedExplanation
 import dev.ipf.whitenoise.android.state.reportReasonLabel
 
 internal const val REPORT_SHEET_TEST_TAG = "message.report"
+internal const val REPORT_BODY_TEST_TAG = "message.report.body"
 
 /**
  * Reports one message to the group's admins. The reader picks a reason and may add an explanation, both of
@@ -53,8 +56,32 @@ internal fun ReportMessageSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         modifier = Modifier.testTag(REPORT_SHEET_TEST_TAG),
     ) {
+        ReportMessageForm(reason, { reason = it }, explanation, { explanation = it }, sending, onSubmit)
+    }
+}
+
+/** Measures the action first, then lets only the form body scroll within the sheet's inset-aware viewport. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ReportMessageForm(
+    reason: ReportReasonFfi,
+    onReasonChange: (ReportReasonFfi) -> Unit,
+    explanation: String,
+    onExplanationChange: (String) -> Unit,
+    sending: Boolean,
+    onSubmit: (ReportReasonFfi, String) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp),
+            modifier =
+                Modifier
+                    .weight(1f, fill = false)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .testTag(REPORT_BODY_TEST_TAG),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(stringResource(R.string.report_message_title), style = MaterialTheme.typography.titleMedium)
@@ -68,25 +95,25 @@ internal fun ReportMessageSheet(
                     ReportReasonRow(
                         label = stringResource(reportReasonLabel(candidate)),
                         selected = candidate == reason,
-                        onSelect = { reason = candidate },
+                        onSelect = { onReasonChange(candidate) },
                     )
                 }
             }
             OutlinedTextField(
                 value = explanation,
-                onValueChange = { explanation = it.take(REPORT_EXPLANATION_LIMIT) },
+                onValueChange = { onExplanationChange(it.take(REPORT_EXPLANATION_LIMIT)) },
                 label = { Text(stringResource(R.string.report_message_explanation_hint)) },
                 modifier = Modifier.fillMaxWidth().testTag("message.report.explanation"),
                 singleLine = false,
                 minLines = 2,
             )
-            Button(
-                onClick = { onSubmit(reason, boundedExplanation(explanation)) },
-                enabled = !sending,
-                modifier = Modifier.fillMaxWidth().testTag("message.report.send"),
-            ) {
-                Text(stringResource(R.string.report_message_send))
-            }
+        }
+        Button(
+            onClick = { onSubmit(reason, boundedExplanation(explanation)) },
+            enabled = !sending,
+            modifier = Modifier.fillMaxWidth().testTag("message.report.send"),
+        ) {
+            Text(stringResource(R.string.report_message_send))
         }
     }
 }

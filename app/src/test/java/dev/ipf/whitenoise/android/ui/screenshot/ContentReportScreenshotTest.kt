@@ -1,14 +1,22 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ContentReportFfi
@@ -17,10 +25,13 @@ import dev.ipf.marmotkit.ReportReasonFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_DETAILS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
+import dev.ipf.whitenoise.android.ui.conversation.messages.REPORT_BODY_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.ReportMessageForm
 import dev.ipf.whitenoise.android.ui.conversation.messages.ReportMessageSheet
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -66,6 +77,55 @@ class ContentReportScreenshotTest {
         composeRule.onNodeWithTag("message.report").captureRoboImage(SHEET_BASELINE)
         composeRule.onNodeWithTag("message.report.send").performClick()
         assertEquals(listOf(ReportReasonFfi.IMPERSONATION to ""), submitted)
+    }
+
+    /** A long form at compact height scrolls independently while its action remains visible and unchanged. */
+    @Test
+    fun reportFooterCompactLargeRtl() {
+        val height = mutableStateOf(240.dp)
+        val reason = mutableStateOf(ReportReasonFfi.SPAM)
+        val explanation = mutableStateOf("Evidence " + "long explanation ".repeat(30))
+        val sending = mutableStateOf(false)
+        val submitted = mutableListOf<Pair<ReportReasonFfi, String>>()
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                WhiteNoiseTheme(darkTheme = true, fontScale = 2f) {
+                    Surface(Modifier.fillMaxWidth().height(height.value).testTag("report.viewport")) {
+                        ReportMessageForm(
+                            reason = reason.value,
+                            onReasonChange = { reason.value = it },
+                            explanation = explanation.value,
+                            onExplanationChange = { explanation.value = it },
+                            sending = sending.value,
+                            onSubmit = { value, text -> submitted += value to text },
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithTag("message.report.explanation").performScrollTo().assertIsDisplayed()
+        assertPinnedFooter()
+        composeRule
+            .onNodeWithTag("report.viewport")
+            .captureRoboImage("src/test/snapshots/message_report_compact_dark_large_rtl.png")
+        composeRule.onNodeWithTag("message.report.send").performClick()
+        assertEquals(listOf(ReportReasonFfi.SPAM to explanation.value.trim()), submitted)
+        composeRule.runOnIdle { sending.value = true }
+        composeRule.onNodeWithTag("message.report.send").assertIsNotEnabled()
+        composeRule.runOnIdle { height.value = 480.dp }
+        assertPinnedFooter()
+        composeRule.runOnIdle { height.value = 200.dp }
+        assertPinnedFooter()
+    }
+
+    /** Footer and scroll-body bounds are sampled from the production form after every viewport change. */
+    private fun assertPinnedFooter() {
+        composeRule.onNodeWithTag("message.report.send").assertIsDisplayed()
+        val footer = composeRule.onNodeWithTag("message.report.send").fetchSemanticsNode().boundsInRoot
+        val body = composeRule.onNodeWithTag(REPORT_BODY_TEST_TAG).fetchSemanticsNode().boundsInRoot
+        val viewport = composeRule.onNodeWithTag("report.viewport").fetchSemanticsNode().boundsInRoot
+        assertTrue("body overlaps footer", body.bottom <= footer.top)
+        assertTrue("footer outside viewport", footer.bottom <= viewport.bottom)
     }
 
     /** An admin sees each report's reason, explanation, reporter and time, with Dismiss only on open ones. */
