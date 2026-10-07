@@ -163,6 +163,7 @@ import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
+import dev.ipf.whitenoise.android.ui.conversation.share.isBareLocationShare
 import dev.ipf.whitenoise.android.ui.conversation.share.isContactShareCaption
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
@@ -1949,6 +1950,12 @@ internal fun MessageBubble(
                             null
                         }
                     }
+                // A maps link inside prose draws the card with the prose as its
+                // caption; only a bare link lets the card replace the text.
+                val sharedLocationOwnsBody =
+                    remember(shareBodyText, sharedLocation) {
+                        sharedLocation != null && isBareLocationShare(shareBodyText)
+                    }
                 val sharedUser =
                     remember(shareBodyText, canRenderStructuredShare) {
                         if (canRenderStructuredShare) {
@@ -2040,7 +2047,7 @@ internal fun MessageBubble(
                         persistedFailure = persistedFailure,
                         structuredShareOwnsBody =
                             captionIsContactText ||
-                                sharedLocation != null ||
+                                sharedLocationOwnsBody ||
                                 sharedUser != null ||
                                 remoteGiphyMedia != null,
                         hasPendingMediaName = mediaPendingName != null,
