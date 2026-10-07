@@ -335,6 +335,7 @@ private class ComposerLayoutCaretCorrectionGate {
     private var lastViewport: Int = -1
     private var lastMaxScroll: Int = -1
 
+    /** Allows a layout correction only when selection or viewport geometry differs from the last correction. */
     fun shouldCorrect(
         selection: ComposerSelectionLayout,
         viewport: Int,
@@ -681,7 +682,7 @@ internal fun ComposerPill(
     val draftTopGeometryState =
         remember(
             scrollOwnerKey,
-            textFieldValue,
+            textFieldValue.text,
             geometryTransitionActive,
             geometryAvailableHeight,
             transformedText,
@@ -951,7 +952,7 @@ internal fun ComposerPill(
         geometryTransitionActive,
         geometryAvailableHeight,
         transformedText,
-        textFieldValue,
+        textFieldValue.text,
         scrollOwnerKey,
         compactMeasurementWidth,
         textHeightTarget,
@@ -1051,6 +1052,7 @@ internal fun ComposerPill(
     }
 
     /** Applies the one-line/three-line hysteresis to the measured editor line count. */
+
     fun updateMultilineControls(lineCount: Int) {
         val nextMultilineControls =
             when {
