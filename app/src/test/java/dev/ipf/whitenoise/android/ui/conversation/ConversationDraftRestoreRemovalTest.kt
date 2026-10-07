@@ -37,11 +37,15 @@ import dev.ipf.whitenoise.android.ui.conversation.media.composerVisualAttachment
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -59,8 +63,11 @@ import java.io.File
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ConversationDraftRestoreRemovalTest {
+    private val fixtureApps = mutableListOf<WhiteNoiseAppState>()
+
     @get:Rule val composeRule = createComposeRule()
 
+    /** Successful send cleanup retires restored native photos without discarding a newer picker occurrence. */
     @Test
     fun nativeSendCleanupRemovesRestoredPhotosButPreservesANewPickerSelection() {
         var finalShelf: List<PendingMediaSlot> = emptyList()
@@ -120,6 +127,7 @@ class ConversationDraftRestoreRemovalTest {
                 assertTrue(reconciled.documentUris.isEmpty())
                 assertTrue(owner.preparedDocumentAttachments().isEmpty())
             } finally {
+                closeFixtureJobs()
                 Dispatchers.resetMain()
             }
         }
@@ -196,6 +204,7 @@ class ConversationDraftRestoreRemovalTest {
                 assertEquals(latest, restored.mediaSlots)
                 assertEquals(setOf("saved-photo"), owner.preparedAttachments().keys)
             } finally {
+                closeFixtureJobs()
                 Dispatchers.resetMain()
             }
         }
@@ -331,6 +340,7 @@ class ConversationDraftRestoreRemovalTest {
                 assertEquals(0L, app.nativeComposerCleanupRevision("account", group.groupIdHex))
                 assertNull(owner.restorePersistedAttachments())
             } finally {
+                closeFixtureJobs()
                 Dispatchers.resetMain()
             }
         }
@@ -392,6 +402,7 @@ class ConversationDraftRestoreRemovalTest {
                 assertNull(owner.restorePersistedAttachments())
                 assertEquals(setOf("native-photo"), owner.preparedAttachments().keys)
             } finally {
+                closeFixtureJobs()
                 Dispatchers.resetMain()
             }
         }
@@ -443,6 +454,7 @@ class ConversationDraftRestoreRemovalTest {
                 assertNull(owner.restorePersistedAttachments())
                 assertTrue(owner.preparedAttachments().isEmpty())
             } finally {
+                closeFixtureJobs()
                 Dispatchers.resetMain()
             }
         }
@@ -493,10 +505,25 @@ class ConversationDraftRestoreRemovalTest {
                 assertTrue(owner.preparedDocumentAttachments().isEmpty())
                 assertNull(gateway.current)
             } finally {
+                closeFixtureJobs()
                 Dispatchers.resetMain()
             }
         }
 
+    /** Stops IO continuations owned by these fixtures before the process-wide Main dispatcher is reset. */
+    private suspend fun closeFixtureJobs() {
+        withContext(NonCancellable) {
+            try {
+                for (app in fixtureApps) {
+                    app.mutationsScope.coroutineContext[Job]?.cancelAndJoin()
+                }
+            } finally {
+                fixtureApps.clear()
+            }
+        }
+    }
+
+    /** Records the app-scoped jobs created by each isolated native-draft fixture for deterministic teardown. */
     private fun appForRestore(
         context: Context,
         repository: MessageDraftRepository,
@@ -508,7 +535,7 @@ class ConversationDraftRestoreRemovalTest {
             accounts = emptyList(),
             activeAccountRef = "account",
             messageDraftRepository = repository,
-        )
+        ).also(fixtureApps::add)
 
     /** Native-id slots model an already restored saveable shelf without relying on FileProvider shadows. */
     private fun savedNativeSlots(attachments: List<MessageDraftAttachmentFfi>): List<PendingMediaSlot> =

@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AuditLogSettingsFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
+import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -29,6 +30,7 @@ internal class AuditUploadConsent(
 
     fun choose(enabled: Boolean) {
         DictationDiagnostics.setEnabled(false)
+        DmCreationDiagnostics.setEnabled(false)
         check(
             preferences
                 .edit()
@@ -53,6 +55,7 @@ internal class AuditUploadConsent(
         persistSettings: suspend (AuditLogSettingsFfi) -> AuditLogSettingsFfi,
     ): AuditLogSettingsFfi {
         DictationDiagnostics.setEnabled(false)
+        DmCreationDiagnostics.setEnabled(false)
         configureUpload(false)
         if (!settings.enabled) {
             // Denial survives recorder-cleanup failure; startup cannot restore the token.
@@ -75,6 +78,7 @@ internal class AuditUploadConsent(
             choose(true)
             configureUpload(true)
             DictationDiagnostics.setEnabled(stored.enabled && granted)
+            DmCreationDiagnostics.setEnabled(stored.enabled && granted)
             stored
         } catch (failure: Exception) {
             // No failed grant should be retried as an accepted choice on startup.
@@ -96,6 +100,7 @@ internal class AuditUploadConsent(
      */
     suspend fun prepare(runtime: MarmotInterface) {
         DictationDiagnostics.setEnabled(false)
+        DmCreationDiagnostics.setEnabled(false)
         startupUploadConfigured = false
         runtime.configureAuditRuntime(uploadConsentGranted = false)
         if (!granted && runtime.auditLogSettings().enabled) {
@@ -114,6 +119,7 @@ internal class AuditUploadConsent(
         }
         val recording = runCatchingCancellable { runtime.auditLogSettings().enabled }.getOrDefault(false)
         DictationDiagnostics.setEnabled(recording && granted)
+        DmCreationDiagnostics.setEnabled(recording && granted)
     }
 }
 

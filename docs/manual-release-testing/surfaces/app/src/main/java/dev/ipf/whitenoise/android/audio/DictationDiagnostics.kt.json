@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnostics.kt",
+  "legacy_sha256": "6b6de78d9889927c579f9cdd28c716808205a8c193e45f4403e1a30c4b4497d9",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Dictation export consent and queue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnostics.kt",
+        "anchor": "internal object DictationDiagnostics {",
+        "test_ids": [
+          "DIC-002",
+          "SEC-008",
+          "SEC-009",
+          "SEC-010"
+        ]
+      },
+      {
+        "surface": "DM trace attribution and owner-approved diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/DictationDiagnostics.kt",
+        "anchor": "internal fun recordFields(",
+        "test_ids": [
+          "SEC-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

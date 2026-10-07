@@ -3,6 +3,10 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.ExistingDirectConversationFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.PresentedChatRowFfi
+import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
+import dev.ipf.whitenoise.android.diagnostics.DmCreationFailure
+import dev.ipf.whitenoise.android.diagnostics.DmCreationOutcome
+import dev.ipf.whitenoise.android.diagnostics.DmCreationPhase
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolution
 import dev.ipf.whitenoise.android.ui.chats.newchat.existingDirectChatFromProvenance
 import dev.ipf.whitenoise.android.ui.chats.newchat.rankedDirectChatCandidates
@@ -19,6 +23,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 internal suspend fun ChatsController.resolveExistingDirectChat(
     targetReference: String,
     excludingGroupIdHex: String? = null,
+    diagnosticAttempt: DmCreationAttempt? = null,
 ): NewMessageDirectChatResolution {
     val unavailable = NewMessageDirectChatResolution(item = null, createRequired = false)
     val account = accountRef ?: return unavailable
@@ -30,7 +35,7 @@ internal suspend fun ChatsController.resolveExistingDirectChat(
             .filterNot { it.pendingConfirmation }
             .map { projectChatRow(it) }
             .toList()
-    val lookup = accountWideDirectChat(account, targetReference, retained)
+    val lookup = accountWideDirectChat(account, targetReference, retained, diagnosticAttempt)
     val accountWide = (lookup as? DirectLookup.Row)?.let { projectChatRow(it.row.row) }
     val candidateGroupIds =
         rankedDirectChatCandidates(retained + listOfNotNull(accountWide), excludingGroupIdHex).map(ChatListItem::id)
@@ -42,6 +47,7 @@ internal suspend fun ChatsController.resolveExistingDirectChat(
                 activeAccountIdHex = activeAccountIdHex,
                 groupIdHex = groupIdHex,
                 targetReference = targetReference,
+                diagnosticAttempt = diagnosticAttempt,
                 chatItemForGroup = { id ->
                     chatItemForGroup(id) ?: accountWide?.takeIf { it.id.equals(id, ignoreCase = true) }
                 },
@@ -82,11 +88,12 @@ private suspend fun ChatsController.accountWideDirectChat(
     account: String,
     targetReference: String,
     retained: List<ChatListItem>,
+    diagnosticAttempt: DmCreationAttempt?,
 ): DirectLookup {
     val peer = appState.accountIdHexForMention(targetReference) ?: return DirectLookup.None
-    return when (val read = appState.readExistingDirectConversation(account, peer)) {
+    return when (val read = appState.readExistingDirectConversation(account, peer, diagnosticAttempt)) {
         is ExistingDirectRead.Failed -> read.lookup
-        is ExistingDirectRead.Completed -> reusableRow(account, read.existing, retained)
+        is ExistingDirectRead.Completed -> reusableRow(account, read.existing, retained, diagnosticAttempt)
     }
 }
 
@@ -94,15 +101,33 @@ private suspend fun ChatsController.accountWideDirectChat(
 private suspend fun WhiteNoiseAppState.readExistingDirectConversation(
     account: String,
     peer: String,
+    diagnosticAttempt: DmCreationAttempt?,
 ): ExistingDirectRead =
     try {
-        withTimeoutOrNull(DIRECT_LOOKUP_TIMEOUT_MS) {
+        withDirectChatLookupDeadline(diagnosticAttempt) {
             ExistingDirectRead.Completed(marmotIo { existingDirectConversation(account, peer) })
         } ?: ExistingDirectRead.Failed(DirectLookup.Unavailable)
     } catch (cancel: CancellationException) {
+        diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, cancel)
         throw cancel
     } catch (failure: MarmotKitException) {
+        diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, failure)
         ExistingDirectRead.Failed(directLookupFailure(failure))
+    }
+
+/** A non-null read wrapper distinguishes a completed native miss from an expired Android deadline. */
+internal suspend fun <T : Any> withDirectChatLookupDeadline(
+    diagnosticAttempt: DmCreationAttempt?,
+    read: suspend () -> T,
+): T? =
+    withTimeoutOrNull(DIRECT_LOOKUP_TIMEOUT_MS) { read() }.also { result ->
+        if (result == null) {
+            diagnosticAttempt?.record(
+                DmCreationPhase.EXISTING_LOOKUP,
+                DmCreationOutcome.FAILURE,
+                DmCreationFailure.LOOKUP_TIMEOUT,
+            )
+        }
     }
 
 /**
@@ -114,11 +139,13 @@ private suspend fun ChatsController.reusableRow(
     account: String,
     existing: ExistingDirectConversationFfi?,
     retained: List<ChatListItem>,
+    diagnosticAttempt: DmCreationAttempt?,
 ): DirectLookup {
     val reusable =
         existing?.takeIf { it.reusable && retained.none { row -> row.id.equals(it.groupIdHex, ignoreCase = true) } }
             ?: return DirectLookup.None
     return runCatchingCancellable { appState.marmotIo { presentedChatListRow(account, reusable.groupIdHex) } }
+        .onFailure { diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, it) }
         .getOrNull()
         ?.let(DirectLookup::Row)
         ?: DirectLookup.Unavailable
@@ -143,6 +170,7 @@ internal suspend fun ChatsController.resolveDirectChatGroup(
     groupIdHex: String?,
     targetReference: String,
     chatItemForGroup: (String) -> ChatListItem?,
+    diagnosticAttempt: DmCreationAttempt? = null,
 ): NewMessageDirectChatResolution {
     val normalizedTarget = targetReference.trim()
     return existingDirectChatFromProvenance(
@@ -153,6 +181,7 @@ internal suspend fun ChatsController.resolveDirectChatGroup(
         chatItemForGroup = chatItemForGroup,
         authoritativeGroupDetails = { currentGroupIdHex ->
             runCatchingCancellable { appState.marmotIo { groupDetails(account, currentGroupIdHex) } }
+                .onFailure { diagnosticAttempt?.failed(DmCreationPhase.EXISTING_LOOKUP, it) }
                 .getOrNull()
                 ?.let(::applyAuthoritativeGroupDetails)
         },

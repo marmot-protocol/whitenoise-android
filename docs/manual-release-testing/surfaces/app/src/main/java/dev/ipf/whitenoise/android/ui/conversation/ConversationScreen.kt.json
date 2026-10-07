@@ -148,6 +148,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "DM trace attribution and owner-approved diagnostic export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "RecordDmConversationFirstFrame(",
+        "test_ids": [
+          "SEC-009"
+        ]
       }
     ]
   },

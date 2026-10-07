@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/DmConversationFirstFrame.kt",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "RecordDmConversationFirstFrame",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/DmConversationFirstFrame.kt",
+        "anchor": "fun RecordDmConversationFirstFrame(",
+        "test_ids": [
+          "SEC-009",
+          "NCH-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8"
+}

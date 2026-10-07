@@ -3260,6 +3260,13 @@ internal fun ConversationScreen(
                 ),
         )
 
+    RecordDmConversationFirstFrame(
+        accountRef = conversationAccountRef,
+        groupId = controller.group.groupIdHex,
+        runtimeGeneration = appState.runtimeGeneration,
+        currentRuntimeGeneration = { appState.runtimeGeneration },
+    )
+
     var createOpenConversationTiming by remember(chat.id) {
         mutableStateOf(ChatCreateOpenConversationTimingState())
     }
