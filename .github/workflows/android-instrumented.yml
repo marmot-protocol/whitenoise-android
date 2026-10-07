@@ -13,6 +13,29 @@ name: Android Instrumented Tests
 on:
   workflow_dispatch:
     inputs:
+      maestro_pilot:
+        description: Run only Maestro against a retained APK (no build or connected tests)
+        required: false
+        type: boolean
+        default: false
+      maestro_artifact_id:
+        description: Artifact ID of a maestro-dev-apk output from successful Android CI
+        required: false
+        type: string
+      maestro_source_sha:
+        description: Full source commit SHA displayed by the producer Android CI run
+        required: false
+        type: string
+      maestro_repetitions:
+        description: Journeys in one emulator boot (1 through 20)
+        required: false
+        type: string
+        default: '1'
+      maestro_negative_control:
+        description: Append an impossible assertion to verify failure reporting (job must fail)
+        required: false
+        type: boolean
+        default: false
       review_demo_e2e:
         description: Run the opt-in isolated-preview real-relay demo test
         required: true
@@ -88,14 +111,15 @@ on:
 # Cancel superseded runs on the same ref so a force-push or rapid re-push does
 # not pile up redundant (and expensive) emulator runs.
 concurrency:
-  group: android-instrumented-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && 'android-maestro-pilot' || format('android-instrumented-{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && inputs.maestro_pilot) }}
 
 permissions:
   contents: read
 
 jobs:
   attachment-fixture:
+    if: github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot
     name: Controlled attachment fixture (${{ matrix.distribution }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -147,6 +171,7 @@ jobs:
           retention-days: 7
 
   instrumented:
+    if: github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -218,4 +243,113 @@ jobs:
             cryptoBenchmark/build/outputs/androidTest-results/
             app/build/reports/document-provider-matrix/
           if-no-files-found: ignore
+          retention-days: 7
+
+  maestro-pilot:
+    name: Optional Maestro onboarding pilot
+    if: github.event_name == 'workflow_dispatch' && inputs.maestro_pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      MAESTRO_REPETITIONS: ${{ inputs.maestro_repetitions }}
+      MAESTRO_NEGATIVE_CONTROL: ${{ inputs.maestro_negative_control }}
+      MAESTRO_CLI_NO_ANALYTICS: 'true'
+      MAESTRO_DISABLE_UPDATE_CHECK: 'true'
+      MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
+    steps:
+      - name: Checkout the selected flow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Validate selection, spare capacity and retained APK provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ inputs.maestro_artifact_id }}
+          SOURCE_SHA: ${{ inputs.maestro_source_sha }}
+          REVIEW_DEMO: ${{ inputs.review_demo_e2e }}
+          DOCUMENT_MATRIX: ${{ inputs.document_provider_matrix }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/maestro-pilot
+          printf 'setup_started_at=%s\n' "$(date +%s)" > build/maestro-pilot/timings.env
+          [[ "$REVIEW_DEMO" != true && "$DOCUMENT_MATRIX" != true ]] || { echo 'Select only the Maestro pilot'; exit 2; }
+          python3 scripts/maestro_apk.py fetch --artifact-id "$ARTIFACT_ID" --source "$SOURCE_SHA" \
+            --repetitions "$MAESTRO_REPETITIONS" --destination build/maestro-pilot/apk
+
+      - name: Require the expected dev package and API 34 compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          aapt=$(find "$ANDROID_HOME/build-tools" -mindepth 2 -maxdepth 2 -type f -name aapt | sort -V | tail -1)
+          test -x "$aapt"
+          "$aapt" dump badging build/maestro-pilot/apk/app.apk > build/maestro-pilot/apk-badging.txt
+          grep -q "^package: name='dev.ipf.whitenoise.android.dev' " build/maestro-pilot/apk-badging.txt
+          min_sdk=$(sed -n "s/^sdkVersion:'\([0-9]*\)'$/\1/p" build/maestro-pilot/apk-badging.txt)
+          [[ "$min_sdk" =~ ^[0-9]+$ && "$min_sdk" -le 34 ]]
+
+      - name: Set up Java for Maestro
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Reuse the checksummed Maestro distribution
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/maestro.zip
+          key: maestro-cli-${{ runner.os }}-2.11.0-5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
+
+      - name: Install the pinned Maestro CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$RUNNER_TEMP/maestro.zip" ]]; then
+            curl --fail --location --retry 2 --max-time 120 \
+              https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.11.0/maestro.zip \
+              --output "$RUNNER_TEMP/maestro.zip"
+          fi
+          echo '5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a  '"$RUNNER_TEMP/maestro.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro-cli"
+          printf '%s\n' "$RUNNER_TEMP/maestro-cli/maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Recheck spare capacity before emulator startup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/maestro_apk.py idle
+
+      - name: Enable KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the offline journey against the installed APK
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/run-maestro-pilot.sh
+
+      - name: Retain pilot results on success or failure
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: maestro-pilot-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/maestro-pilot/*.json
+            build/maestro-pilot/*.xml
+            build/maestro-pilot/*.txt
+            build/maestro-pilot/*.env
+            build/maestro-pilot/debug/
+            build/maestro-pilot/screenshots/
+          if-no-files-found: warn
           retention-days: 7

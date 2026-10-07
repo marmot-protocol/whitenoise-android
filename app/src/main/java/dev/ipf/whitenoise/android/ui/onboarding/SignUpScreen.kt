@@ -106,6 +106,10 @@ internal fun SignUpScreen(
         if (stage == SignUpStage.PhotoFailed || stage == SignUpStage.PublishFailed) {
             controller.retry()
         } else {
+            // A nameless profile gets a pseudonym, shown in the field so the user sees what is published.
+            if (name.text.isBlank()) {
+                name.setTextAndPlaceCursorAtEnd(randomName(null))
+            }
             controller.submit(SignUpProfileDraft(name.text.toString(), about.text.toString(), photo))
         }
     }

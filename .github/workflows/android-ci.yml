@@ -77,6 +77,9 @@ jobs:
       - name: Test attachment fixture HTTP ledger and cancellation contracts
         run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
 
+      - name: Test Maestro artifact and manual-only execution contracts
+        run: python3 -m unittest scripts/test_maestro_apk.py
+
       - name: Validate manual release guide
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -269,6 +272,7 @@ jobs:
         run: ./gradlew :app:assembleDevZapstoreBenchmarkRelease --build-cache --profile --no-daemon --stacktrace
 
       - name: Verify packaged Baseline Profile assets
+        id: baseline_apk
         if: matrix.phase == 'baseline'
         shell: bash
         run: |
@@ -284,6 +288,27 @@ jobs:
           ' "$metadata")
           app_apk="$(dirname "$metadata")/$output_file"
           bash scripts/verify-baseline-profile.sh "$app_apk"
+          printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
+
+      - name: Stage the existing APK for optional Maestro testing
+        id: maestro_stage
+        if: matrix.phase == 'baseline' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
+        continue-on-error: true
+        env:
+          APK_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          APP_APK: ${{ steps.baseline_apk.outputs.apk }}
+        run: python3 scripts/maestro_apk.py stage --apk "$APP_APK" --destination build/maestro-apk
+
+      - name: Retain the existing APK for optional Maestro testing
+        if: steps.maestro_stage.outcome == 'success'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: maestro-dev-apk-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build/maestro-apk/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Verify unpatched Compose regression control
         if: matrix.phase == 'baseline' && github.event_name == 'pull_request'
