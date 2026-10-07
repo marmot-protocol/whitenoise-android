@@ -7,11 +7,22 @@ name: composer-expanded-rotation
 - assertVisible: "Generated fixture message"
 - tapOn: "Message"
 - inputText: "Maestro expanded draft"
-- tapOn: "Expand message composer"
-- assertVisible: "Collapse message composer"
+- swipe:
+    from:
+      id: "composer-resize-gesture"
+    direction: UP
+    duration: 1000
+- assertNotVisible: "Generated fixture message"
+- assertVisible:
+    id: "composer-pill-surface"
 - assertVisible: "Maestro expanded draft"
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible: "Maestro expanded draft"
 - setOrientation: PORTRAIT
 - assertVisible: "Maestro expanded draft"
-- tapOn: "Collapse message composer"
+- swipe:
+    from:
+      id: "composer-resize-gesture"
+    direction: DOWN
+    duration: 1000
+- assertVisible: "Generated fixture message"

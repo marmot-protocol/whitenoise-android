@@ -7,12 +7,17 @@ name: composer-expanded-route-return
 - assertVisible: "Generated fixture message"
 - tapOn: "Message"
 - inputText: "Maestro expanded draft"
-- tapOn: "Expand message composer"
-- assertVisible: "Collapse message composer"
+- swipe:
+    from:
+      id: "composer-resize-gesture"
+    direction: UP
+    duration: 1000
+- assertNotVisible: "Generated fixture message"
+- assertVisible:
+    id: "composer-pill-surface"
 - assertVisible: "Maestro expanded draft"
-- tapOn: "Collapse message composer"
 - hideKeyboard
 - back
-- assertVisible: "Maestro expanded draft"
+- assertVisible: "Draft: Maestro expanded draft"
 - tapOn: "Maestro group"
 - assertVisible: "Maestro expanded draft"

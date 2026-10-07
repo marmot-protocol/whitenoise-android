@@ -691,32 +691,32 @@
       "manual_ids": [
         "CON-017"
       ],
-      "assertions": "Expand and collapse the composer without dropping an unsent native draft.",
-      "postcondition": "none"
+      "assertions": "Drag-expand and collapse the composer without dropping an unsent native draft. Independently verify the retained account/group geometry and unchanged native draft.",
+      "postcondition": "composer-automatic"
     },
     "composer-expanded-rotation": {
       "suite": "composer",
       "manual_ids": [
         "CON-017"
       ],
-      "assertions": "Expanded draft text survives landscape and portrait rotation.",
-      "postcondition": "none"
+      "assertions": "Expanded draft text survives landscape and portrait rotation. Independently verify the retained account/group geometry and unchanged native draft.",
+      "postcondition": "composer-automatic"
     },
     "composer-expanded-keyboard-back": {
       "suite": "composer",
       "manual_ids": [
         "CON-017"
       ],
-      "assertions": "Keyboard Back preserves the expanded draft and its collapse control.",
-      "postcondition": "none"
+      "assertions": "Keyboard Back preserves the expanded draft and its collapse control. Independently verify the retained account/group geometry and unchanged native draft.",
+      "postcondition": "composer-expanded"
     },
     "composer-expanded-route-return": {
       "suite": "composer",
       "manual_ids": [
         "CON-017"
       ],
-      "assertions": "Expanded-to-compact draft survives leaving and reopening the conversation.",
-      "postcondition": "none"
+      "assertions": "Expanded-to-compact draft survives leaving and reopening the conversation. Independently verify the retained account/group geometry and unchanged native draft.",
+      "postcondition": "composer-expanded"
     },
     "developer-unlock": {
       "suite": "developer",

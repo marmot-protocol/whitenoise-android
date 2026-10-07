@@ -34,6 +34,8 @@ private val MAESTRO_POSTCONDITIONS =
         "none",
         "send",
         "reactions-retained",
+        "composer-expanded",
+        "composer-automatic",
         "dark",
         "light",
         "amoled",
@@ -223,9 +225,12 @@ class MaestroRuntimeHostTest {
         if (postcondition == "amoled") check(state?.themeMode == AppThemeMode.Amoled)
         if (postcondition == "dark") check(state?.themeMode == AppThemeMode.Dark)
         if (postcondition == "font-large") check(state?.fontScale == AppFontScale.Large)
-        if (postcondition == "send") verifyMaestroSend(native, checkNotNull(state), peerLabel, group)
-        if (postcondition == "reactions-retained") {
-            verifyMaestroReactions(native, checkNotNull(state?.activeAccountRef), peerLabel, group)
+        when (postcondition) {
+            "send" -> verifyMaestroSend(native, checkNotNull(state), peerLabel, group)
+            "reactions-retained" ->
+                verifyMaestroReactions(native, checkNotNull(state?.activeAccountRef), peerLabel, group)
+            "composer-expanded", "composer-automatic" ->
+                verifyMaestroComposer(checkNotNull(state), group, postcondition)
         }
     }
 }

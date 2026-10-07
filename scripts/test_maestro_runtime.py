@@ -367,6 +367,18 @@ class RuntimeEvidenceTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             markdown_inventory(result, '../master')
 
+    def test_viewer_picker_and_loading_overlay_keep_their_own_edge_plans(self):
+        """Media, search and transient account surfaces must not disappear merely because of their names."""
+        result = inventory()
+        by_name = {screen['symbol']: screen for screen in result['screen_catalog']}
+        for name in ('MessageFullScreenView', 'AvatarFullScreenViewer', 'GlobalSearchDatePicker',
+                     'QuickAccountSwitchTransitionOverlay', 'ComposerEmojiPickerPane'):
+            with self.subTest(surface=name):
+                self.assertIn(name, by_name)
+                self.assertTrue(by_name[name]['manual_ids'])
+                self.assertFalse(by_name[name]['execution_verified'])
+                self.assertEqual({edge['dimension'] for edge in by_name[name]['edge_plan']}, set(EDGE_DIMENSIONS))
+
     def test_new_requirement_family_requires_an_explicit_campaign_plan(self):
         """New families cannot silently inherit a generic or obsolete layer assignment."""
         for fault in ('missing', 'extra', 'unknown-layer', 'no-prerequisite', 'non-string-layer'):

@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
@@ -86,7 +87,7 @@ internal fun <T> ChoiceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = modifier,
+        modifier = modifier.exposePerformanceTestTags(),
         title = { Text(title) },
         text = {
             Column(
@@ -226,7 +227,9 @@ internal fun WhiteNoiseAlertDialog(
         AlertDialog(
             onDismissRequest = onDismissRequest,
             confirmButton = confirmButton,
-            modifier = if (outline != null) modifier.border(outline, MaterialTheme.shapes.extraLarge) else modifier,
+            modifier =
+                (if (outline != null) modifier.border(outline, MaterialTheme.shapes.extraLarge) else modifier)
+                    .exposePerformanceTestTags(),
             dismissButton = dismissButton,
             icon = icon,
             title = title,
@@ -262,6 +265,7 @@ internal fun SpeechChoiceDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        modifier = Modifier.exposePerformanceTestTags(),
         title = { Text(title) },
         text = {
             Column(

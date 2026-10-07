@@ -7,10 +7,16 @@ name: composer-expanded-keyboard-back
 - assertVisible: "Generated fixture message"
 - tapOn: "Message"
 - inputText: "Maestro expanded draft"
-- tapOn: "Expand message composer"
-- assertVisible: "Collapse message composer"
+- swipe:
+    from:
+      id: "composer-resize-gesture"
+    direction: UP
+    duration: 1000
+- assertNotVisible: "Generated fixture message"
+- assertVisible:
+    id: "composer-pill-surface"
 - assertVisible: "Maestro expanded draft"
 - back
 - assertVisible: "Maestro expanded draft"
-- assertVisible: "Collapse message composer"
-- tapOn: "Collapse message composer"
+- assertVisible:
+    id: "composer-pill-surface"
