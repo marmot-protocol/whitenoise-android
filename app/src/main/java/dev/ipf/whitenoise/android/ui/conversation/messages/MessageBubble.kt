@@ -163,6 +163,7 @@ import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
+import dev.ipf.whitenoise.android.ui.conversation.share.isContactShareCaption
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
@@ -1918,15 +1919,17 @@ internal fun MessageBubble(
                     )
                 val sharedContact = fileContact ?: captionContact
                 // The card replaces the caption only when the caption is the
-                // generated name/phone text. A sender's own words, such as
-                // "Please call 555-0100", disagree with the file and stay visible.
+                // generated name/phone text. Once the file is local, anything
+                // else, such as "Call Ada" above the number, is the sender's own
+                // words and stays visible.
                 val captionIsContactText =
-                    captionContact != null &&
-                        (
-                            fileContact == null ||
-                                captionContact.phone == fileContact.phone &&
-                                captionContact.email == fileContact.email
-                        )
+                    remember(fileContact, captionContact, shareBodyText) {
+                        if (fileContact == null) {
+                            captionContact != null
+                        } else {
+                            isContactShareCaption(shareBodyText, fileContact)
+                        }
+                    }
                 // A caption is the message's last line, so it carries the time and
                 // delivery state the way a text bubble does; the file card keeps the
                 // footer only when there is no caption to carry it. A contact card

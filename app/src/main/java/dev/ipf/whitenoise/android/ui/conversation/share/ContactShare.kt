@@ -63,6 +63,20 @@ internal fun parseSharedContactFromText(text: String): SharedContact? {
 }
 
 /**
+ * True when [text] is exactly the caption a contact share generates for [contact], so the card may
+ * replace it. Any other line, such as `Call Ada` above the number, is the sender's own text and stays.
+ */
+internal fun isContactShareCaption(
+    text: String,
+    contact: SharedContact,
+): Boolean {
+    val lines = text.lines().map(String::trim).filter(String::isNotEmpty)
+    // A picked contact without a name ships its number as the vCard's FN, while its caption omits the name.
+    val unnamed = contact.copy(name = contact.name.takeUnless { it == contact.phone || it == contact.email })
+    return lines == formatContactShareText(contact).lines() || lines == formatContactShareText(unnamed).lines()
+}
+
+/**
  * Recovers the contact from a raw `.vcf` the user attached, so the file can go
  * out exactly like a picker share and draw the same card. Null for other files,
  * multi-contact files, and cards whose generated caption would not parse back to
