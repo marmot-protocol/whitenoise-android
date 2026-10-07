@@ -258,6 +258,7 @@ internal class ConversationDictationDraftRecoveryTest {
             f.recovery.recoverWithResult(1, f.target, "first"),
         )
         assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first"))
+        assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first", requireVerifiedRecovery = false))
         f.reject = false
         assertTrue(f.recovery.recover(1, f.target, "first"))
         assertEquals("Draft first", f.draft.value.text)
@@ -277,6 +278,9 @@ internal class ConversationDictationDraftRecoveryTest {
             )
             assertTrue(f.recovery.owns(1, f.target))
             assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first"))
+            assertTrue(f.recovery.hasSavedTranscript(1, f.target, "first", requireVerifiedRecovery = false))
+            assertFalse(f.recovery.hasSavedTranscript(2, f.target, "first", requireVerifiedRecovery = false))
+            assertFalse(f.recovery.hasSavedTranscript(1, f.target, "first second", requireVerifiedRecovery = false))
             assertNull(f.recovery.sendTarget(1, f.target))
             assertEquals(1, f.writes)
             f.rejectRead = false

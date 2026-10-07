@@ -15,6 +15,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -511,6 +512,46 @@ class ConversationDictationPersistentControlTest {
             composeRule.onNodeWithTag("dictation-partial-send-dialog").assertDoesNotExist()
         }
 
+    /** Recovery availability changes must recompose the existing failure control. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun unreadableRetryPublishesAvailabilityAndVerifiedEditsDisableTheMountedAction() =
+        runTest {
+            var readUnavailable = false
+            var sends = 0
+            val fixture =
+                fixture(
+                    TextFieldValue("Draft", TextRange(5)),
+                    deliveryScope = this,
+                    onDraftRead = { check(!readUnavailable) },
+                    send = {
+                        sends++
+                        false
+                    },
+                )
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+            fixture.controller.send()
+            fixture.platform.listener.onResult("recognized")
+            runCurrent()
+            fixture.edit(TextFieldValue("Edited saved text"))
+            render(fixture)
+            composeRule.onNodeWithContentDescription("Retry Send").assertIsNotEnabled()
+            composeRule.runOnIdle {
+                readUnavailable = true
+                fixture.controller.retry()
+            }
+            composeRule.onNodeWithContentDescription("Retry Send").assertIsEnabled().performClick()
+            composeRule.onNodeWithContentDescription("Retry Send").assertIsEnabled()
+            composeRule.runOnIdle {
+                readUnavailable = false
+                fixture.controller.onAppForegrounded()
+            }
+            composeRule.onNodeWithContentDescription("Retry Send").assertIsNotEnabled()
+            composeRule.onNodeWithContentDescription("Dismiss").assertIsDisplayed()
+            assertEquals(1, sends)
+            assertEquals("Edited saved text", fixture.draft.text)
+        }
+
     private fun render(
         fixture: Fixture,
         fontScale: Float = 1f,
@@ -540,6 +581,7 @@ class ConversationDictationPersistentControlTest {
         deferActivityReadiness: Boolean = false,
         deliveryScope: CoroutineScope? = null,
         send: suspend (ConversationDictationSendRequest) -> Boolean = { false },
+        onDraftRead: () -> Unit = {},
     ): Fixture {
         val platform = FakePlatform(deferActivityReadiness)
         var draft = initial
@@ -547,7 +589,10 @@ class ConversationDictationPersistentControlTest {
         val controller =
             ConversationDictationController(
                 platform = platform,
-                readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, revision) },
+                readDraft = { _, _ ->
+                    onDraftRead()
+                    ConversationDictationDraftSnapshot(draft, revision)
+                },
                 writeDraft = { _, _, expected, value ->
                     if (expected != revision) {
                         null

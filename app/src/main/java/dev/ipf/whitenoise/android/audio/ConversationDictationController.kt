@@ -1378,14 +1378,28 @@ internal class ConversationDictationController internal constructor(
         val hasBlockedText =
             failed.reason == ConversationDictationFailure.SendBlocked && !failed.retainedTranscript.isNullOrBlank()
         if (!hasBlockedText) return false
-        if (hasUnrecoveredTranscript || canRetryRecoveredSend) return false
+        val savedBefore =
+            draftRecovery.hasSavedTranscript(
+                failed.sessionId,
+                failed.target,
+                failed.retainedTranscript,
+                requireVerifiedRecovery = false,
+            )
+        if (!savedBefore || canRetryRecoveredSend) return false
         if (runCatching(platform::callerAudioHasPending).getOrDefault(true)) return false
         val recovery = recoverRecognizedDraftResult(failed.sessionId, failed.target, failed.retainedTranscript)
         if (state !== failed) return true
-        if (recovery == ConversationDictationDraftRecovery.Result.Superseded) {
-            state = failed.copy(draftRecovered = false, draftSuperseded = true)
+        state =
+            failed.copy(
+                draftRecovered = recovery.draftRecovered,
+                draftSuperseded = recovery == ConversationDictationDraftRecovery.Result.Superseded,
+            )
+        if (recovery == ConversationDictationDraftRecovery.Result.Unavailable) {
+            pendingForegroundRecoverySessionId = failed.sessionId
+            reattachForegroundRecoveryAfterClosure()
+        } else if (!foregroundMicrophoneRequired) {
+            releaseDurableSessionLease()
         }
-        if (!foregroundMicrophoneRequired) releaseDurableSessionLease()
         return true
     }
 
@@ -1499,12 +1513,14 @@ internal class ConversationDictationController internal constructor(
         pendingForegroundRecoverySessionId = (state as? ConversationDictationState.Failed)?.sessionId
         if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed
-        if (failed != null &&
-            !failed.draftRecovered &&
-            recoverRecognizedDraft(failed.sessionId, failed.target, failed.retainedTranscript)
-        ) {
+        if (failed != null && !failed.draftRecovered) {
+            val recovery = recoverRecognizedDraftResult(failed.sessionId, failed.target, failed.retainedTranscript)
             if (state !== failed) return
-            state = failed.copy(draftRecovered = true)
+            state =
+                failed.copy(
+                    draftRecovered = recovery.draftRecovered,
+                    draftSuperseded = recovery == ConversationDictationDraftRecovery.Result.Superseded,
+                )
         }
         val savedFailure = state is ConversationDictationState.Failed && !hasUnrecoveredTranscript
         if (savedFailure &&

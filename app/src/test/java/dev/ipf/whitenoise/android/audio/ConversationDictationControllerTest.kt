@@ -3203,6 +3203,77 @@ class ConversationDictationControllerTest {
             }
         }
 
+    /** Retry keeps unreadable historical saves protected without resending or extending their deadline. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun retryReattachesUnreadableSavedDraftWithoutRestartingItsRecoveryDeadline() =
+        runTest {
+            for (leaseReleased in listOf(false, true)) {
+                for (readRecovers in listOf(false, true)) {
+                    var readUnavailable = false
+                    var expired = 0
+                    var starts = 0
+                    var sends = 0
+                    val f =
+                        fixture(
+                            draft = TextFieldValue("Draft", TextRange(5)),
+                            targetValidationScope = this,
+                            onDraftRead = { check(!readUnavailable) },
+                            onRecoveryExpired = { expired++ },
+                            startDurableSession = { _, ready ->
+                                starts++
+                                ready()
+                                true
+                            },
+                            sendTranscriptIfOriginUnchanged = {
+                                sends++
+                                false
+                            },
+                        )
+                    f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+                    f.controller.send()
+                    f.platform.listener.onResult("retained")
+                    advanceUntilIdle()
+                    val saved = f.controller.state as ConversationDictationState.Failed
+                    assertTrue(saved.draftRecovered)
+                    f.edit(key(), TextFieldValue("Edited saved text"))
+                    if (leaseReleased) f.controller.onAppForegrounded()
+                    assertEquals(!leaseReleased, f.controller.hasDurableSession)
+                    val recognizers = f.platform.sessions.size
+                    f.scheduler.sleepWithoutDispatch(5 * 60 * 1_000L)
+                    readUnavailable = true
+                    repeat(2) { f.controller.retry() }
+                    advanceUntilIdle()
+                    val protected = f.controller.state as ConversationDictationState.Failed
+                    assertFalse(protected.draftRecovered)
+                    assertFalse(protected.draftSuperseded)
+                    assertEquals(saved.sessionId, protected.sessionId)
+                    assertEquals("retained", protected.retainedTranscript)
+                    assertTrue(f.controller.hasUnrecoveredTranscript)
+                    assertTrue(f.controller.hasDurableSession)
+                    assertFalse(f.controller.foregroundMicrophoneRequired)
+                    assertFalse(f.controller.canRetryRecoveredSend)
+                    assertEquals(if (leaseReleased) 2 else 1, starts)
+                    assertEquals(recognizers, f.platform.sessions.size)
+                    if (readRecovers) {
+                        readUnavailable = false
+                        f.controller.onAppForegrounded()
+                        assertTrue((f.controller.state as ConversationDictationState.Failed).draftSuperseded)
+                        assertFalse(f.controller.hasUnrecoveredTranscript)
+                        assertFalse(f.controller.hasDurableSession)
+                    }
+                    f.scheduler.sleepWithoutDispatch(25 * 60 * 1_000L)
+                    f.controller.onAppForegrounded()
+                    assertTrue(f.controller.state is ConversationDictationState.Idle)
+                    assertFalse(f.controller.hasDurableSession)
+                    assertEquals(if (readRecovers) 0 else 1, expired)
+                    assertEquals(1, sends)
+                    assertEquals(1, f.writes)
+                    assertEquals("Edited saved text", f.drafts.getValue(key()).text)
+                }
+            }
+        }
+
     /** An involuntary replay teardown respects saved edits while protecting any unrecognized PCM. */
     @Test
     fun serviceTeardownCompletesSupersededPasteOnlyWithoutPendingAudio() {

@@ -36,11 +36,12 @@ internal class ConversationDictationDraftRecovery(
         target: ConversationDictationTarget,
     ): Boolean = receipt?.let { it.session == session && it.target == target } == true
 
-    /** A save survives verified editor changes; unreadable recovery and our own clear stay protected. */
+    /** Recovery requires a verified save; Retry may inspect historical ownership before checking again. */
     fun hasSavedTranscript(
         session: Long,
         target: ConversationDictationTarget,
         transcript: String?,
+        requireVerifiedRecovery: Boolean = true,
     ): Boolean =
         !transcript.isNullOrBlank() &&
             receipt?.let {
@@ -48,7 +49,7 @@ internal class ConversationDictationDraftRecovery(
                     it.target == target &&
                     it.transcript == transcript.trim() &&
                     it.emptiedRevision == null &&
-                    !it.recoveryUnavailable
+                    (!requireVerifiedRecovery || !it.recoveryUnavailable)
             } == true
 
     /** Tracks only the clear or restoration actually performed by this session's dispatch. */

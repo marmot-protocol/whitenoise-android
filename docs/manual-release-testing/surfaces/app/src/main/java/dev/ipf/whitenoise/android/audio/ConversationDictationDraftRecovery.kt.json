@@ -18,6 +18,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Historical saved transcript identity remains distinct from verified recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+        "anchor": "requireVerifiedRecovery: Boolean = true,",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },
