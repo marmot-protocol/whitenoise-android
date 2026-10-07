@@ -13,8 +13,12 @@ import dev.ipf.marmotkit.PresentationTextFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
 import dev.ipf.whitenoise.android.notifications.setAppLockScreenVisibleForTest
 import dev.ipf.whitenoise.android.ui.share.group
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,6 +30,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.concurrent.atomic.AtomicLong
 
 /** App-level policy keeps local pictures out of public identity and rejects obsolete editors. */
 @RunWith(RobolectricTestRunner::class)
@@ -154,6 +159,58 @@ class AppStateContactPictureTest {
             app.setAppLockScreenVisibleForTest(true)
             assertNull(captured.currentAvatar?.invoke())
         }
+
+    /** A narrow approval waits for both broad jobs without invalidating their other pins' pending presentation. */
+    @Test fun approvalWaitsForBroadJobsWithoutSupersedingTheirRevision() =
+        runBlocking {
+            val app = app()
+            val revision = app.privateField("pinnedShortcutPresentationRevision") as AtomicLong
+            revision.set(7L)
+            val publication = Job()
+            val avatarRefresh = Job()
+            app.setPrivateField("shareShortcutPublishJob", publication)
+            app.setPrivateField("pinnedShortcutRefreshJob", avatarRefresh)
+            val capability = PinnedConversationCapability("a", "ab".repeat(16), "account-token", "group-token")
+            val approval = launch(start = CoroutineStart.UNDISPATCHED) { app.refreshApprovedPinnedShortcut(capability) }
+            assertFalse(approval.isCompleted)
+            assertEquals(7L, revision.get())
+            publication.complete()
+            assertFalse(approval.isCompleted)
+            // A newer broad publication owns the final write; approval must not query or overwrite its row.
+            revision.incrementAndGet()
+            avatarRefresh.complete()
+            approval.join()
+            assertEquals(8L, revision.get())
+        }
+
+    /** An inactive owner's late approval cannot cancel the active account's pending pin refresh. */
+    @Test fun inactiveApprovalLeavesBroadRevisionUnchanged() =
+        runBlocking {
+            val app = app()
+            val revision = app.privateField("pinnedShortcutPresentationRevision") as AtomicLong
+            revision.set(7L)
+            val capability = PinnedConversationCapability("b", "ab".repeat(16), "account-token", "group-token")
+            app.refreshApprovedPinnedShortcut(capability)
+            assertEquals(7L, revision.get())
+        }
+
+    /** Observes production scheduling state without replacing the approval path with a parallel test implementation. */
+    private fun WhiteNoiseAppState.privateField(name: String): Any? =
+        WhiteNoiseAppState::class.java
+            .getDeclaredField(name)
+            .apply { isAccessible = true }
+            .get(this)
+
+    /** Holds the real AppState broad jobs at a deterministic boundary without invoking native or device work. */
+    private fun WhiteNoiseAppState.setPrivateField(
+        name: String,
+        value: Any,
+    ) {
+        WhiteNoiseAppState::class.java
+            .getDeclaredField(name)
+            .apply { isAccessible = true }
+            .set(this, value)
+    }
 
     /** Creates a small synthetic normalized replacement without relying on external media. */
     private fun picture(color: Int) = ContactPictureChange.Replace(contactPicturePng(color))

@@ -3788,12 +3788,16 @@ class WhiteNoiseAppState private constructor(
     /**
      * Approval may outlive a private-picture edit and the bounded chat projection. Re-read its exact native row;
      * failed lookup, account changes and cold approval leave the scrubbed pin generic until a later refresh.
+     * Existing broad jobs finish first; this narrow update never invalidates another pin's queued presentation.
      */
     internal suspend fun refreshApprovedPinnedShortcut(capability: PinnedConversationCapability) {
         val account = capability.accountRef
         val runtime = runtimeGeneration
-        val revision = pinnedShortcutPresentationRevision.incrementAndGet()
         if (!canRefreshApprovedPin(account, runtime)) return
+        val revision = pinnedShortcutPresentationRevision.get()
+        shareShortcutPublishJob?.join()
+        pinnedShortcutRefreshJob?.join()
+        if (pinnedShortcutPresentationRevision.get() != revision) return
         val item = preloadNotificationChatListItem(account, capability.groupIdHex)
         val available = item.group.selfMembership == SelfMembershipFfi.MEMBER && !item.group.pendingConfirmation
         if (!available || !canRefreshApprovedPin(account, runtime)) return
