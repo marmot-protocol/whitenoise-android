@@ -1,0 +1,34 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signin-back
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign In"
+- assertVisible: "Private key"
+- assertNotVisible: "Sign in with Amber"
+- tapOn: "Private key"
+- inputText: "cancel-me"
+- hideKeyboard
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- assertNotVisible: "Private key"
+- tapOn: "Sign In"
+- assertVisible: "Private key"
+- tapOn: "Private key"
+- inputText: "cancel-again"
+- hideKeyboard
+- back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- assertNotVisible: "Private key"
+- takeScreenshot: signin-back

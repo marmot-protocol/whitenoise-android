@@ -1,0 +1,111 @@
+"""Guard suite budgets and reject incomplete or misleading UI execution evidence."""
+
+import json
+from pathlib import Path
+import tempfile
+import unittest
+import xml.etree.ElementTree as ET
+
+from scripts import maestro_suite as suite
+
+
+class MaestroSuiteTest(unittest.TestCase):
+    def test_allowlist_and_budget_before_setup(self):
+        self.assertEqual(suite.selection('onboarding', '20', 'false')[1], 20)
+        self.assertEqual(len(suite.selection('offline', '3', 'false')[0]) * 3, 18)
+        for values in [('offline', '4', 'false'), ('../other', '1', 'false'),
+                       ('offline', '01', 'false'), ('offline', '1', 'yes'),
+                       ('onboarding', '21', 'false'), ('offline', '1\n', 'false')]:
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                suite.selection(*values)
+
+    def test_every_selected_case_is_unique_and_mapped(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary)
+            manifest = suite.prepare('offline', '3', 'true', destination)
+            flows = list((destination / 'suite').glob('*.yaml'))
+            self.assertEqual(len(flows), 19)
+            self.assertEqual(manifest['positive_count'], 18)
+            self.assertEqual(len({case['name'] for case in manifest['cases']}), 19)
+            self.assertTrue(all(case['manual_ids'] for case in manifest['cases'] if not case['negative']))
+            self.assertEqual(len({flow.read_text().split('name: ', 1)[1].splitlines()[0] for flow in flows}), 19)
+            self.assertIn(suite.NEGATIVE_ASSERTION, (destination / 'suite/zz-negative-control.yaml').read_text())
+            with self.assertRaises(ValueError):
+                suite.prepare('onboarding', '1', 'false', destination)
+
+    def test_missing_flow_cannot_leave_partial_suite(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with self.assertRaises(FileNotFoundError):
+                suite.prepare('offline', '1', 'false', root / 'reports', root=root)
+            self.assertFalse((root / 'reports/suite').exists())
+
+    def write_results(self, destination, *, negative=False):
+        """Model executed JUnit; setup or selection alone is never a passing result."""
+        manifest = suite.prepare('offline', '1', str(negative).lower(), destination)
+        document = ET.Element('testsuites')
+        report = ET.SubElement(document, 'testsuite')
+        for case in manifest['cases']:
+            result = ET.SubElement(report, 'testcase', name=case['name'], time='1.25', status='SUCCESS')
+            if case['negative']:
+                result.set('status', 'ERROR')
+                ET.SubElement(result, 'failure').text = 'Assertion is false: ' + suite.NEGATIVE_ASSERTION
+        ET.ElementTree(document).write(destination / 'junit.xml')
+        return document, report
+
+    def test_completed_positive_and_intentional_failure_have_distinct_results(self):
+        for control in (False, True):
+            with self.subTest(control=control), tempfile.TemporaryDirectory() as temporary:
+                destination = Path(temporary)
+                self.write_results(destination, negative=control)
+                result = suite.report(destination, int(control))
+                self.assertEqual(result['positive_passed'], 6)
+                self.assertEqual(result['negative_control_verified'], control)
+                self.assertTrue(result['evidence_complete'])
+
+    def test_missing_duplicate_unexpected_skipped_failed_cases_do_not_pass(self):
+        for fault in ('missing', 'duplicate', 'unexpected', 'skipped', 'failed', 'non_success'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                destination = Path(temporary)
+                document, report = self.write_results(destination)
+                case = report[0]
+                if fault == 'missing':
+                    report.remove(case)
+                elif fault == 'duplicate':
+                    report.append(ET.fromstring(ET.tostring(case)))
+                elif fault == 'unexpected':
+                    case.set('name', 'not-selected')
+                elif fault == 'non_success':
+                    case.set('status', 'ERROR')
+                else:
+                    ET.SubElement(case, 'skipped' if fault == 'skipped' else 'failure').text = 'fixture'
+                ET.ElementTree(document).write(destination / 'junit.xml')
+                with self.assertRaises(ValueError):
+                    suite.report(destination, 0)
+
+    def test_setup_failure_or_unexpected_exit_is_not_negative_proof(self):
+        for fault in ('driver_error', 'skipped', 'unexpected_exit'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                destination = Path(temporary)
+                document, report = self.write_results(destination, negative=True)
+                case = report[-1]
+                if fault == 'driver_error':
+                    case[0].text = 'Driver could not launch'
+                elif fault == 'skipped':
+                    case[0].tag = 'skipped'
+                ET.ElementTree(document).write(destination / 'junit.xml')
+                with self.assertRaises(ValueError):
+                    suite.report(destination, 0 if fault == 'unexpected_exit' else 1)
+                saved = json.loads((destination / 'suite-results.json').read_text())
+                self.assertFalse(saved['evidence_complete'])
+
+    def test_absent_junit_is_not_success(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary)
+            suite.prepare('offline', '1', 'false', destination)
+            with self.assertRaises(FileNotFoundError):
+                suite.report(destination, 0)
+
+
+if __name__ == '__main__':
+    unittest.main()

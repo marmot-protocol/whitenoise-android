@@ -1,4 +1,4 @@
-# On-demand Maestro onboarding pilot
+# On-demand Maestro onboarding tests
 
 This pilot checks an installed White Noise dev APK: welcome → Sign In →
 private-key screen → Android Back → welcome. It enters no key, creates no
@@ -9,10 +9,33 @@ Before launch, the runner applies airplane mode through Android's connectivity
 service, disables Wi-Fi and mobile data, and requires no active default network.
 The bounded check retains its connectivity dump as `network-state.txt`.
 
-Use this to try installed-app UI automation before adding more journeys. It is
+Select the original `onboarding` journey or the six-case `offline` suite. It is
 manually requested, is not a required PR check and has no automatic Maestro
 trigger. Normal instrumented tests remain unchanged. There is no Maestro Cloud
 account, API key, shared-phone access or local app build.
+
+## Offline coverage and limits
+
+Each allowlisted flow clears only the disposable dev app state, denies permissions and dismisses the known optional diagnostics sheet. Case names and screenshots are unique across repetitions. `suite-manifest.json` records the exact selected cases and their partial manual-checklist mappings; `suite-results.json` reconciles actual JUnit against that selection. Missing, extra, duplicated, skipped or failed cases cannot be reported as passing. The intentional negative control is recorded separately and still leaves the job failed.
+
+| Flow | Assertions | Partial checklist coverage |
+|---|---|---|
+| `onboarding` | Welcome → private-key screen → Android Back → Welcome | `ONB-001`, `ONB-004` |
+| `signin-invalid` | Empty action disabled; malformed text and malformed nsec input rejected; toolbar Back and reopen | `ONB-005` |
+| `signin-public` | Synthetic public npub rejected with the secret-key-required message; Android Back | `ONB-005` |
+| `signin-back` | Amber action absent; toolbar and Android Back work after typing | `ONB-004`, `ONB-010` |
+| `signup-cancel` | Synthetic Name/About edits; cancellation and reopening | `ONB-002` |
+| `signup-offline-retry` | Offline notice, Retry, retained edits, cancellation and reopening | `ONB-002` |
+
+The malformed nsec fixture has invalid shape and checksum; it never enters native login. These checks do **not** validate checksum-only rejection of an otherwise shaped secret key, import a secret, create an account, establish native account counts, or prove peer delivery. The public fixture encodes synthetic zero public bytes and is not an account credential. Real signer, authenticated-account, relay, layout, accessibility, device and release checks remain separate.
+
+The existing test tags are exposed by the retained benchmark APK. [Maestro state selectors](https://docs.maestro.dev/reference/selectors/state-selectors) check enabled state; [hideKeyboard](https://docs.maestro.dev/reference/commands-available/hidekeyboard) dismisses the IME before the separate navigation assertion. No fixed sleeps or coordinate taps are needed.
+
+## What to add next
+
+First require the offline suite and its intentional assertion failure to produce complete hosted evidence. Then add a separate opt-in prepared-account suite with disposable test identities, explicit setup/reset, no real keys in YAML or logs, and controlled relay prerequisites. Start with opening an existing conversation, draft entry/cancellation and settings navigation. Only after that fixture is reliable add two-peer messaging, media and lifecycle checks. Keep normal PR CI and required native integration checks unchanged; use the optional suite for focused checks when its surfaces change.
+
+A failed flow is a failure to investigate, not permission to loosen assertions. Inspect the hierarchy/debug output and determine whether the APK behavior regressed or a selector is wrong. Reuse the same verified APK for tooling-only corrections; obtain a new producer APK when application behavior changes.
 
 ## Select an APK already built by CI
 
@@ -37,12 +60,11 @@ The artifact must belong to the producer's current successful run attempt.
 Re-running only failed jobs can leave an older APK that is rejected; choose a
 successful attempt that also ran the Baseline Profile job.
 
-## Request one journey
+## Select coverage and request a run
 
 In **Actions → Android Instrumented Tests → Run workflow**, select the flow
 branch, enable `maestro_pilot`, and fill `maestro_artifact_id` and
-`maestro_source_sha`. Leave the demo/provider options off. Keep repetitions at
-`1` and negative control off.
+`maestro_source_sha`. Leave the demo/provider options off. Select `maestro_suite=offline` for the expanded checks, or leave `onboarding` selected for the original navigation check. Keep repetitions at `1` and negative control off for the first run.
 
 The equivalent CLI request is:
 
@@ -52,6 +74,7 @@ gh workflow run android-instrumented.yml \
   -f maestro_pilot=true \
   -f maestro_artifact_id=ARTIFACT_ID \
   -f maestro_source_sha=FULL_SOURCE_SHA \
+  -f maestro_suite=offline \
   -f maestro_repetitions=1
 ```
 
@@ -81,8 +104,7 @@ push and PR checks retain their existing concurrency and execution behavior.
 
 ## Repetition, failure proof and results
 
-Set `maestro_repetitions` to `20` to execute 20 clean journeys in one boot and one
-CLI invocation. The emulator and Maestro driver stay warm; app state is fresh
+The original `onboarding` suite permits 1–20 repetitions. The `offline` suite permits 1–3 repetitions: six distinct cases run once, twice or three times (6, 12 or 18 journeys). A request exceeding 20 positive journeys fails before APK download or emulator setup. All cases share one boot and CLI invocation. The emulator and Maestro driver stay warm; app state is fresh
 for each journey. This checks consistency rather than production performance.
 
 To check failure reporting, enable `maestro_negative_control`. An additional

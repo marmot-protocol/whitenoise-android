@@ -6,11 +6,17 @@ set -euo pipefail
 [[ "${MAESTRO_REPETITIONS:-}" =~ ^([1-9]|1[0-9]|20)$ ]] || exit 2
 [[ "${MAESTRO_NEGATIVE_CONTROL:-false}" =~ ^(true|false)$ ]] || exit 2
 reports=build/maestro-pilot
-mkdir -p "$reports/suite"
+python3 scripts/maestro_suite.py prepare --suite "${MAESTRO_SUITE:-onboarding}" \
+  --repetitions "$MAESTRO_REPETITIONS" --negative "${MAESTRO_NEGATIVE_CONTROL:-false}" --destination "$reports"
+# Negative assertion remains MAESTRO_NEGATIVE_CONTROL_IMPOSSIBLE_3141.
+
 
 finish() {
   # Preserve the original result, end timestamp and bounded emulator logs.
   result=$?
+  if [[ "${maestro_started:-false}" == true ]]; then
+    python3 scripts/maestro_suite.py report --destination "$reports" --maestro-exit "$result" || result=2
+  fi
   printf 'finished_at=%s\nexit_code=%s\n' "$(date +%s)" "$result" >> "$reports/timings.env"
   adb -s emulator-5554 logcat -d -t 1000 > "$reports/logcat.txt" 2>&1 || true
   exit "$result"
@@ -25,22 +31,9 @@ python3 scripts/maestro_apk.py offline > "$reports/network-state.txt"
 # The pilot intentionally uses a dev benchmark APK; -t is confined to this emulator.
 adb -s emulator-5554 install -r -t "$reports/apk/app.apk"
 
-python3 - <<'PY'
-import os
-from pathlib import Path
-flow = Path('.maestro/onboarding.yaml').read_text()
-suite = Path('build/maestro-pilot/suite')
-for index in range(1, int(os.environ['MAESTRO_REPETITIONS']) + 1):
-    case = flow.replace('name: Welcome, sign in, and return', f'name: Onboarding journey {index:02}')
-    case = case.replace('welcome-returned', f'welcome-returned-{index:02}')
-    (suite / f'onboarding-{index:02}.yaml').write_text(case)
-if os.environ.get('MAESTRO_NEGATIVE_CONTROL') == 'true':
-    # The same real journey must pass before the deliberately impossible assertion.
-    case = flow.replace('name: Welcome, sign in, and return', 'name: Intentional assertion failure')
-    (suite / 'negative-control.yaml').write_text(case + '- assertVisible: "MAESTRO_NEGATIVE_CONTROL_IMPOSSIBLE_3141"\n')
-PY
 printf 'test_started_at=%s\n' "$(date +%s)" >> "$reports/timings.env"
 maestro --version > "$reports/maestro-version.txt"
+maestro_started=true
 maestro --device emulator-5554 test --format JUNIT --output "$reports/junit.xml" \
   --test-suite-name 'White Noise onboarding pilot' --debug-output "$reports/debug" \
   --test-output-dir "$reports/screenshots" "$reports/suite"

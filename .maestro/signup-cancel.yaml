@@ -1,0 +1,42 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signup-cancel
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign Up"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.name"
+    direction: DOWN
+- tapOn:
+    id: "onboarding.sign_up.name"
+- eraseText
+- inputText: "Maestro Offline Draft"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.about"
+    direction: DOWN
+- tapOn:
+    id: "onboarding.sign_up.about"
+- inputText: "Synthetic offline test only"
+- hideKeyboard
+- assertVisible: "Maestro Offline Draft"
+- assertVisible: "Synthetic offline test only"
+- tapOn: "Back"
+- assertVisible: "Sign In"
+- tapOn: "Sign Up"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.name"
+    direction: DOWN
+- assertVisible: "Name"
+- takeScreenshot: signup-cancel

@@ -26,8 +26,14 @@ on:
         description: Full source commit SHA displayed by the producer Android CI run
         required: false
         type: string
+      maestro_suite:
+        description: Offline coverage to execute against the retained APK
+        required: false
+        type: choice
+        options: [onboarding, offline]
+        default: onboarding
       maestro_repetitions:
-        description: Journeys in one emulator boot (1 through 20)
+        description: Suite repetitions (onboarding 1–20, offline 1–3; at most 20 journeys)
         required: false
         type: string
         default: '1'
@@ -254,6 +260,7 @@ jobs:
       contents: read
       actions: read
     env:
+      MAESTRO_SUITE: ${{ inputs.maestro_suite }}
       MAESTRO_REPETITIONS: ${{ inputs.maestro_repetitions }}
       MAESTRO_NEGATIVE_CONTROL: ${{ inputs.maestro_negative_control }}
       MAESTRO_CLI_NO_ANALYTICS: 'true'
@@ -278,6 +285,8 @@ jobs:
           mkdir -p build/maestro-pilot
           printf 'setup_started_at=%s\n' "$(date +%s)" > build/maestro-pilot/timings.env
           [[ "$REVIEW_DEMO" != true && "$DOCUMENT_MATRIX" != true ]] || { echo 'Select only the Maestro pilot'; exit 2; }
+          python3 scripts/maestro_suite.py validate --suite "$MAESTRO_SUITE" \
+            --repetitions "$MAESTRO_REPETITIONS" --negative "$MAESTRO_NEGATIVE_CONTROL"
           python3 scripts/maestro_apk.py fetch --artifact-id "$ARTIFACT_ID" --source "$SOURCE_SHA" \
             --repetitions "$MAESTRO_REPETITIONS" --destination build/maestro-pilot/apk
 
