@@ -76,16 +76,19 @@ internal class DictationForegroundTestPlatform : ConversationDictationPlatform {
         return true
     }
 
-    override fun discardCallerAudio(onClosed: () -> Unit): Boolean {
-        if (deferEmptyCaptureClosure) {
-            captureClosureCallback = onClosed
-            return true
+    override fun discardCallerAudio(onClosed: () -> Unit): Boolean =
+        when {
+            deferEmptyCaptureClosure -> {
+                captureClosureCallback = onClosed
+                true
+            }
+            !pendingCallerAudio -> false
+            else -> {
+                pendingCallerAudio = false
+                onClosed()
+                true
+            }
         }
-        if (!pendingCallerAudio) return false
-        pendingCallerAudio = false
-        onClosed()
-        return true
-    }
 
     /** Captures the listener and returns a no-op provider generation. */
     @Suppress("MaxLineLength")

@@ -312,7 +312,9 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
             val service = lifecycle.get()
             service.onStartCommand(startIntent(service, harness), 0, 1)
             val token = requireNotNull(harness.conversationDictation.notificationSessionToken)
-            harness.platform.listener.onCallerAudioFailure(ConversationDictationCallerAudioFailure.CaptureFailed) { true }
+            harness.platform.listener.onCallerAudioFailure(
+                ConversationDictationCallerAudioFailure.CaptureFailed,
+            ) { true }
             assertTrue(harness.conversationDictation.state is ConversationDictationState.Failed)
             harness.conversationDictation.dismissFailure()
             assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)

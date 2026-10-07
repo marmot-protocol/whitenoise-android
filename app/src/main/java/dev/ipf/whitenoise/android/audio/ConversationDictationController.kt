@@ -802,14 +802,7 @@ internal class ConversationDictationController internal constructor(
     ): Boolean {
         expireRetainedRecoveryIfDue()
         conversationDictationDiagnostic("event=request_start mode=${mode.name}")
-        if (pendingCaptureLeaseReleaseGeneration != null) {
-            conversationDictationDiagnostic("event=request_start accepted=false reason=capture_closing")
-            return false
-        }
-        if (!targetAvailable(accountRef, groupIdHex)) {
-            conversationDictationDiagnostic("event=request_start accepted=false reason=target_unavailable")
-            return false
-        }
+        if (!canBeginCapture(accountRef, groupIdHex)) return false
         // Unlike the app-owned SpeechRecognizer, an external provider Activity
         // cannot be synchronously terminated by this controller. Keep its one
         // ActivityResult owner stable until the provider returns, so a result
@@ -871,6 +864,22 @@ internal class ConversationDictationController internal constructor(
         }
         startTarget(sessionId, target)
         return true
+    }
+
+    /** Capture closing and an unavailable target both reject a gesture before changing its owner. */
+    private fun canBeginCapture(
+        accountRef: String,
+        groupIdHex: String,
+    ): Boolean {
+        val reason =
+            when {
+                pendingCaptureLeaseReleaseGeneration != null -> "capture_closing"
+                !targetAvailable(accountRef, groupIdHex) -> "target_unavailable"
+                else -> null
+            }
+        if (reason == null) return true
+        conversationDictationDiagnostic("event=request_start accepted=false reason=$reason")
+        return false
     }
 
     /** A new gesture cannot inherit capture closure or notification actions from its predecessor. */
