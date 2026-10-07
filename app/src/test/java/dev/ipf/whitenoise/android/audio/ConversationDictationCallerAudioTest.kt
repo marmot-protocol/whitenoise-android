@@ -502,6 +502,7 @@ class ConversationDictationCallerAudioTest {
 
             val next = checkNotNull(capture.openProviderStream(failures::add))
             assertEquals(listOf(ConversationDictationCallerAudioFailure.BufferFull), failures)
+            assertTrue(capture.acknowledgeFailure(ConversationDictationCallerAudioFailure.BufferFull))
             next.cancel()
             next.closeProviderEnd()
             val last = checkNotNull(capture.openProviderStream(failures::add))

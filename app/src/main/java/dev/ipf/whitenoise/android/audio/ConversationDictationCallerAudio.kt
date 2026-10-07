@@ -47,9 +47,11 @@ private const val POST_ACTION_CAPTURE_DRAIN_READS = 6
 private const val POST_ACTION_CAPTURE_DRAIN_MILLIS = 750L
 private const val FORCED_CAPTURE_SEAL_GRACE_MILLIS = 750L
 
-/** A terminal capture condition that must be surfaced to the owning recognition session. */
+/** A caller-audio failure that must be surfaced to the owning recognition session. */
 internal enum class ConversationDictationCallerAudioFailure {
     BufferFull,
+    CaptureFailed,
+    PipeFailed,
 }
 
 /** Narrow capture-device boundary that keeps lifecycle behavior directly testable off-device. */
@@ -186,7 +188,6 @@ internal class ConversationDictationCallerAudio internal constructor(
         val stream = ConversationDictationCallerAudioStream(this, pipe[1], pipe[0], buffer, pipeWriter, onFailure)
         return if (activeStream.compareAndSet(null, stream)) {
             pendingFailure?.let { failure ->
-                pendingFailure = null
                 stream.reportFailure(failure)
             }
             stream
@@ -275,16 +276,29 @@ internal class ConversationDictationCallerAudio internal constructor(
         activeStream.compareAndSet(stream, null)
     }
 
-    /** Keeps a terminal failure until a stream can receive it, atomically with generation changes. */
+    /** Consumes a capture failure only after the controller accepts its owning generation. */
+    @Synchronized
+    internal fun acknowledgeFailure(failure: ConversationDictationCallerAudioFailure): Boolean {
+        return when {
+            discarded.get() -> false
+            failure == ConversationDictationCallerAudioFailure.PipeFailed -> true
+            pendingFailure == failure -> {
+                pendingFailure = null
+                true
+            }
+            else -> false
+        }
+    }
+
+    /** The feeder shares the capture's monotonic clock, including deterministic stall tests. */
+    internal fun elapsedRealtimeMillis(): Long = elapsedRealtime()
+
+    /** Keeps a terminal failure until a current generation accepts it, rather than merely posting it. */
     @Synchronized
     private fun reportCaptureFailure(failure: ConversationDictationCallerAudioFailure) {
         if (discarded.get()) return
-        val stream = activeStream.get()
-        if (stream == null) {
-            pendingFailure = failure
-        } else {
-            stream.reportFailure(failure)
-        }
+        if (pendingFailure == null) pendingFailure = failure
+        pendingFailure?.let { activeStream.get()?.reportFailure(it) }
     }
 
     /** Records continuously across provider generations and seals the last read before closure. */
@@ -293,12 +307,15 @@ internal class ConversationDictationCallerAudio internal constructor(
         val encoded = ByteArray(FRAMES_PER_READ * BYTES_PER_FRAME)
         val progress = CallerAudioProgress(elapsedRealtime)
         var currentChunkHasSpeech = false
+        var failure: ConversationDictationCallerAudioFailure? = null
         try {
             while (recording.get() && progress.stopReason == null) {
                 // Keep an outstanding read, then drain the native buffer without recording a fresh tail.
-                val read = device.read(samples, waitForSamples = !finishing.get())
+                val blocking = !finishing.get()
+                val read = device.read(samples, waitForSamples = blocking)
                 if (read <= 0) {
                     progress.stopReason = "read=$read"
+                    if (read < 0 || blocking) failure = unexpectedCaptureFailure()
                 } else {
                     synchronized(this) {
                         if (captureSealed.get()) return@synchronized
@@ -318,16 +335,47 @@ internal class ConversationDictationCallerAudio internal constructor(
                     }
                 }
             }
+        } catch (error: RuntimeException) {
+            progress.stopReason = "exception=${error.javaClass.simpleName}"
+            failure = unexpectedCaptureFailure()
         } finally {
             samples.fill(0)
             encoded.fill(0)
-            recording.set(false)
-            if (!discarded.get()) buffer.finish()
-            runCatching(device::stop)
-            releaseRecorder()
-            progress.reportClosed(buffer.bufferedBytes)
+            finishCaptureThread(progress, failure)
         }
     }
+
+    /** Seals retained PCM and reports a failure before potentially blocking native cleanup. */
+    private fun finishCaptureThread(
+        progress: CallerAudioProgress,
+        failure: ConversationDictationCallerAudioFailure?,
+    ) {
+        synchronized(this) {
+            // A terminated recorder can replay PCM while native release is still pending.
+            finishing.set(true)
+            recording.set(false)
+            if (!discarded.get()) buffer.finish()
+            val terminalFailure =
+                if (progress.stopReason == "buffer_full") {
+                    ConversationDictationCallerAudioFailure.BufferFull
+                } else {
+                    failure
+                }
+            terminalFailure?.let(::reportCaptureFailure)
+        }
+        runCatching(device::stop)
+        releaseRecorder()
+        progress.reportClosed(buffer.bufferedBytes)
+    }
+
+    /** A requested tail drain still records; only force-close/discard/sealing explains read errors. */
+    @Synchronized
+    private fun unexpectedCaptureFailure(): ConversationDictationCallerAudioFailure? =
+        if (recording.get() && !discarded.get() && !captureSealed.get()) {
+            ConversationDictationCallerAudioFailure.CaptureFailed
+        } else {
+            null
+        }
 
     /** Appends one recorder read and seals a speech-bearing chunk at a natural sentence boundary. */
     private fun appendCapturedAudio(
@@ -347,7 +395,6 @@ internal class ConversationDictationCallerAudio internal constructor(
             conversationDictationDiagnostic(
                 "event=caller_audio_backpressure bytes=${buffer.bufferedBytes} action=stop_capture",
             )
-            reportCaptureFailure(ConversationDictationCallerAudioFailure.BufferFull)
             return currentChunkHasSpeech
         }
 
@@ -480,7 +527,8 @@ internal class ConversationDictationCallerAudioStream(
     private val fullyFed = AtomicBoolean(false)
     private val feedClosedCallbacks = ConcurrentLinkedQueue<() -> Unit>()
     private val cancelled = AtomicBoolean(false)
-    private val failureReported = AtomicBoolean(false)
+    private val captureFailureReported = AtomicBoolean(false)
+    private val pipeFailureReported = AtomicBoolean(false)
     private val chunk = AtomicReference<ConversationDictationAudioChunk?>(null)
 
     /** Starts the device or feeder once; a sealed capture may only drain retained PCM. */
@@ -536,7 +584,13 @@ internal class ConversationDictationCallerAudioStream(
 
     /** Delivers one typed capture failure to the generation that owns this stream. */
     fun reportFailure(failure: ConversationDictationCallerAudioFailure) {
-        if (failureReported.compareAndSet(false, true)) onFailure(failure)
+        val reported =
+            if (failure == ConversationDictationCallerAudioFailure.PipeFailed) {
+                pipeFailureReported
+            } else {
+                captureFailureReported
+            }
+        if (!cancelled.get() && reported.compareAndSet(false, true)) onFailure(failure)
     }
 
     /** Claims one chunk, feeds its PCM, and requeues ownership on interruption or provider disconnection. */
@@ -561,17 +615,21 @@ internal class ConversationDictationCallerAudioStream(
             reportFeedFailure(failure)
         } catch (failure: IOException) {
             reportFeedFailure(failure)
+        } catch (failure: RuntimeException) {
+            reportFeedFailure(failure)
         } finally {
             closePipe()
         }
     }
 
-    /** Logs only the failure type and makes the unacknowledged chunk available to a replacement stream. */
+    /** Requeues exact PCM before notifying the controller, even if settlement changed no buffer bytes. */
     private fun reportFeedFailure(failure: Exception) {
         conversationDictationDiagnostic(
             "event=caller_audio_feed_failed type=${failure.javaClass.simpleName} action=requeue",
         )
-        settle(requeue = true)
+        settle(requeue = true) {
+            reportFailure(ConversationDictationCallerAudioFailure.PipeFailed)
+        }
     }
 
     /** Feeds an owned chunk until completion, cancellation, or a bounded nonblocking-write stall. */
@@ -579,22 +637,25 @@ internal class ConversationDictationCallerAudioStream(
         val sink = writeEnd.fileDescriptor
         var offset = 0
         var stalledAt: Long? = null
-        while (!cancelled.get() && offset < owned.pcm.size) {
-            try {
-                val written = pipeWriter.write(sink, owned.pcm, offset, owned.pcm.size - offset)
-                if (written > 0) {
-                    offset += written
-                    stalledAt = null
+        while (!cancelled.get() && !settled.get() && offset < owned.pcm.size) {
+            val written =
+                try {
+                    pipeWriter.write(sink, owned.pcm, offset, owned.pcm.size - offset)
+                } catch (failure: ErrnoException) {
+                    if (failure.errno != OsConstants.EAGAIN) throw failure
+                    0
                 }
-            } catch (failure: ErrnoException) {
-                if (failure.errno != OsConstants.EAGAIN) throw failure
-                val now = SystemClock.elapsedRealtime()
+            if (written > 0) {
+                offset += written
+                stalledAt = null
+            } else {
+                val now = capture.elapsedRealtimeMillis()
                 val since = stalledAt ?: now.also { stalledAt = it }
                 if (now - since >= PIPE_STALL_TIMEOUT_MILLIS) {
                     conversationDictationDiagnostic(
                         "event=caller_audio_write_stalled chunk=${owned.chunkId} bytes=$offset",
                     )
-                    retry()
+                    reportFeedFailure(IOException("provider audio pipe stalled"))
                     return
                 }
                 Thread.sleep(PIPE_RETRY_MILLIS)
@@ -611,6 +672,7 @@ internal class ConversationDictationCallerAudioStream(
     private fun settle(
         requeue: Boolean,
         coalesceFollowingAudio: Boolean = false,
+        onSettled: () -> Unit = {},
     ): Boolean {
         if (!settled.compareAndSet(false, true)) return false
         val owned = chunk.getAndSet(null)
@@ -622,6 +684,7 @@ internal class ConversationDictationCallerAudioStream(
                 else -> buffer.acknowledge(owned.chunkId)
             }
         capture.streamSettled(this)
+        onSettled()
         return changed
     }
 

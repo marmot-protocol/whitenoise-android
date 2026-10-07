@@ -173,6 +173,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Native capture and pipe failures queue to the owning recognition generation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "internal fun mainThreadDictationCallerAudioFailure(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

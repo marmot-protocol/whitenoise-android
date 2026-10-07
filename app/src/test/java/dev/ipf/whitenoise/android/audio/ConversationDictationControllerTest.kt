@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.content.pm.ServiceInfo
+import android.os.Looper
 import android.speech.SpeechRecognizer
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -18,6 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLog
 
@@ -6097,6 +6099,123 @@ class ConversationDictationControllerTest {
     }
 
     /** A typed capture overflow must destroy the recognizer and surface its cause in the visible session. */
+    /** The production main-queue bridge cannot consume a failure from an expired generation. */
+    @Test
+    fun queuedCaptureFailureWaitsForTheCurrentGenerationToAcceptIt() {
+        val fixture = fixture(draft = TextFieldValue("Draft"))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val old = fixture.platform.listener
+        var consumed = false
+        val acknowledge: (ConversationDictationCallerAudioFailure) -> Boolean = {
+            if (consumed) false else true.also { consumed = true }
+        }
+        mainThreadDictationCallerAudioFailure(old, acknowledge)(ConversationDictationCallerAudioFailure.CaptureFailed)
+        old.onResult("recognized prefix")
+        shadowOf(Looper.getMainLooper()).idle()
+        assertFalse(consumed)
+        fixture.scheduler.advanceBy(500L)
+        val current = fixture.platform.listener
+        val reportCurrent = mainThreadDictationCallerAudioFailure(current, acknowledge)
+        reportCurrent(ConversationDictationCallerAudioFailure.CaptureFailed)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(consumed)
+        assertEquals("Draft recognized prefix", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val replacement = fixture.controller.state
+        reportCurrent(ConversationDictationCallerAudioFailure.CaptureFailed)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(fixture.controller.state === replacement)
+    }
+
+    /** A recorder fault after Send keeps PCM and text recoverable until actual microphone closure. */
+    @Test
+    fun captureFailureDuringFinishNeverSendsPartialTextOrAcknowledgesEarlyClosure() {
+        val platform = FakePlatform(deferCaptureCompletion = true).apply {
+            pendingCallerAudio = true
+            deferCallerAudioFinish = true
+        }
+        var sends = 0
+        val fixture = fixture(
+            draft = TextFieldValue("Draft"),
+            platform = platform,
+            sendTranscriptIfOriginUnchanged = {
+                sends++
+                true
+            },
+        )
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        platform.listener.onResult("recognized prefix")
+        fixture.scheduler.advanceBy(500L)
+        fixture.controller.send()
+        var consumed = 0
+        val report = mainThreadDictationCallerAudioFailure(platform.listener) {
+            consumed++
+            true
+        }
+        report(ConversationDictationCallerAudioFailure.CaptureFailed)
+        shadowOf(Looper.getMainLooper()).idle()
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals(1, consumed)
+        assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+        assertEquals(ConversationDictationFailure.Unknown, failed.cause)
+        assertTrue(failed.recognitionIncomplete)
+        assertEquals("recognized prefix", failed.retainedTranscript)
+        assertEquals("Draft recognized prefix", fixture.drafts.getValue(key()).text)
+        assertTrue(fixture.controller.canRetryRetainedAudio)
+        assertTrue(fixture.controller.foregroundMicrophoneRequired)
+        assertEquals(0, sends)
+        checkNotNull(platform.callerAudioFinishCallback).invoke()
+        assertFalse(fixture.controller.foregroundMicrophoneRequired)
+        fixture.controller.cancelSession()
+    }
+
+    /** Pipe failures use the existing logical-session retry budget and reject the dead provider's final. */
+    @Test
+    fun callerAudioPipeRetriesAreBoundedAndRetainUnrecognizedAudio() {
+        val platform = FakePlatform().apply { pendingCallerAudio = true }
+        val fixture = fixture(draft = TextFieldValue("Draft"), platform = platform)
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        listOf(500L, 1_000L, 2_000L).forEach { delay ->
+            val dead = platform.listener
+            val session = platform.session
+            val report = mainThreadDictationCallerAudioFailure(dead) { true }
+            report(ConversationDictationCallerAudioFailure.PipeFailed)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(session.destroyed)
+            dead.onResult("must not be delivered")
+            assertEquals("Draft", fixture.drafts.getValue(key()).text)
+            fixture.scheduler.advanceBy(delay)
+            assertTrue(fixture.controller.state is ConversationDictationState.Starting)
+        }
+        val report = mainThreadDictationCallerAudioFailure(platform.listener) { true }
+        report(ConversationDictationCallerAudioFailure.PipeFailed)
+        shadowOf(Looper.getMainLooper()).idle()
+        val failed = fixture.controller.state as ConversationDictationState.Failed
+        assertEquals(ConversationDictationFailure.ProviderDisconnected, failed.reason)
+        assertTrue(fixture.controller.canRetryRetainedAudio)
+        assertTrue(platform.pendingCallerAudio)
+        assertEquals(0, fixture.writes)
+        fixture.controller.cancelSession()
+    }
+
+    /** A provider recovered on the next generation may still commit its recognized text. */
+    @Test
+    fun callerAudioPipeRecoveryCanSucceedBeforeExhaustingItsBudget() {
+        val fixture = fixture(draft = TextFieldValue("Draft"))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key()))
+        val report = mainThreadDictationCallerAudioFailure(fixture.platform.listener) { true }
+        report(ConversationDictationCallerAudioFailure.PipeFailed)
+        shadowOf(Looper.getMainLooper()).idle()
+        fixture.scheduler.advanceBy(500L)
+        fixture.platform.listener.onResult("recovered")
+        fixture.controller.paste()
+        assertEquals("Draft recovered", fixture.drafts.getValue(key()).text)
+        assertEquals(1, fixture.writes)
+        assertTrue(fixture.controller.state is ConversationDictationState.Idle)
+    }
+
     @Test
     fun callerAudioBufferOverflowFailsTheVisibleSession() {
         val platform = FakePlatform(callerAudio = ConversationDictationCallerAudioRequirement.Supported)
