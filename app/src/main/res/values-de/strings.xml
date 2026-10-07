@@ -2299,4 +2299,11 @@
     <string name="contact_picture_clear">Privates Bild entfernen</string>
     <string name="contact_picture_local_only">Nur für dieses Konto auf diesem Gerät. Wird nie geteilt oder hochgeladen.</string>
     <string name="contact_picture_failed">Dieses Bild konnte nicht verwendet oder die Änderungen nicht gespeichert werden. Die vorherige Auswahl bleibt erhalten. Erneut versuchen.</string>
+
+    <string name="add_conversation_to_home_screen">Zum Startbildschirm hinzufügen</string>
+    <string name="pinned_shortcut_unsupported">Dein Launcher unterstützt keine angehefteten Verknüpfungen.</string>
+    <string name="pinned_shortcut_already_added">Diese Unterhaltung ist bereits auf deinem Startbildschirm.</string>
+    <string name="pinned_shortcut_finish">Bestätige im Launcher, um diese Unterhaltung hinzuzufügen.</string>
+    <string name="pinned_shortcut_unavailable">Diese Unterhaltung ist nicht mehr verfügbar.</string>
+    <string name="pinned_shortcut_failed">Die Verknüpfung konnte nicht angefordert werden. Versuche es erneut.</string>
 </resources>

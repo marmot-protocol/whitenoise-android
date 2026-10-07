@@ -113,6 +113,7 @@ class ChatListProfileReturnSnapCoverageTest {
         )
     }
 
+    /** Notification and other non-list opens cannot consume a list-return head retained by an earlier route. */
     @Test
     fun nonListConversationOpensDoNotConsumeStaleReturnHead() {
         val mainShell = mainShellSource().readText()
@@ -121,7 +122,7 @@ class ChatListProfileReturnSnapCoverageTest {
         val notificationCommitBlock =
             mainShell.requiredSection(
                 start = "fun commitNotificationConversationOpen(chatItem: ChatListItem) {",
-                end = "\n        fun fallBackToChatList() {",
+                end = "\n        when (step) {",
             )
         assertTrue(
             "shared notification-open commit must reset armed return-head provenance",

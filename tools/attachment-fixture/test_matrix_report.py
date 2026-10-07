@@ -85,7 +85,7 @@ class MatrixTest(unittest.TestCase):
         self.assertFalse(result["performance_qualified"])
 
     def test_segment_isolates_one_sample_between_numbered_markers(self):
-        """A sample sees only the events between its marker and the next one."""
+        """Ordinary sample windows remain disjoint when every server event precedes the next marker."""
         events = profile([(65536, 2)])["ledger"]
         first, second = segment(events, 1), segment(events, 2)
         self.assertEqual(7, len(first))
@@ -93,6 +93,50 @@ class MatrixTest(unittest.TestCase):
         self.assertTrue(set(e["seq"] for e in first).isdisjoint(e["seq"] for e in second))
         self.assertIsNone(segment(events, 3))
         self.assertIsNone(segment(events, 99))
+
+    def test_late_server_events_stay_with_their_admitted_request(self):
+        """Final-byte and completion logging can follow the client's next marker without a refetch."""
+        item = profile([(65536, 2)])
+        ledger = item["ledger"]
+        first_get = next(e["seq"] for e in ledger if e["kind"] == "get")
+        late = [e for e in ledger if e["request"] == first_get and e["kind"] in ("body_bytes", "complete")]
+        ledger[:] = [e for e in ledger if e not in late]
+        next_marker = next(i for i, e in enumerate(ledger) if e["kind"] == "marker" and e["value"] == 2)
+        ledger[next_marker + 1:next_marker + 1] = late
+        sequences = {e["seq"]: i + 1 for i, e in enumerate(ledger)}
+        for event in ledger:
+            event["seq"] = sequences[event["seq"]]
+            if event["request"] is not None:
+                event["request"] = sequences[event["request"]]
+        first_get = sequences[first_get]
+        result = check_matrix(raw(item))
+        self.assertTrue(result["passed"], result)
+        first, second = segment(ledger, 1), segment(ledger, 2)
+        self.assertEqual(1, sum(e["kind"] == "complete" for e in first))
+        self.assertEqual(1, sum(e["kind"] == "complete" for e in second))
+        self.assertTrue(set(e["seq"] for e in first).isdisjoint(e["seq"] for e in second))
+
+        # Joining across a marker must not excuse a missing or duplicate acknowledgement.
+        for duplicate in (False, True):
+            altered = deepcopy(item)
+            events = altered["ledger"]
+            completion = next(e for e in events if e["kind"] == "complete" and e["request"] == first_get)
+            if duplicate:
+                events.append({**completion, "seq": 900})
+            else:
+                events.remove(completion)
+                altered["boundary"] -= 1
+            self.assertFalse(check_matrix(raw(altered))["passed"], duplicate)
+
+    def test_an_orphan_response_cannot_be_dropped_by_request_joining(self):
+        """An acknowledgement without an admitted parent remains material unexpected evidence."""
+        item = profile([(65536, 2)])
+        ledger = item["ledger"]
+        marker = next(i for i, e in enumerate(ledger) if e["kind"] == "marker" and e["value"] == 2)
+        ledger.insert(marker, {"seq": 900, "request": 899, "kind": "complete", "value": 0,
+                               "fixture": "u", "at_ns": MS})
+        item["boundary"] += 1
+        self.assertFalse(check_matrix(raw(item))["passed"])
 
     def test_a_retry_a_head_or_a_refetch_fails(self):
         """One extra request in a sample's own segment is a correctness failure whatever the latency."""

@@ -24,6 +24,8 @@ data class NotificationTarget(
     val messageIdHex: String?,
     val kind: NotificationTargetKind,
     val replyDraft: NotificationReplyDraft? = null,
+    /** Rechecked at final navigation commit so deletion also revokes an already queued launcher tap. */
+    val shortcutCapability: PinnedConversationCapability? = null,
 )
 
 /**

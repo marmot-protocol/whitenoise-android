@@ -106,13 +106,23 @@ class SettingsSignOutOperationTest {
 
     /** Waits for the actual native continuation, rather than treating an unchanged progress flag as proof of a call. */
     private fun awaitPending(fixture: Fixture) {
-        composeRule.waitUntil(TIMEOUT_MILLIS) { fixture.native.pending.get() != null }
+        composeRule.waitUntil(TIMEOUT_MILLIS) {
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
+            fixture.native.pending.get() != null
+        }
         composeRule.runOnIdle { assertTrue(fixture.state.signOutInProgress) }
     }
 
     /** Waits until the real helper's finally block releases teardown after the native result has been returned. */
     private fun awaitIdle(fixture: Fixture) {
-        composeRule.waitUntil(TIMEOUT_MILLIS) { !fixture.state.signOutInProgress }
+        composeRule.waitUntil(TIMEOUT_MILLIS) {
+            org.robolectric.Shadows
+                .shadowOf(android.os.Looper.getMainLooper())
+                .idle()
+            !fixture.state.signOutInProgress
+        }
         composeRule.runOnIdle {
             assertFalse(fixture.state.signOutInProgress)
             assertEquals(ACCOUNT_REF, fixture.state.activeAccountRef)

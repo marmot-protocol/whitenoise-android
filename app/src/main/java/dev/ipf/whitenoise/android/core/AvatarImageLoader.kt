@@ -644,6 +644,7 @@ internal class PartitionedProfileImageCache(
         image: ImageBitmap,
     ) {
         partitionFor(cacheKey).put(cacheKey, image)
+        if (profileImageVariantOf(cacheKey) == ProfileImageVariant.AVATAR) AvatarCacheChanges.published()
     }
 
     /** Drops both variants for account teardown without recording a capacity eviction. */
@@ -684,6 +685,10 @@ internal class PartitionedProfileImageCache(
                 value: ImageBitmap,
             ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
 
+            /**
+             * Records bounded cache eviction diagnostics and notifies avatar observers when their
+             * cached pixels change.
+             */
             override fun entryRemoved(
                 evicted: Boolean,
                 key: String,
@@ -691,6 +696,7 @@ internal class PartitionedProfileImageCache(
                 newValue: ImageBitmap?,
             ) {
                 if (evicted && kind != null) AvatarCacheDiagnostics.evicted(kind)
+                if (kind == AvatarCacheKind.PROFILE) AvatarCacheChanges.published()
             }
         }
     }

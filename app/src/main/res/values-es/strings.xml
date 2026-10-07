@@ -2282,4 +2282,11 @@
     <string name="contact_picture_clear">Quitar imagen privada</string>
     <string name="contact_picture_local_only">Solo para esta cuenta en este dispositivo. Nunca se comparte ni se sube.</string>
     <string name="contact_picture_failed">No se pudo usar esta imagen ni guardar los cambios. La selección anterior no ha cambiado. Inténtalo de nuevo.</string>
+
+    <string name="add_conversation_to_home_screen">Añadir a la pantalla de inicio</string>
+    <string name="pinned_shortcut_unsupported">Tu lanzador no admite accesos directos fijados.</string>
+    <string name="pinned_shortcut_already_added">Esta conversación ya está en tu pantalla de inicio.</string>
+    <string name="pinned_shortcut_finish">Confirma en tu lanzador para añadir esta conversación.</string>
+    <string name="pinned_shortcut_unavailable">Esta conversación ya no está disponible.</string>
+    <string name="pinned_shortcut_failed">No se pudo solicitar el acceso directo. Inténtalo de nuevo.</string>
 </resources>
