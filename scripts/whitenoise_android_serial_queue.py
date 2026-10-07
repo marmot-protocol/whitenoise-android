@@ -23,6 +23,7 @@ POLICY_VERSION = 1
 SHA = re.compile(r'[a-f0-9]{40}')
 DIGEST = re.compile(r'[a-f0-9]{64}')
 UNCERTAIN = {'attempted', 'unknown'}
+MAX_NOT_SENT_ATTEMPTS = 3
 
 
 class Held(ValueError):
@@ -177,12 +178,22 @@ def validate_journal(journal):
         raise Held('invalid-journal')
     for key, record in journal['effects'].items():
         if (not isinstance(record, dict) or record.get('state') not in
-                {'attempted', 'unknown', 'confirmed', 'refused', 'retired-closed', 'not-sent'}
+                {'attempted', 'unknown', 'confirmed', 'refused', 'retired-closed',
+                 'not-sent', 'not-sent-exhausted'}
                 or digest(record.get('payload')) != key
                 or record.get('payload', {}).get('repo') != REPO):
             raise Held('invalid-journal-record')
-        if record.get('state')=='not-sent' and not DIGEST.fullmatch(str(record.get('response_sha256',''))):
-            raise Held('not-sent-proof-required')
+        attempts = record.get('not_sent_attempts', 0)
+        if type(attempts) is not int or attempts < 0:
+            raise Held('invalid-not-sent-attempts')
+        budget = record.get('not_sent_budget', MAX_NOT_SENT_ATTEMPTS)
+        if type(budget) is not int or budget != MAX_NOT_SENT_ATTEMPTS:
+            raise Held('invalid-not-sent-budget')
+        if record['state'] in {'not-sent', 'not-sent-exhausted'}:
+            if not DIGEST.fullmatch(str(record.get('response_sha256', ''))):
+                raise Held('not-sent-proof-required')
+            if attempts == 0 or (record['state'] == 'not-sent-exhausted' and attempts < budget):
+                raise Held('invalid-not-sent-attempts')
         if record.get('state')=='retired-closed' and (not DIGEST.fullmatch(str(record.get('terminal_proof_sha256',''))) or not isinstance(record.get('retired_by'),dict) or record.get('terminal_unmerged') is not True):
             raise Held('retired-terminal-proof-required')
         payload = record['payload']
@@ -191,6 +202,21 @@ def validate_journal(journal):
         if rebuilt.payload() != payload:
             raise Held('invalid-journal-payload')
     return journal
+
+
+def previous_result(record):
+    if record is None:
+        return None
+    if record['state'] == 'not-sent-exhausted' or (
+            record['state'] == 'not-sent'
+            and record['not_sent_attempts'] >= MAX_NOT_SENT_ATTEMPTS):
+        return 'not-sent-exhausted-held'
+    if record['state'] != 'not-sent':
+        return {'refused': 'known-refusal-held',
+                'retired-closed': 'terminal-retired-held'}.get(record['state'], 'observed-confirmed')
+    if time.time() < record.get('retry_after', 0):
+        return 'not-sent-backoff'
+    return None
 
 
 def tick(journal, observe: Callable, candidate, verify_source: Callable,
@@ -219,10 +245,9 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
     if effect is None:
         return 'idle'
     key = effect.key()
-    previous=journal['effects'].get(key)
-    if previous and previous['state']!='not-sent':
-        return {'refused':'known-refusal-held','retired-closed':'terminal-retired-held'}.get(previous['state'],'observed-confirmed')
-    if previous and time.time()<previous.get('retry_after',0):return 'not-sent-backoff'
+    held = previous_result(journal['effects'].get(key))
+    if held:
+        return held
     if shadow:
         return 'shadow-eligible'
     # A second full fresh read and proof verification must agree. Unknown reads
@@ -241,21 +266,23 @@ def execute(journal, effect, write, readback, persist):
     if any(r['state'] in UNCERTAIN for r in journal['effects'].values()):
         return 'unknown-held'
     previous=journal['effects'].get(key)
-    if previous and previous['state']!='not-sent':
-        return {'refused':'known-refusal-held','retired-closed':'terminal-retired-held'}.get(previous['state'],'observed-confirmed')
-    if previous and time.time()<previous.get('retry_after',0):return 'not-sent-backoff'
+    held = previous_result(previous)
+    if held:
+        return held
     journal['effects'][key] = {'payload': effect.payload(), 'state': 'attempted', 'attempted_at': time.time(),
         'not_sent_attempts':(previous or {}).get('not_sent_attempts',0),
+        'not_sent_budget': MAX_NOT_SENT_ATTEMPTS,
         'last_not_sent_proof':(previous or {}).get('response_sha256')}
     persist()  # Any failure propagates: write has not been invoked.
     try:
         write(effect, key)
     except NotSent as refusal:
         attempts=journal['effects'][key].get('not_sent_attempts',0)+1
-        journal['effects'][key].update(state='not-sent',response_sha256=refusal.response_sha256,
+        exhausted = attempts >= MAX_NOT_SENT_ATTEMPTS
+        journal['effects'][key].update(state='not-sent-exhausted' if exhausted else 'not-sent',response_sha256=refusal.response_sha256,
             not_sent_attempts=attempts,retry_after=time.time()+min(60*2**min(attempts-1,4),900))
         persist()
-        return 'not-sent-backoff'
+        return 'not-sent-exhausted-held' if exhausted else 'not-sent-backoff'
     except DefiniteRefusal as refusal:
         journal['effects'][key].update(state='refused', response_sha256=refusal.response_sha256)
         persist()

@@ -250,6 +250,88 @@ class QueueTest(unittest.TestCase):
             self.tick(verify_source=lambda *_:None)
         self.assertFalse(self.writes)
 
+    def exhaust_never_sent_budget(self):
+        from unittest.mock import patch
+        attempts = []
+
+        def never_sent(effect, key):
+            self.assertEqual(self.saved[-1]['effects'][key]['state'], 'attempted')
+            attempts.append(effect)
+            raise q.NotSent('e' * 64)
+
+        for index in range(q.MAX_NOT_SENT_ATTEMPTS):
+            with patch.object(q.time, 'time', return_value=1000 + index * 1000):
+                result = self.tick(write=never_sent)
+            self.assertEqual(result, 'not-sent-exhausted-held' if index == 2 else 'not-sent-backoff')
+            # Load only the last persisted state, as a replacement process does.
+            self.journal = copy.deepcopy(self.saved[-1])
+        return attempts
+
+    def test_never_sent_exhaustion_survives_restart_and_later_ticks(self):
+        from unittest.mock import patch
+        attempts = self.exhaust_never_sent_budget()
+        record = next(iter(self.journal['effects'].values()))
+        self.assertEqual(record['state'], 'not-sent-exhausted')
+        self.assertEqual(record['not_sent_budget'], 3)
+        self.assertEqual(record['not_sent_attempts'], 3)
+        saved = copy.deepcopy(self.journal)
+        with patch.object(q.time, 'time', return_value=1000000):
+            for _ in range(5):
+                self.assertEqual(self.tick(), 'not-sent-exhausted-held')
+            self.assertEqual(self.tick(shadow=True), 'not-sent-exhausted-held')
+        self.assertEqual(len(attempts), 3)
+        self.assertEqual(self.journal, saved)
+        self.assertFalse(self.writes)
+
+    def test_direct_execution_cannot_bypass_exhausted_budget(self):
+        attempts = self.exhaust_never_sent_budget()
+        self.assertEqual(q.execute(self.journal, attempts[-1], self.write,
+                                  self.readback, self.save), 'not-sent-exhausted-held')
+        self.assertFalse(self.writes)
+
+    def test_legacy_never_sent_counter_at_limit_cannot_retry(self):
+        from unittest.mock import patch
+        self.exhaust_never_sent_budget()
+        record = next(iter(self.journal['effects'].values()))
+        record['state'] = 'not-sent'
+        record.pop('not_sent_budget')
+        with patch.object(q.time, 'time', return_value=1000000):
+            self.assertEqual(self.tick(), 'not-sent-exhausted-held')
+        self.assertFalse(self.writes)
+
+    def test_corrupt_retry_budget_or_counter_holds_without_invocation(self):
+        self.exhaust_never_sent_budget()
+        original = copy.deepcopy(self.journal)
+        for field, values in [('not_sent_attempts', [True, -1, '3', 0]),
+                              ('not_sent_budget', [True, -1, '3', 4])]:
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    self.journal = copy.deepcopy(original)
+                    next(iter(self.journal['effects'].values()))[field] = value
+                    with self.assertRaises(q.Held):
+                        self.tick()
+        self.assertFalse(self.writes)
+
+    def test_owner_generation_recovery_retains_exhaustion_and_revalidates(self):
+        self.exhaust_never_sent_budget()
+        old_key = next(iter(self.journal['effects']))
+        self.snapshot['generation'] = 1
+        with self.assertRaises(q.Held):
+            self.tick(verify_source=lambda *_: None)
+        self.assertFalse(self.writes)
+        calls = []
+        self.assertEqual(self.tick(verify_source=lambda *args: calls.append(args) or 'c' * 64),
+                         'authorize-source-confirmed')
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(self.journal['effects'][old_key]['state'], 'not-sent-exhausted')
+        self.assertEqual(self.writes[-1][0].generation, 1)
+
+    def test_generation_change_does_not_release_unknown_sent_effect(self):
+        self.assertEqual(self.tick(readback=lambda *_: False), 'unknown-held')
+        self.snapshot['generation'] = 1
+        self.assertEqual(self.tick(readback=lambda *_: False), 'unknown-held')
+        self.assertEqual(len(self.writes), 1)
+
     def test_corrupt_no_send_proof_cannot_be_retried(self):
         from unittest.mock import patch
         with patch.object(q.time,'time',return_value=1000):
