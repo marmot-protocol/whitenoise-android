@@ -18,6 +18,14 @@ trap finish EXIT
 printf 'emulator_ready_at=%s\n' "$(date +%s)" >> "$reports/timings.env"
 [[ "$(adb -s emulator-5554 shell getprop ro.build.version.sdk | tr -d '\r')" == 34 ]]
 [[ "$(adb -s emulator-5554 shell getprop ro.product.cpu.abi | tr -d '\r')" == x86_64 ]]
+# Fresh Google API images use English. Check it rather than attempting to set a
+# non-qemu property through emulator -prop (which Android does not support).
+locale=$(adb -s emulator-5554 shell getprop persist.sys.locale | tr -d '\r')
+if [[ -z "$locale" ]]; then
+  locale=$(adb -s emulator-5554 shell settings get system system_locales | tr -d '\r')
+fi
+printf '%s\n' "$locale" > "$reports/locale.txt"
+[[ "$locale" == en-US || "$locale" == en_US || "$locale" == en ]] || { echo 'Pilot selectors require English' >&2; exit 2; }
 # The pilot intentionally uses a dev benchmark APK; -t is confined to this emulator.
 adb -s emulator-5554 install -r -t "$reports/apk/app.apk"
 adb -s emulator-5554 shell settings put global airplane_mode_on 1
