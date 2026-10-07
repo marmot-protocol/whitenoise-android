@@ -61,9 +61,11 @@ branch writer or advance another PR. Obsolete integration authorization is
 revoked before reassessment. Final squash signature, parent and tree must match
 before releasing the slot. A known timeout/refusal can receive a new
 logged admission generation from the original source owner after fresh proof;
-this never replays an uncertain effect. Known pre-send guard/quota refusals
-carry a fixed marker and remain distinct from lost network responses. The
-CLI child verifies the journal intent and its actual ancestor producer lock.
+this never replays an uncertain effect. A positive local receipt that no
+request reached GitHub permits another attempt after bounded backoff and full
+fresh identity/proof checks. A remote API refusal stays held for explicit
+recovery; a sent request with a lost response stays uncertain. The CLI child
+verifies the journal intent and its actual ancestor producer lock.
 An explicit owner recovery can retire a positively closed, unmerged PR after
 two matching reads of the PR and an empty queue. It preserves the uncertain
 effect as terminal evidence, excludes the PR from future selection and never

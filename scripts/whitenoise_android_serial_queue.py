@@ -35,6 +35,10 @@ class DefiniteRefusal(Held):
         super().__init__('verified-api-refusal')
 
 
+class NotSent(DefiniteRefusal):
+    """Positive local proof that upstream mutation was never invoked."""
+
+
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True,
                                     separators=(',', ':')).encode()).hexdigest()
@@ -173,10 +177,12 @@ def validate_journal(journal):
         raise Held('invalid-journal')
     for key, record in journal['effects'].items():
         if (not isinstance(record, dict) or record.get('state') not in
-                {'attempted', 'unknown', 'confirmed', 'refused', 'retired-closed'}
+                {'attempted', 'unknown', 'confirmed', 'refused', 'retired-closed', 'not-sent'}
                 or digest(record.get('payload')) != key
                 or record.get('payload', {}).get('repo') != REPO):
             raise Held('invalid-journal-record')
+        if record.get('state')=='not-sent' and not DIGEST.fullmatch(str(record.get('response_sha256',''))):
+            raise Held('not-sent-proof-required')
         if record.get('state')=='retired-closed' and (not DIGEST.fullmatch(str(record.get('terminal_proof_sha256',''))) or not isinstance(record.get('retired_by'),dict) or record.get('terminal_unmerged') is not True):
             raise Held('retired-terminal-proof-required')
         payload = record['payload']
@@ -213,8 +219,10 @@ def tick(journal, observe: Callable, candidate, verify_source: Callable,
     if effect is None:
         return 'idle'
     key = effect.key()
-    if key in journal['effects']:
-        return {'refused':'known-refusal-held','retired-closed':'terminal-retired-held'}.get(journal['effects'][key]['state'],'observed-confirmed')
+    previous=journal['effects'].get(key)
+    if previous and previous['state']!='not-sent':
+        return {'refused':'known-refusal-held','retired-closed':'terminal-retired-held'}.get(previous['state'],'observed-confirmed')
+    if previous and time.time()<previous.get('retry_after',0):return 'not-sent-backoff'
     if shadow:
         return 'shadow-eligible'
     # A second full fresh read and proof verification must agree. Unknown reads
@@ -232,12 +240,22 @@ def execute(journal, effect, write, readback, persist):
     key = effect.key()
     if any(r['state'] in UNCERTAIN for r in journal['effects'].values()):
         return 'unknown-held'
-    if key in journal['effects']:
-        return {'refused':'known-refusal-held','retired-closed':'terminal-retired-held'}.get(journal['effects'][key]['state'],'observed-confirmed')
-    journal['effects'][key] = {'payload': effect.payload(), 'state': 'attempted', 'attempted_at': time.time()}
+    previous=journal['effects'].get(key)
+    if previous and previous['state']!='not-sent':
+        return {'refused':'known-refusal-held','retired-closed':'terminal-retired-held'}.get(previous['state'],'observed-confirmed')
+    if previous and time.time()<previous.get('retry_after',0):return 'not-sent-backoff'
+    journal['effects'][key] = {'payload': effect.payload(), 'state': 'attempted', 'attempted_at': time.time(),
+        'not_sent_attempts':(previous or {}).get('not_sent_attempts',0),
+        'last_not_sent_proof':(previous or {}).get('response_sha256')}
     persist()  # Any failure propagates: write has not been invoked.
     try:
         write(effect, key)
+    except NotSent as refusal:
+        attempts=journal['effects'][key].get('not_sent_attempts',0)+1
+        journal['effects'][key].update(state='not-sent',response_sha256=refusal.response_sha256,
+            not_sent_attempts=attempts,retry_after=time.time()+min(60*2**min(attempts-1,4),900))
+        persist()
+        return 'not-sent-backoff'
     except DefiniteRefusal as refusal:
         journal['effects'][key].update(state='refused', response_sha256=refusal.response_sha256)
         persist()

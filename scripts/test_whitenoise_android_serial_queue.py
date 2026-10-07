@@ -212,6 +212,52 @@ class QueueTest(unittest.TestCase):
         self.assertEqual(self.tick(), 'known-refusal-held')
         self.assertFalse(self.writes)
 
+    def test_two_positive_no_send_failures_recover_after_fresh_validation(self):
+        from unittest.mock import patch
+        attempts=[];proofs=[]
+        def write(effect,key):
+            self.assertEqual(self.saved[-1]['effects'][key]['state'],'attempted')
+            attempts.append(key)
+            if len(attempts)<3:raise q.NotSent('e'*64)
+            self.write(effect,key)
+        def proof(*args):proofs.append(args);return 'c'*64
+        with patch.object(q.time,'time',return_value=1000):
+            self.assertEqual(self.tick(write=write,verify_source=proof),'not-sent-backoff')
+            self.assertEqual(self.tick(write=write,verify_source=proof),'not-sent-backoff')
+        self.assertEqual(len(attempts),1)
+        with patch.object(q.time,'time',return_value=1060):
+            self.assertEqual(self.tick(write=write,verify_source=proof),'not-sent-backoff')
+        with patch.object(q.time,'time',return_value=1180):
+            before=len(proofs)
+            self.assertEqual(self.tick(write=write,verify_source=proof),'authorize-source-confirmed')
+            self.assertEqual(len(proofs)-before,2)
+        self.assertEqual(len(set(attempts)),1)
+        record=next(iter(self.journal['effects'].values()))
+        self.assertEqual(record['not_sent_attempts'],2)
+        self.assertEqual(record['last_not_sent_proof'],'e'*64)
+        self.assertEqual(record['state'],'confirmed')
+
+    def test_positive_no_send_retry_cannot_skip_fresh_identity_checks(self):
+        from unittest.mock import patch
+        with patch.object(q.time,'time',return_value=1000):
+            self.assertEqual(self.tick(write=lambda *_: (_ for _ in ()).throw(q.NotSent('e'*64))),'not-sent-backoff')
+        second=copy.deepcopy(self.snapshot);second['candidate']['source']='f'*40
+        with patch.object(q.time,'time',return_value=2000), self.assertRaises(q.Held):
+            reads=iter([self.snapshot,second]);self.tick(observe=lambda:next(reads))
+        self.assertFalse(self.writes)
+        self.assertEqual(next(iter(self.journal['effects'].values()))['state'],'not-sent')
+        with patch.object(q.time,'time',return_value=2000), self.assertRaises(q.Held):
+            self.tick(verify_source=lambda *_:None)
+        self.assertFalse(self.writes)
+
+    def test_corrupt_no_send_proof_cannot_be_retried(self):
+        from unittest.mock import patch
+        with patch.object(q.time,'time',return_value=1000):
+            self.tick(write=lambda *_: (_ for _ in ()).throw(q.NotSent('e'*64)))
+        next(iter(self.journal['effects'].values()))['response_sha256']='invalid'
+        with self.assertRaisesRegex(q.Held,'not-sent-proof'):self.tick()
+        self.assertFalse(self.writes)
+
     def test_explicit_recovery_generation_creates_a_new_pinned_attempt(self):
         self.tick()
         first = self.writes[-1][0]
