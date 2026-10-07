@@ -15,6 +15,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
@@ -26,6 +27,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@PullRequestDeviceSmoke
 @RunWith(AndroidJUnit4::class)
 class ComposerResizeAccessibilityAndroidTest {
     @get:Rule
@@ -59,7 +61,13 @@ class ComposerResizeAccessibilityAndroidTest {
         val description = composeRule.activity.getString(R.string.composer_resize)
         val accessibility = InstrumentationRegistry.getInstrumentation().uiAutomation
         composeRule.waitForIdle()
-        val info = accessibility.rootInActiveWindow?.findByDescription(description)
+        var candidate: AccessibilityNodeInfo? = null
+        // Compose idleness does not imply that Android exported its accessibility update.
+        composeRule.waitUntil(ACCESSIBILITY_EXPORT_TIMEOUT_MILLIS) {
+            candidate = accessibility.rootInActiveWindow?.findByDescription(description)
+            candidate != null
+        }
+        val info = candidate
 
         assertNotNull("the resize leaf must be exported through AccessibilityNodeInfo", info)
         checkNotNull(info)
@@ -87,6 +95,7 @@ class ComposerResizeAccessibilityAndroidTest {
     }
 
     private companion object {
+        const val ACCESSIBILITY_EXPORT_TIMEOUT_MILLIS = 10_000L
         const val LONG_DRAFT =
             "A thoughtful long message starts here.\n" +
                 "It keeps growing naturally line by line.\n" +

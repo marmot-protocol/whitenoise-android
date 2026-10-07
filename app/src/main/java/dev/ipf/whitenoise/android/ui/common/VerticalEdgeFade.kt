@@ -85,12 +85,9 @@ internal fun Modifier.verticalEdgeFade(
     this
         .graphicsLayer {
             outsets = SCROLL_LAYER_OUTSETS
-            compositingStrategy =
-                if (topFade() > 0.dp || bottomFade() > 0.dp || bottomInset() > 0.dp) {
-                    CompositingStrategy.Offscreen
-                } else {
-                    CompositingStrategy.Auto
-                }
+            // Keep the render target stable while scroll edges and IME geometry change.
+            // Only the mask changes; reaching an edge must not tear down its layer.
+            compositingStrategy = CompositingStrategy.Offscreen
         }.drawWithCache {
             val stops =
                 verticalEdgeFadeStops(
