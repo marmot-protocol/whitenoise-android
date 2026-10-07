@@ -22,6 +22,7 @@ internal class ConversationDictationDraftRecovery(
         val appendOnly: Boolean = false,
         val appendPayload: Boolean = false,
         val emptiedRevision: Long? = null,
+        val recoveryUnavailable: Boolean = false,
     )
 
     private var receipt: Receipt? = null
@@ -35,7 +36,7 @@ internal class ConversationDictationDraftRecovery(
         target: ConversationDictationTarget,
     ): Boolean = receipt?.let { it.session == session && it.target == target } == true
 
-    /** An accepted save survives editor changes, but our unresolved dispatch clear still needs recovery. */
+    /** A save survives verified editor changes; unreadable recovery and our own clear stay protected. */
     fun hasSavedTranscript(
         session: Long,
         target: ConversationDictationTarget,
@@ -46,7 +47,8 @@ internal class ConversationDictationDraftRecovery(
                 it.session == session &&
                     it.target == target &&
                     it.transcript == transcript.trim() &&
-                    it.emptiedRevision == null
+                    it.emptiedRevision == null &&
+                    !it.recoveryUnavailable
             } == true
 
     /** Tracks only the clear or restoration actually performed by this session's dispatch. */
@@ -60,7 +62,12 @@ internal class ConversationDictationDraftRecovery(
         if (clearedRevision != null) {
             receipt = saved.copy(emptiedRevision = clearedRevision)
         } else if (restoredRevision != null) {
-            receipt = saved.copy(draft = saved.draft.copy(revision = restoredRevision), emptiedRevision = null)
+            receipt =
+                saved.copy(
+                    draft = saved.draft.copy(revision = restoredRevision),
+                    emptiedRevision = null,
+                    recoveryUnavailable = false,
+                )
         }
     }
 
@@ -99,12 +106,18 @@ internal class ConversationDictationDraftRecovery(
         repeat(DICTATION_DRAFT_WRITE_ATTEMPTS) {
             if (result == RecoveryAttempt.Retry) result = recoverAttempt(session, target, text, options)
         }
-        return when (result) {
-            RecoveryAttempt.Written -> Result.Written
-            RecoveryAttempt.AlreadyPresent -> Result.AlreadyPresent
-            RecoveryAttempt.Superseded -> Result.Superseded
-            else -> Result.Unavailable
+        val outcome =
+            when (result) {
+                RecoveryAttempt.Written -> Result.Written
+                RecoveryAttempt.AlreadyPresent -> Result.AlreadyPresent
+                RecoveryAttempt.Superseded -> Result.Superseded
+                else -> Result.Unavailable
+            }
+        // Preserve historical ownership through failed reads, while protecting uncertain recovery.
+        receipt?.takeIf { it.session == session && it.target == target && it.transcript == text }?.let {
+            receipt = it.copy(recoveryUnavailable = outcome == Result.Unavailable)
         }
+        return outcome
     }
 
     private enum class RecoveryAttempt {

@@ -3146,6 +3146,58 @@ class ConversationDictationControllerTest {
             }
         }
 
+    /** An unavailable draft read cannot let an older save receipt silence recovery protection. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun unreadableSavedDraftStaysProtectedUntilVerificationOrWarnedExpiry() =
+        runTest {
+            for (edited in listOf("Edited text", "")) {
+                for (readRecovers in listOf(false, true)) {
+                    var readUnavailable = false
+                    var expired = 0
+                    val f = fixture(
+                        draft = TextFieldValue("Draft", TextRange(5)),
+                        targetValidationScope = this,
+                        onDraftRead = { check(!readUnavailable) },
+                        onRecoveryExpired = { expired++ },
+                    )
+                    f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+                    f.controller.send()
+                    f.platform.listener.onResult("retained")
+                    advanceUntilIdle()
+                    assertTrue((f.controller.state as ConversationDictationState.Failed).draftRecovered)
+                    f.edit(key(), TextFieldValue(edited, TextRange(edited.length)))
+                    readUnavailable = true
+                    f.controller.paste()
+                    advanceUntilIdle()
+                    assertTrue(f.controller.state is ConversationDictationState.Failed)
+                    assertTrue(f.controller.hasUnrecoveredTranscript)
+                    assertFalse(f.controller.canRetryRecoveredSend)
+                    assertFalse(f.controller.canRetryRetainedAudio)
+                    f.controller.onAppForegrounded()
+                    assertTrue(f.controller.hasDurableSession)
+                    assertEquals("retained", (f.controller.state as ConversationDictationState.Failed).retainedTranscript)
+                    assertEquals(1, f.writes)
+                    assertEquals(1, f.controller.completionRevision(ACCOUNT, GROUP))
+                    if (readRecovers) {
+                        readUnavailable = false
+                        f.controller.onAppForegrounded()
+                        assertFalse(f.controller.hasUnrecoveredTranscript)
+                        assertFalse(f.controller.hasDurableSession)
+                    }
+                    f.scheduler.sleepWithoutDispatch(30 * 60 * 1_000L)
+                    f.controller.onAppForegrounded()
+                    assertTrue(f.controller.state is ConversationDictationState.Idle)
+                    assertFalse(f.controller.hasDurableSession)
+                    assertEquals(if (readRecovers) 0 else 1, expired)
+                    assertEquals(edited, f.drafts.getValue(key()).text)
+                    assertEquals(1, f.writes)
+                    f.controller.onAppForegrounded()
+                    assertEquals(if (readRecovers) 0 else 1, expired)
+                }
+            }
+        }
+
     /** An involuntary replay teardown respects saved edits while protecting any unrecognized PCM. */
     @Test
     fun serviceTeardownCompletesSupersededPasteOnlyWithoutPendingAudio() {
