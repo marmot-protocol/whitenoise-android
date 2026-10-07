@@ -717,7 +717,8 @@ internal fun ComposerPill(
             minimumDictationWidth - (if (sendAccessoryContent != null) 66.dp else 0.dp)
     // A compact-height row cannot afford another toolbar above it; preserve its editor and core tools.
     val showDraftTop =
-        !geometryTransitionActive &&
+        textFieldValue.text.isNotEmpty() &&
+            !geometryTransitionActive &&
             draftTopGeometrySettled &&
             draftStartOffscreen &&
             (!multilineControlsSuppressed || navigationRoom >= 48.dp)
