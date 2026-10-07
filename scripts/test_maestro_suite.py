@@ -10,6 +10,17 @@ from scripts import maestro_suite as suite
 
 
 class MaestroSuiteTest(unittest.TestCase):
+    def test_captured_pinned_cli_output_reconciles_nine_actual_cases(self):
+        """Validate the real pinned Maestro report rather than relying solely on constructed XML."""
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary)
+            suite.prepare('offline-signin', '1', 'false', destination)
+            source = suite.ROOT / 'scripts/test-fixtures/maestro-2.11.0-signin-junit.xml'
+            (destination / 'junit.xml').write_bytes(source.read_bytes())
+            result = suite.report(destination, 0)
+            self.assertEqual(result['positive_passed'], 9)
+            self.assertTrue(result['evidence_complete'])
+
     def test_every_allowlisted_flow_starts_with_disposable_state(self):
         """A new flow cannot accidentally retain prior identity or enable sharing."""
         for filename, _ in suite.CASES.values():

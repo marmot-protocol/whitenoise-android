@@ -16,7 +16,7 @@ internal suspend fun verifyMaestroChatList(
         while (true) {
             val local = native.presentedChatListRow(owner, group)?.row
             val remote = native.presentedChatListRow(peer, group)?.row
-            check(remote != null && !remote.pinned) { "Alice's local action altered Bob's row" }
+            check(remote?.pinned != true) { "Alice's local action altered Bob's row" }
             val matched =
                 when (postcondition) {
                     "chat-deleted" -> local == null
@@ -24,7 +24,7 @@ internal suspend fun verifyMaestroChatList(
                     "chat-unpinned" -> local?.pinned == false
                     else -> error("Unknown chat-list postcondition")
                 }
-            if (matched) return@withTimeout
+            if (remote != null && matched) return@withTimeout
             delay(100L)
         }
     }

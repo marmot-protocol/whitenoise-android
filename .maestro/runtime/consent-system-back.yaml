@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: consent-system-back
+---
+- assertVisible: "Help Improve White Noise"
+- assertVisible: "Share usage"
+- assertVisible: "Share diagnostic logs"
+- back
+- assertVisible: "Maestro group"
+- assertNotVisible: "Help Improve White Noise"

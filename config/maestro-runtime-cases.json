@@ -971,6 +971,148 @@
       ],
       "assertions": "Confirmed local deletion removes only Alice row while Bob retains his actual group.",
       "postcondition": "chat-deleted"
+    },
+    "consent-default-close": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Closing untouched default-off choices reaches Chats and native telemetry is declined with logging still off.",
+      "postcondition": "consent-declined",
+      "fixture": "consent"
+    },
+    "consent-system-back": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "System Back dismisses the first-launch choice sheet and records decline without enabling logging.",
+      "postcondition": "consent-declined",
+      "fixture": "consent"
+    },
+    "consent-usage-details": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Usage disclosure expands and collapses without recording consent or enabling either choice.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "consent-logs-details": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Log disclosure is readable and can collapse while consent remains undecided and logging off.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "consent-details-independent": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Collapsing usage disclosure leaves diagnostic-log disclosure expanded without granting collection.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "consent-details-rotation": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Usage disclosure stays expanded across landscape and portrait recreation without recording consent.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "consent-log-confirm-cancel": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Enabling diagnostic logs requires the explicit upload disclosure; Cancel leaves native logging off and consent undecided.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "keys-empty": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Empty passwords disable both encrypted-backup destinations.",
+      "postcondition": "none"
+    },
+    "keys-short-boundary": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Matching eleven-character passwords remain invalid.",
+      "postcondition": "none"
+    },
+    "keys-minimum-boundary": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Matching twelve-character passwords enable both destinations without exporting.",
+      "postcondition": "none"
+    },
+    "keys-mismatch": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Different valid-length passwords cannot request a backup.",
+      "postcondition": "none"
+    },
+    "keys-cancel-clears": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Cancel erases valid passphrases before the next dialog opens.",
+      "postcondition": "none"
+    },
+    "keys-back-clears": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "System Back dismisses and clears passphrases without exporting.",
+      "postcondition": "none"
+    },
+    "keys-correct-mismatch": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Correcting confirmation enables both destinations and clears mismatch feedback.",
+      "postcondition": "none"
+    },
+    "keys-rotation-clears": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Activity recreation clears transient export passphrases and leaves the raw key hidden.",
+      "postcondition": "none"
     }
   }
 }

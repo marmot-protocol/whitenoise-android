@@ -28,12 +28,11 @@ internal suspend fun verifyMaestroPoll(
             val remote = matchingMaestroPoll(native, peer, group, question)
             if (
                 local != null &&
-                remote != null &&
-                matchesMaestroTally(local, labels) &&
-                matchesMaestroTally(remote, labels)
+                remote != null
             ) {
+                val tallyMatches = matchesMaestroTally(local, labels) && matchesMaestroTally(remote, labels)
                 val selection = local.options.filter { it.id in local.localSelection }.map { it.label }.toSet()
-                if (selection == labels) return@withTimeout
+                if (tallyMatches && selection == labels) return@withTimeout
             }
             delay(100L)
         }

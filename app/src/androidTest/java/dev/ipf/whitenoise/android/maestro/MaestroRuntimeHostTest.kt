@@ -49,6 +49,8 @@ private val MAESTRO_POSTCONDITIONS =
         "chat-deleted",
         "chat-pinned",
         "chat-unpinned",
+        "consent-pending",
+        "consent-declined",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
@@ -159,7 +161,7 @@ class MaestroRuntimeHostTest {
                             .toString(),
                     )
                     activity = ActivityScenario.launch(MainActivity::class.java)
-                    awaitMaestroFixtureWindow(directory)
+                    awaitMaestroFixtureWindow(directory, requireConsent = fixture == "consent")
                     File(directory, "ready.json").writeText(
                         JSONObject()
                             .put("generation", generation)
@@ -212,6 +214,9 @@ class MaestroRuntimeHostTest {
         }
         if (postcondition.startsWith("chat-")) {
             verifyMaestroChatList(native, checkNotNull(state?.activeAccountRef), peerLabel, group, postcondition)
+        }
+        if (postcondition.startsWith("consent-")) {
+            verifyMaestroConsent(native, checkNotNull(state), postcondition)
         }
         if (postcondition.startsWith("folder-")) {
             val app = checkNotNull(state)

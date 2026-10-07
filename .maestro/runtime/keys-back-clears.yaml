@@ -1,0 +1,35 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-back-clears
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- tapOn: "Profile Keys"
+- assertVisible: "Private key hidden"
+- tapOn: "Export Encrypted Private Key"
+- assertVisible: "Encrypted Private Key"
+- tapOn: "Password"
+- inputText: "Maestro-test1!"
+- tapOn: "Confirm password"
+- inputText: "Maestro-test1!"
+- hideKeyboard
+- assertVisible:
+    text: "View backup"
+    enabled: true
+- assertVisible:
+    text: "Export"
+    enabled: true
+- back
+- assertVisible: "Private key hidden"
+- tapOn: "Export Encrypted Private Key"
+- assertVisible: "Encrypted Private Key"
+- hideKeyboard
+- assertVisible:
+    text: "View backup"
+    enabled: false
+- assertVisible:
+    text: "Export"
+    enabled: false
+- tapOn: "Cancel"
+- assertVisible: "Private key hidden"
+- assertNotVisible: "Encrypted Private Key"

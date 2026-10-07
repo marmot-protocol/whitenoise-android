@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: consent-logs-details
+---
+- assertVisible: "Help Improve White Noise"
+- assertVisible: "Share usage"
+- assertVisible: "Share diagnostic logs"
+- tapOn: "Share diagnostic logs, Details"
+- scrollUntilVisible:
+    element:
+      text: "Group diagnostic logs help investigate reliability problems.*"
+    direction: DOWN
+- assertVisible: "Group diagnostic logs help investigate reliability problems.*"
+- scrollUntilVisible:
+    element:
+      text: "Share diagnostic logs, Hide details"
+    direction: UP
+- tapOn: "Share diagnostic logs, Hide details"
+- assertVisible: "Share usage, Details"

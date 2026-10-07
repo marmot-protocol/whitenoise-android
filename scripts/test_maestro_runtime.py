@@ -206,6 +206,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(jobs['maestro-runtime']['needs'], 'maestro-runtime-build')
         self.assertNotIn('gradlew', json.dumps(jobs['maestro-runtime']))
         self.assertEqual(jobs['maestro-runtime']['strategy']['max-parallel'], 2)
+        self.assertGreater(jobs['maestro-runtime']['timeout-minutes'] * 60,
+                           runtime.CAMPAIGN_SECONDS + 300 + runtime.CASE_RESERVE_SECONDS)
         self.assertEqual(jobs['maestro-runtime']['env']['MAESTRO_PAIR_PRODUCER_ATTEMPT'],
                          '${{ needs.maestro-runtime-build.outputs.pair_attempt }}')
         download = next(step for step in jobs['maestro-runtime']['steps'] if 'download-artifact' in step.get('uses', ''))

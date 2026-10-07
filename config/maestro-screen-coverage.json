@@ -31,7 +31,15 @@
       "navigation-profile-edit-cancel"
     ],
     "AccountKeys": [
-      "settings-profile-keys"
+      "settings-profile-keys",
+      "keys-empty",
+      "keys-short-boundary",
+      "keys-minimum-boundary",
+      "keys-mismatch",
+      "keys-cancel-clears",
+      "keys-back-clears",
+      "keys-correct-mismatch",
+      "keys-rotation-clears"
     ],
     "Relays": [
       "advanced-relays"

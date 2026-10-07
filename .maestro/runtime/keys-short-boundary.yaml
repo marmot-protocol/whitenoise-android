@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-short-boundary
+---
+- assertVisible: "Maestro group"
+- tapOn: "Open settings.*"
+- assertVisible: "Settings"
+- tapOn: "Profile Keys"
+- assertVisible: "Private key hidden"
+- tapOn: "Export Encrypted Private Key"
+- assertVisible: "Encrypted Private Key"
+- tapOn: "Password"
+- inputText: "12345678901"
+- tapOn: "Confirm password"
+- inputText: "12345678901"
+- hideKeyboard
+- assertVisible:
+    text: "View backup"
+    enabled: false
+- assertVisible:
+    text: "Export"
+    enabled: false
+- assertVisible: "Too short"
+- tapOn: "Cancel"
+- assertVisible: "Private key hidden"
+- assertNotVisible: "Encrypted Private Key"
