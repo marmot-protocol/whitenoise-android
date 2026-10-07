@@ -1346,7 +1346,13 @@ internal fun ChatsScreen(
                     returnedSearchSelection == searchViewport?.selection?.selected &&
                     returnedSearchSelection?.matches(item.group.groupIdHex, bodyMatch.messageIdHex) == true
             val returnFocus =
-                globalSearchReturnFocusModifier(returnedRow, searchViewport?.selection?.returnGeneration ?: 0L) {
+                globalSearchReturnFocusModifier(
+                    restoredSelection = returnedRow,
+                    returnGeneration = searchViewport?.selection?.returnGeneration ?: 0L,
+                    consumeReturn = {
+                        searchViewport?.selection?.let { it.consumeReturnFocus(it.returnGeneration) } == true
+                    },
+                ) {
                     !chatListState.isScrollInProgress &&
                         chatListState.layoutInfo.visibleItemsInfo.any { it.key == rowId }
                 }

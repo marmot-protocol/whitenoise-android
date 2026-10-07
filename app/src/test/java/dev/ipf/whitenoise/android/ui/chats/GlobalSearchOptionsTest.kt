@@ -45,7 +45,16 @@ class GlobalSearchOptionsTest {
         composeRule.waitUntil(OPTIONS_TIMEOUT_MILLIS) { !visible.loading && visible.senders.isNotEmpty() }
         composeRule.runOnIdle {
             // An ordinary activity/unread republish is not a picker dependency.
-            scope.value = scope.value.copy(chatChoices = listOf(row.copy(hasOptimisticSendPreview = true)))
+            val republished =
+                row.copy(
+                    hasOptimisticSendPreview = true,
+                    group =
+                        row.group.copy(
+                            description = "Updated non-picker metadata",
+                            relays = listOf("wss://relay.test"),
+                        ),
+                )
+            scope.value = scope.value.copy(chatChoices = listOf(republished), senderChats = listOf(republished))
         }
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(1, calls.get()) }

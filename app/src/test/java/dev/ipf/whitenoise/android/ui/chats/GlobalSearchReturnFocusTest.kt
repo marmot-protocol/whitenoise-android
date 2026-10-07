@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performSemanticsAction
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -104,6 +105,55 @@ class GlobalSearchReturnFocusTest {
         composeRule.onNodeWithTag("next").assertIsFocused()
         composeRule.runOnIdle { selected.value = false }
         composeRule.onNodeWithTag("returned").assertIsNotFocused()
+    }
+
+    @Test
+    fun remountedRowCannotStealFocusUntilAnotherExplicitReturn() {
+        val mounted = mutableStateOf(false)
+        val owner = GlobalSearchSelectionOwner(mutableStateOf(GlobalSearchSelectedResult("group", "message")))
+        composeRule.setContent {
+            inputModeManager = LocalInputModeManager.current
+            WhiteNoiseTheme {
+                Column {
+                    if (mounted.value) {
+                        Button(
+                            onClick = {},
+                            modifier =
+                                globalSearchReturnFocusModifier(
+                                    restoredSelection = true,
+                                    returnGeneration = owner.returnGeneration,
+                                    consumeReturn = { owner.consumeReturnFocus(owner.returnGeneration) },
+                                ) { true }.testTag("recycled"),
+                        ) { Text("Returned result") }
+                    }
+                    Button(onClick = {}, modifier = Modifier.testTag("other")) { Text("Other result") }
+                }
+            }
+        }
+        composeRule.runOnIdle {
+            assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard))
+            mounted.value = true
+        }
+        composeRule.onNodeWithTag("recycled").assertIsFocused()
+        composeRule.onNodeWithTag("other").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.onNodeWithTag("other").assertIsFocused()
+        composeRule.runOnIdle { mounted.value = false }
+        composeRule.runOnIdle { mounted.value = true }
+        composeRule.onNodeWithTag("other").assertIsFocused()
+        composeRule.onNodeWithTag("recycled").assertIsNotFocused()
+        composeRule.runOnIdle { owner.onConversationReturned() }
+        composeRule.onNodeWithTag("recycled").assertIsFocused()
+    }
+
+    @Test
+    fun focusConsumptionRejectsRepeatedAndSupersededReturns() {
+        val owner = GlobalSearchSelectionOwner(mutableStateOf(GlobalSearchSelectedResult()))
+        assertTrue(owner.consumeReturnFocus(0L))
+        assertFalse(owner.consumeReturnFocus(0L))
+        owner.onConversationReturned()
+        assertFalse(owner.consumeReturnFocus(0L))
+        assertTrue(owner.consumeReturnFocus(1L))
+        assertFalse(owner.consumeReturnFocus(1L))
     }
 
     @Test

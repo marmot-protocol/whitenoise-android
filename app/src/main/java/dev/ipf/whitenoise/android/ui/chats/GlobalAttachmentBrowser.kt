@@ -200,7 +200,13 @@ private fun GlobalAttachmentGrid(
                             item.attachmentIndex,
                         ) == true
                 val returnFocus =
-                    globalSearchReturnFocusModifier(returnedRow, layout.selectionOwner?.returnGeneration ?: 0L) {
+                    globalSearchReturnFocusModifier(
+                        restoredSelection = returnedRow,
+                        returnGeneration = layout.selectionOwner?.returnGeneration ?: 0L,
+                        consumeReturn = {
+                            layout.selectionOwner?.let { it.consumeReturnFocus(it.returnGeneration) } == true
+                        },
+                    ) {
                         !layout.state.isScrollInProgress &&
                             layout.state.layoutInfo.visibleItemsInfo
                                 .any { it.key == globalLibraryItemTag(item) }

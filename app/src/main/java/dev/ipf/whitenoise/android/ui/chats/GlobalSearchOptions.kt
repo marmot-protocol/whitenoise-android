@@ -6,10 +6,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
-import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.PresentationTextFfi
+import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.canonicalChatListGroupId
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ProfilePresentationRevision
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -48,24 +49,32 @@ private data class GlobalSearchOptionsBoundary(
 
 /** Excludes message previews, unread counters and ordering from picker projection ownership. */
 private data class GlobalSearchChatChoiceKey(
-    val group: AppGroupRecordFfi,
-    val presentation: ConversationPresentationFfi?,
+    val groupId: String,
+    val name: String,
+    val pendingInviteAccount: String?,
+    val selectedTitle: PresentationTextFfi?,
     val projectedTitle: String?,
     val kind: ChatConversationKindFfi?,
     val peer: String?,
     val memberCount: Int,
     val soleSelfMember: Boolean,
+    val avatarSeed: String?,
+    val avatarUrl: String?,
 )
 
 private fun ChatListItem.choiceKey(): GlobalSearchChatChoiceKey =
     GlobalSearchChatChoiceKey(
-        group,
-        selectedPresentation,
+        canonicalChatListGroupId(group.groupIdHex),
+        group.name,
+        GroupProjector.inviteAccount(group, presentationOtherMemberAccount),
+        selectedPresentation?.title,
         projectedTitle,
         projection?.conversationKind,
         presentationOtherMemberAccount,
         presentationMemberCount,
         presentationActiveAccountIsSoleMember,
+        selectedAvatarSeed,
+        selectedAvatarUrl,
     )
 
 /** Project large local rosters off-main; request identity rejects old account/scope and A–B–A results. */

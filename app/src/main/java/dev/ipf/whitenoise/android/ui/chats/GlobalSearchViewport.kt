@@ -76,9 +76,17 @@ internal class GlobalSearchSelectionOwner(
 
     var returnGeneration by mutableLongStateOf(0L)
         private set
+    private var consumedFocusGeneration: Long? = null
 
     fun onConversationReturned() {
         returnGeneration++
+    }
+
+    /** A lazy row may remount many times; only the explicit return owns one focus attempt. */
+    fun consumeReturnFocus(generation: Long): Boolean {
+        if (generation != returnGeneration || consumedFocusGeneration == generation) return false
+        consumedFocusGeneration = generation
+        return true
     }
 }
 

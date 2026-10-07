@@ -14,14 +14,17 @@ import androidx.compose.ui.focus.focusRequester
 internal fun globalSearchReturnFocusModifier(
     restoredSelection: Boolean,
     returnGeneration: Long = 0L,
+    consumeReturn: () -> Boolean = { true },
     isVisible: () -> Boolean,
 ): Modifier {
     val requester = remember { FocusRequester() }
     val visible = rememberUpdatedState(isVisible)
+    val consume = rememberUpdatedState(consumeReturn)
     LaunchedEffect(restoredSelection, returnGeneration) {
         if (restoredSelection) {
             withFrameNanos { }
-            if (visible.value()) requester.requestFocus()
+            // Consume even an offscreen/touch-mode attempt, so recycling cannot steal later user focus.
+            if (consume.value() && visible.value()) requester.requestFocus()
         }
     }
     return Modifier.focusRequester(requester)
