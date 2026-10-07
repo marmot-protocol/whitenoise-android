@@ -37,6 +37,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -317,7 +318,7 @@ class NotificationStartupOrderingTest {
             assertLateCorrectionRejectedAtFinalWrite(
                 accounts = listOf(signingAccount("account-a", "self")),
             ) { fixture ->
-                fixture.appState.setConversationNotifyForMode("group-a", ChatNotifyMode.MENTIONS_ONLY)
+                fixture.appState.setConversationNotifyForMode(fixture.update.groupIdHex, ChatNotifyMode.MENTIONS_ONLY)
             }
         }
 
@@ -734,11 +735,12 @@ class NotificationStartupOrderingTest {
             }
         }
 
+    /** Returns the live platform notification for the fixture's conversation card. */
     private fun NotificationBootstrapTestFixture.activeNotification(): Notification =
         context
             .getSystemService(NotificationManager::class.java)
             .activeNotifications
-            .single { it.tag == "account-a|group-a" }
+            .single { it.tag == notificationCardKey.tag && it.id == notificationCardKey.id }
             .notification
 
     private fun NotificationBootstrapTestFixture.activeMessagingStyle(): NotificationCompat.MessagingStyle =
@@ -788,6 +790,31 @@ class NotificationStartupOrderingTest {
         }
     }
 
+    /** Gives each late writer a distinct card, keeping other pending notification hooks out of its barriers. */
+    private fun lateCorrectionFixture(
+        accounts: List<AccountSummaryFfi>,
+        releaseFirstRead: CountDownLatch,
+    ): NotificationBootstrapTestFixture {
+        val fixtureIdentity =
+            UUID
+                .randomUUID()
+                .toString()
+                .replace("-", "")
+                .padEnd(64, '0')
+        return NotificationBootstrapTestFixture(
+            context = context,
+            notificationUsersHaveDisplayNames = true,
+            previewText = "**resolved after fallback**",
+            messageIdHex = fixtureIdentity,
+            groupIdHex = fixtureIdentity,
+            accounts = accounts,
+            onDisplayName = { _, _ ->
+                releaseFirstRead.await(5, TimeUnit.SECONDS)
+                "Alice"
+            },
+        )
+    }
+
     /** Holds a late writer at its final gate, applies invalidation, then releases it. */
     private suspend fun assertLateCorrectionRejectedAtFinalWrite(
         accounts: List<AccountSummaryFfi>,
@@ -800,26 +827,23 @@ class NotificationStartupOrderingTest {
         val correctionFinished = CountDownLatch(1)
         val writes = AtomicInteger(0)
         val correctionClaimed = AtomicBoolean(false)
-        val fixture =
-            NotificationBootstrapTestFixture(
-                context = context,
-                notificationUsersHaveDisplayNames = true,
-                previewText = "**resolved after fallback**",
-                accounts = accounts,
-                onDisplayName = { _, _ ->
-                    releaseFirstRead.await(5, TimeUnit.SECONDS)
-                    "Alice"
-                },
-            )
+        val fixture = lateCorrectionFixture(accounts, releaseFirstRead)
         ConversationCardPostSynchronizer.testHook =
             object : ConversationCardTestHook {
+                /** Parks the fixture card's second show-notify write before it lands and counts completed writes. */
                 override fun onBarrier(
                     op: ConversationCardOp,
                     barrier: ConversationCardBarrier,
                     notificationTag: String,
                     notificationId: Int,
                 ) {
-                    if (op != ConversationCardOp.SHOW_NOTIFY) return
+                    if (
+                        op != ConversationCardOp.SHOW_NOTIFY ||
+                        notificationTag != fixture.notificationCardKey.tag ||
+                        notificationId != fixture.notificationCardKey.id
+                    ) {
+                        return
+                    }
                     if (
                         barrier == ConversationCardBarrier.BEFORE_WRITE &&
                         writes.get() == 1 &&
@@ -831,12 +855,16 @@ class NotificationStartupOrderingTest {
                     if (barrier == ConversationCardBarrier.AFTER_WRITE) writes.incrementAndGet()
                 }
 
+                /** Reports that the parked correction has released the card lock. */
                 override fun onLockReleased(
                     op: ConversationCardOp,
                     notificationTag: String,
                     notificationId: Int,
                 ) {
-                    if (op == ConversationCardOp.SHOW_NOTIFY && correctionClaimed.get()) {
+                    val ownsCard =
+                        notificationTag == fixture.notificationCardKey.tag &&
+                            notificationId == fixture.notificationCardKey.id
+                    if (op == ConversationCardOp.SHOW_NOTIFY && ownsCard && correctionClaimed.get()) {
                         correctionFinished.countDown()
                     }
                 }
@@ -846,6 +874,15 @@ class NotificationStartupOrderingTest {
             fixture.awaitNotificationPosted()
             awaitWrites(writes, expected = 1)
             assertEquals(1, writes.get())
+            assertEquals(
+                "**resolved after fallback**",
+                fixture
+                    .activeMessagingStyle()
+                    .messages
+                    .single()
+                    .text
+                    .toString(),
+            )
 
             releaseFirstRead.countDown()
             awaitLatch(correctionBeforeWrite)
@@ -875,7 +912,7 @@ class NotificationStartupOrderingTest {
                     preloadPolicy = AccountSwitchPreloadPolicy.TARGET_CONVERSATION_FIRST,
                 )
             }
-            fixture.appState.setConversationNotifyForMode("group-a", ChatNotifyMode.ALL)
+            fixture.appState.setConversationNotifyForMode(fixture.update.groupIdHex, ChatNotifyMode.ALL)
             fixture.close()
         }
     }

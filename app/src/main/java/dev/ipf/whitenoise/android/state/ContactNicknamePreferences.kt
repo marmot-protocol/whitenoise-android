@@ -12,6 +12,7 @@ import java.util.Locale
 internal object ContactNicknamePreferences {
     private const val KeyPrefix = "contact_nickname:"
 
+    /** Rejects incomplete ownership and combines a length-prefixed account scope with a normalized contact key. */
     fun preferenceKey(
         accountRef: String?,
         contactPubkeyHex: String,
@@ -21,15 +22,18 @@ internal object ContactNicknamePreferences {
         return accountKeyPrefix(account) + contact
     }
 
+    /** Reads the account-private nickname under the shared picture/details transaction lock. */
     fun readNickname(
         preferences: SharedPreferences,
         accountRef: String?,
         contactPubkeyHex: String,
-    ): String? {
-        val key = preferenceKey(accountRef, contactPubkeyHex) ?: return null
-        return ProfileSanitizer.displayName(preferences.getString(key, null))
-    }
+    ): String? =
+        synchronized(ContactPictureStore.lock) {
+            val key = preferenceKey(accountRef, contactPubkeyHex) ?: return@synchronized null
+            ProfileSanitizer.displayName(preferences.getString(key, null))
+        }
 
+    /** Stores only normalized changes and removes blank overrides so public defaults remain authoritative. */
     fun writeNickname(
         preferences: SharedPreferences,
         accountRef: String?,
@@ -50,6 +54,7 @@ internal object ContactNicknamePreferences {
         return true
     }
 
+    /** Commits deletion of the exact account prefix on disk; similar account labels retain their private records. */
     fun clearAllForAccount(
         preferences: SharedPreferences,
         accountRef: String?,
@@ -65,11 +70,13 @@ internal object ContactNicknamePreferences {
         return edit.commit()
     }
 
+    /** Trims local account labels without changing their case-sensitive storage identity. */
     private fun normalizedAccountRef(accountRef: String?): String? =
         accountRef
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
 
+    /** Canonicalizes hex contact identity independently of the viewing account label. */
     private fun normalizedContactPubkey(contactPubkeyHex: String): String? =
         contactPubkeyHex
             .trim()
@@ -79,5 +86,7 @@ internal object ContactNicknamePreferences {
     // Key by the Marmot account ref/label rather than account hex: writes use
     // WhiteNoiseAppState.activeAccountRef, notification updates carry
     // update.accountRef, and sign-out/wipe cleanup receives the same ref.
+
+    /** Length-prefixes the account label so prefix-based cleanup cannot match another account. */
     private fun accountKeyPrefix(accountRef: String): String = "$KeyPrefix${accountRef.length}:$accountRef:"
 }

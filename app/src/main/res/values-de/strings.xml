@@ -2291,4 +2291,12 @@
     <string name="gestures_read_unread">Gelesen / ungelesen</string>
     <string name="gestures_mute_unmute">Stumm / Ton an</string>
     <string name="gestures_pin_unpin">Anheften / lösen</string>
+
+    <string name="contact_private_picture">Privates Bild</string>
+    <string name="contact_picture_pick">Foto auswählen</string>
+    <string name="contact_picture_replace">Foto ersetzen</string>
+    <string name="contact_picture_reposition">Verschieben / zuschneiden</string>
+    <string name="contact_picture_clear">Privates Bild entfernen</string>
+    <string name="contact_picture_local_only">Nur für dieses Konto auf diesem Gerät. Wird nie geteilt oder hochgeladen.</string>
+    <string name="contact_picture_failed">Dieses Bild konnte nicht verwendet oder die Änderungen nicht gespeichert werden. Die vorherige Auswahl bleibt erhalten. Erneut versuchen.</string>
 </resources>

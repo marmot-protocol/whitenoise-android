@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -11,7 +12,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.test.espresso.Espresso
+import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
+import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.ui.chats.ChatRowPortFixtures
+import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
+import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -23,6 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.Locale
 
 /** Regression coverage for native selection ownership across scroll, Back, and reopen. */
 @RunWith(RobolectricTestRunner::class)
@@ -34,7 +41,20 @@ class MessageFullScreenSelectionBackTest {
 
     /** Back clears an active native range before it dismisses the reader. */
     @Test
-    fun backClearsSelectionBeforeDismissingTheReader() {
+    fun backClearsSelectionBeforeDismissingTheReader() = selectionBackScenario(hosted = false)
+
+    /** The real playback host must preserve the same two-step Back contract while the speech strip is visible. */
+    @Test
+    fun playbackControlsPreserveNativeSelectionBackOrder() = selectionBackScenario(hosted = true)
+
+    /** Exercises native long-press selection and platform Back without replacing the reader's selection controller. */
+    private fun selectionBackScenario(hosted: Boolean) {
+        val appState = if (hosted) ChatRowPortFixtures.state(composeRule.activity) else null
+        if (appState != null) {
+            appState.ttsController.attachEngine(FakeSessionEngine())
+            assertTrue(appState.speakAloud(listOf(TtsSpeakableEntry("speech", "Alice", "Active speech.")), Locale.US))
+        }
+        val host = appState?.let { ShellPlaybackHost(it) {} }
         val body = "select this word before closing the reader"
         var selection: ReaderTextSelectionController? = null
         var dismissCount = 0
@@ -42,11 +62,13 @@ class MessageFullScreenSelectionBackTest {
             WhiteNoiseTheme {
                 val controller = rememberReaderTextSelectionController(body)
                 selection = controller
-                reader(
-                    body = body,
-                    selection = controller,
-                    onDismiss = { dismissCount++ },
-                )
+                if (host == null) {
+                    reader(body = body, selection = controller, onDismiss = { dismissCount++ })
+                } else {
+                    CompositionLocalProvider(LocalShellPlaybackHost provides host) {
+                        reader(body = body, selection = controller, onDismiss = { dismissCount++ })
+                    }
+                }
             }
         }
 
@@ -60,7 +82,10 @@ class MessageFullScreenSelectionBackTest {
         }
 
         pressBack()
-        composeRule.runOnIdle { assertEquals(1, dismissCount) }
+        composeRule.runOnIdle {
+            assertEquals(1, dismissCount)
+            appState?.stopSpeaking()
+        }
     }
 
     /** Reopening content cannot inherit the prior reader's native selection. */

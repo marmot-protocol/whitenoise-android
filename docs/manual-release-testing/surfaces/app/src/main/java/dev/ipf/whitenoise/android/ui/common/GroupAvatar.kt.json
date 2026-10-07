@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/GroupAvatar.kt",
+  "legacy_sha256": "cdf369d1750f31be8ea386ae8059bc483abee0beedc91e4c8470f663dfb65980",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "private_contact_group_avatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/GroupAvatar.kt",
+        "anchor": "fun rememberGroupAvatarPresentation(",
+        "test_ids": [
+          "PRO-008"
+        ]
+      },
+      {
+        "surface": "GroupAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/GroupAvatar.kt",
+        "anchor": "fun GroupAvatar(",
+        "test_ids": [
+          "GRP-003",
+          "INT-011",
+          "PRO-006"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

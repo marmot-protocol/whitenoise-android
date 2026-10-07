@@ -80,6 +80,7 @@ class PersonProfileRouteTest {
         composeRule.onNodeWithTag("person_profile.nickname").performTextInput("Local name")
         composeRule.onNodeWithTag("person_profile.notes").performTextInput("Private contact note")
         composeRule.onNodeWithTag("person_profile.private_save").performClick()
+        composeRule.waitUntil(5_000) { app.contactNickname(target) == "Local name" }
         assertEquals("Local name", app.contactNickname(target))
         assertEquals("Private contact note", app.contactNotes(target))
         assertEquals(profile, app.pendingProfileMetadata)
@@ -95,6 +96,42 @@ class PersonProfileRouteTest {
         composeRule.onNodeWithText("Private contact note").assertDoesNotExist()
     }
 
+    /** Closing and reopening before disposal never revives an earlier private editor's captured Save. */
+    @Test fun privateEditorReopenRejectsThePreviousEntrySave() {
+        val app = show()
+        val open =
+            composeRule
+                .onNodeWithTag("person_profile.private_details")
+                .performScrollTo()
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        openPrivate()
+        composeRule.onNodeWithTag("person_profile.nickname").performTextInput("Old entry")
+        val save =
+            composeRule
+                .onNodeWithTag("person_profile.private_save")
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        val cancel =
+            composeRule
+                .onNodeWithTag("person_profile.private_cancel")
+                .fetchSemanticsNode()
+                .config[SemanticsActions.OnClick]
+                .action!!
+        composeRule.runOnIdle {
+            cancel()
+            open()
+            save()
+        }
+        composeRule.waitForIdle()
+        assertEquals(null, app.contactNickname(target))
+        composeRule.onNodeWithTag("person_profile.nickname").performTextReplacement("New entry")
+        composeRule.onNodeWithTag("person_profile.private_save").performClick()
+        composeRule.waitUntil(5_000) { app.contactNickname(target) == "New entry" }
+    }
+
     /** Cancel leaves the native local record unchanged, while explicit clearing restores the public display name. */
     @Test fun privateCancelAndClearRespectTheExistingLocalOwner() {
         val app = show(initialNickname = "Saved name")
@@ -105,6 +142,7 @@ class PersonProfileRouteTest {
         openPrivate()
         composeRule.onNodeWithTag("person_profile.nickname").performTextReplacement("")
         composeRule.onNodeWithTag("person_profile.private_save").performClick()
+        composeRule.waitUntil(5_000) { app.contactNickname(target) == null }
         assertEquals(null, app.contactNickname(target))
         composeRule.onNodeWithText("Published name").assertExists()
         assertEquals(profile, app.pendingProfileMetadata)
@@ -148,6 +186,7 @@ class PersonProfileRouteTest {
         openPrivate()
         composeRule.onNodeWithTag("person_profile.nickname").performTextInput("Long ".repeat(40))
         composeRule.onNodeWithTag("person_profile.private_save").performClick()
+        composeRule.waitUntil(5_000) { app.contactNickname(target) != null }
         val nickname = checkNotNull(app.contactNickname(target))
         assertTrue(nickname.length <= 80)
         assertFalse(nickname.contains('\n'))

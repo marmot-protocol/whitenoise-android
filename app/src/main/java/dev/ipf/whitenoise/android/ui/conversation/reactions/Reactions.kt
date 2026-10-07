@@ -231,7 +231,7 @@ private fun ReactionParticipantRow(
             title = displayName,
             seed = participant.sender,
             size = 48.dp,
-            pictureUrl = appState.avatarUrl(participant.sender),
+            pictureUrl = appState.contactAvatarSource(participant.sender),
         )
     }
     val trailing: @Composable () -> Unit = {

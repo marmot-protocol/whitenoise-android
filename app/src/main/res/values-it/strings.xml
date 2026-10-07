@@ -2274,4 +2274,12 @@
     <string name="gestures_read_unread">Letto / non letto</string>
     <string name="gestures_mute_unmute">Silenzia / riattiva</string>
     <string name="gestures_pin_unpin">Fissa / rimuovi</string>
+
+    <string name="contact_private_picture">Immagine privata</string>
+    <string name="contact_picture_pick">Scegli foto</string>
+    <string name="contact_picture_replace">Sostituisci foto</string>
+    <string name="contact_picture_reposition">Riposiziona / ritaglia</string>
+    <string name="contact_picture_clear">Rimuovi immagine privata</string>
+    <string name="contact_picture_local_only">Solo per questo account su questo dispositivo. Mai condivisa o caricata.</string>
+    <string name="contact_picture_failed">Impossibile usare questa immagine o salvare le modifiche. La selezione precedente è invariata. Riprova.</string>
 </resources>

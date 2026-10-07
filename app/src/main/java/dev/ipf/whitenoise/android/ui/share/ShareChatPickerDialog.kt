@@ -3,11 +3,11 @@
 package dev.ipf.whitenoise.android.ui.share
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.share.SharePayload
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 
 internal fun runShareChatPickerDismissal(
     clearFocus: () -> Unit,
@@ -33,8 +33,9 @@ internal fun ShareChatPickerFullScreen(
         controller.bind(accountRef)
     },
 ) {
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = {},
+        onSourceDismiss = onDismiss,
         properties =
             DialogProperties(
                 usePlatformDefaultWidth = false,

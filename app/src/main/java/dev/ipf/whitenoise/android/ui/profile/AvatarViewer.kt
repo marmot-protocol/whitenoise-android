@@ -61,7 +61,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import dev.ipf.whitenoise.android.R
@@ -83,6 +82,7 @@ import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
 import kotlinx.coroutines.Dispatchers
@@ -106,7 +106,7 @@ internal fun rememberAvatarImageAvailable(pictureUrl: String?): Boolean {
 /** Displays warm pixels immediately, then decodes original bytes at viewer resolution with guarded Save. */
 @Composable
 // Viewer chrome and optional export remain one lifecycle-owned surface.
-@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 internal fun AvatarFullScreenViewer(
     title: String,
     seed: String,
@@ -118,8 +118,27 @@ internal fun AvatarFullScreenViewer(
     securePolicy: SecureFlagPolicy = SecureFlagPolicy.Inherit,
     readLocalBytes: (suspend () -> ByteArray?)? = null,
 ) {
+    val privateSource =
+        dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+            .isPrivate(pictureUrl)
+    val privateState by key(pictureUrl, AvatarImageLoader.currentCacheLifetime()) {
+        produceState<AvatarViewerImageState>(
+            initialValue =
+                pictureUrl
+                    ?.takeIf { privateSource }
+                    ?.let(AvatarImageLoader::peek)
+                    ?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Loading,
+        ) {
+            if (privateSource) {
+                value = AvatarImageLoader
+                    .load(checkNotNull(pictureUrl))
+                    ?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Failed
+            }
+        }
+    }
+    val displayPicture = if (privateSource) null else picture
     val safePictureUrl = remember(pictureUrl) { ProfileSanitizer.protocolImageUrl(pictureUrl) }
-    if (safePictureUrl == null && picture == null) {
+    if (safePictureUrl == null && displayPicture == null && !privateSource) {
         LaunchedEffect(Unit) { onDismiss() }
         return
     }
@@ -134,7 +153,18 @@ internal fun AvatarFullScreenViewer(
     var offset by remember(safePictureUrl, picture) { mutableStateOf(Offset.Zero) }
     val dismissThresholdPx = with(LocalDensity.current) { 96.dp.toPx() }
 
-    val imageState = rememberAvatarViewerImageState(safePictureUrl, picture, readLocalBytes)
+    val imageState =
+        if (privateSource) {
+            if (dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
+                    .belongsToActiveAccount(checkNotNull(pictureUrl))
+            ) {
+                privateState
+            } else {
+                AvatarViewerImageState.Failed
+            }
+        } else {
+            rememberAvatarViewerImageState(safePictureUrl, displayPicture, readLocalBytes.takeUnless { privateSource })
+        }
 
     val ready = imageState as? AvatarViewerImageState.Ready
     val readyBitmap = ready?.bitmap
@@ -145,7 +175,7 @@ internal fun AvatarFullScreenViewer(
         if (imageState is AvatarViewerImageState.Failed) onDismiss()
     }
 
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismiss,
         properties =
             DialogProperties(
@@ -159,31 +189,38 @@ internal fun AvatarFullScreenViewer(
             onDismiss = onDismiss,
             menuOpen = menuOpen,
             onMenuOpenChange = { menuOpen = it },
-            saveEnabled = ready != null || readLocalBytes != null,
+            saveEnabled = !privateSource && (ready != null || readLocalBytes != null),
             editActionLabel = editActionLabel,
             onEditPicture = onEditPicture,
             onSave = {
-                scope.launch {
-                    val outcome =
-                        runCatchingCancellable {
-                            // Retained exports must recheck ownership; decoded viewer bytes are not a grant.
-                            val bytes = if (readLocalBytes != null) readLocalBytes() else ready?.bytes
-                            checkNotNull(bytes) { "Stored avatar is no longer available" }
-                            val saved =
-                                withContext(Dispatchers.IO) {
-                                    saveImageToGallery(context, bytes, fileName, avatarViewerMimeType(bytes, fileName))
-                                }
-                            check(saved) { "MediaStore save returned false" }
-                        }
-                    snackbarHostState.showSnackbar(
-                        mediaSaveSnackbarVisuals(
-                            context = context,
-                            outcome = outcome,
-                            successTitleRes = R.string.media_saved,
-                            failureTitleRes = R.string.media_save_failed,
-                            operationCode = "AVATAR_VIEWER_SAVE",
-                        ),
-                    )
+                if (!privateSource) {
+                    scope.launch {
+                        val outcome =
+                            runCatchingCancellable {
+                                // Retained exports must recheck ownership; decoded viewer bytes are not a grant.
+                                val bytes = if (readLocalBytes != null) readLocalBytes() else ready?.bytes
+                                checkNotNull(bytes) { "Stored avatar is no longer available" }
+                                val saved =
+                                    withContext(Dispatchers.IO) {
+                                        saveImageToGallery(
+                                            context,
+                                            bytes,
+                                            fileName,
+                                            avatarViewerMimeType(bytes, fileName),
+                                        )
+                                    }
+                                check(saved) { "MediaStore save returned false" }
+                            }
+                        snackbarHostState.showSnackbar(
+                            mediaSaveSnackbarVisuals(
+                                context = context,
+                                outcome = outcome,
+                                successTitleRes = R.string.media_saved,
+                                failureTitleRes = R.string.media_save_failed,
+                                operationCode = "AVATAR_VIEWER_SAVE",
+                            ),
+                        )
+                    }
                 }
             },
             snackbarHostState = snackbarHostState,

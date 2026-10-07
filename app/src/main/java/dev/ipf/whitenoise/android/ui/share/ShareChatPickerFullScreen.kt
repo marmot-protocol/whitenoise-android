@@ -698,7 +698,7 @@ private fun rememberShareChatPickerState(
 
 /** One share destination; a DM's stored peer picture animates like any other profile picture. */
 @Composable
-private fun ShareTargetRow(
+internal fun ShareTargetRow(
     item: ChatListItem,
     title: String,
     selected: Boolean,
@@ -714,7 +714,7 @@ private fun ShareTargetRow(
             appState,
             item,
             ownerAccountRef,
-            avatarAccount?.let { appState.avatarUrl(it) },
+            avatarAccount?.let { appState.contactAvatarSource(it, ownerAccountRef) },
         )
     val memberIds =
         remember(item, selectedAccountIdHex) {

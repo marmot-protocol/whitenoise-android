@@ -2344,4 +2344,12 @@
     <string name="gestures_read_unread">Прочитано / не прочитано</string>
     <string name="gestures_mute_unmute">Выключить / включить звук</string>
     <string name="gestures_pin_unpin">Закрепить / открепить</string>
+
+    <string name="contact_private_picture">Личное изображение</string>
+    <string name="contact_picture_pick">Выбрать фото</string>
+    <string name="contact_picture_replace">Заменить фото</string>
+    <string name="contact_picture_reposition">Переместить / обрезать</string>
+    <string name="contact_picture_clear">Убрать личное изображение</string>
+    <string name="contact_picture_local_only">Только для этого аккаунта на этом устройстве. Не публикуется и не загружается.</string>
+    <string name="contact_picture_failed">Не удалось использовать это изображение или сохранить изменения. Предыдущий выбор не изменился. Попробуйте ещё раз.</string>
 </resources>

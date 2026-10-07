@@ -1,0 +1,84 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+  "legacy_sha256": "ae6b1d4ed2b9309601931bdadf65df14fbeaf96949740b0b9f3248169ce1226f",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MainShell",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "fun MainShell(",
+        "test_ids": [
+          "NAV-001",
+          "NTF-009",
+          "SEC-012"
+        ]
+      },
+      {
+        "surface": "ProfileGroupForegroundCoordinator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "fun ProfileGroupForegroundCoordinator(",
+        "test_ids": [
+          "NAV-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Share destination storage recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "Share destination identity recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "R.string.toast_notification_account_unavailable",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "WhiteNoiseApp",
+        "test_ids": [
+          "AXY-001",
+          "AXY-002",
+          "AXY-003",
+          "AXY-004",
+          "AXY-005",
+          "AXY-006",
+          "AXY-007",
+          "AXY-008",
+          "AXY-009",
+          "AXY-010",
+          "AXY-011",
+          "AXY-012",
+          "NAV-001",
+          "NAV-002",
+          "NAV-003",
+          "NAV-004",
+          "NAV-005",
+          "NAV-006",
+          "NAV-007",
+          "NAV-008",
+          "NAV-009",
+          "NAV-010"
+        ]
+      },
+      {
+        "surface": "Chat-list playback through pending and outgoing conversation navigation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt",
+        "anchor": "val playbackInChatList =",
+        "test_ids": [
+          "MED-028"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

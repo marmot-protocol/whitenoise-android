@@ -1,0 +1,82 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+  "legacy_sha256": "7cf6a306d4adaf51847d4f16cb1f4b6dede00e25f57d1579d924043f8b2ade61",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "private_contact_notification",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "fun withCurrentContactAvatars(",
+        "test_ids": [
+          "PRO-008"
+        ]
+      }
+    ],
+    "notification_content_contracts": [
+      {
+        "surface": "localized notification emoji fallback label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "R.string.custom_emoji",
+        "test_ids": [
+          "NTF-034"
+        ]
+      },
+      {
+        "surface": "silent active-card contact nickname reconciliation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun refreshContactSenderName(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "group notification sender title refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "R.string.notification_sender_in_group",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "bounded conversation-open notification cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun dismissConversationMessages(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "same-card avatar enrichment preserves heads-up eligibility without repeat alerts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "private fun buildEnrichedMessagingNotification(",
+        "test_ids": [
+          "NTF-006",
+          "NTF-010"
+        ]
+      },
+      {
+        "surface": "plain notification body and privacy presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "suspend fun show(",
+        "test_ids": [
+          "NTF-008",
+          "NTF-011"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "source:app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "class LocalNotificationPresenter",
+        "test_ids": [
+          "NTF-006",
+          "NTF-007",
+          "NTF-008",
+          "NTF-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -67,7 +67,7 @@ class MediaPreviewThemeTest {
         // Output quality now belongs to the photo editor, not to this screen.
         rule.onNodeWithText(text(R.string.photo_editor_quality)).assertDoesNotExist()
         assertShellColors()
-        // Verify the resting frame before the click starts a transient pressed/ripple animation.
+        // Capture the static chrome before the real pointer tap starts its platform ripple.
         capture("media_preview_themed_light")
         rule.onNodeWithContentDescription(text(R.string.photo_editor_edit_action)).performClick()
         assertEquals(listOf(0), edited)

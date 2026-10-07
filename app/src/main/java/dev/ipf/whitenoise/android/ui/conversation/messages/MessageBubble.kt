@@ -1739,7 +1739,7 @@ internal fun MessageBubble(
                     showSenderAvatar = showSenderAvatar,
                     title = appState.displayName(record.sender),
                     seed = record.sender,
-                    pictureUrl = appState.avatarUrl(record.sender),
+                    pictureUrl = appState.contactAvatarSource(record.sender),
                     picture =
                         if (showSenderAvatar) {
                             rememberDurableAvatar(
@@ -2834,7 +2834,7 @@ internal fun MessageBubble(
                     MessageFullScreenView(
                         senderDisplayName = appState.displayName(record.sender),
                         senderSeed = record.sender,
-                        senderAvatarUrl = appState.avatarUrl(record.sender),
+                        senderAvatarUrl = appState.contactAvatarSource(record.sender),
                         body = expandedBody,
                         bodyMarkdownDocument = displayedMarkdownDocument,
                         mentionDisplayName =
@@ -3085,7 +3085,7 @@ internal fun MessageBubble(
                         mine = mine,
                         senderDisplayName = appState.displayName(record.sender),
                         senderNpub = appState.npubForDisplay(record.sender),
-                        senderAvatarUrl = appState.avatarUrl(record.sender),
+                        senderAvatarUrl = appState.contactAvatarSource(record.sender),
                         reactions = controller.reactions[record.messageIdHex].orEmpty(),
                         recipients = messageDetailsRecipients(controller, appState, mine),
                         attachmentLabels = mediaReferences.map { it.fileName.ifBlank { it.mediaType } },

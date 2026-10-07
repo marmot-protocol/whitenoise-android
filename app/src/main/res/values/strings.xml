@@ -2433,4 +2433,12 @@
     <string name="gestures_read_unread">Read / unread</string>
     <string name="gestures_mute_unmute">Mute / unmute</string>
     <string name="gestures_pin_unpin">Pin / unpin</string>
+
+    <string name="contact_private_picture">Private picture</string>
+    <string name="contact_picture_pick">Pick photo</string>
+    <string name="contact_picture_replace">Replace photo</string>
+    <string name="contact_picture_reposition">Reposition / crop</string>
+    <string name="contact_picture_clear">Clear private picture</string>
+    <string name="contact_picture_local_only">Only for this account on this device. Never shared or uploaded.</string>
+    <string name="contact_picture_failed">Couldn’t use this picture or save your changes. Your previous selection is unchanged. Try again.</string>
 </resources>

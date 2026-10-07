@@ -95,12 +95,17 @@ object AvatarImageLoader {
         }
     }
 
+    /** Intercepts private display handles before the MDK public-profile image acquisition boundary. */
     suspend fun load(url: String): ImageBitmap? =
-        load(
-            request = avatarRequest(url),
-            expectedGeneration = null,
-            fetchLane = AvatarFetchLane.REGULAR,
-        )
+        if (PrivateContactAvatarLoader.isPrivate(url)) {
+            PrivateContactAvatarLoader.load(url)
+        } else {
+            load(
+                request = avatarRequest(url),
+                expectedGeneration = null,
+                fetchLane = AvatarFetchLane.REGULAR,
+            )
+        }
 
     /**
      * Loads [url] for a full-width profile banner, decoded for a box [targetWidthPx] wide.
@@ -310,8 +315,10 @@ object AvatarImageLoader {
      * of flashing the placeholder while [load] re-resolves it. In-memory read
      * only — safe to call from composition. See issue #31.
      */
+    @Suppress("ReturnCount") // Private handles use account validation before the ordinary public cache lookup.
     fun peek(url: String?): ImageBitmap? {
         val key = url ?: return null
+        if (PrivateContactAvatarLoader.isPrivate(key)) return PrivateContactAvatarLoader.peek(key)
         return synchronized(lock) { cache.get(key) }
     }
 
@@ -460,7 +467,7 @@ object AvatarImageLoader {
         maxBytes: Int,
         measureAvatar: Boolean = false,
     ): AvatarByteFetchResult {
-        if (maxBytes <= 0) return AvatarByteFetchResult.Failed
+        if (maxBytes <= 0 || PrivateContactAvatarLoader.isPrivate(url)) return AvatarByteFetchResult.Failed
         val fetcher = synchronized(lock) { profileImageFetcher } ?: return AvatarByteFetchResult.Unavailable
         if (measureAvatar) AvatarCacheDiagnostics.fetch(AvatarCacheKind.PROFILE)
         val bytes = fetcher(url, maxBytes.toULong())

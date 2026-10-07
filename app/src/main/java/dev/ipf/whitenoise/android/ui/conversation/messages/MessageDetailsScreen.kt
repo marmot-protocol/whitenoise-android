@@ -42,7 +42,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.os.ConfigurationCompat
 import dev.ipf.marmotkit.AppMessageRecordFfi
@@ -61,6 +60,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import java.time.ZoneId
@@ -91,7 +91,7 @@ internal fun messageDetailsRecipients(
             MessageDetailsRecipient(
                 title = appState.displayName(member.memberIdHex),
                 seed = member.memberIdHex,
-                avatarUrl = appState.avatarUrl(member.memberIdHex),
+                avatarUrl = appState.contactAvatarSource(member.memberIdHex),
             )
         }
 }
@@ -128,7 +128,7 @@ internal fun MessageDetailsScreen(
         } else {
             record.plaintext
         }
-    Dialog(
+    PlaybackDialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
