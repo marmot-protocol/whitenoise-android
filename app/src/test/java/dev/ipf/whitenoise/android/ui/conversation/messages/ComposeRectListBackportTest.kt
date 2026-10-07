@@ -17,8 +17,8 @@ class ComposeRectListBackportTest : ComposeRectListReuseFixture() {
     /** Guards against tests silently resolving an unpatched UI jar on either distribution. */
     @Test
     fun runtimeContainsTheReviewedSourceBackport() {
-        val stream = javaClass.classLoader
-            ?.getResourceAsStream("META-INF/whitenoise-compose-rectlist-backport.properties")
+        val markerPath = "META-INF/whitenoise-compose-rectlist-backport.properties"
+        val stream = javaClass.classLoader?.getResourceAsStream(markerPath)
         assertNotNull("the Compose source backport must be on the test runtime classpath", stream)
         val properties = Properties()
         requireNotNull(stream).use(properties::load)

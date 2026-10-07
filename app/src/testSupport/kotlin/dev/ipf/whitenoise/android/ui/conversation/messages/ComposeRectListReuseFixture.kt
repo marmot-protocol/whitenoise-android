@@ -61,7 +61,10 @@ abstract class ComposeRectListReuseFixture {
     }
 
     /** Drives pooled reuse without changing the same-height outer row's measured dimensions. */
-    private fun exerciseReuse(rowAlignment: Boolean, lookahead: Boolean) {
+    private fun exerciseReuse(
+        rowAlignment: Boolean,
+        lookahead: Boolean,
+    ) {
         val itemPx = 20
         val itemDp = with(rule.density) { itemPx.toDp() }
         val state = LazyListState()
@@ -92,7 +95,11 @@ abstract class ComposeRectListReuseFixture {
     /** Keeps outer dimensions constant while the pooled descendant changes width and baseline. */
     @Suppress("FunctionNaming") // Compose UI functions use PascalCase, including shared test fixtures.
     @Composable
-    private fun ReusedItem(index: Int, itemPx: Int, rowAlignment: Boolean) {
+    private fun ReusedItem(
+        index: Int,
+        itemPx: Int,
+        rowAlignment: Boolean,
+    ) {
         val leaf: @Composable () -> Unit = {
             Box(Modifier.fillMaxWidth()) {
                 Spacer(
