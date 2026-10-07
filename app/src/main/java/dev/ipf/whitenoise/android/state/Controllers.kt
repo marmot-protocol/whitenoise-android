@@ -11250,7 +11250,9 @@ class ConversationController(
 
     /** Commits the encrypted image and reports failure only while [change] owns the attempt. */
     internal suspend fun updateGroupImage(change: ScopedGroupImageMutation<ImageUploadDraft?>): Boolean {
+        if (change.viewerPermissionCheck && !change.isActive()) return false
         val draft = change.value
+        val capturedGroupId = group.groupIdHex
         val requestedMutationKey =
             draft?.let { withContext(Dispatchers.Default) { it.mutationKey() } }
                 ?: REMOVE_GROUP_IMAGE_MUTATION_KEY
@@ -11258,47 +11260,70 @@ class ConversationController(
             lastMutationError = null
             val account = conversationAccountRef ?: return@withMutationLockResult false
             var attemptedLegacyClear = false
-            runCatchingCancellable {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    if (shouldCommitPrimaryGroupImageMutation(
-                            requestedMutationKey = requestedMutationKey,
-                            pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
-                            hasProjectedEncryptedImage = group.imageHashHex != null,
-                        )
-                    ) {
-                        if (draft != null) {
-                            appState.marmotIo {
-                                updateGroupImage(
-                                    account,
-                                    group.groupIdHex,
-                                    draft.plaintext,
-                                    draft.mediaType,
+            val committed =
+                runCatchingCancellable {
+                    appState
+                        .withGroupCommitLock(account, capturedGroupId) {
+                            val admission = admitViewerGroupImageMutation(appState, change, account, capturedGroupId)
+                            if (!admission.allowed) return@withGroupCommitLock false
+                            if (!admission.alreadyCommitted &&
+                                shouldCommitPrimaryGroupImageMutation(
+                                    requestedMutationKey = requestedMutationKey,
+                                    pendingLegacyClearMutationKey = pendingLegacyAvatarClearAfterImageMutationKey,
+                                    hasProjectedEncryptedImage = group.imageHashHex != null,
                                 )
+                            ) {
+                                commitGroupImageBytes(account, capturedGroupId, draft, change)
                             }
-                        } else {
-                            appState.marmotIo {
-                                clearGroupImage(account, group.groupIdHex)
-                            }
-                        }
-                    }
 
-                    // URL avatars win; clear the legacy URL only after the encrypted
-                    // mutation succeeds so a partial failure never removes both images.
-                    if (!group.avatarUrl.isNullOrBlank() || pendingLegacyAvatarClearAfterImageMutationKey != null) {
-                        pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
-                        attemptedLegacyClear = true
-                        appState.marmotIo {
-                            updateGroupAvatarUrl(account, group.groupIdHex, null, null, null)
-                        }
-                        pendingLegacyAvatarClearAfterImageMutationKey = null
+                            // URL avatars win; clear the legacy URL only after the encrypted
+                            // mutation succeeds so a partial failure never removes both images.
+                            if (admission.legacyAvatarPresent ||
+                                !group.avatarUrl.isNullOrBlank() ||
+                                pendingLegacyAvatarClearAfterImageMutationKey != null
+                            ) {
+                                pendingLegacyAvatarClearAfterImageMutationKey = requestedMutationKey
+                                attemptedLegacyClear = true
+                                appState.marmotIo {
+                                    if (change.viewerPermissionCheck && !change.isActive()) {
+                                        throw CancellationException("Viewer owner replaced")
+                                    }
+                                    updateGroupAvatarUrl(account, capturedGroupId, null, null, null)
+                                }
+                                pendingLegacyAvatarClearAfterImageMutationKey = null
+                            }
+                            true
+                        }.also { if (!it) return@runCatchingCancellable false }
+                    refreshMembers()
+                    if (!change.viewerPermissionCheck || change.isActive()) {
+                        presentConversationTransient(R.string.toast_group_updated)
                     }
-                }
-                refreshMembers()
-                presentConversationTransient(R.string.toast_group_updated)
-                true
-            }.onFailure {
-                if (change.isActive()) presentGroupImageMutationFailure(it, requestedMutationKey, attemptedLegacyClear)
-            }.getOrDefault(false)
+                    true
+                }.onFailure {
+                    if (change.isActive()) {
+                        presentGroupImageMutationFailure(it, requestedMutationKey, attemptedLegacyClear)
+                    }
+                }.getOrDefault(false)
+            committed && (!change.viewerPermissionCheck || change.isActive())
+        }
+    }
+
+    /** Native command entry rechecks viewer ownership after dispatcher/lock suspension. */
+    private suspend fun commitGroupImageBytes(
+        account: String,
+        groupId: String,
+        draft: ImageUploadDraft?,
+        change: ScopedGroupImageMutation<ImageUploadDraft?>,
+    ) {
+        appState.marmotIo {
+            if (change.viewerPermissionCheck && !change.isActive()) {
+                throw CancellationException("Viewer owner replaced")
+            }
+            if (draft != null) {
+                updateGroupImage(account, groupId, draft.plaintext, draft.mediaType)
+            } else {
+                clearGroupImage(account, groupId)
+            }
         }
     }
 

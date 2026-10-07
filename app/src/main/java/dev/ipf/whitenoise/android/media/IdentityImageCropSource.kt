@@ -62,3 +62,18 @@ internal suspend fun loadIdentityImageCropSource(
         null
     }
 }
+
+/** Prepares a verified private attachment with the same group SVG and bounded crop policies as the picker. */
+internal suspend fun loadGroupAttachmentCropSource(
+    bytes: ByteArray,
+    mediaType: String,
+): IdentityImageCropSource {
+    if (bytes.size > IDENTITY_IMAGE_SOURCE_MAX_BYTES) throw ImageUploadPreparationException.PreparedImageTooLarge
+    val source = prepareGroupIdentityImageSource(bytes, mediaType)
+    val renderer = PhotoEditorRenderer()
+    val oriented =
+        (renderer.inspect(source) as? PhotoEditorInspectResult.Success)?.source?.orientedSize
+            ?: throw ImageUploadPreparationException.UnsupportedImage
+    val preview = renderer.decodePreview(source) ?: throw ImageUploadPreparationException.UnsupportedImage
+    return IdentityImageCropSource(source, preview, oriented)
+}

@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +33,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -70,15 +73,23 @@ import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
+import dev.ipf.whitenoise.android.media.IDENTITY_IMAGE_SOURCE_MAX_BYTES
+import dev.ipf.whitenoise.android.media.IdentityImageCropShape
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
+import dev.ipf.whitenoise.android.media.loadGroupAttachmentCropSource
+import dev.ipf.whitenoise.android.media.renderIdentityImageDraft
 import dev.ipf.whitenoise.android.state.ATTACHMENT_EXPLICIT_READ_MAX_BYTES
 import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
 import dev.ipf.whitenoise.android.state.AttachmentDownloadPriority
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MediaQuality
+import dev.ipf.whitenoise.android.state.ScopedGroupImageMutation
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.ui.common.IdentityImageCropDialog
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
@@ -88,6 +99,8 @@ import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerPagerScrollEnabled
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.group.GroupImageFailureScope
+import dev.ipf.whitenoise.android.ui.group.groupImageFailureDetail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -425,6 +438,67 @@ internal fun FullScreenMediaViewer(
             controller.group.groupIdHex,
             appState.runtimeGeneration,
         )
+    val pictureFailures =
+        remember(actionOwner) {
+            GroupImageFailureScope({ appState.toast }, { appState.clearToast(it) })
+        }
+    val pictureSession =
+        remember(actionOwner) {
+            ViewerGroupPictureSession(
+                ownerIsCurrent = {
+                    currentActionOwner() == actionOwner && controller.boundAccountRef == actionOwner.accountRef
+                },
+                permitted = {
+                    controller.isSelfMember &&
+                        controller.isSelfAdmin &&
+                        !controller.isDm &&
+                        !controller.group.unrecoverable &&
+                        !controller.group.pendingConfirmation &&
+                        !controller.group.leaveRequestPending &&
+                        !controller.group.disbanding &&
+                        !controller.group.disbanded
+                },
+            )
+        }
+    DisposableEffect(pictureSession) {
+        onDispose {
+            pictureSession.close()
+            pictureFailures.dispose()
+        }
+    }
+    LaunchedEffect(currentActionOwner(), controller.isSelfMember, controller.isSelfAdmin) {
+        if (!pictureSession.isCurrent()) pictureSession.close()
+    }
+
+    /** Prepare and commit within the captured viewer's account/group; retries reconcile native image bytes. */
+    suspend fun commitPicture(
+        draft: dev.ipf.whitenoise.android.media.ImageUploadDraft,
+        reconcile: Boolean,
+    ): Boolean {
+        val attempt = pictureFailures.begin()
+        val updated =
+            controller.updateGroupImage(
+                ScopedGroupImageMutation(draft) {
+                    pictureSession.isCurrent() && pictureFailures.isCurrent(attempt)
+                }.forViewer(reconcile),
+            )
+
+        if (!updated && controller.lastMutationError != null) pictureFailures.captureFailure(attempt)
+        return updated
+    }
+
+    /** Read/render errors use the existing group-image failure surface while this viewer owns the attempt. */
+    fun pictureFailure(error: Throwable) {
+        if (!pictureSession.isCurrent()) return
+        val attempt = pictureFailures.begin()
+        appState.presentFailure(
+            R.string.group_photo_error,
+            "VIEWER_GROUP_IMAGE",
+            error,
+            detail = groupImageFailureDetail(error),
+        )
+        pictureFailures.captureFailure(attempt)
+    }
     actionGate.currentPage = currentPage
     DisposableEffect(actionGate) { onDispose { actionGate.close() } }
     val latestGoToMessage by rememberUpdatedState(onGoToMessage)
@@ -491,6 +565,37 @@ internal fun FullScreenMediaViewer(
                         }
                     }
                 },
+            onSetGroupPicture =
+                if (canSetViewerGroupPicture(
+                        controller.isDm,
+                        controller.isSelfMember,
+                        controller.isSelfAdmin,
+                        pictureSession.isCurrent(),
+                        currentPage,
+                    )
+                ) {
+                    {
+                        actionGate.dispatch(currentPage, currentActionOwner()) { page ->
+                            scope.launch {
+                                pictureSession.choose(page, read = { selected ->
+                                    val bytes =
+                                        attachmentBytes(
+                                            controller,
+                                            selected.messageIdHex,
+                                            selected.attachmentIndex,
+                                            selected.reference,
+                                            selected.mine,
+                                            maxBytes = IDENTITY_IMAGE_SOURCE_MAX_BYTES.toLong(),
+                                        )
+                                    loadGroupAttachmentCropSource(bytes, selected.reference.mediaType)
+                                }, failure = ::pictureFailure)
+                            }
+                        }
+                    }
+                } else {
+                    null
+                },
+            groupPictureBusy = pictureSession.busy,
             onDismiss = onDismiss,
             onSave = {
                 val ref = currentReference
@@ -651,6 +756,48 @@ internal fun FullScreenMediaViewer(
             }
         }
     }
+    pictureSession.source?.takeIf { pictureSession.isCurrent() }?.let { source ->
+        IdentityImageCropDialog(
+            source.preview.asImageBitmap(),
+            source.orientedSize,
+            IdentityImageCropShape.RoundedSquare,
+            onDismiss = {
+                pictureSession.cancel()
+                pictureFailures.clear()
+            },
+            onConfirm = { crop ->
+                scope.launch {
+                    pictureSession.apply(
+                        crop,
+                        render = { bytes, chosen -> renderIdentityImageDraft(bytes, chosen, MediaQuality.Standard) },
+                        commit = ::commitPicture,
+                        failure = ::pictureFailure,
+                    )
+                }
+            },
+        )
+    }
+    if (pictureSession.failedDraft != null && pictureSession.isCurrent() && !pictureSession.busy) {
+        AlertDialog(
+            onDismissRequest = {
+                pictureSession.cancel()
+                pictureFailures.clear()
+            },
+            title = { Text(stringResource(R.string.toast_couldnt_update_group)) },
+            text = { Text(stringResource(R.string.error_try_again)) },
+            confirmButton = {
+                TextButton(onClick = { scope.launch { pictureSession.retry(::commitPicture) } }) {
+                    Text(stringResource(R.string.retry))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pictureSession.cancel()
+                    pictureFailures.clear()
+                }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
 }
 
 /** Draws native edge-to-edge media with prototype chrome inside the supplied cutout/system safe insets. */
@@ -671,6 +818,8 @@ internal fun MediaViewerFrame(
     onGoToMessage: (() -> Unit)? = null,
     onForwardMessage: (() -> Unit)? = null,
     chromeVisible: Boolean = true,
+    onSetGroupPicture: (() -> Unit)? = null,
+    groupPictureBusy: Boolean = false,
     body: @Composable BoxScope.() -> Unit,
 ) {
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
@@ -687,6 +836,21 @@ internal fun MediaViewerFrame(
     }
     Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         body()
+        if (groupPictureBusy) {
+            Surface(
+                Modifier.align(Alignment.Center).testTag("conversation.media.viewer.group-picture-progress"),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                Column(
+                    Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator()
+                    Text(stringResource(R.string.group_preparing_photo))
+                }
+            }
+        }
         if (chromeVisible) {
             Surface(
                 modifier =
@@ -753,6 +917,16 @@ internal fun MediaViewerFrame(
                                             onClick = onSave,
                                         ),
                                     )
+                                    if (onSetGroupPicture != null) {
+                                        add(
+                                            WhiteNoiseMenuItem(
+                                                label = stringResource(R.string.media_set_group_picture),
+                                                icon = R.drawable.ic_image,
+                                                onClick = onSetGroupPicture,
+                                                enabled = !groupPictureBusy,
+                                            ),
+                                        )
+                                    }
                                     if (onGoToMessage != null) {
                                         add(
                                             WhiteNoiseMenuItem(
