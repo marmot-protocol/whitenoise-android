@@ -12,6 +12,7 @@ import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.AttachmentEntryFfi
 import dev.ipf.marmotkit.AttachmentHistoryCursor
 import dev.ipf.marmotkit.AttachmentPageReadFfi
+import dev.ipf.marmotkit.AttachmentRoleFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
@@ -115,7 +116,10 @@ internal fun attachmentProjectionTouched(
     return update.accountLabel == account && update.update.groupIdHex == group
 }
 
-/** Maps accepted native categories to presentation, retaining MDK order, authored indexes and source time. */
+/**
+ * Displays native shared slots, retaining MDK order, authored indexes and source time. Inline emoji
+ * artwork stays in the pager's collection so filtering never changes native continuation or refresh.
+ */
 internal fun attachmentLibraryTiles(
     entries: List<AttachmentEntryFfi>,
     accountId: String?,
@@ -124,6 +128,7 @@ internal fun attachmentLibraryTiles(
     val voice = mutableListOf<SharedMediaRow>()
     val files = mutableListOf<SharedMediaRow>()
     entries.forEach { entry ->
+        if (entry.role != AttachmentRoleFfi.SHARED) return@forEach
         val attachment = entry.attachment as? MediaAttachmentOutcomeFfi.Accepted ?: return@forEach
         val index = attachment.attachmentIndex.toInt()
         val mine = entry.sender.equals(accountId, ignoreCase = true)

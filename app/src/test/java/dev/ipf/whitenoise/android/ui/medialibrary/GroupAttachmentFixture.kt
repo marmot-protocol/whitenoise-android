@@ -7,6 +7,7 @@ import dev.ipf.marmotkit.AttachmentHistoryCursor
 import dev.ipf.marmotkit.AttachmentHistoryVersion
 import dev.ipf.marmotkit.AttachmentPageFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
+import dev.ipf.marmotkit.AttachmentRoleFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -116,6 +117,7 @@ internal fun historyEntry(
     id: Int,
     index: UInt = 0u,
     category: AttachmentCategoryFfi = AttachmentCategoryFfi.IMAGE,
+    role: AttachmentRoleFfi = AttachmentRoleFfi.SHARED,
 ) = AttachmentEntryFfi(
     "message-$id",
     "source-$id",
@@ -124,6 +126,7 @@ internal fun historyEntry(
     1_700_000_000u,
     1u,
     category,
+    role,
     MediaAttachmentOutcomeFfi.Accepted(
         index,
         MediaAttachmentReferenceFfi(
