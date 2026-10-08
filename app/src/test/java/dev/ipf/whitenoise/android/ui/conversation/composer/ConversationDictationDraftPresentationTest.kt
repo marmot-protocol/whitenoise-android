@@ -157,6 +157,7 @@ class ConversationDictationDraftPresentationTest {
         // Native draft generations and editor presentation revisions are separate domains.
         var revision = 41L
         var editorWrites = 0
+        private var elapsedMillis = 0L
         lateinit var editor: ComposerTextState
         lateinit var lateSendAcceptance: () -> Unit
         val writers = mutableMapOf<Int, (TextFieldValue) -> Unit>()
@@ -215,11 +216,17 @@ class ConversationDictationDraftPresentationTest {
                 },
                 disclosureAccepted = { true },
                 markDisclosureAccepted = {},
+                elapsedRealtime = { elapsedMillis },
                 scheduleTimeout = { delay, callback ->
                     if (delay == 500L) restarts += callback
                     ConversationDictationTimeoutHandle { restarts.remove(callback) }
                 },
-                targetValidationScope = if (dispatchRecognized) CoroutineScope(SupervisorJob() + Dispatchers.Unconfined) else null,
+                targetValidationScope =
+                    if (dispatchRecognized) {
+                        CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+                    } else {
+                        null
+                    },
                 sendTranscriptIfOriginUnchanged = { request ->
                     request.beginDispatch().also { claimed ->
                         if (claimed) {
@@ -272,6 +279,7 @@ class ConversationDictationDraftPresentationTest {
         fun failTail() = listener.onError(ConversationDictationFailure.NoMatch)
 
         fun runRestart() {
+            elapsedMillis += 500L
             restarts.toList().also { restarts.clear() }.forEach { it() }
         }
 

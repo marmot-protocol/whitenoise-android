@@ -36,6 +36,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Completion and optional recovery commands respect their originating controls and generation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "private fun isStaleCompletionCommand(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

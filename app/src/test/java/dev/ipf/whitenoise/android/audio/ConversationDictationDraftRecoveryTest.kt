@@ -25,10 +25,16 @@ internal class ConversationDictationDraftRecoveryTest {
             f.recovery.consumeSubmittedTranscript(1, f.target, "first")
             f.edit(edited)
             assertTrue(f.recovery.recover(1, f.target, "first recovered tail"))
-            assertEquals(listOf(edited, "recovered tail").filter(String::isNotBlank).joinToString(" "), f.draft.value.text)
+            assertEquals(
+                listOf(edited, "recovered tail").filter(String::isNotBlank).joinToString(" "),
+                f.draft.value.text,
+            )
             assertNull(f.recovery.sendTarget(1, f.target))
             assertTrue(f.recovery.recover(1, f.target, "first recovered tail"))
-            assertEquals(listOf(edited, "recovered tail").filter(String::isNotBlank).joinToString(" "), f.draft.value.text)
+            assertEquals(
+                listOf(edited, "recovered tail").filter(String::isNotBlank).joinToString(" "),
+                f.draft.value.text,
+            )
         }
     }
 

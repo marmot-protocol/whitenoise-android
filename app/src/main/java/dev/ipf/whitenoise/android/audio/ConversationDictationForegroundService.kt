@@ -97,20 +97,7 @@ internal class ConversationDictationForegroundService(
                 }
                 return Service.START_NOT_STICKY
             }
-            if (intent.action in setOf(ACTION_CANCEL, ACTION_PASTE, ACTION_SEND) &&
-                (
-                    controller.state is ConversationDictationState.Failed ||
-                        intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L) != controller.notificationActionGeneration
-                )
-            ) {
-                return Service.START_NOT_STICKY
-            }
-            if (intent.action in setOf(ACTION_RETRY_AUDIO, ACTION_DISCARD_RECOVERY) &&
-                (!controller.recoveryHandedToComposer ||
-                    intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L) != controller.notificationActionGeneration)
-            ) {
-                return Service.START_NOT_STICKY
-            }
+            if (isStaleCompletionCommand(intent, controller)) return Service.START_NOT_STICKY
             when (intent.action) {
                 ACTION_CANCEL -> controller.cancel()
                 ACTION_PASTE -> controller.paste()
@@ -325,6 +312,18 @@ internal class ConversationDictationForegroundService(
         internal const val ACTION_DISCARD_RECOVERY = "dev.ipf.whitenoise.android.dictation.DISCARD_RECOVERY"
         internal const val EXTRA_SESSION_TOKEN = "dictation_session_token"
         internal const val EXTRA_ACTION_GENERATION = "dictation_action_generation"
+
+        /** Completion actions belong to the controls and action generation that created them. */
+        private fun isStaleCompletionCommand(intent: Intent, controller: ConversationDictationController): Boolean {
+            val staleGeneration =
+                intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L) != controller.notificationActionGeneration
+            return when (intent.action) {
+                ACTION_CANCEL, ACTION_PASTE, ACTION_SEND ->
+                    controller.state is ConversationDictationState.Failed || staleGeneration
+                ACTION_RETRY_AUDIO, ACTION_DISCARD_RECOVERY -> !controller.recoveryHandedToComposer || staleGeneration
+                else -> false
+            }
+        }
 
         /** A foreground service can run even when Android hides all of its drawer actions. */
         internal fun notificationControlsAvailable(context: Context): Boolean {

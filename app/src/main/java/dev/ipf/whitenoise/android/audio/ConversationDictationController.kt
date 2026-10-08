@@ -636,6 +636,8 @@ internal class ConversationDictationController internal constructor(
     private val completionIntent = ConversationDictationCompletionIntent()
     private val requestedDeliveryMode: ConversationDictationDeliveryMode?
         get() = completionIntent.mode
+    private val explicitSendRequested: Boolean
+        get() = completionIntent.explicit && requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish
     private var generationHasSpeech = false
     private var callerAudioEndpointingActive = false
     private var consecutiveNoSpeechRestarts = 0
@@ -1056,8 +1058,8 @@ internal class ConversationDictationController internal constructor(
     fun sendRecognizedText() {
         if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed ?: return
-        if (foregroundMicrophoneRequired || recoveryHandedToComposer ||
-            failed.reason != ConversationDictationFailure.SendBlocked ||
+        if (foregroundMicrophoneRequired || recoveryHandedToComposer) return
+        if (failed.reason != ConversationDictationFailure.SendBlocked ||
             failed.retainedTranscript.isNullOrBlank()
         ) {
             return
@@ -1409,23 +1411,7 @@ internal class ConversationDictationController internal constructor(
             return
         }
         failed.retainedTranscript?.takeIf(String::isNotBlank)?.let { transcript ->
-            conversationDictationDiagnostic("event=retry path=retained_transcript")
-            val retrySend =
-                failed.reason == ConversationDictationFailure.SendBlocked ||
-                    requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish
-            val automatic = !completionIntent.explicit
-            completionIntent.reset()
-            val retryMode =
-                if (retrySend) {
-                    // Retry cannot absorb another writer's text/attachment generation.
-                    ConversationDictationDeliveryMode.SendOnFinish
-                } else {
-                    ConversationDictationDeliveryMode.PasteIntoDraft
-                }
-            completionIntent.choose(retryMode, automatic = automatic)
-            finishRequested = true
-            state = ConversationDictationState.Processing(failed.sessionId, failed.target)
-            validateAndDeliverTranscript(failed.sessionId, failed.target, transcript)
+            retryRetainedTranscript(failed, transcript)
             return
         }
         val accepted =
@@ -1437,6 +1423,27 @@ internal class ConversationDictationController internal constructor(
                 mode = failed.target.mode,
             )
         conversationDictationDiagnostic("event=retry path=fresh_start accepted=$accepted")
+    }
+
+    /** Revalidates retained text without upgrading an automatic completion to an explicit Send. */
+    private fun retryRetainedTranscript(failed: ConversationDictationState.Failed, transcript: String) {
+        conversationDictationDiagnostic("event=retry path=retained_transcript")
+        val retrySend =
+            failed.reason == ConversationDictationFailure.SendBlocked ||
+                requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish
+        val automatic = !completionIntent.explicit
+        completionIntent.reset()
+        val retryMode =
+            if (retrySend) {
+                // Retry cannot absorb another writer's text/attachment generation.
+                ConversationDictationDeliveryMode.SendOnFinish
+            } else {
+                ConversationDictationDeliveryMode.PasteIntoDraft
+            }
+        completionIntent.choose(retryMode, automatic = automatic)
+        finishRequested = true
+        state = ConversationDictationState.Processing(failed.sessionId, failed.target)
+        validateAndDeliverTranscript(failed.sessionId, failed.target, transcript)
     }
 
     /** Keeps an intentionally edited saved draft and its original deadline without restarting recovery. */
@@ -3026,14 +3033,9 @@ internal class ConversationDictationController internal constructor(
     ) {
         if (transcript.isBlank()) {
             fail(sessionId, target, ConversationDictationFailure.NoSpeech, captureEnd = DictationFailureCapture.Cancel)
-        } else if (completionIntent.explicit &&
-            requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish &&
-            failureCause != null && !foregroundMicrophoneRequired
-        ) {
+        } else if (explicitSendRequested && failureCause != null && !foregroundMicrophoneRequired) {
             validateAndDeliverTranscript(sessionId, target, transcript)
-        } else if (completionIntent.explicit &&
-            requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish && failureCause != null
-        ) {
+        } else if (explicitSendRequested && failureCause != null) {
             pendingPrefixSend = PendingPrefixSend(sessionId, captureClosureGeneration, transcript)
             fail(
                 sessionId, target, failureCause,
@@ -3251,10 +3253,8 @@ internal class ConversationDictationController internal constructor(
     /** A provider-owned microphone also needs its real closure callback before explicit prefix dispatch. */
     private fun deliverPrefixAfterCaptureClosure(failed: ConversationDictationState.Failed): Boolean {
         val pending = pendingPrefixSend ?: return false
-        if (foregroundMicrophoneRequired || state !== failed || pending.sessionId != failed.sessionId ||
-            pending.captureGeneration != captureClosureGeneration || !completionIntent.explicit ||
-            requestedDeliveryMode != ConversationDictationDeliveryMode.SendOnFinish
-        ) {
+        if (foregroundMicrophoneRequired || state !== failed || pending.sessionId != failed.sessionId) return false
+        if (pending.captureGeneration != captureClosureGeneration || !explicitSendRequested) {
             return false
         }
         pendingPrefixSend = null
@@ -3534,12 +3534,11 @@ internal class ConversationDictationController internal constructor(
         }
         val admissionTarget = draftRecovery.sendTarget(sessionId, target)
         val current = runCatching { readDraft(target.accountRef, target.groupIdHex) }.getOrNull()
-        if (
-            admissionTarget == null ||
+        val draftConflict =
             current == null ||
-            current.revision != admissionTarget.capturedDraftRevision ||
-            current.value.text != admissionTarget.capturedDraft.text
-        ) {
+                current.revision != admissionTarget?.capturedDraftRevision ||
+                current.value.text != admissionTarget?.capturedDraft?.text
+        if (admissionTarget == null || draftConflict) {
             conversationDictationDiagnostic("event=send_outcome outcome=retained reason=draft_conflict")
             fail(sessionId, target, ConversationDictationFailure.SendBlocked, retainedTranscript = transcript)
             return

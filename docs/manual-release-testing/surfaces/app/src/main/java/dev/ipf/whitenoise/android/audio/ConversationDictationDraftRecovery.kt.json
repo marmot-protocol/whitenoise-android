@@ -34,6 +34,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Tail recovery preserves the entire submitted prefix before appending a suffix",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+        "anchor": "private fun dictationRecoveryRepresentedPrefixLength(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },
