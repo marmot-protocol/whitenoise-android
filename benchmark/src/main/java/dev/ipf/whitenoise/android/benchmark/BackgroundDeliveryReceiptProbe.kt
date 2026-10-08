@@ -27,8 +27,9 @@ class BackgroundDeliveryReceiptListener : NotificationListenerService() {
         BackgroundDeliveryReceipts.connected = false
     }
 
-    /** Rejects other packages before accessing extras; no payload or notification identity is logged. */
+    /** Rejects other profiles and packages before extras; no payload or notification identity is logged. */
     override fun onNotificationPosted(notification: StatusBarNotification) {
+        if (notification.user != Process.myUserHandle()) return
         if (!BackgroundDeliveryReceipts.accepts(notification.packageName)) return
         val extras = notification.notification.extras
         val messages =
@@ -197,6 +198,7 @@ internal class BackgroundDeliveryReceiptProbe(
         require(Process.myUid() / ANDROID_PER_USER_UID_RANGE == userId) {
             "Instrumentation is not running in the authorized disposable profile."
         }
+        BenchmarkConfig.requireQualificationUser(device.executeShellCommand("am get-current-user"))
         val original = hasListenerGrant()
         BackgroundDeliveryReceipts.arm(BenchmarkConfig.TARGET_PACKAGE, expectedTexts)
         try {

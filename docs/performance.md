@@ -373,6 +373,17 @@ do not set a fleet-wide threshold until representative baselines exist.
 
 ### Idle background-delivery baselines and push-burst power
 
+For the screen-off reconnect scenario use
+`NetworkRecoveryBenchmark#backgroundValidatedNetworkRecoveryPower` with
+`QUALIFICATION_USER_ID` and `ALLOW_NETWORK_TOGGLE=true`. It selects Push, checks
+validated internet, backgrounds the app and turns the screen off before taking
+Wi-Fi and cellular offline. The measured 25-second window restores connectivity
+and requires genuine internet validation while the screen stays off. Both the
+test and host cleanup restore the original Wi-Fi and airplane-mode switches.
+Run one sample per invocation, then repeat balanced independent rounds.
+The existing foreground `validatedNetworkRecoveryPower` measures UI recovery;
+its energy result cannot qualify a background campaign.
+
 `BackgroundIdleBenchmark` ([#2786](https://github.com/marmot-protocol/whitenoise-android/issues/2786))
 measures the three remaining delivery postures the recovery benchmark above does
 not cover, plus a representative push burst. Unlike the recovery journey, these
@@ -382,13 +393,15 @@ frame timing).
 
 The product has no third "delivery entirely disabled" mode — it always resolves
 to push or local/keep-connected (see `NativePushDelivery.resolvedNotificationDeliveryMode`).
-`idleWithDeliveryDisabledPower` approximates the floor a user who disabled
-notifications would see: push mode selected (so the always-on local stream is
-off) with the OS notification permission revoked for the run, restored
-afterward regardless of outcome.
+`idleWithDeliveryDisabledPower` uses a controlled disposable fixture: Push
+selected so the Local stream is off, the fixture Firebase receiver disabled so
+FCM cannot enter, and notification permission revoked. It resumes the process
+after permission/component changes, requires it to stay alive and screen-off,
+and restores both exact platform overrides afterward. This experimental floor
+is not a third product mode or a claim that background Android/GMS activity ceases.
 
 ```bash
-ANDROID_SERIAL=<device-serial> \
+ANDROID_SERIAL=<device-serial> QUALIFICATION_USER_ID=<disposable-user-id> \
   BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.BackgroundIdleBenchmark#idleWithDeliveryDisabledPower" \
   scripts/run-performance-benchmarks.sh
 ```
@@ -419,7 +432,7 @@ Android profile, counts each matching body once, rescans existing matching
 cards for every generation, and fails if the full burst is absent at the deadline.
 Actual Android posting time must follow the window start; delayed setup callbacks
 and ambiguous wall-clock changes cannot qualify. The listener
-ignores other packages before reading extras, emits no payloads, clears the
+ignores other profiles and packages before reading extras, emits no payloads, clears the
 fixture bodies, and restores its prior access on exit:
 
 ```bash
@@ -460,10 +473,16 @@ Run the benchmark script with `BENCHMARK_APK_DIR`, `ORIGINAL_DEV_APK`,
 `QUALIFICATION_USER_ID`, SDK `APKSIGNER` and `AAPT`, and the selected device serial.
 It skips Gradle completely in this route. Switch to the authorized profile first.
 Process selection, installs, instrumentation and output storage are profile-scoped;
-the exit trap restores the preserved original Dev APK in place. A concurrent Dev
+the prebuilt route temporarily disables Dev in other installed users to prevent
+their accounts from starting with fixture configuration. The exit trap restores
+the preserved original Dev APK in place before restoring their exact overrides.
+If restoration fails or competing code appears, those users remain protected;
+the captured override file identifies the recovery state. A concurrent Dev
 installation invalidates the campaign. Ownership checks run before instrumentation,
 after measurement and before restoration; the runner refuses to overwrite unexpected
 code. Resolve the competing install and take a new private backup before retrying.
+The host also captures and verifies the fixture notification permission and FCM
+receiver override, restoring them even if the instrumented process terminates.
 
 ### Resource campaign acceptance
 

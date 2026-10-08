@@ -1,5 +1,11 @@
 package dev.ipf.whitenoise.android.benchmark
 
+import android.app.Notification
+import android.os.Bundle
+import android.os.Process
+import android.os.SystemClock
+import android.os.UserHandle
+import android.service.notification.StatusBarNotification
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -105,6 +111,52 @@ class BackgroundDeliveryReceiptTest {
         BackgroundDeliveryReceipts.beginWindow(0, 100, 1_000)
         BackgroundDeliveryReceipts.record(FIXTURE_PACKAGE, texts, 50, 3_000, 3_000)
         assertTrue(runCatching { BackgroundDeliveryReceipts.finishWindow(100, 3_050) }.isFailure)
+    }
+
+    /** A same-package card from a personal user cannot qualify the disposable user's burst. */
+    @Test
+    fun anotherProfileCannotCompleteBurst() {
+        val foreignUid = if (Process.myUid() / 100_000 == 0) 100_000 else 0
+        postSyntheticBurst(UserHandle.getUserHandleForUid(foreignUid))
+        assertTrue(
+            runCatching {
+                BackgroundDeliveryReceipts.finishWindow(SystemClock.elapsedRealtime(), System.currentTimeMillis())
+            }.isFailure,
+        )
+    }
+
+    /** Real Android card parsing still accepts all distinct bodies posted by the fixture user. */
+    @Test
+    fun fixtureProfileCardsCompleteBurst() {
+        postSyntheticBurst(Process.myUserHandle())
+        BackgroundDeliveryReceipts.finishWindow(SystemClock.elapsedRealtime(), System.currentTimeMillis())
+    }
+
+    /** Builds content only in this test process, without posting any system notification. */
+    private fun postSyntheticBurst(user: UserHandle) {
+        val now = SystemClock.elapsedRealtime()
+        BackgroundDeliveryReceipts.beginWindow(now, now + 10_000, System.currentTimeMillis())
+        val listener = BackgroundDeliveryReceiptListener()
+        texts.forEachIndexed { index, text ->
+            val notification =
+                Notification().apply {
+                    extras = Bundle().apply { putCharSequence(Notification.EXTRA_TEXT, text) }
+                }
+            listener.onNotificationPosted(
+                StatusBarNotification(
+                    FIXTURE_PACKAGE,
+                    FIXTURE_PACKAGE,
+                    index,
+                    null,
+                    Process.myUid(),
+                    Process.myPid(),
+                    0,
+                    notification,
+                    user,
+                    System.currentTimeMillis(),
+                ),
+            )
+        }
     }
 
     private companion object {

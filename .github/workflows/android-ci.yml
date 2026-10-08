@@ -130,7 +130,7 @@ jobs:
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 
       - name: Test background delivery measurement acceptance
-        run: python3 -m unittest scripts.test_background_delivery_report scripts.test_background_fixture_artifacts
+        run: python3 -m unittest scripts.test_background_delivery_report scripts.test_background_fixture_artifacts scripts.test_background_fixture_state
 
       - name: Test preview security and update contracts
         run: |

@@ -330,7 +330,7 @@ jobs:
         with:
           name: background-fixture-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: build/background-fixture/
-          compression-level: 0
+          compression-level: 9
           if-no-files-found: error
           retention-days: 7
       - name: Remove Firebase configuration

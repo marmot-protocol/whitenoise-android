@@ -60,6 +60,14 @@ if [[ -n "${QUALIFICATION_USER_ID:-}" ]]; then
   }
 fi
 
+require_fixture_foreground() {
+  if [[ -n "${QUALIFICATION_USER_ID:-}" &&
+    "$(adb_cmd shell am get-current-user | tr -d '\r')" != "$QUALIFICATION_USER_ID" ]]; then
+    echo "The authorized fixture is no longer foreground; refusing device UI control." >&2
+    return 1
+  fi
+}
+
 # Package code is shared across Android users. Refuse a changed binary instead
 # of overwriting another task's in-place update or attributing mixed code to a run.
 installed_code_hash() {
@@ -237,6 +245,12 @@ original_heads_up_notifications_enabled=""
 target_replaced=false
 airplane_mode_captured=false
 original_airplane_mode=""
+wifi_state_captured=false
+original_wifi_enabled=""
+delivery_state_captured=false
+original_delivery_state=""
+protected_users_changed=false
+original_protected_users=""
 
 capture_device_state() {
   local destination="$1"
@@ -316,10 +330,117 @@ restore_airplane_mode() {
   return 1
 }
 
+# Read only the switch line; cmd wifi status also contains private network details.
+current_wifi_enabled() {
+  local status
+  status="$(adb_cmd shell cmd wifi status | tr -d '\r' | awk 'NR == 1 {print}')" || return 1
+  case "$status" in
+    "Wifi is enabled") printf '%s\n' true ;;
+    "Wifi is disabled") printf '%s\n' false ;;
+    *) return 1 ;;
+  esac
+}
+
+fixture_delivery_state() {
+  local dump state
+  dump="$(mktemp)" || return 1
+  if ! adb_cmd shell dumpsys package "$target_package" >"$dump"; then rm -f "$dump"; return 1; fi
+  state="$(python3 scripts/background_fixture_state.py "$dump" "$benchmark_user" "$@")" || {
+    rm -f "$dump"; return 1;
+  }
+  rm -f "$dump"
+  printf '%s\n' "$state"
+}
+
+# Other users retain their data but must not bootstrap with fixture configuration.
+protect_other_users() {
+  local user action
+  original_protected_users="$(fixture_delivery_state --protected-users)" || return 1
+  printf '%s\n' "$original_protected_users" >"$local_output/protected-user-overrides.json"
+  protected_users_changed=true
+  while IFS=$'\t' read -r user action; do
+    [[ "$user" =~ ^[0-9]+$ && "$user" != "$benchmark_user" ]] || return 1
+    case "$action" in
+      default-state | enable)
+        adb_cmd shell pm disable-user --user "$user" "$target_package" >/dev/null || return 1
+        ;;
+      disable | disable-user | disable-until-used) ;;
+      *) return 1 ;;
+    esac
+  done < <(jq -r '.[] | [.user, .action] | @tsv' <<<"$original_protected_users")
+  local expected observed
+  expected="$(jq -c 'map(if .action == "default-state" or .action == "enable" then .action = "disable-user" else . end)' \
+    <<<"$original_protected_users")"
+  observed="$(fixture_delivery_state --protected-users)" || return 1
+  [[ "$(jq -c . <<<"$observed")" == "$expected" ]] || {
+    echo "Could not protect every non-fixture Dev profile before replacement." >&2
+    return 1
+  }
+}
+
+restore_other_users() {
+  local user action observed
+  # Do not restart personal accounts with test configuration or competing code.
+  [[ "$(installed_code_hash)" == "$(sha256_file "$dev_app_apk")" ]] || {
+    echo "Dev profiles remain protected until the exact original APK is restored; original overrides are retained." >&2
+    return 1
+  }
+  while IFS=$'\t' read -r user action; do
+    [[ "$user" =~ ^[0-9]+$ && "$user" != "$benchmark_user" ]] || return 1
+    case "$action" in default-state | enable | disable | disable-user | disable-until-used) ;; *) return 1 ;; esac
+    adb_cmd shell pm "$action" --user "$user" "$target_package" >/dev/null || return 1
+  done < <(jq -r '.[] | [.user, .action] | @tsv' <<<"$original_protected_users")
+  observed="$(fixture_delivery_state --protected-users)" || return 1
+  [[ "$observed" == "$original_protected_users" ]] || {
+    echo "The original non-fixture Dev profile overrides were not restored." >&2
+    return 1
+  }
+}
+
+# A host fence survives instrumentation death while Kotlin finally blocks cannot.
+restore_fixture_delivery_state() {
+  local permission_action receiver_action restored
+  if [[ "$(jq -r '.permission_granted' <<<"$original_delivery_state")" == true ]]; then
+    permission_action=grant
+  else
+    permission_action=revoke
+  fi
+  receiver_action="$(jq -r '.receiver_action' <<<"$original_delivery_state")"
+  case "$receiver_action" in default-state | enable | disable) ;; *) return 1 ;; esac
+  adb_cmd shell pm "$permission_action" --user "$benchmark_user" "$target_package" \
+    android.permission.POST_NOTIFICATIONS >/dev/null 2>&1 || true
+  adb_cmd shell pm "$receiver_action" --user "$benchmark_user" \
+    "$target_package/com.google.firebase.iid.FirebaseInstanceIdReceiver" >/dev/null 2>&1 || true
+  restored="$(fixture_delivery_state)" || return 1
+  [[ "$restored" == "$original_delivery_state" ]] || {
+    echo "The fixture permission/FCM receiver overrides were not restored." >&2
+    return 1
+  }
+}
+
+restore_wifi_state() {
+  local action restored attempt
+  if [[ "$original_wifi_enabled" == true ]]; then action=enabled; else action=disabled; fi
+  adb_cmd shell cmd wifi set-wifi-enabled "$action" >/dev/null 2>&1 || true
+  for attempt in {1..50}; do
+    restored="$(current_wifi_enabled)" || restored=""
+    if [[ "$restored" == "$original_wifi_enabled" ]]; then return 0; fi
+    sleep 0.1
+  done
+  echo "Failed to restore the original Wi-Fi switch; reconnect and restore it before relying on network evidence." >&2
+  return 1
+}
+
 cleanup() {
   local status=$?
   trap - EXIT
   if [[ "$airplane_mode_captured" == true ]] && ! restore_airplane_mode; then
+    if ((status == 0)); then status=1; fi
+  fi
+  if [[ "$wifi_state_captured" == true ]] && ! restore_wifi_state; then
+    if ((status == 0)); then status=1; fi
+  fi
+  if [[ "$delivery_state_captured" == true ]] && ! restore_fixture_delivery_state; then
     if ((status == 0)); then status=1; fi
   fi
   if [[ "$heads_up_setting_captured" == true ]] && ! restore_heads_up_notifications; then
@@ -340,10 +461,21 @@ cleanup() {
       if ((status == 0)); then status=1; fi
     fi
   fi
+  if [[ "$protected_users_changed" == true ]] && ! restore_other_users; then
+    if ((status == 0)); then status=1; fi
+  fi
   rm -f "$result_file"
   exit "$status"
 }
 trap cleanup EXIT
+
+if [[ -n "${QUALIFICATION_USER_ID:-}" ]]; then
+  original_delivery_state="$(fixture_delivery_state)" || {
+    echo "Cannot capture exact fixture delivery overrides before qualification." >&2
+    exit 1
+  }
+  delivery_state_captured=true
+fi
 
 if [[ "$allow_network_toggle" == true ]]; then
   original_airplane_mode="$(adb_cmd shell cmd connectivity airplane-mode | tr -d '\r')"
@@ -355,6 +487,11 @@ if [[ "$allow_network_toggle" == true ]]; then
       ;;
   esac
   airplane_mode_captured=true
+  original_wifi_enabled="$(current_wifi_enabled)" || {
+    echo "Cannot capture the original Wi-Fi switch; refusing connectivity changes." >&2
+    exit 1
+  }
+  wifi_state_captured=true
 fi
 
 # A heads-up notification can cover a Compose target between UiAutomator
@@ -376,9 +513,17 @@ adb_cmd shell cmd statusbar collapse
 # normal dev debug APK even when either journey fails.
 capture_device_state "$local_output/package-replacement-device.txt"
 package_replacement_install_log="$local_output/package-replacement-install.log"
+require_fixture_foreground
 if [[ -n "${BENCHMARK_APK_DIR:-}" && "$(installed_code_hash)" != "$(sha256_file "$dev_app_apk")" ]]; then
   echo "Shared Dev APK changed before replacement; preserving the competing install." >&2
   exit 1
+fi
+if [[ -n "${BENCHMARK_APK_DIR:-}" ]]; then
+  protect_other_users
+  if [[ "$(installed_code_hash)" != "$(sha256_file "$dev_app_apk")" ]]; then
+    echo "Shared Dev APK changed while protecting profiles; refusing the fixture replacement." >&2
+    exit 1
+  fi
 fi
 if adb_cmd install --user "$benchmark_user" -r -d -t "$app_apk" >"$package_replacement_install_log" 2>&1; then
   target_replaced=true
@@ -401,6 +546,7 @@ adb_cmd shell mkdir -p "$device_output"
 # an Activity, so force-stop immediately before the explicit launch to make the
 # journey cold without clearing authenticated data.
 main_activity="$target_package/dev.ipf.whitenoise.android.MainActivity"
+require_fixture_foreground
 adb_cmd shell am force-stop --user "$benchmark_user" "$target_package"
 wait_for_package_update_ui_to_settle
 # The transient package-update Activity may have forwarded the launch intent as
@@ -547,12 +693,14 @@ fi
 if [[ "$allow_network_toggle" == true ]]; then
   instrument_command="$instrument_command \
 -e allowNetworkToggle true \
--e originalAirplaneMode $(quote_device_shell_arg "$original_airplane_mode")"
+-e originalAirplaneMode $(quote_device_shell_arg "$original_airplane_mode") \
+-e originalWifiEnabled $(quote_device_shell_arg "$original_wifi_enabled")"
 fi
 instrument_command="$instrument_command \
 $(quote_device_shell_arg "$runner")"
 
 require_owned_candidate
+require_fixture_foreground
 capture_device_state "$local_output/device-before.txt"
 instrumentation_status=0
 adb_cmd shell "$instrument_command" | tee "$result_file" || instrumentation_status=$?
