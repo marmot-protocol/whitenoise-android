@@ -80,6 +80,22 @@ Smart-folder cases dismiss the filter picker, open/cancel Unread and Chat type c
 
 ## Required edge-case matrix
 
+### Android Back and keyboard qualification
+
+The optional runtime campaign accepts `maestro_android_api` (`33`, `34`, `36`, `37.0`) and `maestro_navigation_mode` (`button`, `gesture`); defaults remain API 34 and three-button navigation. These choices apply only to manual generated-account runs. Offline onboarding and ordinary connected/media jobs retain their existing image selection. Validate a request before its build, then verify the actual emulator SDK, enabled navigation overlay, SystemUI navigation setting and image fingerprint before installing the fixture. Each runtime shard retains `maestro-runtime-environment.json`. Reconciliation rejects missing, foreign, wrong-version, wrong-mode and mixed-image reports, even with successful UI and native receipts.
+
+For a change to Back dispatch, execute `runtime-reactions` serially for each of the four APIs in both navigation modes. API 37 reuses the established Android 17 cmdline-tools, bounded input-service readiness and emulator stabilization, with a 4 GB Pixel 6 image. The ordinary PR workflow does not start this matrix automatically. In gesture mode the six reactor-detail journeys use an actual left-edge swipe through the [Maestro swipe command](https://docs.maestro.dev/reference/commands-available/swipe); in button mode they send Android Back. Neither path dismisses the keyboard or refocuses the composer to conceal a failed dismissal. Other unrelated Back steps retain their usual key event and cannot certify gesture handling.
+
+Require the reactor popup to close while the conversation and reaction pill remain visible, the Chats route stays absent, and reopening restores the full participant filter. The two keyboard cases additionally require the same native draft, unchanged native owner/peer reactions and actual activity IME visibility after dismissal. Retain all ten selected cases and their setup/postcondition/cleanup receipts for each API/mode. A passing API-34 key-event run does not qualify API 33, newer Android or the system edge gesture. Handled rotation also remains separate from Activity recreation and process death. Production Back opt-in stays unqualified until those source-bound results pass; inventory generation and tooling contracts cannot substitute for them.
+
+```sh
+gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-android \
+  --ref FLOW_BRANCH -f maestro_pilot=true -f maestro_suite=runtime-reactions \
+  -f maestro_android_api=33 -f maestro_navigation_mode=gesture \
+  -f maestro_repetitions=1 -f maestro_negative_control=false \
+  -f review_demo_e2e=false -f document_provider_matrix=false
+```
+
 For every applicable surface, assess initial/empty/loading/populated/error states; normal action; cancellation and Back; permission denial; invalid and boundary input; repeated taps; retry and interrupted work; account/target changes; offline/reconnect; warm resume, recreation and process death; portrait/landscape, large text, RTL and accessibility actions. Use the actual permanent case's detailed subcases rather than marking this generic list as execution proof.
 
 Some states require dedicated fixtures. External signer success/cancellation, biometric enrollment, notification permission and background delivery, microphone/camera behavior, controlled attachment corruption/recovery, low storage, process death, stale membership and release packaging must retain their native or physical campaigns. A hidden-key navigation case does not prove secret export. The manifest handles orientation changes without recreating MainActivity. Rotation checks configuration handling; it does not prove Activity recreation or process death. Emoji/menu cancellation does not prove media upload. An emulator UI playback control does not prove sound quality.

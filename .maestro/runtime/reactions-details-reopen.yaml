@@ -12,7 +12,7 @@ name: reactions-details-reopen
 - assertVisible: Maestro Bob
 - tapOn: 👍 1
 - assertNotVisible: Maestro Bob
-- back
+- runFlow: ../fixtures/reactor-back.yaml
 - assertNotVisible: All · 2
 - assertVisible:
     id: composer-pill-surface
@@ -26,7 +26,7 @@ name: reactions-details-reopen
 - assertVisible: All · 2
 - assertVisible: Maestro Bob
 - assertVisible: You
-- back
+- runFlow: ../fixtures/reactor-back.yaml
 - assertNotVisible: All · 2
 - assertVisible:
     id: composer-pill-surface

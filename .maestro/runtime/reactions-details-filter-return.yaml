@@ -16,7 +16,7 @@ name: reactions-details-filter-return
 - tapOn: All · 2
 - assertVisible: Maestro Bob
 - assertVisible: You
-- back
+- runFlow: ../fixtures/reactor-back.yaml
 - assertNotVisible: All · 2
 - assertVisible:
     id: composer-pill-surface

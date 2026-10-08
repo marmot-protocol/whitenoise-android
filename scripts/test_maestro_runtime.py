@@ -68,7 +68,7 @@ class CampaignSummaryTest(unittest.TestCase):
         self.assertEqual(prefix, 'build')
         paths = [str(Path(path).relative_to(prefix)) for path in paths]
         self.assertEqual(paths, ['maestro-runtime-${{ matrix.slice }}-${{ matrix.partition }}',
-                                 'maestro-runtime-pair/pair.json'])
+                                 'maestro-runtime-pair/pair.json', 'maestro-runtime-environment.json'])
         self.assertNotIn('build/', '\n'.join(paths))
 
     def prepare(self, root):
@@ -83,6 +83,11 @@ class CampaignSummaryTest(unittest.TestCase):
             pair_path.parent.mkdir(parents=True)
             pair_path.write_text(json.dumps(identity))
             pairs.append(pair_path)
+            environment = {'schema': 1, 'source_sha': 'a' * 40, 'run_id': '123', 'run_attempt': '1',
+                           'api': '34', 'sdk': 34, 'navigation': 'button', 'navigation_mode': '0',
+                           'navigation_overlay': 'com.android.internal.systemui.navbar.threebutton',
+                           'image_fingerprint': 'synthetic-image', 'qemu': True}
+            (artifact / 'maestro-runtime-environment.json').write_text(json.dumps(environment))
             reports = artifact / f'maestro-runtime-navigation-{partition}'
             names = runtime.case_selection('navigation', partition)
             rows = []
@@ -137,11 +142,33 @@ class CampaignSummaryTest(unittest.TestCase):
             source = root / 'maestro-runtime-results-navigation-1-123-1'
             target = root / 'maestro-runtime-results-navigation-1-123-2'
             shutil.copytree(source, target)
+            environment_path = target / 'maestro-runtime-environment.json'
+            environment = json.loads(environment_path.read_text())
+            environment['run_attempt'] = '2'
+            environment_path.write_text(json.dumps(environment))
             leaf = target / 'maestro-runtime-navigation-1' / runtime.case_selection('navigation', 1)[0]
             (leaf / 'junit.xml').unlink()
             result = campaign(root, 'runtime-navigation', 'a' * 40, '123', '2')
             self.assertFalse(result['evidence_complete'])
             self.assertEqual(result['passed_count'], 5)
+
+    def test_missing_or_mixed_platform_cannot_qualify_complete_ui_results(self):
+        """Matching APKs and UI/native success still require one observed OS/navigation environment."""
+        for mutation in ('missing', 'sdk', 'navigation', 'image_fingerprint', 'run_attempt'):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                self.prepare(root)
+                path = root / 'maestro-runtime-results-navigation-2-123-1/maestro-runtime-environment.json'
+                if mutation == 'missing':
+                    path.unlink()
+                else:
+                    record = json.loads(path.read_text())
+                    record[mutation] = {'sdk': 36, 'navigation': 'gesture',
+                                        'image_fingerprint': 'different-image', 'run_attempt': '2'}[mutation]
+                    path.write_text(json.dumps(record))
+                result = self.result(root)
+                self.assertFalse(result['evidence_complete'])
+                self.assertTrue(result['errors'])
 
     def test_future_shard_attempt_cannot_certify_current_run(self):
         """A future artifact is invalid even when older matching evidence passes."""

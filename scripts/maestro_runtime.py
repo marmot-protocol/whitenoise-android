@@ -154,8 +154,12 @@ def run_case(name, reports):
 
 def run_ui(name, directory):
     """Retain bounded CLI stdout and stderr, including parse failures that produce no JUnit."""
+    navigation = os.environ.get('MAESTRO_NAVIGATION_MODE', 'button')
+    if navigation not in ('button', 'gesture'):
+        raise ValueError('Qualified navigation mode required')
     with (directory / 'maestro-output.txt').open('w') as log:
         return subprocess.run(['maestro', '--device', 'emulator-5554', 'test', '--format', 'JUNIT',
+                               '-e', f'MAESTRO_NAVIGATION_MODE={navigation}',
                                '--output', str(directory / 'junit.xml'), '--debug-output', str(directory / 'debug'),
                                '--test-output-dir', str(directory / 'screenshots'),
                                str(ROOT / '.maestro/runtime' / f'{name}.yaml')],

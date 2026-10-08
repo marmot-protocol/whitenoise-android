@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow:
+    when:
+      true: ${MAESTRO_NAVIGATION_MODE == 'gesture'}
+    commands:
+      - swipe:
+          start: 0%, 50%
+          end: 50%, 50%
+          duration: 400
+- runFlow:
+    when:
+      true: ${MAESTRO_NAVIGATION_MODE == 'button'}
+    commands:
+      - back

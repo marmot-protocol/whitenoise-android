@@ -12,7 +12,7 @@ name: reactions-details-keyboard-reopen
 - assertVisible: All · 2
 - assertVisible: You
 - assertVisible: Maestro Bob
-- back
+- runFlow: ../fixtures/reactor-back.yaml
 - assertNotVisible: All · 2
 - assertVisible:
     id: composer-pill-surface
@@ -26,7 +26,7 @@ name: reactions-details-keyboard-reopen
 - assertVisible: All · 2
 - assertVisible: You
 - assertVisible: Maestro Bob
-- back
+- runFlow: ../fixtures/reactor-back.yaml
 - assertNotVisible: All · 2
 - assertVisible:
     id: composer-pill-surface

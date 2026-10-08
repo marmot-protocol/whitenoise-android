@@ -10,9 +10,11 @@ import xml.etree.ElementTree as ET
 try:
     from scripts.maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result
     from scripts.maestro_runtime_selection import matrix_selection
+    from scripts.maestro_environment import qualify
 except ModuleNotFoundError:
     from maestro_runtime import CASES, PACKAGE, case_selection, receipt, ui_result
     from maestro_runtime_selection import matrix_selection
+    from maestro_environment import qualify
 
 
 def read_json(path):
@@ -25,7 +27,7 @@ def read_json(path):
     return result
 
 
-def campaign(directory, suite, source, run_id, attempt):
+def campaign(directory, suite, source, run_id, attempt, api='34', navigation='button'):
     """Require complete selected shards, identical APK identity and independent per-case success evidence."""
     if not re.fullmatch('[0-9a-f]{40}', source) or not re.fullmatch('[1-9][0-9]*', str(run_id)):
         raise ValueError('Exact source and positive workflow identity required')
@@ -33,6 +35,7 @@ def campaign(directory, suite, source, run_id, attempt):
         raise ValueError('Positive bounded attempt required')
     results, errors, generations = [], [], set()
     identity = None
+    platform = None
     artifacts = set()
     available = {path.name for path in directory.iterdir()} if directory.exists() else set()
     for shard in matrix_selection(suite):
@@ -50,6 +53,11 @@ def campaign(directory, suite, source, run_id, attempt):
         root = directory / artifact
         reports = root / f'maestro-runtime-{logical}-{partition}'
         try:
+            observed = qualify(read_json(root / 'maestro-runtime-environment.json'), source, run_id,
+                               artifact.removeprefix(prefix), api, navigation)
+            if platform is not None and observed != platform:
+                raise ValueError('Shards used different Android images or navigation modes')
+            platform = observed
             pair = read_json(root / 'maestro-runtime-pair/pair.json')
             if (pair.get('schema') != 1 or pair.get('source_sha') != source or pair.get('run_id') != str(run_id)
                     or pair.get('package') != PACKAGE or pair.get('distribution') != 'Zapstore'):
@@ -104,7 +112,8 @@ def campaign(directory, suite, source, run_id, attempt):
         if extra:
             errors.append(f'Unexpected shard artifacts: {sorted(extra)}')
     return {'schema': 1, 'selection': suite, 'source_sha': source, 'run_id': str(run_id), 'run_attempt': str(attempt),
-            'pair': identity, 'expected_count': len(results), 'passed_count': sum(row['passed'] for row in results),
+            'pair': identity, 'platform': platform,
+            'expected_count': len(results), 'passed_count': sum(row['passed'] for row in results),
             'results': results, 'errors': errors,
             'evidence_complete': bool(results) and not errors and all(row['passed'] for row in results),
             'full_release_coverage': False}
@@ -118,7 +127,9 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     result = campaign(args.artifacts, args.suite, os.environ['GITHUB_SHA'],
-                      os.environ['GITHUB_RUN_ID'], os.environ['GITHUB_RUN_ATTEMPT'])
+                      os.environ['GITHUB_RUN_ID'], os.environ['GITHUB_RUN_ATTEMPT'],
+                      os.environ.get('MAESTRO_ANDROID_API', '34'),
+                      os.environ.get('MAESTRO_NAVIGATION_MODE', 'button'))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + '\n')
     message = f"Maestro campaign: {result['passed_count']}/{result['expected_count']} selected UI cases passed."
