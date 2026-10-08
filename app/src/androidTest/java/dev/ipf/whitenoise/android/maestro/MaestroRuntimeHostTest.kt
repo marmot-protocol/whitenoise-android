@@ -61,6 +61,8 @@ private val MAESTRO_POSTCONDITIONS =
         "notification-granted",
         "camera-denied",
         "accounts-retained",
+        "account-action-signed-out",
+        "account-action-wiped",
         "contact-private-saved",
         "contact-private-cleared",
         "contact-private-boundary",
@@ -125,6 +127,7 @@ class MaestroRuntimeHostTest {
             var externalContact: MaestroExternalContact? = null
             var editorBaselines: MaestroEditorBaselines? = null
             var inboundShareBaseline: MaestroInboundShareBaseline? = null
+            var accountActionBaseline: MaestroAccountActionBaseline? = null
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -196,6 +199,7 @@ class MaestroRuntimeHostTest {
                         }
                     val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
                     editorBaselines = captureMaestroEditorBaselines(native, app, postcondition)
+                    accountActionBaseline = captureMaestroAccountAction(native, app, group, postcondition)
                     if (postcondition.startsWith("message-") || postcondition == "accounts-retained") {
                         expectedAccountIds = accounts.map { it.accountIdHex }.toSet()
                         val original = checkNotNull(nativeRow.row.lastMessage)
@@ -261,8 +265,18 @@ class MaestroRuntimeHostTest {
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
-                        .put("speechRateVerified", verifyMaestroSpeechRate(context, checkNotNull(state), postcondition))
                         .put(
+                            "accountActionVerified",
+                            verifyMaestroAccountAction(
+                                native,
+                                checkNotNull(state),
+                                accountActionBaseline,
+                                postcondition,
+                            ),
+                        ).put(
+                            "speechRateVerified",
+                            verifyMaestroSpeechRate(context, checkNotNull(state), postcondition),
+                        ).put(
                             "smartFolderRuleVerified",
                             verifyMaestroFolderRules(
                                 context,

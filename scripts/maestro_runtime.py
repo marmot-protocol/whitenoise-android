@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = 'dev.ipf.whitenoise.android.maestrolab'
 HOST = 'dev.ipf.whitenoise.android.maestro.MaestroRuntimeHostTest'
 RUNNER = 'dev.ipf.whitenoise.android.maestro.MaestroFixtureRunner'
-SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'settings-lifecycle', 'speech-persistence', 'profile-text', 'folder-rules', 'relay-validation', 'inbound-share')
+SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'account-actions', 'settings-lifecycle', 'speech-persistence', 'profile-text', 'folder-rules', 'relay-validation', 'inbound-share')
 MAX_CASES_PER_SHARD = 4
 CASE_RESERVE_SECONDS = 660
 UI_TIMEOUTS = {'polls-question-boundary': 240}
@@ -137,6 +137,9 @@ def run_case(name, reports):
                 if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
                         and verified.get('relayListsVerified') is not True):
                     raise ValueError('Unchanged native relay lists were not verified')
+                if (CASES[name]['postcondition'].startswith('account-action-')
+                        and verified.get('accountActionVerified') is not True):
+                    raise ValueError('Authoritative account action and retained private state were not verified')
                 if (CASES[name]['postcondition'].startswith('share-request-')
                         and verified.get('shareImportVerified') is not True):
                     raise ValueError('Actual inbound share recovery and no-send proof was not verified')

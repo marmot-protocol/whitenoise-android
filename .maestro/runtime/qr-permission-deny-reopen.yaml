@@ -1,0 +1,42 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: qr-permission-deny-reopen
+---
+- runFlow: ../fixtures/runtime-qr-denied-ready.yaml
+- tapOn:
+    id: qr_scanner.close
+- assertNotVisible:
+    id: qr_scanner_sheet_content
+- assertVisible:
+    id: share_connect.screen
+- assertVisible: Maestro Alice
+- tapOn:
+    id: share_connect.open_scanner
+- assertVisible:
+    id: com.android.permissioncontroller:id/permission_deny_button
+- tapOn:
+    id: com.android.permissioncontroller:id/permission_deny_button
+- assertVisible:
+    id: qr_scanner_sheet_content
+- assertVisible:
+    text: ^Camera Access Needed$
+- assertVisible:
+    id: qr_scanner.recovery
+    enabled: true
+- assertNotVisible:
+    id: qr_scanner.target
+- assertNotVisible:
+    id: qr_scanner.torch
+- assertVisible:
+    text: ^Open settings$
+- tapOn:
+    id: qr_scanner.close
+- assertNotVisible:
+    id: qr_scanner_sheet_content
+- assertVisible:
+    id: share_connect.screen
+- assertVisible: Maestro Alice
+- back
+- assertVisible: Settings
+- assertVisible: Maestro Alice
+- back
+- assertVisible: Maestro group

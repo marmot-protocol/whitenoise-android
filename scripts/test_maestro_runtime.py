@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import xml.etree.ElementTree as ET
 import yaml
 
@@ -287,6 +287,26 @@ class CampaignSummaryTest(unittest.TestCase):
                 record['relayListsVerified'] = True
                 path.write_text(json.dumps(record))
                 self.assertTrue(self.result(root)['evidence_complete'])
+
+    def test_generic_native_success_cannot_certify_account_actions(self):
+        """Signed-out/wiped UI must have matching native account, survivor and durable-draft proof."""
+        for postcondition in ('account-action-signed-out', 'account-action-wiped'):
+            with self.subTest(postcondition=postcondition), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                leaves, _ = self.prepare(root)
+                name = runtime.case_selection('navigation', 1)[0]
+                with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': postcondition}}):
+                    result = self.result(root)
+                    self.assertFalse(result['evidence_complete'])
+                    self.assertIn('account action', result['results'][0]['failure'])
+                    path = leaves[0] / 'verified.json'
+                    record = json.loads(path.read_text())
+                    record['accountActionVerified'] = False
+                    path.write_text(json.dumps(record))
+                    self.assertFalse(self.result(root)['evidence_complete'])
+                    record['accountActionVerified'] = True
+                    path.write_text(json.dumps(record))
+                    self.assertTrue(self.result(root)['evidence_complete'])
 
     def test_generic_native_success_cannot_certify_inbound_share_recovery(self):
         """UI navigation needs real imported-error/request-cleanup/no-send native evidence."""
@@ -1040,6 +1060,53 @@ class RuntimeEvidenceTest(unittest.TestCase):
                           {'generation': generation, flag: False}, {'generation': generation, flag: 'true'}):
                 with self.subTest(value=value), self.assertRaises(ValueError):
                     runtime.receipt(json.dumps(value), generation, flag)
+
+    def test_executor_rejects_missing_false_or_untyped_account_action_proof(self):
+        """Even successful UI and safe teardown cannot turn a missing account-action proof into PASS."""
+        generation = 'a' * 32
+        name = 'navigation-settings-back'
+        for postcondition in ('account-action-signed-out', 'account-action-wiped'):
+            for proof in (None, False, 'true', 1, True):
+                with self.subTest(postcondition=postcondition, proof=proof), tempfile.TemporaryDirectory() as temporary:
+                    process = Mock(returncode=0)
+                    process.poll.side_effect = [None, 0, 0]
+
+                    def start(*args, **kwargs):
+                        kwargs['stdout'].write('OK (1 test)\n')
+                        kwargs['stdout'].flush()
+                        return process
+
+                    def command(arguments):
+                        if arguments[-2:] == ['clear', runtime.PACKAGE]:
+                            return 'Success'
+                        path = arguments[-1]
+                        if path.endswith('/ready.json'):
+                            return json.dumps({'generation': generation, 'ready': True, 'accounts': 3,
+                                               'fixture': 'basic', 'uiObserver': 'maestro'})
+                        if path.endswith('/closed.json'):
+                            return json.dumps({'generation': generation, 'closed': True})
+                        if path.endswith('/verified.json'):
+                            record = {'generation': generation, 'verified': True}
+                            if proof is not None:
+                                record['accountActionVerified'] = proof
+                            return json.dumps(record)
+                        return ''
+
+                    def ui(case, directory):
+                        (directory / 'junit.xml').write_text(
+                            f'<testsuite><testcase name="{case}" status="SUCCESS" time="1"/></testsuite>')
+                        return Mock(returncode=0)
+
+                    with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': postcondition}}), \
+                         patch.object(runtime.uuid, 'uuid4', return_value=Mock(hex=generation)), \
+                         patch.object(runtime, 'command', side_effect=command), \
+                         patch.object(runtime.subprocess, 'Popen', side_effect=start), \
+                         patch.object(runtime, 'run_ui', side_effect=ui):
+                        result = runtime.run_case(name, Path(temporary))
+                    self.assertTrue(result['cleanup_safe'])
+                    self.assertEqual(result['passed'], proof is True)
+                    if proof is not True:
+                        self.assertIn('account action', result['cleanup_failure'])
 
     def test_missing_duplicate_skipped_wrong_and_failed_ui_results_are_rejected(self):
         """Require exactly the selected named assertion without skipped or failure children."""

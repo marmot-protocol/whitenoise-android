@@ -64,6 +64,7 @@ internal suspend fun captureMaestroInboundShare(
         }
     check(accounts.size == 3 && messages.size == 2 && owner in messages)
     check(messages.values.all { timeline -> timeline.any { it.text == "Generated fixture message" && !it.deleted } })
+    check(withContext(Dispatchers.IO) { messages.keys.all { native.messageDraft(it, group) == null } })
     val request = awaitMaestroImportedShare(activity)
     val expectedText = maestroExpectedShareText(fixture)
     val expectedErrors = maestroExpectedShareErrors(fixture)
@@ -123,7 +124,7 @@ internal suspend fun verifyMaestroInboundShare(
             matches =
                 cleared &&
                 maestroShareLocalStateMatches(state, before, expectedDraft) &&
-                maestroShareHistoriesMatch(native, before) &&
+                maestroShareHistoriesMatch(native, before, expectedDraft) &&
                 verifyMaestroShareFiles(context, before, postcondition)
             if (!matches) delay(100L)
         }
@@ -148,15 +149,18 @@ private suspend fun maestroShareLocalStateMatches(
 private suspend fun maestroShareHistoriesMatch(
     native: Marmot,
     before: MaestroInboundShareBaseline,
+    expectedDraft: String?,
 ): Boolean =
     withContext(Dispatchers.IO) {
         native.listAccounts().associate { it.label to it.accountIdHex } == before.accountIds &&
             before.messages.all { (account, messages) ->
-                maestroSharedMessageSnapshot(native, account, before.group) == messages
+                val draft = if (account == before.owner) expectedDraft else null
+                maestroSharedMessageSnapshot(native, account, before.group) == messages &&
+                    native.messageDraft(account, before.group)?.content == draft
             }
     }
 
-private fun maestroSharedMessageSnapshot(
+internal fun maestroSharedMessageSnapshot(
     native: Marmot,
     account: String,
     group: String,

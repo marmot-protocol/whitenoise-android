@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: qr-permission-deny-back
+---
+- runFlow: ../fixtures/runtime-qr-denied-ready.yaml
+- back
+- assertNotVisible:
+    id: qr_scanner_sheet_content
+- assertVisible:
+    id: share_connect.screen
+- assertVisible: Maestro Alice
+- back
+- assertVisible: Settings
+- assertVisible: Maestro Alice
+- back
+- assertVisible: Maestro group
