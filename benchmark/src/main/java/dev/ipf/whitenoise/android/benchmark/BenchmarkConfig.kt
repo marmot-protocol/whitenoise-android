@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.benchmark
 
+import android.os.Process
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assume.assumeTrue
 
@@ -60,6 +61,22 @@ internal object BenchmarkConfig {
 
     val originalAirplaneMode: BenchmarkAirplaneMode?
         get() = BenchmarkAirplaneMode.fromStatusValue(arguments.getString("originalAirplaneMode"))
+
+    /** Host-captured radio state; absent or malformed input cannot authorize Wi-Fi changes. */
+    val originalWifiEnabled: Boolean?
+        get() = arguments.getString("originalWifiEnabled")?.toBooleanStrictOrNull()
+
+    /** Refuses device UI control unless instrumentation and the foreground fixture user agree. */
+    fun requireQualificationUser(currentUser: String): Int {
+        val authorized = arguments.getString("qualificationUserId")?.toIntOrNull()
+        require(authorized != null && authorized > 0 && Process.myUid() / 100_000 == authorized) {
+            "Run in an explicitly authorized disposable qualification profile."
+        }
+        check(currentUser.trim().toIntOrNull() == authorized) {
+            "The authorized fixture profile is no longer foreground."
+        }
+        return authorized
+    }
 
     /** Smoke-run override for a [BackgroundIdleBenchmark] method's sleep window; defaults apply when absent. */
     val idleWindowMs: Long?
