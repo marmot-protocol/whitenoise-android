@@ -31,9 +31,6 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
-import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
-import dev.ipf.marmotkit.MarkdownListItemFfi
-import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
@@ -99,16 +96,17 @@ class TimelineRowTtsHighlightPaintTest {
         val key = "npub1" + "q".repeat(58)
         val doc =
             MarkdownDocumentFfi(
-                false,
-                listOf(
-                    MarkdownBlockFfi.Paragraph(
-                        listOf(
-                            MarkdownInlineFfi.Text("Hello "),
-                            MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, key)),
+                truncated = false,
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Paragraph(
+                            listOf(
+                                MarkdownInlineFfi.Text("Hello "),
+                                MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, key)),
+                            ),
                         ),
                     ),
-                ),
-                byteArrayOf(),
+                blankLinesBefore = byteArrayOf(),
             )
         val record = untokenizedRecord().copy(plaintext = "Hello nostr:$key", contentTokens = doc)
         fun entry(name: String) =
@@ -209,7 +207,7 @@ class TimelineRowTtsHighlightPaintTest {
                     message = record,
                     editedText = null,
                     senderDisplayName = SENDER_NAME,
-                    parseMarkdown = { richDocument() },
+                    parseMarkdown = { richPaintDocument() },
                 )!!
             }
 
@@ -526,7 +524,7 @@ class TimelineRowTtsHighlightPaintTest {
             groupIdHex = GROUP_ID,
             sender = SENDER_ID,
             plaintext = RICH_BODY,
-            contentTokens = richDocument(),
+            contentTokens = richPaintDocument(),
             kind = 9uL,
             tags = emptyList(),
             sourceEpoch = null,
@@ -534,67 +532,6 @@ class TimelineRowTtsHighlightPaintTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
-        )
-
-    /**
-     * Mirrors the shapes a tester actually reads aloud: a heading, emphasis,
-     * inline code, a link, a list, and a quote. Each rendered leaf must still
-     * align with the projected speech text for the highlight to survive.
-     */
-    private fun richDocument() =
-        MarkdownDocumentFfi(
-            truncated = false,
-            blankLinesBefore = byteArrayOf(0, 0, 0, 0),
-            blocks =
-                listOf(
-                    MarkdownBlockFfi.Heading(
-                        level = 1u,
-                        inlines = listOf(MarkdownInlineFfi.Text("Release notes")),
-                    ),
-                    MarkdownBlockFfi.Paragraph(
-                        inlines =
-                            listOf(
-                                MarkdownInlineFfi.Text("Important "),
-                                MarkdownInlineFfi.Strong(listOf(MarkdownInlineFfi.Text("bright"))),
-                                MarkdownInlineFfi.Text(" details with "),
-                                MarkdownInlineFfi.Code("code"),
-                                MarkdownInlineFfi.Text(" and "),
-                                MarkdownInlineFfi.Link(
-                                    dest = "https://example.com/docs",
-                                    title = null,
-                                    children = listOf(MarkdownInlineFfi.Text("a link")),
-                                    classification = MarkdownLinkDestinationKindFfi.WEB,
-                                ),
-                                MarkdownInlineFfi.Text("."),
-                            ),
-                    ),
-                    MarkdownBlockFfi.ListBlock(
-                        kind = MarkdownListKindFfi.Bullet("-"),
-                        tight = true,
-                        items =
-                            listOf(
-                                MarkdownListItemFfi(
-                                    blocks =
-                                        listOf(
-                                            MarkdownBlockFfi.Paragraph(
-                                                inlines = listOf(MarkdownInlineFfi.Text("First item.")),
-                                            ),
-                                        ),
-                                    checked = null,
-                                    blankLinesBefore = byteArrayOf(0),
-                                ),
-                            ),
-                    ),
-                    MarkdownBlockFfi.BlockQuote(
-                        blocks =
-                            listOf(
-                                MarkdownBlockFfi.Paragraph(
-                                    inlines = listOf(MarkdownInlineFfi.Text("A quoted line.")),
-                                ),
-                            ),
-                        blankLinesBefore = byteArrayOf(0),
-                    ),
-                ),
         )
 
     /**

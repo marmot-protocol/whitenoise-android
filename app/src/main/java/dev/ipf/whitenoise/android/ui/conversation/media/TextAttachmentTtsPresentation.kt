@@ -120,12 +120,11 @@ internal fun rememberTextAttachmentTtsUi(
             TextAttachmentTtsFollow(policy, layouts, scroll, currentPlayback)
         }
     val requestRevision = policy.requestRevision
+    val interactionOwnsViewport = dragging || selection.active
     LaunchedEffect(target, requestRevision, viewport, dragging, selection.active, retryGeneration) {
         // Observers can schedule a newer request after composition but before this effect starts.
         // Leave it pending for the matching effect instead of claiming work that will be cancelled.
-        if (policy.requestRevision != requestRevision || policy.currentTarget != target ||
-            dragging || selection.active
-        ) {
+        if (policy.requestRevision != requestRevision || policy.currentTarget != target || interactionOwnsViewport) {
             return@LaunchedEffect
         }
         val visible = viewport ?: return@LaunchedEffect
@@ -174,10 +173,20 @@ internal fun rememberTextAttachmentTtsUi(
         layoutReporter = reporter,
         sentenceActions = actions,
         deferLinkActivation = links::activate,
-        showResumeFollow =
-            target != null && (policy.showResumeAction || layouts.needsReveal(target)) && !selection.active,
+        showResumeFollow = shouldShowReaderResume(target, policy, layouts, selection.active),
         resumeFollow = { policy.requestExplicitReveal() },
     )
+}
+
+/** Selection owns the viewport; otherwise unconfirmed exposure always permits explicit recovery. */
+private fun shouldShowReaderResume(
+    target: ConversationTtsFollowTarget?,
+    policy: ConversationTtsFollowPolicy,
+    layouts: ConversationTtsSentenceLayoutRegistry,
+    selecting: Boolean,
+): Boolean {
+    if (target == null || selecting) return false
+    return policy.showResumeAction || layouts.needsReveal(target)
 }
 
 /** Reopening reveals the live paused/speaking cursor, but never submits text to the speech engine. */

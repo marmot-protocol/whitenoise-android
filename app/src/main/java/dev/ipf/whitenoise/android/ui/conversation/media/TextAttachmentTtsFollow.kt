@@ -35,23 +35,33 @@ internal class TextAttachmentTtsFollow(
         return if (bounds == null) {
             policy.retryFailedFollowAttempt(request.target)
         } else {
-            if (policy.isCurrentTarget(request.target) && playback.value?.isCurrent?.invoke() == true) {
-                val offset = textAttachmentFollowOffset(scroll.value, scroll.maxValue, viewport, bounds, request)
-                if (offset != null) scroll.scrollTo(offset)
-                withFrameNanos { }
-                if (policy.isCurrentTarget(request.target) && playback.value?.isCurrent?.invoke() == true) {
-                    val revealed =
-                        ttsSentenceWasRevealed(
-                            layouts.completeSentenceBounds(request.target),
-                            layouts.viewportBoundsInWindow,
-                        )
-                    if (!revealed) return policy.retryFailedFollowAttempt(request.target)
-                    policy.onFollowSucceeded(request.target)
-                }
-            }
-            false
+            revealMeasuredSentence(request, viewport, bounds)
         }
     }
+
+    private suspend fun revealMeasuredSentence(
+        request: ConversationTtsFollowRequest,
+        viewport: Rect,
+        bounds: Rect,
+    ): Boolean {
+        if (!isCurrent(request)) return false
+        val offset = textAttachmentFollowOffset(scroll.value, scroll.maxValue, viewport, bounds, request)
+        if (offset != null) scroll.scrollTo(offset)
+        withFrameNanos { }
+        return if (!isCurrent(request)) {
+            false
+        } else if (
+            ttsSentenceWasRevealed(layouts.completeSentenceBounds(request.target), layouts.viewportBoundsInWindow)
+        ) {
+            policy.onFollowSucceeded(request.target)
+            false
+        } else {
+            policy.retryFailedFollowAttempt(request.target)
+        }
+    }
+
+    private fun isCurrent(request: ConversationTtsFollowRequest): Boolean =
+        policy.isCurrentTarget(request.target) && playback.value?.isCurrent?.invoke() == true
 }
 
 /** Converts shared window-space sentence anchoring into a bounded eager-scroll offset. */
