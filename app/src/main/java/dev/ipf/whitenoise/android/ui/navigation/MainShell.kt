@@ -516,6 +516,7 @@ internal fun MainShell(
         val origin = globalSearch.conversationReturn ?: return@LaunchedEffect
         if (sectionName != MainSection.Chats.name) {
             globalSearch.finishConversationSearch()
+            selectedChatListFolderId = origin.previousFolderId
         } else if (!scopedGlobalSearchState.isOpen && selectedChat == null) {
             globalSearch.finishConversationSearch()
             selectedChatListFolderId = origin.previousFolderId
