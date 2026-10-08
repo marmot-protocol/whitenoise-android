@@ -9,10 +9,25 @@ name: keys-correct-mismatch
 - assertVisible: "Private key hidden"
 - tapOn: "Export Encrypted Private Key"
 - assertVisible: "Encrypted Private Key"
-- tapOn: "Password"
+- tapOn:
+    id: "profile_keys.export_password"
+- assertVisible:
+    id: "profile_keys.export_password"
+    focused: true
 - inputText: "Maestro-test1!"
-- tapOn: "Confirm password"
+- assertVisible:
+    id: "profile_keys.export_password"
+    text: "^Maestro-test1!$"
+- hideKeyboard
+- tapOn:
+    id: "profile_keys.export_confirmation"
+- assertVisible:
+    id: "profile_keys.export_confirmation"
+    focused: true
 - inputText: "Maestro-test2!"
+- assertVisible:
+    id: "profile_keys.export_confirmation"
+    text: "^Maestro-test2!$"
 - hideKeyboard
 - assertVisible:
     id: "profile_keys.view_backup"
@@ -20,9 +35,39 @@ name: keys-correct-mismatch
 - assertVisible:
     id: "profile_keys.export_file"
     enabled: false
-- tapOn: "Confirm password"
-- eraseText
+- assertVisible: "Passwords don’t match.*"
+- longPressOn:
+    id: "profile_keys.export_confirmation"
+- runFlow:
+    when:
+      notVisible: "(?i)select all"
+    commands:
+      - runFlow:
+          when:
+            visible: "More options"
+          commands:
+            - tapOn: "More options"
+- runFlow:
+    when:
+      visible: "(?i)select all"
+    commands:
+      - tapOn: "(?i)select all"
+- assertVisible:
+    id: "profile_keys.export_confirmation"
+    focused: true
+- eraseText: 1
+- assertNotVisible:
+    id: "profile_keys.export_confirmation"
+    text: ".+"
+- tapOn:
+    id: "profile_keys.export_confirmation"
+- assertVisible:
+    id: "profile_keys.export_confirmation"
+    focused: true
 - inputText: "Maestro-test1!"
+- assertVisible:
+    id: "profile_keys.export_confirmation"
+    text: "^Maestro-test1!$"
 - hideKeyboard
 - assertVisible:
     id: "profile_keys.view_backup"

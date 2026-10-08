@@ -24,8 +24,7 @@ name: smart-folders-picker-back
 - assertVisible:
     id: folder.addField.PARTICIPANTS
 - back
-- assertVisible:
-    id: folder.name
+- runFlow: ../fixtures/return-from-smart-folder-filter.yaml
 - back
 - assertVisible:
     id: chat-folders-content

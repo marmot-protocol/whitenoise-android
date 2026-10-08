@@ -648,6 +648,63 @@ class RuntimeEvidenceTest(unittest.TestCase):
                         self.assertIn('- assertVisible:\n    id: "profile_keys.' + field + '"', flow)
                         self.assertIn('- assertNotVisible:\n    id: "profile_keys.' + field + '"\n    text: ".+"', flow)
 
+    def test_backup_correction_proves_complete_replacement_before_matching_buttons(self):
+        """Reject cursor-relative clearing that left st2! behind the corrected confirmation."""
+        _, commands = list(yaml.safe_load_all(
+            (runtime.ROOT / '.maestro/runtime/keys-correct-mismatch.yaml').read_text()))
+        expected = [('export_password', 'Maestro-test1!'),
+                    ('export_confirmation', 'Maestro-test2!'),
+                    ('export_confirmation', 'Maestro-test1!')]
+        inputs = [(index, command['inputText']) for index, command in enumerate(commands)
+                  if isinstance(command, dict) and 'inputText' in command]
+        self.assertEqual(len(inputs), len(expected))
+        for (index, value), (field, wanted) in zip(inputs, expected):
+            tag = 'profile_keys.' + field
+            self.assertEqual(value, wanted)
+            self.assertEqual(commands[index - 1], {'assertVisible': {'id': tag, 'focused': True}})
+            self.assertEqual(commands[index + 1], {'assertVisible': {'id': tag, 'text': '^' + wanted + '$'}})
+            self.assertEqual(commands[index + 2], 'hideKeyboard')
+        erase = next(index for index, command in enumerate(commands)
+                     if isinstance(command, dict) and 'eraseText' in command)
+        confirmation = 'profile_keys.export_confirmation'
+        self.assertIn({'longPressOn': {'id': confirmation}}, commands[inputs[1][0]:erase])
+        self.assertEqual(commands[erase - 1], {'assertVisible': {'id': confirmation, 'focused': True}})
+        self.assertEqual(commands[erase + 1], {'assertNotVisible': {'id': confirmation, 'text': '.+'}})
+        self.assertLess(inputs[1][0], erase)
+        self.assertLess(erase, inputs[2][0])
+        for tag in ('view_backup', 'export_file'):
+            disabled = {'assertVisible': {'id': 'profile_keys.' + tag, 'enabled': False}}
+            enabled = {'assertVisible': {'id': 'profile_keys.' + tag, 'enabled': True}}
+            self.assertIn(disabled, commands[inputs[1][0]:erase])
+            self.assertIn(enabled, commands[inputs[2][0]:])
+        self.assertIn({'tapOn': 'Cancel'}, commands)
+        self.assertNotIn({'tapOn': {'id': 'profile_keys.export_file'}}, commands)
+
+    def test_folder_cancel_return_restores_viewport_before_untouched_name_assertion(self):
+        """The returned LazyColumn stays at filters; an off-screen name is not a failed dismissal."""
+        cases = {name: case for name, case in runtime.CASES.items() if case['suite'] == 'smart-folders'}
+        self.assertEqual(len(cases), 8)
+        returned = {'runFlow': '../fixtures/return-from-smart-folder-filter.yaml'}
+        for name, case in cases.items():
+            with self.subTest(case=name):
+                _, commands = list(yaml.safe_load_all(
+                    (runtime.ROOT / '.maestro/runtime' / (name + '.yaml')).read_text()))
+                self.assertEqual(case['postcondition'], 'folder-absent')
+                self.assertEqual(commands.count(returned), 1)
+                # Preserve initial form discovery; the later return must restore its viewport.
+                self.assertEqual(commands.count({'assertVisible': {'id': 'folder.name'}}), 1)
+                self.assertEqual(commands[-3:], [returned, 'back', {'assertVisible': {'id': 'chat-folders-content'}}])
+        _, commands = list(yaml.safe_load_all(
+            (runtime.ROOT / '.maestro/fixtures/return-from-smart-folder-filter.yaml').read_text()))
+        self.assertEqual(commands[0], {'assertVisible': {'id': 'chat-folder-edit-content'}})
+        for tag in ('folder.addField.PARTICIPANTS', 'folder.conditionDone'):
+            self.assertIn({'assertNotVisible': {'id': tag}}, commands[:3])
+        scroll = next(index for index, command in enumerate(commands) if 'scrollUntilVisible' in command)
+        self.assertEqual(commands[scroll]['scrollUntilVisible'], {'element': {'id': 'folder.name'}, 'direction': 'UP'})
+        self.assertEqual(commands[scroll + 1], {'assertVisible': {'id': 'folder.name'}})
+        self.assertEqual(commands[scroll + 2], {'assertNotVisible': {'id': 'folder.name', 'text': '.+'}})
+        self.assertEqual(commands[scroll + 3], {'assertVisible': {'id': 'folder.save', 'enabled': False}})
+
     def test_private_contact_editing_proves_recipient_focus_and_dismisses_each_ime(self):
         """Reject the captured notes-in-nickname failure and keyboard suggestion Save match."""
         paths = [runtime.ROOT / '.maestro/fixtures/save-external-private-details.yaml']
