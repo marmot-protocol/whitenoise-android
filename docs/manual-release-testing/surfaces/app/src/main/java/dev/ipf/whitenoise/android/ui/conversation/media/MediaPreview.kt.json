@@ -1,0 +1,92 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+  "legacy_sha256": "36d9959346a5c49c8e4207b1fd9ce68efea8d884a38fa4895534ef12b9579e7e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ApplyPreviewExclusions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "fun ApplyPreviewExclusions(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "MediaPreviewContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "fun MediaPreviewContent(",
+        "test_ids": [
+          "MED-001",
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "MediaPreviewScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "fun MediaPreviewScreen(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "MediaPreviewTopBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "fun MediaPreviewTopBar(",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel_media_changes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "R.string.cancel_media_changes",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:photo_editor_edit_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "R.string.photo_editor_edit_action",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:photo_editor_not_editable_source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "R.string.photo_editor_not_editable_source",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:photo_editor_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "R.string.photo_editor_title",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "string:preview_media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaPreview.kt",
+        "anchor": "R.string.preview_media",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
