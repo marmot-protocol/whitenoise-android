@@ -471,6 +471,15 @@ class RuntimeEvidenceTest(unittest.TestCase):
         configured = {case.get('fixture', 'basic') for case in runtime.CASES.values()}
         self.assertFalse(configured - allowed, configured - allowed)
 
+    def test_named_warm_resume_cases_map_to_return_not_rotation(self):
+        """A Home/foreground journey must not credit the rotation requirement in the inventory."""
+        for name, case in runtime.CASES.items():
+            if 'warm-resume' in name:
+                with self.subTest(case=name):
+                    self.assertIn('NAV-010', case['manual_ids'])
+                    if 'rotation' not in name:
+                        self.assertNotIn('NAV-009', case['manual_ids'])
+
     def test_canonical_runtime_recipe_matches_the_selected_inventory(self):
         """An expanding suite must not leave operators reconciling an obsolete case/partition count."""
         guide = (runtime.ROOT / 'docs/automated-testing.md').read_text()

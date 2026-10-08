@@ -2604,7 +2604,8 @@
       "suite": "inbound-share",
       "manual_ids": [
         "SYS-004",
-        "SYS-005"
+        "SYS-005",
+        "NAV-010"
       ],
       "assertions": "Real inbound share owned error warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
       "fixture": "share-invalid-owned",
@@ -2614,7 +2615,8 @@
       "suite": "inbound-share",
       "manual_ids": [
         "SYS-004",
-        "SYS-005"
+        "SYS-005",
+        "NAV-010"
       ],
       "assertions": "Real inbound share http error warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
       "fixture": "share-invalid-http",
@@ -2624,7 +2626,8 @@
       "suite": "inbound-share",
       "manual_ids": [
         "SYS-004",
-        "SYS-005"
+        "SYS-005",
+        "NAV-010"
       ],
       "assertions": "Real inbound share partial error warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
       "fixture": "share-partial",
@@ -2634,7 +2637,8 @@
       "suite": "inbound-share",
       "manual_ids": [
         "SYS-004",
-        "SYS-005"
+        "SYS-005",
+        "NAV-010"
       ],
       "assertions": "Real inbound share picker warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
       "fixture": "share-text",
@@ -2644,7 +2648,8 @@
       "suite": "inbound-share",
       "manual_ids": [
         "SYS-004",
-        "SYS-005"
+        "SYS-005",
+        "NAV-010"
       ],
       "assertions": "Real inbound share selected warm resume; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and exact Unicode owner draft with other drafts untouched.",
       "fixture": "share-text",
@@ -2844,7 +2849,8 @@
       "suite": "inbound-share",
       "manual_ids": [
         "SYS-004",
-        "SYS-005"
+        "SYS-005",
+        "NAV-010"
       ],
       "fixture": "share-external-document",
       "postcondition": "share-request-staged",
@@ -3005,7 +3011,8 @@
     "qr-permission-denied-warm-resume": {
       "suite": "acquisition",
       "manual_ids": [
-        "ACC-003"
+        "ACC-003",
+        "NAV-010"
       ],
       "assertions": "Open the actual profile scanner from Share & Connect; deny camera permission and verify the recovery card has no target/torch. denied warm resume. Return to Alice Settings and generated Chats. Native Android CAMERA must remain denied; this does not certify camera grant, barcode recognition or hardware release.",
       "postcondition": "camera-denied"
@@ -3053,7 +3060,8 @@
     "accounts-signout-warm-resume": {
       "suite": "account-actions",
       "manual_ids": [
-        "ACC-013"
+        "ACC-013",
+        "NAV-010"
       ],
       "assertions": "Type a disposable Alice draft, complete real sign-out, then select Bob and require a clean Bob composer. Native proof distinguishes Alice removal from retained signed-out identity; complete surviving profiles and unchanged member histories/drafts are compared. Sign-out must retain the exact MDK owner draft; no public-relay or forensic byte-erasure claim.",
       "postcondition": "account-action-signed-out"
@@ -3088,7 +3096,7 @@
       "suite": "app-lock",
       "manual_ids": [
         "SEC-001",
-        "NAV-009"
+        "NAV-010"
       ],
       "assertions": "On a real emulator without an OS credential, require the disabled unchecked device-authentication switch, setup guidance, available Android security action and absent Auto-lock/lock cover. Home and foreground return retain the actual unavailable state without stopping the generated native host. Independent native proof checks real Keyguard/biometric unavailability before UI and at completion, unchanged lock preferences, three original identities, Alice session and both original messages. No PIN setup, lock/unlock success or full SEC-001 completion claim.",
       "postcondition": "app-lock-unavailable"
