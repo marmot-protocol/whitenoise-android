@@ -92,8 +92,9 @@ class ComposerDictationControlTest {
                 .getUnclippedBoundsInRoot()
         assertEquals(after.top, dictation.top)
         assertEquals(after.bottom, dictation.bottom)
-        // Both layouts keep their tools below the persistent grip; focusing adds the editor row.
-        assertEquals(24.dp, after.top - before.top)
+        // The resting row centers its tools with the text line, so they start 6 dp below the pill top; focusing
+        // pins them under the 12 dp grip inset and that 36 dp line, 12 + 36 - 6 below where they rested.
+        assertEquals(42.dp, after.top - before.top)
         composeRule.onNode(hasSetTextAction()).assertIsFocused()
     }
 

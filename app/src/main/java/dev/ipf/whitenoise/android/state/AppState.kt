@@ -2815,10 +2815,14 @@ class WhiteNoiseAppState private constructor(
         return false
     }
 
+    /** Sends through the mounted composer: with its staged attachments when it holds any, else as plain text. */
     private suspend fun sendDictationThroughMountedController(
         controller: ConversationController,
         request: ConversationDictationSendRequest,
     ): Boolean {
+        controller.stagedAttachmentSender
+            ?.takeIf(StagedAttachmentSender::hasStagedAttachments)
+            ?.let { staged -> return sendDictationWithStagedAttachments(staged, request) }
         val replyTarget = controller.replyingTo
         var durablyAccepted = false
         return try {
@@ -2829,6 +2833,20 @@ class WhiteNoiseAppState private constructor(
                 controller.replyingTo = replyTarget
             }
         }
+    }
+
+    /**
+     * Sends the dictated text together with the composer's staged attachments, as an ordinary Send would.
+     *
+     * A refusal publishes nothing and releases the dispatch claim, so the transcript returns to the draft
+     * with the attachments still staged instead of leaving as a text-only message.
+     */
+    private suspend fun sendDictationWithStagedAttachments(
+        staged: StagedAttachmentSender,
+        request: ConversationDictationSendRequest,
+    ): Boolean {
+        if (staged.sendWithCaption(request.payload, request.onPendingShown)) return true
+        return rejectDictationDispatchBeforeTransport(request)
     }
 
     private fun conversationDictationReplyTargetResolution(

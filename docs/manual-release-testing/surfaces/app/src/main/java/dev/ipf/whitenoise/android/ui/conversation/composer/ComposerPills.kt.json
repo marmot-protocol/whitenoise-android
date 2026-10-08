@@ -16,7 +16,8 @@
           "CON-021",
           "CON-024",
           "SET-004",
-          "CON-017"
+          "CON-017",
+          "CON-030"
         ]
       },
       {
@@ -116,7 +117,8 @@
         "anchor": "R.string.message",
         "test_ids": [
           "CON-013",
-          "CON-017"
+          "CON-017",
+          "CON-030"
         ]
       },
       {

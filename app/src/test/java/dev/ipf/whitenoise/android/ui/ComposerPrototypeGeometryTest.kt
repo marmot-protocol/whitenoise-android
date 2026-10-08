@@ -16,6 +16,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -69,13 +70,27 @@ class ComposerPrototypeGeometryTest {
 
         assertEquals(16f, surface.left, 1f)
         assertEquals(328f, surface.width, 1f)
-        assertEquals(60f, surface.height, 1f)
+        // One 24 dp line with the 12 dp grip inset above and the same inset below, matching the 48 dp controls.
+        assertEquals(48f, surface.height, 1f)
         assertTrue(add.center.x < emoji.center.x && emoji.center.x < send.center.x)
         assertEquals(add.center.y, emoji.center.y, 1f)
         assertEquals(emoji.center.y, send.center.y, 1f)
         assertTrue(send.center.x < surface.right && send.center.x > surface.left)
+        listOf(add, emoji, send).forEach { assertTrue("tap target stays 48 dp tall", it.height >= 48f) }
         composeRule.onNode(hasSetTextAction()).assertIsNotFocused()
         capture("composer_prototype_reading_light")
+    }
+
+    /** The empty placeholder shares the controls' vertical center and starts clear of the emoji control. */
+    @Test
+    fun emptyPlaceholderIsCenteredWithTheControlsAndStartsBesideTheEmoji() {
+        render(ComposerTextState(TextFieldValue()))
+        val surface = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+        val placeholder = placeholderBounds()
+
+        assertEquals(actionBounds(R.string.open_emoji_picker).center.y, placeholder.center.y, 1f)
+        assertEquals(placeholder.top - surface.top, surface.bottom - placeholder.bottom, 1f)
+        assertTrue(placeholder.left >= actionBounds(R.string.open_emoji_picker).right - 1f)
     }
 
     /** Editing row uses full width above actions and only clears after acceptance. */
@@ -263,6 +278,13 @@ class ComposerPrototypeGeometryTest {
         }
         composeRule.waitForIdle()
     }
+
+    /** Bounds of the empty-composer placeholder text, not the editable field that hosts it. */
+    private fun placeholderBounds() =
+        composeRule
+            .onNode(hasText(app.getString(R.string.message)) and hasSetTextAction().not())
+            .fetchSemanticsNode()
+            .boundsInRoot
 
     /** Bounds of the tagged action node. */
     private fun actionBounds(label: Int) =
