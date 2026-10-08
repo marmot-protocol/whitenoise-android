@@ -133,12 +133,26 @@ the screen, its capture is not White Noise's to cancel, paste or send, and a
 first tap that lands there while a later tap reaches app-owned capture makes the
 control surface unpredictable. Offer the provider's own setup app instead.
 
-If a later provider generation fails after useful text was accumulated, retain
-that text for explicit review. An ambiguous draft merge offers Copy, Insert at end
-or Discard; an uncertain send offers only Copy or Discard. Copying must not silently
-discard retained text. A 30-minute session watchdog and bounded processing/send
-timeouts prevent orphan recording or indefinite pending UI. Process death does
-not persist transcript audio/text; a service restart must not resume old capture.
+If a later provider generation fails after useful text was accumulated, save
+that text into the original draft when its revision can be verified. The ordinary
+composer stays editable and sendable. Dictate remains visible in compact and
+expanded layouts: unresolved audio opens app-local Retry remaining audio, Keep
+for later, and confirmed Discard instead of starting overlapping capture. Retry
+transcribes sealed audio into the draft without reopening the microphone or
+replaying an earlier Send. Pending native closure and indeterminate audio state
+remain inspectable and fail closed. An uncertain send retains its independent
+Delivery not confirmed warning and cannot be replayed.
+
+The 65-minute logical capture watchdog and bounded processing/send timeouts
+prevent orphan recording or indefinite pending UI. Recovery foreground protection
+lasts at most 30 minutes; expiration releases that service after actual microphone
+closure without deleting unresolved PCM or unsaved text. Foreground returns do
+not renew it. An explicit audio Retry reacquires protection. Retained audio is
+volatile and can be lost if Android stops the app; successfully saved draft text
+persists. A service restart must not resume old capture. Neither a 119 ms final
+NoMatch nor repeated long empty decodes prove silence, audio loss, or a native
+crash. Keep their exact unresolved PCM under the existing finite retry and buffer
+policy until acknowledgment or the user's explicit discard.
 
 ## Android 17 multi-provider acceptance matrix (not device results)
 

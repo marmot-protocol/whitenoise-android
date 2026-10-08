@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.ui.shouldShowConversationDictationPersistentControl
 
 /** Presentation ownership only; this must never become a dictation delivery destination. */
@@ -27,9 +28,12 @@ internal fun conversationDictationControlOwner(
     state: ConversationDictationState,
     route: ConversationDictationComposerRoute,
     appLockScreenVisible: Boolean,
+    recoveryHandedToComposer: Boolean = false,
 ): ConversationDictationControlOwner {
     val target = state.target
-    if (appLockScreenVisible || target == null) return ConversationDictationControlOwner.Hidden
+    if (appLockScreenVisible || target == null || !state.requiresCompletionControls(recoveryHandedToComposer)) {
+        return ConversationDictationControlOwner.Hidden
+    }
     val originComposerVisible =
         route.navigationAccountStable &&
             route.composerVisible &&

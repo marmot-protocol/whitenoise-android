@@ -31,6 +31,7 @@ internal fun MainShellNoticeLayout(
             state = dictationController.state,
             route = dictationComposerRoute,
             appLockScreenVisible = appLockScreenVisible,
+            recoveryHandedToComposer = dictationController.recoveryHandedToComposer,
         )
     CompositionLocalProvider(LocalShellPlaybackHost provides playbackHost) {
         ShellTransientNoticeLayout(
@@ -46,7 +47,9 @@ internal fun MainShellNoticeLayout(
             persistentTopContentConsumesStatusBars = persistentTopContentConsumesStatusBars,
             persistentBottomContent = {
                 if (!appLockScreenVisible) {
-                    if (dictationController.hasDurableSession) ConversationDictationNotificationNotice()
+                    if (dictationController.hasDurableSession && dictationController.completionControlsRequired) {
+                        ConversationDictationNotificationNotice()
+                    }
                     if (dictationControlOwner == ConversationDictationControlOwner.Persistent) {
                         ConversationDictationPersistentControl(
                             state = dictationController.state,

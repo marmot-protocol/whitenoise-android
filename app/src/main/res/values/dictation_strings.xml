@@ -13,11 +13,20 @@
     <string name="dictation_send_blocked">Not sent</string>
     <string name="dictation_retry_send">Retry Send</string>
     <string name="dictation_recovery_title">Dictation needs attention</string>
-    <string name="dictation_recovery_text">Open White Noise to recover dictation. Unfinished dictation can be recovered for up to 30 minutes.</string>
+    <string name="dictation_recovery_text">Open White Noise to recover dictation. Retained audio is temporary and can be lost if Android stops the app.</string>
     <string name="dictation_recovery_open">Open app</string>
-    <string name="dictation_recovery_expired_title">Dictation recovery expired</string>
-    <string name="dictation_recovery_expired_text">Unfinished dictation was cleared from this device.</string>
+    <string name="dictation_recovery_expired_title">Dictation recovery available in app</string>
+    <string name="dictation_recovery_expired_text">Background protection ended. Open White Noise to recover retained dictation.</string>
     <string name="dictation_incomplete_title">Incomplete dictation</string>
     <string name="dictation_incomplete_text">Transcription stopped before it finished. Review the recognized text in the draft before sending.</string>
     <string name="dictation_send_recognized_text">Send recognized text</string>
+    <string name="dictation_remaining_audio">Remaining dictation audio</string>
+    <string name="dictation_stopped_remaining">Recording stopped. Some audio is not transcribed.</string>
+    <string name="dictation_remaining_explanation">Retry transcribes the retained audio without recording or sending. Audio is temporary and can be lost if Android stops the app.</string>
+    <string name="dictation_retry_remaining">Retry remaining audio</string>
+    <string name="dictation_keep_later">Keep for later</string>
+    <string name="dictation_discard_remaining">Discard untranscribed audio? Text already in the composer stays.</string>
+    <string name="dictation_finishing_microphone">Finishing microphone…</string>
+    <string name="dictation_audio_state_unavailable">Could not check the retained audio. Keep it and try again.</string>
+    <string name="dictation_original_conversation">Finish dictation in the original conversation.</string>
 </resources>

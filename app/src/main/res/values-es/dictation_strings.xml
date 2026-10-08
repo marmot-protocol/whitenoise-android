@@ -22,11 +22,20 @@
     <string name="dictation_send_blocked">No enviado</string>
     <string name="dictation_retry_send">Reintentar envío</string>
     <string name="dictation_recovery_title">El dictado necesita atención</string>
-    <string name="dictation_recovery_text">Abre White Noise para recuperar el dictado. Los dictados sin terminar se pueden recuperar durante un máximo de 30 minutos.</string>
+    <string name="dictation_recovery_text">Abre White Noise para recuperar el dictado. El audio conservado es temporal y puede perderse si Android detiene la app.</string>
     <string name="dictation_recovery_open">Abrir app</string>
-    <string name="dictation_recovery_expired_title">La recuperación del dictado caducó</string>
-    <string name="dictation_recovery_expired_text">El dictado sin terminar se eliminó de este dispositivo.</string>
+    <string name="dictation_recovery_expired_title">Dictado recuperable en la app</string>
+    <string name="dictation_recovery_expired_text">La protección en segundo plano terminó. Abre White Noise para recuperar el dictado conservado.</string>
     <string name="dictation_incomplete_title">Dictado incompleto</string>
     <string name="dictation_incomplete_text">La transcripción se detuvo antes de terminar. Revisa el texto reconocido en el borrador antes de enviarlo.</string>
     <string name="dictation_send_recognized_text">Enviar texto reconocido</string>
+    <string name="dictation_remaining_audio">Audio de dictado pendiente</string>
+    <string name="dictation_stopped_remaining">La grabación se detuvo. Parte del audio no está transcrito.</string>
+    <string name="dictation_remaining_explanation">Reintentar transcribe el audio conservado sin grabar ni enviar. El audio es temporal y puede perderse si Android detiene la app.</string>
+    <string name="dictation_retry_remaining">Reintentar el audio pendiente</string>
+    <string name="dictation_keep_later">Guardar para después</string>
+    <string name="dictation_discard_remaining">¿Descartar el audio sin transcribir? El texto del cuadro de escritura se conserva.</string>
+    <string name="dictation_finishing_microphone">Cerrando el micrófono…</string>
+    <string name="dictation_audio_state_unavailable">No se pudo comprobar el audio conservado. Consérvalo e inténtalo de nuevo.</string>
+    <string name="dictation_original_conversation">Termina el dictado en la conversación original.</string>
 </resources>

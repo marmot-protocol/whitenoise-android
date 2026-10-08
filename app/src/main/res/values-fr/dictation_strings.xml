@@ -22,11 +22,20 @@
     <string name="dictation_send_blocked">Non envoyé</string>
     <string name="dictation_retry_send">Réessayer l’envoi</string>
     <string name="dictation_recovery_title">La dictée nécessite votre attention</string>
-    <string name="dictation_recovery_text">Ouvrez White Noise pour récupérer la dictée. Les dictées inachevées peuvent être récupérées pendant 30 minutes maximum.</string>
+    <string name="dictation_recovery_text">Ouvrez White Noise pour récupérer la dictée. L’audio conservé est temporaire et peut être perdu si Android arrête l’app.</string>
     <string name="dictation_recovery_open">Ouvrir l’application</string>
-    <string name="dictation_recovery_expired_title">La récupération de la dictée a expiré</string>
-    <string name="dictation_recovery_expired_text">La dictée inachevée a été effacée de cet appareil.</string>
+    <string name="dictation_recovery_expired_title">Dictée récupérable dans l’app</string>
+    <string name="dictation_recovery_expired_text">La protection en arrière-plan est terminée. Ouvrez White Noise pour récupérer la dictée conservée.</string>
     <string name="dictation_incomplete_title">Dictée incomplète</string>
     <string name="dictation_incomplete_text">La transcription s’est arrêtée avant la fin. Vérifiez le texte reconnu dans le brouillon avant de l’envoyer.</string>
     <string name="dictation_send_recognized_text">Envoyer le texte reconnu</string>
+    <string name="dictation_remaining_audio">Audio de dictée restant</string>
+    <string name="dictation_stopped_remaining">Enregistrement arrêté. Une partie de l’audio n’est pas transcrite.</string>
+    <string name="dictation_remaining_explanation">Réessayer transcrit l’audio conservé sans enregistrer ni envoyer. L’audio est temporaire et peut être perdu si Android arrête l’app.</string>
+    <string name="dictation_retry_remaining">Réessayer l’audio restant</string>
+    <string name="dictation_keep_later">Garder pour plus tard</string>
+    <string name="dictation_discard_remaining">Supprimer l’audio non transcrit ? Le texte déjà dans la zone de saisie reste.</string>
+    <string name="dictation_finishing_microphone">Fermeture du microphone…</string>
+    <string name="dictation_audio_state_unavailable">Impossible de vérifier l’audio conservé. Gardez-le et réessayez.</string>
+    <string name="dictation_original_conversation">Terminez la dictée dans la conversation d’origine.</string>
 </resources>

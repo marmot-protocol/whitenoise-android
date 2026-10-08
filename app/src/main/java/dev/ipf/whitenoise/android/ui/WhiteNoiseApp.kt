@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.share.ShareRequest
 import dev.ipf.whitenoise.android.state.AppPhase
@@ -100,9 +101,11 @@ internal fun shouldShowConversationDictationPersistentControl(
     state: ConversationDictationState,
     originVisible: Boolean,
     appLockScreenVisible: Boolean,
+    recoveryHandedToComposer: Boolean = false,
 ): Boolean =
     !appLockScreenVisible &&
         !originVisible &&
+        state.requiresCompletionControls(recoveryHandedToComposer) &&
         when (state) {
             is ConversationDictationState.Starting,
             is ConversationDictationState.CheckingProvider,

@@ -28,7 +28,10 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "DMAttachmentJob"
 private const val JOB_NAMESPACE = "attachment_download_v1"
-private const val CHANNEL_ID = "attachment_download_v1"
+private const val CHANNEL_ID = "attachment_download_v2"
+
+/** The channel earlier builds created, whose badge and sound settings Android keeps on an upgraded install. */
+private const val LEGACY_CHANNEL_ID = "attachment_download_v1"
 private const val KEY_IDENTITY = "identity"
 private const val KEY_ACCOUNT = "account_ref"
 private const val KEY_GROUP = "group_id_hex"
@@ -128,24 +131,57 @@ internal object AttachmentUserInitiatedDownloads {
     }
 }
 
-/** Notification contains no conversation, attachment, account, or file metadata. */
-internal fun attachmentDownloadNotification(context: Context): Notification {
+/**
+ * Returns the id of the transfer channel to post on, creating the silent, badge-free one if it does not exist.
+ *
+ * Android keeps an existing channel's settings, so an upgraded install would otherwise keep the earlier channel's
+ * badge and sound. The earlier channel is therefore replaced, unless the user blocked it: turning the transfer
+ * card off stays honored instead of being undone by the new id.
+ */
+private fun ensureAttachmentDownloadChannel(context: Context): String {
     val manager = context.getSystemService(NotificationManager::class.java)
+    val legacy = manager.getNotificationChannel(LEGACY_CHANNEL_ID)
+    if (legacy != null && legacy.importance == NotificationManager.IMPORTANCE_NONE) return LEGACY_CHANNEL_ID
     manager.createNotificationChannel(
         NotificationChannel(
             CHANNEL_ID,
             context.getString(R.string.media_downloading),
             NotificationManager.IMPORTANCE_LOW,
-        ),
+        ).apply {
+            setShowBadge(false)
+            setSound(null, null)
+            enableVibration(false)
+            enableLights(false)
+        },
     )
-    return Notification
-        .Builder(context, CHANNEL_ID)
+    if (legacy != null) manager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
+    return CHANNEL_ID
+}
+
+/**
+ * The notification for one transfer, which contains no conversation, attachment, account, or file metadata.
+ *
+ * It is quiet by construction. A progress update never alerts again, an indeterminate bar shows an active
+ * transfer is alive without claiming a byte count neither scheduler reports, and Android may hold back a
+ * transfer that finishes within its foreground-service grace period, so a cached or tiny file never flashes
+ * a card that vanishes at once.
+ */
+internal fun attachmentDownloadNotification(context: Context): Notification =
+    Notification
+        .Builder(context, ensureAttachmentDownloadChannel(context))
         .setSmallIcon(R.drawable.ic_stat_whitenoise)
         .setContentTitle(context.getString(R.string.media_downloading))
         .setContentText(context.getString(R.string.media_attachment))
+        .setCategory(Notification.CATEGORY_PROGRESS)
+        .setProgress(0, 0, true)
         .setOngoing(true)
-        .build()
-}
+        .setOnlyAlertOnce(true)
+        .setLocalOnly(true)
+        .apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
+            }
+        }.build()
 
 /** Runs an explicit attachment fetch through Android's user-initiated transfer job. */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
@@ -153,12 +189,14 @@ class AttachmentUserInitiatedDownloadService : JobService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val runs = AttachmentDownloadJobRuns(scope)
 
+    /** Posts the quiet transfer card for the job, then runs its explicit download until the job finishes or stops. */
     override fun onStartJob(params: JobParameters): Boolean {
         val request = decodeAttachmentJobExtras(params.extras)
         if (request == null) {
             Log.w(TAG, "attachment_user_job_invalid_identity")
             return false
         }
+        Log.i(TAG, "attachment_user_job_started")
         setNotification(
             params,
             params.jobId,

@@ -22,11 +22,20 @@
     <string name="dictation_send_blocked">Gönderilmedi</string>
     <string name="dictation_retry_send">Yeniden gönder</string>
     <string name="dictation_recovery_title">Dikte için işlem gerekiyor</string>
-    <string name="dictation_recovery_text">Dikteyi kurtarmak için White Noise uygulamasını açın. Tamamlanmamış dikte en fazla 30 dakika boyunca kurtarılabilir.</string>
+    <string name="dictation_recovery_text">Dikteyi kurtarmak için White Noise uygulamasını açın. Saklanan ses geçicidir ve Android uygulamayı durdurursa kaybolabilir.</string>
     <string name="dictation_recovery_open">Uygulamayı aç</string>
-    <string name="dictation_recovery_expired_title">Dikte kurtarma süresi doldu</string>
-    <string name="dictation_recovery_expired_text">Tamamlanmamış dikte bu cihazdan temizlendi.</string>
+    <string name="dictation_recovery_expired_title">Dikte uygulamada kurtarılabilir</string>
+    <string name="dictation_recovery_expired_text">Arka plan koruması sona erdi. Saklanan dikteyi kurtarmak için White Noise uygulamasını açın.</string>
     <string name="dictation_incomplete_title">Eksik dikte</string>
     <string name="dictation_incomplete_text">Metne dönüştürme tamamlanmadan durdu. Göndermeden önce taslaktaki tanınan metni gözden geçirin.</string>
     <string name="dictation_send_recognized_text">Tanınan metni gönder</string>
+    <string name="dictation_remaining_audio">Kalan dikte sesi</string>
+    <string name="dictation_stopped_remaining">Kayıt durdu. Sesin bir kısmı yazıya çevrilmedi.</string>
+    <string name="dictation_remaining_explanation">Yeniden deneme, kayıt yapmadan veya göndermeden saklanan sesi yazıya çevirir. Ses geçicidir ve Android uygulamayı durdurursa kaybolabilir.</string>
+    <string name="dictation_retry_remaining">Kalan sesi yeniden dene</string>
+    <string name="dictation_keep_later">Daha sonrası için sakla</string>
+    <string name="dictation_discard_remaining">Yazıya çevrilmeyen ses silinsin mi? Yazma alanındaki metin kalır.</string>
+    <string name="dictation_finishing_microphone">Mikrofon kapatılıyor…</string>
+    <string name="dictation_audio_state_unavailable">Saklanan ses kontrol edilemedi. Saklayıp yeniden deneyin.</string>
+    <string name="dictation_original_conversation">Dikteyi ilk konuşmada tamamlayın.</string>
 </resources>
