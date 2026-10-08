@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: settings-profile-keys
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- tapOn: "Profile Keys"
+- assertVisible: "Show private key"
+- assertVisible: "Private key hidden"
+- back
+- assertVisible: "Settings"

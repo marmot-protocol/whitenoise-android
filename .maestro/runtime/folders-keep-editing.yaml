@@ -1,0 +1,33 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-keep-editing
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Folders"
+    direction: DOWN
+- tapOn: "Folders"
+- assertVisible:
+    id: "chat-folders-content"
+- tapOn: "New Folder"
+- assertVisible:
+    id: "folder.name"
+- tapOn:
+    id: "folder.name"
+- inputText: "Maestro unsaved folder"
+- hideKeyboard
+- back
+- assertVisible: "Discard changes[?]"
+- tapOn: "Keep Editing"
+- assertVisible:
+    id: "folder.name"
+    text: "Maestro unsaved folder"
+- back
+- assertVisible: "Discard changes[?]"
+- tapOn: "Discard Changes"
+- assertVisible:
+    id: "chat-folders-content"
+- assertNotVisible: "Maestro unsaved folder"

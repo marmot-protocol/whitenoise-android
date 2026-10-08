@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: creation-search-invalid
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "New Message"
+- assertVisible:
+    id: "new_message.screen"
+- tapOn:
+    id: "new_message.searchField"
+- inputText: "npub-invalid-maestro"
+- hideKeyboard
+- assertVisible:
+    id: "new_message.screen"
+- back
+- assertVisible: "Maestro group"

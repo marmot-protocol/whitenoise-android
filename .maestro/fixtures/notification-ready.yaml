@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Leave the system choice untouched for the dedicated permission assertion.
+- retry:
+    maxRetries: 3
+    commands:
+    - runFlow:
+        when:
+          visible: Help Improve White Noise
+        commands:
+        - tapOn: Close
+    - assertVisible: Allow Maestro Test Lab to send you notifications\?

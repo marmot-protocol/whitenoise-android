@@ -1,0 +1,6 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Departed history has no composer; reject the same message text in a Chats preview.
+- assertNotVisible:
+    id: chats.scope.chats
+- assertVisible: Generated fixture message

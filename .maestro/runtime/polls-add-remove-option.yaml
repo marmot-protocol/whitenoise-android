@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: polls-add-remove-option
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Add attachment"
+- scrollUntilVisible:
+    element:
+      text: "Create poll"
+    direction: DOWN
+- tapOn: "Create poll"
+- assertVisible: "Question"
+- scrollUntilVisible:
+    element:
+      text: "Add option"
+    direction: DOWN
+- tapOn: "Add option"
+- assertVisible: "Option 3"
+- tapOn: "Remove option 3"
+- assertNotVisible: "Option 3"
+- tapOn: "Cancel"
+- assertNotVisible: "Post poll"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

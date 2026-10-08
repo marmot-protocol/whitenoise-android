@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Ordinary sheets only. Material owns the handle, shape, width, IME, motion and dismissal. */
@@ -44,7 +45,7 @@ fun WhiteNoiseModalBottomSheet(
     CompositionLocalProvider(LocalWhiteNoiseTextFieldContainerColor provides scheme.surfaceContainerLowest) {
         ModalBottomSheet(
             onDismissRequest = onDismissRequest,
-            modifier = modifier.testTag("sheet.surface"),
+            modifier = modifier.exposePerformanceTestTags().testTag("sheet.surface"),
             sheetState = sheetState,
             containerColor = containerColor ?: scheme.surfaceContainerLow,
             contentColor = scheme.onSurface,

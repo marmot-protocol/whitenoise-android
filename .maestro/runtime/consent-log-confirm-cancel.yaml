@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: consent-log-confirm-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: "Help Improve White Noise"
+- assertVisible: "Share usage"
+- assertVisible: "Share diagnostic logs"
+- tapOn: "Share diagnostic logs"
+- assertVisible: "Share group diagnostic logs with White Noise[?]"
+- tapOn: "Cancel"
+- assertVisible: "Help Improve White Noise"

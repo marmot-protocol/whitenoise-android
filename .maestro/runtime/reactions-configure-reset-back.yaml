@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reactions-configure-reset-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- longPressOn:
+    text: Generated fixture message
+- tapOn: Open emoji picker
+- assertVisible: "Search emoji"
+- assertVisible: "Smileys & People"
+- tapOn: Configure Reactions
+- assertVisible: Tap an emoji to replace it\.
+- tapOn: Reset
+- back
+- assertNotVisible: Tap an emoji to replace it\.
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

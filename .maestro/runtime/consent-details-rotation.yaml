@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: consent-details-rotation
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: "Help Improve White Noise"
+- assertVisible: "Share usage"
+- assertVisible: "Share diagnostic logs"
+- tapOn: "Share usage, Details"
+- setOrientation: LANDSCAPE_LEFT
+- scrollUntilVisible:
+    element:
+      text: "Share usage, Hide details"
+    direction: UP
+- assertVisible: "Share usage, Hide details"
+- setOrientation: PORTRAIT
+- assertVisible: "Share usage, Hide details"

@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: ballots-votes-sheet-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Maestro fixture poll"
+- tapOn: "Maestro Tea"
+- tapOn:
+    id: "poll-view-votes"
+- assertVisible: "Votes"
+- assertVisible: "Polls are not anonymous[.] Every group member can see who chose each option[.]"
+- assertVisible: "Maestro Alice"
+- assertVisible: "Maestro Tea"
+- back
+- assertNotVisible: "Votes"
+- assertNotVisible: "Polls are not anonymous[.] Every group member can see who chose each option[.]"
+- assertVisible: "Maestro fixture poll"

@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: support-relays-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Chat with support"
+    direction: DOWN
+- tapOn: "Chat with support"
+- assertVisible: "White Noise Support"
+- assertVisible:
+    id: "support.start"
+- scrollUntilVisible:
+    element:
+      id: "support.relays"
+    direction: DOWN
+- tapOn:
+    id: "support.relays"
+- assertVisible:
+    id: "relays.group"
+- back
+- assertVisible: "White Noise Support"

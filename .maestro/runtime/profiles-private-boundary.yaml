@@ -1,0 +1,42 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-private-boundary
+---
+- runFlow: ../fixtures/open-external-private-details.yaml
+- scrollUntilVisible:
+    element:
+      id: person_profile.nickname
+    direction: DOWN
+- tapOn:
+    id: person_profile.nickname
+- assertVisible:
+    id: person_profile.nickname
+    focused: true
+- inputText: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+- assertVisible:
+    id: person_profile.nickname
+    text: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_save
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_save
+- assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Nickname & notes
+    direction: DOWN
+- tapOn: Nickname & notes
+- scrollUntilVisible:
+    element:
+      text: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+    direction: DOWN
+- assertVisible: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+- assertNotVisible: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_cancel
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_cancel

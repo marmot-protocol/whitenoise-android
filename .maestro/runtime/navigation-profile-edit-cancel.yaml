@@ -1,0 +1,35 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: navigation-profile-edit-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- tapOn: "Profile"
+- tapOn:
+    id: "profile.edit"
+- scrollUntilVisible:
+    element:
+      id: "profile.name_field"
+    direction: DOWN
+- tapOn:
+    id: "profile.name_field"
+- eraseText
+- inputText: "Maestro cancelled edit"
+- hideKeyboard
+- back
+- scrollUntilVisible:
+    element:
+      id: "profile.name_field"
+    direction: DOWN
+- assertNotVisible: "Maestro cancelled edit"
+- assertVisible: "Maestro Alice"
+- tapOn:
+    id: "profile.edit"
+- scrollUntilVisible:
+    element:
+      id: "profile.name_field"
+    direction: DOWN
+- assertNotVisible: "Maestro cancelled edit"
+- assertVisible: "Maestro Alice"
+- back

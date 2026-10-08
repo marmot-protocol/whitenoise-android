@@ -231,6 +231,20 @@ class MaestroOfflineTest(unittest.TestCase):
         self.assertIn('airplane_mode=enabled', output.getvalue())
         self.assertIn('Active default network: none', output.getvalue())
 
+    def test_slow_radio_teardown_is_observed_without_admitting_a_connected_emulator(self):
+        """Regress the hosted cellular network still present after the old four-second window."""
+        dumps = iter(['Active default network: 101\n'] * 7 + ['Active default network: none\n'])
+        def adb(command, **kwargs):
+            """Return only the late actual disconnection as a successful admission."""
+            if command[-1] == 'airplane-mode':
+                return 'enabled'
+            return next(dumps) if command[-1] == 'connectivity' else ''
+        with mock.patch.dict(os.environ, {'GITHUB_ACTIONS': 'true'}), \
+                mock.patch.object(pilot.subprocess, 'check_output', side_effect=adb), \
+                mock.patch.object(pilot.time, 'sleep') as settle, redirect_stdout(io.StringIO()):
+            pilot.offline()
+        self.assertEqual(settle.call_count, 7)
+
     def test_remaining_or_unknown_network_and_disabled_airplane_mode_are_rejected(self):
         """Fail closed on connected, unknown and unapplied airplane-mode states."""
         for state, dump in [('disabled', ''), ('enabled', 'Active default network: 100\n'),
@@ -244,7 +258,7 @@ class MaestroOfflineTest(unittest.TestCase):
                         mock.patch.object(pilot.time, 'sleep') as settle, redirect_stdout(io.StringIO()):
                     with self.assertRaises(ValueError):
                         pilot.offline()
-                self.assertLessEqual(settle.call_count, 4)
+                self.assertLessEqual(settle.call_count, 19)
         with mock.patch.dict(os.environ, {'GITHUB_ACTIONS': 'false'}), \
                 mock.patch.object(pilot.subprocess, 'check_output') as adb:
             with self.assertRaisesRegex(ValueError, 'disposable'):
@@ -266,9 +280,10 @@ class MaestroWorkflowTest(unittest.TestCase):
     def enabled(self, name, event, selected):
         """Evaluate the trusted job condition with restricted event/input fixtures."""
         expression = re.search(r'^    if: (.+)$', self.job(name), re.MULTILINE).group(1)
-        expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.')
+        expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
         return eval(expression, {'__builtins__': {}},
-                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected)})
+                    {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding'),
+                     'startsWith': lambda value, prefix: value.startswith(prefix)})
 
     def test_pilot_and_normal_jobs_are_exclusive_for_every_event(self):
         """Ensure only a selected manual pilot skips the normal instrumented jobs."""

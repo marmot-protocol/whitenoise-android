@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: chats-folder-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- longPressOn:
+    text: "Maestro group"
+- assertVisible: "Pin"
+- tapOn: "Add to folder"
+- assertVisible: "New folder"
+- tapOn: "Cancel"
+- assertVisible: "Maestro group"

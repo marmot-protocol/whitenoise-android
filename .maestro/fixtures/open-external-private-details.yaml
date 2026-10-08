@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- runFlow: assert-fixture-conversation.yaml
+- tapOn: Maestro group
+- assertVisible:
+    id: chat_info.list
+- scrollUntilVisible:
+    element:
+      text: Maestro Dave
+    direction: DOWN
+- tapOn: Maestro Dave
+- assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Nickname & notes
+    direction: DOWN
+- tapOn: Nickname & notes

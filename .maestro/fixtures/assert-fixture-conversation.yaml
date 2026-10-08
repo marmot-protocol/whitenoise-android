@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# A chat-list preview contains the same text; require the actual active conversation.
+- assertVisible:
+    id: composer-pill-surface
+- assertNotVisible:
+    id: chats.scope.chats
+- assertVisible: Generated fixture message

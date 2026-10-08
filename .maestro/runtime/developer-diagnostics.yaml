@@ -1,0 +1,42 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: developer-diagnostics
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Help"
+    direction: DOWN
+- tapOn: "Help"
+- tapOn:
+    id: "help.about"
+- assertVisible:
+    id: "about.app"
+- repeat:
+    times: 7
+    commands:
+      - tapOn:
+          id: "about.version"
+- scrollUntilVisible:
+    element:
+      id: "about.developer"
+    direction: DOWN
+- tapOn:
+    id: "about.developer"
+- assertVisible:
+    id: "developer.warning"
+- scrollUntilVisible:
+    element:
+      id: "developer.diagnostics"
+    direction: DOWN
+- tapOn:
+    id: "developer.diagnostics"
+- assertVisible:
+    id: "diagnostics-content"
+- assertVisible:
+    id: "diagnostics.events_title"
+- back
+- assertVisible:
+    id: "developer.warning"

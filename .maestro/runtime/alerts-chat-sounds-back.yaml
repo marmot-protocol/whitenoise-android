@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: alerts-chat-sounds-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Maestro group
+- assertVisible:
+    id: chat_info.list
+- scrollUntilVisible:
+    element:
+      text: Sounds & notifications
+    direction: DOWN
+- tapOn: Sounds & notifications
+- scrollUntilVisible:
+    element:
+      id: conversation-sound-appearance-open
+    direction: DOWN
+- tapOn:
+    id: conversation-sound-appearance-open
+- assertVisible:
+    id: conversation-sound-appearance-content
+- back
+- assertNotVisible:
+    id: conversation-sound-appearance-content
+- assertVisible: Sounds & notifications

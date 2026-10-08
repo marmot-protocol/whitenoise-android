@@ -1,0 +1,68 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signin-qr-denied
+---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+# Back closes this known optional sheet and records declined sharing choices.
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign In"
+- tapOn: "Private key"
+- inputText: "not-a-key"
+- hideKeyboard
+- tapOn:
+    id: "onboarding.sign_in.scan"
+- runFlow:
+    when:
+      visible: "Don’t allow"
+    commands:
+      - tapOn: "Don’t allow"
+- runFlow:
+    when:
+      visible: "Don't allow"
+    commands:
+      - tapOn: "Don't allow"
+- assertVisible: "Camera Access Needed"
+- assertVisible: "Allow camera access to scan a Private Key QR code."
+- assertVisible: "Close"
+- tapOn: "Close"
+- assertVisible: "Private key"
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That doesn't look like a valid nsec or npub key."
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That doesn't look like a valid nsec or npub key."
+- tapOn:
+    id: "onboarding.sign_in.scan"
+- runFlow:
+    when:
+      visible: "Don’t allow"
+    commands:
+      - tapOn: "Don’t allow"
+- runFlow:
+    when:
+      visible: "Don't allow"
+    commands:
+      - tapOn: "Don't allow"
+- assertVisible: "Camera Access Needed"
+- assertVisible: "Allow camera access to scan a Private Key QR code."
+- assertVisible: "Close"
+- tapOn: "Close"
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That doesn't look like a valid nsec or npub key."
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- takeScreenshot: signin-qr-denied

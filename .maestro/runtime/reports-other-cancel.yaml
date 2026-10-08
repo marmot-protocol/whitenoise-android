@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reports-other-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- assertVisible: Generated incoming fixture message
+- longPressOn:
+    text: Generated incoming fixture message
+- tapOn: Report
+- assertVisible: Report this message
+- assertVisible: "Send report"
+- scrollUntilVisible:
+    element:
+      text: Something else
+    direction: DOWN
+- tapOn: Something else
+- back
+- assertNotVisible: Report this message
+- assertVisible: Generated incoming fixture message

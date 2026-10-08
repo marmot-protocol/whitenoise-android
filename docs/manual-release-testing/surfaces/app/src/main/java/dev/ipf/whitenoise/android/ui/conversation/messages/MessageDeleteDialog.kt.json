@@ -1,0 +1,47 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+  "legacy_sha256": "007b24cea846e0989e4968e29e142b4529788c762b8dab4b0b3484d39c4212e4",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BatchMessageDeleteDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "fun BatchMessageDeleteDialog(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-004",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "BatchMessageDeleteDialogContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "fun BatchMessageDeleteDialogContent(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-004",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "MessageDeleteDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "fun MessageDeleteDialog(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-008"
+        ]
+      },
+      {
+        "surface": "MessageDeleteDialogContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageDeleteDialog.kt",
+        "anchor": "fun MessageDeleteDialogContent(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

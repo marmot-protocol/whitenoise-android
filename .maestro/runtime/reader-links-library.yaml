@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reader-links-library
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      id: "shared.category.Links"
+    direction: DOWN
+- tapOn:
+    id: "shared.category.Links"
+- assertVisible:
+    id: "shared.destination.Links"
+- assertVisible: ".*example[.]invalid.*"
+- back
+- assertVisible:
+    id: "chat_info.list"

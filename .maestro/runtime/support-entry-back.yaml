@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: support-entry-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Chat with support"
+    direction: DOWN
+- tapOn: "Chat with support"
+- assertVisible: "White Noise Support"
+- assertVisible:
+    id: "support.start"
+- back
+- assertVisible: "Settings"

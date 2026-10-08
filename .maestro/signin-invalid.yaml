@@ -1,0 +1,56 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signin-invalid
+---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign In"
+- assertVisible: "Private key"
+- assertVisible:
+    id: "onboarding.sign_in.action"
+    enabled: false
+- tapOn: "Private key"
+- inputText: "not-a-key"
+- hideKeyboard
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That doesn't look like a valid nsec or npub key."
+- tapOn: "Clear"
+- tapOn: "Private key"
+# Invalid shape AND checksum; does not test native checksum validation.
+- inputText: "nsec1invalid-checksum!"
+- hideKeyboard
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That doesn't look like a valid nsec or npub key."
+# Correct 63-character nsec shape; only the synthetic fixture checksum is changed.
+- tapOn: "Clear"
+- tapOn: "Private key"
+- inputText: "nsec1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqsmhltgq"
+- hideKeyboard
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "Couldn't sign in with that key. Check it and try again."
+- assertVisible: "Private key"
+- assertNotVisible: "Setting up your account"
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- assertNotVisible: "Private key"
+- tapOn: "Sign In"
+- assertVisible: "Private key"
+- takeScreenshot: signin-invalid
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"

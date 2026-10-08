@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: dictation-provider-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Dictation
+    direction: DOWN
+- tapOn: Dictation
+- assertVisible:
+    id: dictation.preferences.group
+- tapOn: Speech provider
+- assertVisible:
+    text: "Choose a provider for future dictation[.].*"
+- assertVisible: Automatic
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    text: "Choose a provider for future dictation[.].*"
+- setOrientation: PORTRAIT
+- back
+- assertNotVisible:
+    text: "Choose a provider for future dictation[.].*"
+- assertVisible:
+    id: dictation.preferences.group

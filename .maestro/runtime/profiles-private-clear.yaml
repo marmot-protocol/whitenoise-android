@@ -1,0 +1,127 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-private-clear
+---
+- runFlow: ../fixtures/open-external-private-details.yaml
+- scrollUntilVisible:
+    element:
+      id: person_profile.nickname
+    direction: DOWN
+- tapOn:
+    id: person_profile.nickname
+- assertVisible:
+    id: person_profile.nickname
+    focused: true
+- inputText: Maestro private Dave
+- assertVisible:
+    id: person_profile.nickname
+    text: Maestro private Dave
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: person_profile.notes
+    direction: DOWN
+- tapOn:
+    id: person_profile.notes
+- assertVisible:
+    id: person_profile.notes
+    focused: true
+- inputText: Maestro private note
+- assertVisible:
+    id: person_profile.notes
+    text: Maestro private note
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_save
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_save
+- assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Nickname & notes
+    direction: DOWN
+- tapOn: Nickname & notes
+- scrollUntilVisible:
+    element:
+      id: person_profile.nickname
+    direction: DOWN
+- assertVisible:
+    id: person_profile.nickname
+    text: Maestro private Dave
+- scrollUntilVisible:
+    element:
+      id: person_profile.notes
+    direction: DOWN
+- assertVisible:
+    id: person_profile.notes
+    text: Maestro private note
+- scrollUntilVisible:
+    element:
+      id: person_profile.nickname
+    direction: UP
+- longPressOn:
+    id: person_profile.nickname
+- runFlow:
+    when:
+      notVisible: "(?i)select all"
+    commands:
+      - tapOn: "More options"
+- tapOn: "(?i)select all"
+- assertVisible:
+    id: person_profile.nickname
+    focused: true
+- eraseText: 1
+- assertNotVisible:
+    id: person_profile.nickname
+    text: ".+"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: person_profile.notes
+    direction: DOWN
+- longPressOn:
+    id: person_profile.notes
+- runFlow:
+    when:
+      notVisible: "(?i)select all"
+    commands:
+      - tapOn: "More options"
+- tapOn: "(?i)select all"
+- assertVisible:
+    id: person_profile.notes
+    focused: true
+- eraseText: 1
+- assertNotVisible:
+    id: person_profile.notes
+    text: ".+"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_save
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_save
+- assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Nickname & notes
+    direction: DOWN
+- tapOn: Nickname & notes
+- scrollUntilVisible:
+    element:
+      text: Name \(from profile\).*Maestro Dave
+    direction: UP
+- assertVisible: Name \(from profile\).*Maestro Dave
+- assertNotVisible: Maestro private Dave
+- scrollUntilVisible:
+    element:
+      id: person_profile.notes
+    direction: DOWN
+- assertNotVisible: Maestro private note
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_cancel
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_cancel

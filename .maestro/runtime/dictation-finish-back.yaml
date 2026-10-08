@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: dictation-finish-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Dictation
+    direction: DOWN
+- tapOn: Dictation
+- assertVisible:
+    id: dictation.preferences.group
+- tapOn: Finish dictation
+- assertVisible: When I choose Paste or Send
+- back
+- assertVisible:
+    id: dictation.preferences.group

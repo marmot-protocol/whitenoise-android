@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: nested-share-connect
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- tapOn:
+    id: "settings.active_profile"
+- assertVisible:
+    id: "share_connect.screen"
+- assertVisible:
+    id: "share_connect.qr_surface"
+- back
+- assertVisible: "Settings"

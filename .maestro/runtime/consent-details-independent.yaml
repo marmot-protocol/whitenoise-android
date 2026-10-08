@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: consent-details-independent
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: "Help Improve White Noise"
+- assertVisible: "Share usage"
+- assertVisible: "Share diagnostic logs"
+- tapOn: "Share usage, Details"
+- scrollUntilVisible:
+    element:
+      text: "Share diagnostic logs, Details"
+    direction: DOWN
+- tapOn: "Share diagnostic logs, Details"
+- scrollUntilVisible:
+    element:
+      text: "Share usage, Hide details"
+    direction: UP
+- tapOn: "Share usage, Hide details"
+- scrollUntilVisible:
+    element:
+      text: "Share diagnostic logs, Hide details"
+    direction: DOWN
+- assertVisible: "Share diagnostic logs, Hide details"

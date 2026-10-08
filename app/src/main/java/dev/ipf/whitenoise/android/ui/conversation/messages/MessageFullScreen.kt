@@ -44,6 +44,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.readerScrollIndicator
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 
 internal const val MESSAGE_FULL_SCREEN_TAG = "message-full-screen"
 internal const val MESSAGE_FULL_SCREEN_BODY_TAG = "message-full-screen-body"
@@ -102,7 +103,7 @@ internal fun MessageFullScreenView(
         }
         var overflowOpen by remember { mutableStateOf(false) }
         Scaffold(
-            modifier = Modifier.testTag(MESSAGE_FULL_SCREEN_TAG),
+            modifier = Modifier.exposePerformanceTestTags().testTag(MESSAGE_FULL_SCREEN_TAG),
             contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
                 TopAppBar(

@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: accounts-signout-toggle-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-signout-sheet.yaml
+- assertVisible:
+    id: "profile_keys.signout_invitation_keys"
+    checked: true
+- tapOn:
+    id: "profile_keys.signout_invitation_keys"
+- assertVisible:
+    id: "profile_keys.signout_invitation_keys"
+    checked: false
+- back
+- assertVisible: "Settings"
+- runFlow: ../fixtures/show-signout-sheet.yaml
+- assertVisible:
+    id: "profile_keys.signout_invitation_keys"
+    checked: true
+- back
+- assertNotVisible: "Stays on this device"
+- assertVisible: "Settings"
+- back
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

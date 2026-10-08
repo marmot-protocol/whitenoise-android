@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-font-large
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: DOWN
+- tapOn: "Appearance"
+- scrollUntilVisible:
+    element:
+      text: "Font size"
+    direction: DOWN
+- tapOn: "Font size"
+- tapOn: "Large"
+- assertVisible: "Large"
+- back
+- tapOn: "Appearance"
+- scrollUntilVisible:
+    element:
+      text: "Large"
+    direction: DOWN
+- assertVisible: "Large"

@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: settings-connectors
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "AI Agents"
+    direction: DOWN
+- tapOn: "AI Agents"
+- assertVisible:
+    id: "ai_agents.connectors"
+- tapOn: "Back"
+- assertVisible: "Settings"
+- tapOn: "Back"
+- assertVisible: "Maestro group"

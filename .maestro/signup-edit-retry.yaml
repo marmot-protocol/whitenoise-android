@@ -1,0 +1,101 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signup-edit-retry
+---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+# Back closes this known optional sheet and records declined sharing choices.
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign Up"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.name"
+    direction: DOWN
+- tapOn:
+    id: "onboarding.sign_up.name"
+- eraseText
+- inputText: "Maestro Offline Draft"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.about"
+    direction: DOWN
+- tapOn:
+    id: "onboarding.sign_up.about"
+- inputText: "Synthetic offline test only"
+- hideKeyboard
+- tapOn:
+    id: "onboarding.sign_up.action"
+- scrollUntilVisible:
+    element:
+      text: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+    direction: DOWN
+- assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.name"
+    direction: UP
+# Tap placement can leave the cursor in the middle; eraseText alone backspaces only.
+- longPressOn:
+    id: "onboarding.sign_up.name"
+- runFlow:
+    when:
+      notVisible: "(?i)select all"
+    commands:
+      - tapOn: "More options"
+- tapOn: "(?i)select all"
+- eraseText: 1
+- inputText: "Maestro Edited Draft"
+- hideKeyboard
+- assertVisible: "Maestro Edited Draft"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.about"
+    direction: DOWN
+# Tap placement can leave the cursor in the middle; eraseText alone backspaces only.
+- longPressOn:
+    id: "onboarding.sign_up.about"
+- runFlow:
+    when:
+      notVisible: "(?i)select all"
+    commands:
+      - tapOn: "More options"
+- tapOn: "(?i)select all"
+- eraseText: 1
+- inputText: "Edited after offline failure"
+- hideKeyboard
+- assertVisible: "Edited after offline failure"
+- scrollUntilVisible:
+    element:
+      text: "Retry"
+    direction: DOWN
+- tapOn: "Retry"
+- scrollUntilVisible:
+    element:
+      text: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+    direction: DOWN
+- assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+- scrollUntilVisible:
+    element:
+      text: "Maestro Edited Draft"
+    direction: UP
+- assertVisible: "Maestro Edited Draft"
+- scrollUntilVisible:
+    element:
+      text: "Edited after offline failure"
+    direction: DOWN
+- assertVisible: "Edited after offline failure"
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- takeScreenshot: signup-edit-retry
