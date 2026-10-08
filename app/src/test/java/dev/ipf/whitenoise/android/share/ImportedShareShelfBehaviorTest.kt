@@ -101,7 +101,12 @@ class ImportedShareShelfBehaviorTest {
             if (!draftFirst) composeRule.runOnIdle { restoreOrdinary() }
             val expectedCount = importedCount + ordinaryCount + ordinary.documentUris.size
             composeRule.onNodeWithText("Items: $expectedCount").assertExists()
-            imported.forEach { assertNotNull(files.metadata(it)) }
+            imported.forEach { uri ->
+                assertNotNull(
+                    "Restored private source must retain its original and metadata: $uri",
+                    files.metadata(uri),
+                )
+            }
             assertEquals(imported, files.leases.loadShelf("restore-account", "restore-chat"))
         } finally {
             files.leases.saveShelf("restore-account", "restore-chat", emptyList())
