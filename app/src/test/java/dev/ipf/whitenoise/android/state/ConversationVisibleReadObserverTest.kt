@@ -71,6 +71,90 @@ class ConversationVisibleReadObserverTest {
         }
     }
 
+    @Test
+    fun anchorTimeoutRetriesTheSameMessageWhenVisibilityReturns() {
+        val row = reminderRow()
+        val fixture = fixture(row)
+        runBlocking { fixture.bootstrap() }
+        val state = fixture.appState
+        val subscription = installTimeline(state)
+        val commandStarted = CompletableDeferred<Unit>()
+        val releaseCommand = CompletableDeferred<Unit>()
+        subscription.beforeAnchorReply = {
+            commandStarted.complete(Unit)
+            releaseCommand.await()
+        }
+        subscription.anchorReplies += null
+        val controller = controller(state, row)
+        awaitTimeline(controller, subscription)
+        var observing by mutableStateOf(true)
+        try {
+            composeRule.runOnIdle {
+                state.setAppInForeground(true, dismissRetainedVisibleConversation = false)
+                state.clearActiveConversation()
+            }
+            installObserver(state, controller, ReadLifecycleOwner()) { observing }
+            activate(state, row.groupIdHex)
+            composeRule.waitUntil(5_000) {
+                shadowOf(Looper.getMainLooper()).idle()
+                commandStarted.isCompleted
+            }
+            composeRule.runOnIdle { state.setAppInForeground(false) }
+            releaseCommand.complete(Unit)
+            composeRule.waitUntil(5_000) {
+                shadowOf(Looper.getMainLooper()).idle()
+                !controller.timelineSubscriptionActiveCallMutex.isLocked
+            }
+            composeRule.waitForIdle()
+            composeRule.runOnIdle { state.setAppInForeground(true, dismissRetainedVisibleConversation = false) }
+            composeRule.waitUntil(5_000) {
+                shadowOf(Looper.getMainLooper()).idle()
+                subscription.anchorReports.size == 2
+            }
+            assertEquals(List(2) { ConversationTimelineTestIds.MESSAGE_B }, subscription.anchorReports)
+        } finally {
+            releaseCommand.complete(Unit)
+            composeRule.runOnIdle { observing = false }
+            composeRule.waitForIdle()
+            controller.onCleared()
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun firstStreamedPageMakesAnInitiallyUnavailableWindowReportable() {
+        val row = reminderRow()
+        val fixture = fixture(row)
+        runBlocking { fixture.bootstrap() }
+        val state = fixture.appState
+        val page = timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, timelineAt = 2uL))
+        val subscription = ScriptedConversationTimelineSubscription(null, anchorPage = page)
+        state.liveSubscriptionOverrides.conversation =
+            ScriptedConversationLiveSubscriptions(listOf(subscription), conversationTimelineTestGroup()).subscriptions
+        val controller = controller(state, row)
+        runBlocking { awaitConversationCondition { controller.timelineSubscription === subscription } }
+        var observing by mutableStateOf(true)
+        try {
+            composeRule.runOnIdle {
+                state.setAppInForeground(true, dismissRetainedVisibleConversation = false)
+                state.clearActiveConversation()
+            }
+            installObserver(state, controller, ReadLifecycleOwner()) { observing }
+            activate(state, row.groupIdHex)
+            composeRule.waitForIdle()
+            assertTrue(subscription.anchorReports.isEmpty())
+            subscription.emitWindow(page)
+            awaitTimeline(controller, subscription)
+            awaitAnchor(subscription)
+            assertEquals(listOf(ConversationTimelineTestIds.MESSAGE_B), subscription.anchorReports)
+        } finally {
+            composeRule.runOnIdle { observing = false }
+            composeRule.waitForIdle()
+            controller.onCleared()
+            fixture.close()
+        }
+    }
+
     /** A retained reader must seed each replacement native window with its settled row. */
     @Test
     fun retainedObserverReportsSameAnchorToReplacementTimelineWindow() {
@@ -79,13 +163,9 @@ class ConversationVisibleReadObserverTest {
         runBlocking { fixture.bootstrap() }
         val state = fixture.appState
         val first =
-            ScriptedConversationTimelineSubscription(
-                timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, timelineAt = 2uL)),
-            )
+            observerSubscription()
         val second =
-            ScriptedConversationTimelineSubscription(
-                timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, timelineAt = 2uL)),
-            )
+            observerSubscription()
         val scripted =
             ScriptedConversationLiveSubscriptions(listOf(first, second), conversationTimelineTestGroup())
         state.liveSubscriptionOverrides.conversation = scripted.subscriptions
@@ -205,9 +285,7 @@ class ConversationVisibleReadObserverTest {
     /** Supplies a real controller subscription path with one retained native timeline record. */
     private fun installTimeline(state: WhiteNoiseAppState): ScriptedConversationTimelineSubscription {
         val subscription =
-            ScriptedConversationTimelineSubscription(
-                timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, timelineAt = 2uL)),
-            )
+            observerSubscription()
         val scripted =
             ScriptedConversationLiveSubscriptions(
                 timelineScripts = listOf(subscription),
@@ -215,6 +293,11 @@ class ConversationVisibleReadObserverTest {
             )
         state.liveSubscriptionOverrides.conversation = scripted.subscriptions
         return subscription
+    }
+
+    private fun observerSubscription(): ScriptedConversationTimelineSubscription {
+        val page = timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, timelineAt = 2uL))
+        return ScriptedConversationTimelineSubscription(page, anchorPage = page)
     }
 
     /** Waits until the controller owns the scripted subscription and retains its visible record. */

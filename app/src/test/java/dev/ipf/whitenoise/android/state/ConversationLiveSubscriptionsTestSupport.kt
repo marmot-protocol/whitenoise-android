@@ -58,6 +58,9 @@ internal class ScriptedConversationTimelineSubscription(
     /** Holds an anchor reply while its controller retires the visible window owner. */
     var beforeAnchorReply: suspend () -> Unit = {}
 
+    /** Optional command outcomes, including a null native timeout/not-ready reply. */
+    val anchorReplies = mutableListOf<TimelinePageFfi?>()
+
     val lifecycleEventOrder: List<String>
         get() = lifecycleEvents.toList()
 
@@ -113,7 +116,7 @@ internal class ScriptedConversationTimelineSubscription(
         lifecycleEvents += "setVisibleAnchor"
         anchorCalls += messageIdHex
         beforeAnchorReply()
-        return anchorPage
+        return if (anchorReplies.isEmpty()) anchorPage else anchorReplies.removeAt(0)
     }
 
     val forwardsCallCount: Int

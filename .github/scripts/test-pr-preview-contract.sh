@@ -87,6 +87,10 @@ reject 'BLOSSOM_UPLOAD_NSEC' "$workflow"
 # Both the pre-checkout prepare job and the post-checkout publish job must bind
 # artifact downloads explicitly to this repository. Without --repo, gh fails
 # before checkout with "not a git repository" and no preview links are posted.
+candidate_downloads=$(grep -Fc 'gh run download "$BUILD_RUN_ID"' "$workflow")
+scoped_candidate_downloads=$(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY"' "$workflow")
+[[ "$candidate_downloads" -eq 4 ]]
+[[ "$scoped_candidate_downloads" -eq "$candidate_downloads" ]]
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-stable' "$workflow") -eq 2 ]]
 [[ $(grep -Fc 'gh run download "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --name pr-preview-isolated' "$workflow") -eq 2 ]]
 

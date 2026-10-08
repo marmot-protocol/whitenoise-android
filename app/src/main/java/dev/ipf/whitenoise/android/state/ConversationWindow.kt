@@ -459,6 +459,13 @@ internal fun ConversationController.installWindowFrame(frame: ConversationWindow
     return reactionChanges
 }
 
+/** Wakes retained screen observers after the first authoritative page of this subscription is installed. */
+internal fun ConversationController.publishReadyTimelineSubscription(handle: ConversationTimelineSubscriptionHandle) {
+    synchronized(liveSubscriptionLock) {
+        if (!accountTeardownRequested && timelineSubscription === handle) window.readySubscription = handle
+    }
+}
+
 /**
  * Reports the message the reader settled on so replacements keep it in view; a no-op without a window.
  * Optimistic rows carry local ids MDK never issued, so only a retained authoritative row is reported.
@@ -475,13 +482,9 @@ internal suspend fun ConversationController.reportVisibleMessage(
                 !accountTeardownRequested && timelineSubscription === handle && window.readySubscription === handle
             }
         if (!ownsHandle() || !retainsTimelineRecord(messageIdHex)) return@withLock false
-        val page = withContext(Dispatchers.IO) { handle.setVisibleAnchor(messageIdHex) }
+        val page = withContext(Dispatchers.IO) { handle.setVisibleAnchor(messageIdHex) } ?: return@withLock false
         if (!ownsHandle()) return@withLock false
-        if (page != null) {
-            applyTimelinePage(page, replaceWindow = false, updatePagination = true, reconcileNewExtendedRecords = true)
-        }
-        // A null page can be an unchanged window. Record submission to this
-        // owner, rather than claiming that a new native frame was installed.
+        applyTimelinePage(page, replaceWindow = false, updatePagination = true, reconcileNewExtendedRecords = true)
         true
     }
 
