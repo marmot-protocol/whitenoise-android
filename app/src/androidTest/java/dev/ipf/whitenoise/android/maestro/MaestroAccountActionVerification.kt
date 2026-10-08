@@ -43,7 +43,7 @@ internal suspend fun verifyMaestroAccountAction(
     before: MaestroAccountActionBaseline?,
     postcondition: String?,
 ): Boolean {
-    if (postcondition?.startsWith("account-action-") != true) return true
+    if (postcondition?.startsWith("account-action-") != true) return false
     val baseline = checkNotNull(before)
     val wiped = postcondition == "account-action-wiped"
     return withTimeoutOrNull(15_000L) {

@@ -170,6 +170,9 @@ def run_fixture(name, directory, generation):
                 if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
                         and verified.get('relayListsVerified') is not True):
                     raise ValueError('Unchanged native relay lists were not verified')
+                if (CASES[name]['postcondition'].startswith('public-key-copy-')
+                        and verified.get('publicKeyCopyVerified') is not True):
+                    raise ValueError('Actual public-key clipboard and cleanup were not verified')
                 if (CASES[name]['postcondition'].startswith('account-action-')
                         and verified.get('accountActionVerified') is not True):
                     raise ValueError('Authoritative account action and retained private state were not verified')

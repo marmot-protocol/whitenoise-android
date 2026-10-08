@@ -1,0 +1,30 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-public-copy-rotation-return
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-fixture-profile-keys.yaml
+- runFlow: ../fixtures/copy-fixture-public-key.yaml
+- setOrientation: LANDSCAPE_LEFT
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: DOWN
+- assertVisible: Private key hidden
+- scrollUntilVisible:
+    element:
+      id: profile_keys.public_key_value
+    direction: UP
+- assertVisible:
+    id: profile_keys.public_key_value
+- setOrientation: PORTRAIT
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: DOWN
+- assertVisible: Private key hidden
+- runFlow: ../fixtures/copy-fixture-public-key.yaml
+- tapOn: Back
+- assertVisible: Settings
+- tapOn: Back
+- assertVisible: Maestro group

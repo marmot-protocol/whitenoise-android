@@ -3146,6 +3146,41 @@
       ],
       "postcondition": "app-lock-credential-delay",
       "assertions": "After real PIN cancellation/retry, select Immediately and After1/5/15 minutes in the actual Auto-lock picker, reopen each selected radio, cancel and rotate the final picker landscape/portrait without mutation, then return to Chats. Independent native samples require all four explicit stored preference values in order and the final15m production state/store, alongside accepted cipher retry, accounts/original messages and owned-PIN OS restoration. This selects and persists every delay; it does not qualify elapsed delay boundaries, process recreation, routed notifications or full SEC003."
+    },
+    "keys-public-copy": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010"
+      ],
+      "assertions": "Operate actual Copy public key and its acknowledgement with the private key hidden. Native proof requires the exact original SDK Alice npub in one plain-text Android clipboard item with the public-key label, no URI/Intent/HTML or sensitive flag, and actual foreground window focus. Only the matched disposable clip is then cleared and its absence verified; all three identities and both original messages must remain. This is public clipboard copy, not private/encrypted key export, external sharing, clipboard expiry, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "public-key-copy-owner"
+    },
+    "keys-public-copy-rotation-return": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "NAV-009"
+      ],
+      "assertions": "Operate actual Copy public key and its acknowledgement with the private key hidden before and after handled rotation. Native proof requires the exact original SDK Alice npub in one plain-text Android clipboard item with the public-key label, no URI/Intent/HTML or sensitive flag, and actual foreground window focus. Only the matched disposable clip is then cleared and its absence verified; all three identities and both original messages must remain. This is public clipboard copy, not private/encrypted key export, external sharing, clipboard expiry, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "public-key-copy-owner"
+    },
+    "keys-public-copy-warm-resume": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "NAV-010"
+      ],
+      "assertions": "Operate actual Copy public key and its acknowledgement with the private key hidden before and after same-process warm return. Native proof requires the exact original SDK Alice npub in one plain-text Android clipboard item with the public-key label, no URI/Intent/HTML or sensitive flag, and actual foreground window focus. Only the matched disposable clip is then cleared and its absence verified; all three identities and both original messages must remain. This is public clipboard copy, not private/encrypted key export, external sharing, clipboard expiry, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "public-key-copy-owner"
+    },
+    "keys-public-copy-account-switch": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-010",
+        "ACC-017"
+      ],
+      "assertions": "Operate actual Copy public key and its acknowledgement with the private key hidden, switch to Bob and copy his public key before returning to Alice. Native proof requires the exact original SDK Bob npub in one plain-text Android clipboard item with the public-key label, no URI/Intent/HTML or sensitive flag, and actual foreground window focus. Only the matched disposable clip is then cleared and its absence verified; all three identities and both original messages must remain. This is public clipboard copy, not private/encrypted key export, external sharing, clipboard expiry, process death or full ACC010/ACC017 acceptance.",
+      "postcondition": "public-key-copy-peer"
     }
   }
 }

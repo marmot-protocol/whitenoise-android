@@ -67,6 +67,8 @@ private val MAESTRO_POSTCONDITIONS =
         "app-lock-credential-warm-disabled",
         "app-lock-credential-delay",
         "accounts-retained",
+        "public-key-copy-owner",
+        "public-key-copy-peer",
         "account-action-signed-out",
         "account-action-wiped",
         "contact-private-saved",
@@ -284,32 +286,31 @@ class MaestroRuntimeHostTest {
                         context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
                         postcondition,
                     )
-                credentialJournal?.observe(checkNotNull(state), checkNotNull(originalActivity))
-                val credentialEvidence =
-                    credentialJournal?.verify(
-                        context,
+                val publicKeyCopyVerified =
+                    verifyMaestroPublicKeyCopy(
+                        checkNotNull(originalActivity),
+                        native,
                         checkNotNull(state),
-                        checkNotNull(postcondition),
+                        messageBaseline,
+                        postcondition,
                     )
-                val appLockVerified =
-                    if (credentialEvidence != null) {
-                        true
-                    } else {
-                        verifyMaestroNoAppLockCredential(
-                            context,
-                            checkNotNull(state),
-                            context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
-                            postcondition,
-                        )
-                    }
+                val appLockVerification =
+                    verifyMaestroAppLock(
+                        credentialJournal,
+                        checkNotNull(originalActivity),
+                        checkNotNull(state),
+                        context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
+                        postcondition,
+                    )
                 File(directory, "verified.json").writeText(
                     JSONObject()
                         .put("generation", generation)
                         .put("verified", true)
                         .put("activityRecreated", activityRecreated)
                         .put("privateContactVerified", privateContactVerified)
-                        .put("credentialEvidence", credentialEvidence ?: JSONObject.NULL)
-                        .put("appLockVerified", appLockVerified)
+                        .put("publicKeyCopyVerified", publicKeyCopyVerified)
+                        .put("credentialEvidence", appLockVerification.credentialJsonValue)
+                        .put("appLockVerified", appLockVerification.verified)
                         .put(
                             "accountActionVerified",
                             verifyMaestroAccountAction(

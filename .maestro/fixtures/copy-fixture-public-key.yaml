@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- scrollUntilVisible:
+    element:
+      text: Copy public key
+    direction: UP
+- tapOn: Copy public key
+- assertVisible: Public key copied
+- scrollUntilVisible:
+    element:
+      text: Private key hidden
+    direction: DOWN
+- assertVisible: Private key hidden

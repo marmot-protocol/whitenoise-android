@@ -6,12 +6,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
-/** Scanner/capture denial must preserve identity/history just as cancellation of account dialogs must. */
+/** Account cancellation, scanner/lock checks and public-key copy must retain original identities and histories. */
 internal fun requiresMaestroAccountRetentionProof(postcondition: String?): Boolean =
     postcondition in setOf("accounts-retained", "camera-denied", "app-lock-unavailable") ||
-        postcondition?.startsWith("app-lock-credential-") == true
+        postcondition?.startsWith("app-lock-credential-") == true ||
+        postcondition?.startsWith("public-key-copy-") == true
 
-/** Cancelled account actions must preserve the original native identities, session and both histories. */
+/** A retained-account case must preserve the original native identities, session and both histories. */
 internal suspend fun verifyMaestroAccountsRetained(
     native: Marmot,
     state: WhiteNoiseAppState?,

@@ -308,6 +308,25 @@ class CampaignSummaryTest(unittest.TestCase):
                     path.write_text(json.dumps(record))
                     self.assertTrue(self.result(root)['evidence_complete'])
 
+    def test_public_key_copy_requires_typed_native_clipboard_and_owned_cleanup(self):
+        """The copy glyph plus generic verified cannot prove the expected native identity was copied."""
+        for post in ('public-key-copy-owner', 'public-key-copy-peer'):
+            for proof in (None, False, 1, 'true', True):
+                with self.subTest(post=post, proof=proof), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    leaves, _ = self.prepare(root)
+                    name = runtime.case_selection('navigation', 1)[0]
+                    path = leaves[0] / 'verified.json'
+                    row = json.loads(path.read_text())
+                    if proof is not None:
+                        row['publicKeyCopyVerified'] = proof
+                    path.write_text(json.dumps(row))
+                    with patch.dict(runtime.CASES, {name: {**runtime.CASES[name], 'postcondition': post}}):
+                        result = self.result(root)
+                    self.assertEqual(result['evidence_complete'], proof is True)
+                    if proof is not True:
+                        self.assertIn('public-key clipboard', result['results'][0]['failure'])
+
     def test_app_lock_needs_typed_real_credential_state_before_and_after_ui(self):
         """Final OS state cannot certify a fake prerequisite or replace its native postcondition."""
         for phase, field in (('ready', 'appLockFixtureNoCredential'), ('verified', 'appLockVerified')):
@@ -878,9 +897,10 @@ class RuntimeEvidenceTest(unittest.TestCase):
 
     def test_backup_checks_use_button_state_and_verify_both_cleared_inputs(self):
         """Reject the captured false label-state proof and unintended Back on an unfocused dialog."""
-        for name, case in runtime.CASES.items():
-            if case['suite'] != 'keys':
-                continue
+        backups = {name: case for name, case in runtime.CASES.items()
+                   if case['suite'] == 'keys' and 'ACC-011' in case['manual_ids']}
+        self.assertEqual(len(backups), 8)
+        for name, case in backups.items():
             flow = (runtime.ROOT / '.maestro/runtime' / (name + '.yaml')).read_text()
             with self.subTest(case=name):
                 self.assertNotIn('- assertVisible: "Encrypted Private Key"\n- hideKeyboard', flow)
@@ -1122,6 +1142,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
         requirements = (
             ('account-action-signed-out', 'accountActionVerified', 'verified', 'account action'),
             ('account-action-wiped', 'accountActionVerified', 'verified', 'account action'),
+            ('public-key-copy-owner', 'publicKeyCopyVerified', 'verified', 'public-key clipboard'),
+            ('public-key-copy-peer', 'publicKeyCopyVerified', 'verified', 'public-key clipboard'),
             ('app-lock-unavailable', 'appLockFixtureNoCredential', 'ready', 'app-lock prerequisite'),
             ('app-lock-unavailable', 'appLockVerified', 'verified', 'app-lock state'),
         )
@@ -1303,6 +1325,30 @@ class RuntimeEvidenceTest(unittest.TestCase):
                     self.assertIs(type(node.get('checked')), bool)
                     states.append(node['checked'])
             self.assertEqual(states, expected)
+
+    def test_public_key_copy_flows_use_acknowledged_real_controls_and_keep_private_key_hidden(self):
+        """Regress copy/account/lifecycle routes without crediting the raw-key or external-share criteria."""
+        names = ('keys-public-copy', 'keys-public-copy-rotation-return',
+                 'keys-public-copy-warm-resume', 'keys-public-copy-account-switch')
+        root = runtime.ROOT / '.maestro'
+        for name in names:
+            text = (root / 'runtime' / f'{name}.yaml').read_text()
+            self.assertIn('runFlow: ../fixtures/open-fixture-profile-keys.yaml', text)
+            self.assertIn('runFlow: ../fixtures/copy-fixture-public-key.yaml', text)
+            self.assertIn('ACC-010', runtime.CASES[name]['manual_ids'])
+            self.assertNotIn('Show private key', text)
+            self.assertNotIn('Copy private key', text)
+        peer = (root / 'runtime/keys-public-copy-account-switch.yaml').read_text()
+        self.assertLess(peer.index('- tapOn: Maestro Bob'), peer.index('- tapOn: Maestro Alice'))
+        self.assertEqual(runtime.CASES[names[-1]]['postcondition'], 'public-key-copy-peer')
+        self.assertIn('runtime-warm-resume.yaml', (root / 'runtime' / f'{names[2]}.yaml').read_text())
+        rotated = (root / 'runtime' / f'{names[1]}.yaml').read_text()
+        self.assertIn('LANDSCAPE_LEFT', rotated)
+        self.assertIn('PORTRAIT', rotated)
+        helper = (root / 'fixtures/copy-fixture-public-key.yaml').read_text()
+        self.assertIn('- tapOn: Copy public key', helper)
+        self.assertIn('- assertVisible: Public key copied', helper)
+        self.assertIn('- assertVisible: Private key hidden', helper)
 
     def test_settings_entry_uses_real_multi_identity_selector(self):
         """Regress the hosted tree where the avatar says Switch Profile rather than Open settings."""

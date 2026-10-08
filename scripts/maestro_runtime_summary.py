@@ -116,6 +116,9 @@ def campaign(directory, suite, source, run_id, attempt, api='34', navigation='bu
                 if (CASES[name]['postcondition'] == 'relay-lists-unchanged'
                         and read_json(leaf / 'verified.json').get('relayListsVerified') is not True):
                     raise ValueError('Unchanged native relay lists were not verified')
+                if (CASES[name]['postcondition'].startswith('public-key-copy-')
+                        and read_json(leaf / 'verified.json').get('publicKeyCopyVerified') is not True):
+                    raise ValueError('Actual public-key clipboard and cleanup were not verified')
                 if (CASES[name]['postcondition'].startswith('account-action-')
                         and read_json(leaf / 'verified.json').get('accountActionVerified') is not True):
                     raise ValueError('Authoritative account action and retained private state were not verified')
