@@ -373,6 +373,17 @@ do not set a fleet-wide threshold until representative baselines exist.
 
 ### Idle background-delivery baselines and push-burst power
 
+For the screen-off reconnect scenario use
+`NetworkRecoveryBenchmark#backgroundValidatedNetworkRecoveryPower` with
+`QUALIFICATION_USER_ID` and `ALLOW_NETWORK_TOGGLE=true`. It selects Push, checks
+validated internet, backgrounds the app and turns the screen off before taking
+Wi-Fi and cellular offline. The measured 25-second window restores connectivity
+and requires genuine internet validation while the screen stays off. Both the
+test and host cleanup restore the original Wi-Fi and airplane-mode switches.
+Run one sample per invocation, then repeat balanced independent rounds.
+The existing foreground `validatedNetworkRecoveryPower` measures UI recovery;
+its energy result cannot qualify a background campaign.
+
 `BackgroundIdleBenchmark` ([#2786](https://github.com/marmot-protocol/whitenoise-android/issues/2786))
 measures the three remaining delivery postures the recovery benchmark above does
 not cover, plus a representative push burst. Unlike the recovery journey, these
@@ -382,22 +393,24 @@ frame timing).
 
 The product has no third "delivery entirely disabled" mode — it always resolves
 to push or local/keep-connected (see `NativePushDelivery.resolvedNotificationDeliveryMode`).
-`idleWithDeliveryDisabledPower` approximates the floor a user who disabled
-notifications would see: push mode selected (so the always-on local stream is
-off) with the OS notification permission revoked for the run, restored
-afterward regardless of outcome.
+`idleWithDeliveryDisabledPower` uses a controlled disposable fixture: Push
+selected so the Local stream is off, the fixture Firebase receiver disabled so
+FCM cannot enter, and notification permission revoked. It resumes the process
+after permission/component changes, requires it to stay alive and screen-off,
+and restores both exact platform overrides afterward. This experimental floor
+is not a third product mode or a claim that background Android/GMS activity ceases.
 
 ```bash
-ANDROID_SERIAL=<device-serial> \
+ANDROID_SERIAL=<device-serial> QUALIFICATION_USER_ID=<disposable-user-id> \
   BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.BackgroundIdleBenchmark#idleWithDeliveryDisabledPower" \
   scripts/run-performance-benchmarks.sh
 ```
 
 Swap the method name for `idleWithNativePushPower` or `idleWithKeepConnectedPower`
 to capture the other two postures. All three default to a 60-second idle window
-per iteration across 3 iterations; override it for a quick smoke run before
-committing to the full-length guarded pass, since a multi-minute `measureBlock`
-is new territory for this harness:
+in one iteration per invocation. A sleeping screen may engage a secure keyguard,
+so repeat independent invocations after unlocking. Short overrides are smoke
+checks only and cannot establish energy budgets:
 
 ```bash
 IDLE_WINDOW_MS=10000 \
@@ -411,16 +424,91 @@ messages arriving together, which is a different thing from
 measurement against notifications already sitting in the tray — the burst must
 arrive *during* the measured window here, not before it. It runs a single
 iteration; watch `adb logcat -s BackgroundIdleBenchmark` for the "send the push
-burst now" line, then send roughly five messages in quick succession from a
-second account before the (also `IDLE_WINDOW_MS`-overridable) window closes:
+burst now" line, then send at least five messages with distinct fresh fixture
+bodies from a disposable second account before the window closes. Set
+`NOTIFICATION_TEXTS` to those bodies using the existing `;;` delimiter. The
+benchmark requires temporary listener access on an explicitly named disposable
+Android profile, counts each matching body once, rescans existing matching
+cards for every generation, and fails if the full burst is absent at the deadline.
+Actual Android posting time must follow the window start; delayed setup callbacks
+and ambiguous wall-clock changes cannot qualify. The listener
+ignores other profiles and packages before reading extras, emits no payloads, clears the
+fixture bodies, and restores its prior access on exit:
 
 ```bash
-BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.BackgroundIdleBenchmark#pushBurstPower" \
+QUALIFICATION_USER_ID=<disposable-user-id> ALLOW_RECEIPT_LISTENER=true \
+  NOTIFICATION_TEXTS="<fresh-body-1>;;<fresh-body-2>;;<fresh-body-3>;;<fresh-body-4>;;<fresh-body-5>" \
+  BENCHMARK_CLASS_FILTER="dev.ipf.whitenoise.android.benchmark.BackgroundIdleBenchmark#pushBurstPower" \
   scripts/run-performance-benchmarks.sh
 ```
 
 Same caveat as the recovery baseline: system-wide energy, same-device
 comparison only, no fleet-wide threshold until representative baselines exist.
+
+### Hosted qualification artifacts
+
+Agent builds run on GitHub under [CI request policy](ci-request-policy.md).
+Dispatch `android-staging-apk.yml` on the reviewed candidate with
+`background_fixture=true` for configured Dev debug, benchmark target and test
+APKs. This explicit fixture path uses the staging push gateway; ordinary PR
+previews disable push and cannot prove FCM delivery. The artifact records source
+SHA, workflow run/attempt, MDK revision, package identities and SHA-256 hashes.
+Keep downloaded artifacts and raw device traces in private qualification storage.
+
+Android shares a package's APK across user profiles. Before updating a configured
+Dev package on a personal phone, preserve its exact installed APK and a fresh
+private data backup. Use only an explicitly authorized disposable profile for
+accounts, fixture messages and settings. Never uninstall, clear data, or restore
+an older database. Follow the workspace's device migration recovery runbook.
+
+`scripts/background_fixture_artifacts.py verify <artifact-directory> <source-sha>`
+checks downloaded identity. Its `prepare` command accepts the preserved original
+Dev APK, an **existing** development keystore and SDK `apksigner`. It can change
+signatures only: all compiled ZIP entries must remain identical to hosted bytes.
+It never generates keys or installs apps. The runner additionally verifies actual
+APK package identities, matching signers, unchanged installed original bytes,
+and identical arm64 MDK runtime bytes before any device mutation.
+
+Run the benchmark script with `BENCHMARK_APK_DIR`, `ORIGINAL_DEV_APK`,
+`QUALIFICATION_USER_ID`, SDK `APKSIGNER` and `AAPT`, and the selected device serial.
+It skips Gradle completely in this route. Switch to the authorized profile first.
+Process selection, installs, instrumentation and output storage are profile-scoped;
+the prebuilt route temporarily disables Dev in other installed users to prevent
+their accounts from starting with fixture configuration. The exit trap restores
+the preserved original Dev APK in place before restoring their exact overrides.
+If restoration fails or competing code appears, those users remain protected;
+the captured override file identifies the recovery state. A concurrent Dev
+installation invalidates the campaign. Ownership checks run before instrumentation,
+after measurement and before restoration; the runner refuses to overwrite unexpected
+code. Resolve the competing install and take a new private backup before retrying.
+The host also captures and verifies fixture notification permission, FCM receiver
+override and receipt-listener access, restoring them even if instrumentation dies.
+
+### Resource campaign acceptance
+
+`scripts/background_delivery_report.py <campaign.json>` validates measured,
+anonymous records for all five scenarios. Its field contract is defined by
+`CAMPAIGN_FIELDS`, `RUN_FIELDS` and `RESOURCES` in the script. Supply exact source,
+artifact and MDK provenance, device model/API/build, scenario-specific budgets,
+and actual measured records. Unknown fields are rejected without echoing values.
+Missing platform measurements must stay missing; never replace them with zero.
+The current resource vector covers CPU/network/memory rail energy, wake-lock and
+service duration, and recovery attempts. Scheduled work and UID network activity
+remain independent trace/device evidence in the [device matrix](battery-device-matrix.md).
+
+Collect at least five balanced rounds per scenario in a shuffled order, fixed
+windows and network/charging posture, with screen off, a live fixture process,
+verified mode/permission, and restored state. Idle requires 60 seconds, reconnect
+25 seconds and push burst 30 seconds. The validator's initial repeatability rule
+rejects a temperature spread above 2°C or an energy range above 25% of the median.
+These are conservative campaign screening rules, not fleet budgets. Preserve
+rejected samples and diagnose noise rather than dropping outliers.
+
+Set and review budgets from controlled baselines **before** retry/wake/service
+changes, then compare matched rounds and trace the dominant cost. A passing
+report always leaves tracker completion false: reviewed budget provenance,
+before/after attribution and the holistic device matrix remain required. Rail
+energy includes system activity and cannot establish app-exclusive mAh savings.
 
 To measure group creation separately, use the state-preserving runner with an
 explicit mutation argument. This creates ten persistent MLS groups:

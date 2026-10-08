@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.benchmark
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Process
 import android.os.SystemClock
 import android.util.Log
 import androidx.benchmark.macro.BaselineProfileMode
@@ -25,9 +28,8 @@ import org.junit.runner.RunWith
  *
  * The product never resolves to a true third "nothing" delivery mode (see
  * `NativePushDelivery.resolvedNotificationDeliveryMode`), so [idleWithDeliveryDisabledPower]
- * approximates the floor a user who disabled notifications entirely would see: push mode selected
- * (so the always-on local/keep-connected stream is off) with the OS notification permission
- * revoked.
+ * measures a controlled fixture floor: Push selected (so Local is off), the fixture FCM receiver
+ * disabled and notification permission revoked. Both platform overrides are restored afterward.
  */
 @RunWith(AndroidJUnit4::class)
 class BackgroundIdleBenchmark {
@@ -35,40 +37,49 @@ class BackgroundIdleBenchmark {
     val benchmarkRule = MacrobenchmarkRule()
 
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+    private val fixture = BackgroundFixtureGuard(device)
 
-    /** Floor baseline: push mode selected, OS notification permission revoked, app backgrounded. */
+    /** Fixture floor: Local off, FCM ingress disabled and permission revoked, with a live background process. */
     @Test
     fun idleWithDeliveryDisabledPower() {
+        fixture.requireForeground()
         val journeys = WhiteNoiseJourneys()
+        val permissionWasGranted = notificationPermissionGranted()
         try {
-            benchmarkRule.measureRepeated(
-                packageName = BenchmarkConfig.TARGET_PACKAGE,
-                metrics = idleMetrics(),
-                compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
-                iterations = IDLE_ITERATIONS,
-                setupBlock = {
-                    journeys.run { resumeToChatList() }
-                    journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Fcm)
-                    revokeNotificationPermission()
-                    // Revoking a granted runtime permission can kill the app's process; resume
-                    // and settle again so the measured window samples a live, backgrounded app
-                    // rather than one that never came back up after the revoke.
-                    journeys.run { resumeToChatList() }
-                    pressHome()
-                },
-                measureBlock = {
-                    device.sleep()
-                    SystemClock.sleep(idleWindowMs())
-                },
-            )
+            BackgroundPushReceiverControl(device).withReceiverDisabled {
+                benchmarkRule.measureRepeated(
+                    packageName = BenchmarkConfig.TARGET_PACKAGE,
+                    metrics = idleMetrics(),
+                    compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
+                    iterations = IDLE_ITERATIONS,
+                    setupBlock = {
+                        fixture.requireForeground()
+                        journeys.run { resumeToChatList() }
+                        journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Fcm)
+                        revokeNotificationPermission()
+                        // Revoking a granted runtime permission can kill the app's process; resume
+                        // and settle again so the measured window samples a live, backgrounded app
+                        // rather than one that never came back up after the revoke.
+                        journeys.run { resumeToChatList() }
+                        pressHome()
+                    },
+                    measureBlock = {
+                        device.sleep()
+                        val pid = fixture.requireScreenOffProcess()
+                        SystemClock.sleep(idleWindowMs())
+                        fixture.verify(pid)
+                    },
+                )
+            }
         } finally {
-            grantNotificationPermission()
+            restoreNotificationPermission(permissionWasGranted)
         }
     }
 
     /** Native push (Fcm) selected, idle in the background. */
     @Test
     fun idleWithNativePushPower() {
+        fixture.requireForeground()
         val journeys = WhiteNoiseJourneys()
         benchmarkRule.measureRepeated(
             packageName = BenchmarkConfig.TARGET_PACKAGE,
@@ -76,13 +87,16 @@ class BackgroundIdleBenchmark {
             compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
             iterations = IDLE_ITERATIONS,
             setupBlock = {
+                fixture.requireForeground()
                 journeys.run { resumeToChatList() }
                 journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Fcm)
                 pressHome()
             },
             measureBlock = {
                 device.sleep()
+                val pid = fixture.requireScreenOffProcess()
                 SystemClock.sleep(idleWindowMs())
+                fixture.verify(pid)
             },
         )
     }
@@ -90,6 +104,7 @@ class BackgroundIdleBenchmark {
     /** Local/keep-connected selected, idle in the background. */
     @Test
     fun idleWithKeepConnectedPower() {
+        fixture.requireForeground()
         val journeys = WhiteNoiseJourneys()
         benchmarkRule.measureRepeated(
             packageName = BenchmarkConfig.TARGET_PACKAGE,
@@ -97,13 +112,16 @@ class BackgroundIdleBenchmark {
             compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
             iterations = IDLE_ITERATIONS,
             setupBlock = {
+                fixture.requireForeground()
                 journeys.run { resumeToChatList() }
                 journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Local)
                 pressHome()
             },
             measureBlock = {
                 device.sleep()
+                val pid = fixture.requireScreenOffProcess()
                 SystemClock.sleep(idleWindowMs())
+                fixture.verify(pid)
             },
         )
     }
@@ -120,23 +138,37 @@ class BackgroundIdleBenchmark {
      */
     @Test
     fun pushBurstPower() {
+        fixture.requireForeground()
+        val expectedTexts = BenchmarkConfig.notificationTexts
+        require(expectedTexts.size >= 5 && expectedTexts.distinct().size == expectedTexts.size) {
+            "Pass at least five distinct disposable fixture texts in notificationTexts."
+        }
         val journeys = WhiteNoiseJourneys()
-        benchmarkRule.measureRepeated(
-            packageName = BenchmarkConfig.TARGET_PACKAGE,
-            metrics = idleMetrics(),
-            compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
-            iterations = BURST_ITERATIONS,
-            setupBlock = {
-                journeys.run { resumeToChatList() }
-                journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Fcm)
-                pressHome()
-            },
-            measureBlock = {
-                device.sleep()
-                Log.i(BURST_LOG_TAG, "Send the push burst now; observing for ${burstWindowMs()}ms.")
-                SystemClock.sleep(burstWindowMs())
-            },
-        )
+        val receipts = BackgroundDeliveryReceiptProbe(device, expectedTexts)
+        receipts.withListener {
+            benchmarkRule.measureRepeated(
+                packageName = BenchmarkConfig.TARGET_PACKAGE,
+                metrics = idleMetrics(),
+                compilationMode = CompilationMode.Partial(BaselineProfileMode.Require),
+                iterations = BURST_ITERATIONS,
+                setupBlock = {
+                    fixture.requireForeground()
+                    journeys.run { resumeToChatList() }
+                    journeys.setNotificationDeliveryMode(BenchmarkDeliveryMode.Fcm)
+                    receipts.requireFreshFixture()
+                    pressHome()
+                },
+                measureBlock = {
+                    device.sleep()
+                    val pid = fixture.requireScreenOffProcess()
+                    receipts.beginWindow(burstWindowMs())
+                    Log.i(BURST_LOG_TAG, "Send the push burst now; observing for ${burstWindowMs()}ms.")
+                    SystemClock.sleep(burstWindowMs())
+                    fixture.verify(pid)
+                    receipts.finishWindow()
+                },
+            )
+        }
     }
 
     /** The idle methods' sleep duration, overridable via `idleWindowMs` for a short smoke run. */
@@ -148,16 +180,30 @@ class BackgroundIdleBenchmark {
     /** Revokes POST_NOTIFICATIONS so the OS cannot surface anything during the disabled baseline. */
     private fun revokeNotificationPermission() {
         device.executeShellCommand(
-            "pm revoke ${BenchmarkConfig.TARGET_PACKAGE} android.permission.POST_NOTIFICATIONS",
+            "pm revoke --user ${fixtureUserId()} ${BenchmarkConfig.TARGET_PACKAGE} android.permission.POST_NOTIFICATIONS",
         )
     }
 
-    /** Restores the notification permission grant after the disabled-baseline iterations finish. */
-    private fun grantNotificationPermission() {
+    /** Reads the original fixture grant rather than assuming setup always started granted. */
+    private fun notificationPermissionGranted(): Boolean =
+        InstrumentationRegistry.getInstrumentation().context.packageManager.checkPermission(
+            Manifest.permission.POST_NOTIFICATIONS,
+            BenchmarkConfig.TARGET_PACKAGE,
+        ) == PackageManager.PERMISSION_GRANTED
+
+    /** Restores the exact original grant after success, failure or a permission-killed process. */
+    private fun restoreNotificationPermission(wasGranted: Boolean) {
+        val action = if (wasGranted) "grant" else "revoke"
         device.executeShellCommand(
-            "pm grant ${BenchmarkConfig.TARGET_PACKAGE} android.permission.POST_NOTIFICATIONS",
+            "pm $action --user ${fixtureUserId()} ${BenchmarkConfig.TARGET_PACKAGE} android.permission.POST_NOTIFICATIONS",
         )
+        check(notificationPermissionGranted() == wasGranted) {
+            "The fixture notification permission was not restored."
+        }
     }
+
+    /** Applies shell permission changes to this instrumentation's profile, never the Owner implicitly. */
+    private fun fixtureUserId(): Int = Process.myUid() / 100_000
 
     private companion object {
         // A genuinely slept screen re-engages a secure keyguard that `wm dismiss-keyguard`
