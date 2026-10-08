@@ -21,6 +21,15 @@ require_command() {
   fi
 }
 
+
+# Reject absent measurement bytes before counting a collected trace as evidence.
+require_nonempty_trace() {
+  if [[ ! -s "$1" ]]; then
+    echo "Benchmark trace is missing or empty: $1" >&2
+    return 1
+  fi
+}
+
 require_command jq
 require_command rg
 
@@ -776,6 +785,7 @@ done < <(find "$local_output" -type f -name '*-benchmarkData.json' -print)
 
 benchmark_trace_count=0
 while IFS= read -r trace; do
+  require_nonempty_trace "$trace"
   ((benchmark_trace_count += 1))
 done < <(find "$local_output" -type f \( -name '*.perfetto-trace' -o -name '*.trace' \) -print)
 

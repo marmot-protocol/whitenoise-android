@@ -203,5 +203,27 @@ adb_cmd() {
             ])
 
 
+class TraceEvidenceTest(unittest.TestCase):
+    """Reject missing and empty collected evidence before a runner can count it."""
+
+    def test_collected_trace_requires_actual_bytes(self):
+        """Exercise the actual Bash gate against missing, empty and populated output."""
+        root = Path(__file__).resolve().parents[1]
+        script = (root / "scripts/run-performance-benchmarks.sh").read_text()
+        function = re.search(r"^require_nonempty_trace\(\) \{\n.*?^\}", script, re.M | re.S).group(0)
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory) / "missing.perfetto-trace"
+            empty = Path(directory) / "empty.perfetto-trace"
+            populated = Path(directory) / "populated.perfetto-trace"
+            empty.touch()
+            populated.write_bytes(b"recorded-measurement-bytes")
+            for path, expected in ((missing, 1), (empty, 1), (populated, 0)):
+                with self.subTest(path=path.name):
+                    run = function + '\nrequire_nonempty_trace "$TRACE_EVIDENCE"\n'
+                    result = subprocess.run(["bash", "-c", run], env=dict(os.environ, TRACE_EVIDENCE=str(path)),
+                                            capture_output=True, text=True)
+                    self.assertEqual(result.returncode, expected, result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
