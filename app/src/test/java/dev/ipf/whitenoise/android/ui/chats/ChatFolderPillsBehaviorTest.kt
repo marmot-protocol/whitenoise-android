@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
+import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -25,6 +26,31 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ChatFolderPillsBehaviorTest {
     @get:Rule val composeRule = createComposeRule()
+
+    /** The untouched Chats default shares the scroll strip and can be edited; removed defaults expose All chats. */
+    @Test fun editableChatsHomeAndFallbackShareTheStrip() {
+        val home = ChatFolderChipModel("home", SystemFolderKind.CHATS, "", 0, unfilteredHome = true)
+        var chips by mutableStateOf(listOf(home) + folders())
+        var edited: String? = null
+        var selected by mutableStateOf<String?>(null)
+        composeRule.setContent {
+            WhiteNoiseTheme { Surface { ChatFolderPills(chips, selected, { selected = it }, { edited = it }, {}) } }
+        }
+        composeRule
+            .onNodeWithTag(CHAT_LIST_FILTER_CHIP_ALL_TAG)
+            .assertIsSelected()
+            .performSemanticsAction(SemanticsActions.OnLongClick)
+        assertEquals("home", edited)
+        composeRule.onNodeWithTag(CHAT_LIST_FILTER_CHIP_ALL_TAG).performClick()
+        assertEquals("home", selected)
+        composeRule.runOnIdle {
+            chips = chips.drop(1)
+            selected = "folder-9"
+        }
+        composeRule.onNodeWithTag(chatListFilterChipTag("folder-9")).assertIsDisplayed()
+        composeRule.runOnIdle { selected = null }
+        composeRule.onNodeWithTag(CHAT_LIST_FILTER_CHIP_ALL_TAG).assertIsDisplayed().assertIsSelected()
+    }
 
     /** Initially selected distant folder is revealed and explicit chats resets selection. */
     @Test fun initiallySelectedDistantFolderIsRevealedAndExplicitChatsResetsSelection() {
@@ -96,7 +122,7 @@ class ChatFolderPillsBehaviorTest {
         composeRule
             .onNodeWithTag(chatListFilterChipTag("folder-0"))
             .performSemanticsAction(SemanticsActions.OnLongClick)
-        composeRule.onNodeWithTag("chats.folders").performScrollToIndex(1)
+        composeRule.onNodeWithTag("chats.folders").performScrollToIndex(2)
         composeRule.onNodeWithTag("chats.manageFolders").performClick()
         assertEquals(listOf("current:folder-0"), edits)
         assertEquals(1, managed)

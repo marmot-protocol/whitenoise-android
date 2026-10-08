@@ -1,0 +1,165 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+  "legacy_sha256": "0a9bd3103b7352d55f64ce671d0136bbe2d8a1f640d45c556d0df989536b36ee",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GlobalSearchFilterControlsRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "fun GlobalSearchFilterControlsRow(",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "GlobalSearchFilterIconButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "fun GlobalSearchFilterIconButton(",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "GlobalSearchFilterMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "fun GlobalSearchFilterMenu(",
+        "test_ids": [
+          "FIND-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:archived",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.archived",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_filter_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_filter_groups",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_filter_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_filter_unread",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_chat_chip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_chat_chip",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_direct_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_direct_chats",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_filter_chat",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_chat_type",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_filter_chat_type",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_content",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_filter_content",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_date",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_filter_date",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_folders",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_filter_folders",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_filter_sender",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_filter_sender",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_folder_chip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_folder_chip",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_groups",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "string:chat_list_search_sender_chip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_sender_chip",
+        "test_ids": [
+          "FIND-001"
+        ]
+      },
+      {
+        "surface": "R.string.chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "FLD-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.chat_list_search_clear_all_filters",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterUi.kt",
+        "anchor": "R.string.chat_list_search_clear_all_filters",
+        "test_ids": [
+          "FIND-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

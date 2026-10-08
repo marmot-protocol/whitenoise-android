@@ -1,16 +1,20 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
+import androidx.activity.BackEventCompat
+import androidx.activity.ComponentActivity
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -26,7 +30,10 @@ import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.captureClickCallbackForReplay
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -38,7 +45,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36], qualifiers = "en")
 class ChatsScreenFolderSelectionRecompositionTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
@@ -49,6 +56,75 @@ class ChatsScreenFolderSelectionRecompositionTest {
             .edit()
             .clear()
             .commit()
+    }
+
+    /** Predictive cancellation preserves scope; committed Back unwinds the folder before leaving Chats. */
+    @Test fun folderBackUnwindsOnlyOnCommitAndRootCanExit() {
+        val appState = testAppState()
+        val controller = ChatsController(appState)
+        setControllerItems(controller, listOf(chatItem("g1")))
+        val folder = appState.chatFolderPreferences.createFolder(ACCOUNT_REF, "Work")!!
+        appState.chatFolderPreferences.setChatInFolder(ACCOUNT_REF, folder.id, "g1", true)
+        var selected by mutableStateOf<String?>(folder.id)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatsScreen(
+                    appState,
+                    controller,
+                    {},
+                    { _, _, _, _ -> },
+                    selectedFolderId = selected,
+                    onSelectFolder = { selected = it },
+                )
+            }
+        }
+        composeRule.runOnIdle {
+            val dispatcher = composeRule.activity.onBackPressedDispatcher
+            dispatcher.dispatchOnBackStarted(BackEventCompat(0f, 0f, 0f, BackEventCompat.EDGE_LEFT))
+            dispatcher.dispatchOnBackProgressed(BackEventCompat(40f, 0f, 0.5f, BackEventCompat.EDGE_LEFT))
+            dispatcher.dispatchOnBackCancelled()
+            assertEquals(folder.id, selected)
+            dispatcher.onBackPressed()
+            assertEquals(null, selected)
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { assertFalse(composeRule.activity.onBackPressedDispatcher.hasEnabledCallbacks()) }
+        controller.onCleared()
+    }
+
+    /** Exclude acts after menu dismissal; an old folder's captured command cannot affect a new selection. */
+    @Test fun exclusionUsesTheOpeningFolderAndRejectsStaleCapturedActions() {
+        val appState = testAppState()
+        val controller = ChatsController(appState)
+        setControllerItems(controller, listOf(chatItem("g1")))
+        val store = appState.chatFolderPreferences
+        val first = store.createFolder(ACCOUNT_REF, "First")!!
+        val second = store.createFolder(ACCOUNT_REF, "Second")!!
+        listOf(first, second).forEach { store.setChatInFolder(ACCOUNT_REF, it.id, "g1", true) }
+        var selected by mutableStateOf<String?>(first.id)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatsScreen(
+                    appState,
+                    controller,
+                    {},
+                    { _, _, _, _ -> },
+                    selectedFolderId = selected,
+                    onSelectFolder = { selected = it },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("chat.row.g1").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        val old = composeRule.onNodeWithTag("chat.action.ExcludeFolder").captureClickCallbackForReplay()
+        composeRule.runOnIdle { selected = second.id }
+        composeRule.runOnIdle { old() }
+        assertEquals(emptySet<String>(), store.excludedChats(ACCOUNT_REF, first.id))
+        assertEquals(emptySet<String>(), store.excludedChats(ACCOUNT_REF, second.id))
+        composeRule.onNodeWithTag("chat.row.g1").performSemanticsAction(SemanticsActions.OnLongClick) { it() }
+        composeRule.onNodeWithTag("chat.action.ExcludeFolder").performClick()
+        assertEquals(setOf("g1"), store.excludedChats(ACCOUNT_REF, second.id))
+        composeRule.onNodeWithTag("chat.row.g1").assertDoesNotExist()
+        controller.onCleared()
     }
 
     @Test

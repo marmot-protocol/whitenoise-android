@@ -6,9 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
@@ -80,10 +78,18 @@ internal fun ChatFolderPills(
             },
             label = "Selected folder background",
         ).value
-    val selectedIndex = selectedFolderId?.let { id -> chips.indexOfFirst { it.folderId == id } }?.coerceAtLeast(0) ?: 0
+    val home = chips.firstOrNull { it.unfilteredHome }
+    val showRoot = home == null
+    val selectedIndex =
+        (
+            if (selectedFolderId == null) {
+                if (showRoot) 0 else chips.indexOf(home)
+            } else {
+                chips.indexOfFirst { it.folderId == selectedFolderId } + if (showRoot) 1 else 0
+            }
+        ).coerceAtLeast(0)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = selectedIndex)
-    LaunchedEffect(selectedIndex, chips.map { it.folderId }) {
-        if (chips.isEmpty()) return@LaunchedEffect
+    LaunchedEffect(selectedIndex, showRoot, chips.map { it.folderId }) {
         val layout = listState.layoutInfo
         val selected = layout.visibleItemsInfo.firstOrNull { it.index == selectedIndex }
         if (selected == null ||
@@ -93,66 +99,61 @@ internal fun ChatFolderPills(
             listState.scrollToItem(selectedIndex)
         }
     }
-    Row(
-        modifier = modifier.fillMaxWidth().background(containerColor),
+    LazyRow(
+        state = listState,
+        modifier = modifier.fillMaxWidth().background(containerColor).testTag("chats.folders"),
+        contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.padding(start = WhiteNoiseSpacing.CompactScreenMargin)) {
-            ChatFolderPill(
-                stringResource(R.string.chats),
-                selectedFolderId == null,
-                CHAT_LIST_FILTER_CHIP_ALL_TAG,
-                selectedColor,
-                { onSelect(null) },
-                unreadMessageCount = chatsUnreadCount,
-            )
-        }
-        LazyRow(
-            state = listState,
-            modifier = Modifier.weight(1f).testTag("chats.folders"),
-            contentPadding =
-                PaddingValues(
-                    start = WhiteNoiseSpacing.Related,
-                    end = WhiteNoiseSpacing.CompactScreenMargin,
-                ),
-            horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            items(chips, key = { it.folderId }) { chip ->
+        if (showRoot) {
+            item(key = "scope:all") {
                 ChatFolderPill(
-                    label =
-                        chip.customLabel.ifEmpty {
-                            when (chip.systemKind) {
-                                SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
-                                SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
-                                SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
-                                null -> ""
-                            }
-                        },
-                    selected = selectedFolderId == chip.folderId,
-                    tag = chatListFilterChipTag(chip.folderId),
-                    selectedColor = selectedColor,
-                    onClick = { onSelect(chip.folderId) },
-                    onLongClick = { onEditFolder(chip.folderId) },
-                    trailingCount = chip.trailingCount,
+                    stringResource(R.string.folder_all_chats),
+                    selectedFolderId == null,
+                    CHAT_LIST_FILTER_CHIP_ALL_TAG,
+                    selectedColor,
+                    { onSelect(null) },
+                    unreadMessageCount = chatsUnreadCount,
                 )
             }
-            if (onFolders != null) {
-                item(key = "manage") {
-                    IconButton(
-                        onClick = onFolders,
-                        modifier =
-                            Modifier
-                                .minimumInteractiveComponentSize()
-                                .size(FOLDER_MANAGER_BUTTON_SIZE)
-                                .testTag("chats.manageFolders"),
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.ic_bookmark_manager),
-                            stringResource(R.string.manage_folders),
-                            Modifier.size(FOLDER_MANAGER_ICON_SIZE),
-                        )
-                    }
+        }
+        items(chips, key = { it.folderId }) { chip ->
+            ChatFolderPill(
+                label =
+                    chip.customLabel.ifEmpty {
+                        when (chip.systemKind) {
+                            SystemFolderKind.CHATS -> stringResource(R.string.chats)
+                            SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
+                            SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
+                            SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
+                            null -> ""
+                        }
+                    },
+                selected = selectedFolderId == chip.folderId || (selectedFolderId == null && chip.unfilteredHome),
+                tag = if (chip.unfilteredHome) CHAT_LIST_FILTER_CHIP_ALL_TAG else chatListFilterChipTag(chip.folderId),
+                selectedColor = selectedColor,
+                onClick = { onSelect(chip.folderId) },
+                onLongClick = { onEditFolder(chip.folderId) },
+                trailingCount = chip.trailingCount,
+                unreadMessageCount = if (chip.unfilteredScope) chatsUnreadCount else null,
+            )
+        }
+        if (onFolders != null) {
+            item(key = "manage") {
+                IconButton(
+                    onClick = onFolders,
+                    modifier =
+                        Modifier
+                            .minimumInteractiveComponentSize()
+                            .size(FOLDER_MANAGER_BUTTON_SIZE)
+                            .testTag("chats.manageFolders"),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_bookmark_manager),
+                        stringResource(R.string.manage_folders),
+                        Modifier.size(FOLDER_MANAGER_ICON_SIZE),
+                    )
                 }
             }
         }

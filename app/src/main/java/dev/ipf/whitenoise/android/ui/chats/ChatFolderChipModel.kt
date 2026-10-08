@@ -19,8 +19,8 @@ internal suspend fun ChatsController.returnSmartFolderWindowsToTop() {
 }
 
 /**
- * One renderable chat-list chip. `All` is not modeled here: it is the
- * permanent reset state the row always renders first, not a real folder.
+ * One configured folder chip. The unchanged Chats configuration can also represent
+ * the unfiltered root, avoiding a duplicate All chats chip until Chats changes.
  * [customLabel] is the stored folder name; when empty and [systemKind] is
  * set, the chip renders that default's localized label instead.
  */
@@ -30,6 +30,8 @@ internal data class ChatFolderChipModel(
     val customLabel: String,
     val trailingCount: Int,
     val pending: Boolean = false,
+    val unfilteredHome: Boolean = false,
+    val unfilteredScope: Boolean = unfilteredHome,
 )
 
 /**
@@ -50,6 +52,7 @@ internal fun chatFolderChipModels(
     membershipOf: (folderId: String) -> Set<String>,
     pendingFolderIds: Set<String> = emptySet(),
     selectedFolderId: String? = null,
+    excludedOf: (String) -> Set<String> = { emptySet() },
 ): List<ChatFolderChipModel> =
     folders
         .sortedBy { it.order }
@@ -78,6 +81,15 @@ internal fun chatFolderChipModels(
                     customLabel = folder.name,
                     trailingCount = unreadCount,
                     pending = pending,
+                    unfilteredHome =
+                        folder.systemKind == SystemFolderKind.CHATS &&
+                            ruleOf(folder.id) == ChatFolderRule(includeAll = true, includeMuted = true) &&
+                            folder.sort == dev.ipf.whitenoise.android.state.ChatFolderSort.RECENT &&
+                            excludedOf(folder.id).isEmpty(),
+                    unfilteredScope =
+                        folder.systemKind == SystemFolderKind.CHATS &&
+                            ruleOf(folder.id) == ChatFolderRule(includeAll = true, includeMuted = true) &&
+                            excludedOf(folder.id).isEmpty(),
                 )
             }
         }
