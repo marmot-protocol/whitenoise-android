@@ -136,8 +136,10 @@ class DisposableCredential:
         return row
 
 
-def accepted_unlock(output, pid):
+def accepted_unlock(output, pid, successes=1):
     """Real app callback markers certify cipher/session acceptance, never arbitrary log text."""
+    if type(successes) is not int or successes not in (1, 2):
+        raise ValueError('Known credential success count required')
     if type(pid) is not int or pid <= 0:
         raise ValueError('Matching native process identity required')
     events = []
@@ -149,17 +151,29 @@ def accepted_unlock(output, pid):
                 events.append(fields)
     cancelled = [row for row in events if row.get('event') == 'prompt-terminated']
     succeeded = [row for row in events if row.get('event') == 'prompt-succeeded']
-    if (len(cancelled) != 1 or len(succeeded) != 1
-            or int(succeeded[0]['session']) <= int(cancelled[0]['session'])
-            or events.index(succeeded[0]) <= events.index(cancelled[0])
-            or cancelled[0]['activity'] != succeeded[0]['activity']):
+    launched = [row for row in events if row.get('event') == 'prompt-launched']
+    expected = list(range(1, successes + 2))
+    if (len(cancelled) != 1 or int(cancelled[0]['session']) != 1
+            or len(succeeded) != successes or [int(row['session']) for row in succeeded] != expected[1:]
+            or [int(row['session']) for row in launched] != expected
+            or len({row['activity'] for row in cancelled + succeeded + launched}) != 1):
         raise ValueError('Missing matching real cancellation and accepted crypto/session retry')
-    return {'cancelledSession': int(cancelled[0]['session']), 'acceptedSession': int(succeeded[0]['session']),
+    terminals = cancelled + succeeded
+    for index, (launch, terminal) in enumerate(zip(launched, terminals)):
+        if events.index(launch) >= events.index(terminal):
+            raise ValueError('Accepted callback preceded its actual prompt')
+        if index and events.index(launch) <= events.index(terminals[index - 1]):
+            raise ValueError('Another prompt launched before the preceding session terminated')
+    if events.index(cancelled[0]) >= events.index(succeeded[0]):
+        raise ValueError('Retry succeeded before the actual cancellation')
+    return {'cancelledSession': 1, 'acceptedSession': expected[-1], 'acceptedSessions': expected[1:],
             'acceptedCryptoSession': True, 'pid': pid}
 
 
 def credential_state(ready, verified, postcondition):
     """Require typed native cancellation/window evidence, ordered cover rotation and unlocked state."""
+    disabled = postcondition == 'app-lock-credential-warm-disabled'
+    delay_picker = postcondition == 'app-lock-credential-delay'
     evidence = verified.get('credentialEvidence')
     if (ready.get('appLockFixtureCredential') is not True or verified.get('appLockVerified') is not True
             or type(ready.get('nativePid')) is not int or ready['nativePid'] <= 0
@@ -169,7 +183,9 @@ def credential_state(ready, verified, postcondition):
             or evidence['rotatedCover'] != (postcondition == 'app-lock-credential-rotation')
             or any(type(evidence.get(key)) is not int or evidence[key] <= 0
                    for key in ('cancelledSession', 'acceptedSession'))
-            or evidence['acceptedSession'] <= evidence['cancelledSession']):
+            or evidence['cancelledSession'] != 1 or evidence['acceptedSession'] != (3 if disabled else 2)
+            or type(evidence.get('disabledWarmReturn')) is not bool or evidence['disabledWarmReturn'] != disabled
+            or type(evidence.get('delayChoicesVerified')) is not bool or evidence['delayChoicesVerified'] != delay_picker):
         raise ValueError('Missing typed native credential/window/session proof')
     rows = evidence.get('observations')
     if not isinstance(rows, list) or not 2 <= len(rows) <= 128:
@@ -179,6 +195,9 @@ def credential_state(ready, verified, postcondition):
                 for key in ('cover', 'secure', 'cancelled', 'evaluating', 'required', 'available'))
                 or type(row.get('latestSession')) is not int or row['latestSession'] < 0
                 or type(row.get('orientation')) is not int or row['orientation'] not in (1, 2)
+                or row.get('delay') not in ('immediately', '1m', '5m', '15m')
+                or 'storedDelay' not in row or row['storedDelay'] not in (None, 'immediately', '1m', '5m', '15m')
+                or row.get('lifecycle') not in ('INITIALIZED', 'CREATED', 'STARTED', 'RESUMED', 'DESTROYED')
                 or 'activeSession' not in row or (row['activeSession'] is not None
                                                  and type(row['activeSession']) is not int)):
             raise ValueError('Malformed native app-lock observation')
@@ -195,9 +214,27 @@ def credential_state(ready, verified, postcondition):
             raise ValueError('Missing ordered secure cover rotation/return')
     final = rows[-1]
     if (final['cover'] or final['evaluating'] or final['cancelled'] or final['activeSession'] is not None
-            or not final['required'] or not final['available']
+            or final['required'] is not (not disabled) or not final['available']
+            or final['delay'] != ('15m' if delay_picker else 'immediately')
+            or final['storedDelay'] != ('15m' if delay_picker else None)
             or final['latestSession'] != evidence['acceptedSession']):
         raise ValueError('Final state did not accept the actual retry')
+    if disabled:
+        disabled_rows = [row for row in rows if not row['required'] and row['latestSession'] == 3]
+        if any(row['cover'] or row['activeSession'] is not None for row in disabled_rows):
+            raise ValueError('Disabled app exposed a new lock/session')
+        stopped = [index for index, row in enumerate(disabled_rows) if row['lifecycle'] == 'CREATED']
+        if not stopped or not any(row['lifecycle'] == 'RESUMED' for row in disabled_rows[stopped[0] + 1:]):
+            raise ValueError('Actual disabled warm lifecycle was not observed')
+    if delay_picker:
+        previous = -1
+        for value in ('immediately', '1m', '5m', '15m'):
+            matching = [index for index, row in enumerate(rows)
+                        if index > previous and row['required'] and row['delay'] == value
+                        and row['storedDelay'] == value]
+            if not matching:
+                raise ValueError('Actual ordered delay choices were not persisted')
+            previous = matching[0]
     return evidence
 
 
@@ -222,7 +259,8 @@ def qualify_credential(leaf, generation, ready, verified, postcondition):
     observed = probe_record(regular_text(leaf / 'credential-probe-restored.txt'), generation, 'restored')
     if {key: value for key, value in restored.items() if key != 'credentialRestored'} != observed:
         raise ValueError('Restoration differs from completed native OS readback')
-    trace = accepted_unlock(regular_text(leaf / 'app-unlock-trace.txt'), ready['nativePid'])
+    trace = accepted_unlock(regular_text(leaf / 'app-unlock-trace.txt'), ready['nativePid'],
+                            2 if postcondition == 'app-lock-credential-warm-disabled' else 1)
     if any(trace[key] != from_record[key] for key in ('cancelledSession', 'acceptedSession')):
         raise ValueError('Native observation and actual callback disagree')
     if json.loads(regular_text(leaf / 'credential-accepted.json')) != {'generation': generation, **trace}:

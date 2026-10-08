@@ -64,6 +64,8 @@ private val MAESTRO_POSTCONDITIONS =
         "app-lock-unavailable",
         "app-lock-credential-retry",
         "app-lock-credential-rotation",
+        "app-lock-credential-warm-disabled",
+        "app-lock-credential-delay",
         "accounts-retained",
         "account-action-signed-out",
         "account-action-wiped",
@@ -211,7 +213,10 @@ class MaestroRuntimeHostTest {
                             postcondition,
                         )
                     val appLockFixtureCredential = requireMaestroSyntheticCredential(context, app, postcondition)
-                    if (appLockFixtureCredential) credentialJournal = MaestroCredentialJournal()
+                    if (appLockFixtureCredential) {
+                        credentialJournal =
+                            MaestroCredentialJournal(context.getSharedPreferences(directory.name, Context.MODE_PRIVATE))
+                    }
                     editorBaselines = captureMaestroEditorBaselines(native, app, postcondition)
                     accountActionBaseline = captureMaestroAccountAction(native, app, group, postcondition)
                     if (postcondition.startsWith("message-") || requiresMaestroAccountRetentionProof(postcondition)) {
@@ -284,7 +289,6 @@ class MaestroRuntimeHostTest {
                     credentialJournal?.verify(
                         context,
                         checkNotNull(state),
-                        context.getSharedPreferences(directory.name, Context.MODE_PRIVATE),
                         checkNotNull(postcondition),
                     )
                 val appLockVerified =

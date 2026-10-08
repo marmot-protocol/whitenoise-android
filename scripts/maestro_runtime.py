@@ -180,7 +180,8 @@ def run_fixture(name, directory, generation):
                     observed = credential_state(ready, verified, CASES[name]['postcondition'])
                     trace = command(adb + ['logcat', '-d', '-v', 'threadtime', 'WNAppUnlock:I', '*:S'])
                     (directory / 'app-unlock-trace.txt').write_text(trace[-256000:])
-                    proof = accepted_unlock(trace, ready.get('nativePid'))
+                    proof = accepted_unlock(trace, ready.get('nativePid'),
+                                            2 if CASES[name]['postcondition'] == 'app-lock-credential-warm-disabled' else 1)
                     if any(proof.get(key) != observed.get(key) for key in ('cancelledSession', 'acceptedSession')):
                         raise ValueError('Native observation and real app callback disagree')
                     (directory / 'credential-accepted.json').write_text(

@@ -36,13 +36,16 @@ internal fun requireMaestroSyntheticCredential(
 }
 
 /** Bounded passive state/window samples; these do not certify frame-by-frame flash or Recents protection. */
-internal class MaestroCredentialJournal {
+internal class MaestroCredentialJournal(
+    private val preferences: SharedPreferences,
+) {
     private val observations = mutableListOf<JSONObject>()
 
     suspend fun observe(
         state: WhiteNoiseAppState,
         activity: MainActivity,
     ) {
+        val storedDelay = preferences.getString("app_lock_delay", null)
         val row =
             withContext(Dispatchers.Main.immediate) {
                 JSONObject()
@@ -53,6 +56,9 @@ internal class MaestroCredentialJournal {
                     .put("latestSession", state.appUnlockSessions.latestSessionId)
                     .put("required", state.requireAppUnlock)
                     .put("available", state.appLockCredentialAvailable)
+                    .put("delay", state.appLockDelay.preferenceValue)
+                    .put("storedDelay", storedDelay ?: JSONObject.NULL)
+                    .put("lifecycle", activity.lifecycle.currentState.name)
                     .put("orientation", activity.resources.configuration.orientation)
                     .put("secure", activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
             }
@@ -65,29 +71,37 @@ internal class MaestroCredentialJournal {
     suspend fun verify(
         context: Context,
         state: WhiteNoiseAppState,
-        preferences: SharedPreferences,
         postcondition: String,
     ): JSONObject {
         requireMaestroSyntheticCredential(context, state, postcondition)
         val cancelled = observations.indexOfFirst(::cancelledSecure)
         check(cancelled >= 0) { "No actual secure cancellation cover observed" }
         if (postcondition == "app-lock-credential-rotation") verifyRotation(cancelled)
+        val disabled = postcondition == "app-lock-credential-warm-disabled"
+        val delayPicker = postcondition == "app-lock-credential-delay"
+        val expectedDelay = if (delayPicker) AppLockDelay.FifteenMinutes else AppLockDelay.Immediately
         val final = checkNotNull(observations.lastOrNull())
         check(!final.getBoolean("cover") && !final.getBoolean("evaluating"))
-        check(final.isNull("activeSession") && final.getBoolean("required") && final.getBoolean("available"))
+        check(final.isNull("activeSession") && final.getBoolean("available"))
+        check(final.getBoolean("required") == !disabled)
         check(final.getLong("latestSession") > observations[cancelled].getLong("latestSession"))
+        if (disabled) verifyDisabledWarmReturn(final.getLong("latestSession"))
+        if (delayPicker) verifyDelayChoices()
         withContext(Dispatchers.Main.immediate) {
             check(state.appUnlockError == null)
-            check(state.appLockDelay == AppLockDelay.Immediately)
+            check(state.appLockDelay == expectedDelay)
         }
-        check(preferences.getBoolean("require_app_unlock", false))
-        check(preferences.getString("app_lock_delay", null) == null)
+        check(preferences.getBoolean("require_app_unlock", false) == !disabled)
+        val persistedDelay = preferences.getString("app_lock_delay", null)
+        check(persistedDelay == if (delayPicker) expectedDelay.preferenceValue else null)
         return JSONObject()
             .put("cancelledSecure", true)
             .put("rotatedCover", postcondition == "app-lock-credential-rotation")
             .put("cancelledSession", observations[cancelled].getLong("latestSession"))
             .put("acceptedSession", final.getLong("latestSession"))
             .put("acceptedState", true)
+            .put("disabledWarmReturn", disabled)
+            .put("delayChoicesVerified", delayPicker)
             .put("observations", JSONArray(observations))
     }
 
@@ -109,5 +123,29 @@ internal class MaestroCredentialJournal {
                     row.getInt("orientation") == Configuration.ORIENTATION_PORTRAIT
             },
         ) { "Cancelled secure portrait cover was not restored" }
+    }
+
+    private fun verifyDisabledWarmReturn(session: Long) {
+        check(session == 3L) { "Immediate warm return did not authenticate exactly once" }
+        val disabled = observations.filter { !it.getBoolean("required") && it.getLong("latestSession") == session }
+        check(disabled.isNotEmpty())
+        check(disabled.none { it.getBoolean("cover") || !it.isNull("activeSession") })
+        val stopped = disabled.indexOfFirst { it.getString("lifecycle") == "CREATED" }
+        check(stopped >= 0) { "Disabled app was not actually backgrounded" }
+        check(disabled.drop(stopped + 1).any { it.getString("lifecycle") == "RESUMED" }) {
+            "Disabled app did not actually return to foreground"
+        }
+    }
+
+    private fun verifyDelayChoices() {
+        var previous = -1
+        for (value in AppLockDelay.entries.map { it.preferenceValue }) {
+            val index =
+                observations.withIndex().firstOrNull { (index, row) ->
+                    val matches = row.getString("delay") == value && row.getString("storedDelay") == value
+                    index > previous && row.getBoolean("required") && matches
+                }?.index
+            previous = checkNotNull(index) { "Actual persisted delay choice was not observed: $value" }
+        }
     }
 }

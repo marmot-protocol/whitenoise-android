@@ -35,13 +35,16 @@ class MaestroCredentialProbeTest {
             strong == BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE ||
                 strong == BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED
         val keyguard = checkNotNull(context.getSystemService(KeyguardManager::class.java))
+        check(UserHandle.getUserHandleForUid(Process.myUid()) == UserHandle.getUserHandleForUid(0)) {
+            "Disposable credential fixture requires the actual primary Android user"
+        }
         val row =
             JSONObject()
                 .put("schema", 1)
                 .put("generation", generation)
                 .put("stage", stage)
                 .put("package", context.packageName)
-                .put("user", UserHandle.getUserHandleForUid(Process.myUid()).identifier)
+                .put("user", 0) // The public UserHandle equality check above independently proves user zero.
                 .put("sdk", Build.VERSION.SDK_INT)
                 .put("qemu", true) // requireMaestroEmulator independently checked the actual property.
                 .put("secure", keyguard.isDeviceSecure)

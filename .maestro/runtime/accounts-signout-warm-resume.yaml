@@ -19,12 +19,12 @@ name: accounts-signout-warm-resume
 - runFlow: ../fixtures/open-signout-sheet.yaml
 - assertVisible:
     id: profile_keys.signout_invitation_keys
-    selected: true
+    checked: true
 - tapOn:
     id: profile_keys.signout_invitation_keys
 - assertVisible:
     id: profile_keys.signout_invitation_keys
-    selected: false
+    checked: false
 - tapOn:
     text: ^Sign Out$
     below: Remove invitation keys from relays

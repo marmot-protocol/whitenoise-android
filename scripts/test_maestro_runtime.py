@@ -1287,6 +1287,23 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 self.assertTrue(case['assertions'])
                 self.assertTrue(set(case['manual_ids']) <= set(ids), case['manual_ids'])
 
+    def test_switch_assertions_use_checked_accessibility_state(self):
+        """Regression: selected is not Android switch state and can prevent actual teardown."""
+        paths = [('.maestro/fixtures/assert-no-credential-privacy.yaml', [False]),
+                 ('.maestro/runtime/accounts-signout-keep-invitations.yaml', [True, False]),
+                 ('.maestro/runtime/accounts-signout-warm-resume.yaml', [True, False])]
+        for path, expected in paths:
+            _, commands = list(yaml.safe_load_all((runtime.ROOT / path).read_text()))
+            states = []
+            for command in commands:
+                node = command.get('assertVisible') if isinstance(command, dict) else None
+                if isinstance(node, dict) and (node.get('id') == 'profile_keys.signout_invitation_keys'
+                                              or node.get('text') == 'Require device authentication'):
+                    self.assertNotIn('selected', node)
+                    self.assertIs(type(node.get('checked')), bool)
+                    states.append(node['checked'])
+            self.assertEqual(states, expected)
+
     def test_settings_entry_uses_real_multi_identity_selector(self):
         """Regress the hosted tree where the avatar says Switch Profile rather than Open settings."""
         helper = (runtime.ROOT / '.maestro/fixtures/open-settings.yaml').read_text()
@@ -1433,14 +1450,16 @@ class CredentialControlTest(unittest.TestCase):
     def evidence(self, rotated=False):
         cancelled = {'cover': True, 'secure': True, 'cancelled': True, 'evaluating': False,
                      'activeSession': None, 'latestSession': 1, 'required': True,
-                     'available': True, 'orientation': 1}
+                     'available': True, 'orientation': 1, 'delay': 'immediately',
+                     'storedDelay': None, 'lifecycle': 'RESUMED'}
         final = {**cancelled, 'cover': False, 'cancelled': False, 'latestSession': 2}
         rows = [cancelled]
         if rotated:
             rows.extend([{**cancelled, 'orientation': 2}, dict(cancelled)])
         rows.append(final)
         return {'cancelledSecure': True, 'rotatedCover': rotated, 'cancelledSession': 1,
-                'acceptedSession': 2, 'acceptedState': True, 'observations': rows}
+                'acceptedSession': 2, 'acceptedState': True, 'disabledWarmReturn': False,
+                'delayChoicesVerified': False, 'observations': rows}
 
     def test_native_probe_requires_completed_exact_typed_os_observation(self):
         from scripts import maestro_credential as credential
@@ -1651,6 +1670,95 @@ class CredentialControlTest(unittest.TestCase):
             validate_credential_platform('runtime-navigation', api)
         workflow = (runtime.ROOT / '.github/workflows/android-instrumented.yml').read_text()
         self.assertIn('maestro_runtime_selection "$SELECTED" "$ANDROID_API"', workflow)
+
+    def test_warm_disabling_needs_real_second_pin_and_ordered_disabled_lifecycle(self):
+        from scripts import maestro_credential as credential
+        ready = {'appLockFixtureCredential': True, 'nativePid': 456}
+        evidence = self.evidence()
+        final = {**evidence['observations'][-1], 'latestSession': 3, 'required': False}
+        evidence.update(acceptedSession=3, disabledWarmReturn=True)
+        evidence['observations'].extend([{**final, 'lifecycle': 'CREATED'}, final])
+        verified = {'appLockVerified': True, 'credentialEvidence': evidence}
+        credential.credential_state(ready, verified, 'app-lock-credential-warm-disabled')
+        trace = self.trace() + '\n' + '\n'.join([
+            '10-08 12:00:01.001  456  789 I WNAppUnlock: activity=10 session=3 event=prompt-launched',
+            '10-08 12:00:02.001  456  789 I WNAppUnlock: activity=10 session=3 event=prompt-succeeded'])
+        self.assertEqual(credential.accepted_unlock(trace, 456, 2)['acceptedSessions'], [2, 3])
+        for output, count in [(trace, 1), (self.trace(), 2), (trace, True),
+                              (trace.replace('3 event=prompt-launched', '2 event=prompt-launched'), 2)]:
+            with self.subTest(output=output, count=count), self.assertRaises(ValueError):
+                credential.accepted_unlock(output, 456, count)
+        interleaved = trace.splitlines()
+        interleaved[3], interleaved[4] = interleaved[4], interleaved[3]
+        with self.assertRaisesRegex(ValueError, 'preceding session'):
+            credential.accepted_unlock('\n'.join(interleaved), 456, 2)
+        for key, value in [('disabledWarmReturn', False), ('disabledWarmReturn', 1), ('acceptedSession', 2)]:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                credential.credential_state(ready, {**verified, 'credentialEvidence': {
+                    **evidence, key: value}}, 'app-lock-credential-warm-disabled')
+        for deleted in (-1, -2):
+            altered = json.loads(json.dumps(evidence))
+            altered['observations'].pop(deleted)
+            with self.subTest(deleted=deleted), self.assertRaises(ValueError):
+                credential.credential_state(ready, {**verified, 'credentialEvidence': altered},
+                                            'app-lock-credential-warm-disabled')
+        altered = json.loads(json.dumps(evidence))
+        altered['observations'][-2]['cover'] = True
+        with self.assertRaisesRegex(ValueError, 'new lock/session'):
+            credential.credential_state(ready, {**verified, 'credentialEvidence': altered},
+                                        'app-lock-credential-warm-disabled')
+
+    def test_delay_picker_requires_all_explicit_persisted_choices_in_order(self):
+        from scripts import maestro_credential as credential
+        ready = {'appLockFixtureCredential': True, 'nativePid': 456}
+        evidence = self.evidence()
+        final = evidence['observations'][-1]
+        evidence.update(delayChoicesVerified=True)
+        evidence['observations'].extend([{**final, 'delay': value, 'storedDelay': value}
+                                        for value in ('immediately', '1m', '5m', '15m')])
+        verified = {'appLockVerified': True, 'credentialEvidence': evidence}
+        credential.credential_state(ready, verified, 'app-lock-credential-delay')
+        for removed in range(2, 6):
+            altered = json.loads(json.dumps(evidence))
+            altered['observations'].pop(removed)
+            with self.subTest(removed=removed), self.assertRaises(ValueError):
+                credential.credential_state(ready, {**verified, 'credentialEvidence': altered},
+                                            'app-lock-credential-delay')
+        for index, key, value in [(2, 'storedDelay', None), (3, 'storedDelay', '5m'),
+                                  (-1, 'storedDelay', None), (-1, 'delay', '1m'),
+                                  (-1, 'lifecycle', True)]:
+            altered = json.loads(json.dumps(evidence))
+            altered['observations'][index][key] = value
+            with self.subTest(index=index, key=key), self.assertRaises(ValueError):
+                credential.credential_state(ready, {**verified, 'credentialEvidence': altered},
+                                            'app-lock-credential-delay')
+        with self.assertRaises(ValueError):
+            credential.credential_state(ready, {**verified, 'credentialEvidence': {
+                **evidence, 'delayChoicesVerified': 1}}, 'app-lock-credential-delay')
+
+    def test_app_lock_extended_flows_reuse_real_pin_controls_without_state_or_clock_injection(self):
+        root = runtime.ROOT / '.maestro'
+        warm = (root / 'runtime/app-lock-credential-warm-resume-disable.yaml').read_text()
+        self.assertEqual(warm.count('runFlow: ../fixtures/runtime-warm-resume.yaml'), 2)
+        self.assertIn('runFlow: ../fixtures/enter-device-pin.yaml', warm)
+        self.assertEqual(runtime.CASES['app-lock-credential-warm-resume-disable']['manual_ids'],
+                         ['SEC-002', 'SEC-004', 'NAV-010'])
+        delay = (root / 'runtime/app-lock-credential-delay-picker-return.yaml').read_text()
+        for label in ('Immediately', 'After 1 minute', 'After 5 minutes', 'After 15 minutes'):
+            self.assertIn(label, delay)
+        self.assertIn('LANDSCAPE_LEFT', delay)
+        self.assertIn('PORTRAIT', delay)
+        self.assertEqual(delay.count('- tapOn: Cancel'), 2)
+        commands = list(yaml.safe_load_all(delay))[1]
+        self.assertTrue(any('assertNotVisible' in command and command['assertNotVisible'] == 'Cancel'
+                            for command in commands if isinstance(command, dict)))
+        for text in (warm, delay):
+            for forbidden in ('clearState:', 'runScript:', 'evalScript:', 'stopApp:', 'setAppLockDelay',
+                              'credentialAvailableOverride', 'markAppUnlockSucceeded'):
+                if forbidden == 'stopApp:':
+                    self.assertNotIn('stopApp: true', text)
+                else:
+                    self.assertNotIn(forbidden, text)
 
     def test_restoration_commands_share_a_bounded_deadline(self):
         from scripts import maestro_credential as credential

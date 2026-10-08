@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- scrollUntilVisible:
+    element:
+      text: '^After 15 minutes$'
+    direction: DOWN
+- assertVisible:
+    text: '^After 15 minutes$'
+    checked: true
+- assertVisible: Cancel

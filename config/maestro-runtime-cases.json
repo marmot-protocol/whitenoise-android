@@ -3127,6 +3127,25 @@
       ],
       "assertions": "Cancel actual Android PIN authentication on a generation-owned disposable API34 AVD, rotate the cancelled opaque app cover to landscape and back, require the error, Retry and hidden protected UI in both orientations, then perform a real PIN retry. Ordered native samples require the secure cancelled cover in both orientations and a later unlocked session; actual accepted crypto/session markers, enabled preference, three identities, both original messages and independently restored OS credential baseline are mandatory. Rotation of the cancelled app cover does not claim rotation/recreation of the pending Android prompt, frame-by-frame flash, Recents or full manual acceptance.",
       "postcondition": "app-lock-credential-rotation"
+    },
+    "app-lock-credential-warm-resume-disable": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-002",
+        "SEC-004",
+        "NAV-010"
+      ],
+      "postcondition": "app-lock-credential-warm-disabled",
+      "assertions": "After real PIN cancellation/retry, Home and warm foreground return with the generated host alive must demand another actual PIN and restore Chats. Disable through the production switch, require the unchecked state and absent Auto-lock, then Home and warm return with Chats visible and no app/system PIN cover. Native samples require exactly the second accepted retry, disabled state, real stopped/foreground lifecycle without a newer session, false persisted requirement, original accounts/messages, process-bound accepted cipher callbacks and owned-PIN OS restoration. No process-death, delay-boundary, notification or frame-by-frame claim."
+    },
+    "app-lock-credential-delay-picker-return": {
+      "suite": "app-lock",
+      "manual_ids": [
+        "SEC-003",
+        "NAV-009"
+      ],
+      "postcondition": "app-lock-credential-delay",
+      "assertions": "After real PIN cancellation/retry, select Immediately and After1/5/15 minutes in the actual Auto-lock picker, reopen each selected radio, cancel and rotate the final picker landscape/portrait without mutation, then return to Chats. Independent native samples require all four explicit stored preference values in order and the final15m production state/store, alongside accepted cipher retry, accounts/original messages and owned-PIN OS restoration. This selects and persists every delay; it does not qualify elapsed delay boundaries, process recreation, routed notifications or full SEC003."
     }
   }
 }
