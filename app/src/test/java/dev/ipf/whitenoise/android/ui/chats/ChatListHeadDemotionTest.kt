@@ -474,6 +474,7 @@ class ChatListHeadDemotionTest {
         assertEquals(0f, rowTop("B"), 0.5f)
     }
 
+    /** Rapid transactions retain the visible domain row while its index changes with the pinned order. */
     @Test
     @Suppress("LongMethod")
     fun rapidPinUnpinSettlesOnceAtAuthoritativeOrder() {
@@ -533,11 +534,16 @@ class ChatListHeadDemotionTest {
         }
         composeRule.runOnIdle { }
         composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle { }
         lateinit var secondTransaction: ChatListHeadDemotion
         composeRule.runOnUiThread {
             secondTransaction = listStateHolder[0]!!.headDemotion("A", 2L, itemIds)
             demotion = secondTransaction
         }
+        val secondAnchor = requireNotNull(secondTransaction.viewportAnchor)
+        assertEquals("B", secondAnchor.chatId)
+        assertEquals(1, secondAnchor.firstVisibleItemIndex)
+        assertEquals(7, secondAnchor.firstVisibleItemScrollOffset)
         composeRule.runOnIdle { }
         composeRule.runOnUiThread {
             itemIds = listOf("B", "C", "A") + tail
@@ -555,12 +561,18 @@ class ChatListHeadDemotionTest {
 
         assertEquals(listOf(1L, 2L), consumedTransactions)
         assertEquals(0, correctionStarts)
+        // B moves from index 1 to 0 when A leaves the pinned head. Preserve B,
+        // not its obsolete index or the still-painted outgoing animation row.
+        assertEquals(0, listStateHolder[0]!!.firstVisibleItemIndex)
         assertEquals(
-            secondTransaction.viewportAnchor?.firstVisibleItemIndex,
-            listStateHolder[0]!!.firstVisibleItemIndex,
+            secondAnchor.chatId,
+            listStateHolder[0]!!
+                .layoutInfo.visibleItemsInfo
+                .first { it.index == 0 }
+                .key,
         )
         assertEquals(
-            secondTransaction.viewportAnchor?.firstVisibleItemScrollOffset,
+            secondAnchor.firstVisibleItemScrollOffset,
             listStateHolder[0]!!.firstVisibleItemScrollOffset,
         )
         assertTrue(rowTop("A") > anchoredTop + 1f)

@@ -2,7 +2,8 @@ package dev.ipf.whitenoise.android.ui.group
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -31,12 +32,15 @@ class ConversationNotificationSoundSheetTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** Group alerts remain reachable after closing and reopening the prepared sound drawer. */
     @Test
     fun groupSettingsOpenAndCloseSoundDrawer() = checkSheetFlow(isDm = false)
 
+    /** Direct-message settings use the same repeatable sound-drawer dismissal path. */
     @Test
     fun directSettingsOpenAndCloseSoundDrawer() = checkSheetFlow(isDm = true)
 
+    /** Exercises real settings entry points, including a fresh category load on each opening. */
     private fun checkSheetFlow(isDm: Boolean) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appState = testAppState(context)
@@ -59,17 +63,34 @@ class ConversationNotificationSoundSheetTest {
                 )
             }
         }
+        val primary = if (isDm) NotificationChannelSpec.DIRECT_MESSAGES else NotificationChannelSpec.GROUP_MESSAGES
+        repeat(3) {
+            openLoadedSoundDrawer()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.close))
+                .assertIsDisplayed()
+                .performClick()
+            composeRule.waitUntil(timeoutMillis = 5_000) {
+                composeRule.onAllNodesWithTag("sheet.surface").fetchSemanticsNodes().isEmpty()
+            }
+            composeRule.onNodeWithTag("sheet.surface").assertDoesNotExist()
+            composeRule.onNodeWithTag("conversation-alert-${primary.id}").performScrollTo().assertIsDisplayed()
+        }
+    }
+
+    /** Waits for asynchronous categories and their layout before targeting the moving sheet header. */
+    private fun openLoadedSoundDrawer() {
         composeRule.onNodeWithTag(SOUND_APPEARANCE_OPEN_TAG).performScrollTo().performClick()
-        composeRule.mainClock.advanceTimeBy(1_000)
+        val lastCategoryTag = "open-conversation-notification-${NotificationChannelSpec.AGENT_ACTIVITY.id}"
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodesWithTag(lastCategoryTag).fetchSemanticsNodes().size == 1
+        }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("sheet.surface").assertIsDisplayed()
         composeRule.onNodeWithTag("sheet.dragHandle", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
-        composeRule.onNodeWithTag("sheet.surface").assertDoesNotExist()
-        val primary = if (isDm) NotificationChannelSpec.DIRECT_MESSAGES else NotificationChannelSpec.GROUP_MESSAGES
-        composeRule.onNodeWithTag("conversation-alert-${primary.id}").performScrollTo().assertIsDisplayed()
     }
 
+    /** Keeps account and draft state local while exercising production notification preparation. */
     private fun testAppState(context: Context): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,

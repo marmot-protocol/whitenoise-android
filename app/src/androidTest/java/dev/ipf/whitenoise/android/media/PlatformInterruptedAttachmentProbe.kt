@@ -27,10 +27,14 @@ import dev.ipf.whitenoise.android.state.attachmentIntentStore
 import dev.ipf.whitenoise.android.state.nativeProgress
 import dev.ipf.whitenoise.android.state.openNativeAttachment
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -42,10 +46,26 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicLong
 
 /** Stops one real ordinary WorkManager job, preserving native automatic demand and its received checkpoint. */
 internal object PlatformInterruptedAttachmentProbe {
     private const val FAILURE_STATE_LIMIT = 12
+    private const val NATIVE_RESUME_TIMEOUT_MILLIS = 60_000L
+
+    /** Closed native scheduling facts; references, account identities and error text never enter reports. */
+    private data class NativeResumeSnapshot(
+        val observationIndex: Long,
+        val phase: AttachmentTransferStateFfi,
+        val attempt: ULong,
+        val retryAt: ULong?,
+    )
+
+    /** Both observers belong to one probe lifetime and supply its success or failure evidence. */
+    private class ResumeObservations {
+        val workStates = CopyOnWriteArrayList<WorkInfo>()
+        val nativeStates = CopyOnWriteArrayList<NativeResumeSnapshot>()
+    }
 
     /** Automatic demand receives no interactive read, deliberate Retry, force-run or seeded checkpoint. */
     @Suppress("LongMethod") // One lifetime owns the generated platform job and its cleanup.
@@ -62,7 +82,11 @@ internal object PlatformInterruptedAttachmentProbe {
         val manager = WorkManager.getInstance(context)
         val workName = attachmentDownloadWorkName(request)
         val store = attachmentIntentStore(context)
-        val states = CopyOnWriteArrayList<WorkInfo>()
+        val observations = ResumeObservations()
+        val states = observations.workStates
+        val nativeStates = observations.nativeStates
+        val nativeObservationIndex = AtomicLong()
+        var nativeObserver: Job? = null
         val observer =
             launch {
                 manager.getWorkInfosForUniqueWorkFlow(workName).collect { infos ->
@@ -83,6 +107,24 @@ internal object PlatformInterruptedAttachmentProbe {
                 val firstRun = states.first { it.state == WorkInfo.State.RUNNING }
                 step = "held-prefix"
                 val progress = awaitAutomaticProgress(state, request)
+                nativeObserver =
+                    launch {
+                        state
+                            .nativeProgress(request)
+                            .filterNotNull()
+                            .map {
+                                NativeResumeSnapshot(
+                                    observationIndex = nativeObservationIndex.incrementAndGet(),
+                                    phase = it.phase,
+                                    attempt = it.attempt,
+                                    retryAt = it.retryAt,
+                                )
+                            }.collect {
+                                if (nativeStates.size == FAILURE_STATE_LIMIT) nativeStates.removeAt(0)
+                                nativeStates.add(it)
+                            }
+                    }
+                awaitFirstNativeSnapshot(nativeStates)
                 assertEquals((bytes.size + 16).toULong(), progress.total)
                 HeldAttachmentCancellationProbe.awaitLedger(port) { events ->
                     events.any { it.getString("kind") == "held" }
@@ -100,6 +142,7 @@ internal object PlatformInterruptedAttachmentProbe {
                 val beforeLogs = workerStopLogs()
                 HeldAttachmentCancellationProbe.control(port, "/__platform-stop-marker")
                 val namespace = if (job.first == null) "" else "-n ${job.first} "
+                val nativeObservationBeforeStop = nativeObservationIndex.get()
                 val stopped = shell("cmd jobscheduler timeout -u 0 ${namespace}${context.packageName} ${job.second}")
                 check(stopped.contains("Timing out:") || stopped.contains("Stopping job:")) {
                     "Android did not stop the selected job: $stopped"
@@ -124,9 +167,7 @@ internal object PlatformInterruptedAttachmentProbe {
                 awaitResumedRun(states, firstRun)
                 val runningAt = SystemClock.elapsedRealtime()
                 step = "resume-request"
-                HeldAttachmentCancellationProbe.awaitLedger(port) { e ->
-                    e.any { it.getString("kind") == "held" && it.getLong("value") == 3L * 1024 * 1024 }
-                }
+                awaitResumedAcquisition(port, nativeStates, nativeObservationBeforeStop)
                 val requestedAt = SystemClock.elapsedRealtime()
                 step = "resumed-completion"
                 assertNull("resumed partial ciphertext cannot be published", state.openNativeAttachment(request))
@@ -162,15 +203,18 @@ internal object PlatformInterruptedAttachmentProbe {
                         .put("worker_run_attempt", stopDiagnostic.second)
                         .put("resume_running_ms", runningAt - stoppedAt)
                         .put("resume_request_ms", requestedAt - runningAt)
+                        .put("native_observation_before_stop", nativeObservationBeforeStop)
+                        .put("native_resume_states", nativeResumeDiagnostics(nativeStates))
                         .put("android_process_restart_qualified", false),
                 )
             }
         } catch (failure: Throwable) {
-            reportFailure(step, failure, states, port, stoppedAt)
+            reportFailure(step, failure, observations, port, stoppedAt)
             throw failure
         } finally {
             withContext(NonCancellable) {
-                observer.cancel()
+                observer.cancelAndJoin()
+                nativeObserver?.cancelAndJoin()
                 try {
                     manager.cancelUniqueWork(workName).result.get()
                     state.stopNotificationListenerForAccountTeardown()
@@ -179,6 +223,57 @@ internal object PlatformInterruptedAttachmentProbe {
                 }
             }
         }
+    }
+
+    /** Establishes a first-run observation before capturing the boundary used to reject stale resume evidence. */
+    private suspend fun awaitFirstNativeSnapshot(nativeStates: List<NativeResumeSnapshot>) {
+        withTimeout(5_000L) { while (nativeStates.isEmpty()) delay(25L) }
+    }
+
+    /**
+     * Android RUNNING does not start MDK's retry clock. Observe the independent resumed body under a bounded
+     * functional deadline, allowing native backoff/maintenance while rejecting terminal decisions immediately.
+     * A monotonically indexed native emission after the stop boundary is also required, even if its scheduling
+     * fields match the first run. The bounded diagnostic buffer's size is not an observation position.
+     * The enclosing probe's 120-second deadline remains in force; this is not a latency qualification.
+     */
+    private suspend fun awaitResumedAcquisition(
+        port: Int,
+        nativeStates: List<NativeResumeSnapshot>,
+        nativeObservationBeforeStop: Long,
+    ) = withTimeout(NATIVE_RESUME_TIMEOUT_MILLIS) {
+        while (true) {
+            val latest = nativeStates.toList().lastOrNull()
+            check(latest?.phase !in NATIVE_TRANSFER_TERMINAL_FAILURES) {
+                "automatic native recovery ended as ${latest?.phase}"
+            }
+            val events = HeldAttachmentCancellationProbe.ledger(port)
+            val resumedBodyHeld =
+                events.any { it.getString("kind") == "held" && it.getLong("value") == 3L * 1024 * 1024 }
+            if (latest != null && latest.observationIndex > nativeObservationBeforeStop && resumedBodyHeld) {
+                return@withTimeout
+            }
+            delay(25L)
+        }
+    }
+
+    /** Remaining delay is relative to serialization time; only closed scheduling facts leave the fixture. */
+    private fun nativeResumeDiagnostics(states: List<NativeResumeSnapshot>): JSONArray {
+        val nowSeconds = System.currentTimeMillis() / 1_000L
+        return JSONArray(
+            states.toList().takeLast(FAILURE_STATE_LIMIT).map { snapshot ->
+                JSONObject()
+                    .put("observation_index", snapshot.observationIndex)
+                    .put("state", snapshot.phase.name)
+                    .put("attempt", snapshot.attempt.toLong())
+                    .put(
+                        "retry_delay_ms",
+                        snapshot.retryAt?.let {
+                            (it.toLong() - nowSeconds).coerceAtLeast(0L) * 1_000L
+                        } ?: JSONObject.NULL,
+                    )
+            },
+        )
     }
 
     /** Fail on a terminal native decision rather than disguising refused admission as a progress timeout. */
@@ -238,13 +333,13 @@ internal object PlatformInterruptedAttachmentProbe {
 
     /**
      * Records which step failed and what the platform and server had shown by then, as closed facts only: step name,
-     * exception class, the order of work states, ledger event counts and time since the stop. Nothing identifies the
-     * generated attachment, so a failed hosted run says where it stopped instead of only that it did.
+     * exception class, work states, native phases/attempts/retry delays, ledger counts and time since the stop.
+     * Nothing identifies the generated attachment; a failed run says where it stopped instead of only that it did.
      */
     private suspend fun reportFailure(
         step: String,
         failure: Throwable,
-        states: List<WorkInfo>,
+        observations: ResumeObservations,
         port: Int,
         stoppedAt: Long,
     ) {
@@ -261,7 +356,10 @@ internal object PlatformInterruptedAttachmentProbe {
                 .put("phase", "automatic-platform-resume-failure")
                 .put("step", step)
                 .put("exception", failure.javaClass.simpleName)
-                .put("work_states", JSONArray(states.takeLast(FAILURE_STATE_LIMIT).map { it.state.name }))
+                .put(
+                    "work_states",
+                    JSONArray(observations.workStates.takeLast(FAILURE_STATE_LIMIT).map { it.state.name }),
+                ).put("native_resume_states", nativeResumeDiagnostics(observations.nativeStates))
                 .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
                 .put("ms_since_stop", sinceStop),
         )
