@@ -142,7 +142,7 @@ internal class MaestroCredentialJournal(
         for (value in AppLockDelay.entries.map { it.preferenceValue }) {
             val index =
                 observations.withIndex().firstOrNull { (index, row) ->
-                    val matches = row.getString("delay") == value && row.getString("storedDelay") == value
+                    val matches = row.getString("delay") == value && row.optString("storedDelay") == value
                     index > previous && row.getBoolean("required") && matches
                 }?.index
             previous = checkNotNull(index) { "Actual persisted delay choice was not observed: $value" }
