@@ -8,7 +8,7 @@ bursts, reconnect failure, successful catch-up, and keep-connected on/off," in
 addition to the automated `BackgroundIdleBenchmark` and `NetworkRecoveryBenchmark`
 energy baselines documented in [docs/performance.md](performance.md). This is the holistic acceptance contract; resource benchmarks and the anonymous
 campaign validator cover only part of it. A row is supported only after its exact-artifact journey
-passes on the named device; nothing below has been executed yet.
+passes on the named device. The [2026-10-08 stock-Pixel observations](performance-data/background-battery-pixel-2026-10-08.md) record a partial, failed resource campaign; they do not pass this matrix or qualify GrapheneOS.
 
 Use a dedicated GrapheneOS fixture for the child's GrapheneOS acceptance gate.
 An explicitly authorized disposable user on a stock Pixel can qualify that
