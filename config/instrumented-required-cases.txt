@@ -30,3 +30,6 @@ dev.ipf.whitenoise.android.ui.common.ScrollEdgeFadeImeAndroidTest#sheetFormUsesI
 # Draft navigation retains real keyboard/viewport geometry and cancels reading momentum (#3131).
 dev.ipf.whitenoise.android.ui.ComposerDraftNavigationAndroidTest#typingAndRealImeReflowPreserveNavigation
 dev.ipf.whitenoise.android.ui.ComposerDraftNavigationAndroidTest#topActionCancelsFlingWithoutEditingOrKeyboardChanges
+
+# Read-aloud must render sentences beyond a collapsed message cutoff.
+dev.ipf.whitenoise.android.ui.conversation.TimelineRowTtsHighlightPaintAndroidTest#collapsedBodyRevealsAndHighlightsSentencesBeyondItsCutoff
