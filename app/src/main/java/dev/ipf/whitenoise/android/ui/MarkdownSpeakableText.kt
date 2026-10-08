@@ -285,8 +285,7 @@ private fun collectSpeakableInlineSegment(
     }
 }
 
-// Exhaustive sealed-node dispatch is clearer than scattering one AST walk
-// across type casts; the traversal itself remains depth/node/size bounded.
+/** Collects visible inline speech and render paths within the depth, node and character budgets. */
 @Suppress("CyclomaticComplexMethod", "LongMethod")
 private fun MappedTextBuilder.appendSpeakableInlines(
     inlines: List<MarkdownInlineFfi>,

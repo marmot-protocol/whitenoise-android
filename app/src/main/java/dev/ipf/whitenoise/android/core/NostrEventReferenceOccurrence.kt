@@ -91,6 +91,7 @@ private class NostrEventReferenceCollector {
         }
     }
 
+    /** Collects event references from destinations and nested labels while ignoring literal leaves. */
     private fun walkInline(inline: MarkdownInlineFfi) {
         when (inline) {
             is MarkdownInlineFfi.NostrMention ->

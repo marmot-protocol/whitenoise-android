@@ -228,6 +228,7 @@ private class RecoveryWindow(
 
     override suspend fun returnToTop(sequence: ULong) = current
 
+    /** Emits a recovered group frame so quarantine observers can replace their previously hidden row. */
     fun deliverRecoveredGroup() {
         val row = notificationChatListRow().copy(lastMessage = null, unreadCount = 0uL, hasUnread = false)
         val presented =

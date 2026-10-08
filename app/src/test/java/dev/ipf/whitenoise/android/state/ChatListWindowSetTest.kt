@@ -356,6 +356,7 @@ private class FakeWindow(
     )
 }
 
+/** Creates a group-fallback presentation without a native draft version for window tests. */
 internal fun presentedRow(groupIdHex: String) =
     PresentedChatRowFfi(
         draftVersion = null,

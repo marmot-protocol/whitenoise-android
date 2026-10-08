@@ -1793,8 +1793,10 @@ internal fun shouldConfirmMarkdownLink(
 }
 
 /** Flattened visible text of an inline run, for label-vs-destination checks. */
+@Suppress("CyclomaticComplexMethod") // Keep every native inline variant explicit in this projection.
 internal fun markdownInlinePlainText(inlines: List<MarkdownInlineFfi>): String =
     buildString {
+        /** Flattens nested labels and image alt text without introducing their link destinations. */
         fun walk(nodes: List<MarkdownInlineFfi>) {
             nodes.forEach { inline ->
                 when (inline) {

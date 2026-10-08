@@ -131,6 +131,7 @@ internal object MarmotWindowTestFakes {
         rows: List<ChatListRowFfi>,
     ): List<ChatListRowFfi> = if (view == ChatListViewFfi.CHATS) rows else emptyList()
 
+    /** Supplies deterministic fallback title/avatar values without requiring native draft metadata. */
     private fun presentedRow(row: ChatListRowFfi) =
         PresentedChatRowFfi(
             draftVersion = null,
