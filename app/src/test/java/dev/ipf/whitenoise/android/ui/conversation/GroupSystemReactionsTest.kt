@@ -113,12 +113,20 @@ class GroupSystemReactionsTest : GroupSystemReactionTestFixtures() {
         assertTrue(recordedCalls().none { it.first == "reactToMessage" || it.first == "deleteMessage" })
     }
 
-    /** Removing the target while the reaction waits must prevent native admission. */
-    @Test fun removedTargetDiscardsQueuedReaction() {
+    /** Removal fences a queued reaction even while frame settlement preserves the old display snapshot. */
+    @Test fun removedRetainedTargetCannotUsePreservedDisplaySnapshot() {
         val item = render()
+        composeRule.runOnIdle { applyPage(requireNotNull(item.projected)) }
         openMenu()
         composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:👍").performClick()
-        composeRule.runOnIdle { pollController.removeProjectedRecord(item.record.messageIdHex) }
+        composeRule.runOnIdle {
+            val owner = GroupSystemReactionOwner("personal", item.record.groupIdHex, item.record.messageIdHex)
+            assertTrue(pollController.timeline.any { it.record.messageIdHex == owner.messageId })
+            pollController.removeProjectedRecord(owner.messageId)
+            assertNull(pollController.retainedTimelineItem(owner.messageId))
+            assertTrue(pollController.timeline.any { it.record.messageIdHex == owner.messageId })
+            assertNull(currentGroupSystemReactionTarget(pollController, owner))
+        }
         settle()
         composeRule.waitUntil { pollController.reactions[item.record.messageIdHex].isNullOrEmpty() }
         assertTrue(recordedCalls().none { it.first == "reactToMessage" })

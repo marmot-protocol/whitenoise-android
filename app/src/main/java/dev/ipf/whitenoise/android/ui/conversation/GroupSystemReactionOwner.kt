@@ -23,10 +23,9 @@ internal fun currentGroupSystemReactionTarget(
             !controller.group.pendingConfirmation &&
             !MessageProjector.isDeleted(owner.messageId, controller.deletedMessageIds)
     if (!available) return null
-    val current =
-        controller.retainedTimelineItem(owner.messageId)
-            ?: controller.timeline.firstOrNull { it.record.messageIdHex == owner.messageId }
-    return current?.takeIf { groupSystemReactionEligible(it, owner) }
+    // A display snapshot can outlive removal from the retained window during frame settlement.
+    val current = controller.retainedTimelineItem(owner.messageId) ?: return null
+    return current.takeIf { groupSystemReactionEligible(it, owner) }
 }
 
 /** Only MDK's attributed, authenticated activity projection supplies a reaction target. */
