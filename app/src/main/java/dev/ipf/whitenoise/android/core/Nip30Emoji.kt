@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 object Nip30Emoji {
     private const val TAG_NAME = "emoji"
     private const val TAG_SIZE = 3
+    private const val TAG_SIZE_WITH_SET = 4
     private val codePattern = Regex("[A-Za-z0-9_-]{1,64}")
     private val shortcodeInText = Regex(":($codePattern):")
     private val sendableCodePattern = Regex("[A-Za-z0-9_]{1,62}")
@@ -36,7 +37,8 @@ object Nip30Emoji {
      * The `:code:`s each image attachment defines, keyed by protocol attachment index and in tag
      * order. Aliases of one image share its attachment, so one attachment may carry several codes.
      * The first well-formed tag for a code wins even when it names no attachment, so a repeated
-     * code with another URL cannot rebind it.
+     * code with another URL cannot rebind it. Every matching image slot is claimed, matching native
+     * attachment-history roles; renderers may still choose the first image for each shortcode.
      */
     fun attachmentShortcodes(
         tags: List<MessageTagFfi>,
@@ -52,9 +54,10 @@ object Nip30Emoji {
             if (!seen.add(shortcode)) {
                 continue
             }
-            val attachment = images.firstOrNull { (_, reference) -> reference.locators.any { it.value == url } }
-            if (attachment != null) {
-                defined.getOrPut(attachment.index) { mutableListOf() }.add(shortcode)
+            for ((index, reference) in images) {
+                if (reference.locators.any { it.value == url }) {
+                    defined.getOrPut(index) { mutableListOf() }.add(shortcode)
+                }
             }
         }
         return defined
@@ -86,7 +89,7 @@ object Nip30Emoji {
     /** `:code:` and url of a well-formed emoji tag. */
     private fun shortcodeAndUrl(tag: MessageTagFfi): Pair<String, String>? {
         val values = tag.values
-        if (values.size < TAG_SIZE || values[0] != TAG_NAME) {
+        if (values.size !in TAG_SIZE..TAG_SIZE_WITH_SET || values[0] != TAG_NAME) {
             return null
         }
         return (":${values[1]}:" to values[2]).takeIf { codePattern.matches(values[1]) && values[2].isNotBlank() }
