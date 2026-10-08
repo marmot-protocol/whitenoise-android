@@ -1524,6 +1524,7 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
                     append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                 }
             }
+            is MarkdownInlineFfi.Timestamp -> append(markdownTimestampLiteral(inline))
             is MarkdownInlineFfi.Math -> withStyle(ctx.codeStyle) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
             is MarkdownInlineFfi.NostrMention -> appendNostrEntity(inline.entity, mention = true, ctx)
             is MarkdownInlineFfi.NostrUri -> appendNostrEntity(inline.entity, mention = false, ctx)
@@ -1792,14 +1793,17 @@ internal fun shouldConfirmMarkdownLink(
 }
 
 /** Flattened visible text of an inline run, for label-vs-destination checks. */
+@Suppress("CyclomaticComplexMethod") // Keep every native inline variant explicit in this projection.
 internal fun markdownInlinePlainText(inlines: List<MarkdownInlineFfi>): String =
     buildString {
+        /** Flattens nested labels and image alt text without introducing their link destinations. */
         fun walk(nodes: List<MarkdownInlineFfi>) {
             nodes.forEach { inline ->
                 when (inline) {
                     is MarkdownInlineFfi.Text -> append(inline.content)
                     is MarkdownInlineFfi.Code -> append(inline.content)
                     is MarkdownInlineFfi.Math -> append(inline.content)
+                    is MarkdownInlineFfi.Timestamp -> append(markdownTimestampLiteral(inline))
                     is MarkdownInlineFfi.Autolink -> append(inline.url)
                     is MarkdownInlineFfi.Emph -> walk(inline.children)
                     is MarkdownInlineFfi.Strong -> walk(inline.children)

@@ -135,6 +135,7 @@ class AccountSwitchFirstFrameTest {
                         presentedRows =
                             listOf(
                                 PresentedChatRowFfi(
+                                    draftVersion = null,
                                     preview = emptyChatRowPreview(),
                                     actions = noChatRowActions(),
                                     row = rawRow,

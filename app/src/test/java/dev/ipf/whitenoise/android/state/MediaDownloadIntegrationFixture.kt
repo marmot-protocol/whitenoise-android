@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.AttachmentLocalBytesFfi
 import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentPageFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
+import dev.ipf.marmotkit.AttachmentRoleFfi
 import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
@@ -121,6 +122,7 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                                     1u,
                                     1u,
                                     AttachmentCategoryFfi.IMAGE,
+                                    AttachmentRoleFfi.SHARED,
                                     MediaAttachmentOutcomeFfi.Accepted(0u, reference(index)),
                                 )
                             },

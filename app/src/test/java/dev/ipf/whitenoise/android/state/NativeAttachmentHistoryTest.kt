@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.AttachmentEntryFfi
+import dev.ipf.marmotkit.AttachmentRoleFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -64,6 +65,7 @@ class NativeAttachmentHistoryTest {
             receivedAt = 3u,
             sourceEpoch = 1u,
             category = AttachmentCategoryFfi.FILE,
+            role = AttachmentRoleFfi.SHARED,
             attachment = MediaAttachmentOutcomeFfi.Accepted(index.toUInt(), reference()),
         )
 
