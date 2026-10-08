@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDeliveryMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
+import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import kotlin.math.PI
@@ -78,7 +79,7 @@ internal fun ConversationDictationPersistentControl(
     controller: ConversationDictationController,
     modifier: Modifier = Modifier,
 ) {
-    if (state is ConversationDictationState.Idle) return
+    if (!state.requiresCompletionControls(controller.recoveryHandedToComposer)) return
     val status =
         if (controller.deliveryInProgress) {
             stringResource(R.string.message_status_pending)
@@ -125,7 +126,7 @@ internal fun ConversationDictationCompactActions(
     modifier: Modifier = Modifier,
     actionColors: AccountActionColors = accountActionColors(appState = null),
 ) {
-    if (state is ConversationDictationState.Idle) return
+    if (!state.requiresCompletionControls(controller.recoveryHandedToComposer)) return
     val status =
         if (controller.deliveryInProgress) {
             stringResource(R.string.message_status_pending)

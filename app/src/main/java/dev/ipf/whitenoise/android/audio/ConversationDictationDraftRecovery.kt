@@ -72,6 +72,28 @@ internal class ConversationDictationDraftRecovery(
         }
     }
 
+    /** Submitted text remains represented even after its composer was cleared or subsequently edited. */
+    fun consumeSubmittedTranscript(
+        session: Long,
+        target: ConversationDictationTarget,
+        transcript: String,
+    ) {
+        val current = runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull()
+        val snapshot = current ?: ConversationDictationDraftSnapshot(TextFieldValue(""), Long.MIN_VALUE)
+        receipt =
+            Receipt(
+                session = session,
+                target = target,
+                transcript = transcript.trim(),
+                draft = snapshot,
+                sendEligible = false,
+                base = snapshot.value,
+                baseTranscript = transcript.trim(),
+                appendOnly = true,
+                recoveryUnavailable = current == null,
+            )
+    }
+
     data class Options(
         val restoreCapturedPrefix: Boolean = false,
         val ownedEmptyRevision: Long? = null,

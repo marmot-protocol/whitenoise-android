@@ -1284,11 +1284,11 @@ internal fun ComposerBar(
                 val dictationActiveInComposer =
                     dictationControlsVisible &&
                         dictationOwnedByComposer &&
-                        dictationState !is ConversationDictationState.Idle
+                        dictationController?.completionControlsRequired == true
                 val dictationOriginHidden =
                     !dictationControlsVisible &&
                         dictationOwnedByComposer &&
-                        dictationState !is ConversationDictationState.Idle
+                        dictationController?.completionControlsRequired == true
                 val activeDictationController = dictationController?.takeIf { dictationActiveInComposer }
                 val showMicButton =
                     ((text.isBlank() && !hasPendingAttachments) || isRecordingVoice) &&

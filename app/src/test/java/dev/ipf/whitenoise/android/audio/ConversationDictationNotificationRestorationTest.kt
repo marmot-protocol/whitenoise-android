@@ -541,10 +541,10 @@ internal class ConversationDictationNotificationRestorationTest : ConversationDi
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 internal class ConversationDictationNotificationSuppressionTest : ConversationDictationNotificationTestFixture() {
-    /** Rejected notification Send keeps a control-free recovery card until the composer is opened. */
+    /** A verified text-only fallback retires the dictation card even after a queued notification refresh. */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun rejectedBackgroundSendKeepsItsOpenAppCardAfterDraftRecovery() =
+    fun rejectedBackgroundSendReleasesDictationCardAfterVerifiedDraftRecovery() =
         runTest {
             val harness = Harness(this)
             harness.acceptSend = false
@@ -564,19 +564,15 @@ internal class ConversationDictationNotificationSuppressionTest : ConversationDi
                 runCurrent()
                 Snapshot.sendApplyNotifications()
                 shadowOf(Looper.getMainLooper()).idle()
-                val failed = harness.conversationDictation.state as ConversationDictationState.Failed
-                assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
-                assertTrue(failed.draftRecovered)
+                assertTrue(harness.conversationDictation.state is ConversationDictationState.Idle)
                 assertEquals("recognized", harness.draft.text)
                 assertTrue(harness.sent.isEmpty())
-                assertTrue(harness.conversationDictation.hasDurableSession)
+                assertFalse(harness.conversationDictation.hasDurableSession)
                 assertFalse(harness.conversationDictation.foregroundMicrophoneRequired)
-                val card = manager.activeNotifications.single().notification
-                assertEquals(
-                    service.getString(R.string.dictation_recovery_title),
-                    card.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
-                )
-                assertEquals(service.getString(R.string.dictation_recovery_open), card.actions.single().title)
+                service.foreground.dictation.refreshNotification()
+                assertFalse(manager.activeNotifications.any {
+                    it.notification.channelId == ConversationDictationForegroundService.CHANNEL_ID
+                })
                 harness.conversationDictation.onAppForegrounded()
                 runCurrent()
                 assertFalse(harness.conversationDictation.hasDurableSession)

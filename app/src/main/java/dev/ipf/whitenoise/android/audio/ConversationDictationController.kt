@@ -231,6 +231,10 @@ internal sealed interface ConversationDictationState {
     ) : ConversationDictationState
 }
 
+/** Saved or submitted recovery leaves the ordinary composer in control, including during audio Retry. */
+internal fun ConversationDictationState.requiresCompletionControls(recoveryHandedToComposer: Boolean = false): Boolean =
+    this !is ConversationDictationState.Idle && !recoveryHandedToComposer
+
 internal interface ConversationDictationRecognitionListener {
     /** Reports that the provider is ready to receive speech. */
     fun onReady()
@@ -616,10 +620,19 @@ internal class ConversationDictationController internal constructor(
     private var pendingTargetValidation: Any? = null
     private var accumulatedTranscript = ""
     private var pendingCompletedTranscript = ""
+    private data class PendingPrefixSend(val sessionId: Long, val captureGeneration: Long, val transcript: String)
+
+    private var pendingPrefixSend: PendingPrefixSend? = null
+    private var retainedAudioFailure: ConversationDictationFailure? = null
+    var recoveryHandedToComposer by mutableStateOf(false)
+        private set
+    val completionControlsRequired: Boolean
+        get() = state.requiresCompletionControls(recoveryHandedToComposer)
     private var finishRequested by mutableStateOf(false)
     private var captureDeadlineElapsedMillis: Long? = null
     private var dispatchedSessionId by mutableStateOf<Long?>(null)
     private var sendJob: Job? = null
+    private var pendingDispatchClaim: ConversationDictationDispatchClaim? = null
     private val completionIntent = ConversationDictationCompletionIntent()
     private val requestedDeliveryMode: ConversationDictationDeliveryMode?
         get() = completionIntent.mode
@@ -813,6 +826,9 @@ internal class ConversationDictationController internal constructor(
         // Tear down the previous generation before publishing the new target;
         // all callbacks from the previous generation then fail the session-id
         // ownership check and become no-ops.
+        pendingPrefixSend = null
+        retainedAudioFailure = null
+        recoveryHandedToComposer = false
         clearRecognitionSession(cancel = true)
         draftRecovery.reset()
         draftTargetRemoved = false
@@ -883,7 +899,10 @@ internal class ConversationDictationController internal constructor(
     ): Boolean {
         val reason =
             when {
-                pendingCaptureLeaseReleaseGeneration != null -> "capture_closing"
+                pendingCaptureLeaseReleaseGeneration != null ||
+                    (state is ConversationDictationState.Failed && foregroundMicrophoneRequired) -> "capture_closing"
+                state is ConversationDictationState.Failed &&
+                    runCatching(platform::callerAudioHasPending).getOrDefault(true) -> "retained_audio"
                 !targetAvailable(accountRef, groupIdHex) -> "target_unavailable"
                 else -> null
             }
@@ -1022,6 +1041,7 @@ internal class ConversationDictationController internal constructor(
     fun paste() {
         if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed
+        if (recoveryHandedToComposer && canRetryRetainedAudio) return
         if (failed != null &&
             failed.reason != ConversationDictationFailure.DeliveryUnknown &&
             !failed.retainedTranscript.isNullOrBlank()
@@ -1036,7 +1056,8 @@ internal class ConversationDictationController internal constructor(
     fun sendRecognizedText() {
         if (expireRetainedRecoveryIfDue()) return
         val failed = state as? ConversationDictationState.Failed ?: return
-        if (failed.reason != ConversationDictationFailure.SendBlocked ||
+        if (foregroundMicrophoneRequired || recoveryHandedToComposer ||
+            failed.reason != ConversationDictationFailure.SendBlocked ||
             failed.retainedTranscript.isNullOrBlank()
         ) {
             return
@@ -1228,6 +1249,9 @@ internal class ConversationDictationController internal constructor(
     }
 
     private fun cancelSession() {
+        pendingPrefixSend = null
+        recoveryHandedToComposer = false
+        retainedAudioFailure = null
         draftRecovery.reset()
         if (state.sessionId != null) conversationDictationDiagnostic("event=session_finished outcome=cancelled")
         if (state is ConversationDictationState.CheckingProvider) {
@@ -1366,6 +1390,14 @@ internal class ConversationDictationController internal constructor(
             conversationDictationDiagnostic("event=retry accepted=false reason=delivery_unknown")
             return
         }
+        if (recoveryHandedToComposer) {
+            completionIntent.reset()
+            completionIntent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
+            if (!runCatching(platform::callerAudioHasPending).getOrDefault(true)) {
+                retainSupersededSendDraft(failed)
+                return
+            }
+        }
         if (retainSupersededSendDraft(failed)) return
         recoveryTimeoutHandle?.cancel()
         recoveryTimeoutHandle = null
@@ -1381,6 +1413,7 @@ internal class ConversationDictationController internal constructor(
             val retrySend =
                 failed.reason == ConversationDictationFailure.SendBlocked ||
                     requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish
+            val automatic = !completionIntent.explicit
             completionIntent.reset()
             val retryMode =
                 if (retrySend) {
@@ -1389,7 +1422,7 @@ internal class ConversationDictationController internal constructor(
                 } else {
                     ConversationDictationDeliveryMode.PasteIntoDraft
                 }
-            completionIntent.choose(retryMode)
+            completionIntent.choose(retryMode, automatic = automatic)
             finishRequested = true
             state = ConversationDictationState.Processing(failed.sessionId, failed.target)
             validateAndDeliverTranscript(failed.sessionId, failed.target, transcript)
@@ -1537,6 +1570,7 @@ internal class ConversationDictationController internal constructor(
             releaseDurableSessionLease()
         }
         val failed = state as? ConversationDictationState.Failed
+        if (failed != null && deliverPrefixAfterCaptureClosure(failed)) return
         val recoveryPresented =
             failed?.let { pendingForegroundRecoverySessionId == sessionId || it.draftSuperseded } == true
         if (recoveryPresented &&
@@ -1545,6 +1579,7 @@ internal class ConversationDictationController internal constructor(
         ) {
             releaseDurableSessionLease()
         }
+        if (recoveryHandedToComposer) (state as? ConversationDictationState.Failed)?.let(::handRecoveryToComposer)
         reattachForegroundRecoveryAfterClosure()
     }
 
@@ -1562,6 +1597,7 @@ internal class ConversationDictationController internal constructor(
                     draftSuperseded = recovery == ConversationDictationDraftRecovery.Result.Superseded,
                 )
         }
+        (state as? ConversationDictationState.Failed)?.let(::handRecoveryToComposer)
         val savedFailure = state is ConversationDictationState.Failed && !hasUnrecoveredTranscript
         if (savedFailure &&
             !foregroundMicrophoneRequired &&
@@ -2517,9 +2553,18 @@ internal class ConversationDictationController internal constructor(
         clearRecognitionGeneration(cancel = false)
         val drainAlreadyExpired = finishRequested && failure == ConversationDictationFailure.TimedOut
         finishRequested = true
+        retainedAudioFailure = failure
         val retained = recognizedTranscript ?: accumulatedTranscript.trim().ifBlank { null }
-        val recovered = recoverRecognizedDraft(sessionId, target, retained)
+        if (completionIntent.explicit && requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
+            retained?.trim()?.takeIf(String::isNotBlank)?.let { prefix ->
+                pendingPrefixSend = PendingPrefixSend(sessionId, captureClosureGeneration, prefix)
+            }
+        }
+        val recovery = recoverRecognizedDraftResult(sessionId, target, retained)
         if (state.sessionId != sessionId) return
+        if (!recovery.draftRecovered && recovery != ConversationDictationDraftRecovery.Result.Superseded) {
+            recoveryHandedToComposer = false
+        }
         val failed =
             ConversationDictationState.Failed(
                 sessionId = sessionId,
@@ -2539,7 +2584,8 @@ internal class ConversationDictationController internal constructor(
                             !retained.isNullOrBlank()
                     },
                 recognitionIncomplete = true,
-                draftRecovered = recovered,
+                draftRecovered = recovery.draftRecovered,
+                draftSuperseded = recovery == ConversationDictationDraftRecovery.Result.Superseded,
             )
         state = failed
         notificationActionGeneration += 1L
@@ -2561,9 +2607,8 @@ internal class ConversationDictationController internal constructor(
             acknowledgeCaptureClosed(sessionId, captureGeneration)
             if (state === failed && notificationSessionToken == token) {
                 val retainedAudio = runCatching(platform::callerAudioHasPending).getOrDefault(true)
-                if (!retainedAudio && failed.retainedTranscript.isNullOrBlank()) {
-                    releaseDurableSessionLease()
-                }
+                handRecoveryToComposer(failed)
+                if (!retainedAudio && failed.retainedTranscript.isNullOrBlank()) releaseDurableSessionLease()
             }
         }
         captureClosureTimeoutHandle?.cancel()
@@ -2578,6 +2623,12 @@ internal class ConversationDictationController internal constructor(
                         foregroundMicrophoneRequired
                 },
                 callback = {
+                    if (state === failed) {
+                        pendingPrefixSend = null
+                        completionIntent.reset()
+                        completionIntent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
+                        handRecoveryToComposer(failed)
+                    }
                     requestForcedRecoveryCaptureClosure(onClosed, acknowledgeAbsentCapture = !captureAlreadyDiscarded)
                 },
             )
@@ -2975,6 +3026,20 @@ internal class ConversationDictationController internal constructor(
     ) {
         if (transcript.isBlank()) {
             fail(sessionId, target, ConversationDictationFailure.NoSpeech, captureEnd = DictationFailureCapture.Cancel)
+        } else if (completionIntent.explicit &&
+            requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish &&
+            failureCause != null && !foregroundMicrophoneRequired
+        ) {
+            validateAndDeliverTranscript(sessionId, target, transcript)
+        } else if (completionIntent.explicit &&
+            requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish && failureCause != null
+        ) {
+            pendingPrefixSend = PendingPrefixSend(sessionId, captureClosureGeneration, transcript)
+            fail(
+                sessionId, target, failureCause,
+                captureEnd = DictationFailureCapture.CancelIncomplete,
+                retainedTranscript = transcript,
+            )
         } else if (requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
             fail(
                 sessionId,
@@ -3068,7 +3133,14 @@ internal class ConversationDictationController internal constructor(
             releaseDurableSession = !recoverable,
         )
         if (state.sessionId != sessionId) return
-        resetTranscriptSession()
+        val retainsAudio =
+            retainedAudioFailure != null && runCatching(platform::callerAudioHasPending).getOrDefault(true)
+        if (!retainsAudio) {
+            val mode = requestedDeliveryMode
+            val explicit = completionIntent.explicit
+            resetTranscriptSession()
+            completionIntent.choose(mode, automatic = !explicit)
+        }
         state =
             ConversationDictationState.Failed(
                 sessionId,
@@ -3081,8 +3153,11 @@ internal class ConversationDictationController internal constructor(
                 draftSuperseded = recovery == ConversationDictationDraftRecovery.Result.Superseded,
             )
         notificationActionGeneration += 1L
-        (state as ConversationDictationState.Failed)
-            .takeIf { !retainedTranscript.isNullOrBlank() && failure != ConversationDictationFailure.DeliveryUnknown }
+        val failed = state as ConversationDictationState.Failed
+        if (deliverPrefixAfterCaptureClosure(failed)) return
+        handRecoveryToComposer(failed)
+        (state as? ConversationDictationState.Failed)
+            ?.takeIf { !retainedTranscript.isNullOrBlank() && failure != ConversationDictationFailure.DeliveryUnknown }
             ?.let { failed ->
                 protectRetainedRecovery(failed)
                 if (failed.draftSuperseded &&
@@ -3117,6 +3192,7 @@ internal class ConversationDictationController internal constructor(
         releaseDurableSession: Boolean = true,
     ) {
         pendingForegroundRecoverySessionId = null
+        pendingDispatchClaim = null
         sendJob?.cancel()
         sendJob = null
         validatingSessionId = null
@@ -3147,7 +3223,16 @@ internal class ConversationDictationController internal constructor(
             captureSessionId?.let(::finishPlaybackInterruption)
             closingSessionId?.let { acknowledgeCaptureClosed(it, closingCaptureGeneration) }
         }
-        val platformOwnsCaptureClosure = runCatching { platform.discardCallerAudio(onCaptureFinished) }.getOrNull()
+        val preserveAudio =
+            retainedAudioFailure != null && runCatching(platform::callerAudioHasPending).getOrDefault(true)
+        val platformOwnsCaptureClosure =
+            runCatching {
+                if (preserveAudio) {
+                    platform.finishCallerAudioCapture(onCaptureFinished)
+                } else {
+                    platform.discardCallerAudio(onCaptureFinished)
+                }
+            }.getOrNull()
         // A disposal exception can release app audio ownership after recognizer teardown,
         // but cannot prove that a possibly separate native recorder has closed.
         val onGenerationClosed: () -> Unit =
@@ -3161,6 +3246,47 @@ internal class ConversationDictationController internal constructor(
             onAudioCaptureFinished = onGenerationClosed,
         )
         if (releaseDurableSession && !releaseAfterCaptureClosure) releaseDurableSessionLease()
+    }
+
+    /** A provider-owned microphone also needs its real closure callback before explicit prefix dispatch. */
+    private fun deliverPrefixAfterCaptureClosure(failed: ConversationDictationState.Failed): Boolean {
+        val pending = pendingPrefixSend ?: return false
+        if (foregroundMicrophoneRequired || state !== failed || pending.sessionId != failed.sessionId ||
+            pending.captureGeneration != captureClosureGeneration || !completionIntent.explicit ||
+            requestedDeliveryMode != ConversationDictationDeliveryMode.SendOnFinish
+        ) {
+            return false
+        }
+        pendingPrefixSend = null
+        state = ConversationDictationState.Processing(failed.sessionId, failed.target)
+        validateAndDeliverTranscript(failed.sessionId, failed.target, pending.transcript)
+        return true
+    }
+
+    /** Only a verified save or respected editor change can release completion controls. */
+    private fun handRecoveryToComposer(failed: ConversationDictationState.Failed) {
+        if (state !== failed || pendingPrefixSend != null ||
+            failed.reason == ConversationDictationFailure.DeliveryUnknown
+        ) {
+            return
+        }
+        if (!failed.draftRecovered && !failed.draftSuperseded) {
+            recoveryHandedToComposer = false
+            return
+        }
+        completionIntent.reset()
+        completionIntent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
+        if (!foregroundMicrophoneRequired && !runCatching(platform::callerAudioHasPending).getOrDefault(true)) {
+            retainedAudioFailure = null
+            recoveryHandedToComposer = false
+            clearRecognitionSession(cancel = false)
+            draftRecovery.reset()
+            resetTranscriptSession()
+            state = ConversationDictationState.Idle
+        } else if (!recoveryHandedToComposer) {
+            recoveryHandedToComposer = true
+            notificationActionGeneration += 1L
+        }
     }
 
     /** Failed dictation keeps foreground protection without recording controls, bounded to 30 minutes. */
@@ -3191,6 +3317,14 @@ internal class ConversationDictationController internal constructor(
         recoveryDeadlineElapsedMillis = null
         recoveryTimeoutHandle?.cancel()
         recoveryTimeoutHandle = null
+        val failed = state as ConversationDictationState.Failed
+        if (failed.reason == ConversationDictationFailure.DeliveryUnknown) {
+            retainedAudioFailure = null
+            clearRecognitionSession(cancel = false)
+            notificationActionGeneration += 1L
+            onRecoveryExpired()
+            return true
+        }
         val clearedUnsavedData =
             hasUnrecoveredTranscript || runCatching(platform::callerAudioHasPending).getOrDefault(true)
         cancelSession()
@@ -3389,7 +3523,7 @@ internal class ConversationDictationController internal constructor(
         )
     }
 
-    /** Sends only the immutable origin payload; a rejected Send stays a recoverable failed Send. */
+    /** Sends only the immutable origin payload, preserving a rejected Send in the draft. */
     private fun sendTranscriptOnFinish(
         sessionId: Long,
         target: ConversationDictationTarget,
@@ -3399,9 +3533,10 @@ internal class ConversationDictationController internal constructor(
             recoverRecognizedDraft(sessionId, target, transcript)
         }
         val admissionTarget = draftRecovery.sendTarget(sessionId, target)
-        val current = readDraft(target.accountRef, target.groupIdHex)
+        val current = runCatching { readDraft(target.accountRef, target.groupIdHex) }.getOrNull()
         if (
             admissionTarget == null ||
+            current == null ||
             current.revision != admissionTarget.capturedDraftRevision ||
             current.value.text != admissionTarget.capturedDraft.text
         ) {
@@ -3435,6 +3570,7 @@ internal class ConversationDictationController internal constructor(
     ) {
         val scope = requireNotNull(targetValidationScope)
         val claim = ConversationDictationDispatchClaim()
+        pendingDispatchClaim = claim
         val guardedRequest =
             sendRequest.copy(
                 beginDispatch = {
@@ -3445,17 +3581,23 @@ internal class ConversationDictationController internal constructor(
                     }
                 },
                 onDispatchRejectedBeforeTransport = {
-                    rejectDictationDispatchBeforeTransport(sessionId, admissionTarget, claim)
-                    draftRecovery.updateDispatch(sessionId, target, restoredRevision = claim.restoredRevision)
+                    if (pendingDispatchClaim === claim) {
+                        rejectDictationDispatchBeforeTransport(sessionId, admissionTarget, claim)
+                        draftRecovery.updateDispatch(sessionId, target, restoredRevision = claim.restoredRevision)
+                    }
                 },
-                onPendingShown = { completePendingDictationDispatch(sessionId, target) },
+                onPendingShown = { completePendingDictationDispatch(sessionId, target, claim) },
             )
         sendJob =
             scope.launch(start = CoroutineStart.LAZY) {
                 if (state.sessionId != sessionId) return@launch
                 try {
                     val accepted = dispatchTranscript(guardedRequest)
-                    if (state.sessionId != sessionId) return@launch
+                    if (pendingDispatchClaim !== claim || state.sessionId != sessionId ||
+                        state !is ConversationDictationState.Processing
+                    ) {
+                        return@launch
+                    }
                     if (accepted == true) {
                         conversationDictationDiagnostic("event=send_outcome outcome=accepted")
                         if (claim.emptiedRevision == null) emptyDraftForDispatch(admissionTarget)
@@ -3468,7 +3610,9 @@ internal class ConversationDictationController internal constructor(
                         retainFailedDispatchDraft(sessionId, target, admissionTarget, transcript, claim)
                     }
                 } finally {
-                    if (state.sessionId == sessionId && state is ConversationDictationState.Processing) {
+                    if (pendingDispatchClaim === claim && state.sessionId == sessionId &&
+                        state is ConversationDictationState.Processing
+                    ) {
                         conversationDictationDiagnostic("event=send_outcome outcome=retained reason=interrupted")
                         retainFailedDispatchDraft(sessionId, target, admissionTarget, transcript, claim)
                     }
@@ -3521,7 +3665,7 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
         claim: ConversationDictationDispatchClaim,
     ): Boolean {
-        if (state.sessionId != sessionId || dispatchedSessionId != null) return false
+        if (pendingDispatchClaim !== claim || state.sessionId != sessionId || dispatchedSessionId != null) return false
         dispatchedSessionId = sessionId
         claim.emptiedRevision = emptyDraftForDispatch(target)
         return (claim.emptiedRevision != null).also { claimed ->
@@ -3534,7 +3678,7 @@ internal class ConversationDictationController internal constructor(
         target: ConversationDictationTarget,
         claim: ConversationDictationDispatchClaim,
     ) {
-        if (state.sessionId != sessionId || dispatchedSessionId != sessionId) return
+        if (pendingDispatchClaim !== claim || state.sessionId != sessionId || dispatchedSessionId != sessionId) return
         conversationDictationDiagnostic("event=send_outcome outcome=rejected_before_transport")
         val rejectedRevision = claim.emptiedRevision
         dispatchedSessionId = null
@@ -3545,8 +3689,9 @@ internal class ConversationDictationController internal constructor(
     private fun completePendingDictationDispatch(
         sessionId: Long,
         target: ConversationDictationTarget,
+        claim: ConversationDictationDispatchClaim,
     ) {
-        if (state.sessionId != sessionId || dispatchedSessionId != sessionId) return
+        if (pendingDispatchClaim !== claim || state.sessionId != sessionId || dispatchedSessionId != sessionId) return
         conversationDictationDiagnostic("event=send_outcome outcome=pending_visible")
         val key = ConversationDictationKey.from(target.accountRef, target.groupIdHex)
         pendingSendRevisions[key] = (pendingSendRevisions[key] ?: 0) + 1
@@ -3599,8 +3744,11 @@ internal class ConversationDictationController internal constructor(
             conversationDictationDiagnostic("event=send_outcome outcome=retained reason=delivery_unknown")
             val recovered = recoverRecognizedDraft(sessionId, target, transcript)
             if (state.sessionId != sessionId) return
-            clearRecognitionSession(cancel = false)
-            resetTranscriptSession()
+            val retainsAudio =
+                retainedAudioFailure != null && runCatching(platform::callerAudioHasPending).getOrDefault(true)
+            clearRecognitionSession(cancel = false, releaseDurableSession = !retainsAudio)
+            if (!retainsAudio) resetTranscriptSession()
+            recoveryHandedToComposer = false
             state =
                 ConversationDictationState.Failed(
                     sessionId = sessionId,
@@ -3610,6 +3758,7 @@ internal class ConversationDictationController internal constructor(
                     draftRecovered = recovered,
                 )
             notificationActionGeneration += 1L
+            if (retainsAudio) protectRetainedRecovery(state as ConversationDictationState.Failed)
         } else {
             conversationDictationDiagnostic("event=send_outcome outcome=retained reason=not_dispatched")
             fail(sessionId, target, ConversationDictationFailure.SendBlocked, retainedTranscript = transcript)
@@ -3721,6 +3870,36 @@ internal class ConversationDictationController internal constructor(
     /** Releases durable ownership and publishes a completion revision for the origin composer. */
     private fun complete(target: ConversationDictationTarget) {
         conversationDictationDiagnostic("event=session_finished outcome=completed")
+        pendingDispatchClaim = null
+        pendingPrefixSend = null
+        val sessionId = state.sessionId
+        val failure = retainedAudioFailure
+        val transcript = pendingCompletedTranscript.ifBlank { accumulatedTranscript }.trim()
+        if (sessionId != null && failure != null && runCatching(platform::callerAudioHasPending).getOrDefault(true)) {
+            if (requestedDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
+                draftRecovery.consumeSubmittedTranscript(sessionId, target, transcript)
+            }
+            clearRecognitionSession(cancel = false, releaseDurableSession = false)
+            accumulatedTranscript = transcript
+            recoveryHandedToComposer = true
+            dispatchedSessionId = null
+            completionIntent.reset()
+            completionIntent.choose(ConversationDictationDeliveryMode.PasteIntoDraft)
+            val failed =
+                ConversationDictationState.Failed(
+                    sessionId, target, failure,
+                    retainedTranscript = transcript,
+                    recognitionIncomplete = true,
+                    draftRecovered = true,
+                )
+            val key = ConversationDictationKey.from(target.accountRef, target.groupIdHex)
+            completionRevisions[key] = (completionRevisions[key] ?: 0) + 1
+            state = failed
+            notificationActionGeneration += 1L
+            protectRetainedRecovery(failed)
+            return
+        }
+        retainedAudioFailure = null
         clearRecognitionSession(cancel = false)
         draftRecovery.reset()
         resetTranscriptSession()
@@ -3858,6 +4037,7 @@ internal class ConversationDictationController internal constructor(
         recoveryDeadlineElapsedMillis = null
         accumulatedTranscript = ""
         pendingCompletedTranscript = ""
+        recoveryHandedToComposer = false
         finishRequested = false
         captureDeadlineElapsedMillis = null
         dispatchedSessionId = null

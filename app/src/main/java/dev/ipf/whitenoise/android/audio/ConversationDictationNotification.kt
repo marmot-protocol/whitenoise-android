@@ -23,7 +23,7 @@ internal fun buildConversationDictationNotification(
         .setSmallIcon(R.drawable.ic_stat_whitenoise)
         .setContentTitle(
             context.getString(
-                if (controller.state is ConversationDictationState.Failed) {
+                if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
                     R.string.dictation_recovery_title
                 } else {
                     R.string.dictation_notification_title
@@ -31,7 +31,7 @@ internal fun buildConversationDictationNotification(
             ),
         ).setContentText(
             context.getString(
-                if (controller.state is ConversationDictationState.Failed) {
+                if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
                     R.string.dictation_recovery_text
                 } else {
                     dictationNotificationStatus(controller)
@@ -45,13 +45,36 @@ internal fun buildConversationDictationNotification(
         .setOnlyAlertOnce(true)
         .setShowWhen(false)
         .apply {
-            if (controller.state is ConversationDictationState.Failed) {
-                addAction(0, context.getString(R.string.dictation_recovery_open), openDictationAppIntent(context))
+            if (controller.state is ConversationDictationState.Failed || controller.recoveryHandedToComposer) {
+                addRecoveryActions(context, controller, actionIntent)
             } else {
                 setStyle(Notification.DecoratedCustomViewStyle())
                 setCustomContentView(compactDictationControls(context, controller, actionIntent))
             }
         }.build()
+
+/** Optional audio recovery uses the existing drawer surface without taking composer controls. */
+private fun Notification.Builder.addRecoveryActions(
+    context: Context,
+    controller: ConversationDictationController,
+    actionIntent: (String, String) -> PendingIntent,
+) {
+    addAction(0, context.getString(R.string.dictation_recovery_open), openDictationAppIntent(context))
+    if (!controller.recoveryHandedToComposer) return
+    val token = requireNotNull(controller.notificationSessionToken)
+    if (controller.canRetryRetainedAudio && !controller.foregroundMicrophoneRequired) {
+        addAction(
+            0,
+            context.getString(R.string.retry),
+            actionIntent(ConversationDictationForegroundService.ACTION_RETRY_AUDIO, token),
+        )
+    }
+    addAction(
+        0,
+        context.getString(R.string.dismiss),
+        actionIntent(ConversationDictationForegroundService.ACTION_DISCARD_RECOVERY, token),
+    )
+}
 
 /** Expiry clears recovery data and leaves one ordinary, dismissible notice with no recording actions. */
 internal fun notifyConversationDictationRecoveryExpired(context: Context) {

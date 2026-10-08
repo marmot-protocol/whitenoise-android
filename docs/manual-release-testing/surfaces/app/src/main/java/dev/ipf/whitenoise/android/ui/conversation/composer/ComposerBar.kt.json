@@ -85,6 +85,14 @@
         "test_ids": [
           "CON-017"
         ]
+      },
+      {
+        "surface": "Recovered dictation uses ordinary composer Send and IME Send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "dictationController?.completionControlsRequired == true",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

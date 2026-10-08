@@ -548,6 +548,38 @@ internal class ConversationDictationForegroundServiceStartTest : ConversationDic
         lifecycle.destroy()
     }
 
+    /** Optional audio recovery owns fenced drawer actions while ordinary composer controls stay available. */
+    @Test
+    fun savedTailRecoveryNotificationRetriesAudioWithoutRevivingOldCompletionActions() {
+        val harness = installHost()
+        val lifecycle = Robolectric.buildService(NotificationStreamForegroundService::class.java).create()
+        val service = lifecycle.get()
+        service.onStartCommand(startIntent(service, harness), 0, 1)
+        val oldSend = actionCommand(service, harness, ConversationDictationForegroundService.ACTION_SEND)
+        harness.platform.pendingCallerAudio = true
+        harness.platform.listener.onResult("prefix")
+        shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(500L))
+        harness.conversationDictation.paste()
+        harness.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        service.foreground.dictation.refreshNotification()
+        val notification = requireNotNull(service.foreground.dictation.notificationOrNull())
+        assertEquals(listOf("Open app", "Retry", "Dismiss"), notification.actions.map { it.title.toString() })
+        assertNull(notification.contentView)
+        assertFalse(harness.conversationDictation.completionControlsRequired)
+        val retry = shadowOf(notification.actions[1].actionIntent).savedIntent
+        val oldDiscard = shadowOf(notification.actions[2].actionIntent).savedIntent
+        service.onStartCommand(retry, 0, 2)
+        val recovering = harness.conversationDictation.state
+        service.onStartCommand(oldSend, 0, 3)
+        service.onStartCommand(oldDiscard, 0, 4)
+        assertEquals(recovering, harness.conversationDictation.state)
+        assertFalse(harness.conversationDictation.completionControlsRequired)
+        assertEquals("prefix", harness.draft.text)
+        assertTrue(harness.sent.isEmpty())
+        harness.conversationDictation.cancel()
+        lifecycle.destroy()
+    }
+
     /** Verifies recents removal preserves explicit capture but service destruction fails it closed. */
     @Test
     fun recentsSwipeKeepsCaptureButServiceDestructionCancelsIt() {

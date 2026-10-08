@@ -26,6 +26,14 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Submitted dictation prefix stays consumed during later suffix recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationDraftRecovery.kt",
+        "anchor": "fun consumeSubmittedTranscript(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

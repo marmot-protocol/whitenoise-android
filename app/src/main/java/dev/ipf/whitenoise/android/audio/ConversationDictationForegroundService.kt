@@ -105,10 +105,18 @@ internal class ConversationDictationForegroundService(
             ) {
                 return Service.START_NOT_STICKY
             }
+            if (intent.action in setOf(ACTION_RETRY_AUDIO, ACTION_DISCARD_RECOVERY) &&
+                (!controller.recoveryHandedToComposer ||
+                    intent.getLongExtra(EXTRA_ACTION_GENERATION, -1L) != controller.notificationActionGeneration)
+            ) {
+                return Service.START_NOT_STICKY
+            }
             when (intent.action) {
                 ACTION_CANCEL -> controller.cancel()
                 ACTION_PASTE -> controller.paste()
                 ACTION_SEND -> controller.send()
+                ACTION_RETRY_AUDIO -> if (!controller.foregroundMicrophoneRequired) controller.retry()
+                ACTION_DISCARD_RECOVERY -> controller.cancel()
             }
             // A completion received before the queued start must not promote stale controls
             // or open the microphone. Android posts foreground notifications asynchronously.
@@ -313,6 +321,8 @@ internal class ConversationDictationForegroundService(
         internal const val ACTION_CANCEL = "dev.ipf.whitenoise.android.dictation.CANCEL"
         internal const val ACTION_PASTE = "dev.ipf.whitenoise.android.dictation.PASTE"
         internal const val ACTION_SEND = "dev.ipf.whitenoise.android.dictation.SEND"
+        internal const val ACTION_RETRY_AUDIO = "dev.ipf.whitenoise.android.dictation.RETRY_AUDIO"
+        internal const val ACTION_DISCARD_RECOVERY = "dev.ipf.whitenoise.android.dictation.DISCARD_RECOVERY"
         internal const val EXTRA_SESSION_TOKEN = "dictation_session_token"
         internal const val EXTRA_ACTION_GENERATION = "dictation_action_generation"
 
@@ -370,7 +380,15 @@ internal class ConversationDictationForegroundService(
         internal const val ACTION_START = "dev.ipf.whitenoise.android.dictation.START"
 
         internal fun isCommand(intent: Intent?): Boolean =
-            intent?.action in setOf(ACTION_START, ACTION_CANCEL, ACTION_PASTE, ACTION_SEND) ||
+            intent?.action in
+                setOf(
+                    ACTION_START,
+                    ACTION_CANCEL,
+                    ACTION_PASTE,
+                    ACTION_SEND,
+                    ACTION_RETRY_AUDIO,
+                    ACTION_DISCARD_RECOVERY,
+                ) ||
                 intent?.hasExtra(EXTRA_SESSION_TOKEN) == true
 
         /** Creates the low-importance, badge-free channel once per installation. */

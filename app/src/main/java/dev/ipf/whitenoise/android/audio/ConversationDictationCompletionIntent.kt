@@ -9,6 +9,8 @@ internal class ConversationDictationCompletionIntent {
     private enum class Phase { Open, Automatic, Explicit, Committed }
 
     private var phase by mutableStateOf(Phase.Open)
+    var explicit by mutableStateOf(false)
+        private set
     var mode by mutableStateOf<ConversationDictationDeliveryMode?>(null)
         private set
 
@@ -22,6 +24,7 @@ internal class ConversationDictationCompletionIntent {
     ): Boolean {
         if (!canChooseExplicit || (automatic && phase != Phase.Open)) return false
         mode = delivery
+        explicit = !automatic
         phase = if (automatic) Phase.Automatic else Phase.Explicit
         return true
     }
@@ -33,5 +36,6 @@ internal class ConversationDictationCompletionIntent {
     fun reset() {
         phase = Phase.Open
         mode = null
+        explicit = false
     }
 }

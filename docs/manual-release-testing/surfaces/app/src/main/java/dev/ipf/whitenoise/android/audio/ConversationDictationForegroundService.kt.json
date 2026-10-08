@@ -1,0 +1,43 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+  "legacy_sha256": "1de4206bd6ab824cb2b11b03810099efe0db36c8b52050937499a69641fd86b7",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "Dictation notification completion cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "private fun removeForegroundNotification()",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Dictation completion command avoids queued foreground repost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "fun onStartCommand(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:notification_channel_dictation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "R.string.notification_channel_dictation",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Optional dictation audio recovery notification actions are session and generation fenced",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationForegroundService.kt",
+        "anchor": "internal const val ACTION_RETRY_AUDIO",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
