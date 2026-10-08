@@ -1,0 +1,10 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: open-wipe-sheet.yaml
+# First label is the sheet title; the second button only opens the typed confirmation.
+- tapOn:
+    text: "Sign Out & Wipe"
+    index: 1
+- assertVisible: "Wipe this account[?]"
+- assertVisible: "Type WIPE to confirm[.]"
+- assertVisible: "Confirmation"

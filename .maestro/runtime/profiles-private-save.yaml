@@ -1,0 +1,4 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-private-save
+---
+- runFlow: ../fixtures/save-external-private-details.yaml

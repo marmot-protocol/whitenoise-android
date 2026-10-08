@@ -1,0 +1,29 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-whitespace-name
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Folders"
+    direction: DOWN
+- tapOn: "Folders"
+- assertVisible:
+    id: "chat-folders-content"
+- tapOn: "New Folder"
+- assertVisible:
+    id: "folder.name"
+- tapOn:
+    id: "folder.name"
+- inputText: "   "
+- hideKeyboard
+- assertVisible:
+    id: "folder.save"
+    enabled: false
+- back
+- assertVisible: "Discard changes[?]"
+- tapOn: "Discard Changes"
+- assertVisible:
+    id: "chat-folders-content"

@@ -1,0 +1,4 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: open-settings.yaml
+- runFlow: show-signout-sheet.yaml

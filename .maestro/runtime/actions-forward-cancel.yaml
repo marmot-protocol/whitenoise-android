@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: actions-forward-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- longPressOn:
+    text: "Generated fixture message"
+- tapOn: "Forward"
+- assertVisible: "Forward to"
+- assertVisible: "1 message"
+- assertVisible: "Maestro Alice"
+- assertVisible: "No other chats to forward to[.]"
+- back
+- assertNotVisible: "Forward to"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

@@ -1,0 +1,44 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signin-edit-error
+---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+# Back closes this known optional sheet and records declined sharing choices.
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign In"
+- tapOn: "Private key"
+- inputText: "not-a-key"
+- hideKeyboard
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That doesn't look like a valid nsec or npub key."
+- tapOn: "Private key"
+- eraseText
+- inputText: "another-invalid-input"
+- hideKeyboard
+- assertNotVisible: "That doesn't look like a valid nsec or npub key."
+- assertVisible: "Enter your Nostr secret key to use an existing identity on this device."
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That doesn't look like a valid nsec or npub key."
+- tapOn: "Clear"
+- assertVisible:
+    id: "onboarding.sign_in.action"
+    enabled: false
+- assertNotVisible: "That doesn't look like a valid nsec or npub key."
+- assertVisible: "Enter your Nostr secret key to use an existing identity on this device."
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- takeScreenshot: signin-edit-error

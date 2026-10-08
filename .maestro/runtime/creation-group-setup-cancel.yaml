@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: creation-group-setup-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "New Message"
+- assertVisible:
+    id: "new_message.screen"
+- tapOn: "New Group"
+- assertVisible:
+    id: "new_group.screen"
+- tapOn:
+    id: "new_group.continue"
+- assertVisible:
+    id: "group_setup.screen"
+- tapOn:
+    id: "group_setup.name"
+- inputText: "Maestro unsubmitted group"
+- hideKeyboard
+- back
+- assertVisible:
+    id: "new_group.screen"

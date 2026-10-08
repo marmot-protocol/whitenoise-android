@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: groups-edit-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Edit Group"
+    direction: DOWN
+- tapOn: "Edit Group"
+- assertVisible:
+    id: "group_edit.photoAction"
+- back
+- assertVisible:
+    id: "chat_info.list"
+- assertVisible: "Maestro group"

@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: navigation-account-empty
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- tapOn:
+    id: "settings.switch_profile"
+- tapOn: "Maestro Carol"
+- assertVisible: "Switch Profile, Maestro Carol"
+- assertVisible: "No Chats"
+- assertNotVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Maestro Carol"
+- tapOn:
+    id: "settings.switch_profile"
+- tapOn: "Maestro Alice"
+- assertVisible: "Switch Profile, Maestro Alice"
+- assertVisible: "Maestro group"

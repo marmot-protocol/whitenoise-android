@@ -1,0 +1,1895 @@
+{
+  "schema": 1,
+  "coverage": "Partial assertions only; permanent manual checklist remains unchecked.",
+  "cases": {
+    "settings-appearance": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Appearance opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-notifications": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Notifications opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-read-aloud": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Read Aloud opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-data": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001",
+        "SET-010"
+      ],
+      "assertions": "Data Usage opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-privacy": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Privacy & Security opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-connectors": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "AI Agents opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-help": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "Help opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "navigation-settings-back": {
+      "suite": "navigation",
+      "manual_ids": [
+        "NAV-001",
+        "NAV-002"
+      ],
+      "assertions": "Settings opens through the accessible avatar and System Back restores Chats.",
+      "postcondition": "none"
+    },
+    "navigation-selector-cancel": {
+      "suite": "navigation",
+      "manual_ids": [
+        "NAV-004"
+      ],
+      "assertions": "Profile selector dismissal preserves active Alice.",
+      "postcondition": "none"
+    },
+    "navigation-account-empty": {
+      "suite": "navigation",
+      "manual_ids": [
+        "NAV-004",
+        "NAV-005",
+        "CHL-001"
+      ],
+      "assertions": "Carol has no Alice conversation; returning to Alice restores her group.",
+      "postcondition": "none"
+    },
+    "navigation-search-clear": {
+      "suite": "navigation",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-002"
+      ],
+      "assertions": "Title search finds the generated group, excludes it for a unique query, and Back clears search.",
+      "postcondition": "none"
+    },
+    "navigation-help-about": {
+      "suite": "navigation",
+      "manual_ids": [
+        "SET-018",
+        "SET-019"
+      ],
+      "assertions": "About shows app/version information and System Back returns to Help; no external browser is opened.",
+      "postcondition": "none"
+    },
+    "conversation-history-back": {
+      "suite": "conversation",
+      "manual_ids": [
+        "CON-001",
+        "CON-002"
+      ],
+      "assertions": "Generated native history renders in the conversation and Back restores the chat list.",
+      "postcondition": "none"
+    },
+    "conversation-draft-return": {
+      "suite": "conversation",
+      "manual_ids": [
+        "CON-008"
+      ],
+      "assertions": "An unsent composer draft appears in the list and survives leaving and reopening its conversation.",
+      "postcondition": "none"
+    },
+    "conversation-send": {
+      "suite": "conversation",
+      "manual_ids": [
+        "CON-005"
+      ],
+      "assertions": "UI send clears the composer, renders the outgoing text, updates the list, and reaches Bob exactly once in native history.",
+      "postcondition": "send"
+    },
+    "conversation-selection-cancel": {
+      "suite": "conversation",
+      "manual_ids": [
+        "MSG-004"
+      ],
+      "assertions": "Long-press message actions can be dismissed without removing the selected message.",
+      "postcondition": "none"
+    },
+    "conversation-landscape": {
+      "suite": "conversation",
+      "manual_ids": [
+        "NAV-009",
+        "AXY-004"
+      ],
+      "assertions": "Conversation history stays accessible across landscape and portrait rotation.",
+      "postcondition": "none"
+    },
+    "settings-profile-keys": {
+      "suite": "settings",
+      "manual_ids": [
+        "ACC-009"
+      ],
+      "assertions": "Private key remains concealed when opening and leaving Profile Keys; no reveal or clipboard export.",
+      "postcondition": "none"
+    },
+    "navigation-profile-edit-cancel": {
+      "suite": "navigation",
+      "manual_ids": [
+        "PRO-001"
+      ],
+      "assertions": "Back discards an edited profile name without publishing it.",
+      "postcondition": "none"
+    },
+    "preferences-dark": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-002"
+      ],
+      "assertions": "Dark selection survives leaving/reopening Appearance; fixture verifies the selected theme.",
+      "postcondition": "dark"
+    },
+    "preferences-font-large": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-006"
+      ],
+      "assertions": "Large font selection remains displayed after returning to Appearance; fixture verifies the selected font scale.",
+      "postcondition": "font-large"
+    },
+    "preferences-font-cancel": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-024"
+      ],
+      "assertions": "System Back dismisses the font-size picker and retains the default choice.",
+      "postcondition": "none"
+    },
+    "preferences-language-cancel": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-008"
+      ],
+      "assertions": "Language picker is reachable and Back returns to Appearance without a language change.",
+      "postcondition": "none"
+    },
+    "conversation-emoji-cancel": {
+      "suite": "conversation",
+      "manual_ids": [
+        "CON-010"
+      ],
+      "assertions": "Emoji picker opens and dismisses without sending or removing history.",
+      "postcondition": "none"
+    },
+    "conversation-attachment-cancel": {
+      "suite": "conversation",
+      "manual_ids": [
+        "MED-001"
+      ],
+      "assertions": "Attachment menu opens and dismisses without starting a media send.",
+      "postcondition": "none"
+    },
+    "advanced-dictation": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-027"
+      ],
+      "assertions": "Dictation opens its own content and System Back returns to Settings.",
+      "postcondition": "none"
+    },
+    "advanced-gestures": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-032"
+      ],
+      "assertions": "Swipe actions opens its own content and System Back returns to Settings.",
+      "postcondition": "none"
+    },
+    "advanced-folders": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Folders opens its own content and System Back returns to Settings.",
+      "postcondition": "none"
+    },
+    "advanced-relays": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-001"
+      ],
+      "assertions": "Relays opens its own content and System Back returns to Settings.",
+      "postcondition": "none"
+    },
+    "advanced-folder-create-cancel": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Back cancels an entered folder name and no new folder appears.",
+      "postcondition": "none"
+    },
+    "advanced-custom-emoji": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SET-030"
+      ],
+      "assertions": "Custom emoji management opens with photo/file actions and Back returns to Appearance.",
+      "postcondition": "none"
+    },
+    "connectors-hermes": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "hermes setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "connectors-openclaw": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "openclaw setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "connectors-opencode": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "opencode setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "connectors-codex": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "codex setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "connectors-claude": {
+      "suite": "connectors",
+      "manual_ids": [
+        "SET-016"
+      ],
+      "assertions": "claude setup sheet displays its prompt and copy action; Back dismisses without installing, copying or opening a browser.",
+      "postcondition": "none"
+    },
+    "groups-details-return": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-001",
+        "NAV-008"
+      ],
+      "assertions": "Conversation header opens real group details and Back restores its history.",
+      "postcondition": "none"
+    },
+    "groups-members": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Native group roster displays both generated members.",
+      "postcondition": "none"
+    },
+    "groups-relays": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "Group relay details can be opened and dismissed without editing or publishing relay configuration.",
+      "postcondition": "none"
+    },
+    "creation-message-back": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-001"
+      ],
+      "assertions": "New Message opens its recipient screen and Back restores the chat list.",
+      "postcondition": "none",
+      "fixture": "creation"
+    },
+    "creation-search-invalid": {
+      "suite": "creation",
+      "manual_ids": [
+        "FIND-006",
+        "NCH-001"
+      ],
+      "assertions": "Malformed recipient input stays in the picker; no conversation is opened automatically.",
+      "postcondition": "none",
+      "fixture": "creation"
+    },
+    "creation-group-back": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-002"
+      ],
+      "assertions": "Group recipient picker Back restores New Message.",
+      "postcondition": "none",
+      "fixture": "creation"
+    },
+    "creation-group-setup-cancel": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-002"
+      ],
+      "assertions": "An entered group name can be canceled before native submission.",
+      "postcondition": "none",
+      "fixture": "creation"
+    },
+    "creation-group-name-retained": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-002"
+      ],
+      "assertions": "Unsubmitted setup name survives Back to the recipient picker and return.",
+      "postcondition": "none",
+      "fixture": "creation"
+    },
+    "actions-edit-cancel": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-007"
+      ],
+      "assertions": "Editing an outgoing fixture message can be canceled with its original text retained.",
+      "postcondition": "none"
+    },
+    "actions-forward-cancel": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-010"
+      ],
+      "assertions": "Forward destination picker opens then cancels without sending.",
+      "postcondition": "none"
+    },
+    "actions-selection-back": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-012"
+      ],
+      "assertions": "Explicit Select mode can be dismissed while keeping the transcript.",
+      "postcondition": "none"
+    },
+    "actions-info-back": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-013"
+      ],
+      "assertions": "Message information opens and Back restores its source transcript.",
+      "postcondition": "none"
+    },
+    "groups-mute-cancel": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-015"
+      ],
+      "assertions": "Mute duration dialog cancels without activating a mute.",
+      "postcondition": "none"
+    },
+    "groups-retention-cancel": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-017"
+      ],
+      "assertions": "Disappearing-message picker opens and cancels before a native mutation.",
+      "postcondition": "none"
+    },
+    "groups-edit-cancel": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-002"
+      ],
+      "assertions": "Admin group editor opens and cancels with the existing group title retained.",
+      "postcondition": "none"
+    },
+    "groups-notifications-back": {
+      "suite": "groups",
+      "manual_ids": [
+        "GRP-016"
+      ],
+      "assertions": "Conversation notification settings opens through group details and Back restores that group.",
+      "postcondition": "none"
+    },
+    "polls-cancel": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Cancel a typed poll draft without publishing it.",
+      "postcondition": "none"
+    },
+    "polls-question-required": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Empty question submission stays in the dialog with its inline validation error.",
+      "postcondition": "none"
+    },
+    "polls-two-options-required": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "One nonempty option is rejected without closing the draft.",
+      "postcondition": "none"
+    },
+    "polls-duplicate-options": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Case-equivalent options show the duplicate validation error.",
+      "postcondition": "none"
+    },
+    "polls-question-boundary": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "A 1025-byte question is rejected at the 1024-byte limit.",
+      "postcondition": "none"
+    },
+    "polls-option-boundary": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "A 257-byte option is rejected at the 256-byte limit.",
+      "postcondition": "none"
+    },
+    "polls-add-remove-option": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Add and remove a third option while retaining the two required option fields.",
+      "postcondition": "none"
+    },
+    "polls-custom-zero": {
+      "suite": "polls",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Custom zero duration is rejected inline instead of starting a deadline.",
+      "postcondition": "none"
+    },
+    "folders-create-reopen": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Save a named folder, reopen its editor and retain the saved name.",
+      "postcondition": "folder-saved"
+    },
+    "folders-empty-name": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Empty name keeps Save disabled and Back leaves without a discard prompt.",
+      "postcondition": "folder-absent"
+    },
+    "folders-whitespace-name": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Whitespace name keeps Save disabled; explicit discard leaves no custom folder.",
+      "postcondition": "folder-absent"
+    },
+    "folders-keep-editing": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Keep Editing preserves an unsaved name; subsequent explicit discard removes the draft.",
+      "postcondition": "folder-absent"
+    },
+    "folders-delete-cancel": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Cancel the folder-specific delete confirmation and retain the saved folder.",
+      "postcondition": "folder-saved"
+    },
+    "folders-delete-confirm": {
+      "suite": "folders",
+      "manual_ids": [
+        "SET-009"
+      ],
+      "assertions": "Confirm deletion of the generated custom folder; fixture checks it was removed.",
+      "postcondition": "folder-absent"
+    },
+    "preferences-light": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-002"
+      ],
+      "assertions": "Light theme survives leaving and reopening Appearance; fixture checks the state projection.",
+      "postcondition": "light"
+    },
+    "preferences-amoled": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-002"
+      ],
+      "assertions": "AMOLED theme survives leaving and reopening Appearance; fixture checks the state projection.",
+      "postcondition": "amoled"
+    },
+    "nested-action-color": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-004"
+      ],
+      "assertions": "Action-color controls and preview open, then Back returns to Appearance without committing a draft.",
+      "postcondition": "none"
+    },
+    "nested-bubble-colors": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-005"
+      ],
+      "assertions": "Bubble-color editor opens its sent-message controls and preview, then Back returns to Appearance.",
+      "postcondition": "none"
+    },
+    "nested-blocked-empty": {
+      "suite": "nested",
+      "manual_ids": [
+        "SEC-014"
+      ],
+      "assertions": "Fresh native account shows the explicit empty block list; Back returns to Privacy.",
+      "postcondition": "none"
+    },
+    "nested-diagnostics": {
+      "suite": "nested",
+      "manual_ids": [
+        "SEC-007",
+        "SEC-008"
+      ],
+      "assertions": "Sharing choices open and dismiss without granting usage or diagnostic sharing.",
+      "postcondition": "none"
+    },
+    "nested-default-retention": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-028"
+      ],
+      "assertions": "Default retention picker opens and cancels without changing new-chat policy.",
+      "postcondition": "none"
+    },
+    "nested-bug-report": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "Bug-report destination and opening action are visible; Back returns to Help without opening GitHub.",
+      "postcondition": "none"
+    },
+    "nested-share-connect": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-001",
+        "ACC-019"
+      ],
+      "assertions": "Active-profile header opens its public QR card and Back restores Settings without sharing.",
+      "postcondition": "none"
+    },
+    "nested-donate": {
+      "suite": "nested",
+      "manual_ids": [
+        "SET-022"
+      ],
+      "assertions": "Donate opens its action and returns without launching a browser or payment flow.",
+      "postcondition": "none"
+    },
+    "reader-back": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Expanded Markdown reader opens its generated heading and returns to the source conversation.",
+      "postcondition": "none"
+    },
+    "reader-scroll-end": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Reader scroll reaches the actual end of a long native message before returning.",
+      "postcondition": "none"
+    },
+    "reader-rotation": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Expanded reader remains open through landscape and portrait configuration changes.",
+      "postcondition": "none"
+    },
+    "reader-actions-cancel": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Reader action menu cancels back to the same expanded message without copying.",
+      "postcondition": "none"
+    },
+    "reader-reply-cancel": {
+      "suite": "reader",
+      "fixture": "reader",
+      "manual_ids": [
+        "MSG-002",
+        "MSG-026"
+      ],
+      "assertions": "Reply from the expanded message creates a reply target; cancel removes that target without sending.",
+      "postcondition": "none"
+    },
+    "reader-links-library": {
+      "suite": "reader",
+      "fixture": "links",
+      "manual_ids": [
+        "GRP-001"
+      ],
+      "assertions": "A genuine native text link exposes the shared Links destination; Back restores its group without browser navigation.",
+      "postcondition": "none"
+    },
+    "composer-expand-collapse": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017"
+      ],
+      "assertions": "Drag-expand and collapse the composer without dropping an unsent native draft. Independently verify the retained account/group geometry and unchanged native draft.",
+      "postcondition": "composer-automatic"
+    },
+    "composer-expanded-rotation": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017"
+      ],
+      "assertions": "Expanded draft text survives landscape and portrait rotation. Independently verify the retained account/group geometry and unchanged native draft.",
+      "postcondition": "composer-automatic"
+    },
+    "composer-expanded-keyboard-back": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017"
+      ],
+      "assertions": "Keyboard Back preserves the expanded draft and its collapse control. Independently verify the retained account/group geometry and unchanged native draft.",
+      "postcondition": "composer-expanded"
+    },
+    "composer-expanded-route-return": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017"
+      ],
+      "assertions": "Expanded draft and full-screen geometry survive leaving and reopening the conversation. Require the actual composer, hidden original bubble, absent chat-list route and native retained FullScreen preference plus unchanged draft.",
+      "postcondition": "composer-expanded"
+    },
+    "composer-expanded-locale-recreation": {
+      "suite": "composer",
+      "manual_ids": [
+        "CON-017",
+        "CON-008",
+        "NAV-009",
+        "SET-008"
+      ],
+      "assertions": "Expand an actual native draft, apply German through the real locale screen to recreate MainActivity, restore System and reopen the owning conversation. Native verification requires a different actual Activity instance, retained FullScreen geometry, unchanged draft and empty application locale; handled rotation is not recreation or process death.",
+      "postcondition": "composer-recreated"
+    },
+    "developer-unlock": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-019",
+        "SET-020"
+      ],
+      "assertions": "Seven version taps reveal Developer Tools with its development warning; Back returns to Settings.",
+      "postcondition": "none"
+    },
+    "developer-mode-off": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-020"
+      ],
+      "assertions": "Turning developer mode off hides debugging controls while leaving Key Packages available.",
+      "postcondition": "none"
+    },
+    "developer-key-packages": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-020"
+      ],
+      "assertions": "Key Packages opens its real native-backed content and Back restores Developer Tools; no package is published.",
+      "postcondition": "none"
+    },
+    "developer-quarantine": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-031"
+      ],
+      "assertions": "Quarantined Groups opens its real content and Back restores Developer Tools; no recovery mutation is submitted.",
+      "postcondition": "none"
+    },
+    "developer-diagnostics": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-020",
+        "SET-021"
+      ],
+      "assertions": "Diagnostics opens Events and actions and Back restores Developer Tools.",
+      "postcondition": "none"
+    },
+    "developer-diagnostics-actions": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-021"
+      ],
+      "assertions": "Opening and dismissing Diagnostics actions retains Events without clearing or submitting native work.",
+      "postcondition": "none"
+    },
+    "developer-diagnostics-health": {
+      "suite": "developer",
+      "manual_ids": [
+        "SET-021"
+      ],
+      "assertions": "Health shows its controls; cancelling returns to Events without sending a diagnostic message.",
+      "postcondition": "none"
+    },
+    "support-entry-back": {
+      "suite": "support",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "Support contact information is displayed; Back returns to Settings without contacting Support.",
+      "postcondition": "none"
+    },
+    "support-relay-guidance": {
+      "suite": "support",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "The loopback-only profile needs public receiving relays; Support offers relay guidance and cannot start a support chat.",
+      "postcondition": "none"
+    },
+    "support-relays-back": {
+      "suite": "support",
+      "manual_ids": [
+        "SET-018"
+      ],
+      "assertions": "Support receiving-relay guidance opens Relays and Back returns to Support without publishing or starting a chat.",
+      "postcondition": "none"
+    },
+    "ballots-open-back": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Published poll displays its question, options and single-choice type; Back does not cast a vote.",
+      "postcondition": "poll-no-vote",
+      "fixture": "poll-single"
+    },
+    "ballots-single-vote": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "UI selection casts one Tea vote; both real native accounts must show one participant and matching tally.",
+      "postcondition": "poll-single-vote",
+      "fixture": "poll-single"
+    },
+    "ballots-change-vote": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Replacing Tea with Coffee retains one voter and transfers the tally, verified on both native accounts.",
+      "postcondition": "poll-change-vote",
+      "fixture": "poll-single"
+    },
+    "ballots-multiple-vote": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "Multiple choice retains Tea and Coffee for one voter; both native accounts must agree on options and tally.",
+      "postcondition": "poll-multiple-vote",
+      "fixture": "poll-multiple"
+    },
+    "ballots-votes-sheet-back": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021",
+        "MSG-032"
+      ],
+      "assertions": "View votes shows the actual Alice voter and chosen Tea option; Back returns to the poll without changing the native tally.",
+      "postcondition": "poll-single-vote",
+      "fixture": "poll-single"
+    },
+    "ballots-publish": {
+      "suite": "ballots",
+      "manual_ids": [
+        "MSG-021"
+      ],
+      "assertions": "UI publishes a valid two-option poll; both native accounts must receive exactly one matching published poll without a vote.",
+      "postcondition": "poll-published",
+      "fixture": "basic"
+    },
+    "profiles-member-back": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-001"
+      ],
+      "assertions": "Bob member profile shows native identity and private-detail entry; Back restores the same group details.",
+      "postcondition": "none"
+    },
+    "profiles-private-cancel": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007"
+      ],
+      "assertions": "Cancelling private nickname and notes leaves the external Dave contact unchanged and discards the unsaved values on reopen. Native verification requires empty owner/other-viewer private preferences and unchanged public profiles.",
+      "postcondition": "contact-private-cleared",
+      "fixture": "contacts"
+    },
+    "profiles-private-rotation": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007",
+        "NAV-009"
+      ],
+      "assertions": "Private nickname and notes survive Activity rotation while editing, then explicit Cancel discards them. Native verification requires empty owner/other-viewer private preferences and unchanged public profiles.",
+      "postcondition": "contact-private-cleared",
+      "fixture": "contacts"
+    },
+    "profiles-add-group-back": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-008"
+      ],
+      "assertions": "The Add-to-group picker can be dismissed without changing existing membership.",
+      "postcondition": "none"
+    },
+    "profiles-shared-groups": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-001"
+      ],
+      "assertions": "Groups in Common shows the actual generated shared group and Back restores Bob profile.",
+      "postcondition": "none"
+    },
+    "profiles-admin-confirm-back": {
+      "suite": "profiles",
+      "manual_ids": [
+        "GRP-007"
+      ],
+      "assertions": "The actual group-scoped Make Admin confirmation names Bob; Back dismisses it and the unchanged Make Admin action remains available. Global multi-group picking and published promotion remain separate.",
+      "postcondition": "none"
+    },
+    "profiles-start-group-back": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-002"
+      ],
+      "assertions": "Start group uses Bob as the intended recipient; Back leaves the unsubmitted setup without creating a group.",
+      "postcondition": "none"
+    },
+    "chats-menu-back": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-002"
+      ],
+      "assertions": "Back cancels the row menu and preserves the generated conversation.",
+      "postcondition": "none"
+    },
+    "chats-delete-cancel": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-010"
+      ],
+      "assertions": "Cancel dismisses device-local deletion confirmation and preserves accessible history.",
+      "postcondition": "none",
+      "fixture": "departed"
+    },
+    "chats-folder-cancel": {
+      "suite": "chats",
+      "manual_ids": [
+        "FLD-002",
+        "SET-009"
+      ],
+      "assertions": "Cancelling Add-to-folder with no custom folders does not create a folder or remove the chat.",
+      "postcondition": "folder-absent"
+    },
+    "chats-select-back": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-011"
+      ],
+      "assertions": "Back leaves selection mode and preserves the selected chat.",
+      "postcondition": "none"
+    },
+    "chats-bulk-delete-cancel": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-011",
+        "CHL-012"
+      ],
+      "assertions": "Cancel from selection deletion preserves the row and permits normal navigation.",
+      "postcondition": "none"
+    },
+    "chatstate-pin": {
+      "suite": "chatstate",
+      "manual_ids": [
+        "CHL-006"
+      ],
+      "assertions": "Pin changes the row command to Unpin and the real native row is pinned.",
+      "postcondition": "chat-pinned"
+    },
+    "chatstate-pin-round-trip": {
+      "suite": "chatstate",
+      "manual_ids": [
+        "CHL-006"
+      ],
+      "assertions": "Pin then Unpin restores the initial native row state without changing the peer row.",
+      "postcondition": "chat-unpinned"
+    },
+    "chatstate-delete-confirm": {
+      "suite": "chatstate",
+      "manual_ids": [
+        "CHL-010"
+      ],
+      "assertions": "Confirmed local deletion removes only Alice row while Bob retains his actual group.",
+      "postcondition": "chat-deleted",
+      "fixture": "departed"
+    },
+    "consent-default-close": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Closing untouched default-off choices reaches Chats and native telemetry is declined with logging still off.",
+      "postcondition": "consent-declined",
+      "fixture": "consent"
+    },
+    "consent-system-back": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "System Back dismisses the first-launch choice sheet and records decline without enabling logging.",
+      "postcondition": "consent-declined",
+      "fixture": "consent"
+    },
+    "consent-usage-details": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Usage disclosure expands and collapses without recording consent or enabling either choice.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "consent-logs-details": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Log disclosure is readable and can collapse while consent remains undecided and logging off.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "consent-details-independent": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Collapsing usage disclosure leaves diagnostic-log disclosure expanded without granting collection.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "consent-details-rotation": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Usage disclosure stays expanded across landscape and portrait configuration changes without recording consent.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "consent-log-confirm-cancel": {
+      "suite": "consent",
+      "manual_ids": [
+        "SEC-012",
+        "SEC-016"
+      ],
+      "assertions": "Enabling diagnostic logs requires the explicit upload disclosure; Cancel leaves native logging off and consent undecided.",
+      "postcondition": "consent-pending",
+      "fixture": "consent"
+    },
+    "keys-empty": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Empty passwords disable both encrypted-backup destinations.",
+      "postcondition": "none"
+    },
+    "keys-short-boundary": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Matching eleven-character passwords remain invalid.",
+      "postcondition": "none"
+    },
+    "keys-minimum-boundary": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Matching twelve-character passwords enable both destinations without exporting.",
+      "postcondition": "none"
+    },
+    "keys-mismatch": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Different valid-length passwords cannot request a backup.",
+      "postcondition": "none"
+    },
+    "keys-cancel-clears": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Cancel erases valid passphrases before the next dialog opens.",
+      "postcondition": "none"
+    },
+    "keys-back-clears": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "System Back dismisses and clears passphrases without exporting.",
+      "postcondition": "none"
+    },
+    "keys-correct-mismatch": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Correcting confirmation enables both destinations and clears mismatch feedback.",
+      "postcondition": "none"
+    },
+    "search-date-cancel": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-008"
+      ],
+      "assertions": "Staging Today then cancelling the date picker leaves no applied date filter.",
+      "postcondition": "none"
+    },
+    "search-custom-start-cancel": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-009"
+      ],
+      "assertions": "Cancelling the custom-range start picker restores presets without applying a range.",
+      "postcondition": "none"
+    },
+    "search-custom-end-cancel": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-009"
+      ],
+      "assertions": "Advancing a selected start date then cancelling the end picker does not commit a partial range.",
+      "postcondition": "none"
+    },
+    "search-types-back": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-008"
+      ],
+      "assertions": "Chat-type filter dialog exposes both categories and Back closes the dialog before search.",
+      "postcondition": "none"
+    },
+    "search-content-back": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-001",
+        "FIND-008"
+      ],
+      "assertions": "Content filter dialog opens and Back returns to the same search without a selection.",
+      "postcondition": "none"
+    },
+    "search-date-today": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Today produces its exact active date chip; Clear all removes it.",
+      "postcondition": "none"
+    },
+    "search-date-week": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Last 7 days produces its exact active date chip; Clear all removes it.",
+      "postcondition": "none"
+    },
+    "search-date-month": {
+      "suite": "search",
+      "manual_ids": [
+        "FIND-008"
+      ],
+      "assertions": "Last 30 days produces its exact active date chip; Clear all removes it.",
+      "postcondition": "none"
+    },
+    "notifications-deny": {
+      "suite": "permissions",
+      "manual_ids": [
+        "NTF-001"
+      ],
+      "assertions": "Deny the actual Android notification prompt and reach Chats with native permission denied.",
+      "postcondition": "notification-denied",
+      "fixture": "notifications"
+    },
+    "notifications-grant": {
+      "suite": "permissions",
+      "manual_ids": [
+        "NTF-001"
+      ],
+      "assertions": "Grant the actual Android notification prompt and verify the system permission is granted.",
+      "postcondition": "notification-granted",
+      "fixture": "notifications"
+    },
+    "notifications-back": {
+      "suite": "permissions",
+      "manual_ids": [
+        "NTF-001"
+      ],
+      "assertions": "Back dismisses the notification request without granting permission.",
+      "postcondition": "notification-denied",
+      "fixture": "notifications"
+    },
+    "notifications-deny-settings": {
+      "suite": "permissions",
+      "manual_ids": [
+        "NTF-001"
+      ],
+      "assertions": "Settings Notifications opens after system denial without silently granting permission.",
+      "postcondition": "notification-denied",
+      "fixture": "notifications"
+    },
+    "actions-delete-cancel": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Outgoing message deletion offers local/everyone choices; Cancel dismisses confirmation and retains the original message.",
+      "postcondition": "none"
+    },
+    "actions-delete-back": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Outgoing message deletion offers local/everyone choices; Android Back dismisses confirmation and retains the original message.",
+      "postcondition": "none"
+    },
+    "actions-delete-rotate": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Outgoing message deletion offers local/everyone choices; landscape/portrait configuration changes and Cancel dismisses confirmation and retains the original message.",
+      "postcondition": "none"
+    },
+    "actions-batch-delete-cancel": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-004",
+        "MSG-008"
+      ],
+      "assertions": "Select one real message, open batch-delete confirmation, cancel, leave selection, and retain its transcript.",
+      "postcondition": "none"
+    },
+    "reports-back": {
+      "suite": "reports",
+      "manual_ids": [
+        "MSG-016"
+      ],
+      "assertions": "Incoming-message reporting states who receives it, offers a send action, and Android Back retains the transcript without submission.",
+      "postcondition": "none",
+      "fixture": "incoming"
+    },
+    "reports-other-cancel": {
+      "suite": "reports",
+      "manual_ids": [
+        "MSG-016"
+      ],
+      "assertions": "The final reason remains selectable after scrolling; closing reporting retains the incoming message.",
+      "postcondition": "none",
+      "fixture": "incoming"
+    },
+    "reports-explanation-cancel": {
+      "suite": "reports",
+      "manual_ids": [
+        "MSG-016"
+      ],
+      "assertions": "Report explanation input accepts disposable text; dismissing the keyboard and sheet returns to the incoming message without submission.",
+      "postcondition": "none",
+      "fixture": "incoming"
+    },
+    "reports-rotation-cancel": {
+      "suite": "reports",
+      "manual_ids": [
+        "MSG-016"
+      ],
+      "assertions": "Reporting remains reachable through landscape/portrait configuration changes and can be canceled without sending.",
+      "postcondition": "none",
+      "fixture": "incoming"
+    },
+    "acquisition-camera-deny": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "MED-004"
+      ],
+      "assertions": "Open real Camera acquisition, deny the request, retain the transcript without selecting or sending media. Verify Android CAMERA remains denied.",
+      "postcondition": "camera-denied"
+    },
+    "acquisition-camera-back": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "MED-004"
+      ],
+      "assertions": "Open real Camera acquisition, cancel with Android Back, retain the transcript without selecting or sending media. Verify Android CAMERA remains denied.",
+      "postcondition": "camera-denied"
+    },
+    "acquisition-gallery-cancel": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "MED-003"
+      ],
+      "assertions": "Open real Photos and videos acquisition, cancel with Android Back, retain the transcript without selecting or sending media.",
+      "postcondition": "none"
+    },
+    "acquisition-document-cancel": {
+      "suite": "acquisition",
+      "manual_ids": [
+        "MED-009"
+      ],
+      "assertions": "Open real Files acquisition, cancel with Android Back, retain the transcript without selecting or sending media.",
+      "postcondition": "none"
+    },
+    "keys-rotation-cancel": {
+      "suite": "keys",
+      "manual_ids": [
+        "ACC-009",
+        "ACC-011"
+      ],
+      "assertions": "Encrypted-backup passphrase dialog remains usable during handled landscape/portrait changes; explicit Cancel clears its fields on reopen and the raw key remains hidden.",
+      "postcondition": "none"
+    },
+    "speech-rate-back": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "The rate chooser lists system/custom choices; Android Back dismisses it to Read Aloud.",
+      "postcondition": "none"
+    },
+    "speech-custom-cancel": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Custom rate input is dismissed by Cancel without applying a value.",
+      "postcondition": "none"
+    },
+    "speech-custom-back": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Android Back dismisses the unfocused custom rate dialog and retains the real Read Aloud screen.",
+      "postcondition": "none"
+    },
+    "speech-custom-reopen": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "An unapplied custom rate is discarded when the dialog is cancelled and reopened.",
+      "postcondition": "none"
+    },
+    "speech-custom-empty": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Unapplied custom rate '' cannot close the dialog after Apply; the range error remains visible.",
+      "postcondition": "none"
+    },
+    "speech-custom-zero": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Unapplied custom rate '0' cannot close the dialog after Apply; the range error remains visible.",
+      "postcondition": "none"
+    },
+    "speech-custom-below-min": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Unapplied custom rate '0.09' cannot close the dialog after Apply; the range error remains visible.",
+      "postcondition": "none"
+    },
+    "speech-custom-above-max": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Unapplied custom rate '10.01' cannot close the dialog after Apply; the range error remains visible.",
+      "postcondition": "none"
+    },
+    "speech-custom-minimum-cancel": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "The exact 0.1 rate boundary is editable; Cancel leaves the destination intact. No applied-rate or audio proof is claimed.",
+      "postcondition": "none"
+    },
+    "speech-custom-maximum-cancel": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "The exact 10.0 rate boundary is editable; Cancel leaves the destination intact. No applied-rate or audio proof is claimed.",
+      "postcondition": "none"
+    },
+    "speech-custom-rotation-cancel": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Custom-rate dialog and entered value remain accessible through handled orientation changes, then Cancel dismisses it.",
+      "postcondition": "none"
+    },
+    "speech-rate-return": {
+      "suite": "speech",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "After dismissing the rate chooser, toolbar Back returns through Settings to Chats.",
+      "postcondition": "none"
+    },
+    "dictation-provider-back": {
+      "suite": "dictation",
+      "manual_ids": [
+        "DIC-003",
+        "DIC-006"
+      ],
+      "assertions": "The actual provider chooser exposes Automatic and dismisses without choosing an external provider; handled rotation stays navigable.",
+      "postcondition": "none"
+    },
+    "dictation-provider-rotation": {
+      "suite": "dictation",
+      "manual_ids": [
+        "DIC-003",
+        "DIC-006"
+      ],
+      "assertions": "The actual provider chooser exposes Automatic and dismisses without choosing an external provider; handled rotation stays navigable.",
+      "postcondition": "none"
+    },
+    "dictation-finish-back": {
+      "suite": "dictation",
+      "manual_ids": [
+        "DIC-001"
+      ],
+      "assertions": "The automatic-completion chooser includes manual Paste or Send and dismisses without changing the option.",
+      "postcondition": "none"
+    },
+    "dictation-provider-reopen": {
+      "suite": "dictation",
+      "manual_ids": [
+        "DIC-003"
+      ],
+      "assertions": "A cancelled provider chooser can be opened again; Automatic remains available.",
+      "postcondition": "none"
+    },
+    "reactions-configure-back": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-001"
+      ],
+      "assertions": "The quick-reaction configuration back path cancels without reacting to or deleting the original message.",
+      "postcondition": "none"
+    },
+    "reactions-configure-reset-back": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-001"
+      ],
+      "assertions": "The quick-reaction configuration reset-back path cancels without reacting to or deleting the original message.",
+      "postcondition": "none"
+    },
+    "reactions-configure-rotation": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-001"
+      ],
+      "assertions": "After handled rotation, Android Back collapses the expanded quick-reaction sheet; the next Back dismisses it and preserves the real conversation without reacting.",
+      "postcondition": "none"
+    },
+    "reactions-configure-slot-cancel": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-001"
+      ],
+      "assertions": "The quick-reaction configuration slot-cancel path cancels without reacting to or deleting the original message.",
+      "postcondition": "none"
+    },
+    "alerts-person-back": {
+      "suite": "alert-dialogs",
+      "manual_ids": [
+        "NTF-033"
+      ],
+      "assertions": "Person-scoped notification options open for Bob and Back returns to that same profile.",
+      "postcondition": "none"
+    },
+    "alerts-person-vibration-cancel": {
+      "suite": "alert-dialogs",
+      "manual_ids": [
+        "NTF-033"
+      ],
+      "assertions": "Bob\u2019s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "postcondition": "none"
+    },
+    "alerts-chat-sounds-back": {
+      "suite": "alert-dialogs",
+      "manual_ids": [
+        "NTF-031"
+      ],
+      "assertions": "The chat sound-and-appearance drawer opens and cancels through back; no Android channel or delivery assertion is claimed.",
+      "postcondition": "none"
+    },
+    "alerts-chat-sounds-rotation": {
+      "suite": "alert-dialogs",
+      "manual_ids": [
+        "NTF-031"
+      ],
+      "assertions": "The chat sound-and-appearance drawer opens and cancels through rotation; no Android channel or delivery assertion is claimed.",
+      "postcondition": "none"
+    },
+    "speech-custom-duplicate-decimal": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Malformed/overflow rate input cannot dismiss the custom dialog after Apply; the range error is visible and Cancel returns to Read Aloud.",
+      "postcondition": "none"
+    },
+    "speech-custom-overflow": {
+      "suite": "speech-validation",
+      "manual_ids": [
+        "TTS-002"
+      ],
+      "assertions": "Malformed/overflow rate input cannot dismiss the custom dialog after Apply; the range error is visible and Cancel returns to Read Aloud.",
+      "postcondition": "none"
+    },
+    "smart-folders-picker-back": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The filter picker cancels to the unchanged new-folder form. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-unread-cancel": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The Unread condition editor opens and cancels without adding a rule. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-chat-type-cancel": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The Chat type editor opens and cancels without adding a rule. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-participants-empty": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "An empty Participants condition cannot be saved; cancelling creates no folder. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-participants-picker-back": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The participant picker cancels to the still-empty condition and disabled Save. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-condition-rotation": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "The Unread condition editor survives handled orientation changes before cancellation. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-title-empty": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "An empty title keyword cannot be saved; cancelling creates no folder. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "smart-folders-title-draft-cancel": {
+      "suite": "smart-folders",
+      "manual_ids": [
+        "FLD-004"
+      ],
+      "assertions": "A typed title keyword enables condition Save, but Cancel leaves the folder form unchanged. Native postcondition requires no persisted custom folder. Matching rules remain separate acceptance.",
+      "postcondition": "folder-absent"
+    },
+    "reactions-details-back": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005"
+      ],
+      "assertions": "The genuine native two-reactor sheet shows owner and Bob, then Back closes it without removing either reaction.",
+      "postcondition": "reactions-retained",
+      "fixture": "reactions"
+    },
+    "reactions-details-filter-return": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005"
+      ],
+      "assertions": "Filtering to the owner\u2019s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
+      "postcondition": "reactions-retained",
+      "fixture": "reactions"
+    },
+    "reactions-details-rotation": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005"
+      ],
+      "assertions": "The genuine reactor sheet and both identities remain visible through portrait/landscape, then Back preserves both native reactions.",
+      "postcondition": "reactions-retained",
+      "fixture": "reactions"
+    },
+    "reactions-details-reopen": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005"
+      ],
+      "assertions": "Reopening a filtered reactor sheet resets to All and restores both identities while native reactions remain unchanged.",
+      "postcondition": "reactions-retained",
+      "fixture": "reactions"
+    },
+    "creation-relays-required": {
+      "suite": "creation",
+      "manual_ids": [
+        "NCH-001"
+      ],
+      "assertions": "Missing usable receiving relays expose Check relays and open real relay settings; Back preserves the existing chat.",
+      "postcondition": "none"
+    },
+    "actions-reply-send": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-005",
+        "MSG-017"
+      ],
+      "assertions": "Reply publishes once to the peer with the exact original native reply target, retains the original, and clears the draft.",
+      "postcondition": "message-reply"
+    },
+    "actions-edit-save": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-007"
+      ],
+      "assertions": "Saving an edit updates the same original native identity and accepted edit metadata on the owner and peer.",
+      "postcondition": "message-edit"
+    },
+    "actions-delete-local": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Delete for me hides only the owner\u2019s original across conversation reopen; both native originals and the peer\u2019s presentation remain unchanged.",
+      "postcondition": "message-delete-local"
+    },
+    "actions-delete-everyone": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Delete for everyone marks the original deleted with the same native deletion identity on the owner and peer.",
+      "postcondition": "message-delete-everyone"
+    },
+    "preferences-language-german": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-008"
+      ],
+      "assertions": "Deutsch changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "postcondition": "language-system"
+    },
+    "preferences-language-traditional-chinese": {
+      "suite": "preferences",
+      "manual_ids": [
+        "SET-008"
+      ],
+      "assertions": "\u7e41\u9ad4\u4e2d\u6587 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "postcondition": "language-system"
+    },
+    "advanced-relay-empty": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft empty makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-whitespace": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft whitespace makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-malformed": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft malformed makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-http": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft http makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-ws": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft ws makes the real Add action disabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "advanced-relay-secure-cancel": {
+      "suite": "advanced",
+      "manual_ids": [
+        "SYS-002"
+      ],
+      "assertions": "Relay draft secure-cancel makes the real Add action enabled; Back cancels the sheet. This editor-only check does not submit, resolve or qualify an endpoint or certify relay publication.",
+      "postcondition": "none"
+    },
+    "chats-delete-unavailable-active": {
+      "suite": "chats",
+      "manual_ids": [
+        "CHL-010"
+      ],
+      "assertions": "The genuine active-member group context menu keeps normal controls and omits Delete from this device; Back retains the conversation. Terminal-history deletion is a separate departed fixture.",
+      "postcondition": "none"
+    },
+    "accounts-signout-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-013"
+      ],
+      "assertions": "Sign-out disclosure and Back retain all original accounts and both histories.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-signout-rotation-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-013"
+      ],
+      "assertions": "Sign-out disclosure survives handled orientation changes; Back retains the active owner and all native accounts.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-signout-toggle-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-013"
+      ],
+      "assertions": "Toggling the sign-out invitation-key choice then dismissing leaves native accounts intact; reopening restores the default choice.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-sheet-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "The wipe disclosure names destroyed data; Back returns to the hidden-key page without removing native accounts or histories.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-empty-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "The empty typed confirmation keeps the actual Wipe button disabled; Back retains every original native account and history.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-invalid-cancel": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "A partial confirmation keyword keeps the actual Wipe action disabled; Cancel preserves all native accounts and histories.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-valid-cancel": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "A full confirmation keyword enables the actual Wipe action, but explicit Cancel retains every account and original native history.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-normalized-cancel": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "The current case-insensitive whitespace-trimmed confirmation enables the actual action; Cancel preserves native accounts and histories.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-rotation-cancel": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "The typed confirmation remains enabled through handled orientation changes; Cancel leaves all original native accounts and histories intact.",
+      "postcondition": "accounts-retained"
+    },
+    "reactions-details-keyboard-back": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005",
+        "CON-005"
+      ],
+      "assertions": "Dismiss the genuine reactor sheet with a typed composer and stay in the conversation; native postconditions require both original reactions, the exact retained draft, automatic composer mode and actual activity IME visibility. Gesture cancellation and physical keyboard behavior remain separate.",
+      "postcondition": "reactions-draft-retained",
+      "fixture": "reactions"
+    },
+    "reactions-details-keyboard-reopen": {
+      "suite": "reactions",
+      "manual_ids": [
+        "MSG-005",
+        "CON-005"
+      ],
+      "assertions": "Dismiss the genuine reactor sheet with a typed composer and reopen it on All; native postconditions require both original reactions, the exact retained draft, automatic composer mode and actual activity IME visibility. Gesture cancellation and physical keyboard behavior remain separate.",
+      "postcondition": "reactions-draft-retained",
+      "fixture": "reactions"
+    },
+    "profiles-private-save": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007"
+      ],
+      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice\u2019s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
+      "postcondition": "contact-private-saved",
+      "fixture": "contacts"
+    },
+    "profiles-private-clear": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007"
+      ],
+      "assertions": "Save then clear both private fields, reopen to the actual public profile name and require removed private records for every local viewer with unchanged public native profiles.",
+      "postcondition": "contact-private-cleared",
+      "fixture": "contacts"
+    },
+    "profiles-private-boundary": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007"
+      ],
+      "assertions": "Enter 81 ASCII nickname characters, Save and reopen the normalized 80-character value; native and direct private-store verification require that exact account-scoped boundary with no notes/public-profile changes.",
+      "postcondition": "contact-private-boundary",
+      "fixture": "contacts"
+    },
+    "profiles-private-account-isolation": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007",
+        "NAV-004"
+      ],
+      "assertions": "Save Alice\u2019s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice\u2019s retained private records, every other viewer empty and unchanged public profiles.",
+      "postcondition": "contact-private-saved",
+      "fixture": "contacts"
+    }
+  }
+}

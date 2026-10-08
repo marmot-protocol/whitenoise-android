@@ -1,0 +1,27 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: composer-expand-collapse
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Message"
+- inputText: "Maestro expanded draft"
+- swipe:
+    from:
+      id: "composer-resize-gesture"
+    direction: UP
+    duration: 1000
+- assertNotVisible: "Generated fixture message"
+- assertVisible:
+    id: "composer-pill-surface"
+- assertVisible: "Maestro expanded draft"
+- swipe:
+    from:
+      id: "composer-resize-gesture"
+    direction: DOWN
+    duration: 1000
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertVisible:
+    id: "composer-resize-gesture"
+- assertVisible: "Maestro expanded draft"

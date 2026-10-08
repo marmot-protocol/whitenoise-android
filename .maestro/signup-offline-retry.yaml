@@ -1,0 +1,68 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signup-offline-retry
+---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign Up"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.name"
+    direction: DOWN
+- tapOn:
+    id: "onboarding.sign_up.name"
+- eraseText
+- inputText: "Maestro Offline Draft"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.about"
+    direction: DOWN
+- tapOn:
+    id: "onboarding.sign_up.about"
+- inputText: "Synthetic offline test only"
+- hideKeyboard
+- assertVisible: "Maestro Offline Draft"
+- assertVisible: "Synthetic offline test only"
+- tapOn:
+    id: "onboarding.sign_up.action"
+- scrollUntilVisible:
+    element:
+      text: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+    direction: DOWN
+- assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+- tapOn: "Retry"
+- assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+- scrollUntilVisible:
+    element:
+      text: "Maestro Offline Draft"
+    direction: UP
+- assertVisible: "Maestro Offline Draft"
+- assertVisible: "Synthetic offline test only"
+- tapOn: "Back"
+- assertVisible: "Sign In"
+- tapOn: "Sign Up"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.name"
+    direction: DOWN
+- assertVisible: "Name"
+- assertNotVisible: "Maestro Offline Draft"
+- scrollUntilVisible:
+    element:
+      id: "onboarding.sign_up.about"
+    direction: DOWN
+- assertVisible: "About"
+- assertNotVisible: "Synthetic offline test only"
+- takeScreenshot: signup-offline-retry

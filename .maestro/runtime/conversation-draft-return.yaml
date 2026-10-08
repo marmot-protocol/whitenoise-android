@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: conversation-draft-return
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Message"
+- inputText: "Maestro unsent draft"
+- hideKeyboard
+- back
+- assertVisible: "Draft: Maestro unsent draft"
+- tapOn: "Maestro group"
+- assertVisible: "Maestro unsent draft"

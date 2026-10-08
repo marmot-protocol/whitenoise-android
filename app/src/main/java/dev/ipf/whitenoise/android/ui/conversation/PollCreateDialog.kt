@@ -49,6 +49,7 @@ import dev.ipf.whitenoise.android.state.POLL_FIVE_MINUTES_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_HOUR_SECONDS
 import dev.ipf.whitenoise.android.state.POLL_WEEK_SECONDS
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import java.util.Locale
 
 /** Edits a short poll draft; MDK remains the only owner of published poll state. */
@@ -77,6 +78,7 @@ internal fun PollCreateDialog(
     var deadlineAttempted by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = { if (!submitting) onDismiss() },
+        modifier = Modifier.exposePerformanceTestTags(),
         title = { Text(stringResource(R.string.poll_create)) },
         text = {
             PollCreateForm(

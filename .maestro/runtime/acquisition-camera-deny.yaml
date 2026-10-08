@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: acquisition-camera-deny
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: Add attachment
+- assertVisible:
+    text: "Camera"
+- tapOn: Camera
+- assertVisible: Allow Maestro Test Lab to take pictures and record video\?
+- tapOn:
+    id: com.android.permissioncontroller:id/permission_deny_button
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertNotVisible:
+    text: "Camera"

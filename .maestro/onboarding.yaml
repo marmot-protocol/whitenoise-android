@@ -1,6 +1,9 @@
 appId: dev.ipf.whitenoise.android.dev
 name: Welcome, sign in, and return
 ---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
 - launchApp:
     clearState: true
     permissions:

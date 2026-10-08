@@ -1,0 +1,82 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+  "legacy_sha256": "7b31896031e7bb9918141e14fc458b37e684cfcfd7969e523ea37a6b39ae7a53",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GlobalSearchCivilDatePickerDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+        "anchor": "fun GlobalSearchCivilDatePickerDialog(",
+        "test_ids": [
+          "FIND-008",
+          "FIND-009",
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "GlobalSearchCustomRangeReviewDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+        "anchor": "fun GlobalSearchCustomRangeReviewDialog(",
+        "test_ids": [
+          "FIND-008",
+          "FIND-009",
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "GlobalSearchDateCustomStageDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+        "anchor": "fun GlobalSearchDateCustomStageDialog(",
+        "test_ids": [
+          "FIND-008",
+          "FIND-009",
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "GlobalSearchDateFilterDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+        "anchor": "fun GlobalSearchDateFilterDialog(",
+        "test_ids": [
+          "FIND-008",
+          "FIND-009",
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "GlobalSearchDatePresetDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+        "anchor": "fun GlobalSearchDatePresetDialog(",
+        "test_ids": [
+          "FIND-008",
+          "FIND-009",
+          "INT-001"
+        ]
+      },
+      {
+        "surface": "GlobalSearchDatePresetRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+        "anchor": "fun GlobalSearchDatePresetRow(",
+        "test_ids": [
+          "FIND-008",
+          "FIND-009",
+          "INT-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: GlobalSearchDateFilterDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/search/GlobalSearchDateFilterDialog.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

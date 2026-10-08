@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: open-settings.yaml
+- tapOn: "Profile Keys"
+- assertVisible: "Private key hidden"
+- scrollUntilVisible:
+    element:
+      text: "Sign Out & Wipe"
+    direction: DOWN
+- tapOn: "Sign Out & Wipe"
+- assertVisible: "This permanently removes this account from this device[.]"
+- assertVisible: "What gets destroyed"

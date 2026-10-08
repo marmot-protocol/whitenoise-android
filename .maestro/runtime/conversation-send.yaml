@@ -1,0 +1,21 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: conversation-send
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Message"
+- inputText: "Maestro verified send"
+- hideKeyboard
+- tapOn: "Send"
+- assertVisible: "Message"
+- assertNotVisible: "Send"
+- assertVisible: "Maestro verified send"
+- back
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Maestro verified send"
+- assertVisible: "Message"
+- assertNotVisible: "Send"

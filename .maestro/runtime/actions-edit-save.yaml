@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: actions-edit-save
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- longPressOn:
+    text: "Generated fixture message"
+- tapOn: "Edit"
+- assertVisible:
+    id: "conversation.composer.edit.cancel"
+- eraseText
+- inputText: "Maestro verified edit"
+- hideKeyboard
+- tapOn: "Send"
+- assertNotVisible:
+    id: "conversation.composer.edit.cancel"
+- assertVisible: "Maestro verified edit"
+- assertNotVisible: "Generated fixture message"

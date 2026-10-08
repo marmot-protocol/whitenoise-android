@@ -1,0 +1,38 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signin-whitespace
+---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+# Back closes this known optional sheet and records declined sharing choices.
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign In"
+- tapOn: "Private key"
+- inputText: "   "
+- hideKeyboard
+- assertVisible:
+    id: "onboarding.sign_in.action"
+    enabled: false
+- assertNotVisible: "That doesn't look like a valid nsec or npub key."
+- assertVisible: "Enter your Nostr secret key to use an existing identity on this device."
+- tapOn: "Clear"
+- tapOn: "Private key"
+- inputText: "  npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzqujme  "
+- hideKeyboard
+- tapOn:
+    id: "onboarding.sign_in.action"
+- assertVisible: "That's a public key. Enter your secret key (nsec) to sign in."
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- takeScreenshot: signin-whitespace

@@ -1,0 +1,8 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: notifications-deny
+---
+- runFlow: ../fixtures/notification-ready.yaml
+- assertVisible: "Allow Maestro Test Lab to send you notifications[?]"
+- tapOn:
+    id: "com.android.permissioncontroller:id/permission_deny_button"
+- assertVisible: "Maestro group"

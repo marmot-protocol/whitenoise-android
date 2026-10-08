@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: ballots-open-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Maestro fixture poll"
+- assertVisible: "Single choice"
+- assertVisible: "Maestro Tea"
+- assertVisible: "Maestro Coffee"
+- back
+- assertVisible: "Chats"

@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: reactions-configure-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- tapOn: Maestro group
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- longPressOn:
+    text: Generated fixture message
+- tapOn: Open emoji picker
+- assertVisible: "Search emoji"
+- assertVisible: "Smileys & People"
+- tapOn: Configure Reactions
+- assertVisible: Tap an emoji to replace it\.
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible: Tap an emoji to replace it\.
+- setOrientation: PORTRAIT
+- assertVisible: Tap an emoji to replace it\.
+# Material first collapses the expanded sheet after rotation; the next Back dismisses it.
+- back
+- waitForAnimationToEnd:
+    timeout: 2000
+- assertVisible: Tap an emoji to replace it\.
+- back
+- assertNotVisible: Tap an emoji to replace it\.
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

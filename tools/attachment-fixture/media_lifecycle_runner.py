@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import subprocess
 import threading
 import time
@@ -44,6 +45,20 @@ def metrics_of(result):
 def passed(result):
     """The JUnit outcome of one process, independent of any metric it reported."""
     return "OK (1 test)" in result and "FAILURES!!!" not in result
+
+
+def failure_kind(result):
+    """Retain only a closed category from the actual stack header; never native messages or identities."""
+    if passed(result):
+        return None
+    match = re.search(
+        r"^INSTRUMENTATION_STATUS: stack=(?:[\w$]+\.)*"
+        r"(OutOfMemoryError|TimeoutCancellationException|TimeoutException|AssertionError)(?=[:\s]|$)",
+        result, re.MULTILINE,
+    )
+    categories = {"OutOfMemoryError": "out-of-memory", "TimeoutCancellationException": "timeout",
+                  "TimeoutException": "timeout", "AssertionError": "assertion"}
+    return categories[match.group(1)] if match else "instrumentation-failure"
 
 
 def wait_for_completion(ledger, start, uploads=len(EXPECTED), gets=len(EXPECTED),
@@ -97,17 +112,20 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
         events, report["prepare_ledger_finalized"] = wait_for_completion(server.ledger, start)
         boundary = len(events)
         report["prepare_passed"] = passed(first)
+        report["prepare_failure_kind"] = failure_kind(first)
         if report["prepare_passed"]:
             adb_command(adb, serial, "shell", "am", "force-stop", APP)
             second = instrument(adb, serial, ports, "read", session, preserve=True)
             report["read_metrics"] = metrics_of(second)
             report["read_passed"] = passed(second)
+            report["read_failure_kind"] = failure_kind(second)
             if report["read_passed"]:
                 # A third process renders the real tiles over the same restored runtime, then cleans up.
                 adb_command(adb, serial, "shell", "am", "force-stop", APP)
                 third = instrument(adb, serial, ports, "read", session, target=TILES)
                 report["tiles_metrics"] = metrics_of(third)
                 report["tiles_passed"] = passed(third)
+                report["tiles_failure_kind"] = failure_kind(third)
         report["environment"] = {
             "api": adb_command(adb, serial, "shell", "getprop", "ro.build.version.sdk").strip(),
             "abi": adb_command(adb, serial, "shell", "getprop", "ro.product.cpu.abi").strip(),

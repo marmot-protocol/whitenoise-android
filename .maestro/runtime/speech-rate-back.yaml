@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: speech-rate-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Read Aloud
+    direction: DOWN
+- tapOn: Read Aloud
+- assertVisible:
+    id: speech.engine.group
+- tapOn: Speech rate
+- assertVisible: System \(follow device setting\)
+- runFlow: ../fixtures/scroll-speech-custom.yaml
+- back
+- assertVisible:
+    id: speech.engine.group

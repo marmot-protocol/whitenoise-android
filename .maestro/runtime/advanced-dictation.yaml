@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: advanced-dictation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Dictation"
+    direction: DOWN
+- tapOn: "Dictation"
+- assertVisible:
+    id: "dictation.ostt_recommendation.group"
+- back
+- assertVisible: "Settings"

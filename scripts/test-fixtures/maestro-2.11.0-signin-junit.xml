@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="White Noise onboarding pilot" device="test" tests="9" failures="0" time="298.025" timestamp="2026-10-07T19:11:58">
+    <testcase id="signin-whitespace-01" name="signin-whitespace-01" classname="signin-whitespace-01" file="build/maestro-pilot/suite/signin-whitespace-01.yaml" time="37.053" timestamp="2026-10-07T19:11:58" status="SUCCESS"/>
+    <testcase id="signin-invalid-01" name="signin-invalid-01" classname="signin-invalid-01" file="build/maestro-pilot/suite/signin-invalid-01.yaml" time="50.386" timestamp="2026-10-07T19:12:35" status="SUCCESS"/>
+    <testcase id="signin-qr-denied-01" name="signin-qr-denied-01" classname="signin-qr-denied-01" file="build/maestro-pilot/suite/signin-qr-denied-01.yaml" time="54.591" timestamp="2026-10-07T19:13:25" status="SUCCESS"/>
+    <testcase id="signin-back-01" name="signin-back-01" classname="signin-back-01" file="build/maestro-pilot/suite/signin-back-01.yaml" time="29.3" timestamp="2026-10-07T19:14:20" status="SUCCESS"/>
+    <testcase id="signin-clear-01" name="signin-clear-01" classname="signin-clear-01" file="build/maestro-pilot/suite/signin-clear-01.yaml" time="24.476" timestamp="2026-10-07T19:14:49" status="SUCCESS"/>
+    <testcase id="signin-public-01" name="signin-public-01" classname="signin-public-01" file="build/maestro-pilot/suite/signin-public-01.yaml" time="26.416" timestamp="2026-10-07T19:15:14" status="SUCCESS"/>
+    <testcase id="signin-edit-error-01" name="signin-edit-error-01" classname="signin-edit-error-01" file="build/maestro-pilot/suite/signin-edit-error-01.yaml" time="35.016" timestamp="2026-10-07T19:15:40" status="SUCCESS"/>
+    <testcase id="signin-warm-resume-01" name="signin-warm-resume-01" classname="signin-warm-resume-01" file="build/maestro-pilot/suite/signin-warm-resume-01.yaml" time="26.055" timestamp="2026-10-07T19:16:15" status="SUCCESS"/>
+    <testcase id="onboarding-01" name="onboarding-01" classname="onboarding-01" file="build/maestro-pilot/suite/onboarding-01.yaml" time="14.681" timestamp="2026-10-07T19:16:41" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

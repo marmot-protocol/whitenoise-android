@@ -89,7 +89,7 @@ jobs:
         run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
 
       - name: Test Maestro artifact and manual-only execution contracts
-        run: python3 -m unittest scripts/test_maestro_apk.py
+        run: python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py scripts/test_maestro_runtime.py scripts/test_maestro_environment.py
 
       - name: Validate manual release guide
         env:
@@ -106,6 +106,8 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           python3 scripts/check_manual_test_guide.py --output-dir build/manual-release-testing
+          python3 scripts/maestro_coverage.py --output build/manual-release-testing/campaign-inventory.json \
+            --markdown-output build/manual-release-testing/campaign-inventory.md --source-sha "$(git rev-parse HEAD)"
           git rev-parse HEAD > build/manual-release-testing/source-revision.txt
           printf 'pr_head=%s\npr_base=%s\n' "$PR_HEAD_SHA" "$PR_BASE_SHA" >> build/manual-release-testing/source-revision.txt
 

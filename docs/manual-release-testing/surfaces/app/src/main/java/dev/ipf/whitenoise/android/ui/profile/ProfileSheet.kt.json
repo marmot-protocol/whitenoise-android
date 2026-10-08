@@ -131,6 +131,22 @@
         "test_ids": [
           "ACC-007"
         ]
+      },
+      {
+        "surface": "Private contact editable control: person_profile.nickname",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "testTag(\"person_profile.nickname\")",
+        "test_ids": [
+          "ACC-007"
+        ]
+      },
+      {
+        "surface": "Private contact editable control: person_profile.notes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "testTag(\"person_profile.notes\")",
+        "test_ids": [
+          "ACC-007"
+        ]
       }
     ],
     "settings_controls": [

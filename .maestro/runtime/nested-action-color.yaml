@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: nested-action-color
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: DOWN
+- tapOn: "Appearance"
+- scrollUntilVisible:
+    element:
+      text: "Action color"
+    direction: DOWN
+- tapOn: "Action color"
+- assertVisible:
+    id: "action_color.controls"
+- assertVisible:
+    id: "action_color.preview"
+- back
+- assertVisible:
+    id: "appearance.theme.group"

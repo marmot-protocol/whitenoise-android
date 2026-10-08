@@ -1,0 +1,99 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+  "legacy_sha256": "a345b89725b579d322586b2a0b47f66fe912a5672cd88cfbf2238b3198073c11",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChoiceDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun <T> ChoiceDialog(",
+        "test_ids": [
+          "SET-006",
+          "SET-007",
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "Modifier.whiteNoiseDialogSelection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun Modifier.whiteNoiseDialogSelection(",
+        "test_ids": [
+          "SET-001",
+          "SET-010"
+        ]
+      },
+      {
+        "surface": "SpeechChoiceDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun SpeechChoiceDialog(",
+        "test_ids": [
+          "TTS-002",
+          "TTS-003"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseAlertDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun WhiteNoiseAlertDialog(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseDialogCheckRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun WhiteNoiseDialogCheckRow(",
+        "test_ids": [
+          "SET-006",
+          "SET-007",
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseDialogChoiceRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "fun WhiteNoiseDialogChoiceRow(",
+        "test_ids": [
+          "SET-006",
+          "SET-007",
+          "SET-008"
+        ]
+      },
+      {
+        "surface": "Cross-process dialog selectors retain ordinary accessibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "exposePerformanceTestTags",
+        "test_ids": [
+          "AXY-001",
+          "AXY-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-006",
+          "SET-007",
+          "SET-008"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: WhiteNoiseDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseDialogs.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

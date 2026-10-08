@@ -1,0 +1,12 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: creation-relays-required
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Check relays"
+- assertVisible: "Relays"
+- assertNotVisible:
+    id: "new_message.screen"
+- back
+- assertVisible: "Maestro group"
+- assertVisible: "Check relays"

@@ -101,6 +101,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.delay
@@ -811,10 +812,12 @@ private fun ExportPasswordDialog(
                 TextButton(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onViewBackup,
+                    modifier = Modifier.testTag("profile_keys.view_backup"),
                 ) { Text(stringResource(R.string.key_export_view_backup)) }
                 TextButton(
                     enabled = !busy && encryptedBackupPassphraseInputsValid(passwordValue, confirmationValue),
                     onClick = onConfirm,
+                    modifier = Modifier.testTag("profile_keys.export_file"),
                 ) { Text(stringResource(R.string.export)) }
             }
         },
@@ -1045,6 +1048,7 @@ private fun AccountWipeFlow(
                         }
                     },
                     enabled = wipeConfirmed,
+                    modifier = Modifier.testTag("profile_keys.wipe_confirm"),
                 ) {
                     Text(
                         stringResource(R.string.wipe),
@@ -1171,6 +1175,7 @@ internal fun SignOutSheet(
 ) {
     var deleteKeyPackages by remember { mutableStateOf(true) }
     ModalBottomSheet(
+        modifier = Modifier.exposePerformanceTestTags(),
         containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -1203,6 +1208,7 @@ internal fun SignOutSheet(
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .testTag("profile_keys.signout_invitation_keys")
                     .toggleable(
                         value = deleteKeyPackages,
                         role = Role.Switch,
