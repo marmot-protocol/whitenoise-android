@@ -301,7 +301,7 @@ class FirstFrameDurableAvatarsTest {
             row: ChatListRowFfi,
             asset: AvatarAssetFfi?,
             presentation: ConversationPresentationFfi = peerPresentation(),
-        ) = PresentedChatRowFfi(emptyChatRowPreview(), noChatRowActions(), row, presentation, asset)
+        ) = PresentedChatRowFfi(null, emptyChatRowPreview(), noChatRowActions(), row, presentation, asset)
 
         /** A small opaque PNG. */
         fun png(): ByteArray {

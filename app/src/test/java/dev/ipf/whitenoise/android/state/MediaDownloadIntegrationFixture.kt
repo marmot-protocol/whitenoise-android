@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.AttachmentEntryFfi
+import dev.ipf.marmotkit.AttachmentRoleFfi
 import dev.ipf.marmotkit.AttachmentHistoryChangeFfi
 import dev.ipf.marmotkit.AttachmentHistoryVersion
 import dev.ipf.marmotkit.AttachmentLocalAssetFfi
@@ -121,6 +122,7 @@ internal class MediaDownloadIntegrationFixture : AutoCloseable {
                                     1u,
                                     1u,
                                     AttachmentCategoryFfi.IMAGE,
+                                    AttachmentRoleFfi.SHARED,
                                     MediaAttachmentOutcomeFfi.Accepted(0u, reference(index)),
                                 )
                             },

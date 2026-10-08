@@ -112,6 +112,7 @@ private class NostrEventReferenceCollector {
             is MarkdownInlineFfi.Text,
             is MarkdownInlineFfi.Code,
             is MarkdownInlineFfi.Math,
+            is MarkdownInlineFfi.Timestamp,
             MarkdownInlineFfi.SoftBreak,
             MarkdownInlineFfi.HardBreak,
             -> Unit

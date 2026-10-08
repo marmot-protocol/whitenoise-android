@@ -232,6 +232,7 @@ private class RecoveryWindow(
         val row = notificationChatListRow().copy(lastMessage = null, unreadCount = 0uL, hasUnread = false)
         val presented =
             PresentedChatRowFfi(
+                draftVersion = null,
                 preview = emptyChatRowPreview(),
                 actions = noChatRowActions(),
                 row = row,

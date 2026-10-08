@@ -1524,6 +1524,7 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
                     append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                 }
             }
+            is MarkdownInlineFfi.Timestamp -> append(markdownTimestampLiteral(inline))
             is MarkdownInlineFfi.Math -> withStyle(ctx.codeStyle) { append(markdownSafeDisplayText(inline.content, Int.MAX_VALUE)) }
             is MarkdownInlineFfi.NostrMention -> appendNostrEntity(inline.entity, mention = true, ctx)
             is MarkdownInlineFfi.NostrUri -> appendNostrEntity(inline.entity, mention = false, ctx)
@@ -1800,6 +1801,7 @@ internal fun markdownInlinePlainText(inlines: List<MarkdownInlineFfi>): String =
                     is MarkdownInlineFfi.Text -> append(inline.content)
                     is MarkdownInlineFfi.Code -> append(inline.content)
                     is MarkdownInlineFfi.Math -> append(inline.content)
+                    is MarkdownInlineFfi.Timestamp -> append(markdownTimestampLiteral(inline))
                     is MarkdownInlineFfi.Autolink -> append(inline.url)
                     is MarkdownInlineFfi.Emph -> walk(inline.children)
                     is MarkdownInlineFfi.Strong -> walk(inline.children)

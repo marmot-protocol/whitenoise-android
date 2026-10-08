@@ -1,0 +1,148 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+  "legacy_sha256": "843dca8b19282f074836bddb6c32a22aa102dea22cec3dcf4ab6640daa875af1",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MarkdownBlockList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownBlockList(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownBlockQuoteView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownBlockQuoteView(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownBlockView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownBlockView(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownBodyText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownBodyText(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "Bare www autolink destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun markdownAutolinkDestination(",
+        "test_ids": [
+          "MSG-029"
+        ]
+      },
+      {
+        "surface": "MarkdownCodeBlockView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownCodeBlockView(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownDetailsBlocksView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownDetailsBlocksView(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownDetailsScaffold",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownDetailsScaffold(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownDetailsView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownDetailsView(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownElisionMarker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownElisionMarker(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownListView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownListView(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownMessageBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownMessageBody(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownNativeDetailsView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownNativeDetailsView(",
+        "test_ids": [
+          "MSG-002"
+        ]
+      },
+      {
+        "surface": "MarkdownTableRowDivider",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownTableRowDivider(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownTableRowView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownTableRowView(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownTableView",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownTableView(",
+        "test_ids": [
+          "RDR-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Markdown message body retains typed timestamp content during native snapshot adoption",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "MarkdownMessageBody",
+        "test_ids": [
+          "RDR-001",
+          "MSG-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

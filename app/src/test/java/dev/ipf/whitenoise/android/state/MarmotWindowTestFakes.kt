@@ -133,6 +133,7 @@ internal object MarmotWindowTestFakes {
 
     private fun presentedRow(row: ChatListRowFfi) =
         PresentedChatRowFfi(
+            draftVersion = null,
             preview = emptyChatRowPreview(),
             actions = noChatRowActions(),
             row = row,

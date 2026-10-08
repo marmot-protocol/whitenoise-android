@@ -1023,6 +1023,7 @@ private fun presentedChatListSnapshot(rows: List<ChatListRowFfi>) =
         rows =
             rows.map { row ->
                 PresentedChatRowFfi(
+                    draftVersion = null,
                     preview = emptyChatRowPreview(),
                     actions = noChatRowActions(),
                     row = row,
