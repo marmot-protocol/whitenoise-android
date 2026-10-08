@@ -4,9 +4,9 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "SearchTargetRetryRecoveryEffect",
+        "surface": "searchTargetRetryRecoveryEffect",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/SearchTargetRetryState.kt",
-        "anchor": "fun SearchTargetRetryRecoveryEffect(",
+        "anchor": "fun searchTargetRetryRecoveryEffect(",
         "test_ids": ["FIND-014"]
       }
     ]

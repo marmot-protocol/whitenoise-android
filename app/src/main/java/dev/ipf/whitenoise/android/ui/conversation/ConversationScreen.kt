@@ -3103,7 +3103,7 @@ internal fun ConversationScreen(
         routePresentationFrozen = false
     }
 
-    SearchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)
+    searchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)
 
     // Scroll-to-message for a chat-list message-body search hit (issue #290).
     // Waits for the first-open anchor to settle, then pages the local timeline

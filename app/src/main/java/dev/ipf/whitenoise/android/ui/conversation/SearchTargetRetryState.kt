@@ -42,7 +42,7 @@ internal class SearchTargetRetryState {
 
 /** Recovery resumes only an explicitly retried request that still owns navigation. */
 @Composable
-internal fun SearchTargetRetryRecoveryEffect(
+internal fun searchTargetRetryRecoveryEffect(
     retry: SearchTargetRetryState,
     loadFailurePresent: Boolean,
 ) {

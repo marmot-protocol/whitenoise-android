@@ -1804,7 +1804,7 @@ class ConversationScrollCoordinatorTest {
         val retryAction = Regex("focusTargetRetry.retry\\(\\s*loadFailurePresent = controller.error != null,?\\s*\\)")
         assertEquals(3, retryAction.findAll(screen).count())
         assertTrue(
-            "SearchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)" in screen,
+            "searchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)" in screen,
         )
         assertTrue(
             "unavailable targets keep the existing localized notice",

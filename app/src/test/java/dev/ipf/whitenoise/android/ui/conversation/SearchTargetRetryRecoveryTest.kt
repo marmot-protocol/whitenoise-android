@@ -21,7 +21,7 @@ class SearchTargetRetryRecoveryTest {
         val navigation = MessageTargetNavigationOwner()
         val retry = SearchTargetRetryState()
         val failed = mutableStateOf(true)
-        composeRule.setContent { SearchTargetRetryRecoveryEffect(retry, failed.value) }
+        composeRule.setContent { searchTargetRetryRecoveryEffect(retry, failed.value) }
         composeRule.runOnIdle {
             retry.failed(navigation.begin())
             retry.retry(loadFailurePresent = true)
@@ -39,7 +39,7 @@ class SearchTargetRetryRecoveryTest {
         val navigation = MessageTargetNavigationOwner()
         val retry = SearchTargetRetryState()
         val failed = mutableStateOf(true)
-        composeRule.setContent { SearchTargetRetryRecoveryEffect(retry, failed.value) }
+        composeRule.setContent { searchTargetRetryRecoveryEffect(retry, failed.value) }
         composeRule.runOnIdle {
             retry.failed(navigation.begin())
             retry.retry(loadFailurePresent = true)
