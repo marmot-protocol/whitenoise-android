@@ -8,11 +8,13 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Button
@@ -78,7 +80,11 @@ class ScrollEdgeFadeImeAndroidTest {
                         Form(scroll, Modifier.heightIn(max = 500.dp)) { submissions++ }
                     }
                 } else {
-                    Form(scroll, Modifier.fillMaxSize()) { submissions++ }
+                    WhiteNoiseScaffold { padding ->
+                        Form(scroll, Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                            submissions++
+                        }
+                    }
                 }
             }
         }
@@ -86,7 +92,7 @@ class ScrollEdgeFadeImeAndroidTest {
         composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) { imeGeometry() != null }
         composeRule.runOnIdle { runBlocking { scroll.scrollTo(scroll.maxValue / 2) } }
         composeRule.onNodeWithTag(FIELD).assertIsFocused()
-        assertFooterAboveIme()
+        waitForFooterAboveIme()
         val position = composeRule.runOnIdle { scroll.value }
         assertTrue("viewport must overflow in both directions", scroll.canScrollBackward && scroll.canScrollForward)
         val keyboardEdges = edgeLevels()
@@ -151,6 +157,16 @@ class ScrollEdgeFadeImeAndroidTest {
             val frame = manager.currentWindowMetrics.bounds
             frame.height() to height
         }
+
+    /** Native IME visibility can precede the Compose layout receiving its final inset. */
+    private fun waitForFooterAboveIme() {
+        composeRule.waitUntil(KEYBOARD_TIMEOUT_MS) {
+            val (windowHeight, imeHeight) = imeGeometry() ?: return@waitUntil false
+            val bounds = composeRule.onNodeWithTag(FOOTER).fetchSemanticsNode().boundsInWindow
+            bounds.bottom <= windowHeight - imeHeight + 2
+        }
+        assertFooterAboveIme()
+    }
 
     private fun assertFooterAboveIme() {
         composeRule.onNodeWithTag(FOOTER).assertIsDisplayed()
