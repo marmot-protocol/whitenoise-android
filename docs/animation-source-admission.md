@@ -18,6 +18,7 @@ draft and the `MED-026` box unchecked until the
 | `admitAnimationSource` (`media/AnimationSourceAdmission.kt`, `AnimationSourceGif.kt`, `AnimationSourceWebp.kt`) | Pure Kotlin with no Android dependencies. It walks container metadata without copying the payload, and it never decodes pixels. |
 | `MediaPipeline.decodeAnimatedDrawable` | The only route to the native animated decoder. It calls `ImageDecoder.createSource` only for an `Admitted` source. Chat attachments, GIPHY cards and animated profile avatars all use this route. |
 | `decodeMessageAttachmentImage` → `decodeAdmittedAttachmentImage` | Chooses the decoder for chat bubbles, the viewer and GIPHY cards. |
+| `readLocalPreviewSource` (`media/LocalPreviewSource.kt`) | Classifies a picked or shared composer source before the shelf's animated decoder or the staged preview's sampled still decoder sees it. A GIF or WebP signature leads to reading the whole source, never more than 8 MiB, and running `admitAnimationSource` on it; any other format costs a twelve-byte header read, so ordinary photos are not copied. An unreadable source is refused. |
 
 Admission looks only at content. The sender's advertised MIME type cannot turn
 admission on or skip it.
@@ -27,6 +28,11 @@ admission on or skip it.
 | `Refused` (a recognized GIF/WebP that is malformed or over a limit) | not called | not called | The existing could-not-load placeholder |
 | `Admitted` (a GIF or animated WebP within every limit) | called | only if the native decode fails, which shows the first frame of the admitted canvas | Animation, or a still |
 | `NotAnimation` (not a GIF/WebP signature, or a still WebP that passed the full walk) | not called | called | The existing still path |
+
+In the composer, a refused source (including one over the 8 MiB preview ceiling or one that cannot be
+read) shows the staged item's filename card on the shelf and in the staged preview, never a spinner that
+cannot finish. The ceiling bounds only what Android copies to admit a preview; it is not an upload or
+acquisition limit, and the send itself is unchanged.
 
 ## Limits
 
