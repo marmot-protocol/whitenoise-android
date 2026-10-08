@@ -43,7 +43,8 @@
           "CON-029",
           "FIND-013",
           "FIND-014",
-          "FIND-016"
+          "FIND-016",
+          "DIC-008"
         ]
       }
     ],
@@ -62,7 +63,7 @@
         "anchor": "R.string.conversation_jump_to_mention",
         "test_ids": [
           "CON-028",
-          "CON-030"
+          "CON-031"
         ]
       },
       {

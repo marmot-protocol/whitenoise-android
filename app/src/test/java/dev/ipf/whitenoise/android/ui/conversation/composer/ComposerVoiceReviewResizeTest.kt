@@ -62,13 +62,15 @@ class ComposerVoiceReviewResizeTest {
             override fun isPlaying(key: String) = false
         }
 
+    /** A collapsed empty composer settles at the manual floor and keeps every voice-review action usable. */
     @Test
     fun collapsedEmptyComposerKeepsAllVoiceReviewActionsUsable() {
         render()
         rule.waitForIdle()
         rule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
-            // Land between the empty automatic row and the manual single-line floor.
-            swipe(center, center - Offset(0f, 30f), durationMillis = 320)
+            // Land between the 60 dp empty automatic row and the 96 dp manual single-line floor: the drag must
+            // cover that 36 dp gap (less the touch slop) to end inside the floor's settle deadband.
+            swipe(center, center - Offset(0f, 44f), durationMillis = 320)
         }
         rule.waitForIdle()
         val collapsedHeight =
