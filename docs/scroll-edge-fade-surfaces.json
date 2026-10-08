@@ -954,10 +954,10 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileEditContent.kt",
       "calls": {
-        "whiteNoiseVerticalScroll": 1
+        "verticalScroll": 1
       },
       "family": "profile",
-      "policy": "ordinary",
+      "policy": "ordinary scrolling retained until the real-keyboard relay-add regression passes with masking",
       "test_ids": [
         "SCR-001",
         "SCR-002",

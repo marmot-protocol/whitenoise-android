@@ -72,6 +72,12 @@ class ComposerResizeAccessibilityAndroidTest {
         assertNotNull("the resize leaf must be exported through AccessibilityNodeInfo", info)
         checkNotNull(info)
         assertTrue("TalkBack must be able to focus the resize leaf", info.isScreenReaderFocusable)
+        assertNotNull(
+            "the resize target must leave the editor accessible",
+            accessibility.rootInActiveWindow?.findNode { node ->
+                node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_TEXT }
+            },
+        )
         assertTrue(
             "the platform node must own the named expand action",
             info.actionList.any { it.label == composeRule.activity.getString(R.string.composer_expand_full_screen) },
@@ -83,12 +89,16 @@ class ComposerResizeAccessibilityAndroidTest {
     }
 
     /** Finds the target through the platform accessibility tree without Compose virtual IDs. */
-    private fun AccessibilityNodeInfo.findByDescription(expectedDescription: String): AccessibilityNodeInfo? {
+    private fun AccessibilityNodeInfo.findByDescription(expectedDescription: String): AccessibilityNodeInfo? =
+        findNode { it.contentDescription == expectedDescription }
+
+    /** Searches exported nodes so overlays cannot silently hide the editor from TalkBack. */
+    private fun AccessibilityNodeInfo.findNode(matches: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
         val pending = ArrayDeque<AccessibilityNodeInfo>()
         pending += this
         while (pending.isNotEmpty()) {
             val node = pending.removeFirst()
-            if (node.contentDescription == expectedDescription) return node
+            if (matches(node)) return node
             repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
         }
         return null

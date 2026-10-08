@@ -1077,27 +1077,6 @@ internal fun ComposerPill(
                     },
                 ),
     ) {
-        // Keep the full resize target beneath interactive descendants for explore-by-touch.
-        if (inputContentVisible) {
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
-                        .semantics {
-                            contentDescription = resizeComposerDescription
-                            customActions =
-                                listOf(
-                                    CustomAccessibilityAction(toggleDescription) {
-                                        latestOnExpansionToggle()
-                                        true
-                                    },
-                                )
-                        },
-            )
-        }
         Surface(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = RoundedCornerShape(24.dp),
@@ -1108,459 +1087,482 @@ internal fun ComposerPill(
                     .then(expandedHeightModifier)
                     .testTag(COMPOSER_PILL_SURFACE_TAG),
         ) {
-            Column(modifier = Modifier.then(expandedHeightModifier)) {
-                if (accessoryContent != null) {
-                    Spacer(Modifier.height(if (multilineControlsSuppressed) 12.dp else CompactEditorTopInset))
+            Box {
+                // Keep resize semantics inside the surface; an underlying sibling is pruned by Android.
+                if (inputContentVisible) {
                     Box(
-                        Modifier
-                            .boundedComposerAccessory()
-                            .onSizeChanged { size ->
-                                // Accessories insert 12dp beyond the ordinary editor padding in either layout.
-                                onAccessoryHeightChanged(with(density) { size.height.toDp() } + 12.dp)
-                            }.fadingVerticalScroll(rememberScrollState()),
-                    ) {
-                        accessoryContent()
-                    }
-                }
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f, fill = expansionMode != ComposerExpansionMode.Automatic)
-                            .heightIn(min = if (voiceReviewContent == null) 48.dp else 96.dp)
-                            .then(expandedHeightModifier),
-                ) {
-                    Box(
-                        contentAlignment = Alignment.TopStart,
                         modifier =
                             Modifier
-                                .align(Alignment.TopStart)
+                                .align(Alignment.TopCenter)
                                 .fillMaxWidth()
-                                .then(expandedHeightModifier)
-                                // The text field's internal handlers consume plain
-                                // drags without ever scrolling this height-capped
-                                // viewport, so the editor's one explicit scroll owner
-                                // lives here, covering the whole editor viewport:
-                                // early vertical drags and wheel/trackpad ticks drive
-                                // composerScrollState directly and arm reading
-                                // intent, while focused taps and long-press selection
-                                // pass through untouched.
-                                .pointerInput(inputContentVisible, scrollOwnerKey) {
-                                    if (!inputContentVisible) return@pointerInput
-                                    composerEditorReadingScrollGestures(
-                                        acceptsTouchDown = { position -> position.y >= latestReadingTopInset.toPx() },
-                                        onScrollInterrupted = { editorScrollJob?.cancel() },
-                                        onFling = { velocity ->
-                                            editorScrollJob =
-                                                editorScrollScope.launch {
-                                                    composerScrollState.scroll {
-                                                        with(latestEditorFlingBehavior) { performFling(velocity) }
-                                                    }
-                                                }
-                                        },
-                                        scrollBy = { delta ->
-                                            val before = composerScrollState.value
-                                            composerScrollState.dispatchRawDelta(delta)
-                                            composerScrollState.value != before
-                                        },
-                                        onReadingScroll = {
-                                            // A non-overflowing editor has nothing to
-                                            // read toward; arming would only suspend
-                                            // caret-following for no scroll intent.
-                                            if (composerScrollState.maxValue > 0) {
-                                                readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
-                                            }
-                                        },
-                                    )
-                                }.deferredPadding(
-                                    start = {
-                                        interpolateDp(
-                                            if (hasAttachmentAction) CompactEditorStartInset else 40.dp,
-                                            EditingEditorStartInset,
-                                            editingProgress.value,
+                                .height(48.dp)
+                                .testTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG)
+                                .semantics {
+                                    contentDescription = resizeComposerDescription
+                                    customActions =
+                                        listOf(
+                                            CustomAccessibilityAction(toggleDescription) {
+                                                latestOnExpansionToggle()
+                                                true
+                                            },
                                         )
-                                    },
-                                    top = {
-                                        if (multilineControlsSuppressed || accessoryContent != null) {
-                                            12.dp
-                                        } else {
-                                            interpolateDp(24.dp, CompactEditorTopInset, editingProgress.value)
-                                        }
-                                    },
-                                    end = {
-                                        interpolateDp(
-                                            compactTrailingReserve,
-                                            ExpandedEditorEndInset,
-                                            editingProgress.value,
-                                        )
-                                    },
-                                    bottom = {
-                                        interpolateDp(
-                                            12.dp,
-                                            ExpandedEditorBottomInset + extraControlsHeight,
-                                            editingProgress.value,
-                                        )
-                                    },
-                                ).alpha(if (inputContentVisible) 1f else 0f)
-                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                                },
+                    )
+                }
+                Column(modifier = Modifier.then(expandedHeightModifier)) {
+                    if (accessoryContent != null) {
+                        Spacer(Modifier.height(if (multilineControlsSuppressed) 12.dp else CompactEditorTopInset))
+                        Box(
+                            Modifier
+                                .boundedComposerAccessory()
+                                .onSizeChanged { size ->
+                                    // Accessories insert 12dp beyond the ordinary editor padding in either layout.
+                                    onAccessoryHeightChanged(with(density) { size.height.toDp() } + 12.dp)
+                                }.fadingVerticalScroll(rememberScrollState()),
+                        ) {
+                            accessoryContent()
+                        }
+                    }
+                    Box(
+                        modifier =
+                            Modifier
+                                .weight(1f, fill = expansionMode != ComposerExpansionMode.Automatic)
+                                .heightIn(min = if (voiceReviewContent == null) 48.dp else 96.dp)
+                                .then(expandedHeightModifier),
                     ) {
-                        val editorOverflowColor = composerOverflowIndicatorColor()
-                        BasicTextField(
-                            value = textFieldValue,
-                            onValueChange = onValueChange,
+                        Box(
+                            contentAlignment = Alignment.TopStart,
                             modifier =
                                 Modifier
+                                    .align(Alignment.TopStart)
                                     .fillMaxWidth()
                                     .then(expandedHeightModifier)
-                                    .then(automaticTextHeight)
-                                    // Drawn outside the scroll modifier so the thumb
-                                    // paints in viewport coordinates over the clipped
-                                    // editor, only while the draft overflows it.
-                                    .drawWithContent {
-                                        drawContent()
-                                        drawComposerEditorOverflowAffordance(
-                                            scrollValue = composerScrollState.value,
-                                            maxScroll = composerScrollState.maxValue,
-                                            color = editorOverflowColor,
-                                            // Painted in the inset the editor already leaves, so the
-                                            // thumb never covers a glyph and the row keeps its width.
-                                            // The compact row reserves its trailing space for the
-                                            // dictation and send controls, so only the gap before them
-                                            // is free; without one the helper falls back inside the
-                                            // editor rather than painting over a control.
-                                            outerGutterPx =
-                                                interpolateDp(
-                                                    compactFreeTrailingGutter,
-                                                    ExpandedEditorEndInset,
-                                                    editingProgress.value,
-                                                ).toPx(),
-                                        )
-                                    }.keepComposerSelectionVisibleDuringLayout(
-                                        composerScrollState,
-                                        layoutCorrectionGate,
-                                    ) {
-                                        if (readingScrollAnchor?.matches(textFieldValue) == true) {
-                                            return@keepComposerSelectionVisibleDuringLayout null
-                                        }
-                                        textLayoutSnapshot
-                                            ?.takeIf {
-                                                it.sourceText == textFieldValue.text &&
-                                                    it.transformedText == transformedText
-                                            }?.let { snapshot ->
-                                                composerSelectionLayout(
-                                                    layout = snapshot.result,
-                                                    value = textFieldValue,
-                                                    transformedText = snapshot.transformedText,
-                                                )
-                                            }
-                                    }.semantics {
-                                        // Accessibility scrolls are reading intent too:
-                                        // arm the anchor before moving the shared state,
-                                        // overriding verticalScroll's un-anchored action.
-                                        scrollBy { _, y ->
-                                            editorScrollJob?.cancel()
-                                            // Report success and arm reading intent
-                                            // only when the viewport actually moved:
-                                            // a boundary or zero-delta action must
-                                            // let the service announce the edge or
-                                            // move to another scroll container.
-                                            val before = composerScrollState.value
-                                            composerScrollState.dispatchRawDelta(y)
-                                            val moved = composerScrollState.value != before
-                                            if (moved) {
-                                                readingScrollAnchor = ComposerReadingAnchor.of(textFieldValue)
-                                            }
-                                            moved
-                                        }
-                                    }
-                                    // The automatic composer has a hard viewport ceiling.
-                                    // Measure the editor at its natural height and own the
-                                    // resulting scroll state here so programmatic bulk
-                                    // commits can follow the real selection, not merely
-                                    // the final text line or the conversation tail.
-                                    .scrollEdgeFade(
-                                        composerScrollState,
-                                        fadeEnabled = !composerFocused && textFieldValue.selection.collapsed,
-                                    ).verticalScroll(composerScrollState)
-                                    .onGloballyPositioned { editorBounds = it.boundsInWindow() }
-                                    .pointerInput(composerFocused, inputContentVisible, inputFocusEnabled) {
-                                        if (!composerFocused && inputContentVisible && inputFocusEnabled) {
-                                            composerUnfocusedTouchFocusGestures(
-                                                onTap = { position ->
-                                                    textToolbar.hide()
-                                                    val value = latestTextFieldValue
-                                                    textLayoutSnapshot
-                                                        ?.takeIf {
-                                                            it.sourceText == value.text &&
-                                                                it.transformedText == latestTransformedText
-                                                        }?.let { snapshot ->
-                                                            val transformedOffset =
-                                                                snapshot.result.getOffsetForPosition(position)
-                                                            val originalOffset =
-                                                                snapshot.transformedText.offsetMapping
-                                                                    .transformedToOriginal(transformedOffset)
-                                                                    .coerceIn(0, value.text.length)
-                                                            if (value.selection.start != originalOffset ||
-                                                                value.selection.end != originalOffset
-                                                            ) {
-                                                                latestOnValueChange(
-                                                                    value.copy(selection = TextRange(originalOffset)),
-                                                                )
-                                                            }
+                                    // The text field's internal handlers consume plain
+                                    // drags without ever scrolling this height-capped
+                                    // viewport, so the editor's one explicit scroll owner
+                                    // lives here, covering the whole editor viewport:
+                                    // early vertical drags and wheel/trackpad ticks drive
+                                    // composerScrollState directly and arm reading
+                                    // intent, while focused taps and long-press selection
+                                    // pass through untouched.
+                                    .pointerInput(inputContentVisible, scrollOwnerKey) {
+                                        if (!inputContentVisible) return@pointerInput
+                                        composerEditorReadingScrollGestures(
+                                            acceptsTouchDown = { position -> position.y >= latestReadingTopInset.toPx() },
+                                            onScrollInterrupted = { editorScrollJob?.cancel() },
+                                            onFling = { velocity ->
+                                                editorScrollJob =
+                                                    editorScrollScope.launch {
+                                                        composerScrollState.scroll {
+                                                            with(latestEditorFlingBehavior) { performFling(velocity) }
                                                         }
-                                                    showKeyboardAfterTouchTap = composerFocus.requestFocus()
-                                                },
-                                                onLongPress = {
-                                                    if (latestCanOfferPaste) {
-                                                        textToolbar.showMenu(
-                                                            rect = editorBounds,
-                                                            onPasteRequested = pasteFromClipboard,
-                                                        )
                                                     }
-                                                },
-                                            )
-                                        }
-                                    }.filterTextContextMenuComponents { component ->
-                                        textFieldValue.text.isNotEmpty() ||
-                                            component.key !== TextContextMenuKeys.AutofillKey
-                                    }.focusProperties { canFocus = inputFocusEnabled }
-                                    .contentReceiver(pasteImageReceiver)
-                                    .onPreInterceptKeyBeforeSoftKeyboard { event ->
-                                        when (
-                                            composerPreImeBackAction(
-                                                enabled = preImeBackEnabled,
-                                                isBackKey = event.key == Key.Back,
-                                                isKeyDown = event.type == KeyEventType.KeyDown,
-                                            )
-                                        ) {
-                                            ComposerPreImeBackAction.IGNORE -> false
-                                            ComposerPreImeBackAction.CONSUME -> true
-                                            ComposerPreImeBackAction.DISMISS -> {
-                                                onPreImeBack()
-                                                true
-                                            }
-                                        }
-                                    }.focusRequester(composerFocus)
-                                    // #589: track focus so the conversation screen's
-                                    // resume observer knows whether the keyboard was up
-                                    // when the app was backgrounded (Case B gate).
-                                    .onFocusChanged {
-                                        composerFocused = it.isFocused
-                                        onComposerFocusChanged(it.isFocused)
-                                    }
-                                    // #404: honor the Enter-key toggle for hardware
-                                    // keyboards (Bluetooth/foldable/ChromeOS). Shift+Enter
-                                    // always inserts a line break as an escape hatch; in
-                                    // NewLine mode a bare Enter falls through to the normal
-                                    // newline insertion.
-                                    .onPreviewKeyEvent { event ->
-                                        if (event.type == KeyEventType.KeyDown &&
-                                            (event.key == Key.Enter || event.key == Key.NumPadEnter)
-                                        ) {
-                                            when {
-                                                event.isShiftPressed -> false
-                                                enterKeyBehavior == EnterKeyBehavior.SendMessage -> {
-                                                    onImeSend()
-                                                    true
+                                            },
+                                            scrollBy = { delta ->
+                                                val before = composerScrollState.value
+                                                composerScrollState.dispatchRawDelta(delta)
+                                                composerScrollState.value != before
+                                            },
+                                            onReadingScroll = {
+                                                // A non-overflowing editor has nothing to
+                                                // read toward; arming would only suspend
+                                                // caret-following for no scroll intent.
+                                                if (composerScrollState.maxValue > 0) {
+                                                    readingScrollAnchor = ComposerReadingAnchor.of(latestTextFieldValue)
                                                 }
-                                                else -> false
+                                            },
+                                        )
+                                    }.deferredPadding(
+                                        start = {
+                                            interpolateDp(
+                                                if (hasAttachmentAction) CompactEditorStartInset else 40.dp,
+                                                EditingEditorStartInset,
+                                                editingProgress.value,
+                                            )
+                                        },
+                                        top = {
+                                            if (multilineControlsSuppressed || accessoryContent != null) {
+                                                12.dp
+                                            } else {
+                                                interpolateDp(24.dp, CompactEditorTopInset, editingProgress.value)
                                             }
-                                        } else {
-                                            false
-                                        }
-                                    },
-                            textStyle = composerTextStyle,
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            visualTransformation = mentionVisualTransformation,
-                            // #404: in SendMessage mode the soft-keyboard action sends;
-                            // in NewLine mode the IME shows an Enter/newline key that
-                            // inserts `\n`.
-                            keyboardOptions =
-                                KeyboardOptions(
-                                    capitalization = KeyboardCapitalization.Sentences,
-                                    keyboardType = KeyboardType.Text,
-                                    imeAction =
-                                        if (enterKeyBehavior == EnterKeyBehavior.SendMessage) {
-                                            ImeAction.Send
-                                        } else {
-                                            ImeAction.Default
                                         },
-                                ),
-                            keyboardActions = KeyboardActions(onSend = { onImeSend() }),
-                            maxLines = Int.MAX_VALUE,
-                            onTextLayout = { layout ->
-                                if (compactLineCount == null) updateMultilineControls(layout.lineCount)
-                                val nextSnapshot =
-                                    ComposerTextLayoutSnapshot(
-                                        sourceText = textFieldValue.text,
-                                        transformedText = transformedText,
-                                        result = layout,
-                                    )
-                                if (textLayoutSnapshot != nextSnapshot) textLayoutSnapshot = nextSnapshot
-                            },
-                        )
-                        if (textFieldValue.text.isEmpty()) {
-                            Text(
-                                stringResource(R.string.message),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-
-                    Box(
-                        modifier =
-                            Modifier
-                                .align(leadingActionsAlignment)
-                                .deferredPadding(
-                                    start = { 0.dp },
-                                ).alpha(if (inputContentVisible) 1f else 0f)
-                                .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (hasAttachmentAction) {
-                                Box(
-                                    modifier =
-                                        Modifier.width(40.dp).height(48.dp).onGloballyPositioned { coordinates ->
-                                            val position = coordinates.positionInWindow()
-                                            attachmentAnchorBounds =
-                                                androidx.compose.ui.unit.IntRect(
-                                                    position.x.roundToInt(),
-                                                    position.y.roundToInt(),
-                                                    position.x.roundToInt() + coordinates.size.width,
-                                                    position.y.roundToInt() + coordinates.size.height,
-                                                )
+                                        end = {
+                                            interpolateDp(
+                                                compactTrailingReserve,
+                                                ExpandedEditorEndInset,
+                                                editingProgress.value,
+                                            )
                                         },
-                                    contentAlignment = Alignment.CenterEnd,
-                                ) {
-                                    IconButton(
-                                        onClick = onAttachmentsToggle,
-                                        enabled = inputContentVisible,
-                                        modifier =
-                                            Modifier
-                                                .width(32.dp)
-                                                .height(48.dp)
-                                                .alpha(if (inputContentVisible) 1f else 0f)
-                                                .then(
-                                                    if (inputContentVisible) {
-                                                        Modifier
-                                                    } else {
-                                                        Modifier.clearAndSetSemantics {}
-                                                    },
-                                                ),
-                                    ) {
-                                        // Swap the glyph on open (X) the way the emoji toggle swaps
-                                        // to a keyboard, so sighted users get a visual cue, not just
-                                        // a changed content description.
-                                        Icon(
-                                            painter =
-                                                painterResource(
-                                                    if (attachmentSheetOpen) R.drawable.ic_close else R.drawable.ic_add,
-                                                ),
-                                            contentDescription =
-                                                stringResource(
-                                                    if (attachmentSheetOpen) {
-                                                        R.string.close
-                                                    } else {
-                                                        R.string.attach_options
-                                                    },
-                                                ),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(24.dp),
-                                        )
-                                    }
-                                    attachmentMenu?.invoke(attachmentAnchorBounds)
-                                }
-                            }
-                            TextEntryEmojiAction(
-                                pickerOpen = emojiPickerOpen,
-                                enabled = inputContentVisible,
-                                onClick = onEmojiPickerToggle,
-                                togglesKeyboard = true,
-                                modifier = Modifier.width(32.dp).height(48.dp).focusRequester(defaultActionFocus),
-                                iconSize = 24.dp,
-                                emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
-                            )
-                        }
-                    }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier =
-                            Modifier
-                                .align(
-                                    if (voiceReviewContent == null) trailingActionsAlignment else Alignment.BottomEnd,
-                                ).height(48.dp),
-                    ) {
-                        if (draftTopWidth > 0.dp && !topOnSeparateRow) draftTopAction()
-                        if (dictationControls != null) {
-                            Row(
-                                Modifier.layout { measurable, constraints ->
-                                    // Row constraints already exclude preceding children such as draft navigation.
-                                    val maximum =
-                                        minOf(
-                                            DICTATION_ACTIVE_ACTIONS_WIDTH.roundToPx(),
-                                            availableDictationWidth.roundToPx(),
-                                            constraints.maxWidth,
-                                        )
-                                    val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maximum))
-                                    layout(child.width, child.height) { child.placeRelative(0, 0) }
-                                },
-                            ) { dictationControls() }
-                        } else if (onDictation != null) {
-                            IconButton(
-                                onClick = onDictation,
-                                enabled = inputContentVisible,
+                                        bottom = {
+                                            interpolateDp(
+                                                12.dp,
+                                                ExpandedEditorBottomInset + extraControlsHeight,
+                                                editingProgress.value,
+                                            )
+                                        },
+                                    ).alpha(if (inputContentVisible) 1f else 0f)
+                                    .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                        ) {
+                            val editorOverflowColor = composerOverflowIndicatorColor()
+                            BasicTextField(
+                                value = textFieldValue,
+                                onValueChange = onValueChange,
                                 modifier =
                                     Modifier
-                                        .width(40.dp)
-                                        .height(48.dp)
-                                        .alpha(if (inputContentVisible) 1f else 0f)
-                                        .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
-                            ) {
-                                // The prototype's microphone is dictation; voice notes use the waveform glyph.
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_mic),
-                                    contentDescription = stringResource(R.string.dictate_text),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(24.dp),
+                                        .fillMaxWidth()
+                                        .then(expandedHeightModifier)
+                                        .then(automaticTextHeight)
+                                        // Drawn outside the scroll modifier so the thumb
+                                        // paints in viewport coordinates over the clipped
+                                        // editor, only while the draft overflows it.
+                                        .drawWithContent {
+                                            drawContent()
+                                            drawComposerEditorOverflowAffordance(
+                                                scrollValue = composerScrollState.value,
+                                                maxScroll = composerScrollState.maxValue,
+                                                color = editorOverflowColor,
+                                                // Painted in the inset the editor already leaves, so the
+                                                // thumb never covers a glyph and the row keeps its width.
+                                                // The compact row reserves its trailing space for the
+                                                // dictation and send controls, so only the gap before them
+                                                // is free; without one the helper falls back inside the
+                                                // editor rather than painting over a control.
+                                                outerGutterPx =
+                                                    interpolateDp(
+                                                        compactFreeTrailingGutter,
+                                                        ExpandedEditorEndInset,
+                                                        editingProgress.value,
+                                                    ).toPx(),
+                                            )
+                                        }.keepComposerSelectionVisibleDuringLayout(
+                                            composerScrollState,
+                                            layoutCorrectionGate,
+                                        ) {
+                                            if (readingScrollAnchor?.matches(textFieldValue) == true) {
+                                                return@keepComposerSelectionVisibleDuringLayout null
+                                            }
+                                            textLayoutSnapshot
+                                                ?.takeIf {
+                                                    it.sourceText == textFieldValue.text &&
+                                                        it.transformedText == transformedText
+                                                }?.let { snapshot ->
+                                                    composerSelectionLayout(
+                                                        layout = snapshot.result,
+                                                        value = textFieldValue,
+                                                        transformedText = snapshot.transformedText,
+                                                    )
+                                                }
+                                        }.semantics {
+                                            // Accessibility scrolls are reading intent too:
+                                            // arm the anchor before moving the shared state,
+                                            // overriding verticalScroll's un-anchored action.
+                                            scrollBy { _, y ->
+                                                editorScrollJob?.cancel()
+                                                // Report success and arm reading intent
+                                                // only when the viewport actually moved:
+                                                // a boundary or zero-delta action must
+                                                // let the service announce the edge or
+                                                // move to another scroll container.
+                                                val before = composerScrollState.value
+                                                composerScrollState.dispatchRawDelta(y)
+                                                val moved = composerScrollState.value != before
+                                                if (moved) {
+                                                    readingScrollAnchor = ComposerReadingAnchor.of(textFieldValue)
+                                                }
+                                                moved
+                                            }
+                                        }
+                                        // The automatic composer has a hard viewport ceiling.
+                                        // Measure the editor at its natural height and own the
+                                        // resulting scroll state here so programmatic bulk
+                                        // commits can follow the real selection, not merely
+                                        // the final text line or the conversation tail.
+                                        .scrollEdgeFade(
+                                            composerScrollState,
+                                            fadeEnabled = !composerFocused && textFieldValue.selection.collapsed,
+                                        ).verticalScroll(composerScrollState)
+                                        .onGloballyPositioned { editorBounds = it.boundsInWindow() }
+                                        .pointerInput(composerFocused, inputContentVisible, inputFocusEnabled) {
+                                            if (!composerFocused && inputContentVisible && inputFocusEnabled) {
+                                                composerUnfocusedTouchFocusGestures(
+                                                    onTap = { position ->
+                                                        textToolbar.hide()
+                                                        val value = latestTextFieldValue
+                                                        textLayoutSnapshot
+                                                            ?.takeIf {
+                                                                it.sourceText == value.text &&
+                                                                    it.transformedText == latestTransformedText
+                                                            }?.let { snapshot ->
+                                                                val transformedOffset =
+                                                                    snapshot.result.getOffsetForPosition(position)
+                                                                val originalOffset =
+                                                                    snapshot.transformedText.offsetMapping
+                                                                        .transformedToOriginal(transformedOffset)
+                                                                        .coerceIn(0, value.text.length)
+                                                                if (value.selection.start != originalOffset ||
+                                                                    value.selection.end != originalOffset
+                                                                ) {
+                                                                    latestOnValueChange(
+                                                                        value.copy(selection = TextRange(originalOffset)),
+                                                                    )
+                                                                }
+                                                            }
+                                                        showKeyboardAfterTouchTap = composerFocus.requestFocus()
+                                                    },
+                                                    onLongPress = {
+                                                        if (latestCanOfferPaste) {
+                                                            textToolbar.showMenu(
+                                                                rect = editorBounds,
+                                                                onPasteRequested = pasteFromClipboard,
+                                                            )
+                                                        }
+                                                    },
+                                                )
+                                            }
+                                        }.filterTextContextMenuComponents { component ->
+                                            textFieldValue.text.isNotEmpty() ||
+                                                component.key !== TextContextMenuKeys.AutofillKey
+                                        }.focusProperties { canFocus = inputFocusEnabled }
+                                        .contentReceiver(pasteImageReceiver)
+                                        .onPreInterceptKeyBeforeSoftKeyboard { event ->
+                                            when (
+                                                composerPreImeBackAction(
+                                                    enabled = preImeBackEnabled,
+                                                    isBackKey = event.key == Key.Back,
+                                                    isKeyDown = event.type == KeyEventType.KeyDown,
+                                                )
+                                            ) {
+                                                ComposerPreImeBackAction.IGNORE -> false
+                                                ComposerPreImeBackAction.CONSUME -> true
+                                                ComposerPreImeBackAction.DISMISS -> {
+                                                    onPreImeBack()
+                                                    true
+                                                }
+                                            }
+                                        }.focusRequester(composerFocus)
+                                        // #589: track focus so the conversation screen's
+                                        // resume observer knows whether the keyboard was up
+                                        // when the app was backgrounded (Case B gate).
+                                        .onFocusChanged {
+                                            composerFocused = it.isFocused
+                                            onComposerFocusChanged(it.isFocused)
+                                        }
+                                        // #404: honor the Enter-key toggle for hardware
+                                        // keyboards (Bluetooth/foldable/ChromeOS). Shift+Enter
+                                        // always inserts a line break as an escape hatch; in
+                                        // NewLine mode a bare Enter falls through to the normal
+                                        // newline insertion.
+                                        .onPreviewKeyEvent { event ->
+                                            if (event.type == KeyEventType.KeyDown &&
+                                                (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                                            ) {
+                                                when {
+                                                    event.isShiftPressed -> false
+                                                    enterKeyBehavior == EnterKeyBehavior.SendMessage -> {
+                                                        onImeSend()
+                                                        true
+                                                    }
+                                                    else -> false
+                                                }
+                                            } else {
+                                                false
+                                            }
+                                        },
+                                textStyle = composerTextStyle,
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                visualTransformation = mentionVisualTransformation,
+                                // #404: in SendMessage mode the soft-keyboard action sends;
+                                // in NewLine mode the IME shows an Enter/newline key that
+                                // inserts `\n`.
+                                keyboardOptions =
+                                    KeyboardOptions(
+                                        capitalization = KeyboardCapitalization.Sentences,
+                                        keyboardType = KeyboardType.Text,
+                                        imeAction =
+                                            if (enterKeyBehavior == EnterKeyBehavior.SendMessage) {
+                                                ImeAction.Send
+                                            } else {
+                                                ImeAction.Default
+                                            },
+                                    ),
+                                keyboardActions = KeyboardActions(onSend = { onImeSend() }),
+                                maxLines = Int.MAX_VALUE,
+                                onTextLayout = { layout ->
+                                    if (compactLineCount == null) updateMultilineControls(layout.lineCount)
+                                    val nextSnapshot =
+                                        ComposerTextLayoutSnapshot(
+                                            sourceText = textFieldValue.text,
+                                            transformedText = transformedText,
+                                            result = layout,
+                                        )
+                                    if (textLayoutSnapshot != nextSnapshot) textLayoutSnapshot = nextSnapshot
+                                },
+                            )
+                            if (textFieldValue.text.isEmpty()) {
+                                Text(
+                                    stringResource(R.string.message),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
-                        if (sendAccessoryContent != null && inputContentVisible) {
-                            Box(
-                                Modifier.layout { measurable, constraints ->
-                                    // Stays clear of the leading tools; the label ellipsizes first.
-                                    val available =
-                                        (
-                                            navigationSurfaceWidth - leadingControlsWidth - reservedTrailingWidth -
-                                                dictationControlWidth
-                                        ).coerceAtLeast(0.dp).roundToPx()
-                                    val child =
-                                        measurable.measure(
-                                            constraints.copy(
-                                                minWidth = 0,
-                                                maxWidth = minOf(constraints.maxWidth, available),
-                                            ),
-                                        )
-                                    layout(child.width, child.height) { child.placeRelative(0, 0) }
-                                },
-                            ) { sendAccessoryContent() }
-                        }
-                        if (expandedTrailingActionInset > 0.dp) {
-                            Spacer(
-                                Modifier.width(expandedTrailingActionInset + 4.dp),
-                            )
-                        }
-                        trailingAction?.invoke(this)
-                    }
-                    if (voiceReviewContent != null) {
-                        Box(Modifier.matchParentSize()) { voiceReviewContent() }
-                    }
-                    if (topOnSeparateRow) {
+
                         Box(
-                            Modifier.align(Alignment.BottomEnd).offset(y = -48.dp).height(48.dp),
-                            contentAlignment = Alignment.CenterEnd,
+                            modifier =
+                                Modifier
+                                    .align(leadingActionsAlignment)
+                                    .deferredPadding(
+                                        start = { 0.dp },
+                                    ).alpha(if (inputContentVisible) 1f else 0f)
+                                    .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
                         ) {
-                            draftTopAction()
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (hasAttachmentAction) {
+                                    Box(
+                                        modifier =
+                                            Modifier.width(40.dp).height(48.dp).onGloballyPositioned { coordinates ->
+                                                val position = coordinates.positionInWindow()
+                                                attachmentAnchorBounds =
+                                                    androidx.compose.ui.unit.IntRect(
+                                                        position.x.roundToInt(),
+                                                        position.y.roundToInt(),
+                                                        position.x.roundToInt() + coordinates.size.width,
+                                                        position.y.roundToInt() + coordinates.size.height,
+                                                    )
+                                            },
+                                        contentAlignment = Alignment.CenterEnd,
+                                    ) {
+                                        IconButton(
+                                            onClick = onAttachmentsToggle,
+                                            enabled = inputContentVisible,
+                                            modifier =
+                                                Modifier
+                                                    .width(32.dp)
+                                                    .height(48.dp)
+                                                    .alpha(if (inputContentVisible) 1f else 0f)
+                                                    .then(
+                                                        if (inputContentVisible) {
+                                                            Modifier
+                                                        } else {
+                                                            Modifier.clearAndSetSemantics {}
+                                                        },
+                                                    ),
+                                        ) {
+                                            // Swap the glyph on open (X) the way the emoji toggle swaps
+                                            // to a keyboard, so sighted users get a visual cue, not just
+                                            // a changed content description.
+                                            Icon(
+                                                painter =
+                                                    painterResource(
+                                                        if (attachmentSheetOpen) R.drawable.ic_close else R.drawable.ic_add,
+                                                    ),
+                                                contentDescription =
+                                                    stringResource(
+                                                        if (attachmentSheetOpen) {
+                                                            R.string.close
+                                                        } else {
+                                                            R.string.attach_options
+                                                        },
+                                                    ),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(24.dp),
+                                            )
+                                        }
+                                        attachmentMenu?.invoke(attachmentAnchorBounds)
+                                    }
+                                }
+                                TextEntryEmojiAction(
+                                    pickerOpen = emojiPickerOpen,
+                                    enabled = inputContentVisible,
+                                    onClick = onEmojiPickerToggle,
+                                    togglesKeyboard = true,
+                                    modifier = Modifier.width(32.dp).height(48.dp).focusRequester(defaultActionFocus),
+                                    iconSize = 24.dp,
+                                    emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
+                                )
+                            }
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier =
+                                Modifier
+                                    .align(
+                                        if (voiceReviewContent == null) trailingActionsAlignment else Alignment.BottomEnd,
+                                    ).height(48.dp),
+                        ) {
+                            if (draftTopWidth > 0.dp && !topOnSeparateRow) draftTopAction()
+                            if (dictationControls != null) {
+                                Row(
+                                    Modifier.layout { measurable, constraints ->
+                                        // Row constraints already exclude preceding children such as draft navigation.
+                                        val maximum =
+                                            minOf(
+                                                DICTATION_ACTIVE_ACTIONS_WIDTH.roundToPx(),
+                                                availableDictationWidth.roundToPx(),
+                                                constraints.maxWidth,
+                                            )
+                                        val child = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maximum))
+                                        layout(child.width, child.height) { child.placeRelative(0, 0) }
+                                    },
+                                ) { dictationControls() }
+                            } else if (onDictation != null) {
+                                IconButton(
+                                    onClick = onDictation,
+                                    enabled = inputContentVisible,
+                                    modifier =
+                                        Modifier
+                                            .width(40.dp)
+                                            .height(48.dp)
+                                            .alpha(if (inputContentVisible) 1f else 0f)
+                                            .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
+                                ) {
+                                    // The prototype's microphone is dictation; voice notes use the waveform glyph.
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_mic),
+                                        contentDescription = stringResource(R.string.dictate_text),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                }
+                            }
+                            if (sendAccessoryContent != null && inputContentVisible) {
+                                Box(
+                                    Modifier.layout { measurable, constraints ->
+                                        // Stays clear of the leading tools; the label ellipsizes first.
+                                        val available =
+                                            (
+                                                navigationSurfaceWidth - leadingControlsWidth - reservedTrailingWidth -
+                                                    dictationControlWidth
+                                            ).coerceAtLeast(0.dp).roundToPx()
+                                        val child =
+                                            measurable.measure(
+                                                constraints.copy(
+                                                    minWidth = 0,
+                                                    maxWidth = minOf(constraints.maxWidth, available),
+                                                ),
+                                            )
+                                        layout(child.width, child.height) { child.placeRelative(0, 0) }
+                                    },
+                                ) { sendAccessoryContent() }
+                            }
+                            if (expandedTrailingActionInset > 0.dp) {
+                                Spacer(
+                                    Modifier.width(expandedTrailingActionInset + 4.dp),
+                                )
+                            }
+                            trailingAction?.invoke(this)
+                        }
+                        if (voiceReviewContent != null) {
+                            Box(Modifier.matchParentSize()) { voiceReviewContent() }
+                        }
+                        if (topOnSeparateRow) {
+                            Box(
+                                Modifier.align(Alignment.BottomEnd).offset(y = -48.dp).height(48.dp),
+                                contentAlignment = Alignment.CenterEnd,
+                            ) {
+                                draftTopAction()
+                            }
                         }
                     }
                 }

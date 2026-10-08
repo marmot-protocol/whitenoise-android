@@ -22,6 +22,7 @@ RAW_ALLOWED = {
     ('conversation/composer/ComposerPills.kt', 'verticalScroll'),
     # Retain the tested IME form until its offscreen fade survives the real-keyboard regression.
     ('conversation/messages/ReportMessageSheet.kt', 'verticalScroll'),
+    ('profile/ProfileEditContent.kt', 'verticalScroll'),
 }
 RAW = {'verticalScroll', 'LazyColumn', 'LazyVerticalGrid'}
 
