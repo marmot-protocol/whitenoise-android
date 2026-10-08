@@ -12247,6 +12247,12 @@
         ]
       },
       {
+        "surface": "150-member invitation warning threshold",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
+        "anchor": "LARGE_GROUP_INVITE_WARNING_THRESHOLD = 150",
+        "test_ids": ["GRP-005"]
+      },
+      {
         "surface": "string:large_group_invite_confirm_message",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/LargeGroupInviteWarning.kt",
         "anchor": "R.string.large_group_invite_confirm_message",

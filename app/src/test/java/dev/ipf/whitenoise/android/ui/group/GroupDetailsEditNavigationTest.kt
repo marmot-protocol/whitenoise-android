@@ -175,7 +175,7 @@ class GroupDetailsEditNavigationTest {
     @Test
     fun addMembersRouteRestoresThroughActualDetailsScreen() {
         val testGroup = group()
-        val members = listOf(member(SELF_HEX, local = true)) + (1 until 50).map { member("member-$it") }
+        val members = listOf(member(SELF_HEX, local = true)) + (1 until 150).map { member("member-$it") }
         val fixture =
             controller(
                 group = testGroup,
