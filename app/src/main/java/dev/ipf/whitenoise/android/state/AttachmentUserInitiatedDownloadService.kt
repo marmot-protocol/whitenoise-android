@@ -28,7 +28,10 @@ import kotlinx.coroutines.withContext
 
 private const val TAG = "DMAttachmentJob"
 private const val JOB_NAMESPACE = "attachment_download_v1"
-private const val CHANNEL_ID = "attachment_download_v1"
+private const val CHANNEL_ID = "attachment_download_v2"
+
+/** The channel earlier builds created, whose badge and sound settings Android keeps on an upgraded install. */
+private const val LEGACY_CHANNEL_ID = "attachment_download_v1"
 private const val KEY_IDENTITY = "identity"
 private const val KEY_ACCOUNT = "account_ref"
 private const val KEY_GROUP = "group_id_hex"
@@ -128,9 +131,17 @@ internal object AttachmentUserInitiatedDownloads {
     }
 }
 
-/** Creates the low-importance transfer channel, silent and badge-free, if it does not exist yet. */
-private fun ensureAttachmentDownloadChannel(context: Context) {
+/**
+ * Returns the id of the transfer channel to post on, creating the silent, badge-free one if it does not exist.
+ *
+ * Android keeps an existing channel's settings, so an upgraded install would otherwise keep the earlier channel's
+ * badge and sound. The earlier channel is therefore replaced, unless the user blocked it: turning the transfer
+ * card off stays honored instead of being undone by the new id.
+ */
+private fun ensureAttachmentDownloadChannel(context: Context): String {
     val manager = context.getSystemService(NotificationManager::class.java)
+    val legacy = manager.getNotificationChannel(LEGACY_CHANNEL_ID)
+    if (legacy != null && legacy.importance == NotificationManager.IMPORTANCE_NONE) return LEGACY_CHANNEL_ID
     manager.createNotificationChannel(
         NotificationChannel(
             CHANNEL_ID,
@@ -143,6 +154,8 @@ private fun ensureAttachmentDownloadChannel(context: Context) {
             enableLights(false)
         },
     )
+    if (legacy != null) manager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
+    return CHANNEL_ID
 }
 
 /**
@@ -153,10 +166,9 @@ private fun ensureAttachmentDownloadChannel(context: Context) {
  * transfer that finishes within its foreground-service grace period, so a cached or tiny file never flashes
  * a card that vanishes at once.
  */
-internal fun attachmentDownloadNotification(context: Context): Notification {
-    ensureAttachmentDownloadChannel(context)
-    return Notification
-        .Builder(context, CHANNEL_ID)
+internal fun attachmentDownloadNotification(context: Context): Notification =
+    Notification
+        .Builder(context, ensureAttachmentDownloadChannel(context))
         .setSmallIcon(R.drawable.ic_stat_whitenoise)
         .setContentTitle(context.getString(R.string.media_downloading))
         .setContentText(context.getString(R.string.media_attachment))
@@ -170,7 +182,6 @@ internal fun attachmentDownloadNotification(context: Context): Notification {
                 setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_DEFERRED)
             }
         }.build()
-}
 
 /** Runs an explicit attachment fetch through Android's user-initiated transfer job. */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)

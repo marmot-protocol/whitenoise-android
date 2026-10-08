@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.ServiceInfo
@@ -84,7 +85,7 @@ class AttachmentUserInitiatedDownloadServiceTest {
         val channel =
             context
                 .getSystemService(NotificationManager::class.java)
-                .getNotificationChannel("attachment_download_v1")
+                .getNotificationChannel("attachment_download_v2")
 
         assertEquals(NotificationManager.IMPORTANCE_LOW, channel!!.importance)
         assertNull(channel.sound)
@@ -132,5 +133,48 @@ class AttachmentUserInitiatedDownloadServiceTest {
 
         assertEquals(attachmentJobId(request), attachmentJobId(sameAttachmentAgain))
         assertNotEquals(attachmentJobId(request), attachmentJobId(anotherAttachment))
+    }
+
+    /** Creates the channel an earlier build left behind, with its badge on, as an upgraded install has it. */
+    private fun installLegacyChannel(importance: Int) {
+        context
+            .getSystemService(NotificationManager::class.java)
+            .createNotificationChannel(NotificationChannel("attachment_download_v1", "Downloading", importance))
+    }
+
+    /** An upgraded install moves to the badge-free channel and the earlier one is removed, not left in settings. */
+    @Test
+    fun upgradeReplacesTheEarlierChannelWithTheBadgeFreeOne() {
+        installLegacyChannel(NotificationManager.IMPORTANCE_LOW)
+        val manager = context.getSystemService(NotificationManager::class.java)
+
+        val notification = transferNotification()
+
+        assertEquals("attachment_download_v2", notification.channelId)
+        assertNull(manager.getNotificationChannel("attachment_download_v1"))
+        assertFalse(manager.getNotificationChannel("attachment_download_v2")!!.canShowBadge())
+    }
+
+    /** A user who blocked the earlier channel keeps it blocked: the transfer card stays on that channel. */
+    @Test
+    fun aBlockedEarlierChannelStaysTheOneInUse() {
+        installLegacyChannel(NotificationManager.IMPORTANCE_NONE)
+        val manager = context.getSystemService(NotificationManager::class.java)
+
+        val notification = transferNotification()
+
+        assertEquals("attachment_download_v1", notification.channelId)
+        assertNull(manager.getNotificationChannel("attachment_download_v2"))
+    }
+
+    /** A fresh install creates only the new channel. */
+    @Test
+    fun freshInstallCreatesOnlyTheNewChannel() {
+        val manager = context.getSystemService(NotificationManager::class.java)
+
+        val notification = transferNotification()
+
+        assertEquals("attachment_download_v2", notification.channelId)
+        assertNull(manager.getNotificationChannel("attachment_download_v1"))
     }
 }
