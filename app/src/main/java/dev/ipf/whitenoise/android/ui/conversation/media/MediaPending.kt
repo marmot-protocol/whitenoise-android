@@ -128,7 +128,7 @@ private fun PendingFilePills(
             PendingFilePill(
                 fileName = attachment.fileName,
                 mediaType = attachment.mediaType,
-                sizeBytes = attachment.plaintextBytes.size.toLong(),
+                sizeBytes = attachment.byteCount,
                 failed = failed,
                 statusLabel = statusLabel,
                 onRetry = onRetry,

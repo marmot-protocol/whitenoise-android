@@ -152,6 +152,8 @@ class KeyboardSafePopupCoverageTest {
         val body = messageActionsSource().readText().functionBody("MessageActionMenu")
         val focusedSource = focusedMessageActionsSource().readText()
         val focusedBody = focusedSource.functionBody("FocusedMessageActions")
+        val scrollSource = sourceFile("ui/common/WhiteNoiseScrollContainers.kt").readText()
+        val scrollBinding = ".verticalScroll(state, overscrollEffect, enabled, flingBehavior, reverseScrolling)"
 
         assertTrue("Native commands must reach the focused presentation", "FocusedMessageActions(" in body)
         listOf(
@@ -188,7 +190,9 @@ class KeyboardSafePopupCoverageTest {
         )
         assertTrue(
             "Tall action content must scroll within the keyboard-safe frame",
-            ".heightIn(max = maxHeight)" in focusedBody && ".verticalScroll(rememberScrollState())" in focusedBody,
+            ".heightIn(max = maxHeight)" in focusedBody &&
+                ".fadingVerticalScroll(rememberScrollState())" in focusedBody &&
+                scrollBinding in scrollSource,
         )
         assertTrue(
             "The stack must remain transparent until its layout, its placement and the preview are ready",

@@ -47,6 +47,7 @@ internal class TtsQueuePreparation(
                             preview = queued.preview.take(TTS_PREVIEW_MAX_LENGTH),
                             announcementsPrepared = false,
                             attachmentDisplayName = attachmentDisplayName,
+                            presentationEntry = this,
                         )
                     }
                 }
@@ -88,6 +89,7 @@ internal class TtsQueuePreparation(
                 messageIdHex = messageIdHex,
                 projectionId = projectionId,
                 timelineAt = timelineAt,
+                presentationEntry = this,
             )
         }
     }

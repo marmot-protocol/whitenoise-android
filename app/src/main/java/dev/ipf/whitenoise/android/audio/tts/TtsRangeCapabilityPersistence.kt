@@ -25,18 +25,12 @@ internal fun confirmTtsRangeCapability(
     rangeVerdictKey: String,
     onConfirmed: () -> Unit,
 ) {
-    // Confirm on EVERY usable range, not only the first: a verdict restored
-    // from storage is provisional, and confirmation is what stops it being
-    // obeyed for the life of the process after the engine has stopped
-    // earning it. The snapshots are read before confirming, because
-    // onRangeStart sets reportsRanges itself - guards evaluated afterwards
-    // would always be false. A first proof retires the estimate and persists
-    // a newly learned verdict. A legacy engine-only true verdict is written
-    // once to this locale's key when the callback confirms it.
+    // Each usable native range retires this utterance's estimate. Historical confirmation
+    // controls persistence only; a later utterance may need its own estimated schedule.
     val wasProven = rangeProbe.hasConfirmedRangeCapability
     rangeProbe.onRangeStart()
+    onConfirmed()
     if (!wasProven) {
-        onConfirmed()
         if (timingStore?.rangeVerdict(rangeVerdictKey) != true) {
             timingStore?.setRangeVerdict(rangeVerdictKey, true)
         }

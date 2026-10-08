@@ -15,7 +15,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -94,7 +94,7 @@ internal fun <T> ChoiceDialog(
                 Modifier
                     .widthIn(max = ChoiceDialogDefaults.ContentMaxWidth)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
+                    .fadingVerticalScroll(rememberScrollState()),
             ) {
                 Column(Modifier.fillMaxWidth().selectableGroup()) {
                     values.forEach { value ->
@@ -273,7 +273,7 @@ internal fun SpeechChoiceDialog(
                     .widthIn(max = ChoiceDialogDefaults.ContentMaxWidth)
                     .fillMaxWidth()
                     .heightIn(max = SpeechChoiceDialogMaxHeight)
-                    .verticalScroll(rememberScrollState())
+                    .fadingVerticalScroll(rememberScrollState())
                     .selectableGroup(),
             ) {
                 choices.forEachIndexed { index, choice ->

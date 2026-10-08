@@ -313,6 +313,20 @@ internal class WhiteNoiseJourneys {
         device.waitForIdle()
     }
 
+    /** Verifies a prepared older viewport without moving it or consuming the unread target. */
+    fun requireUnreadMentionStart(startText: String) {
+        waitForText(startText)
+        waitForVisibleTag(PerformanceTags.JUMP_TO_MENTION)
+    }
+
+    /** Taps the production @ control once and waits for the sole mention's successful read completion. */
+    fun jumpToUnreadMention(targetText: String) {
+        waitForVisibleTag(PerformanceTags.JUMP_TO_MENTION).click()
+        waitForText(targetText, NETWORK_STATE_TIMEOUT_MS)
+        waitForVisibleTagAbsent(PerformanceTags.JUMP_TO_MENTION, NETWORK_STATE_TIMEOUT_MS)
+        device.waitForIdle()
+    }
+
     fun scrollConversation() {
         val x = device.displayWidth / 2
         val top = device.displayHeight / 4

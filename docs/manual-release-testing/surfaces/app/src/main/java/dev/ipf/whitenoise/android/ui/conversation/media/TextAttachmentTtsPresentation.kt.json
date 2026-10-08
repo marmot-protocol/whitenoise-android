@@ -1,0 +1,51 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+  "legacy_sha256": "1fc6eafc5078fcef00afac34cdf74e414e13d4d01471c9cca92c7676658f9306",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Attachment read-aloud follow restoration policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+        "anchor": "fun rememberReaderFollowPolicy(",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "Attachment read-aloud presentation and restoration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+        "anchor": "fun rememberTextAttachmentTtsUi(",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "Attachment read-aloud seek gestures",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+        "anchor": "fun rememberReaderSeekModifier(",
+        "test_ids": [
+          "MED-010"
+        ]
+      },
+      {
+        "surface": "Attachment read-aloud complete sentence geometry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+        "anchor": "fun rememberReaderSentenceLayoutReporter(",
+        "test_ids": [
+          "MED-010"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Reader reveal request generation and offscreen recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/TextAttachmentTtsPresentation.kt",
+        "anchor": "policy.requestRevision != requestRevision",
+        "test_ids": [
+          "MED-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

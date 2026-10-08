@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
-  "legacy_sha256": "ccedc118b33083978d4a44f45b2ec97ba29a8f66bc2505c1e41be7e4a5264931",
+  "legacy_sha256": "30d6257a0df9a5928f6c5fdbd62197b2617830606cbcd1efda9a3fd8b9deefec",
   "categories": {
     "composable_surfaces": [
       {
@@ -85,6 +85,19 @@
           "SET-009",
           "FLD-001",
           "FLD-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: WhiteNoiseEntityPickerSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseEntityPickerSheet.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ]

@@ -138,6 +138,17 @@
           "CHL-017",
           "PRO-008"
         ]
+      },
+      {
+        "surface": "Scroll boundaries: ForwardMessagePicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
       }
     ]
   },

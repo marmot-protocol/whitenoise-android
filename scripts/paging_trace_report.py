@@ -30,6 +30,7 @@ JOURNEYS = {
     "deepOlderFling": "benchmark:paging-deep-older",
     "returnFlingAfterDeepHistory": "benchmark:paging-return-newer",
     "jumpToNewestAfterSaturation": "benchmark:paging-jump-to-newest",
+    "jumpToUnreadMentionFromHistory": "benchmark:paging-jump-to-mention",
     "momentumHandoff": "benchmark:paging-momentum",
     "olderFlingWhileEngineCatchesUp": "benchmark:paging-busy-engine",
 }
@@ -43,6 +44,19 @@ def pct(values, p):
     k = (len(values) - 1) * p
     lo, hi = int(k), min(int(k) + 1, len(values) - 1)
     return values[lo] + (values[hi] - values[lo]) * (k - lo)
+
+
+def mention_phase_metrics(query, window):
+    """Missing trace labels stay unmeasured, rather than becoming false zero-duration phases."""
+    phases = {}
+    for phase in ("total", "availability", "approach", "position", "animation", "layout", "correction"):
+        rows = query(
+            f"select count(*) n, sum(dur)/1e6 ms from slice "
+            f"where name='WhiteNoise.conversation.mention.{phase}' and dur>=0 and {window}"
+        )
+        phases[f"mention_{phase}_n"] = rows[0].n if rows else 0
+        phases[f"mention_{phase}_ms"] = rows[0].ms if rows else None
+    return phases
 
 
 def analyse(path):
@@ -103,12 +117,14 @@ def analyse(path):
         runway_kept=int(sec("runwayKept", "count(*)")),
         edge_reached=int(sec("edgeReached", "count(*)")),
     )
+    mention = mention_phase_metrics(q, win) if test == "jumpToUnreadMentionFromHistory" else {}
     tp.close()
     return dict(
         test=test,
         it=it,
         journey_ms=dur / 1e6,
         **pages,
+        **mention,
         frames=len(frames),
         f_p50=pct(frames, 0.5),
         f_p90=pct(frames, 0.9),
@@ -145,6 +161,11 @@ def main(argv):
                 f"{r['edge_stop']:5d}{r['runway_kept']:5d}{r['edge_reached']:6d}  "
                 f"{r['frames']:5d} {ms(r['f_p50'], 4)}/{ms(r['f_p90'], 4)}/{ms(r['f_p99'], 5)}/{ms(r['f_max'], 5)} {r['jank32']:4d} {r['main_running_ms']:8.0f} {r['gpu_samples']:5d}"
             )
+            if r["test"] == "jumpToUnreadMentionFromHistory":
+                print("  mention phases (ms; dash means unmeasured): " + ", ".join(
+                    f"{phase}={ms(r.get(f'mention_{phase}_ms'), 0)}"
+                    for phase in ("total", "availability", "position", "animation", "layout", "correction")
+                ) + f"; corrections={r.get('mention_correction_n', 0)}")
         print()
         for test in order:
             rs = [r for r in rows if r["test"] == test and r["journey_ms"] is not None]

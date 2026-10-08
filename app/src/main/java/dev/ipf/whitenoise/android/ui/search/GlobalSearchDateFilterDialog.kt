@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -30,6 +29,7 @@ import dev.ipf.whitenoise.android.search.GlobalSearchCustomRangeValidation
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import dev.ipf.whitenoise.android.search.civilDateFromPickerUtcMillis
 import dev.ipf.whitenoise.android.search.pickerUtcMillisForCivilDate
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import java.time.Instant
 import java.time.LocalDate
@@ -167,7 +167,7 @@ private fun GlobalSearchDatePresetDialog(
             Column(
                 modifier =
                     Modifier
-                        .verticalScroll(rememberScrollState())
+                        .fadingVerticalScroll(rememberScrollState())
                         .padding(bottom = Dimens.spaceSm),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
             ) {

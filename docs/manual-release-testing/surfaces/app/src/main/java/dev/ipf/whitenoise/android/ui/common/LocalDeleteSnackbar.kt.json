@@ -1,0 +1,65 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+  "legacy_sha256": "9c31d8bcea302dcf3a202492c921043ff09fb43cdd9a40918c14e23bfca6f9ab",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Local-delete diagnostic Copy action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Local-delete Details action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "R.string.details",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Local-delete Dismiss action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "LocalDeleteSnackbar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "fun LocalDeleteSnackbar(",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "LocalDeleteDetails",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": "fun LocalDeleteDetails(",
+        "test_ids": [
+          "CHL-024",
+          "CHL-025"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: LocalDeleteSnackbar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/LocalDeleteSnackbar.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

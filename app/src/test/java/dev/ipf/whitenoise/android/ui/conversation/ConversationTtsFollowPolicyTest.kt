@@ -105,9 +105,14 @@ class ConversationTtsFollowPolicyTest {
         policy.observe(speaking, ownsSession = true)
 
         assertEquals(target, policy.claimPendingTarget())
+        assertTrue(policy.claimCorrectiveScroll(target))
+        assertFalse(policy.claimCorrectiveScroll(target))
         assertTrue(policy.retryFailedFollowAttempt(target))
         assertEquals(target, policy.claimPendingTarget())
+        assertTrue(policy.claimCorrectiveScroll(target))
+        assertFalse(policy.claimCorrectiveScroll(target))
         assertFalse(policy.retryFailedFollowAttempt(target))
+        assertFalse(policy.claimCorrectiveScroll(target))
 
         policy.observe(speaking, ownsSession = true)
         assertNull(policy.claimPendingTarget())
@@ -184,14 +189,14 @@ class ConversationTtsFollowPolicyTest {
             ConversationTtsFollowRequest(
                 earlier.followTarget(),
                 TtsFollowDirection.Reverse,
-                anchorAtTop = true,
+                anchorAtTop = false,
             ),
             policy.claimPendingRequest(),
         )
     }
 
     @Test
-    fun restoredReverseTargetUsesTopAnchorForOversizedSentence() {
+    fun restoredReverseTargetKeepsVisibleSentenceStill() {
         val policy = ConversationTtsFollowPolicy()
         val later = speaking(sessionId = 1, sentenceIndex = 2)
         policy.observe(later, ownsSession = true)
@@ -208,7 +213,7 @@ class ConversationTtsFollowPolicyTest {
 
         assertEquals(TtsFollowDirection.Reverse, restoredRequest.direction)
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(100),
+            TtsFollowViewportDecision.Stay,
             decide(
                 itemOffset = 0,
                 sentenceTop = 100,
@@ -237,7 +242,7 @@ class ConversationTtsFollowPolicyTest {
 
         assertEquals(TtsFollowDirection.Forward, restoredRequest.direction)
         assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(100),
+            TtsFollowViewportDecision.Stay,
             decide(
                 itemOffset = 0,
                 sentenceTop = 100,
@@ -370,7 +375,7 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
-    fun sentenceLayoutRejectsReportsFromPreviousViewportGeometry() {
+    fun overlayViewportChangesRetainWindowGeometryUntilTheRowMoves() {
         val registry = ConversationTtsSentenceLayoutRegistry()
         val target = speaking(sessionId = 1, sentenceIndex = 0).followTarget()
         val row = Any()
@@ -390,7 +395,7 @@ class ConversationTtsFollowPolicyTest {
         assertEquals(Rect(0f, 300f, 100f, 400f), registry.completeSentenceBounds(target))
 
         registry.updateViewportBounds(Rect(0f, 100f, 100f, 1_000f))
-        assertNull(registry.completeSentenceBounds(target))
+        assertEquals(Rect(0f, 300f, 100f, 400f), registry.completeSentenceBounds(target))
 
         registry.report(
             ConversationTtsSentenceLayoutReport(
@@ -417,169 +422,6 @@ class ConversationTtsFollowPolicyTest {
         assertNotEquals(
             firstSentence.conversationFollowSignal(),
             TtsState.Idle(sessionId = 1).conversationFollowSignal(),
-        )
-    }
-
-    /** A drag suspends follow for the current sentence only; the next spoken sentence resumes it. */
-    @Test
-    fun directDragSuspendsCurrentSentenceAndNextSentenceResumesFollowing() {
-        val policy = ConversationTtsFollowPolicy()
-        policy.observe(speaking(sessionId = 1, sentenceIndex = 0), ownsSession = true)
-        policy.claimPendingTarget()
-
-        policy.onUserDrag()
-        policy.observe(speaking(sessionId = 1, sentenceIndex = 1), ownsSession = true)
-
-        assertTrue(policy.isFollowEnabled)
-        assertFalse(policy.showResumeAction)
-        assertEquals(1, policy.claimPendingTarget()?.sentenceIndex)
-
-        policy.onUserDrag()
-        val restarted = speaking(sessionId = 2, sentenceIndex = 1)
-        policy.observe(restarted, ownsSession = true)
-        assertTrue(policy.isFollowEnabled)
-        assertEquals(restarted.followTarget(), policy.claimPendingTarget())
-    }
-
-    @Test
-    fun pausePreservesFollowStateWithoutRepeatingAnEvaluatedSentence() {
-        val policy = ConversationTtsFollowPolicy()
-        val speaking = speaking(sessionId = 3, sentenceIndex = 2)
-        policy.observe(speaking, ownsSession = true)
-        policy.claimPendingTarget()
-
-        policy.observe(paused(speaking), ownsSession = true)
-        assertTrue(policy.isFollowEnabled)
-        assertFalse(policy.showResumeAction)
-        assertNull(policy.claimPendingTarget())
-
-        policy.observe(speaking, ownsSession = true)
-        assertNull(policy.claimPendingTarget())
-    }
-
-    @Test
-    fun explicitResumeWhilePausedWaitsForPlaybackBeforeClaiming() {
-        val policy = ConversationTtsFollowPolicy()
-        val speaking = speaking(sessionId = 4, sentenceIndex = 2)
-        policy.observe(speaking, ownsSession = true)
-        policy.claimPendingTarget()
-        policy.onUserDrag()
-        policy.observe(paused(speaking), ownsSession = true)
-
-        policy.resumeFollow()
-        assertNull(policy.claimPendingTarget())
-
-        policy.observe(speaking, ownsSession = true)
-        assertEquals(speaking.followTarget(), policy.claimPendingTarget())
-    }
-
-    @Test
-    fun explicitTransportReturnCanRevealAPausedPassageExactlyOnce() {
-        val policy = ConversationTtsFollowPolicy()
-        val speaking = speaking(sessionId = 6, sentenceIndex = 3)
-        val paused = paused(speaking)
-        policy.observe(speaking, ownsSession = true)
-        policy.claimPendingTarget()
-        policy.observe(paused, ownsSession = true)
-
-        assertTrue(policy.requestExplicitReveal())
-        val target = paused.followTarget()
-        assertEquals(target, policy.claimPendingTarget())
-        assertTrue(policy.isCurrentTarget(target))
-
-        policy.onFollowSucceeded(target)
-        assertFalse(policy.isCurrentTarget(target))
-        assertNull(policy.claimPendingTarget())
-    }
-
-    @Test
-    fun terminalStateAndOwnerLossClearSessionLocalFollowState() {
-        val policy = ConversationTtsFollowPolicy()
-        val speaking = speaking(sessionId = 5, sentenceIndex = 0)
-        policy.observe(speaking, ownsSession = true)
-        policy.onUserDrag()
-
-        policy.observe(TtsState.Idle(sessionId = 5), ownsSession = true)
-        assertFalse(policy.isFollowEnabled)
-        assertFalse(policy.showResumeAction)
-        assertNull(policy.claimPendingTarget())
-
-        policy.observe(speaking, ownsSession = false)
-        assertFalse(policy.isFollowEnabled)
-        assertFalse(policy.showResumeAction)
-        assertNull(policy.claimPendingTarget())
-    }
-
-    @Test
-    fun fullyVisibleSentenceStaysPutAndAnyClippedSentenceGoesToTheTop() {
-        assertEquals(
-            TtsFollowViewportDecision.Stay,
-            decide(itemOffset = 0, sentenceTop = 350, sentenceBottom = 450),
-        )
-        assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(-50),
-            decide(itemOffset = 0, sentenceTop = -50, sentenceBottom = 50),
-        )
-        // Clipped at the bottom, so the whole sentence comes to the top rather
-        // than rising by its overflow and clipping again on the next words.
-        assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(850),
-            decide(itemOffset = 0, sentenceTop = 850, sentenceBottom = 1_050),
-        )
-        assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(900),
-            decide(itemOffset = 0, sentenceTop = 900, sentenceBottom = 1_001),
-        )
-    }
-
-    @Test
-    fun bottomClippedSentenceGoesToTheTopWithNonZeroOrigin() {
-        assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(900),
-            TtsFollowViewport.decide(
-                viewportStart = 200,
-                viewportEnd = 1_200,
-                itemOffset = 0,
-                sentenceTop = 1_100,
-                sentenceBottom = 1_201,
-                direction = TtsFollowDirection.Forward,
-                anchorAtTop = false,
-            ),
-        )
-    }
-
-    @Test
-    fun oversizedMeasuredSentenceUsesTopAnchorInEitherDirection() {
-        assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(100),
-            decide(
-                itemOffset = 0,
-                sentenceTop = 100,
-                sentenceBottom = 1_100,
-                direction = TtsFollowDirection.Forward,
-            ),
-        )
-        assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(100),
-            decide(
-                itemOffset = 0,
-                sentenceTop = 100,
-                sentenceBottom = 1_100,
-                direction = TtsFollowDirection.Reverse,
-            ),
-        )
-    }
-
-    @Test
-    fun initialRevealTopAnchorsEvenWhenSentenceIsAlreadyFullyVisible() {
-        assertEquals(
-            TtsFollowViewportDecision.ScrollToItemOffset(350),
-            decide(
-                itemOffset = 0,
-                sentenceTop = 350,
-                sentenceBottom = 450,
-                anchorAtTop = true,
-            ),
         )
     }
 

@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.verticalEdgeFade
 import dev.ipf.whitenoise.android.ui.common.verticalEdgeFadeStops
 
@@ -57,7 +58,7 @@ internal fun Modifier.transcriptEdgeFade(
  *
  * [composerOverlap] is how far the transcript paints beneath the composer, and so is both where the
  * fade starts and how long it takes. A conversation with no overlap has nothing behind the composer
- * and gets no bottom fade.
+ * and uses the ordinary reversed-list edge cues instead.
  */
 @Composable
 internal fun Modifier.transcriptEdgeFade(
@@ -65,11 +66,15 @@ internal fun Modifier.transcriptEdgeFade(
     composerOverlap: Dp,
     fadeHeight: Dp = TRANSCRIPT_EDGE_FADE_HEIGHT,
 ): Modifier {
+    if (composerOverlap <= 0.dp) return scrollEdgeFade(listState, reverseLayout = true, fadeHeight = fadeHeight)
     // The transcript is reversed, so scrolling forward walks back through history towards the bar.
     val topFade by
         animateDpAsState(
             targetValue = if (listState.canScrollForward) fadeHeight else 0.dp,
             label = "transcript-top-fade",
         )
-    return transcriptEdgeFade(topFade = topFade, bottomFade = composerOverlap, bottomInset = 0.dp)
+    return verticalEdgeFade(
+        topFade = { if (listState.canScrollForward) topFade else 0.dp },
+        bottomFade = { composerOverlap },
+    )
 }

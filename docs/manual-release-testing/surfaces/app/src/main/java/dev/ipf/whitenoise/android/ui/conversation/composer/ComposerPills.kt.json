@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
-  "legacy_sha256": "c3341724d26aacd3ba31040bc5e8ca48ad2dc780912bfa7f3b3ae63963f74579",
+  "legacy_sha256": "0b11808daf17f2fe5e0699589cb4c729935d54bed3b119678863615433fc714c",
   "categories": {
     "composable_surfaces": [
       {
@@ -127,6 +127,17 @@
         "anchor": "val showDraftTop =",
         "test_ids": [
           "CON-017"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: ComposerPills",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": ".scrollEdgeFade(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ]

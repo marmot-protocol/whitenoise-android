@@ -6,6 +6,7 @@ import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekResolver
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekTarget
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSpeechMessage
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.StateFlow
@@ -101,6 +102,7 @@ class TtsController internal constructor(
     private val isMediaPlaybackActive: () -> Boolean = { true },
     private val timingStore: TtsTimingStore? = null,
     private val wordTicker: TtsEstimatedWordTicker = TtsEstimatedWordTicker(),
+    private val preparationDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) {
     private companion object {
@@ -403,7 +405,7 @@ class TtsController internal constructor(
         isCurrent: () -> Boolean,
     ): Boolean {
         val preparedStart =
-            withContext(Dispatchers.Default) {
+            withContext(preparationDispatcher) {
                 val job = currentCoroutineContext()
                 val messages =
                     with(preparation) {
@@ -534,6 +536,24 @@ class TtsController internal constructor(
     @Synchronized
     internal fun playbackCallbackGeneration(): Long = queue.callbackGeneration
 
+    /** Explicit transport changes invalidate a pending UI start; natural completion does not. */
+    @Synchronized
+    internal fun speechStartProjectionGuard(): () -> Boolean {
+        val preparationGeneration = preparationRequests.capture()
+        val callbackGeneration = queue.callbackGeneration
+        val sessionId = state.value.sessionId
+        return {
+            synchronized(this) {
+                val current = state.value
+                preparationRequests.isCurrent(preparationGeneration) &&
+                    (
+                        queue.callbackGeneration == callbackGeneration ||
+                            (current is TtsState.Idle && current.sessionId == sessionId)
+                    )
+            }
+        }
+    }
+
     @Synchronized
     fun resume() {
         if (state.value !is TtsState.Paused || !acquireAudioFocus()) return
@@ -635,6 +655,51 @@ class TtsController internal constructor(
 
     @Synchronized
     internal fun deferForTargetSeek(): Boolean = queue.deferForTargetSeek()
+
+    /** Prepares off-lock and resolves the rendered sentence against that exact speech without replacing the session. */
+    internal suspend fun installRenderedSeekTarget(
+        request: TtsRenderedSeekRequest,
+        sessionId: Long,
+        isCurrent: () -> Boolean,
+    ): Boolean {
+        val ticket =
+            synchronized(this) {
+                engine?.takeIf { state.value.sessionId == sessionId && canNavigate() }?.let { it to queueLocale }
+            }
+        return ticket?.let { (ownerEngine, locale) ->
+            prepareRenderedSeekTarget(request, locale, isCurrent)?.let { target ->
+                synchronized(this) {
+                    val sameOwner =
+                        state.value.sessionId == sessionId && engine === ownerEngine && queueLocale == locale
+                    val eligible = sameOwner && canNavigate() && isCurrent()
+                    val ordinal = if (eligible) renderedSeekOrdinal(request, target) else null
+                    ordinal != null && installPreparedSeekTarget(request.entry, ordinal, target)
+                }
+            }
+        } ?: false
+    }
+
+    private suspend fun prepareRenderedSeekTarget(
+        request: TtsRenderedSeekRequest,
+        locale: Locale,
+        isCurrent: () -> Boolean,
+    ): TtsQueuedMessage? =
+        withContext(preparationDispatcher) {
+            val job = currentCoroutineContext()
+            with(preparation) {
+                request.entry.toQueuedMessage(locale) { !job.isActive || !isCurrent() }
+            }
+        }
+
+    private fun renderedSeekOrdinal(
+        request: TtsRenderedSeekRequest,
+        target: TtsQueuedMessage,
+    ): Int? =
+        request.takeIf { it.canCommit() }?.let {
+            target.prepared?.let(request.sentenceIndex)?.takeIf { ordinal ->
+                target.chunks.any { it.sentenceIndex == ordinal }
+            }
+        }
 
     /** Commit a freshly revalidated seek target without replacing the playback session. */
     @Synchronized
@@ -773,25 +838,19 @@ class TtsController internal constructor(
         val startedAt = clock()
         pace.onStart(chunk, appliedRate, startedAt)
         activeTiming = ActiveUtteranceTiming(activeUtteranceId, startedAt, appliedRate)
-        if (rangeProbe.reportsRanges != true) {
-            // A stored capable verdict is provisional for evidence collection,
-            // but it remains the playback-lane decision until enough answerable
-            // silence overturns it. Starting the estimate over that lane races a
-            // range-capable engine and can leave neither the engine nor estimate
-            // owning the visible passage. A restored stale verdict still recovers:
-            // onDone keeps examining it and arms the estimate after overturning it.
-            wordTicker.start(
-                utteranceId = activeUtteranceId,
-                words =
-                    TtsWordTimingEstimate.plan(
-                        text = chunk.text,
-                        locale = chunk.locale,
-                        rate = appliedRate,
-                        msPerUnitAt1x = pace.msPerUnitAt1x,
-                    ),
-                emit = ::onEstimatedRange,
-            )
-        }
+        // Timing belongs to this utterance: a historically capable engine can omit its next ranges.
+        // The first usable native callback stops this estimate and owns the rest of this utterance.
+        wordTicker.start(
+            utteranceId = activeUtteranceId,
+            words =
+                TtsWordTimingEstimate.plan(
+                    text = chunk.text,
+                    locale = chunk.locale,
+                    rate = appliedRate,
+                    msPerUnitAt1x = pace.msPerUnitAt1x,
+                ),
+            emit = ::onEstimatedRange,
+        )
     }
 
     @Synchronized
@@ -800,9 +859,7 @@ class TtsController internal constructor(
         start: Int,
         end: Int,
     ): Boolean {
-        // A capable verdict (restored or confirmed here) owns this playback lane;
-        // estimated ranges are only accepted after silence overturns that verdict.
-        if (rangeProbe.reportsRanges == true) return false
+        if (rangeProbe.hasUsableRangeForCurrentUtterance) return false
         return queue.onRangeStart(utteranceId, start, end, ESTIMATED_RANGE_FRAME) !=
             TtsPlaybackQueue.RangeApplication.Stale
     }
@@ -858,11 +915,8 @@ class TtsController internal constructor(
                 start,
                 end,
                 frame,
-                // While capability is unknown or known-silent, an unusable
-                // engine callback must not erase a word already painted by the
-                // estimate. Once the engine is confirmed capable, preserve the
-                // original engine-only behavior and fall back to the sentence.
-                retainVisibleWordOnFallback = rangeProbe.reportsRanges != true,
+                // An unusable callback must not erase the estimate before this utterance has native timing.
+                retainVisibleWordOnFallback = !rangeProbe.hasUsableRangeForCurrentUtterance,
             )
         if (application != TtsPlaybackQueue.RangeApplication.VisibleWord) return
         confirmTtsRangeCapability(rangeProbe, timingStore, rangeVerdictKey, wordTicker::stop)
@@ -912,6 +966,28 @@ class TtsController internal constructor(
                 it.messageIdHex == messageIdHex &&
                     it.projectionId == projectionId
             }?.prepared
+
+    /** One active session's exact renderer coordinates, never a newly resolved profile projection. */
+    @Synchronized
+    internal fun presentationEntryFor(
+        sessionId: Long,
+        messageIdHex: String,
+        projectionId: String,
+        sourceText: String?,
+    ): TtsSpeakableEntry? {
+        val current = state.value
+        if (current.sessionId != sessionId ||
+            current.passage?.messageIdHex != messageIdHex ||
+            current.passage?.projectionId != projectionId
+        ) {
+            return null
+        }
+        return queue
+            .queuedMessagesSnapshot()
+            .firstOrNull { it.messageIdHex == messageIdHex && it.projectionId == projectionId }
+            ?.presentationEntry
+            ?.takeIf { sourceText != null && it.sourceText == sourceText }
+    }
 }
 
 internal const val TTS_PREVIEW_MAX_LENGTH = 120

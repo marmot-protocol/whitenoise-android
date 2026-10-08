@@ -69,6 +69,38 @@ class ConversationPagingBenchmark {
         }
 
     /**
+     * One real @ action on a separately prepared 50-plus unread/end-only-mention fixture.
+     * None avoids compilation warm-up consuming it; opening and tapping both consume real read state.
+     * Re-provision an equivalent fixture before every additional sample, including failed attempts.
+     */
+    @Test
+    fun jumpToUnreadMentionFromHistory() {
+        BenchmarkConfig.requireFixture(BenchmarkConfig.mentionFixtureId, "mentionFixtureId")
+        val groupName = BenchmarkConfig.requireFixture(BenchmarkConfig.groupName, "groupName")
+        val startText = BenchmarkConfig.requireFixture(BenchmarkConfig.mentionStartText, "mentionStartText")
+        val targetText = BenchmarkConfig.requireFixture(BenchmarkConfig.mentionTargetText, "mentionTargetText")
+        check(BenchmarkConfig.mentionUnreadCount > 50 && BenchmarkConfig.mentionFinalOnly) {
+            "Prepare more than 50 real unread messages with exactly one mention in the final message."
+        }
+        benchmarkRule.measureRepeated(
+            packageName = BenchmarkConfig.TARGET_PACKAGE,
+            metrics = mentionJumpMetrics(),
+            compilationMode = CompilationMode.None(),
+            iterations = 1,
+            setupBlock = {
+                pressHome()
+                journeys.run { resumeToChatList() }
+                journeys.openGroup(groupName)
+                journeys.waitForConversationRouteSettled()
+                journeys.requireUnreadMentionStart(startText)
+            },
+            measureBlock = {
+                tracedJourney(PAGING_JUMP_TO_MENTION_TRACE) { journeys.jumpToUnreadMention(targetText) }
+            },
+        )
+    }
+
+    /**
      * Opens the fixture from the chat list, runs [prepare] unmeasured, then measures [journey]. With
      * [coldProcess] the app process is killed first so the measured block runs against a catching-up
      * engine rather than a settled one.

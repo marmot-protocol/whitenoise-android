@@ -69,6 +69,23 @@ class ConversationMentionNavigationUiTest {
         assertMentionTop(target = Target(720, 150), viewportHeight = 420, padding = 12)
     }
 
+    @Test
+    fun endMentionAcrossMoreThanFiftyMixedRowsStillStartsAtThePhysicalTop() {
+        assertMentionTop(target = Target(720), viewportHeight = 420, padding = 12, initialIndex = 90, mixedRows = true)
+    }
+
+    @Test
+    fun endMentionWithKeyboardAndComposerStillStartsAtThePhysicalTop() {
+        assertMentionTop(
+            target = Target(80),
+            viewportHeight = 260,
+            padding = 144,
+            overlap = 120,
+            initialIndex = 90,
+            mixedRows = true,
+        )
+    }
+
     @Suppress("LongMethod") // One real-list fixture shares measurement and the production command.
     private fun assertMentionTop(
         target: Target,
@@ -76,6 +93,8 @@ class ConversationMentionNavigationUiTest {
         padding: Int,
         overlap: Int = 0,
         rtl: Boolean = false,
+        initialIndex: Int = 0,
+        mixedRows: Boolean = false,
     ) {
         var completed = false
         val targetIndex = target.index
@@ -84,7 +103,7 @@ class ConversationMentionNavigationUiTest {
                 CompositionLocalProvider(
                     LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
-                    val listState = rememberLazyListState()
+                    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
                     val scope = rememberCoroutineScope()
                     val coordinator =
                         remember(listState) {
@@ -97,13 +116,22 @@ class ConversationMentionNavigationUiTest {
                             reverseLayout = true,
                             contentPadding = PaddingValues(bottom = padding.dp),
                         ) {
-                            items((0..targetIndex + 12).toList(), key = { "message-$it" }) { index ->
+                            items(
+                                (0..maxOf(targetIndex, initialIndex) + 12).toList(),
+                                key = { "message-$it" },
+                            ) { index ->
+                                val height =
+                                    when {
+                                        index == targetIndex -> target.height
+                                        mixedRows && index % 9 == 0 -> 480
+                                        else -> 72
+                                    }
                                 Text(
                                     "Message $index",
                                     modifier =
                                         Modifier
                                             .fillMaxWidth()
-                                            .height((if (index == targetIndex) target.height else 72).dp)
+                                            .height(height.dp)
                                             .testTag("message-$index"),
                                 )
                             }

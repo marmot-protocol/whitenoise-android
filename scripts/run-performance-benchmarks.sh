@@ -682,6 +682,16 @@ if [[ -n "$group_name" ]]; then
   instrument_command="$instrument_command \
 -e groupName $(quote_device_shell_arg "$group_name")"
 fi
+# These arguments describe a manually provisioned synthetic fixture, not native read-state resets.
+if [[ -n "${MENTION_FIXTURE_ID:-}" ]]; then
+  instrument_command="$instrument_command \
+-e mentionFixtureId $(quote_device_shell_arg "$MENTION_FIXTURE_ID") \
+-e mentionStartText $(quote_device_shell_arg "${MENTION_START_TEXT:?Missing MENTION_START_TEXT}") \
+-e mentionTargetText $(quote_device_shell_arg "${MENTION_TARGET_TEXT:?Missing MENTION_TARGET_TEXT}") \
+-e mentionUnreadCount $(quote_device_shell_arg "${MENTION_UNREAD_COUNT:?Missing MENTION_UNREAD_COUNT}") \
+-e mentionFinalOnly true"
+fi
+
 if [[ -n "${PAGING_DEEP_FLINGS:-}" ]]; then
   instrument_command="$instrument_command \
 -e pagingDeepFlings $(quote_device_shell_arg "$PAGING_DEEP_FLINGS")"

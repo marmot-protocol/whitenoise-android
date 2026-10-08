@@ -183,6 +183,14 @@
         "release-audit"
       ],
       "prerequisites": "Exact-source reports from every required layer, all failures/unexecuted points and justified inapplicability; final certification must reconcile those reports and remaining checklist subcases."
+    },
+    "SCR": {
+      "layers": [
+        "core-ci",
+        "controlled-integration",
+        "physical-human"
+      ],
+      "prerequisites": "Real fitting and overflowing lists, grids, menus, sheets and forms at both edges; verify light/dark/AMOLED, RTL, large text, TalkBack reachability and actual IME show/hide without moving fixed controls. Screenshot and geometry tests do not certify physical keyboard/accessibility behavior."
     }
   }
 }

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -44,6 +43,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.flow.filter
 
@@ -158,7 +158,7 @@ internal fun TransferAdminSheet(
                     )
                 else ->
                     Column(
-                        Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                        Modifier.fillMaxWidth().heightIn(max = 360.dp).fadingVerticalScroll(rememberScrollState()),
                     ) {
                         GroupMemberIdentityRows(filtered) { _, member ->
                             Row(
@@ -238,7 +238,7 @@ internal fun SoleAdminDeletePicker(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Column(
-                Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                Modifier.fillMaxWidth().heightIn(max = 360.dp).fadingVerticalScroll(rememberScrollState()),
             ) {
                 GroupMemberIdentityRows(candidates) { _, member ->
                     Row(

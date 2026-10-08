@@ -4,7 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
@@ -28,6 +27,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog as AlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseModalBottomSheet as ModalBottomSheet
@@ -135,7 +135,7 @@ internal fun RetainedProfilesSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         WhiteNoiseSheetHeader(stringResource(R.string.onboarding_choose_profile), onClose = onDismiss)
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+        WhiteNoiseLazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
             items(accounts, key = OnboardingSavedAccountUi::label) { account ->
                 ListItem(
                     headlineContent = { EmojiLabel(account.displayName) },
