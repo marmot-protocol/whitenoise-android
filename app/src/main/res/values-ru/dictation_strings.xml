@@ -22,11 +22,20 @@
     <string name="dictation_send_blocked">Не отправлено</string>
     <string name="dictation_retry_send">Повторить отправку</string>
     <string name="dictation_recovery_title">Диктовка требует внимания</string>
-    <string name="dictation_recovery_text">Откройте White Noise, чтобы восстановить диктовку. Незавершённую диктовку можно восстановить в течение 30 минут.</string>
+    <string name="dictation_recovery_text">Откройте White Noise для восстановления диктовки. Сохранённое аудио временное и может быть потеряно, если Android остановит приложение.</string>
     <string name="dictation_recovery_open">Открыть приложение</string>
-    <string name="dictation_recovery_expired_title">Срок восстановления диктовки истёк</string>
-    <string name="dictation_recovery_expired_text">Незавершённая диктовка удалена с этого устройства.</string>
+    <string name="dictation_recovery_expired_title">Диктовку можно восстановить в приложении</string>
+    <string name="dictation_recovery_expired_text">Фоновая защита завершена. Откройте White Noise для восстановления сохранённой диктовки.</string>
     <string name="dictation_incomplete_title">Неполная диктовка</string>
     <string name="dictation_incomplete_text">Расшифровка остановилась до завершения. Проверьте распознанный текст в черновике перед отправкой.</string>
     <string name="dictation_send_recognized_text">Отправить распознанный текст</string>
+    <string name="dictation_remaining_audio">Оставшееся аудио диктовки</string>
+    <string name="dictation_stopped_remaining">Запись остановлена. Часть аудио не расшифрована.</string>
+    <string name="dictation_remaining_explanation">Повторная попытка расшифровывает сохранённое аудио без записи и отправки. Аудио временное и может быть потеряно, если Android остановит приложение.</string>
+    <string name="dictation_retry_remaining">Повторить расшифровку аудио</string>
+    <string name="dictation_keep_later">Оставить на потом</string>
+    <string name="dictation_discard_remaining">Удалить нерасшифрованное аудио? Текст в поле ввода останется.</string>
+    <string name="dictation_finishing_microphone">Закрытие микрофона…</string>
+    <string name="dictation_audio_state_unavailable">Не удалось проверить сохранённое аудио. Сохраните его и попробуйте снова.</string>
+    <string name="dictation_original_conversation">Завершите диктовку в исходном разговоре.</string>
 </resources>

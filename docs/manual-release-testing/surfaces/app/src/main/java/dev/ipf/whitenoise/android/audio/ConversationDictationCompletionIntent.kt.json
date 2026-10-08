@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCompletionIntent.kt",
+  "legacy_sha256": "3c540536b2a4f2519395a664de3fa30709fcdea497d14dcd6d3466b36fbf3fd9",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "Explicit dictation choice overrides automatic completion before delivery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCompletionIntent.kt",
+        "anchor": "fun choose(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Explicit dictation Send provenance remains separate from automatic silence policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationCompletionIntent.kt",
+        "anchor": "var explicit by",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

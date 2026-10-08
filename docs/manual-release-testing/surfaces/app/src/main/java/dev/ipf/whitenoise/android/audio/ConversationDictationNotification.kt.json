@@ -1,0 +1,127 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+  "legacy_sha256": "5561df700627fb086bb2e9ca1616c195c6b1164a2fc3a6a2d295b295a5b90b9f",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "string:dictation_recovery_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_title",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_recovery_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_text",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_recovery_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_open",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_recovery_expired_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_expired_title",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_recovery_expired_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_recovery_expired_text",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_notification_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_notification_title",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_notification_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_notification_text",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_processing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_processing",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dictation_starting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dictation_starting",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:message_status_pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.message_status_pending",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:dismiss",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "R.string.dismiss",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Saved dictation tail recovery exposes optional Retry and Dismiss beside normal composer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "controller.recoveryHandedToComposer",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Protection-ended notification retains app-local recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationNotification.kt",
+        "anchor": "internal fun notifyConversationDictationRecoveryExpired(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

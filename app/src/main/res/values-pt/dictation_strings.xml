@@ -22,11 +22,20 @@
     <string name="dictation_send_blocked">Não enviado</string>
     <string name="dictation_retry_send">Tentar enviar novamente</string>
     <string name="dictation_recovery_title">O ditado precisa de atenção</string>
-    <string name="dictation_recovery_text">Abra o White Noise para recuperar o ditado. Ditados inacabados podem ser recuperados por até 30 minutos.</string>
+    <string name="dictation_recovery_text">Abra o White Noise para recuperar o ditado. O áudio guardado é temporário e pode perder-se se o Android parar a app.</string>
     <string name="dictation_recovery_open">Abrir app</string>
-    <string name="dictation_recovery_expired_title">A recuperação do ditado expirou</string>
-    <string name="dictation_recovery_expired_text">O ditado inacabado foi apagado deste dispositivo.</string>
+    <string name="dictation_recovery_expired_title">Ditado recuperável na app</string>
+    <string name="dictation_recovery_expired_text">A proteção em segundo plano terminou. Abra o White Noise para recuperar o ditado guardado.</string>
     <string name="dictation_incomplete_title">Ditado incompleto</string>
     <string name="dictation_incomplete_text">A transcrição parou antes de terminar. Revise o texto reconhecido no rascunho antes de enviar.</string>
     <string name="dictation_send_recognized_text">Enviar texto reconhecido</string>
+    <string name="dictation_remaining_audio">Áudio de ditado restante</string>
+    <string name="dictation_stopped_remaining">A gravação parou. Parte do áudio não foi transcrita.</string>
+    <string name="dictation_remaining_explanation">Tentar novamente transcreve o áudio guardado sem gravar nem enviar. O áudio é temporário e pode perder-se se o Android parar a app.</string>
+    <string name="dictation_retry_remaining">Tentar o áudio restante novamente</string>
+    <string name="dictation_keep_later">Guardar para mais tarde</string>
+    <string name="dictation_discard_remaining">Descartar o áudio não transcrito? O texto já no campo de escrita permanece.</string>
+    <string name="dictation_finishing_microphone">A fechar o microfone…</string>
+    <string name="dictation_audio_state_unavailable">Não foi possível verificar o áudio guardado. Guarde-o e tente novamente.</string>
+    <string name="dictation_original_conversation">Termine o ditado na conversa original.</string>
 </resources>

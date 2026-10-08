@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellNoticeLayout.kt",
+  "legacy_sha256": "302bf551e1574842556364e48a1b311e54b86adab55187da8a488a115b8da95e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MainShellNoticeLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellNoticeLayout.kt",
+        "anchor": "fun MainShellNoticeLayout(",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Optional recovery does not insert persistent dictation or notification-permission controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellNoticeLayout.kt",
+        "anchor": "dictationController.hasDurableSession && dictationController.completionControlsRequired",
+        "test_ids": [
+          "DIC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
