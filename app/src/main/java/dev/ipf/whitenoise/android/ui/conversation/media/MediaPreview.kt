@@ -39,6 +39,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.decodeAdmittedAttachmentImage
+import dev.ipf.whitenoise.android.media.decodeLocalPreviewStill
+import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import kotlinx.coroutines.Dispatchers
@@ -88,70 +91,58 @@ internal data class PreparedPhotoPreview(
     val bytes: ByteArray,
 )
 
-/** Decode the prepared send artifact when available, otherwise the original local Uri. */
+/** Where one staged preview image stands: still decoding, ready to draw, or refused or unreadable. */
+internal sealed interface MediaPreviewImage {
+    /** The decode has not finished yet. */
+    data object Loading : MediaPreviewImage
+
+    /** The decoded [bitmap], owned and recycled by the composable that produced it. */
+    class Ready(
+        val bitmap: ImageBitmap,
+    ) : MediaPreviewImage
+
+    /** No decoder produced a bitmap, so the caller shows a stable placeholder instead of a spinner. */
+    data object Failed : MediaPreviewImage
+}
+
+/** The decoded preview, or null while it is loading and after it failed. */
 @Composable
 internal fun rememberMediaPreviewBitmap(
     uri: android.net.Uri,
     isVideo: Boolean,
     maxEdgePx: Int,
     prepared: PreparedPhotoPreview? = null,
-): ImageBitmap? {
+): ImageBitmap? = (rememberMediaPreviewImage(uri, isVideo, maxEdgePx, prepared) as? MediaPreviewImage.Ready)?.bitmap
+
+/**
+ * Decode the prepared send artifact when available, otherwise the original local Uri.
+ *
+ * A GIF or WebP reaches a decoder only after content admission, whatever its provider MIME type claims,
+ * and a refused or unreadable source ends as [MediaPreviewImage.Failed] rather than a permanent spinner.
+ */
+@Composable
+internal fun rememberMediaPreviewImage(
+    uri: android.net.Uri,
+    isVideo: Boolean,
+    maxEdgePx: Int,
+    prepared: PreparedPhotoPreview? = null,
+): MediaPreviewImage {
     val context = LocalContext.current
     var bitmap by
         remember(uri, isVideo, maxEdgePx, prepared?.revision) {
             mutableStateOf<android.graphics.Bitmap?>(null)
         }
+    var failed by remember(uri, isVideo, maxEdgePx, prepared?.revision) { mutableStateOf(false) }
     LaunchedEffect(uri, isVideo, maxEdgePx, prepared?.revision) {
         var decoded: android.graphics.Bitmap? = null
         try {
             withContext(Dispatchers.IO) {
                 decoded =
-                    if (prepared != null) {
-                        MediaPipeline.decodeSampledBitmap(prepared.bytes, maxEdgePx)
-                    } else if (isVideo) {
-                        // Video URI: extract the first frame as the staging thumbnail
-                        // instead of trying to decode the bytes as JPEG (which spins
-                        // forever on a video and leaves the sheet stuck). Scaled to
-                        // the staging tile size — full-res posters from a 4K clip
-                        // would be a ~33 MB ARGB bitmap per tile.
-                        runCatching {
-                            val mmr = android.media.MediaMetadataRetriever()
-                            try {
-                                mmr.setDataSource(context, uri)
-                                mmr
-                                    .getScaledFrameAtTime(
-                                        0L,
-                                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                                        maxEdgePx,
-                                        maxEdgePx,
-                                    )
-                            } finally {
-                                runCatching { mmr.release() }
-                            }
-                        }.getOrNull()
-                    } else {
-                        // Decode the picked image straight to a sampled bitmap,
-                        // preserving its native format and alpha. Earlier this
-                        // round-tripped through MediaPipeline.readDownscaledJpeg
-                        // (recompress to JPEG) and then re-decoded those bytes at
-                        // full resolution — that flattened transparent PNGs onto
-                        // white and, on large lossless sources (e.g. PNG
-                        // screenshots), the recompress or the un-sampled re-decode
-                        // could silently OOM/fail, leaving the staging tile stuck
-                        // on a spinner that never resolved (#387). Mirrors the
-                        // in-bubble thumbnail path (decodeSampledBitmap).
-                        runCatching {
-                            MediaPipeline
-                                .decodeSampledFromUri(
-                                    context.contentResolver,
-                                    uri,
-                                    maxEdgePx,
-                                )
-                        }.getOrNull()
-                    }
+                    decodeStagedPreviewBitmap(context, uri, isVideo, maxEdgePx, prepared) { ensureActive() }
             }
             currentCoroutineContext().ensureActive()
             bitmap = decoded
+            failed = decoded == null
             decoded = null
         } finally {
             // A key change can cancel this effect after decoding but before
@@ -167,8 +158,76 @@ internal fun rememberMediaPreviewBitmap(
         val decoded = bitmap
         onDispose { decoded?.recycle() }
     }
-    return remember(bitmap) { bitmap?.asImageBitmap() }
+    val image = remember(bitmap) { bitmap?.asImageBitmap() }
+    return when {
+        image != null -> MediaPreviewImage.Ready(image)
+        failed -> MediaPreviewImage.Failed
+        else -> MediaPreviewImage.Loading
+    }
 }
+
+/**
+ * Decodes one staged preview on the calling IO thread: the prepared send artifact when there is one, a video's
+ * first frame, or the picked image. A GIF or WebP reaches a decoder only after content admission, and a
+ * refused or unreadable source returns null. [ensureActive] runs between source chunks so cancellation stops it.
+ */
+private fun decodeStagedPreviewBitmap(
+    context: android.content.Context,
+    uri: android.net.Uri,
+    isVideo: Boolean,
+    maxEdgePx: Int,
+    prepared: PreparedPhotoPreview?,
+    ensureActive: () -> Unit,
+): android.graphics.Bitmap? =
+    if (prepared != null) {
+        decodeAdmittedAttachmentImage<android.graphics.Bitmap>(
+            prepared.bytes,
+            decodeAnimated = { null },
+            decodeStill = { MediaPipeline.decodeSampledBitmap(prepared.bytes, maxEdgePx) },
+        )
+    } else if (isVideo) {
+        // Video URI: extract the first frame as the staging thumbnail
+        // instead of trying to decode the bytes as JPEG (which spins
+        // forever on a video and leaves the sheet stuck). Scaled to
+        // the staging tile size — full-res posters from a 4K clip
+        // would be a ~33 MB ARGB bitmap per tile.
+        runCatching {
+            val mmr = android.media.MediaMetadataRetriever()
+            try {
+                mmr.setDataSource(context, uri)
+                mmr
+                    .getScaledFrameAtTime(
+                        0L,
+                        android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        maxEdgePx,
+                        maxEdgePx,
+                    )
+            } finally {
+                runCatching { mmr.release() }
+            }
+        }.getOrNull()
+    } else {
+        // Decode the picked image straight to a sampled bitmap,
+        // preserving its native format and alpha. Earlier this
+        // round-tripped through MediaPipeline.readDownscaledJpeg
+        // (recompress to JPEG) and then re-decoded those bytes at
+        // full resolution — that flattened transparent PNGs onto
+        // white and, on large lossless sources (e.g. PNG
+        // screenshots), the recompress or the un-sampled re-decode
+        // could silently OOM/fail, leaving the staging tile stuck
+        // on a spinner that never resolved (#387). Mirrors the
+        // in-bubble thumbnail path (decodeSampledBitmap).
+        val source =
+            readLocalPreviewSource(
+                open = { context.contentResolver.openInputStream(uri) },
+                ensureActive = { ensureActive() },
+            )
+        runCatching {
+            decodeLocalPreviewStill(source) {
+                MediaPipeline.decodeSampledFromUri(context.contentResolver, uri, maxEdgePx)
+            }
+        }.getOrNull()
+    }
 
 /** One staged attachment in the preview, in send order — media first, then documents. */
 internal sealed class StagedPreviewItem {
