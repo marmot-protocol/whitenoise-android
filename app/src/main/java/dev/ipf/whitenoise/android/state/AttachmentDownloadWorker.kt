@@ -298,8 +298,8 @@ class AttachmentDownloadWorker : CoroutineWorker {
     /** Maps a worker result to how the run ended, so a retry is not reported as a failure. */
     private fun outcomeOf(result: Result): AttachmentTransferOutcome =
         when (result) {
-            is Result.Success -> AttachmentTransferOutcome.Completed
-            is Result.Retry -> AttachmentTransferOutcome.Retrying
+            Result.success() -> AttachmentTransferOutcome.Completed
+            Result.retry() -> AttachmentTransferOutcome.Retrying
             else -> AttachmentTransferOutcome.Failed
         }
 
