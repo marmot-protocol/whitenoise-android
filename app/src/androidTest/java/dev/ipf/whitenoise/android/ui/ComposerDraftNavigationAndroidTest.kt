@@ -50,7 +50,7 @@ class ComposerDraftNavigationAndroidTest {
     private var sends = 0
     private var imeAnimationRunning = false
 
-    /** Character edits remain stable with the actual keyboard, and hide/show reflow preserves draft navigation. */
+    /** Character/newline edits stay stable at the real IME's height cap; hide/show reflow retains navigation. */
     @Test
     fun typingAndRealImeReflowPreserveNavigation() {
         renderWithKeyboard()
@@ -60,9 +60,9 @@ class ComposerDraftNavigationAndroidTest {
         val actionBounds = action.fetchSemanticsNode().boundsInRoot
         composeRule.mainClock.autoAdvance = false
         try {
-            repeat(3) {
-                field.performTextInput("x")
-                repeat(4) {
+            for (edit in listOf("x", "x", "x", "\n", "a")) {
+                field.performTextInput(edit)
+                repeat(TEXT_EDIT_OBSERVATION_FRAMES) {
                     composeRule.mainClock.advanceTimeByFrame()
                     composeRule.waitForIdle()
                     action.assertIsDisplayed()
@@ -229,6 +229,7 @@ class ComposerDraftNavigationAndroidTest {
         const val KEYBOARD_TIMEOUT_MS = 10_000L
         const val FLING_OBSERVATION_MS = 1000L
         const val FLING_STARTUP_FRAMES = 3
+        const val TEXT_EDIT_OBSERVATION_FRAMES = 24
         val longDraft = (1..80).joinToString("\n") { "Synthetic device draft line $it" } + "\na"
     }
 }

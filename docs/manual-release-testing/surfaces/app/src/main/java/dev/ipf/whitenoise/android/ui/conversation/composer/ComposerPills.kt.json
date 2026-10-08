@@ -120,7 +120,7 @@
         ]
       },
       {
-        "surface": "Measured-geometry draft navigation remains stable during typing and composing edits",
+        "surface": "Rendered-geometry draft navigation stays stable during typing, composing, fixed-height wraps and line breaks",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
         "anchor": "val showDraftTop =",
         "test_ids": [

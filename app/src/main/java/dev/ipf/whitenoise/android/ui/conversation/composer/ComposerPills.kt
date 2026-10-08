@@ -812,12 +812,16 @@ internal fun ComposerPill(
                 ),
             label = "composer text height",
         )
-    val automaticTextHeight =
-        if (compactTextLayout != null &&
+    // Record the exact clipping bounds used by the rendered editor, not its unbounded draft height.
+    val textHeightBounds = remember(scrollOwnerKey) { mutableStateOf(0..Int.MAX_VALUE) }
+    val usesAnimatedTextHeight =
+        compactTextLayout != null &&
             expansionMode == ComposerExpansionMode.Automatic &&
             !multilineControlsSuppressed
-        ) {
+    val automaticTextHeight =
+        if (usesAnimatedTextHeight) {
             Modifier.layout { measurable, constraints ->
+                textHeightBounds.value = constraints.minHeight..constraints.maxHeight
                 val height = animatedTextHeight.value.coerceIn(constraints.minHeight, constraints.maxHeight)
                 val child = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
                 layout(child.width, child.height) { child.placeRelative(0, 0) }
@@ -878,12 +882,18 @@ internal fun ComposerPill(
     val textHeightTarget by rememberUpdatedState(compactTextLayout?.size?.height ?: 0)
     val editingTarget by rememberUpdatedState(if (editingLayout) 1f else 0f)
     val expansionTarget by rememberUpdatedState(if (expandedLayout) 1f else 0f)
-    // Text content is deliberately not an admission key. The independently measured destination
-    // height catches wrapping/growth, while stable typing retains the current control and its space.
+    val textHeightGeometrySettled by remember(scrollOwnerKey, usesAnimatedTextHeight, animatedTextHeight) {
+        derivedStateOf {
+            val bounds = textHeightBounds.value
+            !usesAnimatedTextHeight ||
+                animatedTextHeight.value.coerceIn(bounds) == textHeightTarget.coerceIn(bounds)
+        }
+    }
+    // Text content and natural height are not admission owners. A manual viewport does not use the
+    // text animation, and automatic overflow clips it: only a change to rendered height revokes admission.
     val draftTopGeometryState =
         remember(
             scrollOwnerKey,
-            textHeightTarget,
             editingTarget,
             expansionTarget,
             targetDictationControlWidth,
@@ -911,6 +921,7 @@ internal fun ComposerPill(
     val showDraftTop =
         textFieldValue.text.isNotEmpty() &&
             !geometryTransitionActive &&
+            textHeightGeometrySettled &&
             draftTopGeometrySettled &&
             draftStartOffscreen &&
             (!multilineControlsSuppressed || navigationRoom >= 40.dp)
@@ -941,6 +952,7 @@ internal fun ComposerPill(
         scrollOwnerKey,
         compactMeasurementWidth,
         textHeightTarget,
+        textHeightGeometrySettled,
         editingTarget,
         expansionTarget,
         targetDictationControlWidth,
@@ -956,7 +968,7 @@ internal fun ComposerPill(
         /** Admits navigation only after the owner geometry and the current draft layout reach their endpoints. */
         fun layoutSettled(): Boolean =
             !geometryTransitionActive &&
-                animatedTextHeight.value == textHeightTarget &&
+                textHeightGeometrySettled &&
                 editingProgress.value == editingTarget &&
                 expansionProgress.value == expansionTarget &&
                 dictationControlWidthState.value == targetDictationControlWidth &&
@@ -965,6 +977,7 @@ internal fun ComposerPill(
                     it.sourceText == textFieldValue.text && it.transformedText == transformedText
                 } == true
 
+        if (!textHeightGeometrySettled) draftTopGeometrySettled = false
         // Admission belongs to the external geometry keys above. Mounting an optional row can briefly
         // reduce the viewport before its parent accepts that row's height; it must not revoke its own admission.
         if (!draftTopGeometrySettled) {

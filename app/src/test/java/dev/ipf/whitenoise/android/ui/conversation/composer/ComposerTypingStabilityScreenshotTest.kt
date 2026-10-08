@@ -97,27 +97,95 @@ class ComposerTypingStabilityScreenshotTest {
         }
     }
 
-    /** A single character that soft-wraps revokes admission on every wrap and unwrap animation frame. */
+    /** A soft wrap inside a fixed manual viewport keeps the control and row on every frame. */
     @Test
-    fun wrappingChangeStillWaitsForFinalGeometry() {
+    fun wrappingChangeKeepsFixedViewportNavigation() {
         render("light", narrow = true, rtl = false)
         val previousText = prepareAtSoftWrapBoundary()
         val beforeLines = measuredLineCount()
+        val bounds = currentBounds()
         composeRule.mainClock.autoAdvance = false
         try {
             composeRule.onNode(hasSetTextAction()).performTextInput("W")
-            assertGeometryTransitionFrames()
+            assertStableRenderedHeightFrames(bounds)
             assertTrue("one character must cross a real soft-wrap boundary", measuredLineCount() > beforeLines)
             assertEquals(previousText.count { it == '\n' }, value.text.count { it == '\n' })
-            settleNavigation()
             composeRule.onNode(hasSetTextAction()).performTextReplacement(previousText)
-            assertGeometryTransitionFrames()
+            assertStableRenderedHeightFrames(bounds)
             assertEquals(beforeLines, measuredLineCount())
-            settleNavigation()
         } finally {
             composeRule.mainClock.autoAdvance = true
         }
     }
+
+    /** An explicit newline must not remove the toolbar when a manually sized editor stays unchanged. */
+    @Test
+    fun lineBreakKeepsTheManualControlsRow() = checkLineBreak(ComposerExpansionMode.Manual, "manual")
+
+    /** Fullscreen draft reading has fixed geometry even while the natural draft gains another line. */
+    @Test
+    fun lineBreakKeepsTheFullscreenControlsRow() = checkLineBreak(ComposerExpansionMode.FullScreen, "fullscreen")
+
+    /** Once automatic growth is capped, new lines keep navigation and its narrow row continuously mounted. */
+    @Test
+    fun lineBreakKeepsTheCappedAutomaticControlsRow() = checkLineBreak(ComposerExpansionMode.Automatic, "capped")
+
+    /** Uncapped automatic growth still suppresses navigation on every genuinely changing height frame. */
+    @Test
+    fun lineBreakGrowthStillWaitsForRenderedGeometry() {
+        value = TextFieldValue("a", TextRange(1))
+        render("light", narrow = true, rtl = false, mode = ComposerExpansionMode.Automatic, expectTop = false)
+        val before = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot.height
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onNode(hasSetTextAction()).performTextInput("\na")
+            repeat(COMPOSER_EXPANSION_ANIMATION_MILLIS / FRAME_STEP_MS) { frame ->
+                assertNoDraftTopOnNextFrame()
+                if (frame == 0) {
+                    composeRule
+                        .onNodeWithTag(TAG)
+                        .captureRoboImage("src/test/snapshots/composer_typing_stable_growing_line_break_light.png")
+                }
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+        composeRule.waitForIdle()
+        assertTrue(composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot.height > before)
+        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertDoesNotExist()
+    }
+
+    /** Checks a newline, its next character and deletion throughout the unused natural-height animation. */
+    private fun checkLineBreak(
+        mode: ComposerExpansionMode,
+        name: String,
+    ) {
+        render("light", narrow = true, rtl = false, mode = mode)
+        val previous = value.text
+        val bounds = currentBounds()
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.onNode(hasSetTextAction()).performTextInput("\n")
+            assertStableRenderedHeightFrames(bounds) {
+                composeRule
+                    .onNodeWithTag(TAG)
+                    .captureRoboImage("src/test/snapshots/composer_typing_stable_${name}_line_break_light.png")
+            }
+            composeRule.onNode(hasSetTextAction()).performTextInput("a")
+            assertStableRenderedHeightFrames(bounds)
+            composeRule.onNode(hasSetTextAction()).performTextReplacement(previous)
+            assertStableRenderedHeightFrames(bounds)
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    /** Captures exact editor/action bounds before an edit that should leave the rendered geometry unchanged. */
+    private fun currentBounds(): DraftTopBounds =
+        DraftTopBounds(
+            composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot,
+            composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).fetchSemanticsNode().boundsInRoot,
+        )
 
     /** Uses real font metrics to choose the last single-line suffix before the next character wraps. */
     private fun prepareAtSoftWrapBoundary(): String {
@@ -148,9 +216,21 @@ class ComposerTypingStabilityScreenshotTest {
         return layouts.single().lineCount
     }
 
-    /** Every intermediate measured-height frame releases both control visibility and its row reservation. */
-    private fun assertGeometryTransitionFrames() {
-        repeat(COMPOSER_EXPANSION_ANIMATION_MILLIS / FRAME_STEP_MS) { assertNoDraftTopOnNextFrame() }
+    /** Natural-height changes are irrelevant when the actual viewport is fixed or already height-capped. */
+    private fun assertStableRenderedHeightFrames(
+        bounds: DraftTopBounds,
+        firstFrame: () -> Unit = {},
+    ) {
+        var captured = false
+        repeat(COMPOSER_EXPANSION_ANIMATION_MILLIS / (FRAME_STEP_MS * 4)) {
+            assertStableDraftTopFrames(composeRule, { value }, { sends }, bounds) {
+                assertEquals(48.dp, extraHeight)
+                if (!captured) {
+                    firstFrame()
+                    captured = true
+                }
+            }
+        }
     }
 
     /** Admits navigation only after the complete animation and its two stable measurement frames. */
@@ -231,6 +311,8 @@ class ComposerTypingStabilityScreenshotTest {
         theme: String,
         narrow: Boolean,
         rtl: Boolean,
+        mode: ComposerExpansionMode = ComposerExpansionMode.Manual,
+        expectTop: Boolean = true,
     ) {
         val width = if (narrow) 240.dp else 360.dp
         composeRule.setContent {
@@ -255,7 +337,7 @@ class ComposerTypingStabilityScreenshotTest {
                                 actionColors = accountActionColors(appState = null),
                                 dictationControls = { Box(Modifier.width(168.dp).height(40.dp)) },
                                 onImeSend = { sends++ },
-                                expansionMode = ComposerExpansionMode.Manual,
+                                expansionMode = mode,
                                 scrollOwnerKey = owner,
                                 geometryTransitionActive = transitionActive,
                                 compactMeasurementWidth = width,
@@ -269,7 +351,8 @@ class ComposerTypingStabilityScreenshotTest {
         }
         composeRule.runOnIdle { focusRequester.requestFocus() }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
+        val top = composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG)
+        if (expectTop) top.assertIsDisplayed() else top.assertDoesNotExist()
     }
 
     private companion object {
