@@ -44,4 +44,52 @@ class SearchTargetRetryStateTest {
         retry.retry()
         assertEquals(1L, retry.generation)
     }
+
+    @Test
+    fun explicitRetryWaitsForRecoveryAndIsConsumedOnce() {
+        val navigation = MessageTargetNavigationOwner()
+        val retry = SearchTargetRetryState()
+        retry.failed(navigation.begin())
+        retry.retry(loadFailurePresent = true)
+        retry.retry(loadFailurePresent = true)
+        retry.onLoadFailureChanged(loadFailurePresent = true)
+        assertEquals(0L, retry.generation)
+        retry.onLoadFailureChanged(loadFailurePresent = false)
+        retry.onLoadFailureChanged(loadFailurePresent = false)
+        assertEquals(1L, retry.generation)
+    }
+
+    @Test
+    fun recoveryWithoutExplicitRetryDoesNotRestartNavigation() {
+        val retry = SearchTargetRetryState()
+        retry.failed(MessageTargetNavigationOwner().begin())
+        retry.onLoadFailureChanged(loadFailurePresent = false)
+        assertEquals(0L, retry.generation)
+    }
+
+    @Test
+    fun delayedRecoveryCannotStealNavigationAfterGestureOrNewTarget() {
+        val navigation = MessageTargetNavigationOwner()
+        val retry = SearchTargetRetryState()
+        retry.failed(navigation.begin())
+        retry.retry(loadFailurePresent = true)
+        navigation.cancel()
+        retry.onLoadFailureChanged(loadFailurePresent = false)
+        assertEquals(0L, retry.generation)
+        retry.failed(navigation.begin())
+        retry.retry(loadFailurePresent = true)
+        navigation.begin()
+        retry.onLoadFailureChanged(loadFailurePresent = false)
+        assertEquals(0L, retry.generation)
+    }
+
+    @Test
+    fun routeResetDropsDeferredRetry() {
+        val retry = SearchTargetRetryState()
+        retry.failed(MessageTargetNavigationOwner().begin())
+        retry.retry(loadFailurePresent = true)
+        retry.clear()
+        retry.onLoadFailureChanged(loadFailurePresent = false)
+        assertEquals(0L, retry.generation)
+    }
 }

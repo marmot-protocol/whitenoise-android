@@ -3103,6 +3103,8 @@ internal fun ConversationScreen(
         routePresentationFrozen = false
     }
 
+    SearchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)
+
     // Scroll-to-message for a chat-list message-body search hit (issue #290).
     // Waits for the first-open anchor to settle, then pages the local timeline
     // back until the matched message is materialized and scrolls to it with a
@@ -3876,7 +3878,9 @@ internal fun ConversationScreen(
                             onRetry = {
                                 scope.launch {
                                     controller.retryLoadFailure()
-                                    navigationState.focusTargetRetry.retry()
+                                    navigationState.focusTargetRetry.retry(
+                                        loadFailurePresent = controller.error != null,
+                                    )
                                     navigationState.initialTimelineBackfillRetryGeneration += 1L
                                 }
                             },
@@ -4022,7 +4026,9 @@ internal fun ConversationScreen(
                                     onRetry = {
                                         scope.launch {
                                             controller.retryLoadFailure()
-                                            navigationState.focusTargetRetry.retry()
+                                            navigationState.focusTargetRetry.retry(
+                                                loadFailurePresent = controller.error != null,
+                                            )
                                         }
                                     },
                                 )
@@ -4223,7 +4229,9 @@ internal fun ConversationScreen(
                                     onRetry = {
                                         scope.launch {
                                             controller.retryLoadFailure()
-                                            navigationState.focusTargetRetry.retry()
+                                            navigationState.focusTargetRetry.retry(
+                                                loadFailurePresent = controller.error != null,
+                                            )
                                         }
                                     },
                                 )

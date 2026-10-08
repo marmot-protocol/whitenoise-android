@@ -1801,7 +1801,11 @@ class ConversationScrollCoordinatorTest {
         assertTrue("explicit Retry must restart the focus effect", "focusTargetRetry.generation" in focus)
         assertTrue("a newer target must clear the earlier failed request", "focusTargetRetry.clear()" in focus)
         assertEquals(2, Regex("focusTargetRetry.failed\\(navigationRequest\\)").findAll(focus).count())
-        assertEquals(3, Regex("focusTargetRetry.retry\\(\\)").findAll(screen).count())
+        val retryAction = Regex("focusTargetRetry.retry\\(\\s*loadFailurePresent = controller.error != null,?\\s*\\)")
+        assertEquals(3, retryAction.findAll(screen).count())
+        assertTrue(
+            "SearchTargetRetryRecoveryEffect(navigationState.focusTargetRetry, controller.error != null)" in screen,
+        )
         assertTrue(
             "unavailable targets keep the existing localized notice",
             "toast_original_message_unavailable" in focus,
