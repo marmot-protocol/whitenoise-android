@@ -1748,6 +1748,78 @@
       ],
       "assertions": "The genuine active-member group context menu keeps normal controls and omits Delete from this device; Back retains the conversation. Terminal-history deletion is a separate departed fixture.",
       "postcondition": "none"
+    },
+    "accounts-signout-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-013"
+      ],
+      "assertions": "Sign-out disclosure and Back retain all original accounts and both histories.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-signout-rotation-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-013"
+      ],
+      "assertions": "Sign-out disclosure survives handled orientation changes; Back retains the active owner and all native accounts.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-signout-toggle-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-013"
+      ],
+      "assertions": "Toggling the sign-out invitation-key choice then dismissing leaves native accounts intact; reopening restores the default choice.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-sheet-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "The wipe disclosure names destroyed data; Back returns to the hidden-key page without removing native accounts or histories.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-empty-back": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "The empty typed confirmation keeps the actual Wipe button disabled; Back retains every original native account and history.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-invalid-cancel": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "A partial confirmation keyword keeps the actual Wipe action disabled; Cancel preserves all native accounts and histories.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-valid-cancel": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "A full confirmation keyword enables the actual Wipe action, but explicit Cancel retains every account and original native history.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-normalized-cancel": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "The current case-insensitive whitespace-trimmed confirmation enables the actual action; Cancel preserves native accounts and histories.",
+      "postcondition": "accounts-retained"
+    },
+    "accounts-wipe-rotation-cancel": {
+      "suite": "account-guards",
+      "manual_ids": [
+        "ACC-014"
+      ],
+      "assertions": "The typed confirmation remains enabled through handled orientation changes; Cancel leaves all original native accounts and histories intact.",
+      "postcondition": "accounts-retained"
     }
   }
 }

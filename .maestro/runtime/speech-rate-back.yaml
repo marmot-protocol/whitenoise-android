@@ -14,7 +14,7 @@ name: speech-rate-back
     id: speech.engine.group
 - tapOn: Speech rate
 - assertVisible: System \(follow device setting\)
-- assertVisible: Custom
+- runFlow: ../fixtures/scroll-speech-custom.yaml
 - back
 - assertVisible:
     id: speech.engine.group

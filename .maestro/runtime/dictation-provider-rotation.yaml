@@ -14,14 +14,14 @@ name: dictation-provider-rotation
     id: dictation.preferences.group
 - tapOn: Speech provider
 - assertVisible:
-    id: dictation_provider_choices
+    text: "Choose a provider for future dictation[.].*"
 - assertVisible: Automatic
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible:
-    id: dictation_provider_choices
+    text: "Choose a provider for future dictation[.].*"
 - setOrientation: PORTRAIT
 - back
 - assertNotVisible:
-    id: dictation_provider_choices
+    text: "Choose a provider for future dictation[.].*"
 - assertVisible:
     id: dictation.preferences.group

@@ -13,6 +13,7 @@ name: speech-custom-reopen
 - assertVisible:
     id: speech.engine.group
 - tapOn: Speech rate
+- runFlow: ../fixtures/scroll-speech-custom.yaml
 - tapOn: Custom
 - assertVisible:
     id: speech.custom_rate
@@ -27,6 +28,7 @@ name: speech-custom-reopen
 - assertVisible:
     id: speech.engine.group
 - tapOn: Speech rate
+- runFlow: ../fixtures/scroll-speech-custom.yaml
 - tapOn: Custom
 - assertNotVisible:
     id: speech.custom_rate

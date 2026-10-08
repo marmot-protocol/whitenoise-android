@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: accounts-wipe-normalized-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-wipe-confirm.yaml
+- tapOn: "Confirmation"
+- inputText: " wIpE "
+- hideKeyboard
+- assertVisible:
+    containsChild:
+      text: "Wipe"
+    enabled: true
+- tapOn: "Cancel"
+- assertNotVisible: "Wipe this account[?]"
+- assertNotVisible: "What gets destroyed"
+- assertVisible: "Private key hidden"
+- back
+- assertVisible: "Settings"
+- back
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- assertVisible: "Generated fixture message"

@@ -14,12 +14,12 @@ name: dictation-provider-reopen
     id: dictation.preferences.group
 - tapOn: Speech provider
 - assertVisible:
-    id: dictation_provider_choices
+    text: "Choose a provider for future dictation[.].*"
 - assertVisible: Automatic
 - back
 - tapOn: Speech provider
 - assertVisible:
-    id: dictation_provider_choices
+    text: "Choose a provider for future dictation[.].*"
 - assertVisible: Automatic
 - back
 - assertVisible:

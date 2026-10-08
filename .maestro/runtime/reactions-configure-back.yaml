@@ -8,8 +8,8 @@ name: reactions-configure-back
 - longPressOn:
     text: Generated fixture message
 - tapOn: Open emoji picker
-- assertVisible:
-    id: emoji.picker.grid
+- assertVisible: "Search emoji"
+- assertVisible: "Smileys & People"
 - tapOn: Configure Reactions
 - assertVisible: Tap an emoji to replace it\.
 - back

@@ -41,7 +41,13 @@
       "keys-cancel-clears",
       "keys-back-clears",
       "keys-correct-mismatch",
-      "keys-rotation-cancel"
+      "keys-rotation-cancel",
+      "accounts-wipe-sheet-back",
+      "accounts-wipe-empty-back",
+      "accounts-wipe-invalid-cancel",
+      "accounts-wipe-valid-cancel",
+      "accounts-wipe-normalized-cancel",
+      "accounts-wipe-rotation-cancel"
     ],
     "Relays": [
       "advanced-relays",
@@ -149,7 +155,10 @@
       "conversation-draft-return"
     ],
     "Settings": [
-      "navigation-settings-back"
+      "navigation-settings-back",
+      "accounts-signout-back",
+      "accounts-signout-rotation-back",
+      "accounts-signout-toggle-back"
     ],
     "Diagnostics": [
       "developer-diagnostics",

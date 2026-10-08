@@ -12,4 +12,10 @@ name: reactions-details-back
 - assertVisible: Maestro Bob
 - back
 - assertNotVisible: All · 2
+- assertVisible:
+    id: composer-pill-surface
+- assertVisible:
+    id: conversation.reaction.pill:0
+- assertNotVisible:
+    id: chats.scope.chats
 - assertVisible: Generated fixture message

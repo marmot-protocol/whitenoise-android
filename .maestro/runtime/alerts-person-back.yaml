@@ -13,17 +13,17 @@ name: alerts-person-back
       text: Maestro Bob
     direction: DOWN
 - tapOn: Maestro Bob
-- assertVisible: Nickname & notes
+- assertVisible: User Profile
 - scrollUntilVisible:
     element:
-      id: person_profile.notifications
+      text: Notifications
     direction: DOWN
 - tapOn:
-    id: person_profile.notifications
+    text: Notifications
 - assertVisible:
-    id: profile_notifications.defaults
+    text: Use defaults
 - assertVisible:
-    id: profile_notifications.mute
+    text: Mute notifications from this person
 - back
 - assertVisible: Maestro Bob
-- assertVisible: Nickname & notes
+- assertVisible: User Profile

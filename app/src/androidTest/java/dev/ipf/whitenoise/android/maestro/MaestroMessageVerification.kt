@@ -43,12 +43,13 @@ internal suspend fun verifyMaestroMessageMutation(
 }
 
 /** Use the same typed MDK projection as the application, without synthesizing message records. */
-private fun readMaestroMessages(
+internal fun readMaestroMessages(
     native: Marmot,
     account: String,
     group: String,
 ): List<TimelineMessageRecordFfi> {
-    return native.timelineMessages(account, TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)).messages
+    val query = TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)
+    return native.timelineMessages(account, query).messages
 }
 
 /** Reply publication preserves the original and references that exact original on both accounts. */

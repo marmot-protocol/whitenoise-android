@@ -488,6 +488,32 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 with self.subTest(key=key), self.assertRaises(ValueError):
                     pair(directory, 'verify', {**retry, key: value})
 
+    def test_account_guard_journeys_never_execute_terminal_account_actions(self):
+        """Keep cancellation evidence from turning into a sign-out or wipe campaign."""
+        def inspect(flow, seen):
+            if flow in seen:
+                return
+            seen.add(flow)
+            commands = list(yaml.safe_load_all(flow.read_text()))[1]
+            for command in commands:
+                if not isinstance(command, dict):
+                    continue
+                tap = command.get('tapOn')
+                text = tap.get('text') if isinstance(tap, dict) else tap
+                self.assertNotEqual(text, 'Wipe', flow)
+                if text == 'Sign Out':
+                    self.assertEqual(flow.name, 'show-signout-sheet.yaml')
+                    self.assertEqual(commands[0], {'assertVisible': 'Settings'})
+                subflow = command.get('runFlow')
+                if isinstance(subflow, str):
+                    inspect((flow.parent / subflow).resolve(), seen)
+        guards = {name: case for name, case in runtime.CASES.items() if case['suite'] == 'account-guards'}
+        self.assertEqual(len(guards), 9)
+        for name, case in guards.items():
+            with self.subTest(case=name):
+                self.assertEqual(case['postcondition'], 'accounts-retained')
+                inspect(runtime.ROOT / '.maestro/runtime' / (name + '.yaml'), set())
+
     def test_backup_checks_use_button_state_and_verify_both_cleared_inputs(self):
         """Reject the captured false label-state proof and unintended Back on an unfocused dialog."""
         for name, case in runtime.CASES.items():
@@ -736,6 +762,8 @@ class RuntimeEvidenceTest(unittest.TestCase):
     def test_fixture_code_and_builds_remain_opt_in(self):
         """Keep native fixture builds manual and fixture code outside production APK source."""
         workflow = yaml.safe_load((runtime.ROOT / '.github/workflows/android-instrumented.yml').read_text())
+        options = workflow.get('on', workflow.get(True))['workflow_dispatch']['inputs']['maestro_suite']['options']
+        self.assertTrue({'runtime-' + suite for suite in runtime.SUITES}.issubset(set(options)))
         jobs = workflow['jobs']
         self.assertIn("github.event_name == 'workflow_dispatch'", jobs['maestro-runtime-build']['if'])
         self.assertIn("startsWith(inputs.maestro_suite, 'runtime-')", jobs['maestro-runtime-build']['if'])

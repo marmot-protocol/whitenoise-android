@@ -58,6 +58,7 @@ private val MAESTRO_POSTCONDITIONS =
         "notification-denied",
         "notification-granted",
         "camera-denied",
+        "accounts-retained",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */
@@ -92,6 +93,7 @@ class MaestroRuntimeHostTest {
             var peerLabel: String? = null
             var groupId: String? = null
             var messageBaseline: MaestroMessageBaseline? = null
+            var expectedAccountIds: Set<String> = emptySet()
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -157,7 +159,8 @@ class MaestroRuntimeHostTest {
                             "Generated group missing from native presentation"
                         }
                     val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
-                    if (postcondition.startsWith("message-")) {
+                    if (postcondition.startsWith("message-") || postcondition == "accounts-retained") {
+                        expectedAccountIds = accounts.map { it.accountIdHex }.toSet()
                         val original = checkNotNull(nativeRow.row.lastMessage)
                         check(original.plaintext == "Generated fixture message")
                         messageBaseline =
@@ -188,6 +191,14 @@ class MaestroRuntimeHostTest {
                     while (!File(directory, "finish").exists()) delay(100L)
                 }
                 verifyNativeState(native, state, checkNotNull(peerLabel), checkNotNull(groupId), messageBaseline)
+                if (InstrumentationRegistry.getArguments().getString("postcondition") == "accounts-retained") {
+                    verifyMaestroAccountsRetained(
+                        native,
+                        checkNotNull(state),
+                        checkNotNull(messageBaseline),
+                        expectedAccountIds,
+                    )
+                }
                 File(directory, "verified.json").writeText(
                     JSONObject().put("generation", generation).put("verified", true).toString(),
                 )
