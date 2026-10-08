@@ -90,6 +90,23 @@ class ChatFolderDraftCommitTest {
             }
         }
 
+    /** Metadata edits preserve overrides; deliberate editor inclusions clear only those overrides atomically. */
+    @Test fun draftPreservesExclusionsUnlessTheUserExplicitlyAddsThatChat() {
+        val folder = store.createFolder(A, "Work")!!
+        store.excludeChat(A, folder.id, "g1")
+        store.excludeChat(A, folder.id, "g2")
+        preferences.writes = 0
+        store.commitFolderDraft(A, folder.id, "Renamed", "", emptySet(), null, sort = ChatFolderSort.NAME)
+        assertEquals(1, preferences.writes)
+        assertEquals(setOf("g1", "g2"), store.excludedChats(A, folder.id))
+        preferences.writes = 0
+        store.commitFolderDraft(A, folder.id, null, "", setOf("G1"), null)
+        assertEquals(1, preferences.writes)
+        assertEquals(setOf("g2"), ChatFolderPreferences(context, preferences).excludedChats(A, folder.id))
+        val reloadedFolder = ChatFolderPreferences(context, preferences).foldersFor(A).first { it.id == folder.id }
+        assertEquals(ChatFolderSort.NAME, reloadedFolder.sort)
+    }
+
     /** Empty membership and rule removal use the same transaction as the edited text. */
     @Test fun clearingMembershipAndRuleIsAtomic() {
         val folder = store.createFolder(A, "Work")!!

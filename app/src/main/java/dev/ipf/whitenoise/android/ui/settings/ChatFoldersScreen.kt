@@ -413,6 +413,7 @@ private fun chatFolderDisplayName(
         name
     } else {
         when (systemKind) {
+            SystemFolderKind.CHATS -> stringResource(R.string.chats)
             SystemFolderKind.UNREAD -> stringResource(R.string.chat_list_filter_unread)
             SystemFolderKind.ARCHIVED -> stringResource(R.string.archived)
             SystemFolderKind.GROUPS -> stringResource(R.string.chat_list_filter_groups)
@@ -438,6 +439,7 @@ private fun folderChatCount(
         chatFolderChatIds(
             items = source,
             manualChatIds = appState.chatFolderPreferences.membershipFor(accountRef, folder.id),
+            excludedChatIds = appState.chatFolderPreferences.excludedChats(accountRef, folder.id),
             rule = rule,
             activeAccountIdHex = appState.activeAccount?.accountIdHex,
             isMuted = { groupIdHex -> source.any { it.group.groupIdHex == groupIdHex && it.engineMuted() } },

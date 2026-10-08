@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="folder_all_chats">Tüm sohbetler</string>
+    <string name="folder_exclude_chat">Bu klasörden hariç tut</string>
+    <string name="folder_sort_title">Sohbetleri sıralama</string>
+    <string name="folder_sort_recent">En son etkinlik</string>
+    <string name="folder_sort_name">Ad A–Z</string>
+    <string name="folder_sort_unread">Önce okunmamışlar</string>
+    <string name="folder_sort_hint">Davetler ve sabitlenmiş sohbetler üstte kalır. Sabitlenmiş sohbetlerin elle belirlenen sırası korunur.</string>
+    <string name="folder_all_active">Tüm etkin sohbetleri dahil et</string>
+</resources>

@@ -87,6 +87,7 @@ class ChatFolderPillsScreenshotTest {
     ) {
         val chips =
             listOf(
+                ChatFolderChipModel("home", SystemFolderKind.CHATS, "", 0, unfilteredHome = true),
                 ChatFolderChipModel("unread", SystemFolderKind.UNREAD, "Catch up", 125),
                 ChatFolderChipModel("work", null, "A long work folder name", 2),
                 ChatFolderChipModel("archive", SystemFolderKind.ARCHIVED, "", 0),

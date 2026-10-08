@@ -134,7 +134,7 @@
     <string name="chat_folder_people">People</string>
     <string name="folder_none">No folders</string>
     <string name="folder_none_detail">Create a folder to organize your chats.</string>
-    <string name="folder_restore_hint">Restore missing Unread, Archived and Groups folders. Existing folders keep your changes.</string>
+    <string name="folder_restore_hint">Restore missing Chats, Unread, Archived and Groups folders. Existing folders keep your changes.</string>
     <string name="folder_edit">Edit Folder</string>
     <string name="folder_delete_action">Delete folder</string>
     <string name="folder_delete_title">Delete “%1$s”?</string>

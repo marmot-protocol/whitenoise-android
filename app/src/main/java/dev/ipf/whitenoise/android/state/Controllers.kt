@@ -2659,6 +2659,7 @@ class ChatsController private constructor(
         get() = memberCacheLifetime.capture()
     private var isCleared = false
 
+    internal val folderSource = ChatFolderLiveSource()
     private val liveSubscriptionLock = Any()
     internal var chatListWindows: ChatListWindowSet? = null
     private var activeChatsSubscription: ChatsSubscriptionHandle? = null
@@ -2778,6 +2779,8 @@ class ChatsController private constructor(
                 lastFailureNotReady = false
                 var chatsSubscription: ChatsSubscriptionHandle? = null
                 var receivedLiveUpdate = false
+                val completeChatList = folderSource.complete.value
+                var folderSourceChanged = false
                 val connectionAttempt =
                     if (initialSubscriptionProjection) {
                         initialSubscriptionProjection = false
@@ -2791,11 +2794,7 @@ class ChatsController private constructor(
                     }
                 try {
                     val chatListStream =
-                        ChatListWindowSet.open(
-                            accountRef,
-                            openFallback = liveSubscriptions.openPresentedChatList,
-                            openWindow = liveSubscriptions.openChatListWindow,
-                        )
+                        liveSubscriptions.openFolderSource(accountRef, completeChatList)
                     chatListSubscription = chatListStream
                     val chatStream = liveSubscriptions.openChats(accountRef, true)
                     chatsSubscription = chatStream
@@ -2845,42 +2844,47 @@ class ChatsController private constructor(
                     pendingReadinessCatchUp = null
                     readinessCatchUp?.let(connectionOwner::observe)
 
-                    coroutineScope {
-                        runUntilFirstLiveSubscriptionEnds(
-                            first = {
-                                chatListStream.receive { view, replacement ->
-                                    appState.recoveryDiagnostics
-                                        .recordChatListSubscriptionReceived()
-                                        ?.let { generation ->
-                                            pendingRecoveryProjectionGeneration.publish(generation)
+                    folderSourceChanged =
+                        folderSource.receiveUntilChanged(completeChatList) {
+                            coroutineScope {
+                                runUntilFirstLiveSubscriptionEnds(
+                                    first = {
+                                        chatListStream.receive { view, replacement ->
+                                            appState.recoveryDiagnostics
+                                                .recordChatListSubscriptionReceived()
+                                                ?.let { generation ->
+                                                    pendingRecoveryProjectionGeneration.publish(generation)
+                                                }
+                                            chatsDebug {
+                                                "chat list window view=$view sequence=${replacement.sequence} " +
+                                                    "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
+                                            }
+                                            requireCompleteChatListWindowRows(
+                                                applyChatListWindowRows(accountRef, chatListStream),
+                                            )
+                                            receivedLiveUpdate = true
+                                            connectionOwner.noteLiveUpdate(connectionAttempt)
+                                            appState.schedulePendingLocalGroupDeleteCleanup()
                                         }
-                                    chatsDebug {
-                                        "chat list window view=$view sequence=${replacement.sequence} " +
-                                            "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
-                                    }
-                                    requireCompleteChatListWindowRows(
-                                        applyChatListWindowRows(accountRef, chatListStream),
-                                    )
-                                    receivedLiveUpdate = true
-                                    connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    appState.schedulePendingLocalGroupDeleteCleanup()
-                                }
-                            },
-                            second = {
-                                while (isActive) {
-                                    val update =
-                                        withContext(Dispatchers.IO) {
-                                            chatStream.next()
-                                        } ?: break
-                                    receivedLiveUpdate = true
-                                    connectionOwner.noteLiveUpdate(connectionAttempt)
-                                    requestGroupProfiles(update)
-                                    chatsDebug { "chat update account=${accountRef.take(8)} ${update.debugSummary()}" }
-                                    foldGroup(update)
-                                }
-                            },
-                        )
-                    }
+                                    },
+                                    second = {
+                                        while (isActive) {
+                                            val update =
+                                                withContext(Dispatchers.IO) {
+                                                    chatStream.next()
+                                                } ?: break
+                                            receivedLiveUpdate = true
+                                            connectionOwner.noteLiveUpdate(connectionAttempt)
+                                            requestGroupProfiles(update)
+                                            chatsDebug {
+                                                "chat update account=${accountRef.take(8)} ${update.debugSummary()}"
+                                            }
+                                            foldGroup(update)
+                                        }
+                                    },
+                                )
+                            }
+                        }
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (throwable: Throwable) {
@@ -2924,6 +2928,10 @@ class ChatsController private constructor(
                     }
                 }
                 if (!coroutineContext.isActive || !shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) break
+                if (folderSourceChanged || folderSource.complete.value != completeChatList) {
+                    initialSubscriptionProjection = true
+                    continue
+                }
                 // Reset only after a real live update, not after a successful
                 // bind/snapshot. A relay that connects and immediately closes
                 // should keep backing off instead of pinning retries at 500ms.

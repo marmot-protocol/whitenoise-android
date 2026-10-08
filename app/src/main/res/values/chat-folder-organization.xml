@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="folder_all_chats">All chats</string>
+    <string name="folder_exclude_chat">Exclude from this folder</string>
+    <string name="folder_sort_title">Sort chats by</string>
+    <string name="folder_sort_recent">Most recent activity</string>
+    <string name="folder_sort_name">Name A–Z</string>
+    <string name="folder_sort_unread">Unread first</string>
+    <string name="folder_sort_hint">Invitations and pinned chats stay first. Pinned chats keep their manual order.</string>
+    <string name="folder_all_active">Include all active chats</string>
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="folder_all_chats">所有聊天</string>
+    <string name="folder_exclude_chat">從此資料夾排除</string>
+    <string name="folder_sort_title">聊天排序方式</string>
+    <string name="folder_sort_recent">最近活動</string>
+    <string name="folder_sort_name">名稱 A–Z</string>
+    <string name="folder_sort_unread">未讀優先</string>
+    <string name="folder_sort_hint">邀請和置頂聊天保持在頂部。置頂聊天保留手動順序。</string>
+    <string name="folder_all_active">包含所有活躍聊天</string>
+</resources>
