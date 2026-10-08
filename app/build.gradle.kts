@@ -282,9 +282,10 @@ val buildShortSha =
 android {
     namespace = "dev.ipf.whitenoise.android"
     compileSdk {
-        version = release(37) {
-            minorApiLevel = 1
-        }
+        version =
+            release(37) {
+                minorApiLevel = 1
+            }
     }
 
     defaultConfig {
@@ -1069,12 +1070,14 @@ dependencies {
     val bouncyCastleVersion = providers.gradleProperty("bouncycastle.version").get()
 
     constraints {
-        // The beta BOM also advances Material3. Preserve the accepted component tokens
-        // while adopting the Compose runtime/UI fix, including redirected Android modules.
-        listOf("material3", "material3-android", "material3-ripple", "material3-ripple-android").forEach { module ->
-            implementation("androidx.compose.material3:$module") {
-                version { strictly(libs.versions.material3.get()) }
-                because("preserve the accepted Material3 component and screenshot baseline pin")
+        // Each test configuration imports the BOM independently; declare the same strict
+        // Material3 pin at every root so test dependencies cannot conflict with the app.
+        listOf("implementation", "testImplementation", "androidTestImplementation").forEach { configuration ->
+            listOf("material3", "material3-android", "material3-ripple", "material3-ripple-android").forEach { module ->
+                add(configuration, "androidx.compose.material3:$module") {
+                    version { strictly(libs.versions.material3.get()) }
+                    because("preserve the accepted Material3 component and screenshot baseline pin")
+                }
             }
         }
         testImplementation("org.bouncycastle:bcprov-jdk18on:$bouncyCastleVersion") {

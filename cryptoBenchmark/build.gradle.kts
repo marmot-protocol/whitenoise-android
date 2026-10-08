@@ -18,9 +18,10 @@ val marmotKitPreparedDir = project(":app").extra["marmotKitPreparedDir"] as File
 android {
     namespace = "dev.ipf.whitenoise.android.crypto.benchmark"
     compileSdk {
-        version = release(37) {
-            minorApiLevel = 1
-        }
+        version =
+            release(37) {
+                minorApiLevel = 1
+            }
     }
     defaultConfig {
         applicationId = "dev.ipf.whitenoise.crypto.benchmark"

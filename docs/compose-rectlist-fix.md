@@ -28,8 +28,9 @@ The downloaded AAR declares minimum compile SDK 37.1 and AGP 9.1.0; the project
 uses compile SDK 37.1 and AGP 9.4.1. Target SDK remains 36.
 
 Material3 stays at the existing `1.5.0-alpha25` pin, including its Android and
-ripple modules. Explicit strict constraints prevent the beta BOM from silently
-advancing those components. Other Compose versions remain BOM-owned. There is
+ripple modules. Explicit strict constraints at the app, unit-test and instrumented
+test roots prevent each separately imported beta BOM from advancing those
+components or conflicting with the tested app. Other Compose versions remain BOM-owned. There is
 no local Compose compiler invocation, source patch, class replacement or AAR
 transform. The checksums above record inspected provenance; they are not a new
 dependency verification mechanism.
