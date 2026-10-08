@@ -13,8 +13,11 @@ import kotlinx.coroutines.withContext
  *
  * @param hasStaged whether the composer currently holds attachments that an ordinary Send would carry.
  * @param isBusy whether the composer is still preparing attachments or already sending a batch, in
- *   which case an ordinary Send is ignored and this one must refuse rather than race it.
- * @param dispatch starts the composer's own attachment send and reports whether it was accepted.
+ *   which case an ordinary Send is ignored and this one must refuse rather than race it. This is only an
+ *   early refusal off the main thread, so [dispatch] must still claim the send itself (see
+ *   [StagedAttachmentSendClaim]), because a send can start between this check and the dispatch.
+ * @param dispatch starts the composer's own attachment send on the main thread and reports whether it was
+ *   accepted, reporting false without sending when another send already owns the shelf.
  */
 internal class StagedAttachmentSender(
     private val hasStaged: () -> Boolean,
@@ -28,7 +31,8 @@ internal class StagedAttachmentSender(
      * Sends the staged attachments with [caption] as one message.
      *
      * Returns true once the message is visibly pending, after calling [onPendingShown], and false when
-     * nothing was published (busy, nothing staged, or rejected) so the caller can keep its draft.
+     * nothing was published (busy, nothing staged, or rejected) so the caller can keep its draft. The
+     * [isBusy] check here is a fast refusal, the authoritative claim is taken inside [dispatch] on the main thread.
      */
     suspend fun sendWithCaption(
         caption: String,

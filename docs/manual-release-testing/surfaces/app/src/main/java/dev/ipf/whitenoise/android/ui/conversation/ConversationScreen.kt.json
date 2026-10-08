@@ -46,6 +46,14 @@
           "FIND-016",
           "DIC-008"
         ]
+      },
+      {
+        "surface": "Staged attachment send claimed once for keyboard and dictation Send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "attachmentSendClaim.send(",
+        "test_ids": [
+          "DIC-008"
+        ]
       }
     ],
     "settings_controls": [
