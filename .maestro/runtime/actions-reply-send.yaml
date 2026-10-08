@@ -1,5 +1,5 @@
 appId: dev.ipf.whitenoise.android.maestrolab
-name: actions-info-back
+name: actions-reply-send
 ---
 - runFlow: ../fixtures/runtime-ready.yaml
 - assertVisible: "Maestro group"
@@ -7,9 +7,10 @@ name: actions-info-back
 - assertVisible: "Generated fixture message"
 - longPressOn:
     text: "Generated fixture message"
-- tapOn: "Info"
-- assertVisible: "Message Details"
-- assertVisible: "Message ID"
-- back
-- assertNotVisible: "Message Details"
-- assertVisible: "Generated fixture message"
+- tapOn: "Reply"
+- inputText: "Maestro verified reply"
+- hideKeyboard
+- tapOn: "Send"
+- assertVisible: "Maestro verified reply"
+- assertVisible: "Message"
+- assertNotVisible: "Send"

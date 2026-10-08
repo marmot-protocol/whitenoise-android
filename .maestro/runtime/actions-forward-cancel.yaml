@@ -8,7 +8,10 @@ name: actions-forward-cancel
 - longPressOn:
     text: "Generated fixture message"
 - tapOn: "Forward"
-- assertVisible:
-    id: "forward_chat_picker_full_screen"
+- assertVisible: "Forward to"
+- assertVisible: "1 message"
+- assertVisible: "Maestro Alice"
+- assertVisible: "No other chats to forward to[.]"
 - back
+- assertNotVisible: "Forward to"
 - assertVisible: "Generated fixture message"

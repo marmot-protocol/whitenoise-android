@@ -656,14 +656,14 @@ class RuntimeEvidenceTest(unittest.TestCase):
                         self.assertNotIn(forbidden, target.read_text())
 
     def test_unknown_slices_are_rejected_before_building(self):
-        """Reject invalid selection and enforce the per-shard case budget."""
+        """Reject invalid selection; logical suites may grow while execution shards stay bounded."""
         self.assertEqual(set(selection('runtime-all')), set(runtime.SUITES))
         self.assertEqual(selection('runtime-settings'), ['settings'])
         for value in ('runtime-../other', 'all', 'runtime-settings\n', 'runtime-'):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 selection(value)
         for name in runtime.SUITES:
-            self.assertTrue(1 <= sum(case['suite'] == name for case in runtime.CASES.values()) <= 8)
+            self.assertGreater(sum(case['suite'] == name for case in runtime.CASES.values()), 0)
 
     def test_partitions_cover_every_logical_case_once(self):
         """Bound each execution shard without dropping or duplicating any selected journey."""

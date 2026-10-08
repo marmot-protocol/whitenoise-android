@@ -1641,6 +1641,39 @@
       ],
       "assertions": "Missing usable receiving relays expose Check relays and open real relay settings; Back preserves the existing chat.",
       "postcondition": "none"
+    },
+    "actions-reply-send": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-005",
+        "MSG-017"
+      ],
+      "assertions": "Reply publishes once to the peer with the exact original native reply target, retains the original, and clears the draft.",
+      "postcondition": "message-reply"
+    },
+    "actions-edit-save": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-007"
+      ],
+      "assertions": "Saving an edit updates the same original native identity and accepted edit metadata on the owner and peer.",
+      "postcondition": "message-edit"
+    },
+    "actions-delete-local": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Delete for me removes the original only from the owner while the peer retains it and the conversation remains.",
+      "postcondition": "message-delete-local"
+    },
+    "actions-delete-everyone": {
+      "suite": "actions",
+      "manual_ids": [
+        "MSG-008"
+      ],
+      "assertions": "Delete for everyone marks the original deleted with the same native deletion identity on the owner and peer.",
+      "postcondition": "message-delete-everyone"
     }
   }
 }

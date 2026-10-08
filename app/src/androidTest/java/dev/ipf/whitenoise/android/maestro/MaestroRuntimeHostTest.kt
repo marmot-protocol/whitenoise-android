@@ -31,6 +31,10 @@ private val MAESTRO_POSTCONDITIONS =
     setOf(
         "none",
         "send",
+        "message-reply",
+        "message-edit",
+        "message-delete-local",
+        "message-delete-everyone",
         "reactions-retained",
         "composer-expanded",
         "composer-automatic",
@@ -86,6 +90,7 @@ class MaestroRuntimeHostTest {
             var activity: ActivityScenario<MainActivity>? = null
             var peerLabel: String? = null
             var groupId: String? = null
+            var messageBaseline: MaestroMessageBaseline? = null
             try {
                 withTimeout(90_000L) {
                     native.start()
@@ -149,6 +154,13 @@ class MaestroRuntimeHostTest {
                         checkNotNull(native.presentedChatListRow(owner.label, group)) {
                             "Generated group missing from native presentation"
                         }
+                    val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
+                    if (postcondition.startsWith("message-")) {
+                        val original = checkNotNull(nativeRow.row.lastMessage)
+                        check(original.plaintext == "Generated fixture message")
+                        messageBaseline =
+                            MaestroMessageBaseline(owner.label, original.messageIdHex, group, accounts[1].label)
+                    }
                     File(directory, "setup.json").writeText(
                         JSONObject()
                             .put("generation", generation)
@@ -173,7 +185,7 @@ class MaestroRuntimeHostTest {
                 withTimeout(300_000L) {
                     while (!File(directory, "finish").exists()) delay(100L)
                 }
-                verifyNativeState(native, state, checkNotNull(peerLabel), checkNotNull(groupId))
+                verifyNativeState(native, state, checkNotNull(peerLabel), checkNotNull(groupId), messageBaseline)
                 File(directory, "verified.json").writeText(
                     JSONObject().put("generation", generation).put("verified", true).toString(),
                 )
@@ -204,6 +216,7 @@ class MaestroRuntimeHostTest {
         state: WhiteNoiseAppState?,
         peerLabel: String,
         group: String,
+        messageBaseline: MaestroMessageBaseline?,
     ) {
         val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
         require(postcondition in MAESTRO_POSTCONDITIONS)
@@ -219,6 +232,9 @@ class MaestroRuntimeHostTest {
             verifyMaestroConsent(native, checkNotNull(state), postcondition)
         }
         if (postcondition.startsWith("folder-")) verifyMaestroFolder(checkNotNull(state), postcondition)
+        if (postcondition.startsWith("message-")) {
+            verifyMaestroMessageMutation(native, checkNotNull(state), postcondition, checkNotNull(messageBaseline))
+        }
         when (postcondition) {
             "light", "dark", "amoled", "font-large" ->
                 verifyMaestroPreferences(checkNotNull(state), postcondition)

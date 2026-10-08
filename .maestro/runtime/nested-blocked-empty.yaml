@@ -14,10 +14,16 @@ name: nested-blocked-empty
     element:
       text: "Blocked users"
     direction: DOWN
-- tapOn: "Blocked users"
-- assertVisible:
-    id: "blocked-users-content"
+- tapOn:
+    text: "Blocked users"
+    index: 1
+- assertVisible: "Blocked users"
 - assertVisible: "You haven’t blocked anyone."
 - back
+- assertVisible: "Privacy & Security"
+- scrollUntilVisible:
+    element:
+      id: "privacy.device_protection.group"
+    direction: UP
 - assertVisible:
     id: "privacy.device_protection.group"
