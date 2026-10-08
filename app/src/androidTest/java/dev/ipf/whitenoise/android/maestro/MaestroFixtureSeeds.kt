@@ -30,6 +30,15 @@ internal suspend fun seedMaestroFixtureMessages(
                 "share-invalid-http",
                 "share-partial",
                 "share-text",
+                "share-external-document",
+                "share-external-caption",
+                "share-external-multiple",
+                "share-external-duplicate",
+                "share-external-expired-grant",
+                "share-external-denied",
+                "share-external-denied-caption",
+                "share-external-empty",
+                "share-external-empty-caption",
             ),
     )
     native.sendText(account, group, "Generated fixture message")

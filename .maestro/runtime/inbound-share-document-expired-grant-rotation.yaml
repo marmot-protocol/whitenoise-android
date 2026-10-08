@@ -1,0 +1,37 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-document-expired-grant-rotation
+---
+- runFlow: ../fixtures/runtime-share-text-ready.yaml
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    text: ^Share$
+- tapOn: Maestro group
+- assertVisible:
+    enabled: true
+    text: ^Share to 1 chat$
+- tapOn:
+    text: ^Share to 1 chat$
+- assertNotVisible:
+    id: performance.share_picker
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertVisible:
+    id: conversation.composer.attachment.0
+- assertNotVisible:
+    id: conversation.composer.attachment.1
+- setOrientation: LANDSCAPE_LEFT
+- &id001
+  runFlow: ../fixtures/assert-fixture-conversation.yaml
+- &id002
+  assertVisible:
+    id: conversation.composer.attachment.0
+- &id003
+  assertNotVisible:
+    id: conversation.composer.attachment.1
+- setOrientation: PORTRAIT
+- *id001
+- *id002
+- *id003

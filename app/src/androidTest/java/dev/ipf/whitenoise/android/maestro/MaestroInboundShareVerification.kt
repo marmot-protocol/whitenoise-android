@@ -25,7 +25,7 @@ internal fun maestroRuntimeLaunchIntent(
     fixture: String,
 ): Intent {
     val intent = Intent(context, MainActivity::class.java)
-    if (!fixture.startsWith("share-")) return intent
+    if (!fixture.startsWith("share-") || fixture.startsWith("share-external-")) return intent
     intent.action = Intent.ACTION_SEND
     intent.type = "text/plain"
     when (fixture) {
@@ -65,21 +65,24 @@ internal suspend fun captureMaestroInboundShare(
     check(accounts.size == 3 && messages.size == 2 && owner in messages)
     check(messages.values.all { timeline -> timeline.any { it.text == "Generated fixture message" && !it.deleted } })
     val request = awaitMaestroImportedShare(activity)
-    val expectedText = if (fixture in setOf("share-partial", "share-text")) MAESTRO_SHARE_TEXT else null
-    val expectedErrors = if (fixture == "share-text") emptyList() else listOf(ShareImportError.Scheme)
-    check(request.payload.text == expectedText && request.payload.streamUris.isEmpty())
+    val expectedText = maestroExpectedShareText(fixture)
+    val expectedErrors = maestroExpectedShareErrors(fixture)
+    check(request.payload.text == expectedText)
     check(request.payload.importErrors == expectedErrors)
     check(request.payload.importRejectedCount == expectedErrors.size)
     val context = InstrumentationRegistry.getInstrumentation().targetContext
     withContext(Dispatchers.IO) {
         check(createPendingShareRequestStore(context).load(request.requestId) == request)
     }
+    val files = captureMaestroShareFiles(context, request, fixture)
     return MaestroInboundShareBaseline(
         owner,
-        accounts.map { it.accountIdHex }.toSet(),
+        accounts.associate { it.label to it.accountIdHex },
         group,
         request.requestId,
         messages,
+        expectedText,
+        files,
     )
 }
 
@@ -106,7 +109,7 @@ internal suspend fun verifyMaestroInboundShare(
     val expectedDraft =
         when (postcondition) {
             "share-request-cancelled" -> null
-            "share-request-staged" -> MAESTRO_SHARE_TEXT
+            "share-request-staged", "share-request-files-removed" -> before.text
             else -> error("Unknown inbound-share postcondition")
         }
     val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -118,8 +121,10 @@ internal suspend fun verifyMaestroInboundShare(
             activity.onActivity { cleared = it.pendingInboundShareRequestForTest == null }
             cleared = cleared && withContext(Dispatchers.IO) { store.load(before.requestId) == null }
             matches =
-                cleared && maestroShareLocalStateMatches(state, before, expectedDraft) &&
-                maestroShareHistoriesMatch(native, before)
+                cleared &&
+                maestroShareLocalStateMatches(state, before, expectedDraft) &&
+                maestroShareHistoriesMatch(native, before) &&
+                verifyMaestroShareFiles(context, before, postcondition)
             if (!matches) delay(100L)
         }
         true
@@ -133,7 +138,7 @@ private suspend fun maestroShareLocalStateMatches(
 ): Boolean =
     withContext(Dispatchers.Main.immediate) {
         state.activeAccountRef == before.owner &&
-            state.accounts.map { it.accountIdHex }.toSet() == before.accountIds &&
+            state.accounts.associate { it.label to it.accountIdHex } == before.accountIds &&
             state.draftStore.get(before.owner, before.group) == expectedDraft &&
             state.accounts.filter { it.label != before.owner }.all {
                 state.draftStore.get(it.label, before.group).isNullOrEmpty()
@@ -145,7 +150,7 @@ private suspend fun maestroShareHistoriesMatch(
     before: MaestroInboundShareBaseline,
 ): Boolean =
     withContext(Dispatchers.IO) {
-        native.listAccounts().map { it.accountIdHex }.toSet() == before.accountIds &&
+        native.listAccounts().associate { it.label to it.accountIdHex } == before.accountIds &&
             before.messages.all { (account, messages) ->
                 maestroSharedMessageSnapshot(native, account, before.group) == messages
             }
@@ -166,3 +171,11 @@ private fun maestroSharedMessageSnapshot(
                 it.replyToMessageIdHex,
             )
         }.sortedBy { it.id }
+
+private fun maestroExpectedShareErrors(fixture: String): List<ShareImportError> =
+    when {
+        fixture.contains("denied") -> listOf(ShareImportError.Unreadable)
+        fixture.contains("empty") -> listOf(ShareImportError.Empty)
+        fixture == "share-text" || fixture.startsWith("share-external-") -> emptyList()
+        else -> listOf(ShareImportError.Scheme)
+    }

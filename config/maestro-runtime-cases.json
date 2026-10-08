@@ -2729,6 +2729,186 @@
       "assertions": "Real inbound share search ime back; native proof requires cleared encrypted request, unchanged global owner/all three accounts/peer message snapshots and no staged draft or additional send.",
       "fixture": "share-text",
       "postcondition": "share-request-cancelled"
+    },
+    "inbound-share-document-cancel-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document cancel close. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-cancel-back": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document cancel back. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-caption-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-caption",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document caption stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-documents-multiple-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-multiple",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise documents multiple stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-duplicate-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-duplicate",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document duplicate stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-expired-grant-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-expired-grant",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document expired grant stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-documents-multiple-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-multiple",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise documents multiple cancel. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-remove": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-files-removed",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document remove. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-documents-multiple-remove": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-multiple",
+      "postcondition": "share-request-files-removed",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise documents multiple remove. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-expired-grant-rotation": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-expired-grant",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document expired grant rotation. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-warm-resume": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-document",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document warm resume. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-denied-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-denied",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document denied close. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-denied-caption-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-denied-caption",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document denied caption cancel. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-denied-caption-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-denied-caption",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document denied caption stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-empty-close": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-empty",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document empty close. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-empty-caption-cancel": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-empty-caption",
+      "postcondition": "share-request-cancelled",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document empty caption cancel. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-empty-caption-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-empty-caption",
+      "postcondition": "share-request-staged",
+      "assertions": "Real external test-APK sender/provider and Android URI grants exercise document empty caption stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
     }
   }
 }

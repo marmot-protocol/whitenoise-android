@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-documents-multiple-stage
+---
+- runFlow: ../fixtures/runtime-share-text-ready.yaml
+- assertVisible:
+    id: performance.share_picker
+- assertVisible:
+    text: ^Maestro group$
+- assertVisible:
+    enabled: false
+    text: ^Share$
+- tapOn: Maestro group
+- assertVisible:
+    enabled: true
+    text: ^Share to 1 chat$
+- tapOn:
+    text: ^Share to 1 chat$
+- assertNotVisible:
+    id: performance.share_picker
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- assertVisible:
+    id: conversation.composer.attachment.0
+- assertVisible:
+    id: conversation.composer.attachment.1
+- assertNotVisible:
+    id: conversation.composer.attachment.2

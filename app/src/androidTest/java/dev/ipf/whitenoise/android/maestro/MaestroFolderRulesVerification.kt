@@ -79,7 +79,9 @@ private fun expectedMaestroFolderRule(postcondition: String): SmartFolderFilter.
         "smart-rule-mentions" ->
             SmartFolderFilter.Group(children = defaults + SmartFolderFilter.Condition(FolderField.MENTIONS))
         "smart-rule-unread" ->
-            SmartFolderFilter.Group(children = defaults + SmartFolderFilter.Condition(FolderField.UNREAD))
+            SmartFolderFilter.Group(
+                children = defaults + SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.PRESENT),
+            )
         "smart-rule-defaults" -> SmartFolderFilter.Group(children = defaults)
         "smart-rule-title" ->
             SmartFolderFilter.Group(

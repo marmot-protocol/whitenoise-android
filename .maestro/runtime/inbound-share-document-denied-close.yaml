@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: inbound-share-document-denied-close
+---
+- runFlow: ../fixtures/runtime-share-error-ready.yaml
+- assertVisible:
+    text: ^A file is unreadable or its access expired\.$
+- assertVisible:
+    text: '^Files not imported: 1$'
+- tapOn: Close
+- assertNotVisible:
+    id: performance.share_picker
+- assertNotVisible: Some files could not be imported
+- assertVisible:
+    text: ^Maestro group$

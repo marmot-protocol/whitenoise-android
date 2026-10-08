@@ -210,7 +210,7 @@ class MaestroRuntimeHostTest {
                             .put("title", nativeRow.presentation.title.toString())
                             .toString(),
                     )
-                    activity = ActivityScenario.launch(maestroRuntimeLaunchIntent(context, fixture))
+                    activity = launchMaestroRuntimeActivity(context, fixture)
                     checkNotNull(activity).onActivity { originalActivity = it }
                     inboundShareBaseline =
                         captureMaestroInboundShare(native, app, checkNotNull(activity), group, fixture)
@@ -286,8 +286,7 @@ class MaestroRuntimeHostTest {
                                 checkNotNull(editorBaselines).relayLists,
                                 postcondition,
                             ),
-                        )
-                        .put(
+                        ).put(
                             "publicProfileVerified",
                             verifyMaestroPublicProfile(
                                 native,
@@ -296,8 +295,7 @@ class MaestroRuntimeHostTest {
                                 checkNotNull(editorBaselines).profileOwner,
                                 postcondition,
                             ),
-                        )
-                        .toString(),
+                        ).toString(),
                 )
             } finally {
                 val activityClosed = runCatching { activity?.close() }
