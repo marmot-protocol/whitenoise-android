@@ -4,6 +4,8 @@ import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
@@ -16,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -33,6 +36,7 @@ import dev.ipf.marmotkit.MarkdownListItemFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
@@ -45,8 +49,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudSentenceHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -177,42 +183,40 @@ class TimelineRowTtsHighlightPaintAndroidTest {
     }
 
     @Test
-    fun speakingPassagePaintsHighlightWhileCollapseLongMessagesIsEnabled() {
-        val body = (1..LONG_BODY_LINES).joinToString(" ") { "Sentence $it about bright things." }
+    fun collapsedBodyRevealsAndHighlightsSentencesBeyondItsCutoff() {
+        val body = (1..LONG_BODY_LINES).joinToString("\n") { "Sentence $it about bright things." }
         val record = speakableRecord(MESSAGE_C, body)
         val entry =
             runBlocking {
-                projectTtsSpeakableEntry(
-                    message = record,
-                    editedText = null,
-                    senderDisplayName = SENDER_NAME,
-                    parseMarkdown = { plainTextDocument(body) },
-                )!!
+                projectTtsSpeakableEntry(record, null, SENDER_NAME, { plainTextDocument(body) })!!
             }
-
         composeRule.setContent {
             val item = timelineMessage(record)
             WhiteNoiseTheme {
-                Box(Modifier.fillMaxWidth()) {
-                    key(item.record.messageIdHex) {
-                        row(item, collapseLongMessages = true)
-                    }
+                LazyColumn(Modifier.fillMaxWidth().height(320.dp)) {
+                    item(key = item.record.messageIdHex) { row(item, collapseLongMessages = true) }
                 }
             }
         }
-
         composeRule.waitForIdle()
-        val idlePixels = renderedPixels()
-
+        val readMore = composeRule.onNodeWithText(context.getString(R.string.message_read_more))
+        readMore.assertExists()
         check(appState.ttsController.speak(listOf(entry), Locale.US))
         composeRule.waitForIdle()
-        val speakingPixels = renderedPixels()
-        val diagnostics = seamDiagnostics()
-
-        assertTrue(
-            "Read-aloud painted nothing while Collapse long messages was enabled. Seam state: $diagnostics",
-            changedPixelCount(idlePixels, speakingPixels) > 0,
-        )
+        readMore.assertDoesNotExist()
+        composeRule.runOnIdle { appState.ttsController.seekToSentence(entry.messageIdHex, LONG_BODY_LINES - 1, entry.projectionId) }
+        composeRule.waitForIdle()
+        val range =
+            composeRule
+                .onNodeWithText(body, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .config
+                .getOrNull(TtsReadAloudSentenceHighlightRangeKey)
+        assertTrue("The formerly hidden sentence must carry a highlight", range != null && !range.isEmpty())
+        assertEquals("Sentence $LONG_BODY_LINES about bright things.", body.substring(range!!.first, range.last + 1))
+        appState.ttsController.pause()
+        composeRule.waitForIdle()
+        readMore.assertDoesNotExist()
     }
 
     /**

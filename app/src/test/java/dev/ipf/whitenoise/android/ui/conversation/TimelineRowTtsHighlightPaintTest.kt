@@ -21,25 +21,17 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
-import dev.ipf.marmotkit.AccountSummaryFfi
-import dev.ipf.marmotkit.AppBlobEndpointFfi
-import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
-import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
-import dev.ipf.marmotkit.AppProtocolProfileFfi
-import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownNostrHrpFfi
-import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.state.ConversationController
-import dev.ipf.whitenoise.android.state.DraftPersistence
-import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -47,6 +39,7 @@ import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightRangeKey
+import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudSentenceHighlightRangeKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleColumnTestTag
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -86,8 +79,8 @@ class TimelineRowTtsHighlightPaintTest {
 
     @Before
     fun setUp() {
-        appState = appState()
-        controller = ConversationController(appState = appState, initialGroup = group())
+        appState = paintTestAppState(context, ACCOUNT_REF, ACCOUNT_ID)
+        controller = ConversationController(appState = appState, initialGroup = paintTestGroup(GROUP_ID, ACCOUNT_ID))
         appState.ttsController.attachEngine(engine)
     }
 
@@ -255,42 +248,79 @@ class TimelineRowTtsHighlightPaintTest {
     }
 
     @Test
-    fun speakingPassagePaintsHighlightWhileCollapseLongMessagesIsEnabled() {
-        val body = (1..LONG_BODY_LINES).joinToString(" ") { "Sentence $it about bright things." }
-        val record = speakableRecord(MESSAGE_C, body)
-        val entry =
+    fun collapsedPlainBodyRevealsItsLateSentenceForReadAloud() = assertCollapsedBodyRevealed(markdown = false)
+
+    @Test
+    fun collapsedMarkdownBodyRevealsItsLateSentenceForReadAloud() = assertCollapsedBodyRevealed(markdown = true)
+
+    private fun assertCollapsedBodyRevealed(markdown: Boolean) {
+        val body = (1..LONG_BODY_LINES).joinToString("\n") { "Sentence $it about bright things." }
+        val document = if (markdown) plainPaintDocument(body) else emptyPaintDocument()
+        val record = speakableRecord(MESSAGE_C, body).copy(contentTokens = document)
+        val entry = runBlocking { projectTtsSpeakableEntry(record, null, SENDER_NAME, { document })!! }
+        val next =
             runBlocking {
-                projectTtsSpeakableEntry(
-                    message = record,
-                    editedText = null,
-                    senderDisplayName = SENDER_NAME,
-                    parseMarkdown = { plainPaintDocument(body) },
-                )!!
+                projectTtsSpeakableEntry(speakableRecord(MESSAGE_D, BODY), null, SENDER_NAME, { plainPaintDocument(BODY) })!!
             }
-
-        composeRule.setContent {
-            val item = timelineMessage(record)
-            WhiteNoiseTheme {
-                Box(Modifier.fillMaxWidth()) {
-                    key(item.record.messageIdHex) {
-                        row(item, collapseLongMessages = true)
-                    }
-                }
-            }
-        }
-
+        renderProductionRow(record, collapseLongMessages = true)
+        val readMore = composeRule.onNodeWithText(context.getString(R.string.message_read_more))
+        readMore.assertExists()
+        check(appState.ttsController.speak(listOf(entry, next), Locale.US))
         composeRule.waitForIdle()
-        val idlePixels = renderedPixels()
-
-        check(appState.ttsController.speak(listOf(entry), Locale.US))
+        readMore.assertDoesNotExist()
+        val first =
+            requireNotNull(
+                appState.ttsController.state.value
+                    .conversationFollowTargetOrNull(),
+            )
+        assertTrue("Expanded body must report its actual sentence", sentenceLayouts.completeSentenceBounds(first) != null)
+        val expandedHeight =
+            collapsedRowHeight()
+        composeRule.runOnIdle { appState.ttsController.seekToSentence(entry.messageIdHex, LONG_BODY_LINES - 1, entry.projectionId) }
         composeRule.waitForIdle()
-        val speakingPixels = renderedPixels()
-        val diagnostics = seamDiagnostics()
-
-        assertTrue(
-            "Read-aloud painted nothing while Collapse long messages was enabled. Seam state: $diagnostics",
-            changedPixelCount(idlePixels, speakingPixels) > 0,
+        assertLateSentenceHighlighted(body)
+        appState.ttsController.pause()
+        composeRule.waitForIdle()
+        readMore.assertDoesNotExist()
+        composeRule.runOnIdle { appState.ttsController.seekToSentence(next.messageIdHex, 0, next.projectionId) }
+        composeRule.waitForIdle()
+        readMore.assertDoesNotExist()
+        assertEquals(
+            expandedHeight,
+            collapsedRowHeight(),
         )
+        appState.ttsController.stop()
+        composeRule.waitForIdle()
+        readMore.assertDoesNotExist()
+        assertEquals(
+            "Stopping speech must not shrink the row and move the user's viewport",
+            expandedHeight,
+            collapsedRowHeight(),
+        )
+    }
+
+    private fun collapsedRowHeight() =
+        composeRule
+            .onNodeWithTag(messageBubbleRowTestTag(MESSAGE_C), useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .size.height
+
+    private fun assertLateSentenceHighlighted(body: String) {
+        val last =
+            requireNotNull(
+                appState.ttsController.state.value
+                    .conversationFollowTargetOrNull(),
+            )
+        assertEquals(LONG_BODY_LINES - 1, last.sentenceIndex)
+        assertTrue("Formerly hidden sentence must have geometry", sentenceLayouts.completeSentenceBounds(last) != null)
+        val range =
+            composeRule
+                .onNodeWithText(body, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .config
+                .getOrNull(TtsReadAloudSentenceHighlightRangeKey)
+        assertTrue("Late sentence must be highlighted", range != null && !range.isEmpty())
+        assertEquals("Sentence $LONG_BODY_LINES about bright things.", body.substring(range!!.first, range.last + 1))
     }
 
     /**
@@ -406,7 +436,10 @@ class TimelineRowTtsHighlightPaintTest {
     }
 
     /** Renders the production timeline row inside the same bounded lazy viewport used by a conversation. */
-    private fun renderProductionRow(record: AppMessageRecordFfi) {
+    private fun renderProductionRow(
+        record: AppMessageRecordFfi,
+        collapseLongMessages: Boolean = false,
+    ) {
         composeRule.setContent {
             val item = timelineMessage(record)
             WhiteNoiseTheme {
@@ -416,7 +449,7 @@ class TimelineRowTtsHighlightPaintTest {
                         .height(320.dp)
                         .testTag(TTS_VIEWPORT_TAG),
                 ) {
-                    item(key = item.record.messageIdHex) { row(item) }
+                    item(key = item.record.messageIdHex) { row(item, collapseLongMessages = collapseLongMessages) }
                 }
             }
         }
@@ -622,79 +655,6 @@ class TimelineRowTtsHighlightPaintTest {
         messageIdHex: String,
         plaintext: String,
     ) = speakablePaintRecord(messageIdHex, plaintext, GROUP_ID, SENDER_ID)
-
-    private fun appState() =
-        WhiteNoiseAppState(
-            context = context,
-            draftStore = DraftStore(EmptyDraftPersistence()),
-            accountIdHexResolver = { null },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
-                ),
-            activeAccountRef = ACCOUNT_REF,
-        )
-
-    private fun group() =
-        AppGroupRecordFfi(
-            groupIdHex = GROUP_ID,
-            protocolProfile = AppProtocolProfileFfi.LEGACY,
-            endpoint = "wss://relay.example",
-            profilePresent = true,
-            name = "Read-aloud paint group",
-            description = "",
-            admins = listOf(ACCOUNT_ID),
-            relays = emptyList(),
-            nostrGroupIdHex = "03".repeat(32),
-            avatarUrl = null,
-            avatarDim = null,
-            avatarThumbhash = null,
-            imageHashHex = null,
-            encryptedMedia =
-                AppGroupEncryptedMediaComponentFfi(
-                    componentId = 0x8008u,
-                    component = "marmot.group.encrypted-media.v1",
-                    required = true,
-                    version = EncryptedMediaVersionFfi.V1,
-                    mediaFormat = "encrypted-media-v1",
-                    allowedLocatorKinds = listOf("blossom-v1"),
-                    defaultBlobEndpoints =
-                        listOf(
-                            AppBlobEndpointFfi(
-                                locatorKind = "blossom-v1",
-                                baseUrl = "https://blossom.example",
-                            ),
-                        ),
-                ),
-            disappearingMessageSecs = 0uL,
-            archived = false,
-            pendingConfirmation = false,
-            unrecoverable = false,
-            selfMembership = SelfMembershipFfi.MEMBER,
-            leaveRequestPending = false,
-            leaveRequestedAtMs = null,
-            disbanding = false,
-            disbandRequest = null,
-            disbanded = false,
-            welcomerAccountIdHex = null,
-            viaWelcomeMessageIdHex = null,
-        )
-
-    private class EmptyDraftPersistence : DraftPersistence {
-        override fun read(): Map<String, String> = emptyMap()
-
-        override fun write(
-            key: String,
-            value: String?,
-        ) = Unit
-    }
 
     private class FakePaintTtsSpeechEngine : TtsSpeechEngine {
         private val spoken = mutableListOf<String>()

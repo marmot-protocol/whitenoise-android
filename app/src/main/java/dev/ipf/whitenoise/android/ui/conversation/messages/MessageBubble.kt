@@ -374,6 +374,7 @@ internal fun MessageBubble(
     ttsHighlightPassage: TtsPassage? = null,
     ttsReadAloudProgress: TtsReadAloudProgress? = null,
     ttsFollowTarget: ConversationTtsFollowTarget? = null,
+    ttsSessionId: Long? = null,
     ttsQuickTransportViewportLock: TtsQuickTransportViewportLock? = null,
     ttsSentenceLayoutSink: ConversationTtsSentenceLayoutSink? = null,
     onTtsSentenceSeek: (TtsState) -> Unit = {},
@@ -890,6 +891,13 @@ internal fun MessageBubble(
             }
         }
     val effectiveTtsReadAloudProgress = ttsProjectionState.effectiveProgress
+    val ttsBodyExpanded =
+        rememberTtsMessageBodyExpanded(
+            messageIdHex = record.messageIdHex,
+            sourceText = speakableIdentity?.bodyText,
+            sessionId = ttsSessionId,
+            verifiedActivePassage = effectiveTtsFollowTarget != null && ttsProjectionResolver != null,
+        )
     val forwardNowSeconds = (System.currentTimeMillis() / 1000L).toULong()
     val forwardEligibility =
         remember(
@@ -2227,8 +2235,8 @@ internal fun MessageBubble(
                 // with Read More in the bottom footer row opening the full-screen view;
                 // tombstones, edit/info copy, and groups with the local collapse
                 // setting disabled never collapse (#325, #1180).
-                val collapsible =
-                    collapseLongMessages && !deleted && !persistedFailure && !textSelectionMode
+                val bodyCanCollapse = collapseLongMessages && !deleted && !persistedFailure
+                val collapsible = bodyCanCollapse && !textSelectionMode && !ttsBodyExpanded
                 // The sender-name label (group chats only). Rendered above the
                 // shared media card when media is present, or as the first child
                 // of the text-only bubble otherwise.

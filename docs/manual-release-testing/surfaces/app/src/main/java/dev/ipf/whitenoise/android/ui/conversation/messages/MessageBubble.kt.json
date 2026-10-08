@@ -33,6 +33,14 @@
           "TTS-001",
           "TTS-004"
         ]
+      },
+      {
+        "surface": "Read-aloud reveals collapsed long-message text inline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "rememberTtsMessageBodyExpanded(",
+        "test_ids": [
+          "TTS-001"
+        ]
       }
     ],
     "settings_controls": [
