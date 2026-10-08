@@ -5,20 +5,18 @@ name: accounts-signout-toggle-back
 - assertVisible: "Maestro group"
 - runFlow: ../fixtures/open-signout-sheet.yaml
 - assertVisible:
-    containsDescendants:
-      - text: "Remove invitation keys from relays"
+    id: "profile_keys.signout_invitation_keys"
     checked: true
-- tapOn: "Remove invitation keys from relays"
+- tapOn:
+    id: "profile_keys.signout_invitation_keys"
 - assertVisible:
-    containsDescendants:
-      - text: "Remove invitation keys from relays"
+    id: "profile_keys.signout_invitation_keys"
     checked: false
 - back
 - assertVisible: "Settings"
 - runFlow: ../fixtures/show-signout-sheet.yaml
 - assertVisible:
-    containsDescendants:
-      - text: "Remove invitation keys from relays"
+    id: "profile_keys.signout_invitation_keys"
     checked: true
 - back
 - assertNotVisible: "Stays on this device"

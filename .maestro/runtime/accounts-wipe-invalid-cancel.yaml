@@ -8,8 +8,7 @@ name: accounts-wipe-invalid-cancel
 - inputText: "WIP"
 - hideKeyboard
 - assertVisible:
-    containsChild:
-      text: "Wipe"
+    id: "profile_keys.wipe_confirm"
     enabled: false
 - tapOn: "Cancel"
 - assertNotVisible: "Wipe this account[?]"

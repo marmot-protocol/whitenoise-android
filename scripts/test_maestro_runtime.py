@@ -595,6 +595,10 @@ class RuntimeEvidenceTest(unittest.TestCase):
         for name, case in guards.items():
             with self.subTest(case=name):
                 self.assertEqual(case['postcondition'], 'accounts-retained')
+                if name.startswith('accounts-wipe-') and name != 'accounts-wipe-sheet-back':
+                    flow = (runtime.ROOT / '.maestro/runtime' / (name + '.yaml')).read_text()
+                    self.assertNotIn('containsChild:', flow)
+                    self.assertIn('id: "profile_keys.wipe_confirm"\n    enabled:', flow)
                 inspect(runtime.ROOT / '.maestro/runtime' / (name + '.yaml'), set())
 
     def test_backup_checks_use_button_state_and_verify_both_cleared_inputs(self):

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.maestro
 
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.Marmot
 import dev.ipf.marmotkit.MarmotOptions
 import dev.ipf.marmotkit.RelayPolicyFfi
@@ -11,16 +12,35 @@ import java.io.File
 /** A genuine nonlocal contact; installed identities are intentionally ineligible for private nicknames. */
 internal class MaestroExternalContact(
     private val remote: Marmot,
-    private val remoteLabel: String,
-    val accountIdHex: String,
+    private val relays: List<String>,
     val owner: String,
-    private val publishedProfile: UserProfileMetadataFfi,
 ) {
+    private var account: AccountSummaryFfi? = null
+    private val publishedProfile =
+        UserProfileMetadataFfi(
+            "Maestro Dave",
+            "Maestro Dave",
+            "Disposable external contact",
+            null,
+            null,
+            null,
+            null,
+        )
+    val accountIdHex: String
+        get() = checkNotNull(account).accountIdHex
     val publicProfiles = mutableMapOf<String, UserProfileMetadataFfi>()
+
+    /** Startup remains suspending, with resource ownership already retained by the host's finally block. */
+    suspend fun prepare() {
+        remote.start()
+        val identity = remote.createIdentity(relays, relays)
+        account = identity
+        remote.publishUserProfile(identity.label, publishedProfile, relays, relays)
+    }
 
     /** Accept the actual native Welcome before the host publishes the generated group message. */
     suspend fun acceptGroup(group: String) {
-        while (runCatching { remote.acceptGroupInvite(remoteLabel, group) }.isFailure) delay(100L)
+        while (runCatching { remote.acceptGroupInvite(checkNotNull(account).label, group) }.isFailure) delay(100L)
     }
 
     /** Retain actual public metadata for every local identity and the external peer before UI handoff. */
@@ -41,13 +61,13 @@ internal class MaestroExternalContact(
     }
 
     /** Close the second native engine before its nested generated storage is removed. */
-    fun close() {
+    suspend fun close() {
         remote.shutdownAndClose()
     }
 }
 
-/** Prepare only the contact scenario, using the same real native API and private loopback relay. */
-internal fun prepareMaestroExternalContact(
+/** Allocate the contact engine before suspending preparation, so failed setup still reaches host cleanup. */
+internal fun createMaestroExternalContact(
     root: File,
     relays: List<String>,
     owner: String,
@@ -60,28 +80,5 @@ internal fun prepareMaestroExternalContact(
             relays,
             MarmotOptions(relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS),
         )
-    try {
-        remote.start()
-        val account = remote.createIdentity(relays, relays)
-        val profile =
-            UserProfileMetadataFfi(
-                "Maestro Dave",
-                "Maestro Dave",
-                "Disposable external contact",
-                null,
-                null,
-                null,
-                null,
-            )
-        remote.publishUserProfile(
-            account.label,
-            profile,
-            relays,
-            relays,
-        )
-        return MaestroExternalContact(remote, account.label, account.accountIdHex, owner, profile)
-    } catch (failure: Throwable) {
-        remote.shutdownAndClose()
-        throw failure
-    }
+    return MaestroExternalContact(remote, relays, owner)
 }

@@ -25,5 +25,9 @@ name: alerts-person-back
 - assertVisible:
     text: Mute notifications from this person
 - back
-- assertVisible: Maestro Bob
 - assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Maestro Bob
+    direction: UP
+- assertVisible: Maestro Bob

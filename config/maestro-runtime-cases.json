@@ -1360,7 +1360,7 @@
       "manual_ids": [
         "TTS-002"
       ],
-      "assertions": "The custom rate dialog dismisses after the keyboard is hidden and Android Back is pressed.",
+      "assertions": "Android Back dismisses the unfocused custom rate dialog and retains the real Read Aloud screen.",
       "postcondition": "none"
     },
     "speech-custom-reopen": {
@@ -1490,7 +1490,7 @@
       "manual_ids": [
         "MSG-001"
       ],
-      "assertions": "The quick-reaction configuration rotation path cancels without reacting to or deleting the original message.",
+      "assertions": "After handled rotation, Android Back collapses the expanded quick-reaction sheet; the next Back dismisses it and preserves the real conversation without reacting.",
       "postcondition": "none"
     },
     "reactions-configure-slot-cancel": {
@@ -1879,6 +1879,16 @@
       ],
       "assertions": "Enter 81 ASCII nickname characters, Save and reopen the normalized 80-character value; native and direct private-store verification require that exact account-scoped boundary with no notes/public-profile changes.",
       "postcondition": "contact-private-boundary",
+      "fixture": "contacts"
+    },
+    "profiles-private-account-isolation": {
+      "suite": "profiles",
+      "manual_ids": [
+        "ACC-007",
+        "NAV-004"
+      ],
+      "assertions": "Save Alice\u2019s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice\u2019s retained private records, every other viewer empty and unchanged public profiles.",
+      "postcondition": "contact-private-saved",
       "fixture": "contacts"
     }
   }

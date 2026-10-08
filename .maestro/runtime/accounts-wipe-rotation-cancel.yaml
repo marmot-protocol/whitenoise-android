@@ -8,15 +8,13 @@ name: accounts-wipe-rotation-cancel
 - inputText: "WIPE"
 - hideKeyboard
 - assertVisible:
-    containsChild:
-      text: "Wipe"
+    id: "profile_keys.wipe_confirm"
     enabled: true
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible: "Wipe this account[?]"
 - setOrientation: PORTRAIT
 - assertVisible:
-    containsChild:
-      text: "Wipe"
+    id: "profile_keys.wipe_confirm"
     enabled: true
 - tapOn: "Cancel"
 - assertNotVisible: "Wipe this account[?]"

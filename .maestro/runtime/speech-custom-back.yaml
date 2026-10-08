@@ -17,7 +17,6 @@ name: speech-custom-back
 - tapOn: Custom
 - assertVisible:
     id: speech.custom_rate
-- hideKeyboard
 - back
 - assertNotVisible:
     id: speech.custom_rate

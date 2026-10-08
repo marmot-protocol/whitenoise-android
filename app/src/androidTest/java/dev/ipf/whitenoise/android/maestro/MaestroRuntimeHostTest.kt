@@ -125,7 +125,8 @@ class MaestroRuntimeHostTest {
                         }
                     val owner = accounts.first()
                     val fixture = InstrumentationRegistry.getArguments().getString("fixtureScenario", "basic")
-                    externalContact = prepareMaestroExternalContact(root, relays, owner.label, fixture)
+                    externalContact = createMaestroExternalContact(root, relays, owner.label, fixture)
+                    externalContact?.prepare()
                     val members = listOf(accounts[1].accountIdHex) + listOfNotNull(externalContact?.accountIdHex)
                     val group = native.createGroup(owner.label, "Maestro group", members, null)
                     while (runCatching { native.acceptGroupInvite(accounts[1].label, group) }.isFailure) delay(100L)

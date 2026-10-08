@@ -5,8 +5,7 @@ name: accounts-wipe-empty-back
 - assertVisible: "Maestro group"
 - runFlow: ../fixtures/open-wipe-confirm.yaml
 - assertVisible:
-    containsChild:
-      text: "Wipe"
+    id: "profile_keys.wipe_confirm"
     enabled: false
 - back
 - assertNotVisible: "Wipe this account[?]"

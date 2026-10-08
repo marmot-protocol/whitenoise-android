@@ -101,6 +101,7 @@ import dev.ipf.whitenoise.android.state.wipeReport
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSecureTextField
 import dev.ipf.whitenoise.android.ui.common.WindowSecureFlag
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.delay
@@ -1047,6 +1048,7 @@ private fun AccountWipeFlow(
                         }
                     },
                     enabled = wipeConfirmed,
+                    modifier = Modifier.testTag("profile_keys.wipe_confirm"),
                 ) {
                     Text(
                         stringResource(R.string.wipe),
@@ -1173,6 +1175,7 @@ internal fun SignOutSheet(
 ) {
     var deleteKeyPackages by remember { mutableStateOf(true) }
     ModalBottomSheet(
+        modifier = Modifier.exposePerformanceTestTags(),
         containerColor = amoledSheetContainerColor(),
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -1205,6 +1208,7 @@ internal fun SignOutSheet(
             Row(
                 Modifier
                     .fillMaxWidth()
+                    .testTag("profile_keys.signout_invitation_keys")
                     .toggleable(
                         value = deleteKeyPackages,
                         role = Role.Switch,
