@@ -50,8 +50,8 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
-import dev.ipf.whitenoise.android.audio.tts.TtsMentionPresentation
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.tts.TtsMentionPresentation
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.messageContainsOnlyNostrEventReferences
 import dev.ipf.whitenoise.android.core.nostrEventReferences

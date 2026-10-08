@@ -976,12 +976,14 @@ class TtsController internal constructor(
         sourceText: String?,
     ): TtsSpeakableEntry? {
         val current = state.value
-        if (current.sessionId != sessionId || current.passage?.messageIdHex != messageIdHex ||
+        if (current.sessionId != sessionId ||
+            current.passage?.messageIdHex != messageIdHex ||
             current.passage?.projectionId != projectionId
         ) {
             return null
         }
-        return queue.queuedMessagesSnapshot()
+        return queue
+            .queuedMessagesSnapshot()
             .firstOrNull { it.messageIdHex == messageIdHex && it.projectionId == projectionId }
             ?.presentationEntry
             ?.takeIf { sourceText != null && it.sourceText == sourceText }

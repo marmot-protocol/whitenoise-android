@@ -785,12 +785,13 @@ internal fun MessageBubble(
     }
     val queuedTtsPresentation =
         ttsFollowTarget?.let { target ->
-            appState.ttsController.presentationEntryFor(
-                target.sessionId,
-                record.messageIdHex,
-                target.projectionId,
-                ttsSpeakableSource?.text,
-            )?.takeIf { effectiveTtsCandidate }
+            appState.ttsController
+                .presentationEntryFor(
+                    target.sessionId,
+                    record.messageIdHex,
+                    target.projectionId,
+                    ttsSpeakableSource?.text,
+                )?.takeIf { effectiveTtsCandidate }
         }
     val speakableProjection =
         remember(

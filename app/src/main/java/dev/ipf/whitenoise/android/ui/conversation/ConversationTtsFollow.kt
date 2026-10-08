@@ -118,8 +118,11 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
     /** Window coordinates belong to the rendered row, independently of overlay occlusion. */
     override fun report(report: ConversationTtsSentenceLayoutReport) {
         if (activeRows[report.target.messageIdHex] !== report.rowInstance) return
-        reports[ReportKey(report.target, report.rowInstance, report.renderedLeafId)] =
-            report
+        val key = ReportKey(report.target, report.rowInstance, report.renderedLeafId)
+        // Reading exposure observes the registry. Identical placement callbacks must not
+        // invalidate that observer and schedule another composition/layout indefinitely.
+        if (reports[key] == report) return
+        reports[key] = report
         revision++
     }
 
@@ -167,13 +170,26 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
     }
 }
 
-internal fun ttsSentenceNeedsReveal(sentence: Rect?, viewport: Rect?): Boolean =
-    sentence == null || viewport == null || viewport.height <= 0f ||
-        sentence.height <= 0f || sentence.top < viewport.top || sentence.bottom > viewport.bottom
+internal fun ttsSentenceNeedsReveal(
+    sentence: Rect?,
+    viewport: Rect?,
+): Boolean =
+    sentence == null ||
+        viewport == null ||
+        viewport.height <= 0f ||
+        sentence.height <= 0f ||
+        sentence.top < viewport.top ||
+        sentence.bottom > viewport.bottom
 
 /** Oversized sentences can expose their beginning, but cannot fit entirely in one viewport. */
-internal fun ttsSentenceWasRevealed(sentence: Rect?, viewport: Rect?): Boolean =
-    sentence != null && viewport != null && viewport.height > 0f && sentence.height > 0f &&
+internal fun ttsSentenceWasRevealed(
+    sentence: Rect?,
+    viewport: Rect?,
+): Boolean =
+    sentence != null &&
+        viewport != null &&
+        viewport.height > 0f &&
+        sentence.height > 0f &&
         sentence.top >= viewport.top - 1f &&
         (
             if (sentence.height > viewport.height) {
@@ -652,7 +668,9 @@ internal suspend fun followTtsTargetInViewport(
         }
     if (commandCompleted && completed) withFrameNanos { }
     val succeeded =
-        commandCompleted && completed && isCurrentTarget() &&
+        commandCompleted &&
+            completed &&
+            isCurrentTarget() &&
             ttsSentenceWasRevealed(
                 sentenceLayouts.completeSentenceBounds(target),
                 sentenceLayouts.viewportBoundsInWindow,
