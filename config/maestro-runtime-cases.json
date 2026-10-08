@@ -1514,7 +1514,7 @@
       "manual_ids": [
         "NTF-033"
       ],
-      "assertions": "Bob\u2019s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
+      "assertions": "Bob’s vibration chooser lists System default and dismisses back to his notification options without selecting a pattern.",
       "postcondition": "none"
     },
     "alerts-chat-sounds-back": {
@@ -1628,7 +1628,7 @@
       "manual_ids": [
         "MSG-005"
       ],
-      "assertions": "Filtering to the owner\u2019s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
+      "assertions": "Filtering to the owner’s thumbs-up excludes Bob, and All restores both native reactors without removing reactions.",
       "postcondition": "reactions-retained",
       "fixture": "reactions"
     },
@@ -1680,7 +1680,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Delete for me hides only the owner\u2019s original across conversation reopen; both native originals and the peer\u2019s presentation remain unchanged.",
+      "assertions": "Delete for me hides only the owner’s original across conversation reopen; both native originals and the peer’s presentation remain unchanged.",
       "postcondition": "message-delete-local"
     },
     "actions-delete-everyone": {
@@ -1704,7 +1704,7 @@
       "manual_ids": [
         "SET-008"
       ],
-      "assertions": "\u7e41\u9ad4\u4e2d\u6587 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
+      "assertions": "繁體中文 changes real language and Appearance titles, route re-entry retains the locale; English then System restore the generated chat title. Native state and Android application locale must both follow System. App relaunch and complete resource coverage remain separate.",
       "postcondition": "language-system"
     },
     "advanced-relay-empty": {
@@ -1860,7 +1860,7 @@
       "manual_ids": [
         "ACC-007"
       ],
-      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice\u2019s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
+      "assertions": "Save and reopen genuine external-contact nickname/notes; only Alice’s scoped Android records change while all four public native profiles and other viewers remain unchanged.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -1888,7 +1888,7 @@
         "ACC-007",
         "NAV-004"
       ],
-      "assertions": "Save Alice\u2019s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice\u2019s retained private records, every other viewer empty and unchanged public profiles.",
+      "assertions": "Save Alice’s genuine external-contact details, switch to Bob and inspect public fallback/empty private fields, then restore Alice. Native checks require Alice’s retained private records, every other viewer empty and unchanged public profiles.",
       "postcondition": "contact-private-saved",
       "fixture": "contacts"
     },
@@ -2147,7 +2147,7 @@
       "manual_ids": [
         "TTS-002"
       ],
-      "assertions": "Apply custom rate then replace with 0\\.5\u00d7; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
+      "assertions": "Apply custom rate then replace with 0\\.5×; screen re-entry retains the new choice. Independent production preference reload verifies the preset override. Audio and process-death proof remain separate.",
       "postcondition": "speech-rate-preset"
     },
     "speech-invalid-keeps-saved-rate": {
@@ -2546,7 +2546,7 @@
         "SYS-004",
         "SYS-005"
       ],
-      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; explicit partial acknowledgment/target staging preserves the exact Unicode/whitespace owner draft; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
+      "assertions": "Real ACTION_SEND/importer and encrypted pending entry are checked before handoff; explicit text-target staging preserves the exact Unicode/whitespace owner draft; native proof requires cleared encrypted ownership, unchanged other drafts/accounts and retained histories with no extra send.",
       "fixture": "share-text",
       "postcondition": "share-request-staged"
     },
@@ -2918,7 +2918,7 @@
       ],
       "fixture": "share-external-log",
       "postcondition": "share-request-staged",
-      "assertions": "Actual external provider log MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+      "assertions": "Actual external provider log MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
     },
     "inbound-share-document-calendar-stage": {
       "suite": "inbound-share",
@@ -2928,7 +2928,7 @@
       ],
       "fixture": "share-external-calendar",
       "postcondition": "share-request-staged",
-      "assertions": "Actual external provider calendar MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+      "assertions": "Actual external provider calendar MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
     },
     "inbound-share-document-font-stage": {
       "suite": "inbound-share",
@@ -2938,7 +2938,7 @@
       ],
       "fixture": "share-external-font",
       "postcondition": "share-request-staged",
-      "assertions": "Actual external provider font MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+      "assertions": "Actual external provider font MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
     },
     "inbound-share-document-model-stage": {
       "suite": "inbound-share",
@@ -2948,7 +2948,7 @@
       ],
       "fixture": "share-external-model",
       "postcondition": "share-request-staged",
-      "assertions": "Actual external provider model MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+      "assertions": "Actual external provider model MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
     },
     "inbound-share-document-unknown-stage": {
       "suite": "inbound-share",
@@ -2958,7 +2958,7 @@
       ],
       "fixture": "share-external-unknown",
       "postcondition": "share-request-staged",
-      "assertions": "Actual external provider unknown MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+      "assertions": "Actual external provider unknown MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. UI checks the single staged attachment card and absence of a second card; native proof qualifies the exact copied file and account-owned shelf, not file-format rendering. No send, upload, account change or cross-account shelf is permitted."
     },
     "inbound-share-document-mixed-types-stage": {
       "suite": "inbound-share",
@@ -3064,7 +3064,7 @@
         "ACC-014",
         "ACC-015"
       ],
-      "assertions": "Type a disposable Alice draft, complete real wipe, then select Bob and require a clean Bob composer. Native proof distinguishes Alice removal from retained signed-out identity; complete surviving profiles and retained original member histories and untouched peer drafts; only MDK-authenticated new MLS system rows are allowed are compared. Sign-out must retain the exact MDK owner draft; no public-relay or forensic byte-erasure claim.",
+      "assertions": "Type a disposable Alice draft, complete real wipe, then select Bob and require a clean Bob composer. Native proof requires Alice removal, unchanged surviving profiles, retained original member histories and untouched peer drafts; only MDK-authenticated new MLS system rows are allowed. The wiped owner draft is not retained or queried; no public-relay or forensic byte-erasure claim.",
       "postcondition": "account-action-wiped"
     }
   }

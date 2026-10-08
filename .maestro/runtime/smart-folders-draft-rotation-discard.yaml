@@ -45,24 +45,13 @@ name: smart-folders-draft-rotation-discard
 - takeScreenshot: smart-folder-condition-before-rotation
 - setOrientation: LANDSCAPE_LEFT
 - takeScreenshot: smart-folder-condition-after-rotation
-- runFlow:
-    when:
-      visible:
-        id: folder.conditionDone
-    commands:
-      - assertVisible:
-          id: folder.conditionDone
-          enabled: true
-      - assertVisible:
-          id: folder.mode
-      - tapOn: Cancel
-- assertNotVisible:
-    id: folder.mode
-- assertNotVisible:
-    id: folder.conditionDone
+- runFlow: ../fixtures/dismiss-restored-folder-condition.yaml
 - assertVisible:
     id: chat-folder-edit-content
 - setOrientation: PORTRAIT
+- runFlow: ../fixtures/dismiss-restored-folder-condition.yaml
+- assertVisible:
+    id: chat-folder-edit-content
 - scrollUntilVisible:
     element:
       id: folder.add.

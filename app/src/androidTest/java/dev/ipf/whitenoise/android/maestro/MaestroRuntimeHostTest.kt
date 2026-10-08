@@ -200,7 +200,7 @@ class MaestroRuntimeHostTest {
                     val postcondition = InstrumentationRegistry.getArguments().getString("postcondition", "none")
                     editorBaselines = captureMaestroEditorBaselines(native, app, postcondition)
                     accountActionBaseline = captureMaestroAccountAction(native, app, group, postcondition)
-                    if (postcondition.startsWith("message-") || postcondition == "accounts-retained") {
+                    if (postcondition.startsWith("message-") || requiresMaestroAccountRetentionProof(postcondition)) {
                         expectedAccountIds = accounts.map { it.accountIdHex }.toSet()
                         val original = checkNotNull(nativeRow.row.lastMessage)
                         check(original.plaintext == "Generated fixture message")
