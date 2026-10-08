@@ -41,26 +41,46 @@ internal fun attachmentTransferSummaryNotification(
         .setTimeoutAfter(SUMMARY_TIMEOUT_MILLIS)
         .build()
 
-/** Keeps one count summary in step with the number of live transfer cards. */
+/** The system notification service, resolved on use so that resolving it can fail inside the best-effort write. */
+private fun Context.notifications(): NotificationManager = getSystemService(NotificationManager::class.java)
+
+/**
+ * Runs a best-effort write to the notification service. Failures, including a binder error rethrown from the
+ * system server, must never reach a transfer, so only the exception type is logged.
+ */
+@Suppress("TooGenericExceptionCaught") // Any runtime failure of a notification write is non-fatal for a download.
+private fun bestEffort(write: () -> Unit) {
+    try {
+        write()
+    } catch (failure: RuntimeException) {
+        Log.w(TAG, "attachment_transfer_summary_failed type=${failure.javaClass.simpleName}")
+    }
+}
+
+/** Keeps one count summary in step with the number of live transfer cards, without ever failing a transfer. */
 internal class AttachmentTransferSummaryNotifier(
-    context: Context,
+    private val post: (Int) -> Unit,
+    private val cancel: () -> Unit,
 ) : (Int) -> Unit {
-    private val appContext = context.applicationContext
-    private val manager = appContext.getSystemService(NotificationManager::class.java)
+    /** The production notifier, which posts and cancels through the system notification service. */
+    constructor(context: Context) : this(
+        post = { count ->
+            context.applicationContext.notifications().notify(
+                SUMMARY_NOTIFICATION_ID,
+                attachmentTransferSummaryNotification(context.applicationContext, count),
+            )
+        },
+        cancel = { context.applicationContext.notifications().cancel(SUMMARY_NOTIFICATION_ID) },
+    )
 
     /** Posts or refreshes the summary from [count] live cards, or removes it when fewer than two remain. */
-    override fun invoke(count: Int) {
-        if (count < SUMMARY_MIN_COUNT) {
-            manager.cancel(SUMMARY_NOTIFICATION_ID)
-        } else {
-            manager.notify(SUMMARY_NOTIFICATION_ID, attachmentTransferSummaryNotification(appContext, count))
+    override fun invoke(count: Int) =
+        bestEffort {
+            if (count < SUMMARY_MIN_COUNT) cancel() else post(count)
         }
-    }
 
     /** Removes a summary left by a process that ended while transfers were live, as none is live in this one. */
-    fun clearStale() {
-        manager.cancel(SUMMARY_NOTIFICATION_ID)
-    }
+    fun clearStale() = bestEffort(cancel)
 }
 
 /** The process-wide ledger of live transfers, wired to the count summary and the diagnostics log. */
