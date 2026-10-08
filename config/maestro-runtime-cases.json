@@ -2909,6 +2909,66 @@
       "fixture": "share-external-empty-caption",
       "postcondition": "share-request-staged",
       "assertions": "Real external test-APK sender/provider and Android URI grants exercise document empty caption stage. Native proof requires exact private-copy bytes/name/MIME/order or complete deletion, only-owner shelf, cleared encrypted request, retained account identities/histories and no send."
+    },
+    "inbound-share-document-log-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-log",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider log MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-calendar-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-calendar",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider calendar MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-font-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-font",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider font MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-model-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-model",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider model MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-unknown-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-unknown",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider unknown MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
+    },
+    "inbound-share-document-mixed-types-stage": {
+      "suite": "inbound-share",
+      "manual_ids": [
+        "SYS-004",
+        "SYS-005"
+      ],
+      "fixture": "share-external-mixed-types",
+      "postcondition": "share-request-staged",
+      "assertions": "Actual external provider mixed-types MIME metadata is preserved through production private copying and staging; exact original three bytes/name/MIME and ordered account-owned shelf are verified for every input. Mixed-batch UI checks its seven-attachment preview and first visible card; native proof qualifies the complete ordered shelf, not offscreen-card visibility or file-format rendering. No send, upload, account change or cross-account shelf is permitted."
     }
   }
 }

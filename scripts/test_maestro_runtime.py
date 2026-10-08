@@ -409,6 +409,36 @@ class CampaignSummaryTest(unittest.TestCase):
 
 
 class RuntimeEvidenceTest(unittest.TestCase):
+    def test_every_configured_case_is_admitted_by_the_actual_native_host(self):
+        """Prefix-based Python reconciliation cannot certify a condition the Kotlin host refuses."""
+        host = (runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro/'
+                'MaestroRuntimeHostTest.kt').read_text()
+        match = re.search(r'MAESTRO_POSTCONDITIONS\s*=\s*setOf\((.*?)\n    \)', host, re.S)
+        self.assertIsNotNone(match)
+        allowed = set(re.findall(r'"([^"]+)"', match.group(1)))
+        configured = {case['postcondition'] for case in runtime.CASES.values()}
+        self.assertFalse(configured - allowed, configured - allowed)
+        seeds = (runtime.ROOT / 'app/src/androidTest/java/dev/ipf/whitenoise/android/maestro/'
+                 'MaestroFixtureSeeds.kt').read_text()
+        match = re.search(r'require\(\s*fixture in\s*listOf\((.*?)\),', seeds, re.S)
+        self.assertIsNotNone(match)
+        allowed = set(re.findall(r'"([^"]+)"', match.group(1)))
+        configured = {case.get('fixture', 'basic') for case in runtime.CASES.values()}
+        self.assertFalse(configured - allowed, configured - allowed)
+
+    def test_canonical_runtime_recipe_matches_the_selected_inventory(self):
+        """An expanding suite must not leave operators reconciling an obsolete case/partition count."""
+        guide = (runtime.ROOT / 'docs/automated-testing.md').read_text()
+        cases = re.search(r'`runtime-all` \((\d+)\)', guide)
+        partitions = re.search(r'executes all (\d+) partitions', guide)
+        journeys = re.search(r'written UI inventory is (\d+) journeys', guide)
+        self.assertIsNotNone(cases)
+        self.assertIsNotNone(partitions)
+        self.assertIsNotNone(journeys)
+        self.assertEqual(int(cases.group(1)), len(runtime.CASES))
+        self.assertEqual(int(partitions.group(1)), len(matrix_selection('runtime-all')))
+        self.assertEqual(int(journeys.group(1)), inventory()['case_count'])
+
     def test_long_input_timeout_fits_existing_fixture_and_cleanup_reserves(self):
         """A measured typing overrun cannot silently enlarge the host lifetime or shard allowance."""
         self.assertEqual(set(runtime.UI_TIMEOUTS), {'polls-question-boundary'})

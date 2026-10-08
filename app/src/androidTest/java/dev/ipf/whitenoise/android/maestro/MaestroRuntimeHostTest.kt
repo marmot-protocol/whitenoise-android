@@ -85,6 +85,7 @@ private val MAESTRO_POSTCONDITIONS =
         "relay-lists-unchanged",
         "share-request-cancelled",
         "share-request-staged",
+        "share-request-files-removed",
     )
 
 /** Real MDK state and production Compose screens; never installed-account or public-relay data. */

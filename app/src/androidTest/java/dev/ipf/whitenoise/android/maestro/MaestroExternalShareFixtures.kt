@@ -32,6 +32,21 @@ internal fun maestroExternalShareNames(fixture: String): List<String> =
     when (fixture) {
         "share-external-multiple" -> listOf("maestro-document.md", "maestro-table.csv")
         "share-external-duplicate" -> listOf("maestro-document.md", "maestro-document.md")
+        "share-external-log" -> listOf("maestro-log.log")
+        "share-external-calendar" -> listOf("maestro-calendar.ics")
+        "share-external-font" -> listOf("maestro-font.ttf")
+        "share-external-model" -> listOf("maestro-model.gltf")
+        "share-external-unknown" -> listOf("maestro-unknown.fixture")
+        "share-external-mixed-types" ->
+            listOf(
+                "maestro-document.md",
+                "maestro-table.csv",
+                "maestro-log.log",
+                "maestro-calendar.ics",
+                "maestro-font.ttf",
+                "maestro-model.gltf",
+                "maestro-unknown.fixture",
+            )
         "share-external-document", "share-external-caption", "share-external-expired-grant",
         "share-external-denied", "share-external-denied-caption", "share-external-empty",
         "share-external-empty-caption",

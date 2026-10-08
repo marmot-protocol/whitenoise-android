@@ -75,6 +75,10 @@ public final class ExternalShareDispatchActivity extends Activity {
             shareIntent.setClipData(clipData);
             if (grantRead) {
                 shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } else {
+                for (Uri uri : streamUris) {
+                    revokeUriPermission(targetPackage, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                }
             }
         }
         startActivity(shareIntent);
