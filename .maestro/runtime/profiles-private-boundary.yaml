@@ -8,10 +8,22 @@ name: profiles-private-boundary
     direction: DOWN
 - tapOn:
     id: person_profile.nickname
+- assertVisible:
+    id: person_profile.nickname
+    focused: true
 - inputText: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+- assertVisible:
+    id: person_profile.nickname
+    text: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+- hideKeyboard
 - assertVisible: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
 - hideKeyboard
-- tapOn: Save
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_save
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_save
 - assertVisible: User Profile
 - scrollUntilVisible:
     element:
@@ -24,4 +36,9 @@ name: profiles-private-boundary
     direction: DOWN
 - assertVisible: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
 - assertNotVisible: MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
-- tapOn: Cancel
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_cancel
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_cancel

@@ -16,9 +16,9 @@ name: profiles-private-account-isolation
 - runFlow: ../fixtures/open-external-private-details.yaml
 - scrollUntilVisible:
     element:
-      text: Name from profile.*Maestro Dave
+      text: Name \(from profile\).*Maestro Dave
     direction: UP
-- assertVisible: Name from profile.*Maestro Dave
+- assertVisible: Name \(from profile\).*Maestro Dave
 - scrollUntilVisible:
     element:
       id: person_profile.nickname
@@ -31,7 +31,12 @@ name: profiles-private-account-isolation
     direction: DOWN
 - assertVisible: Notes
 - assertNotVisible: Maestro private note
-- tapOn: Cancel
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_cancel
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_cancel
 - back
 - assertVisible:
     id: chat_info.list

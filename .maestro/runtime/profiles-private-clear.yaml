@@ -8,16 +8,34 @@ name: profiles-private-clear
     direction: DOWN
 - tapOn:
     id: person_profile.nickname
+- assertVisible:
+    id: person_profile.nickname
+    focused: true
 - inputText: Maestro private Dave
+- assertVisible:
+    id: person_profile.nickname
+    text: Maestro private Dave
+- hideKeyboard
 - scrollUntilVisible:
     element:
       id: person_profile.notes
     direction: DOWN
 - tapOn:
     id: person_profile.notes
+- assertVisible:
+    id: person_profile.notes
+    focused: true
 - inputText: Maestro private note
+- assertVisible:
+    id: person_profile.notes
+    text: Maestro private note
 - hideKeyboard
-- tapOn: Save
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_save
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_save
 - assertVisible: User Profile
 - scrollUntilVisible:
     element:
@@ -26,30 +44,52 @@ name: profiles-private-clear
 - tapOn: Nickname & notes
 - scrollUntilVisible:
     element:
-      text: Maestro private Dave
+      id: person_profile.nickname
     direction: DOWN
-- assertVisible: Maestro private Dave
+- assertVisible:
+    id: person_profile.nickname
+    text: Maestro private Dave
 - scrollUntilVisible:
     element:
-      text: Maestro private note
+      id: person_profile.notes
     direction: DOWN
-- assertVisible: Maestro private note
+- assertVisible:
+    id: person_profile.notes
+    text: Maestro private note
 - scrollUntilVisible:
     element:
       id: person_profile.nickname
     direction: UP
 - tapOn:
     id: person_profile.nickname
+- assertVisible:
+    id: person_profile.nickname
+    focused: true
 - eraseText
+- assertNotVisible:
+    id: person_profile.nickname
+    text: ".+"
+- hideKeyboard
 - scrollUntilVisible:
     element:
       id: person_profile.notes
     direction: DOWN
 - tapOn:
     id: person_profile.notes
+- assertVisible:
+    id: person_profile.notes
+    focused: true
 - eraseText
+- assertNotVisible:
+    id: person_profile.notes
+    text: ".+"
 - hideKeyboard
-- tapOn: Save
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_save
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_save
 - assertVisible: User Profile
 - scrollUntilVisible:
     element:
@@ -58,13 +98,18 @@ name: profiles-private-clear
 - tapOn: Nickname & notes
 - scrollUntilVisible:
     element:
-      text: Name from profile.*Maestro Dave
+      text: Name \(from profile\).*Maestro Dave
     direction: UP
-- assertVisible: Name from profile.*Maestro Dave
+- assertVisible: Name \(from profile\).*Maestro Dave
 - assertNotVisible: Maestro private Dave
 - scrollUntilVisible:
     element:
       id: person_profile.notes
     direction: DOWN
 - assertNotVisible: Maestro private note
-- tapOn: Cancel
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_cancel
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_cancel

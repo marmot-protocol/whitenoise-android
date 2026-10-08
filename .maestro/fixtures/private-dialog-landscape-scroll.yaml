@@ -7,13 +7,13 @@ appId: dev.ipf.whitenoise.android.maestrolab
     commands:
       - runFlow:
           when:
-            notVisible: Name from profile.*
+            notVisible: Name \(from profile\).*
           commands:
             - swipe:
                 start: 50%, 40%
                 end: 50%, 60%
                 duration: 300
-- assertVisible: Name from profile.*
+- assertVisible: Name \(from profile\).*
 - repeat:
     times: 12
     commands:

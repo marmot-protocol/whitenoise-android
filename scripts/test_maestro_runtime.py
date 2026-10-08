@@ -648,6 +648,60 @@ class RuntimeEvidenceTest(unittest.TestCase):
                         self.assertIn('- assertVisible:\n    id: "profile_keys.' + field + '"', flow)
                         self.assertIn('- assertNotVisible:\n    id: "profile_keys.' + field + '"\n    text: ".+"', flow)
 
+    def test_private_contact_editing_proves_recipient_focus_and_dismisses_each_ime(self):
+        """Reject the captured notes-in-nickname failure and keyboard suggestion Save match."""
+        paths = [runtime.ROOT / '.maestro/fixtures/save-external-private-details.yaml']
+        paths += [runtime.ROOT / f'.maestro/runtime/profiles-private-{name}.yaml'
+                  for name in ('cancel', 'clear', 'boundary', 'rotation', 'account-isolation')]
+        edits = 0
+        for path in paths:
+            _, commands = list(yaml.safe_load_all(path.read_text()))
+            for index, command in enumerate(commands):
+                if not isinstance(command, dict) and command != 'eraseText':
+                    continue
+                tap = command.get('tapOn') if isinstance(command, dict) else None
+                self.assertNotIn(tap if isinstance(tap, str) else None, ('Save', 'Cancel'), path.name)
+                if (not isinstance(command, dict) or 'inputText' not in command) and command != 'eraseText':
+                    continue
+                edits += 1
+                focus = commands[index - 1].get('assertVisible', {})
+                tag = focus.get('id')
+                with self.subTest(flow=path.name, field=tag):
+                    self.assertIn(tag, ('person_profile.nickname', 'person_profile.notes'))
+                    self.assertIs(focus.get('focused'), True)
+                    self.assertEqual(commands[index - 2], {'tapOn': {'id': tag}})
+                    if 'inputText' in command:
+                        self.assertEqual(commands[index + 1], {'assertVisible': {'id': tag, 'text': command['inputText']}})
+                    else:
+                        self.assertEqual(commands[index + 1], {'assertNotVisible': {'id': tag, 'text': '.+'}})
+                    self.assertEqual(commands[index + 2], 'hideKeyboard')
+        self.assertEqual(edits, 11)
+
+    def test_private_contact_public_name_anchor_matches_captured_parenthetical_label(self):
+        """The actual profile-name label includes parentheses; a literal-free regex cannot find it."""
+        paths = [runtime.ROOT / '.maestro/fixtures/private-dialog-landscape-scroll.yaml']
+        paths += [runtime.ROOT / f'.maestro/runtime/profiles-private-{name}.yaml'
+                  for name in ('clear', 'account-isolation')]
+        for path in paths:
+            _, commands = list(yaml.safe_load_all(path.read_text()))
+            def anchors(items):
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    for value in item.values():
+                        if isinstance(value, str) and value.startswith('Name '):
+                            yield value
+                        elif isinstance(value, dict):
+                            yield from anchors([value])
+                        elif isinstance(value, list):
+                            yield from anchors(value)
+            found = list(anchors(commands))
+            self.assertTrue(found, path.name)
+            for pattern in found:
+                with self.subTest(flow=path.name, pattern=pattern):
+                    self.assertIsNotNone(re.fullmatch(pattern, 'Name (from profile): Maestro Dave'))
+                    self.assertIsNone(re.fullmatch(pattern, 'Notes'))
+
     def test_optional_pair_cache_cannot_restore_other_jobs_or_bypass_build_validation(self):
         """Guard the observed foreign release-cache stall without loosening the actual producer gates."""
         workflow = yaml.safe_load((runtime.ROOT / '.github/workflows/android-instrumented.yml').read_text())
