@@ -7,6 +7,10 @@ name: notifications-deny-settings
     id: "com.android.permissioncontroller:id/permission_deny_button"
 - assertVisible: "Maestro group"
 - runFlow: ../fixtures/open-settings.yaml
+- scrollUntilVisible:
+    element:
+      text: "Notifications"
+    direction: DOWN
 - tapOn: "Notifications"
 - assertVisible: "Notifications"
 - back

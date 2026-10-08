@@ -488,6 +488,24 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 with self.subTest(key=key), self.assertRaises(ValueError):
                     pair(directory, 'verify', {**retry, key: value})
 
+    def test_backup_checks_use_button_state_and_verify_both_cleared_inputs(self):
+        """Reject the captured false label-state proof and unintended Back on an unfocused dialog."""
+        for name, case in runtime.CASES.items():
+            if case['suite'] != 'keys':
+                continue
+            flow = (runtime.ROOT / '.maestro/runtime' / (name + '.yaml')).read_text()
+            with self.subTest(case=name):
+                self.assertNotIn('- assertVisible: "Encrypted Private Key"\n- hideKeyboard', flow)
+                self.assertNotRegex(flow, r'(?m)^    text: "(?:View backup|Export)"\n    enabled:')
+                for label in ('View backup', 'Export'):
+                    self.assertIn('containsChild:\n      text: "' + label + '"\n    enabled:', flow)
+                self.assertNotIn('- tapOn: "View backup"', flow)
+                self.assertNotIn('- tapOn: "Export"', flow)
+                if name in ('keys-empty', 'keys-cancel-clears', 'keys-back-clears', 'keys-rotation-cancel'):
+                    for field in ('export_password', 'export_confirmation'):
+                        self.assertIn('- assertVisible:\n    id: "profile_keys.' + field + '"', flow)
+                        self.assertIn('- assertNotVisible:\n    id: "profile_keys.' + field + '"\n    text: ".+"', flow)
+
     def test_every_main_and_settings_route_has_named_cases(self):
         """Reject silent coverage drift in top-level and nested navigation destinations."""
         path = runtime.ROOT / 'config/maestro-screen-coverage.json'

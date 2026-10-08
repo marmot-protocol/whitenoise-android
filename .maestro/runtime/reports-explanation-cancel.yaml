@@ -10,14 +10,15 @@ name: reports-explanation-cancel
 - tapOn: Report
 - assertVisible: Report this message
 - assertVisible:
-    text: Send report
+    containsChild:
+      text: "Send report"
     enabled: true
 - scrollUntilVisible:
     element:
-      id: message.report.explanation
+      text: "Anything the admins should know [(]optional[)]"
     direction: DOWN
 - tapOn:
-    id: message.report.explanation
+    text: "Anything the admins should know [(]optional[)]"
 - inputText: Maestro disposable explanation
 - assertVisible: Maestro disposable explanation
 - hideKeyboard

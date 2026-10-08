@@ -11,7 +11,8 @@ name: reports-back
 - assertVisible: Report this message
 - assertVisible: "Your report goes to this group's admins, encrypted like any other message[.] They will see who reported it[.]"
 - assertVisible:
-    text: Send report
+    containsChild:
+      text: "Send report"
     enabled: true
 - back
 - assertNotVisible: Report this message

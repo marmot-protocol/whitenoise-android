@@ -15,10 +15,12 @@ name: keys-minimum-boundary
 - inputText: "123456789012"
 - hideKeyboard
 - assertVisible:
-    text: "View backup"
+    containsChild:
+      text: "View backup"
     enabled: true
 - assertVisible:
-    text: "Export"
+    containsChild:
+      text: "Export"
     enabled: true
 - tapOn: "Cancel"
 - assertVisible: "Private key hidden"

@@ -29,6 +29,6 @@ internal suspend fun prepareMaestroDepartedGroup(
 }
 
 /** The caller's existing fixture deadline bounds every native convergence wait. */
-private suspend fun awaitMaestroGroupCondition(matches: () -> Boolean) {
+private suspend fun awaitMaestroGroupCondition(matches: suspend () -> Boolean) {
     while (!matches()) delay(100L)
 }

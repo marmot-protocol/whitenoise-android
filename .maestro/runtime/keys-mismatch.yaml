@@ -15,10 +15,12 @@ name: keys-mismatch
 - inputText: "Maestro-test2!"
 - hideKeyboard
 - assertVisible:
-    text: "View backup"
+    containsChild:
+      text: "View backup"
     enabled: false
 - assertVisible:
-    text: "Export"
+    containsChild:
+      text: "Export"
     enabled: false
 - assertVisible: "Passwords don’t match.*"
 - tapOn: "Cancel"

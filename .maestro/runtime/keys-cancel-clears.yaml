@@ -15,22 +15,35 @@ name: keys-cancel-clears
 - inputText: "Maestro-test1!"
 - hideKeyboard
 - assertVisible:
-    text: "View backup"
+    containsChild:
+      text: "View backup"
     enabled: true
 - assertVisible:
-    text: "Export"
+    containsChild:
+      text: "Export"
     enabled: true
 - tapOn: "Cancel"
 - assertVisible: "Private key hidden"
 - assertNotVisible: "Encrypted Private Key"
 - tapOn: "Export Encrypted Private Key"
 - assertVisible: "Encrypted Private Key"
-- hideKeyboard
 - assertVisible:
-    text: "View backup"
+    id: "profile_keys.export_password"
+- assertNotVisible:
+    id: "profile_keys.export_password"
+    text: ".+"
+- assertVisible:
+    id: "profile_keys.export_confirmation"
+- assertNotVisible:
+    id: "profile_keys.export_confirmation"
+    text: ".+"
+- assertVisible:
+    containsChild:
+      text: "View backup"
     enabled: false
 - assertVisible:
-    text: "Export"
+    containsChild:
+      text: "Export"
     enabled: false
 - tapOn: "Cancel"
 - assertVisible: "Private key hidden"
