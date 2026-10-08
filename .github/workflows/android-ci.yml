@@ -162,7 +162,7 @@ jobs:
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Android CI aggregate gate
-        run: python3 -m unittest scripts/test_android_ci_gate.py
+        run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_verify_compose_release_apk.py
 
       - name: Check committed screenshot golden owners
         run: |

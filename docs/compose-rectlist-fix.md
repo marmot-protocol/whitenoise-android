@@ -49,7 +49,13 @@ dependency verification mechanism.
   scenario for minified candidates on both distributions, including Android 17.
 
 The old backport identity assertion, its original-1.12.1 negative control and
-APK marker checks are removed because the runtime now comes from Google Maven.
+workflow calls to the APK marker checker are removed because the runtime now
+comes from Google Maven. The legacy `scripts/verify_compose_backport_apk.py` path
+temporarily remains for the trusted preview workflow dispatched from `master`,
+which checks out this PR before invoking that path. Its replacement implementation
+requires unique official UI `1.13.0-beta01` version metadata and rejects the old
+custom marker. Remove this compatibility entry point and its Python tests in a
+follow-up after the updated preview workflow lands on `master`.
 The original positive/negative-control evidence is preserved in PR #3136.
 The shared fixture retains its AndroidX copyright/modification notice and
 [Apache license](../third_party/androidx-test-fixtures/LICENSE.txt).
