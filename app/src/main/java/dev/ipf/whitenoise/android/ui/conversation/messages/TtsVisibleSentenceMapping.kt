@@ -189,6 +189,7 @@ internal fun textOffsetAtWindowPosition(
 internal fun renderedTextHitAtWindowPosition(
     layouts: Collection<SelectableTextLayout>,
     pressInWindow: Offset?,
+    requireTextLineHit: Boolean = false,
 ): RenderedTextHit? {
     if (pressInWindow == null) return null
     val targets =
@@ -196,7 +197,8 @@ internal fun renderedTextHitAtWindowPosition(
             layout.coordinates.isAttached &&
                 layout.layoutResult.layoutInput.text
                     .isNotBlank() &&
-                layout.coordinates.boundsInWindow().contains(pressInWindow)
+                layout.coordinates.boundsInWindow().contains(pressInWindow) &&
+                (!requireTextLineHit || isInsideRenderedTextLine(layout, pressInWindow))
         }
     val target = targets.singleOrNull() ?: return null
     val leafId = target.key as? String ?: return null
@@ -220,6 +222,20 @@ internal fun renderedTextHitAtWindowPosition(
             ),
         )
     return RenderedTextHit(leafId, renderedText, renderedOffset)
+}
+
+/** A layout rectangle can contain empty trailing line space or padding; those are edge actions. */
+private fun isInsideRenderedTextLine(
+    layout: SelectableTextLayout,
+    pointInWindow: Offset,
+): Boolean {
+    val point = layout.coordinates.windowToLocal(pointInWindow)
+    val result = layout.layoutResult
+    val line = result.getLineForVerticalPosition(point.y)
+    return point.y >= result.getLineTop(line) &&
+        point.y < result.getLineBottom(line) &&
+        point.x >= result.getLineLeft(line) &&
+        point.x <= result.getLineRight(line)
 }
 
 private fun visibleLayoutSentence(text: String): String {

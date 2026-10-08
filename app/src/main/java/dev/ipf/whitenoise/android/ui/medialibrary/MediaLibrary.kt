@@ -16,13 +16,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -81,6 +80,9 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
+import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageGridTile
@@ -585,7 +587,7 @@ private fun MediaTileGrid(
         EmptyPlaceholder(emptyLabel)
         return
     }
-    LazyVerticalGrid(
+    WhiteNoiseLazyVerticalGrid(
         columns = GridCells.Adaptive(100.dp),
         state = gridState,
         contentPadding = PaddingValues(4.dp),
@@ -695,7 +697,7 @@ internal fun <T> MonthSectionedColumn(
         EmptyPlaceholder(emptyLabel)
         return
     }
-    LazyColumn(
+    WhiteNoiseLazyColumn(
         state = listState,
         contentPadding = PaddingValues(bottom = 24.dp),
         modifier = Modifier.fillMaxSize().trackWhiteNoiseHeader(listState),
@@ -1068,7 +1070,10 @@ private fun FileLibraryRow(
                         contentDescription = stringResource(R.string.shared_media_file_actions),
                     )
                 }
+                val menuScrollState = rememberScrollState()
                 DropdownMenu(
+                    scrollState = menuScrollState,
+                    modifier = Modifier.scrollEdgeFade(menuScrollState),
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
                     shape = MenuDefaults.shape,

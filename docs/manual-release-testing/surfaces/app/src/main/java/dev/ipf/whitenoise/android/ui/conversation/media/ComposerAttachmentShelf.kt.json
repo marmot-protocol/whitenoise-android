@@ -1,0 +1,94 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+  "legacy_sha256": "fd1dbafeda29c71b38be0dffec621da0fed063fcd8c7c338ef014d16090f9713",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerAttachmentFilename",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "fun ComposerAttachmentFilename(",
+        "test_ids": [
+          "MED-003",
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "ComposerAttachmentShelf",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "fun ComposerAttachmentShelf(",
+        "test_ids": [
+          "MED-003",
+          "MED-009",
+          "MED-026"
+        ]
+      },
+      {
+        "surface": "ComposerAttachmentShelfCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "fun ComposerAttachmentShelfCard(",
+        "test_ids": [
+          "MED-003",
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "ComposerAttachmentShelfItem",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "fun ComposerAttachmentShelfItem(",
+        "test_ids": [
+          "MED-003",
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "ComposerAttachmentVisual",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "fun ComposerAttachmentVisual(",
+        "test_ids": [
+          "MED-003",
+          "MED-009",
+          "MED-026"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:gif",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "R.string.gif",
+        "test_ids": [
+          "MED-003",
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "string:media_attachment_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "R.string.media_attachment_remove",
+        "test_ids": [
+          "MED-003",
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "string:reply_media_document",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "R.string.reply_media_document",
+        "test_ids": [
+          "MED-003",
+          "MED-009"
+        ]
+      },
+      {
+        "surface": "string:reply_media_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ComposerAttachmentShelf.kt",
+        "anchor": "R.string.reply_media_video",
+        "test_ids": [
+          "MED-003",
+          "MED-009"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

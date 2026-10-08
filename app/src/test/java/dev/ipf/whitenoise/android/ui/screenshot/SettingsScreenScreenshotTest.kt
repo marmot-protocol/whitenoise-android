@@ -213,12 +213,17 @@ class SettingsScreenScreenshotTest {
                             appState = appState,
                             onBack = {},
                             isOfflineSpeechToTextInstalled = { true },
+                            resolveProviderPackage = { _, _ -> null },
                         )
                     }
                 }
             }
         }
 
+        // Resolve the provider before scrolling: its explainer changes the height of the first item.
+        composeRule
+            .onNodeWithText("The speech service installed on this device processes the audio", substring = true)
+            .assertExists()
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("dictation.pause_other_audio"))
         composeRule.onNodeWithTag("dictation.pause_other_audio").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("Pause other audio").assertExists()
@@ -259,21 +264,34 @@ class SettingsScreenScreenshotTest {
      * The row governs automatic completion alone. While Paste and Send are the only things that can
      * finish a dictation there is nothing for it to decide, so offering it there would imply a
      * stored default that could send a later dictation nobody asked it to.
+     * Provider discovery is fixed here so its late explainer cannot move a row during touch injection.
      */
     @Test
     fun dictationDeliveryChoiceAppearsOnlyWhileSilenceCanFinishADictation() {
         val appState = dictationAppState()
         composeRule.setContent {
             WhiteNoiseTheme {
-                DictationSettingsScreen(appState = appState, onBack = {})
+                DictationSettingsScreen(
+                    appState = appState,
+                    onBack = {},
+                    resolveProviderPackage = { _, _ -> null },
+                )
             }
         }
 
         composeRule.onNodeWithText("When finished").assertDoesNotExist()
 
-        composeRule.onNodeWithText("Finish dictation").performClick()
+        composeRule
+            .onNodeWithText("Finish dictation")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithText("After 5 seconds of silence").performClick()
-        composeRule.onNodeWithText("When finished").performClick()
+        composeRule
+            .onNodeWithText("When finished")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithText("Send message").performClick()
 
         assertEquals(5_000L, appState.conversationDictationPreferences.current().finishAfterSilenceMillis)
@@ -282,7 +300,11 @@ class SettingsScreenScreenshotTest {
             appState.conversationDictationPreferences.current().silenceDeliveryMode,
         )
 
-        composeRule.onNodeWithText("Finish dictation").performClick()
+        composeRule
+            .onNodeWithText("Finish dictation")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
         composeRule.onNodeWithText("When I choose Paste or Send").performClick()
 
         composeRule.onNodeWithText("When finished").assertDoesNotExist()

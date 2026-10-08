@@ -39,9 +39,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -50,6 +52,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
@@ -69,6 +72,39 @@ import java.util.concurrent.TimeUnit
 @Config(sdk = [36], qualifiers = "en")
 @Suppress("LargeClass") // Send, retry, projection, preview, and durable-draft scenarios share one controller fixture.
 class ConversationSendRetryIntegrationTest {
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun fixtureCleanupWaitsForAnOwnedIoContinuationToReturnToMain() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+            val state = appState()
+            val controller = ConversationController(state, group(), initialMemberSnapshot = memberSnapshot())
+            val enteredIo = CompletableDeferred<Unit>()
+            val releaseIo = CompletableDeferred<Unit>()
+            var returnedToMain = false
+            try {
+                state.mutationsScope.launch(Dispatchers.IO) {
+                    withContext(NonCancellable) {
+                        enteredIo.complete(Unit)
+                        releaseIo.await()
+                        withContext(Dispatchers.Main) { returnedToMain = true }
+                    }
+                }
+                enteredIo.await()
+                val cleanup = async { clearAndAwaitConversationTestFixture(controller) }
+                runCurrent()
+                assertFalse(cleanup.isCompleted)
+                assertFalse(returnedToMain)
+                releaseIo.complete(Unit)
+                cleanup.await()
+                assertTrue(returnedToMain)
+            } finally {
+                releaseIo.complete(Unit)
+                clearAndAwaitConversationTestFixture(controller)
+                Dispatchers.resetMain()
+            }
+        }
+
     /** Wire edit payloads, including another author's forged target, never override the native target row. */
     @Test
     fun mismatchedAuthorEditInTimelineCannotAlterBubble() =
@@ -133,7 +169,7 @@ class ConversationSendRetryIntegrationTest {
                         assertEquals(expectedWire, wireEdits)
                         assertNull(controller.editingMessageId)
                     } finally {
-                        controller.onCleared()
+                        clearAndAwaitConversationTestFixture(controller)
                     }
                 }
             } finally {
@@ -149,6 +185,7 @@ class ConversationSendRetryIntegrationTest {
             val originalTokens = mutableListOf<String>()
             val revisionTokens = mutableListOf<String>()
             val state = appState()
+            val controllers = mutableListOf<ConversationController>()
             try {
                 repeat(2) { revision ->
                     val controller =
@@ -166,6 +203,7 @@ class ConversationSendRetryIntegrationTest {
                                 error("retained native original must keep ordering")
                             },
                         )
+                    controllers += controller
                     try {
                         controller.retryMembers()
                         applyProjection(
@@ -182,6 +220,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(listOf("retained-original-token", "retained-original-token"), originalTokens)
                 assertEquals(2, revisionTokens.distinct().size)
             } finally {
+                clearAndAwaitConversationTestFixture(*controllers.toTypedArray())
                 Dispatchers.resetMain()
             }
         }
@@ -219,7 +258,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(2, revisions.map { it.third }.distinct().size)
                 assertNull(controller.editingMessageId)
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -252,7 +291,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(listOf(originalToken), originalTokens)
                 assertNull(controller.editingMessageId)
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -304,7 +343,7 @@ class ConversationSendRetryIntegrationTest {
                 assertTrue(controller.timeline.isEmpty())
                 assertEquals(readsBeforeDiscard, statusReads)
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -346,7 +385,7 @@ class ConversationSendRetryIntegrationTest {
                 assertFalse(editTokens[0] == editTokens[1])
                 assertEquals(MessageStatus.Pending, controller.timeline.single().status)
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -388,7 +427,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(MessageStatus.Pending, controller.timeline.single().status)
             } finally {
                 release.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -429,7 +468,7 @@ class ConversationSendRetryIntegrationTest {
                 assertNull(controller.editingMessageId)
                 assertEquals("edited body", controller.displayedText(controller.timeline.single().record))
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -489,7 +528,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(1, admissions)
             } finally {
                 reply.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -532,7 +571,7 @@ class ConversationSendRetryIntegrationTest {
             } finally {
                 olderReply.complete(Unit)
                 newerReply.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -586,7 +625,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(1, edits.size)
             } finally {
                 originalReturn.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -633,7 +672,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(MessageStatus.Sent, publishedOriginal.status)
                 assertEquals("revision", controller.displayedText(publishedOriginal.record))
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -669,7 +708,7 @@ class ConversationSendRetryIntegrationTest {
                 original.await()
             } finally {
                 originalReturn.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -717,7 +756,7 @@ class ConversationSendRetryIntegrationTest {
             } finally {
                 originalReturn.complete(Unit)
                 olderEditReturn.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -749,7 +788,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals("accepted pending revision", controller.displayedText(controller.timeline.single().record))
                 assertEquals(listOf("accepted pending revision"), edits)
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -785,7 +824,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(MessageStatus.Sent, controller.timeline.single().status)
                 assertEquals("recovered revision", controller.displayedText(controller.timeline.single().record))
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -832,7 +871,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals("recovered revision", controller.displayedText(controller.timeline.single().record))
             } finally {
                 releaseRead.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -863,7 +902,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals("queued revision", controller.displayedText(controller.timeline.single().record))
                 assertEquals(MessageStatus.Pending, controller.timeline.single().status)
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -910,7 +949,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals("retained revision", controller.displayedText(controller.timeline.single().record))
                 assertEquals(MessageStatus.Pending, controller.timeline.single().status)
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -947,7 +986,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals("same revision", controller.displayedText(controller.timeline.single().record))
             } finally {
                 admissionReturn.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -998,7 +1037,7 @@ class ConversationSendRetryIntegrationTest {
             } finally {
                 olderReturn.complete(Unit)
                 newerReturn.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -1027,7 +1066,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals("retained revision", controller.displayedText(controller.timeline.single().record))
                 assertEquals(token, controller.editingMessageId)
             } finally {
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -1081,7 +1120,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(token, controller.editingMessageId)
             } finally {
                 editReturn.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -1137,7 +1176,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(1, editCalls)
             } finally {
                 releaseOriginal.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -1198,7 +1237,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(1, editCalls)
             } finally {
                 releaseOriginal.complete(Unit)
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(controller)
                 Dispatchers.resetMain()
             }
         }
@@ -1269,8 +1308,7 @@ class ConversationSendRetryIntegrationTest {
                 assertEquals(1, editCalls)
             } finally {
                 releaseOriginal.complete(Unit)
-                replacement?.onCleared()
-                controller.onCleared()
+                clearAndAwaitConversationTestFixture(*listOfNotNull(controller, replacement).toTypedArray())
                 Dispatchers.resetMain()
             }
         }

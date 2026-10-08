@@ -75,6 +75,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
@@ -193,6 +195,7 @@ internal fun MediaVideoGridTile(
     modifier: Modifier = Modifier,
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
+    videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
 ) {
     val context = LocalContext.current
     val epoch = reference.sourceEpoch
@@ -260,23 +263,24 @@ internal fun MediaVideoGridTile(
     // The transfer owns the play disc while it is queued, running, being cancelled, cancelled or failed.
     val transferShown = transfer.visible && localFile == null
     var reloadToken by remember(messageIdHex, attachmentIndex, epoch) { mutableIntStateOf(0) }
+    val materializationLock = remember(messageIdHex, attachmentIndex, epoch) { Mutex() }
 
     /**
      * Promotes the tap to interactive priority and delegates ownership before this tile can dispose. While the reader's
      * Cancel awaits acknowledgement a tap anywhere on the tile does nothing, so it cannot restart that transfer.
      */
-    fun dispatchViewerOpen() {
+    fun dispatchViewerOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
         if (transfer.cancelling) return
         val open = {
-            // An accepted Retry re-materializes the tile itself, not only the viewer it hands off to.
-            if (failed) {
+            // Native failure can offer Retry before the old local waiter reports its own failure.
+            if (retry) {
                 failed = false
                 reloadToken++
             }
             materializationIntent = materializationIntent.afterInteractiveRequest()
             onTap()
         }
-        if (failed) {
+        if (retry) {
             controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { failed = true })
         } else {
             open()
@@ -294,19 +298,24 @@ internal fun MediaVideoGridTile(
         if (localFile != null) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
         runCatching {
-            materializeVideoAttachment(
-                context = context,
-                controller = controller,
-                messageIdHex = messageIdHex,
-                attachmentIndex = attachmentIndex,
-                reference = reference,
-                mine = mine,
-                priority = materializationIntent.priority,
-            )
+            // Drain the old shared publication before Retry can join a fresh file load.
+            materializationLock.withLock {
+                videoFileResolver(
+                    context,
+                    controller,
+                    messageIdHex,
+                    attachmentIndex,
+                    reference,
+                    mine,
+                    materializationIntent.priority,
+                )
+            }
         }.onSuccess { f ->
+            currentCoroutineContext().ensureActive()
             localFile = f
             failed = false
         }.onFailure {
+            currentCoroutineContext().ensureActive()
             if (it is kotlinx.coroutines.CancellationException) {
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
@@ -439,19 +448,7 @@ internal fun MediaVideoGridTile(
         if (transferShown) {
             TileTransferControl(
                 transfer = transfer,
-                onRetry = {
-                    // A failed materialization already retries inside the open hand-off.
-                    if (failed) {
-                        dispatchViewerOpen()
-                    } else {
-                        controller.retryAttachmentTransfer(
-                            messageIdHex,
-                            attachmentIndex,
-                            onAccepted = { dispatchViewerOpen() },
-                            onFailure = { failed = true },
-                        )
-                    }
-                },
+                onRetry = { dispatchViewerOpen(retry = true) },
                 modifier = Modifier.align(Alignment.Center),
             )
         }
@@ -705,6 +702,7 @@ internal fun MediaVideoBubble(
         )
     }
     var reloadToken by remember(pillKey, epoch) { mutableIntStateOf(0) }
+    val materializationLock = remember(pillKey, epoch) { Mutex() }
 
     LaunchedEffect(
         pillKey,
@@ -717,19 +715,24 @@ internal fun MediaVideoBubble(
         if (!startDownload) return@LaunchedEffect
         loading = true
         runCatching {
-            videoFileResolver(
-                context,
-                controller,
-                messageIdHex,
-                attachmentIndex,
-                reference,
-                mine,
-                materializationIntent.priority,
-            )
+            // Drain the old shared publication before Retry can join a fresh file load.
+            materializationLock.withLock {
+                videoFileResolver(
+                    context,
+                    controller,
+                    messageIdHex,
+                    attachmentIndex,
+                    reference,
+                    mine,
+                    materializationIntent.priority,
+                )
+            }
         }.onSuccess { f ->
+            currentCoroutineContext().ensureActive()
             localFile = f
             failed = false
         }.onFailure {
+            currentCoroutineContext().ensureActive()
             if (it is kotlinx.coroutines.CancellationException) {
                 materializationIntent = materializationIntent.afterProducerCancellation(it)
             } else {
@@ -741,10 +744,11 @@ internal fun MediaVideoBubble(
     }
 
     /** Opens the logical video immediately so materialization can continue after bubble disposal. */
-    fun dispatchViewerOpen() {
+    fun dispatchViewerOpen(retry: Boolean = failed || (localFile == null && (transfer.failed || transfer.cancelled))) {
+        if (transfer.cancelling) return
         val open = {
-            // An accepted Retry re-materializes the tile itself, not only the viewer it hands off to.
-            if (failed) {
+            // Native failure can offer Retry before the old local waiter reports its own failure.
+            if (retry) {
                 failed = false
                 reloadToken++
             }
@@ -760,7 +764,7 @@ internal fun MediaVideoBubble(
                 ),
             )
         }
-        if (failed) {
+        if (retry) {
             controller.retryAttachmentTransfer(messageIdHex, attachmentIndex, open, onFailure = { failed = true })
         } else {
             open()
@@ -898,19 +902,7 @@ internal fun MediaVideoBubble(
             if (transferShown) {
                 TileTransferControl(
                     transfer = transfer,
-                    onRetry = {
-                        // A failed materialization already retries inside the open hand-off.
-                        if (failed) {
-                            dispatchViewerOpen()
-                        } else {
-                            controller.retryAttachmentTransfer(
-                                messageIdHex,
-                                attachmentIndex,
-                                onAccepted = { dispatchViewerOpen() },
-                                onFailure = { failed = true },
-                            )
-                        }
-                    },
+                    onRetry = { dispatchViewerOpen(retry = true) },
                     modifier = Modifier.align(Alignment.Center),
                 )
             }

@@ -6,8 +6,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -97,12 +100,15 @@ class GlobalSearchContentFilterChipsTest {
             .assertIsSelected()
     }
 
+    /** Keyboard traversal starts in keyboard mode; touch-mode checkboxes correctly reject focus. */
     @Test
     fun chipsHaveOneKeyboardFocusTargetEachAndActivateWithEnter() {
         var changedSelection: GlobalSearchContentFilterSelection? = null
         lateinit var focusManager: FocusManager
+        lateinit var inputModeManager: InputModeManager
         composeRule.setContent {
             focusManager = LocalFocusManager.current
+            inputModeManager = LocalInputModeManager.current
             WhiteNoiseTheme {
                 Surface {
                     GlobalSearchContentFilterChips(
@@ -113,6 +119,9 @@ class GlobalSearchContentFilterChipsTest {
             }
         }
 
+        composeRule.runOnIdle {
+            assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard))
+        }
         val textChip =
             composeRule.onNodeWithTag(
                 globalSearchContentChipTag(GlobalSearchContentKind.TEXT),

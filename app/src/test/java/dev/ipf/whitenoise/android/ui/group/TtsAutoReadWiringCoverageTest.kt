@@ -151,11 +151,13 @@ class TtsAutoReadWiringCoverageTest {
 
     @Test
     fun speakFromHereClaimsAutoReadOwnershipThroughAppState() {
-        val body = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
+        val source = source("ui/conversation/messages/MessageBubble.kt")
+        val body = source.functionBody("startSpeakAloud")
+        val entries = source.substringAfter("suspend fun speakFromHereEntries").substringBefore("fun startSpeakAloud")
 
         assertTrue(
-            "speak-from-here must build bounded candidates",
-            "ttsSpeakFromHereCandidates(" in body,
+            "speak-from-here must build bounded candidates through the shared preparation helper",
+            "val entries = speakFromHereEntries(literalCode)" in body && "ttsSpeakFromHereCandidates(" in entries,
         )
         assertTrue(
             "speak-from-here must claim auto-read ownership",
@@ -183,10 +185,13 @@ class TtsAutoReadWiringCoverageTest {
 
     @Test
     fun literalCodeModeAppliesOnlyToTheSelectedSpeakFromHereEntry() {
-        val body = source("ui/conversation/messages/MessageBubble.kt").functionBody("startSpeakAloud")
+        val source = source("ui/conversation/messages/MessageBubble.kt")
+        val body = source.functionBody("startSpeakAloud")
+        val entries = source.substringAfter("suspend fun speakFromHereEntries").substringBefore("fun startSpeakAloud")
 
-        assertTrue("the entry position must participate in mode selection", "mapIndexed" in body)
-        assertTrue("only the selected first entry may become literal code", "index == 0 && literalCode" in body)
+        assertTrue("the requested mode must reach preparation", "speakFromHereEntries(literalCode)" in body)
+        assertTrue("the entry position must participate in mode selection", "mapIndexed" in entries)
+        assertTrue("only the selected first entry may become literal code", "index == 0 && literalCode" in entries)
     }
 
     private fun source(relativePath: String): String =

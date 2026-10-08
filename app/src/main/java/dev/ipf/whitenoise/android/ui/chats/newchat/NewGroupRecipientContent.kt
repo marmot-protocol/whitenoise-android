@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -24,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 
@@ -66,7 +66,10 @@ internal fun NewGroupRecipientContent(
             )
         },
     ) {
-        LazyColumn(Modifier.fillMaxSize().testTag("new_group.list"), contentPadding = PaddingValues(bottom = 24.dp)) {
+        WhiteNoiseLazyColumn(
+            modifier = Modifier.fillMaxSize().testTag("new_group.list"),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
             item {
                 NewGroupRecipientSearchField(
                     query,

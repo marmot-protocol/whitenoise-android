@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -37,6 +36,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecentEmojiList
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseSheetHeader
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -68,7 +68,7 @@ internal fun ConfigureReactionsSheet(
                     Modifier
                         .fillMaxWidth()
                         .widthIn(max = ConfigureReactionsMaximumWidth)
-                        .verticalScroll(rememberScrollState())
+                        .fadingVerticalScroll(rememberScrollState())
                         .padding(horizontal = WhiteNoiseSpacing.Section)
                         .padding(bottom = WhiteNoiseSpacing.Section),
                 verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),

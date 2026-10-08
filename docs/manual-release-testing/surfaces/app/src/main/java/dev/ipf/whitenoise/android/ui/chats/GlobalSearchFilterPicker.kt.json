@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
-  "legacy_sha256": "06b369833b71ebf1c6b5ca43991783b850ea76d66de139705a2425c7bab64e3f",
+  "legacy_sha256": "472216ff638f3e15152517607e100658e51521ea5e6bd11a892013e45165e9e7",
   "categories": {
     "composable_surfaces": [
       {
@@ -175,6 +175,19 @@
         "test_ids": [
           "FIND-008",
           "FIND-012"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: GlobalSearchFilterPicker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalSearchFilterPicker.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ]

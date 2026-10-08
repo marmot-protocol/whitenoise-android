@@ -58,7 +58,9 @@ class FragmentTest(unittest.TestCase):
         return self.git("rev-parse", "HEAD")
 
     def init_git(self):
+        """Create disposable history without background writers racing temporary-directory cleanup."""
         self.git("init", "-q", "-b", "main")
+        self.git("config", "maintenance.auto", "false")
         self.git("config", "user.name", "Fixture")
         self.git("config", "user.email", "fixture@example.invalid")
         self.git("config", "commit.gpgsign", "false")

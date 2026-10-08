@@ -2,7 +2,6 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import android.graphics.ImageDecoder
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import androidx.compose.foundation.Image
@@ -51,12 +50,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.decodeLocalPreviewAnimation
+import dev.ipf.whitenoise.android.media.readLocalPreviewSource
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import java.io.IOException
 import kotlin.math.roundToInt
 
 private const val VISUAL_CARD_HEIGHT = 112
@@ -347,7 +349,12 @@ private fun ComposerAttachmentFilename(
     }
 }
 
-/** Decode the chosen local animation at thumbnail size; the shared drawable renderer owns playback/disposal. */
+/**
+ * Decode the chosen local animation at thumbnail size; the shared drawable renderer owns playback/disposal.
+ *
+ * The native decoder sees the source only after content admission, so a refused, oversized or unreadable
+ * source stays on the still tile, and a replaced or removed preview never receives a late drawable.
+ */
 @Composable
 private fun rememberShelfAnimation(uri: Uri): Drawable? {
     val resolver = LocalContext.current.contentResolver
@@ -355,19 +362,13 @@ private fun rememberShelfAnimation(uri: Uri): Drawable? {
         val drawable by produceState<Drawable?>(null, resolver, uri) {
             value =
                 withContext(Dispatchers.IO) {
-                    try {
-                        ImageDecoder.decodeDrawable(ImageDecoder.createSource(resolver, uri)) { decoder, info, _ ->
-                            val largestEdge = maxOf(info.size.width, info.size.height).coerceAtLeast(1)
-                            val scale = minOf(1f, PREVIEW_DECODE_EDGE.toFloat() / largestEdge)
-                            decoder.setTargetSize(
-                                (info.size.width * scale).roundToInt().coerceAtLeast(1),
-                                (info.size.height * scale).roundToInt().coerceAtLeast(1),
-                            )
-                        }
-                    } catch (_: IOException) {
-                        null
-                    } catch (_: SecurityException) {
-                        null
+                    val source =
+                        readLocalPreviewSource(
+                            open = { resolver.openInputStream(uri) },
+                            ensureActive = { ensureActive() },
+                        )
+                    decodeLocalPreviewAnimation(source) { bytes ->
+                        MediaPipeline.decodeAnimatedDrawable(bytes, PREVIEW_DECODE_EDGE)
                     }
                 }
         }

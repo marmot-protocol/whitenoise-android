@@ -1,6 +1,6 @@
 {
   "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
-  "legacy_sha256": "24aa70b2100ef9f387a614e434054c0bba3fc80b53607c56b07dd9fcd3fd6bf1",
+  "legacy_sha256": "9c1faa0d2ef8ef64dcc370483086b2a25b6aac4568ec62abdc5975e5a8e9144c",
   "categories": {
     "composable_surfaces": [
       {
@@ -270,6 +270,19 @@
         "anchor": "R.string.chats",
         "test_ids": [
           "FLD-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: ChatFoldersScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
         ]
       }
     ]

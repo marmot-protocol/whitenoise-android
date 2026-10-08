@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -16,6 +15,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 internal data class TtsSentenceChoice(
     val revision: String,
@@ -53,7 +53,7 @@ internal fun ttsSentenceAccessibilityActions(
             onDismissRequest = { choosing = false },
             title = { Text(chooseLabel) },
             text = {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
+                Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
                     choices.forEach { choice ->
                         TextButton(onClick = {
                             owner?.select?.invoke(choice)

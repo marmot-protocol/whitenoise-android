@@ -123,6 +123,7 @@ import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.StagedAttachmentSendClaim
 import dev.ipf.whitenoise.android.state.StagedAttachmentSender
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -153,6 +154,7 @@ import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.setUserBlocked
+import dev.ipf.whitenoise.android.state.tracedPagingSection
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
 import dev.ipf.whitenoise.android.state.transcriptRosterError
 import dev.ipf.whitenoise.android.state.unreadCountDivergenceReport
@@ -2410,48 +2412,53 @@ internal fun ConversationScreen(
         val navigationRequest = navigationState.targetNavigation.begin()
         navigationState.navigateReplyJob =
             scope.launch {
-                if (!navigationRequest.isCurrent()) return@launch
-                val available = controller.loadUntilMessageAvailable(targetMessageId)
-                if (!navigationRequest.isCurrent()) return@launch
-                if (!available) {
-                    appState.present(R.string.toast_original_message_unavailable)
-                    return@launch
+                tracedPagingSection(ConversationMentionJumpTrace.TOTAL) {
+                    if (!navigationRequest.isCurrent()) return@launch
+                    val available =
+                        tracedPagingSection(ConversationMentionJumpTrace.AVAILABILITY) {
+                            controller.loadUntilMessageAvailable(targetMessageId)
+                        }
+                    if (!navigationRequest.isCurrent()) return@launch
+                    if (!available) {
+                        appState.present(R.string.toast_original_message_unavailable)
+                        return@launch
+                    }
+                    val timelineIndex =
+                        controller.timeline
+                            .filterNot { MessageProjector.isEdit(it.record) }
+                            .indexOfFirst { it.record.messageIdHex == targetMessageId }
+                    if (timelineIndex < 0) {
+                        appState.present(R.string.toast_original_message_unavailable)
+                        return@launch
+                    }
+                    if (!navigationRequest.isCurrent()) return@launch
+                    val reached =
+                        scrollCoordinator.jumpToMentionReadingStart(
+                            targetMessageId = targetMessageId,
+                            resolveTargetIndex = { currentTimelineListIndex(targetMessageId) },
+                            readLayout = { index ->
+                                val layout = timelineViewport.readingLayoutInfo()
+                                ConversationMentionJumpLayout(
+                                    viewportEndOffsetPx = layout.viewportEndOffset,
+                                    itemHeightPx =
+                                        layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
+                                    estimatedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
+                                )
+                            },
+                            onCompleted = {
+                                if (navigationRequest.isCurrent()) {
+                                    scrollCoordinator.settleReadingAt(currentScrollAnchor())
+                                }
+                            },
+                        )
+                    if (!reached || !navigationRequest.isCurrent()) return@launch
+                    // Mark read up to the visited mention so the count — and the
+                    // chat-list @-badge — decrement in step; advance the local read
+                    // anchor so the chip's derived count updates immediately.
+                    readAnchorMessageId = targetMessageId
+                    controller.markReadUpTo(targetMessageId)
+                    showTransientMessageHighlight(targetMessageId)
                 }
-                val timelineIndex =
-                    controller.timeline
-                        .filterNot { MessageProjector.isEdit(it.record) }
-                        .indexOfFirst { it.record.messageIdHex == targetMessageId }
-                if (timelineIndex < 0) {
-                    appState.present(R.string.toast_original_message_unavailable)
-                    return@launch
-                }
-                if (!navigationRequest.isCurrent()) return@launch
-                val reached =
-                    scrollCoordinator.jumpToMentionReadingStart(
-                        targetMessageId = targetMessageId,
-                        resolveTargetIndex = { currentTimelineListIndex(targetMessageId) },
-                        readLayout = { index ->
-                            val layout = timelineViewport.readingLayoutInfo()
-                            ConversationMentionJumpLayout(
-                                viewportEndOffsetPx = layout.viewportEndOffset,
-                                itemHeightPx =
-                                    layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
-                                estimatedItemHeightPx = navigationState.timelineItemHeightsPx[targetMessageId],
-                            )
-                        },
-                        onCompleted = {
-                            if (navigationRequest.isCurrent()) {
-                                scrollCoordinator.settleReadingAt(currentScrollAnchor())
-                            }
-                        },
-                    )
-                if (!reached || !navigationRequest.isCurrent()) return@launch
-                // Mark read up to the visited mention so the count — and the
-                // chat-list @-badge — decrement in step; advance the local read
-                // anchor so the chip's derived count updates immediately.
-                readAnchorMessageId = targetMessageId
-                controller.markReadUpTo(targetMessageId)
-                showTransientMessageHighlight(targetMessageId)
             }
     }
 
@@ -3307,31 +3314,37 @@ internal fun ConversationScreen(
 
     val pollVotesHost = remember(controller) { PollVotesHostState() }
     var mediaPreviewIndex by rememberSaveable(controller.boundAccountRef, chat.id) { mutableStateOf<Int?>(null) }
-    var attachmentSendPending by remember(controller, chat.id) { mutableStateOf(false) }
+    // Keyboard Send and dictation Send share this one claim, so only the first send captures the staged shelf.
+    val attachmentSendClaim = remember(controller, chat.id) { StagedAttachmentSendClaim() }
     LaunchedEffect(pendingMediaSlots.size, pendingDocumentUris.size) {
         if (pendingMediaSlots.isEmpty() && pendingDocumentUris.isEmpty()) mediaPreviewIndex = null
     }
 
-    /** Sends the staged attachments with [caption] as one message, reporting acceptance through [onResult]. */
+    /**
+     * Sends the staged attachments with [caption] as one message, reporting acceptance through [onResult].
+     *
+     * The send is claimed once here, before the shelf is captured, so a keyboard Send and a dictation Send
+     * that overlap cannot both queue the same attachments. A refused send reports false and leaves the
+     * earlier send's claim alone.
+     */
     fun sendStagedAttachmentsWithCaption(
         caption: String,
         onResult: (Boolean) -> Unit,
     ) {
-        if (
-            importedComposerExceedsLimit(
-                pendingMediaSlots,
-                pendingDocumentUris,
-                MEDIA_PICKER_MAX_ITEMS,
-                importedShareFiles::owns,
-            )
-        ) {
-            appState.present(R.string.share_import_recovered_limit)
-            onResult(false)
-            return
-        }
-        attachmentSendPending = true
-        var dispatched = false
-        try {
+        attachmentSendClaim.send(
+            onResult = onResult,
+            canStart = {
+                val withinLimit =
+                    !importedComposerExceedsLimit(
+                        pendingMediaSlots,
+                        pendingDocumentUris,
+                        MEDIA_PICKER_MAX_ITEMS,
+                        importedShareFiles::owns,
+                    )
+                if (!withinLimit) appState.present(R.string.share_import_recovered_limit)
+                withinLimit
+            },
+        ) { onAccepted, onRejected ->
             val sendingMedia = pendingMediaSlots
             val sendingDocuments = pendingDocumentUris
             mediaSender.sendStagedAttachments(
@@ -3349,21 +3362,14 @@ internal fun ConversationScreen(
                     pendingMediaSlots = pendingMediaSlots.filterNot { it.id in acceptedIds }
                     pendingDocumentUris =
                         removeAcceptedDocumentOccurrences(pendingDocumentUris, sendingDocuments)
-                    attachmentSendPending = false
-                    onResult(true)
+                    onAccepted()
                 },
-                onRejected = {
-                    attachmentSendPending = false
-                    onResult(false)
-                },
+                onRejected = onRejected,
                 onAfterSend = {
                     acceptedSendRevealedTranscript = true
                     revealSentMessage()
                 },
             )
-            dispatched = true
-        } finally {
-            if (!dispatched) attachmentSendPending = false
         }
     }
     // Dictation's Send never sees the composer's staged attachments, so it asks the controller for this
@@ -3378,7 +3384,7 @@ internal fun ConversationScreen(
                     controller.editingMessageId == null &&
                         (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty())
                 },
-                isBusy = { attachmentSendPending || mediaDraftState.isPreparing },
+                isBusy = { attachmentSendClaim.isHeld || mediaDraftState.isPreparing },
                 dispatch = { caption, onResult -> stagedAttachmentDispatch(caption, onResult) },
             )
         controller.stagedAttachmentSender = sender
@@ -3842,17 +3848,17 @@ internal fun ConversationScreen(
                             dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
                                 mediaSlots = pendingMediaSlots,
                                 documentUris = pendingDocumentUris,
-                                enabled = !attachmentSendPending,
+                                enabled = !attachmentSendClaim.isHeld,
                                 prepared = mediaDraftState.preparedPreviews(),
-                                onPreview = { if (!attachmentSendPending) mediaPreviewIndex = it },
+                                onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
                                 onRemoveMedia = { slot ->
-                                    if (!attachmentSendPending) {
+                                    if (!attachmentSendClaim.isHeld) {
                                         mediaDraftState.releasePreparedPhoto(slot.id)
                                         pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
                                     }
                                 },
                                 onRemoveDocument = { index ->
-                                    if (!attachmentSendPending) {
+                                    if (!attachmentSendClaim.isHeld) {
                                         pendingDocumentUris
                                             .getOrNull(index)
                                             ?.let(mediaDraftState::releasePreparedDocument)
@@ -4234,6 +4240,10 @@ internal fun ConversationScreen(
                                         textSelectionMode = textSelectionMessageId == messageId,
                                         onTextSelectionModeChange = { enabled ->
                                             if (enabled) {
+                                                ttsFollowHandle.suspendForDirectDrag(
+                                                    appState.ttsController.state.value,
+                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                                )
                                                 openActionMenuId = null
                                                 textSelectionMessageId = messageId
                                                 textSelectionBubbleBounds = null
@@ -4413,7 +4423,12 @@ internal fun ConversationScreen(
                                     // Selection hides these controls; paging progress never covers message rows.
                                     if (!selectionMode && ttsFollowHandle.showResumeAction) {
                                         TtsResumeFollowButton(
-                                            onClick = ttsFollowHandle::resumeFollow,
+                                            onClick = {
+                                                ttsFollowHandle.revealCurrentPassage(
+                                                    appState.ttsController.state.value,
+                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                                )
+                                            },
                                         )
                                     }
                                     // Jump-to-mention chip: tap visits the oldest unread
@@ -4429,6 +4444,7 @@ internal fun ConversationScreen(
                                             modifier =
                                                 Modifier
                                                     .height(34.dp)
+                                                    .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
                                                     .semantics { contentDescription = jumpToMentionLabel }
                                                     .clickable { jumpToNextUnreadMention() },
                                         ) {
@@ -4720,8 +4736,8 @@ internal fun ConversationScreen(
         onClosePreview = { mediaPreviewIndex = null },
         mediaSlots = pendingMediaSlots,
         documentUris = pendingDocumentUris,
-        onMediaSlotsChange = { if (!attachmentSendPending) pendingMediaSlots = it },
-        onDocumentUrisChange = { if (!attachmentSendPending) pendingDocumentUris = it },
+        onMediaSlotsChange = { if (!attachmentSendClaim.isHeld) pendingMediaSlots = it },
+        onDocumentUrisChange = { if (!attachmentSendClaim.isHeld) pendingDocumentUris = it },
         mediaSender = mediaSender,
         chatTitle = controller.title(groupTitleCopy),
         composerText = composerTextState::acceptanceToken,

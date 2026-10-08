@@ -89,6 +89,19 @@
           "RDR-001"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: NostrEventViewers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

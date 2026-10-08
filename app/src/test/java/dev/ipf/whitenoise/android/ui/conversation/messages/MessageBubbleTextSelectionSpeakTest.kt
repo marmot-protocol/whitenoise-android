@@ -7,6 +7,7 @@ import android.content.pm.ResolveInfo
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.text.contextmenu.data.TextContextMenuItem
 import androidx.compose.foundation.text.contextmenu.provider.LocalTextContextMenuToolbarProvider
 import androidx.compose.foundation.text.contextmenu.provider.TextContextMenuDataProvider
@@ -32,6 +33,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppBlobEndpointFfi
@@ -89,9 +91,9 @@ class MessageBubbleTextSelectionSpeakTest {
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
     private val app = ApplicationProvider.getApplicationContext<Application>()
 
-    /** Long press action menu speak queues through app state at message top. */
+    /** The action menu uses the actual frozen text hit through app state and speech preparation. */
     @Test
-    fun longPressActionMenuSpeakQueuesThroughAppStateAtMessageTop() {
+    fun longPressActionMenuSpeakQueuesThePressedSentence() {
         val engine = FakeSessionEngine()
         val appState = appStateWithTts(engine)
         val item = timelineMessage("First sentence. Second sentence.")
@@ -130,7 +132,122 @@ class MessageBubbleTextSelectionSpeakTest {
             engine.spoken
                 .first()
                 .text
+                .endsWith("Second sentence."),
+        )
+    }
+
+    @Test
+    fun longPressGutterStillStartsAtMessageTop() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item =
+            timelineMessage(
+                "First sentence. Second sentence is deliberately long enough to wrap onto another line, " +
+                    "leaving a short end.",
+            )
+        val controller = conversationController(appState)
+        var menuOpen by mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {}, menuOpen, { menuOpen = it })
+                }
+            }
+        }
+        val layouts = mutableListOf<TextLayoutResult>()
+        val textNode = composeRule.onNodeWithText("First sentence", substring = true, useUnmergedTree = true)
+        textNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        val line = layout.lineCount - 1
+        val lineRight = layout.getLineRight(line)
+        assertTrue(layout.size.width - lineRight > 4f)
+        val textBounds = textNode.getUnclippedBoundsInRoot()
+        val hostBounds = composeRule.onNodeWithTag(MESSAGE_HOST_TAG).getUnclippedBoundsInRoot()
+        val gutter =
+            Offset(
+                textBounds.left.value - hostBounds.left.value + (lineRight + layout.size.width) / 2f,
+                textBounds.top.value - hostBounds.top.value +
+                    (layout.getLineTop(line) + layout.getLineBottom(line)) / 2f,
+            )
+        composeRule.onNodeWithTag(MESSAGE_HOST_TAG).performTouchInput {
+            down(gutter)
+            advanceEventTime(viewConfiguration.longPressTimeoutMillis + 100)
+            up()
+        }
+        composeRule.waitForIdle()
+        assertTrue(menuOpen)
+        composeRule.onNodeWithText(app.getString(R.string.read_aloud)).performScrollTo().performClick()
+        waitForTts(engine, appState)
+        assertTrue(
+            engine.spoken
+                .first()
+                .text
                 .endsWith("First sentence."),
+        )
+    }
+
+    @Test
+    fun longPressReadAloudReplacesAnAdvancingSessionAtItsPressedSentence() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        var menuOpen by mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {}, menuOpen, { menuOpen = it })
+                }
+            }
+        }
+        assertTrue(
+            appState.speakAloudAutoRead(
+                GROUP_ID,
+                listOf(projectedTtsEntry(item).copy(messageIdHex = "previous-session")),
+                Locale.getDefault(),
+            ),
+        )
+        waitForTts(engine, appState)
+        longPressOnMessageText("Second sentence")
+        composeRule.waitForIdle()
+        val generation = appState.ttsController.playbackCallbackGeneration()
+        engine.complete(0)
+        assertEquals(generation, appState.ttsController.playbackCallbackGeneration())
+        val submissions = engine.spoken.size
+        composeRule.onNodeWithText(app.getString(R.string.read_aloud)).performScrollTo().performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            engine.spoken.size > submissions
+        }
+        assertTrue(engine.spoken[submissions].text.endsWith("Second sentence."))
+    }
+
+    @Test
+    fun longPressKeepsOriginalSentenceAfterBubbleMovesWithItsMenuOpen() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        var menuOpen by mutableStateOf(false)
+        var offset by mutableStateOf(0.dp)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().offset(y = offset).testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {}, menuOpen, { menuOpen = it })
+                }
+            }
+        }
+        longPressOnMessageText("Second sentence")
+        composeRule.waitForIdle()
+        assertTrue(menuOpen)
+        composeRule.runOnIdle { offset = 32.dp }
+        composeRule.onNodeWithText(app.getString(R.string.read_aloud)).performScrollTo().performClick()
+        waitForTts(engine, appState)
+        assertTrue(
+            engine.spoken
+                .first()
+                .text
+                .endsWith("Second sentence."),
         )
     }
 
@@ -316,7 +433,7 @@ class MessageBubbleTextSelectionSpeakTest {
     }
 
     @Test
-    fun doubleTapLinkStillOpensWhenItsMessageIsOutsideTheActiveQueue() {
+    fun doubleTapLinkOutsideActiveQueueSeeksItsSpokenNeighborWithoutOpening() {
         val engine = FakeSessionEngine()
         val appState = appStateWithTts(engine)
         val item = timelineMessageWithAutolink()
@@ -337,6 +454,7 @@ class MessageBubbleTextSelectionSpeakTest {
         )
         waitForTts(engine, appState)
         val sessionId = appState.ttsController.state.value.sessionId
+        val submissionsBeforeSeek = engine.spoken.size
         composeRule.mainClock.autoAdvance = false
 
         doubleTapOnMessageText("https://example.com")
@@ -347,8 +465,159 @@ class MessageBubbleTextSelectionSpeakTest {
         )
         composeRule.waitForIdle()
 
-        assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity?.action)
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            engine.spoken.size > submissionsBeforeSeek
+        }
+        assertEquals(null, shadowOf(app).nextStartedActivity)
         assertEquals(sessionId, appState.ttsController.state.value.sessionId)
+        assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
+        assertTrue(engine.spoken[submissionsBeforeSeek].text.endsWith("Read now."))
+    }
+
+    @Test
+    fun doubleTapOtherUnqueuedBubbleSeeksWithoutReplacingPlaybackSession() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {})
+                }
+            }
+        }
+        assertTrue(
+            appState.speakAloudAutoRead(
+                GROUP_ID,
+                listOf(projectedTtsEntry(item).copy(messageIdHex = "outside-window")),
+                Locale.getDefault(),
+            ),
+        )
+        waitForTts(engine, appState)
+        val session = appState.ttsController.state.value.sessionId
+        val submissions = engine.spoken.size
+        doubleTapOnMessageText("Second sentence")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            engine.spoken.size > submissions
+        }
+        assertEquals(session, appState.ttsController.state.value.sessionId)
+        assertEquals(
+            item.record.messageIdHex,
+            appState.ttsController.state.value.passage
+                ?.messageIdHex,
+        )
+        assertEquals(1, appState.ttsController.state.value.sentenceIndexWithinMessage)
+        assertTrue(engine.spoken[submissions].text.endsWith("Second sentence."))
+    }
+
+    @Test
+    fun unmappableRenderedTargetDoesNotPauseOrChangeCurrentSpeech() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessage("First sentence. Second sentence.")
+        val entry = projectedTtsEntry(item)
+        assertTrue(appState.speakAloudAutoRead(GROUP_ID, listOf(entry), Locale.getDefault()))
+        waitForTts(engine, appState)
+        val state = appState.ttsController.state.value
+        val spoken = engine.spoken.size
+        var resolved = false
+        assertTrue(
+            appState.ttsHistorySession.requestRenderedSentenceSeek(
+                item.record.messageIdHex,
+                item.record.recordedAt,
+                expectedSource = appState.ttsHistorySession.conversationSource.value!!,
+                resolveTarget = {
+                    dev.ipf.whitenoise.android.audio.tts.TtsRenderedSeekRequest(
+                        entry,
+                        sentenceIndex = { null },
+                        canCommit = {
+                            resolved = true
+                            true
+                        },
+                    )
+                },
+                onCommitted = { error("An unmappable hit must not commit") },
+            ),
+        )
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            resolved && appState.ttsHistorySession.edgeState.value == null
+        }
+        assertEquals(state, appState.ttsController.state.value)
+        assertEquals(spoken, engine.spoken.size)
+    }
+
+    @Test
+    fun singleTapLinkInUnqueuedBubbleStillOpensDuringPlayback() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessageWithAutolink()
+        val controller = conversationController(appState)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {})
+                }
+            }
+        }
+        assertTrue(
+            appState.speakAloudAutoRead(
+                GROUP_ID,
+                listOf(projectedTtsEntry(item).copy(messageIdHex = "outside-window")),
+                Locale.getDefault(),
+            ),
+        )
+        waitForTts(engine, appState)
+        composeRule.mainClock.autoAdvance = false
+        singleTapOnMessageText("https://example.com")
+        composeRule.mainClock.advanceTimeBy(
+            android.view.ViewConfiguration
+                .getDoubleTapTimeout()
+                .toLong() + 1L,
+        )
+        composeRule.waitForIdle()
+        assertEquals(Intent.ACTION_VIEW, shadowOf(app).nextStartedActivity?.action)
+    }
+
+    @Test
+    fun doubleTapNonCurrentQueuedBubbleDoesNotRequireAnActiveHighlightProjection() {
+        val engine = FakeSessionEngine()
+        val appState = appStateWithTts(engine)
+        val item = timelineMessage("First sentence. Second sentence.")
+        val controller = conversationController(appState)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxWidth().testTag(MESSAGE_HOST_TAG)) {
+                    messageBubbleHost(item, controller, appState, false, {})
+                }
+            }
+        }
+        val target = projectedTtsEntry(item)
+        assertTrue(
+            appState.speakAloudAutoRead(
+                GROUP_ID,
+                listOf(target.copy(messageIdHex = "currently-speaking"), target),
+                Locale.getDefault(),
+            ),
+        )
+        waitForTts(engine, appState)
+        val session = appState.ttsController.state.value.sessionId
+        val submissions = engine.spoken.size
+        doubleTapOnMessageText("Second sentence")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            shadowOf(android.os.Looper.getMainLooper()).idle()
+            engine.spoken.size > submissions
+        }
+        assertEquals(session, appState.ttsController.state.value.sessionId)
+        assertEquals(
+            item.record.messageIdHex,
+            appState.ttsController.state.value.passage
+                ?.messageIdHex,
+        )
+        assertTrue(engine.spoken[submissions].text.endsWith("Second sentence."))
     }
 
     /** Select text from action menu speak clears mode and starts at pressed sentence. */

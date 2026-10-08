@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,6 +34,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,7 +84,7 @@ internal fun ShareChatPickerAccountSheetContent(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
+        WhiteNoiseLazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp)) {
             items(accounts, key = AccountSummaryFfi::label) { account ->
                 ShareChatPickerAccountItem(
                     appState = appState,

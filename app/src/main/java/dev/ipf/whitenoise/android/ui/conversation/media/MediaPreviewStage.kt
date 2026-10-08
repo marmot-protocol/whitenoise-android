@@ -197,19 +197,29 @@ private fun MediaPreviewImagePage(
     label: String,
     onIncludedChange: (Boolean) -> Unit,
 ) {
-    val bitmap =
+    val image =
         metadata?.let {
-            rememberMediaPreviewBitmap(item.uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, prepared)
-        }
+            rememberMediaPreviewImage(item.uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, prepared)
+        } ?: MediaPreviewImage.Loading
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        if (bitmap == null) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(32.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-            return@BoxWithConstraints
-        }
+        val bitmap =
+            when (image) {
+                MediaPreviewImage.Loading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    return@BoxWithConstraints
+                }
+                // A refused or unreadable source gets the stable filename card, never a spinner that cannot end.
+                MediaPreviewImage.Failed -> {
+                    MediaPreviewDocumentPage(label)
+                    MediaPreviewInclusionButton(included, label, onIncludedChange, Modifier.align(Alignment.BottomEnd))
+                    return@BoxWithConstraints
+                }
+                is MediaPreviewImage.Ready -> image.bitmap
+            }
         val ratio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
         val available = if (maxHeight.value > 0f) maxWidth.value / maxHeight.value else ratio
         val mediaWidth = if (ratio >= available) maxWidth else maxHeight * ratio

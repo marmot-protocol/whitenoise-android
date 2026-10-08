@@ -1,0 +1,55 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScrollContainers.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.fadingVerticalScroll",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScrollContainers.kt",
+        "anchor": "fun Modifier.fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseLazyColumn",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScrollContainers.kt",
+        "anchor": "fun WhiteNoiseLazyColumn(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "WhiteNoiseLazyVerticalGrid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScrollContainers.kt",
+        "anchor": "fun WhiteNoiseLazyVerticalGrid(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: WhiteNoiseScrollContainers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/WhiteNoiseScrollContainers.kt",
+        "anchor": ".scrollEdgeFade(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

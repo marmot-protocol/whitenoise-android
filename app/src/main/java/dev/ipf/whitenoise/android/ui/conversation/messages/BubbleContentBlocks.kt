@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.tts.TtsMentionPresentation
 import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import dev.ipf.whitenoise.android.core.messageContainsOnlyNostrEventReferences
 import dev.ipf.whitenoise.android.core.nostrEventReferences
@@ -519,6 +521,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     ttsLeafHighlightResolver: TtsLeafHighlightResolver? = null,
     ttsSentenceActions: TtsSentenceActions? = null,
     ttsSentenceLayoutReporter: TtsSentenceLayoutReporter? = null,
+    ttsMentionPresentation: TtsMentionPresentation? = null,
     ttsReadAloudProgress: TtsReadAloudProgress? = null,
     selectionWrapper: @Composable (@Composable () -> Unit) -> Unit,
     collapsible: Boolean,
@@ -625,6 +628,9 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             )
         var plainLayoutResult by remember(bodyText) { mutableStateOf<TextLayoutResult?>(null) }
         var plainLayoutCoordinates by remember(bodyText) { mutableStateOf<LayoutCoordinates?>(null) }
+        LaunchedEffect(presentedTtsSentenceLayoutReporter, bodyText) {
+            presentedTtsSentenceLayoutReporter?.invoke("plain", bodyText, plainLayoutResult, plainLayoutCoordinates)
+        }
         DisposableEffect(presentedTtsSentenceLayoutReporter, bodyText) {
             onDispose {
                 presentedTtsSentenceLayoutReporter?.invoke("plain", bodyText, null, null)
@@ -671,10 +677,18 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     MarkdownMessageBody(
                         checkNotNull(markdownDocument),
                         mentionDisplayName =
-                            remember(appState) {
-                                { bech32: String -> appState.mentionDisplayName(bech32) }
+                            remember(appState, ttsMentionPresentation) {
+                                ttsMentionPresentation?.let { snapshot -> snapshot::displayName }
+                                    ?: { bech32: String -> appState.mentionDisplayName(bech32) }
                             },
-                        isGroupMember = mentionMembershipResolver,
+                        isGroupMember =
+                            remember(ttsMentionPresentation, mentionMembershipResolver) {
+                                if (ttsMentionPresentation != null) {
+                                    ttsMentionPresentation.membershipResolver()
+                                } else {
+                                    mentionMembershipResolver
+                                }
+                            },
                         useDecorativeBackgrounds = !customBubbleColorActive,
                         onNostrProfileTap =
                             remember(appState) {

@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -26,10 +27,12 @@ fun WhiteNoiseDropdownMenu(
     items: List<WhiteNoiseMenuItem>,
     modifier: Modifier = Modifier,
 ) {
+    val menuScrollState = rememberScrollState()
     DropdownMenu(
+        scrollState = menuScrollState,
         expanded = expanded,
         onDismissRequest = onDismissRequest,
-        modifier = modifier,
+        modifier = modifier.scrollEdgeFade(menuScrollState),
         shape = MaterialTheme.shapes.medium,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         border = amoledOutlineBorder(),

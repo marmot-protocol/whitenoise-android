@@ -1,0 +1,53 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFade.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.scrollEdgeFade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFade.kt",
+        "anchor": "fun Modifier.scrollEdgeFade(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: ScrollEdgeFade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFade.kt",
+        "anchor": ".scrollEdgeFade(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "Shared physical scroll edge policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFade.kt",
+        "anchor": "internal fun scrollEdgeFadeState(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFade.kt",
+        "surface": "Shared scroll masks during software-keyboard visibility",
+        "anchor": "WindowInsets.isImeVisible",
+        "test_ids": [
+          "SCR-002",
+          "SCR-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

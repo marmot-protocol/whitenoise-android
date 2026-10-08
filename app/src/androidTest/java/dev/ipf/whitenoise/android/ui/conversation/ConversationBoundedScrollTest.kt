@@ -30,6 +30,59 @@ class ConversationBoundedScrollTest {
     @get:Rule
     val composeRule = createComposeRule()
 
+    /** The end-only mention path crosses 50-plus mixed rows without composing the intervening history. */
+    @Test
+    fun unreadEndMentionFromFarHistoryKeepsCompositionBounded() {
+        val composed = Collections.synchronizedSet(mutableSetOf<Int>())
+        val finished = AtomicBoolean(false)
+        val reached = AtomicBoolean(false)
+        lateinit var coordinator: ConversationScrollCoordinator
+        lateinit var listState: LazyListState
+        lateinit var scope: CoroutineScope
+        val target = 8
+        composeRule.setContent {
+            listState = rememberLazyListState(initialFirstVisibleItemIndex = 90)
+            coordinator =
+                remember(listState) { ConversationScrollCoordinator(LazyListConversationScrollWriter(listState)) }
+            scope = rememberCoroutineScope()
+            LazyColumn(state = listState, reverseLayout = true, modifier = Modifier.height(240.dp)) {
+                items((0 until ITEM_COUNT).toList(), key = { it }) { index ->
+                    SideEffect { composed += index }
+                    val height = if (index % 9 == 0) 320 else 40
+                    Text("Message $index", Modifier.fillMaxWidth().height(height.dp).testTag("mention-row-$index"))
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val initial = synchronized(composed) { composed.toSet() }
+        composeRule.runOnIdle {
+            scope.launch {
+                reached.set(
+                    coordinator.jumpToMentionReadingStart(
+                        targetMessageId = "message-$target",
+                        resolveTargetIndex = { target },
+                        readLayout = { index ->
+                            val layout = listState.layoutInfo
+                            ConversationMentionJumpLayout(
+                                layout.viewportEndOffset,
+                                layout.visibleItemsInfo.firstOrNull { it.index == index }?.size,
+                            )
+                        },
+                    ),
+                )
+                finished.set(true)
+            }
+        }
+        composeRule.waitUntil(5_000) { finished.get() }
+        composeRule.onNodeWithTag("mention-row-$target").assertIsDisplayed()
+        composeRule.runOnIdle {
+            val newRows = synchronized(composed) { composed.toSet() - initial }
+            assertTrue(reached.get())
+            assertTrue("only the bounded target region is composed: $newRows", newRows.all { it in 0..30 })
+            assertTrue(newRows.size < 40)
+        }
+    }
+
     /** Accepted sends from far history compose only the destination viewport, never intervening rows. */
     @Test
     fun acceptedSendFromFarHistorySnapsWithoutComposingInterveningRows() {

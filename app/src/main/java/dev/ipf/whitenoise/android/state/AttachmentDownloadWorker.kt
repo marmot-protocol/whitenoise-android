@@ -253,6 +253,9 @@ class AttachmentDownloadWorker : CoroutineWorker {
                     AttachmentExecutionClass.ForegroundWork
                 ) {
                     try {
+                        // Owner and attempt only: the identity stays out of the log, but a repeated card can
+                        // be matched to retry churn against a user-initiated job on the same attachment.
+                        Log.i(TAG, "attachment_work_foreground run_attempt=$runAttemptCount")
                         setForeground(
                             attachmentWorkForegroundInfo(applicationContext, request),
                         )
