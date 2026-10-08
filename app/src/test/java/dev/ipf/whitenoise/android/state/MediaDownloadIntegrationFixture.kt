@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AttachmentCategoryFfi
 import dev.ipf.marmotkit.AttachmentEntryFfi
-import dev.ipf.marmotkit.AttachmentRoleFfi
 import dev.ipf.marmotkit.AttachmentHistoryChangeFfi
 import dev.ipf.marmotkit.AttachmentHistoryVersion
 import dev.ipf.marmotkit.AttachmentLocalAssetFfi
@@ -12,6 +11,7 @@ import dev.ipf.marmotkit.AttachmentLocalBytesFfi
 import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentPageFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
+import dev.ipf.marmotkit.AttachmentRoleFfi
 import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
