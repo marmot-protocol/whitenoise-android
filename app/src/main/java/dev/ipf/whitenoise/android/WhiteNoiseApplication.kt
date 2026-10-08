@@ -9,6 +9,7 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.notifications.PushWakeRecoveryScheduler
+import dev.ipf.whitenoise.android.state.AttachmentTransfers
 import dev.ipf.whitenoise.android.state.DisappearingMessageSweepWorker
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.applyApplicationLanguageTag
@@ -103,6 +104,7 @@ open class WhiteNoiseApplication :
                 },
         )
 
+    /** Attaches process-wide diagnostics, language, playback and transfer-count wiring before any component runs. */
     override fun onCreate() {
         super.onCreate()
         DictationDiagnostics.attach(this)
@@ -112,6 +114,7 @@ open class WhiteNoiseApplication :
         // onCreate on API 32 and lower so it can wrap the Activity context.
         applyApplicationLanguageTag(persistedApplicationLanguageTag(this))
         VoicePlaybackController.attach(this)
+        AttachmentTransfers.install(this)
         applicationScope.launch { PushWakeRecoveryScheduler.schedule(this@WhiteNoiseApplication) }
     }
 
