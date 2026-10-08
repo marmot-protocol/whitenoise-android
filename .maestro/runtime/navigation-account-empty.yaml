@@ -9,13 +9,13 @@ name: navigation-account-empty
 - tapOn:
     id: "settings.switch_profile"
 - tapOn: "Maestro Carol"
-- assertVisible: "Maestro Carol"
-- tapOn: "Back"
+- assertVisible: "Switch Profile, Maestro Carol"
+- assertVisible: "No Chats"
 - assertNotVisible: "Maestro group"
 - runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Maestro Carol"
 - tapOn:
     id: "settings.switch_profile"
 - tapOn: "Maestro Alice"
-- tapOn: "Back"
+- assertVisible: "Switch Profile, Maestro Alice"
 - assertVisible: "Maestro group"

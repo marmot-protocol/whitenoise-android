@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -21,6 +22,40 @@ from scripts.manual_test_fragments import definitions, load_guide
 
 
 class CampaignSummaryTest(unittest.TestCase):
+    def test_matrix_cli_works_outside_package_import_context(self):
+        """Regress the hosted summary's direct-script import without a repository PYTHONPATH."""
+        environment = dict(os.environ)
+        environment.pop('PYTHONPATH', None)
+        with tempfile.TemporaryDirectory() as temporary:
+            result = subprocess.run(
+                [sys.executable, str(runtime.ROOT / 'scripts/maestro_runtime_selection.py'), 'runtime-settings'],
+                cwd=temporary, env=environment, capture_output=True, text=True, timeout=10,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout.removeprefix('slices=')), matrix_selection('runtime-settings'))
+
+    def test_summary_cli_retains_missing_cases_outside_package_import_context(self):
+        """The exact hosted CLI writes a failed ledger even when no shard can be qualified."""
+        environment = dict(os.environ)
+        environment.pop('PYTHONPATH', None)
+        environment.update(GITHUB_SHA='a' * 40, GITHUB_RUN_ID='123', GITHUB_RUN_ATTEMPT='1')
+        environment.pop('GITHUB_STEP_SUMMARY', None)
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'summary.json'
+            result = subprocess.run(
+                [sys.executable, str(runtime.ROOT / 'scripts/maestro_runtime_summary.py'),
+                 '--artifacts', str(Path(temporary) / 'missing'), '--suite', 'runtime-settings',
+                 '--output', str(output)],
+                cwd=temporary, env=environment, capture_output=True, text=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 1, result.stderr)
+            ledger = json.loads(output.read_text())
+        self.assertEqual(ledger['expected_count'], sum(c['suite'] == 'settings' for c in runtime.CASES.values()))
+        self.assertEqual(ledger['passed_count'], 0)
+        self.assertFalse(ledger['evidence_complete'])
+        self.assertTrue(all(c['not_run'] for c in ledger['results']))
+        self.assertNotIn('ModuleNotFoundError', result.stderr)
+
     def test_workflow_upload_root_matches_actual_download_layout(self):
         """Keep the real multi-path artifact search root aligned with the reconciler's sibling directories."""
         workflow = yaml.safe_load((runtime.ROOT / '.github/workflows/android-instrumented.yml').read_text())
@@ -345,6 +380,25 @@ class RuntimeEvidenceTest(unittest.TestCase):
             screens = screen_catalog(root, {'ui': [{'source': source, 'test_ids': ['INT-001']}]}, {})
             self.assertEqual([screen['symbol'] for screen in screens], ['ColumnScope.GenericDialog'])
             self.assertEqual(len(screens[0]['edge_plan']), len(EDGE_DIMENSIONS))
+
+    def test_dialogs_outside_ui_package_require_the_same_maintained_edge_plan(self):
+        """Speech/platform dialogs cannot disappear because their owner is outside the UI directory."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = 'app/src/main/java/dev/ipf/whitenoise/android/audio/tts/Trust.kt'
+            path = root / source
+            path.parent.mkdir(parents=True)
+            path.write_text('@Composable fun EngineTrustDialog() {}')
+            with self.assertRaisesRegex(ValueError, 'no maintained source'):
+                screen_catalog(root, {}, {})
+            screens = screen_catalog(root, {'audio': [{'source': source, 'test_ids': ['TTS-001']}]}, {})
+            self.assertEqual([screen['symbol'] for screen in screens], ['EngineTrustDialog'])
+            self.assertEqual(len(screens[0]['edge_plan']), len(EDGE_DIMENSIONS))
+            self.assertFalse(screens[0]['execution_verified'])
+        actual = {screen['symbol']: screen for screen in inventory()['screen_catalog']}
+        self.assertIn('TtsTrustWarningDialog', actual)
+        self.assertEqual(actual['TtsTrustWarningDialog']['source'],
+                         'app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsTrustWarning.kt')
 
     def test_campaign_plan_covers_all_requirements_and_original_flow_filenames(self):
         """Every permanent point receives layer prerequisites and every journey links to its actual source."""

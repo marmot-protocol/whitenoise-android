@@ -17,5 +17,10 @@ name: preferences-language-cancel
 - tapOn: "Language"
 - assertVisible: "English"
 - back
+- assertVisible: "Appearance"
+- scrollUntilVisible:
+    element:
+      id: "appearance.language.group"
+    direction: DOWN
 - assertVisible:
     id: "appearance.language.group"

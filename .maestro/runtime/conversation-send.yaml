@@ -13,6 +13,9 @@ name: conversation-send
 - assertVisible: "Message"
 - assertNotVisible: "Send"
 - assertVisible: "Maestro verified send"
-- hideKeyboard
 - back
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
 - assertVisible: "Maestro verified send"
+- assertVisible: "Message"
+- assertNotVisible: "Send"

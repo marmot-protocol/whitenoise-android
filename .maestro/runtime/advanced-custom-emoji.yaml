@@ -20,5 +20,10 @@ name: advanced-custom-emoji
 - assertVisible:
     id: "custom_emoji.add"
 - back
+- assertVisible: "Appearance"
+- scrollUntilVisible:
+    element:
+      id: "appearance.custom_emoji.group"
+    direction: DOWN
 - assertVisible:
     id: "appearance.custom_emoji.group"

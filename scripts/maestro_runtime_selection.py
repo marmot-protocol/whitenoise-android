@@ -2,7 +2,10 @@
 
 import json
 import sys
-from scripts.maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD
+try:
+    from scripts.maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD
+except ModuleNotFoundError:
+    from maestro_runtime import SUITES, CASES, MAX_CASES_PER_SHARD
 
 
 def selection(value):

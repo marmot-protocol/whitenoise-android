@@ -89,7 +89,7 @@ def screen_catalog(root, surfaces, cases, include_companions=False):
             for symbol in set(symbols):
                 companions.setdefault(symbol, []).append(path.relative_to(root).as_posix())
     result = []
-    for path in sorted((root / 'app/src/main/java/dev/ipf/whitenoise/android/ui').rglob('*.kt')):
+    for path in sorted((root / 'app/src/main/java/dev/ipf/whitenoise/android').rglob('*.kt')):
         source = path.relative_to(root).as_posix()
         text = path.read_text()
         composables = composable_names(text)
