@@ -1,0 +1,530 @@
+{
+  "schema": 1,
+  "qualification_passed": false,
+  "tracker_complete": false,
+  "source_sha": "b7261b3ebceb3b2537811fe09edc078ea2eebfd4",
+  "apk_sha256": "c98cd8311e25398680b968d3ec347548b033701b204d9e427e67be65cc11566c",
+  "measurement": {
+    "method": "Direct platform Perfetto, installed hosted benchmark target; no compilation reset",
+    "configured_window_ms": 60000,
+    "rounds_per_scenario": 5,
+    "policy": "optimized",
+    "charging": false,
+    "energy_scope": "system_wide_hardware_rails",
+    "rail_categories": "CPU: cpu.*; network: AOC, modem, radio frontend, Wi-Fi/BT; memory: DDR and memory interface",
+    "gauge_resolution_uah": 2500,
+    "reported_trace_data_loss": 0.0,
+    "trace_visible_span_ms": [
+      59853.076608,
+      60096.542705
+    ],
+    "temperature_celsius": [
+      33.5,
+      33.9
+    ],
+    "fixture_pid_equal_at_capture_endpoints": true
+  },
+  "samples": [
+    {
+      "round": 1,
+      "scenario": "push_idle",
+      "cpu_energy_uws": 4884278.0,
+      "network_energy_uws": 7674722.0,
+      "memory_energy_uws": 3284581.0,
+      "all_rails_energy_uws": 24612141.0,
+      "fixture_cpu_ms": 559.771286,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59868.148385,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 1,
+      "scenario": "disabled_idle",
+      "cpu_energy_uws": 4417575.0,
+      "network_energy_uws": 6779946.0,
+      "memory_energy_uws": 3121112.0,
+      "all_rails_energy_uws": 22760341.0,
+      "fixture_cpu_ms": 213.823487,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59862.055449,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 1,
+      "scenario": "push_burst",
+      "cpu_energy_uws": 5219029.0,
+      "network_energy_uws": 7304043.0,
+      "memory_energy_uws": 3287800.0,
+      "all_rails_energy_uws": 24534459.0,
+      "fixture_cpu_ms": 3747.398889,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        5112,
+        2046
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        3072,
+        1
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": 5,
+      "visible_trace_span_ms": 59866.479969,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 1,
+      "scenario": "local_idle",
+      "cpu_energy_uws": 4504963.0,
+      "network_energy_uws": 6876243.0,
+      "memory_energy_uws": 3111685.0,
+      "all_rails_energy_uws": 22838360.0,
+      "fixture_cpu_ms": 363.36769,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        73543,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59995.647198,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 2,
+      "scenario": "push_idle",
+      "cpu_energy_uws": 4639144.0,
+      "network_energy_uws": 7553046.0,
+      "memory_energy_uws": 3052032.0,
+      "all_rails_energy_uws": 23686443.0,
+      "fixture_cpu_ms": 489.524831,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59936.485014,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 2,
+      "scenario": "local_idle",
+      "cpu_energy_uws": 4645503.0,
+      "network_energy_uws": 7309378.0,
+      "memory_energy_uws": 3111966.0,
+      "all_rails_energy_uws": 23611262.0,
+      "fixture_cpu_ms": 391.448072,
+      "fuel_gauge_drop_uah": 2500,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        72627,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59870.043161,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 2,
+      "scenario": "push_burst",
+      "cpu_energy_uws": 5430464.0,
+      "network_energy_uws": 7288906.0,
+      "memory_energy_uws": 3325897.0,
+      "all_rails_energy_uws": 24623421.0,
+      "fixture_cpu_ms": 3672.231551,
+      "fuel_gauge_drop_uah": 2500,
+      "uid_partial_wakelock_delta_ms": [
+        5891,
+        2202
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        3689,
+        1
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": 5,
+      "visible_trace_span_ms": 59853.076608,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 2,
+      "scenario": "disabled_idle",
+      "cpu_energy_uws": 15145085.0,
+      "network_energy_uws": 10187065.0,
+      "memory_energy_uws": 5278402.0,
+      "all_rails_energy_uws": 42855905.0,
+      "fixture_cpu_ms": 277.836543,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59923.428577,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 3,
+      "scenario": "disabled_idle",
+      "cpu_energy_uws": 4513241.0,
+      "network_energy_uws": 7146367.0,
+      "memory_energy_uws": 3118084.0,
+      "all_rails_energy_uws": 23304615.0,
+      "fixture_cpu_ms": 282.654544,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59908.202503,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 3,
+      "scenario": "push_idle",
+      "cpu_energy_uws": 5593925.0,
+      "network_energy_uws": 7267722.0,
+      "memory_energy_uws": 3308008.0,
+      "all_rails_energy_uws": 25081983.0,
+      "fixture_cpu_ms": 276.051994,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59856.364653,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 3,
+      "scenario": "local_idle",
+      "cpu_energy_uws": 4356439.0,
+      "network_energy_uws": 7112344.0,
+      "memory_energy_uws": 3068348.0,
+      "all_rails_energy_uws": 23000440.0,
+      "fixture_cpu_ms": 369.460767,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        79349,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59905.752559,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 3,
+      "scenario": "push_burst",
+      "cpu_energy_uws": 5259831.0,
+      "network_energy_uws": 7151736.0,
+      "memory_energy_uws": 3229573.0,
+      "all_rails_energy_uws": 24339441.0,
+      "fixture_cpu_ms": 3916.20145,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        4719,
+        2279
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        2445,
+        1
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": 5,
+      "visible_trace_span_ms": 59960.41694,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 4,
+      "scenario": "local_idle",
+      "cpu_energy_uws": 5142220.0,
+      "network_energy_uws": 6996774.0,
+      "memory_energy_uws": 3325491.0,
+      "all_rails_energy_uws": 24161815.0,
+      "fixture_cpu_ms": 164.271687,
+      "fuel_gauge_drop_uah": 2500,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        77135,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 60096.542705,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 4,
+      "scenario": "push_idle",
+      "cpu_energy_uws": 4839017.0,
+      "network_energy_uws": 6628137.0,
+      "memory_energy_uws": 3234269.0,
+      "all_rails_energy_uws": 23167496.0,
+      "fixture_cpu_ms": 318.941946,
+      "fuel_gauge_drop_uah": 2500,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59875.384632,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 4,
+      "scenario": "disabled_idle",
+      "cpu_energy_uws": 4268860.0,
+      "network_energy_uws": 6783788.0,
+      "memory_energy_uws": 3004296.0,
+      "all_rails_energy_uws": 22494860.0,
+      "fixture_cpu_ms": 222.96412,
+      "fuel_gauge_drop_uah": 2500,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59855.363636,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 4,
+      "scenario": "push_burst",
+      "cpu_energy_uws": 6425719.0,
+      "network_energy_uws": 7204768.0,
+      "memory_energy_uws": 3480243.0,
+      "all_rails_energy_uws": 25998798.0,
+      "fixture_cpu_ms": 3595.488293,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        5010,
+        2064
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        2958,
+        1
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": 5,
+      "visible_trace_span_ms": 59872.385039,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 5,
+      "scenario": "push_burst",
+      "cpu_energy_uws": 4258854.0,
+      "network_energy_uws": 7802936.0,
+      "memory_energy_uws": 3031238.0,
+      "all_rails_energy_uws": 23449989.0,
+      "fixture_cpu_ms": 190.8009,
+      "fuel_gauge_drop_uah": 2500,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": 0,
+      "visible_trace_span_ms": 59866.3568,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 5,
+      "scenario": "push_idle",
+      "cpu_energy_uws": 4499343.0,
+      "network_energy_uws": 7162731.0,
+      "memory_energy_uws": 3149655.0,
+      "all_rails_energy_uws": 23135139.0,
+      "fixture_cpu_ms": 481.31014,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59871.172311,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 5,
+      "scenario": "local_idle",
+      "cpu_energy_uws": 4683368.0,
+      "network_energy_uws": 7056012.0,
+      "memory_energy_uws": 3128206.0,
+      "all_rails_energy_uws": 23234760.0,
+      "fixture_cpu_ms": 416.325843,
+      "fuel_gauge_drop_uah": 2500,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        70849,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59858.328602,
+      "reported_trace_data_loss": 0.0
+    },
+    {
+      "round": 5,
+      "scenario": "disabled_idle",
+      "cpu_energy_uws": 4456643.0,
+      "network_energy_uws": 7017905.0,
+      "memory_energy_uws": 3076471.0,
+      "all_rails_energy_uws": 23058011.0,
+      "fixture_cpu_ms": 358.370768,
+      "fuel_gauge_drop_uah": 0,
+      "uid_partial_wakelock_delta_ms": [
+        0,
+        0
+      ],
+      "uid_fgs_delta_time_ms_and_count": [
+        0,
+        0
+      ],
+      "scheduled_job_records_unchanged": true,
+      "fixture_pid_equal_at_capture_endpoints": true,
+      "posting_distinct_bodies": null,
+      "visible_trace_span_ms": 59860.959055,
+      "reported_trace_data_loss": 0.0
+    }
+  ],
+  "final_timeline_readback": {
+    "expected_sent_distinct_bodies": 44,
+    "canonical_timeline_delivered_distinct_bodies": 44,
+    "canonical_timeline_missing_distinct_bodies": 0,
+    "canonical_timeline_duplicate_ids": 0,
+    "canonical_fifth_burst_counts": [
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "history_start_reached": true,
+    "raw_database_count_available": false,
+    "foreground_open_before_observation": true
+  },
+  "usb_functional_checks": [
+    {
+      "row": "force_stop_explicit_reopen",
+      "mode": "push",
+      "usb_powered_functional_only": true,
+      "stopped_before_reopen": true,
+      "unstopped_after_reopen": true,
+      "fresh_post_within_60s": true
+    },
+    {
+      "row": "force_stop_explicit_reopen",
+      "mode": "local",
+      "usb_powered_functional_only": true,
+      "stopped_before_reopen": true,
+      "unstopped_after_reopen": true,
+      "fresh_post_within_60s": true
+    },
+    {
+      "row": "permission_restored",
+      "mode": "push",
+      "usb_powered_functional_only": true,
+      "fresh_post_within_60s": true,
+      "permission_loss_settings_capture_only": true
+    }
+  ]
+}
