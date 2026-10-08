@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: consent-system-back
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: "Help Improve White Noise"
+- assertVisible: "Share usage"
+- assertVisible: "Share diagnostic logs"
+- back
+- assertVisible: "Allow Maestro Test Lab to send you notifications[?]"
+- tapOn:
+    id: "com.android.permissioncontroller:id/permission_deny_button"
+- assertVisible: "Maestro group"
+- assertNotVisible: "Help Improve White Noise"

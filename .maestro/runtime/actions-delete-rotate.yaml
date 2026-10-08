@@ -1,0 +1,20 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: actions-delete-rotate
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- longPressOn:
+    text: "Generated fixture message"
+- tapOn: "Delete"
+- assertVisible: "Delete message\\?"
+- assertVisible: "Delete for me"
+- assertVisible: "Delete for everyone"
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible: "Delete message\\?"
+- setOrientation: PORTRAIT
+- assertVisible: "Delete message\\?"
+- tapOn: "Cancel"
+- assertNotVisible: "Delete message\\?"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

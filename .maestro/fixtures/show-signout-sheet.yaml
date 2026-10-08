@@ -1,0 +1,11 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# The Settings entry opens the disclosure; its final Sign Out button is never tapped.
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Sign Out"
+    direction: DOWN
+- tapOn: "Sign Out"
+- assertVisible: "Stays on this device"
+- assertVisible: "What changes"

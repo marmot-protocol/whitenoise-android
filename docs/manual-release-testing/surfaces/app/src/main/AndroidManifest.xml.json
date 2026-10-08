@@ -1,0 +1,333 @@
+{
+  "source": "app/src/main/AndroidManifest.xml",
+  "legacy_sha256": "a78105b7bf8fe19f2c060ae907d7d06349856e67c5dc0110bb11abf5de715a65",
+  "categories": {
+    "android_entry_points": [
+      {
+        "surface": "Generation-specific notification group dismissal",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": ".notifications.NotificationGroupDismissReceiver",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "intent:${deepLinkScheme}",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "${deepLinkScheme}",
+        "test_ids": [
+          "SYS-006"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.action.BOOT_COMPLETED",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.action.BOOT_COMPLETED",
+        "test_ids": [
+          "NTF-014"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.action.MAIN",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.action.MAIN",
+        "test_ids": [
+          "INT-001",
+          "INT-002"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.action.MY_PACKAGE_REPLACED",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.action.MY_PACKAGE_REPLACED",
+        "test_ids": [
+          "NTF-014",
+          "SYS-008"
+        ]
+      },
+      {
+        "surface": "intent:*/*",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "*/*",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.action.SEND",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.action.SEND",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.action.SEND_MULTIPLE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.action.SEND_MULTIPLE",
+        "test_ids": [
+          "SYS-004",
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.action.TTS_SERVICE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.action.TTS_SERVICE",
+        "test_ids": [
+          "TTS-001",
+          "TTS-002"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.action.VIEW",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.action.VIEW",
+        "test_ids": [
+          "SYS-006"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.category.BROWSABLE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.category.BROWSABLE",
+        "test_ids": [
+          "SYS-006"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.category.DEFAULT",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.category.DEFAULT",
+        "test_ids": [
+          "SYS-004",
+          "SYS-006"
+        ]
+      },
+      {
+        "surface": "intent:android.intent.category.LAUNCHER",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.intent.category.LAUNCHER",
+        "test_ids": [
+          "INT-001",
+          "INT-002"
+        ]
+      },
+      {
+        "surface": "intent:android.speech.RecognitionService",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.speech.RecognitionService",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "intent:android.speech.action.RECOGNIZE_SPEECH",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.speech.action.RECOGNIZE_SPEECH",
+        "test_ids": [
+          "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "intent:com.google.firebase.MESSAGING_EVENT",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "com.google.firebase.MESSAGING_EVENT",
+        "test_ids": [
+          "NTF-002",
+          "NTF-003",
+          "NTF-006",
+          "NTF-019",
+          "NTF-020"
+        ]
+      },
+      {
+        "surface": "intent:marmot",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "marmot",
+        "test_ids": [
+          "SYS-006"
+        ]
+      },
+      {
+        "surface": "intent:nostrsigner",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "nostrsigner",
+        "test_ids": [
+          "ONB-010",
+          "ONB-011",
+          "ONB-012"
+        ]
+      },
+      {
+        "surface": "MainActivity opts in to Android platform Back callbacks",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android:enableOnBackInvokedCallback=\"true\"",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005",
+          "CON-005"
+        ]
+      }
+    ],
+    "manifest_permissions": [
+      {
+        "surface": "permission:android.permission.ACCESS_COARSE_LOCATION",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.ACCESS_COARSE_LOCATION",
+        "test_ids": [
+          "MED-012"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.ACCESS_FINE_LOCATION",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.ACCESS_FINE_LOCATION",
+        "test_ids": [
+          "MED-012"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.ACCESS_NETWORK_STATE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.ACCESS_NETWORK_STATE",
+        "test_ids": [
+          "INT-006",
+          "INT-007"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.BIND_JOB_SERVICE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.BIND_JOB_SERVICE",
+        "test_ids": [
+          "MED-022"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.CAMERA",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.CAMERA",
+        "test_ids": [
+          "MED-004"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.FOREGROUND_SERVICE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.FOREGROUND_SERVICE",
+        "test_ids": [
+          "DIC-001",
+          "NTF-014",
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+        "test_ids": [
+          "MED-022"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "test_ids": [
+          "DIC-001"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING",
+        "test_ids": [
+          "NTF-006",
+          "NTF-014"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+        "test_ids": [
+          "NTF-006",
+          "NTF-014"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.INTERNET",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.INTERNET",
+        "test_ids": [
+          "INT-006",
+          "INT-007"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.POST_NOTIFICATIONS",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.POST_NOTIFICATIONS",
+        "test_ids": [
+          "NTF-001"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.RECEIVE_BOOT_COMPLETED",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.RECEIVE_BOOT_COMPLETED",
+        "test_ids": [
+          "NTF-014"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.RECORD_AUDIO",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.RECORD_AUDIO",
+        "test_ids": [
+          "DIC-001",
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.RUN_USER_INITIATED_JOBS",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.RUN_USER_INITIATED_JOBS",
+        "test_ids": [
+          "MED-022"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.VIBRATE",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.VIBRATE",
+        "test_ids": [
+          "GRP-016"
+        ]
+      },
+      {
+        "surface": "permission:android.permission.WAKE_LOCK",
+        "source": "app/src/main/AndroidManifest.xml",
+        "anchor": "android.permission.WAKE_LOCK",
+        "test_ids": [
+          "NTF-014",
+          "TTS-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

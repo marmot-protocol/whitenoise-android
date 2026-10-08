@@ -1,0 +1,33 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-start-group-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Bob"
+    direction: DOWN
+- tapOn: "Maestro Bob"
+- assertVisible: "User Profile"
+- scrollUntilVisible:
+    element:
+      text: "Start group"
+    direction: DOWN
+- tapOn: "Start group"
+- assertVisible:
+    id: "new_group.screen"
+- assertVisible: "Maestro Bob"
+- tapOn:
+    id: "new_group.continue"
+- assertVisible:
+    id: "group_setup.screen"
+- back
+- assertVisible:
+    id: "new_group.screen"
+- back
+- assertVisible: "Maestro group"

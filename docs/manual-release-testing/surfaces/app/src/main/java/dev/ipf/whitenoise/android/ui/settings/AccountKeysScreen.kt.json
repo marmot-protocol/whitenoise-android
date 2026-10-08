@@ -1,0 +1,869 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+  "legacy_sha256": "fad867b866be80b4be51c67c5d437491b1ceb054fc61fb704fc4f06bf209c333",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AccountKeysScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun AccountKeysScreen(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "AccountWipeFlow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun AccountWipeFlow(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "EncryptedBackupPassphraseStrength.color",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun EncryptedBackupPassphraseStrength.color(",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "EncryptedBackupResultDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun EncryptedBackupResultDialog(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "ExportPasswordDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun ExportPasswordDialog(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011",
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "ExportPasswordStrengthIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun ExportPasswordStrengthIndicator(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "PrivateKeyValueRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun PrivateKeyValueRow(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "ProfileKeySupportingText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun ProfileKeySupportingText(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "ProfileKeyValueRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun ProfileKeyValueRow(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "ProfileKeysDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun ProfileKeysDialogs(",
+        "test_ids": [
+          "ACC-010",
+          "ACC-011",
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "ProfileKeysEffects",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun ProfileKeysEffects(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "ProfileKeysList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun ProfileKeysList(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SignOutAndWipeSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun SignOutAndWipeSheet(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "SignOutProgressDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun SignOutProgressDialog(",
+        "test_ids": [
+          "ACC-013",
+          "ACC-014"
+        ]
+      },
+      {
+        "surface": "SignOutSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun SignOutSheet(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "WipeBullet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun WipeBullet(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "WipeOutcomeSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun WipeOutcomeSheet(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "WipeOutcomeStageRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun WipeOutcomeStageRow(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "WipeProgressSheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun WipeProgressSheet(",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "WipeProgressStageRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "fun WipeProgressStageRow(",
+        "test_ids": [
+          "SET-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:access_amber_owns_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.access_amber_owns_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:access_amber_signed_in",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.access_amber_signed_in",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:choose_another_location_and_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.choose_another_location_and_try_again",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:confirm_password",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.confirm_password",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:copy_private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.copy_private_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:copy_public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.copy_public_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:couldnt_save_file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.couldnt_save_file",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_result_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.encrypted_backup_result_title",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_strength_fair",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.encrypted_backup_strength_fair",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_strength_strong",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.encrypted_backup_strength_strong",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_strength_too_short",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.encrypted_backup_strength_too_short",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_backup_strength_weak",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.encrypted_backup_strength_weak",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:encrypted_private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.encrypted_private_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:export",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.export",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:export_encrypted_private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.export_encrypted_private_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:export_nsec",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.export_nsec",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:export_password_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.export_password_help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:export_private_key_consequence",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.export_private_key_consequence",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:hide",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.hide",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:hide_private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.hide_private_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:keep_your_private_key_safe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.keep_your_private_key_safe",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:key_export_expired_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.key_export_expired_body",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:key_export_expired_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.key_export_expired_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:key_export_preview_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.key_export_preview_help",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:key_export_view_backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.key_export_view_backup",
+        "test_ids": [
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "string:ok",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.ok",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:outbound_share_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.outbound_share_failed",
+        "test_ids": [
+          "ACC-010"
+        ]
+      },
+      {
+        "surface": "string:password",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.password",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:password_strength",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.password_strength",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:passwords_mismatch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.passwords_mismatch",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.private_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:private_key_hidden",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.private_key_hidden",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:private_key_revealed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.private_key_revealed",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:profile_private_key_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.profile_private_key_help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:profile_public_key_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.profile_public_key_help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.public_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:public_key_copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.public_key_copied",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_profile_keys",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.settings_profile_keys",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:share",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.share",
+        "test_ids": [
+          "ACC-010"
+        ]
+      },
+      {
+        "surface": "string:share_secret_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.share_secret_key",
+        "test_ids": [
+          "ACC-010"
+        ]
+      },
+      {
+        "surface": "string:show_private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.show_private_key",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_confirm_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_confirm_body",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_confirm_field_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_confirm_field_label",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_confirm_instruction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_confirm_instruction",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_confirm_keyword",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_confirm_keyword",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_confirm_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_sheet_destroyed_db",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_sheet_destroyed_db",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_sheet_destroyed_heading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_sheet_destroyed_heading",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_sheet_destroyed_keychain",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_sheet_destroyed_keychain",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_sheet_destroyed_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_sheet_destroyed_relays",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_sheet_fresh_start",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_sheet_fresh_start",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_sheet_intro",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_sheet_intro",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_and_wipe_sheet_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_and_wipe_sheet_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_delete_key_packages_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_delete_key_packages_help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_delete_key_packages_label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_delete_key_packages_label",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_sheet_changes_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_sheet_changes_body",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_sheet_changes_heading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_sheet_changes_heading",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_sheet_stays_body",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_sheet_stays_body",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_sheet_stays_heading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_sheet_stays_heading",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:sign_out_sheet_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.sign_out_sheet_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_create_encrypted_backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_couldnt_create_encrypted_backup",
+        "test_ids": [
+          "ACC-010"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_export_nsec",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_couldnt_export_nsec",
+        "test_ids": [
+          "ACC-010"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_sign_out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_couldnt_sign_out",
+        "test_ids": [
+          "ONB-009"
+        ]
+      },
+      {
+        "surface": "string:toast_couldnt_wipe_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_couldnt_wipe_account",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:toast_signed_out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_signed_out",
+        "test_ids": [
+          "ONB-009"
+        ]
+      },
+      {
+        "surface": "string:toast_signed_out_and_wiped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_signed_out_and_wiped",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:toast_signed_out_relay_cleanup_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_signed_out_relay_cleanup_incomplete",
+        "test_ids": [
+          "ONB-009"
+        ]
+      },
+      {
+        "surface": "string:wipe",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.wipe",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:wipe_outcome_groups_left",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.wipe_outcome_groups_left",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:wipe_outcome_key_packages_deleted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.wipe_outcome_key_packages_deleted",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:wipe_outcome_local_wipe_done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.wipe_outcome_local_wipe_done",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:wipe_outcome_local_wipe_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.wipe_outcome_local_wipe_incomplete",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:wipe_progress_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.wipe_progress_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:wipe_stage_deleting_key_packages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.wipe_stage_deleting_key_packages",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:wipe_stage_leaving_groups",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.wipe_stage_leaving_groups",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:wipe_stage_wiping_local_data",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.wipe_stage_wiping_local_data",
+        "test_ids": [
+          "SET-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "button:profile_keys.view_backup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "testTag(\"profile_keys.view_backup\")",
+        "test_ids": [
+          "ACC-009",
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "button:profile_keys.export_file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "testTag(\"profile_keys.export_file\")",
+        "test_ids": [
+          "ACC-009",
+          "ACC-011"
+        ]
+      },
+      {
+        "surface": "button:profile_keys.wipe_confirm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "testTag(\"profile_keys.wipe_confirm\")",
+        "test_ids": [
+          "ACC-014"
+        ]
+      },
+      {
+        "surface": "switch:profile_keys.signout_invitation_keys",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "testTag(\"profile_keys.signout_invitation_keys\")",
+        "test_ids": [
+          "ACC-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

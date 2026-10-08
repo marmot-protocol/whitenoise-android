@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: nested-default-retention
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Privacy & Security"
+    direction: DOWN
+- tapOn: "Privacy & Security"
+- scrollUntilVisible:
+    element:
+      text: "Default disappearing messages"
+    direction: DOWN
+- tapOn: "Default disappearing messages"
+- assertVisible:
+    text: "Disappearing messages"
+- back
+- assertNotVisible:
+    text: "Disappearing messages"
+- assertVisible:
+    id: "privacy.default_disappearing.group"

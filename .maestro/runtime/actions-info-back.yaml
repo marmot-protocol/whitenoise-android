@@ -1,0 +1,15 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: actions-info-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- longPressOn:
+    text: "Generated fixture message"
+- tapOn: "Info"
+- assertVisible: "Message Details"
+- assertVisible: "Message ID"
+- back
+- assertNotVisible: "Message Details"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

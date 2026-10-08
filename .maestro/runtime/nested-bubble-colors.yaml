@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: nested-bubble-colors
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: DOWN
+- tapOn: "Appearance"
+- scrollUntilVisible:
+    element:
+      text: "Chat bubble colors"
+    direction: DOWN
+- tapOn: "Chat bubble colors"
+- assertVisible:
+    id: "bubble_colors.mine.picker"
+- assertVisible:
+    id: "bubble_colors.mine.preview"
+- back
+- assertVisible:
+    id: "appearance.theme.group"

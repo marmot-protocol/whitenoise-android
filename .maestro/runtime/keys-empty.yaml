@@ -1,0 +1,30 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-empty
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- tapOn: "Profile Keys"
+- assertVisible: "Private key hidden"
+- tapOn: "Export Encrypted Private Key"
+- assertVisible: "Encrypted Private Key"
+- assertVisible:
+    id: "profile_keys.export_password"
+- assertNotVisible:
+    id: "profile_keys.export_password"
+    text: ".+"
+- assertVisible:
+    id: "profile_keys.export_confirmation"
+- assertNotVisible:
+    id: "profile_keys.export_confirmation"
+    text: ".+"
+- assertVisible:
+    id: "profile_keys.view_backup"
+    enabled: false
+- assertVisible:
+    id: "profile_keys.export_file"
+    enabled: false
+- tapOn: "Cancel"
+- assertVisible: "Private key hidden"
+- assertNotVisible: "Encrypted Private Key"

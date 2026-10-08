@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "scope": "Every MainSection and SettingsDetail route; mappings are assertions written, not complete or executed release proof.",
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/AppDestinations.kt",
+  "settings_routes": {
+    "ShareConnect": [
+      "nested-share-connect"
+    ],
+    "Appearance": [
+      "settings-appearance",
+      "preferences-light",
+      "preferences-dark",
+      "preferences-amoled"
+    ],
+    "ActionColor": [
+      "nested-action-color"
+    ],
+    "ChatBubbleColors": [
+      "nested-bubble-colors"
+    ],
+    "Language": [
+      "preferences-language-cancel",
+      "preferences-language-german",
+      "preferences-language-traditional-chinese"
+    ],
+    "CustomEmoji": [
+      "advanced-custom-emoji"
+    ],
+    "Data": [
+      "settings-data"
+    ],
+    "Profile": [
+      "navigation-profile-edit-cancel"
+    ],
+    "AccountKeys": [
+      "settings-profile-keys",
+      "keys-empty",
+      "keys-short-boundary",
+      "keys-minimum-boundary",
+      "keys-mismatch",
+      "keys-cancel-clears",
+      "keys-back-clears",
+      "keys-correct-mismatch",
+      "keys-rotation-cancel",
+      "accounts-wipe-sheet-back",
+      "accounts-wipe-empty-back",
+      "accounts-wipe-invalid-cancel",
+      "accounts-wipe-valid-cancel",
+      "accounts-wipe-normalized-cancel",
+      "accounts-wipe-rotation-cancel"
+    ],
+    "Relays": [
+      "advanced-relays",
+      "advanced-relay-empty",
+      "advanced-relay-whitespace",
+      "advanced-relay-malformed",
+      "advanced-relay-http",
+      "advanced-relay-ws",
+      "advanced-relay-secure-cancel"
+    ],
+    "Support": [
+      "support-entry-back",
+      "support-relay-guidance"
+    ],
+    "SupportRelays": [
+      "support-relays-back"
+    ],
+    "KeyPackages": [
+      "developer-key-packages"
+    ],
+    "QuarantinedGroups": [
+      "developer-quarantine"
+    ],
+    "Notifications": [
+      "settings-notifications"
+    ],
+    "DevicePrivacy": [
+      "settings-privacy"
+    ],
+    "DiagnosticsImprovements": [
+      "nested-diagnostics"
+    ],
+    "BlockedUsers": [
+      "nested-blocked-empty"
+    ],
+    "AiAgents": [
+      "settings-connectors",
+      "connectors-hermes",
+      "connectors-claude",
+      "connectors-codex",
+      "connectors-opencode",
+      "connectors-openclaw"
+    ],
+    "Donate": [
+      "nested-donate"
+    ],
+    "TextToSpeech": [
+      "settings-read-aloud",
+      "speech-rate-back",
+      "speech-custom-cancel",
+      "speech-custom-back",
+      "speech-custom-reopen",
+      "speech-custom-empty",
+      "speech-custom-zero",
+      "speech-custom-below-min",
+      "speech-custom-above-max",
+      "speech-custom-minimum-cancel",
+      "speech-custom-maximum-cancel",
+      "speech-custom-rotation-cancel",
+      "speech-rate-return",
+      "speech-custom-duplicate-decimal",
+      "speech-custom-overflow"
+    ],
+    "Dictation": [
+      "advanced-dictation",
+      "dictation-provider-back",
+      "dictation-provider-rotation",
+      "dictation-finish-back",
+      "dictation-provider-reopen"
+    ],
+    "ChatFolders": [
+      "advanced-folders",
+      "folders-create-reopen",
+      "folders-delete-confirm",
+      "smart-folders-picker-back",
+      "smart-folders-unread-cancel",
+      "smart-folders-chat-type-cancel",
+      "smart-folders-participants-empty",
+      "smart-folders-participants-picker-back",
+      "smart-folders-condition-rotation",
+      "smart-folders-title-empty",
+      "smart-folders-title-draft-cancel"
+    ],
+    "Gestures": [
+      "advanced-gestures"
+    ],
+    "Help": [
+      "settings-help"
+    ],
+    "BugReport": [
+      "nested-bug-report"
+    ],
+    "About": [
+      "navigation-help-about"
+    ],
+    "Developer": [
+      "developer-unlock",
+      "developer-mode-off"
+    ]
+  },
+  "main_routes": {
+    "Chats": [
+      "navigation-search-clear",
+      "navigation-account-empty",
+      "conversation-draft-return"
+    ],
+    "Settings": [
+      "navigation-settings-back",
+      "accounts-signout-back",
+      "accounts-signout-rotation-back",
+      "accounts-signout-toggle-back"
+    ],
+    "Diagnostics": [
+      "developer-diagnostics",
+      "developer-diagnostics-actions",
+      "developer-diagnostics-health"
+    ]
+  }
+}

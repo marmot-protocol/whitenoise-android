@@ -34,7 +34,6 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
@@ -65,6 +64,13 @@ class ComposerDragAndReadingTest {
     private var observed = TextFieldValue()
     private var sends = 0
     private var cancels = 0
+
+    /** Actual edits retain navigation and reserved editor space on every fixed-geometry frame. */
+    @Test
+    fun typingKeepsTheSettledDraftTopAndEditorBounds() {
+        render(longDraft + "\na")
+        assertDraftTopStableDuringTextEdits(composeRule, { observed }, { sends })
+    }
 
     @Test
     fun emptyDraftCanGrowFromItsVisibleGrip() {
@@ -158,13 +164,14 @@ class ComposerDragAndReadingTest {
         assertTrue("returning to Automatic must restore content growth", height() > automaticHeight + 100f)
     }
 
+    /** Compact resizing preserves one measured editor line and focus without reserving an expanded toolbar. */
     @Test
     fun compactHeightCanReachOneEditorLineWithoutReservingAnExpandedToolbar() {
         render(longDraft, surfaceHeight = 150)
         val before = height()
         drag(600f)
         assertTrue("compact chrome must leave unused space to the transcript", height() < before - 40f)
-        assertOneEditorLine()
+        assertOneComposerEditorLine(composeRule.onNode(hasSetTextAction()))
         composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         composeRule.onNode(hasSetTextAction()).assertIsFocused()
     }
@@ -217,6 +224,7 @@ class ComposerDragAndReadingTest {
         assertEquals(original, observed)
     }
 
+    /** Adding a long draft after empty expansion retains the one-line minimum without changing its content. */
     @Test
     fun aLongDraftEnteredAfterExpandingAnEmptyComposerCanStillStayAtOneLine() {
         render("")
@@ -225,7 +233,7 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
         val original = observed
         drag(600f)
-        assertOneEditorLine()
+        assertOneComposerEditorLine(composeRule.onNode(hasSetTextAction()))
         val minimum = height()
         composeRule.mainClock.advanceTimeBy(500)
         composeRule.waitForIdle()
@@ -389,6 +397,7 @@ class ComposerDragAndReadingTest {
         assertEquals(0f, scroll(), 1f)
     }
 
+    /** Large RTL text retains one measured line and top navigation at the narrow manual minimum. */
     @Test
     fun narrowLargeRtlDraftRetainsUsableMinimumAndTopAction() {
         render(longDraft, width = 280, rtl = true, fontScale = 2f)
@@ -396,7 +405,7 @@ class ComposerDragAndReadingTest {
         drag(600f)
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_manual_minimum_large_rtl.png")
-        assertOneEditorLine()
+        assertOneComposerEditorLine(composeRule.onNode(hasSetTextAction()))
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).performClick()
         composeRule.waitForIdle()
         assertEquals(0f, scroll(), 1f)
@@ -474,6 +483,7 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
     }
 
+    /** Narrow RTL editing preserves both top navigation and Cancel when the editor reaches its minimum. */
     @Test
     fun narrowEditedDraftKeepsNavigationAndCancelUsable() {
         render(longDraft, width = 280, rtl = true, fontScale = 2f, editing = true)
@@ -481,7 +491,7 @@ class ComposerDragAndReadingTest {
         composeRule.onNodeWithTag(COMPOSER_DRAFT_TOP_TAG).assertIsDisplayed()
         composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/composer_manual_minimum_edit_large_rtl.png")
         composeRule.onNodeWithTag(COMPOSER_EDIT_CANCEL_TAG).assertIsDisplayed()
-        assertOneEditorLine()
+        assertOneComposerEditorLine(composeRule.onNode(hasSetTextAction()))
         composeRule.onNodeWithTag(COMPOSER_EDIT_CANCEL_TAG).performClick()
         composeRule.waitForIdle()
         assertEquals("navigation must not crowd out Cancel", 1, cancels)
@@ -593,6 +603,7 @@ class ComposerDragAndReadingTest {
         assertEquals(1, dismissed)
     }
 
+    /** Swipes the actual resize strip and waits for layout before assertions inspect its resulting geometry. */
     private fun drag(delta: Float) {
         composeRule.onNodeWithTag(COMPOSER_RESIZE_GESTURE_TAG).performTouchInput {
             swipe(center, center + Offset(0f, delta), durationMillis = 320)
@@ -600,38 +611,16 @@ class ComposerDragAndReadingTest {
         composeRule.waitForIdle()
     }
 
-    private fun height() =
-        composeRule
-            .onNodeWithTag(TAG)
-            .fetchSemanticsNode()
-            .boundsInRoot.height
+    /** Measures the full composer, including any separate navigation row, for resize and reservation assertions. */
+    private fun height() = composerNodeHeight(composeRule.onNodeWithTag(TAG))
 
-    private fun pillHeight() =
-        composeRule
-            .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
-            .fetchSemanticsNode()
-            .boundsInRoot.height
+    /** Measures the editor pill separately from surrounding composer controls during compact resizing. */
+    private fun pillHeight() = composerNodeHeight(composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG))
 
-    private fun scroll() =
-        composeRule
-            .onNode(hasSetTextAction())
-            .fetchSemanticsNode()
-            .config[SemanticsProperties.VerticalScrollAxisRange]
-            .value()
+    /** Reads the editor's semantic scroll offset without moving its caret or selection. */
+    private fun scroll() = composerEditorScroll(composeRule.onNode(hasSetTextAction()))
 
-    private fun assertOneEditorLine() {
-        val editor = composeRule.onNode(hasSetTextAction())
-        val layouts = mutableListOf<TextLayoutResult>()
-        editor.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        val layout = layouts.single()
-        assertEquals(
-            "collapsed editor must expose exactly one measured text line",
-            layout.getLineTop(1) - layout.getLineTop(0),
-            editor.fetchSemanticsNode().boundsInRoot.height,
-            1f,
-        )
-    }
-
+    /** Hosts the real composer with an unsent synthetic draft and observes edits, Send and Cancel callbacks. */
     private fun render(
         draft: String,
         dark: Boolean = false,

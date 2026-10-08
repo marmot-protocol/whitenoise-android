@@ -1,0 +1,14 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: conversation-emoji-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Open emoji picker"
+- assertVisible:
+    id: "emoji.picker.grid"
+- back
+- assertNotVisible:
+    id: "emoji.picker.grid"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

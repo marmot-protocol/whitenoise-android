@@ -1,0 +1,18 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: groups-retention-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- tapOn: "Disappearing"
+- assertVisible:
+    text: "Disappearing messages"
+- tapOn: "Cancel"
+- assertNotVisible:
+    text: "Disappearing messages"
+- assertVisible:
+    id: "chat_info.list"

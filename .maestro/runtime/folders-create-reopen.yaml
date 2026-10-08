@@ -1,0 +1,32 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: folders-create-reopen
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Folders"
+    direction: DOWN
+- tapOn: "Folders"
+- assertVisible:
+    id: "chat-folders-content"
+- tapOn: "New Folder"
+- assertVisible:
+    id: "folder.name"
+- tapOn:
+    id: "folder.name"
+- inputText: "Maestro saved folder"
+- hideKeyboard
+- tapOn:
+    id: "folder.save"
+- assertVisible:
+    id: "chat-folders-content"
+- assertVisible: "Maestro saved folder"
+- tapOn: "Maestro saved folder"
+- assertVisible:
+    id: "folder.name"
+    text: "Maestro saved folder"
+- back
+- assertVisible: "Maestro saved folder"

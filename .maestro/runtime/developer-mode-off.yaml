@@ -1,0 +1,39 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: developer-mode-off
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Help"
+    direction: DOWN
+- tapOn: "Help"
+- tapOn:
+    id: "help.about"
+- assertVisible:
+    id: "about.app"
+- repeat:
+    times: 7
+    commands:
+      - tapOn:
+          id: "about.version"
+- scrollUntilVisible:
+    element:
+      id: "about.developer"
+    direction: DOWN
+- tapOn:
+    id: "about.developer"
+- assertVisible:
+    id: "developer.warning"
+- tapOn:
+    id: "developer.mode.switch"
+- assertNotVisible:
+    id: "developer.debugging"
+- scrollUntilVisible:
+    element:
+      id: "developer.key_packages.row"
+    direction: DOWN
+- assertVisible:
+    id: "developer.key_packages.row"

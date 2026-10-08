@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: accounts-signout-rotation-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-signout-sheet.yaml
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible: "Stays on this device"
+- setOrientation: PORTRAIT
+- assertVisible: "What changes"
+- back
+- assertNotVisible: "Stays on this device"
+- assertVisible: "Settings"
+- back
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml

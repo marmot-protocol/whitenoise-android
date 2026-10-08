@@ -1,0 +1,23 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: connectors-hermes
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "AI Agents"
+    direction: DOWN
+- tapOn: "AI Agents"
+- tapOn:
+    id: "ai_agents.connector.hermes"
+- assertVisible:
+    id: "ai_agents.prompt.hermes"
+- assertVisible:
+    id: "ai_agents.copy.hermes"
+- back
+- assertNotVisible:
+    id: "ai_agents.setup_content"
+- assertVisible:
+    id: "ai_agents.connectors"

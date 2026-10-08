@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: keys-minimum-boundary
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- tapOn: "Profile Keys"
+- assertVisible: "Private key hidden"
+- tapOn: "Export Encrypted Private Key"
+- assertVisible: "Encrypted Private Key"
+- tapOn: "Password"
+- inputText: "123456789012"
+- tapOn: "Confirm password"
+- inputText: "123456789012"
+- hideKeyboard
+- assertVisible:
+    id: "profile_keys.view_backup"
+    enabled: true
+- assertVisible:
+    id: "profile_keys.export_file"
+    enabled: true
+- tapOn: "Cancel"
+- assertVisible: "Private key hidden"
+- assertNotVisible: "Encrypted Private Key"

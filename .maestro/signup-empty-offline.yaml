@@ -1,0 +1,37 @@
+appId: dev.ipf.whitenoise.android.dev
+name: signup-empty-offline
+---
+# Stop the previous foreground process before Android clears its data.
+- stopApp
+- setOrientation: PORTRAIT
+- launchApp:
+    clearState: true
+    permissions:
+      all: deny
+# Back closes this known optional sheet and records declined sharing choices.
+- runFlow:
+    when:
+      visible: "Help Improve White Noise"
+    commands:
+      - back
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- tapOn: "Sign Up"
+- tapOn:
+    id: "onboarding.sign_up.action"
+- scrollUntilVisible:
+    element:
+      text: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+    direction: DOWN
+- assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+- tapOn: "Retry"
+- scrollUntilVisible:
+    element:
+      text: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+    direction: DOWN
+- assertVisible: "No internet connection. Connect with Wi-Fi, mobile data, or another network, then retry."
+- assertNotVisible: "Private key"
+- tapOn: "Back"
+- assertVisible: "Sign Up"
+- assertVisible: "Sign In"
+- takeScreenshot: signup-empty-offline

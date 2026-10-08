@@ -1,0 +1,16 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: search-content-back
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Search chats"
+- hideKeyboard
+- tapOn:
+    id: "chat-list-search-filters-action"
+- tapOn: "Content"
+- assertVisible: "Content"
+- back
+- assertVisible:
+    id: "chats.searchField"
+- back
+- assertVisible: "Maestro group"

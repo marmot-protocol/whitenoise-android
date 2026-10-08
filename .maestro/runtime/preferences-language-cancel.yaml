@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: preferences-language-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Appearance"
+    direction: DOWN
+- tapOn: "Appearance"
+- scrollUntilVisible:
+    element:
+      text: "Language"
+    direction: DOWN
+- tapOn: "Language"
+- assertVisible: "English"
+- back
+- assertVisible: "Appearance"
+- scrollUntilVisible:
+    element:
+      id: "appearance.language.group"
+    direction: DOWN
+- assertVisible:
+    id: "appearance.language.group"

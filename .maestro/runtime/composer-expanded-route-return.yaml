@@ -1,0 +1,28 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: composer-expanded-route-return
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Message"
+- inputText: "Maestro expanded draft"
+- swipe:
+    from:
+      id: "composer-resize-gesture"
+    direction: UP
+    duration: 1000
+- assertNotVisible: "Generated fixture message"
+- assertVisible:
+    id: "composer-pill-surface"
+- assertVisible: "Maestro expanded draft"
+- hideKeyboard
+- back
+- assertVisible: "Draft: Maestro expanded draft"
+- tapOn: "Maestro group"
+- assertVisible: "Maestro expanded draft"
+- assertVisible:
+    id: composer-pill-surface
+- assertNotVisible:
+    id: chats.scope.chats
+- assertNotVisible: Generated fixture message

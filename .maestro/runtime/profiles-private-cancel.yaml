@@ -1,0 +1,60 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-private-cancel
+---
+- runFlow: ../fixtures/open-external-private-details.yaml
+- scrollUntilVisible:
+    element:
+      id: person_profile.nickname
+    direction: DOWN
+- tapOn:
+    id: person_profile.nickname
+- assertVisible:
+    id: person_profile.nickname
+    focused: true
+- inputText: "Maestro unsaved nickname"
+- assertVisible:
+    id: person_profile.nickname
+    text: "Maestro unsaved nickname"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: person_profile.notes
+    direction: DOWN
+- tapOn:
+    id: person_profile.notes
+- assertVisible:
+    id: person_profile.notes
+    focused: true
+- inputText: "Maestro unsaved note"
+- assertVisible:
+    id: person_profile.notes
+    text: "Maestro unsaved note"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_cancel
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_cancel
+- assertVisible: "User Profile"
+- scrollUntilVisible:
+    element:
+      text: "Nickname & notes"
+    direction: DOWN
+- tapOn: "Nickname & notes"
+- scrollUntilVisible:
+    element:
+      id: person_profile.nickname
+    direction: UP
+- assertNotVisible: "Maestro unsaved nickname"
+- scrollUntilVisible:
+    element:
+      id: person_profile.notes
+    direction: DOWN
+- assertNotVisible: "Maestro unsaved note"
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_cancel
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_cancel

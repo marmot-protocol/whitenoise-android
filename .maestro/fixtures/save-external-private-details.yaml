@@ -1,0 +1,63 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+- runFlow: open-external-private-details.yaml
+- scrollUntilVisible:
+    element:
+      id: person_profile.nickname
+    direction: DOWN
+- tapOn:
+    id: person_profile.nickname
+- assertVisible:
+    id: person_profile.nickname
+    focused: true
+- inputText: Maestro private Dave
+- assertVisible:
+    id: person_profile.nickname
+    text: Maestro private Dave
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: person_profile.notes
+    direction: DOWN
+- tapOn:
+    id: person_profile.notes
+- assertVisible:
+    id: person_profile.notes
+    focused: true
+- inputText: Maestro private note
+- assertVisible:
+    id: person_profile.notes
+    text: Maestro private note
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_save
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_save
+- assertVisible: User Profile
+- scrollUntilVisible:
+    element:
+      text: Nickname & notes
+    direction: DOWN
+- tapOn: Nickname & notes
+- scrollUntilVisible:
+    element:
+      id: person_profile.nickname
+    direction: DOWN
+- assertVisible:
+    id: person_profile.nickname
+    text: Maestro private Dave
+- scrollUntilVisible:
+    element:
+      id: person_profile.notes
+    direction: DOWN
+- assertVisible:
+    id: person_profile.notes
+    text: Maestro private note
+- scrollUntilVisible:
+    element:
+      id: person_profile.private_cancel
+    direction: DOWN
+- tapOn:
+    id: person_profile.private_cancel

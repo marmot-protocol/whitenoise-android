@@ -135,6 +135,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
+import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
 import kotlinx.coroutines.delay
@@ -1273,7 +1274,9 @@ internal fun ContactPrivateDetailsDialog(
     ) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            modifier = if (outline != null) Modifier.border(outline, MaterialTheme.shapes.extraLarge) else Modifier,
+            modifier =
+                (if (outline != null) Modifier.border(outline, MaterialTheme.shapes.extraLarge) else Modifier)
+                    .exposePerformanceTestTags(),
             properties = DialogProperties(securePolicy = securePolicy),
             containerColor = scheme.surfaceContainerLow,
             textContentColor = scheme.onSurfaceVariant,

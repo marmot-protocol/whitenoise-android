@@ -1,0 +1,24 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: profiles-shared-groups
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: "Maestro group"
+- tapOn: "Maestro group"
+- runFlow: ../fixtures/assert-fixture-conversation.yaml
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "chat_info.list"
+- scrollUntilVisible:
+    element:
+      text: "Maestro Bob"
+    direction: DOWN
+- tapOn: "Maestro Bob"
+- assertVisible: "User Profile"
+- scrollUntilVisible:
+    element:
+      text: "Groups in Common"
+    direction: DOWN
+- tapOn: "Groups in Common"
+- assertVisible: "Maestro group"
+- back
+- assertVisible: "User Profile"

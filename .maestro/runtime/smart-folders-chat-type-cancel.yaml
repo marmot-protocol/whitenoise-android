@@ -1,0 +1,35 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: smart-folders-chat-type-cancel
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: Folders
+    direction: DOWN
+- tapOn: Folders
+- assertVisible:
+    id: chat-folders-content
+- tapOn: New Folder
+- assertVisible:
+    id: folder.name
+- scrollUntilVisible:
+    element:
+      id: folder.add.
+    direction: DOWN
+- tapOn:
+    id: folder.add.
+- assertVisible:
+    id: folder.addField.PARTICIPANTS
+- tapOn:
+    id: folder.addField.TYPE
+- assertVisible:
+    id: folder.conditionDone
+- tapOn: Cancel
+- assertVisible:
+    id: folder.name
+- back
+- assertVisible:
+    id: chat-folders-content
