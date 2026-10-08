@@ -40,8 +40,13 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CollectionInfo
+import androidx.compose.ui.semantics.CollectionItemInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.collectionInfo
+import androidx.compose.ui.semantics.collectionItemInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -101,7 +106,12 @@ fun WhiteNoiseEntityPickerSheet(
                         ).testTag(searchTag),
             )
             WhiteNoiseLazyColumn(
-                modifier = Modifier.weight(1f, fill = false).fillMaxWidth().testTag("entity.list"),
+                modifier =
+                    Modifier
+                        .weight(1f, fill = false)
+                        .fillMaxWidth()
+                        .testTag("entity.list")
+                        .semantics { collectionInfo = CollectionInfo(visible.size, 1) },
                 contentPadding =
                     PaddingValues(
                         horizontal = WhiteNoiseSpacing.CompactScreenMargin,
@@ -169,6 +179,7 @@ private fun PickerRow(
         Row(
             Modifier
                 .then(interaction)
+                .semantics { collectionItemInfo = CollectionItemInfo(index, 1, 0, 1) }
                 .heightIn(min = PickerRowMinHeight)
                 .padding(horizontal = WhiteNoiseSpacing.FormField, vertical = WhiteNoiseSpacing.Related),
             verticalAlignment = Alignment.CenterVertically,

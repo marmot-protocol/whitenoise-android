@@ -45,6 +45,8 @@ internal data class GlobalSearchFilterOptions(
     val folders: List<GlobalSearchFolderOption> = emptyList(),
     val chats: List<WhiteNoisePickerItem> = emptyList(),
     val senders: List<WhiteNoisePickerItem> = emptyList(),
+    val loading: Boolean = false,
+    val membersPending: Boolean = false,
 )
 
 /**
@@ -69,7 +71,11 @@ internal fun GlobalSearchFilterPicker(
             GlobalSearchEntityPicker(
                 title = stringResource(R.string.chat_list_search_filter_chat),
                 items = options.chats,
-                selectedIds = state.chatFilters.map { it.stableId }.toSet(),
+                selection =
+                    GlobalSearchEntitySelection(
+                        state.chatFilters.associate { it.stableId to it.displayLabel },
+                        options.loading,
+                    ),
                 onToggle = { id, title ->
                     onStateChange { GlobalSearchTransitions.toggleChatFilter(it, GlobalSearchChatFilter(id, title)) }
                 },
@@ -79,7 +85,12 @@ internal fun GlobalSearchFilterPicker(
             GlobalSearchEntityPicker(
                 title = stringResource(R.string.chat_list_search_filter_sender),
                 items = options.senders,
-                selectedIds = state.senderFilters.map { it.stableId }.toSet(),
+                selection =
+                    GlobalSearchEntitySelection(
+                        state.senderFilters.associate { it.stableId to it.displayLabel },
+                        options.loading,
+                        options.membersPending,
+                    ),
                 onToggle = { id, title ->
                     val filter = GlobalSearchSenderFilter(id, title)
                     onStateChange { GlobalSearchTransitions.toggleSenderFilter(it, filter) }
@@ -111,11 +122,17 @@ private fun GlobalSearchFolderPicker(
     onStateChange: ((GlobalSearchState) -> GlobalSearchState) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val unavailableLabel = stringResource(R.string.search_filter_unavailable)
+    val choices =
+        folders +
+            state.folderFilters
+                .filter { id -> folders.none { it.id == id } }
+                .map { GlobalSearchFolderOption(it, unavailableLabel) }
     GlobalSearchCheckDialog(title = stringResource(R.string.chat_list_search_filter_folders), onDismiss = onDismiss) {
-        if (folders.isEmpty()) {
+        if (choices.isEmpty()) {
             Text(stringResource(R.string.chat_list_search_no_folders))
         }
-        folders.forEach { folder ->
+        choices.forEach { folder ->
             GlobalSearchCheckRow(
                 label = folder.name,
                 checked = folder.id in state.folderFilters,
@@ -146,25 +163,62 @@ private fun GlobalSearchChatTypePicker(
 }
 
 /** Chats and senders share the prototype's searchable multi-select sheet. */
+internal data class GlobalSearchEntitySelection(
+    val labels: Map<String, String>,
+    val loading: Boolean,
+    val membersPending: Boolean = false,
+)
+
 @Composable
 private fun GlobalSearchEntityPicker(
     title: String,
     items: List<WhiteNoisePickerItem>,
-    selectedIds: Set<String>,
+    selection: GlobalSearchEntitySelection,
     onToggle: (id: String, title: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val unavailable = stringResource(R.string.search_filter_unavailable)
+    val choices =
+        globalSearchPickerChoices(
+            items,
+            selection.labels,
+            selection.loading || selection.membersPending,
+            unavailable,
+        )
     WhiteNoiseEntityPickerSheet(
         title = title,
-        items = items,
+        items = choices,
+        description =
+            if (selection.loading || selection.membersPending) {
+                stringResource(R.string.search_filter_members_pending)
+            } else {
+                null
+            },
         onDismiss = onDismiss,
-        onSelect = { id -> items.firstOrNull { it.id == id }?.let { item -> onToggle(id, item.title) } },
-        selectedIds = selectedIds,
+        onSelect = { id ->
+            choices.firstOrNull { it.id == id }?.let { item -> onToggle(id, selection.labels[id] ?: item.title) }
+        },
+        selectedIds = selection.labels.keys,
         multiple = true,
         onDone = onDismiss,
         searchTag = CHAT_LIST_SEARCH_FILTER_SEARCH_TAG,
         rowTagPrefix = CHAT_LIST_SEARCH_FILTER_CHOICE_PREFIX,
     )
+}
+
+/** Missing selected rows stay removable; loading never changes the query or disguises a selected identity. */
+internal fun globalSearchPickerChoices(
+    items: List<WhiteNoisePickerItem>,
+    selectedLabels: Map<String, String>,
+    loading: Boolean,
+    unavailable: String,
+): List<WhiteNoisePickerItem> {
+    val availableIds = items.mapTo(mutableSetOf()) { it.id }
+    val missing =
+        selectedLabels.filterKeys { it !in availableIds }.map { (id, label) ->
+            WhiteNoisePickerItem(id = id, title = if (loading) label else "$label · $unavailable")
+        }
+    return missing + items
 }
 
 /** The existing date dialog, applying the selection and closing the picker in one transition. */

@@ -201,7 +201,10 @@ internal fun globalSearchActiveChipLabel(
         GlobalSearchFilterCategory.Folder -> {
             val folderName = folderNames[chip.chipId.removePrefix("folder:")]
             if (folderName == null) {
-                stringResource(R.string.chat_list_search_filter_folders)
+                stringResource(
+                    R.string.chat_list_search_folder_chip,
+                    stringResource(R.string.search_filter_unavailable),
+                )
             } else {
                 stringResource(R.string.chat_list_search_folder_chip, folderName)
             }

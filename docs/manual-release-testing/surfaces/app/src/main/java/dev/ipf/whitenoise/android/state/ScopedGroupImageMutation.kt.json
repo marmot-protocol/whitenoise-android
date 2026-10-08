@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ScopedGroupImageMutation.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Viewer group-picture crop, permission and native commit ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ScopedGroupImageMutation.kt",
+        "anchor": "fun forViewer(",
+        "test_ids": [
+          "GRP-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

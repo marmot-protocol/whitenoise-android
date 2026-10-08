@@ -429,25 +429,22 @@ internal object GlobalSearchTransitions {
             contentFilterSelection = GlobalSearchContentFilterSelection.EMPTY,
         )
 
-    /**
-     * Folders that were deleted and chats that left the folder / chat-type scope drop out of the
-     * filters, as the prototype's `reconcile` does, so a chip never names something the list cannot show.
-     */
-    fun reconcileAvailable(
+    /** Refresh labels by identity without silently broadening a query during loading or scope changes. */
+    fun reconcileLabels(
         state: GlobalSearchState,
-        availableFolderIds: Set<String>?,
-        availableChatIds: Set<String>?,
-    ): GlobalSearchState {
-        val folders = availableFolderIds?.let { state.folderFilters.intersect(it) } ?: state.folderFilters
-        val chats =
-            availableChatIds?.let { ids -> state.chatFilters.filter { it.stableId in ids }.toSet() }
-                ?: state.chatFilters
-        return if (folders == state.folderFilters && chats == state.chatFilters) {
-            state
-        } else {
-            state.copy(folderFilters = folders, chatFilters = chats)
-        }
-    }
+        chatLabels: Map<String, String>,
+        senderLabels: Map<String, String>,
+    ): GlobalSearchState =
+        state.copy(
+            chatFilters =
+                state.chatFilters.mapTo(mutableSetOf()) {
+                    it.copy(displayLabel = chatLabels[it.stableId] ?: it.displayLabel)
+                },
+            senderFilters =
+                state.senderFilters.mapTo(mutableSetOf()) {
+                    it.copy(displayLabel = senderLabels[it.stableId] ?: it.displayLabel)
+                },
+        )
 
     /**
      * Account/runtime generation changes clear account-scoped folder/chat/sender ids

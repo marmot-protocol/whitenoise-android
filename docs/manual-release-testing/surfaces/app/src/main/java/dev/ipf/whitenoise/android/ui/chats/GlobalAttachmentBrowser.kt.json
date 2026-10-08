@@ -1,0 +1,115 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+  "legacy_sha256": "69bddaf6bfd92aa7303d87345d2acd0973524767c2c591500eddab74185c1dc6",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GlobalAttachmentGridCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "fun GlobalAttachmentGridCard(",
+        "test_ids": ["NCH-002", "ACC-017", "FIND-012", "FIND-013"]
+      },
+      {
+        "surface": "Authored emoji prompt: GlobalAttachmentBrowser",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalAttachmentBrowser",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "fun GlobalAttachmentBrowser(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalAttachmentCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "fun GlobalAttachmentCard(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalAttachmentGrid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "fun GlobalAttachmentGrid(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "GlobalAttachmentTile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "fun GlobalAttachmentTile(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:chat_rows_no_results_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "R.string.chat_rows_no_results_detail",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:library_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "R.string.library_empty",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:library_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "R.string.library_loading",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:library_source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "R.string.library_source",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

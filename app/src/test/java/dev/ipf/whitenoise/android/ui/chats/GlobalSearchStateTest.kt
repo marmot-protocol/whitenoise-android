@@ -331,19 +331,22 @@ class GlobalSearchStateTest {
         assertFalse(cleared.hasActiveFilters)
     }
 
-    /** Reconcile available drops vanished folders and out of scope chats. */
+    /** Loading, deletion and a narrower scope never silently remove a user's restrictions. */
     @Test
-    fun reconcileAvailableDropsVanishedFoldersAndOutOfScopeChats() {
+    fun reconcileLabelsPreservesMissingSelectionsAndRefreshesNamesByIdentity() {
         val state =
             GlobalSearchState(
                 isOpen = true,
                 folderFilters = setOf("keep", "gone"),
                 chatFilters = setOf(GlobalSearchChatFilter("in", "In"), GlobalSearchChatFilter("out", "Out")),
             )
-        val reconciled = GlobalSearchTransitions.reconcileAvailable(state, setOf("keep"), setOf("in"))
-        assertEquals(setOf("keep"), reconciled.folderFilters)
-        assertEquals(setOf(GlobalSearchChatFilter("in", "In")), reconciled.chatFilters)
-        assertEquals(state, GlobalSearchTransitions.reconcileAvailable(state, null, null))
+        val reconciled = GlobalSearchTransitions.reconcileLabels(state, mapOf("in" to "Renamed"), emptyMap())
+        assertEquals(state.folderFilters, reconciled.folderFilters)
+        assertEquals(
+            setOf(GlobalSearchChatFilter("in", "Renamed"), GlobalSearchChatFilter("out", "Out")),
+            reconciled.chatFilters,
+        )
+        assertEquals(state, GlobalSearchTransitions.reconcileLabels(state, emptyMap(), emptyMap()))
     }
 
     /** Encode decode round trip. */

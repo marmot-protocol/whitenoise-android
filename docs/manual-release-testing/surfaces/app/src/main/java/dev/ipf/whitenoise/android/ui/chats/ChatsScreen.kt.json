@@ -8,7 +8,9 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "fun ChatListBodyFrame(",
         "test_ids": [
-          "CHL-001"
+          "CHL-001",
+          "FIND-012",
+          "FIND-013"
         ]
       },
       {
@@ -25,7 +27,9 @@
         "anchor": "fun ChatListSearchSectionHeader(",
         "test_ids": [
           "FIND-002",
-          "FIND-003"
+          "FIND-003",
+          "FIND-012",
+          "FIND-013"
         ]
       },
       {
@@ -37,6 +41,8 @@
           "SEC-012",
           "CHL-018",
           "CHL-021",
+          "FIND-012",
+          "FIND-013",
           "FLD-007",
           "FLD-002"
         ]
@@ -49,6 +55,32 @@
         "anchor": "R.string.chat_list_startup_slow",
         "test_ids": [
           "CHL-015"
+        ]
+      },
+      {
+        "surface": "string:conversation_search_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.conversation_search_loading",
+        "test_ids": [
+          "FIND-003",
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "Removed search target notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": [
+          "FIND-013"
+        ]
+      },
+      {
+        "surface": "string:you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.you",
+        "test_ids": [
+          "FIND-008",
+          "FIND-012"
         ]
       }
     ],
