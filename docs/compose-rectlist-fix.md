@@ -50,7 +50,7 @@ dependency verification mechanism.
   scenario for minified candidates on both distributions, including Android 17.
 
 Three fixtures account for the official runtime's test behavior without changing
-production code or accepting new screenshot baselines:
+production code:
 
 - Keyboard chip traversal explicitly requests keyboard input mode before focus;
   the new test rule starts in touch mode, where these controls reject focus.
@@ -60,8 +60,10 @@ production code or accepting new screenshot baselines:
 - The large-font RTL reports dialog starts with an RTL Android configuration as
   well as an RTL composition. Its synthetic `en-Arab` locale keeps English labels
   while making Android derive RTL from the script throughout resource initialization.
-  This keeps initial dialog text measurement in the intended direction and verifies
-  the original PNG unchanged.
+  This keeps initial dialog text measurement in the intended direction. Its single
+  PNG is regenerated for the corrected fixture after inspecting the small vertical
+  pixel shifts: text, dates, wrapping, controls and visibility remain intact. All
+  other baselines and strict comparison thresholds remain unchanged.
 
 The old backport identity assertion, its original-1.12.1 negative control and
 workflow calls to the APK marker checker are removed because the runtime now

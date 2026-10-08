@@ -186,8 +186,16 @@ class ContentReportScreenshotTest {
     @Config(qualifiers = "b+en+Arab-ldrtl-w360dp-h780dp-mdpi")
     fun detailsReportsDarkLargeRtl() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        assertEquals("en", context.resources.configuration.locales[0].language)
-        assertEquals("Arab", context.resources.configuration.locales[0].script)
+        assertEquals(
+            "en",
+            context.resources.configuration.locales[0]
+                .language,
+        )
+        assertEquals(
+            "Arab",
+            context.resources.configuration.locales[0]
+                .script,
+        )
         assertEquals(View.LAYOUT_DIRECTION_RTL, context.resources.configuration.layoutDirection)
         val dismissed = mutableListOf<String>()
         composeRule.setContent {

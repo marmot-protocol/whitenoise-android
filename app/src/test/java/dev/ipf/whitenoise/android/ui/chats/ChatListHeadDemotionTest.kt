@@ -566,7 +566,10 @@ class ChatListHeadDemotionTest {
         assertEquals(0, listStateHolder[0]!!.firstVisibleItemIndex)
         assertEquals(
             secondAnchor.chatId,
-            listStateHolder[0]!!.layoutInfo.visibleItemsInfo.first { it.index == 0 }.key,
+            listStateHolder[0]!!
+                .layoutInfo.visibleItemsInfo
+                .first { it.index == 0 }
+                .key,
         )
         assertEquals(
             secondAnchor.firstVisibleItemScrollOffset,
