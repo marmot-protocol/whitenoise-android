@@ -10,11 +10,13 @@ class LargeGroupInviteWarningTest {
     /** Covers the boundary cases required by the issue without relying on UI state. */
     @Test
     fun thresholdCasesUseTheAuthoritativeRosterAndStagedRecipients() {
-        assertFalse(projection(existing = 48, selected = listOf("new-a")).shouldWarn)
-        assertTrue(projection(existing = 49, selected = listOf("new-a")).shouldWarn)
-        assertTrue(projection(existing = 49, selected = listOf("new-a", "new-b")).shouldWarn)
-        assertTrue(projection(existing = 50).shouldWarn)
-        assertTrue(projection(existing = 50, selected = listOf("new-a")).shouldWarn)
+        assertEquals(150, LARGE_GROUP_INVITE_WARNING_THRESHOLD)
+        assertFalse(projection(existing = 50, selected = listOf("new-a")).shouldWarn)
+        assertFalse(projection(existing = 148, selected = listOf("new-a")).shouldWarn)
+        assertTrue(projection(existing = 149, selected = listOf("new-a")).shouldWarn)
+        assertTrue(projection(existing = 149, selected = listOf("new-a", "new-b")).shouldWarn)
+        assertTrue(projection(existing = 150).shouldWarn)
+        assertTrue(projection(existing = 150, selected = listOf("new-a")).shouldWarn)
     }
 
     /** Proves normalization prevents existing, pending, and repeated staged identities from being counted twice. */
@@ -23,13 +25,13 @@ class LargeGroupInviteWarningTest {
         val result =
             largeGroupInviteProjection(
                 rosterReady = true,
-                authoritativeMemberIds = memberIds(48) + "EXISTING",
+                authoritativeMemberIds = memberIds(148) + "EXISTING",
                 activeAccountIdHex = "MEMBER-0",
                 pendingInviteMemberIds = listOf("pending", "PENDING", "existing"),
                 stagedRecipientIds = listOf("new-a", "NEW-A", "pending", "existing"),
             )
 
-        assertEquals(51, result?.memberCount)
+        assertEquals(151, result?.memberCount)
         assertTrue(result?.shouldWarn == true)
     }
 
@@ -39,13 +41,13 @@ class LargeGroupInviteWarningTest {
         val result =
             largeGroupInviteProjection(
                 rosterReady = true,
-                authoritativeMemberIds = memberIds(48),
+                authoritativeMemberIds = memberIds(148),
                 activeAccountIdHex = "self",
                 pendingInviteMemberIds = emptyList(),
                 stagedRecipientIds = listOf("new-a"),
             )
 
-        assertEquals(50, result?.memberCount)
+        assertEquals(150, result?.memberCount)
         assertTrue(result?.shouldWarn == true)
     }
 
@@ -55,7 +57,7 @@ class LargeGroupInviteWarningTest {
         assertNull(
             largeGroupInviteProjection(
                 rosterReady = false,
-                authoritativeMemberIds = memberIds(50),
+                authoritativeMemberIds = memberIds(150),
                 activeAccountIdHex = "member-0",
                 pendingInviteMemberIds = listOf("pending"),
                 stagedRecipientIds = listOf("new-a"),
