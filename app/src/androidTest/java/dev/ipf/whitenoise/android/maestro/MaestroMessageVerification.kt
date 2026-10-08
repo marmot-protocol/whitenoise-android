@@ -32,7 +32,7 @@ internal suspend fun verifyMaestroMessageMutation(
                         originalMessagesRetained(original, peerOriginal) && replyMatches(own, remote, baseline)
                     "message-edit" -> editMatches(original, peerOriginal)
                     "message-delete-local" ->
-                        localDeletionMatches(original, peerOriginal)
+                        localDeletionMatches(state, original, peerOriginal, baseline)
                     "message-delete-everyone" -> deletionMatches(original, peerOriginal)
                     else -> error("Unknown message postcondition")
                 }
@@ -93,13 +93,21 @@ private fun editMatches(
         peer.edit != null
 }
 
-/** Device-local deletion must leave the exact original visible and undeleted to its peer. */
-private fun localDeletionMatches(
+/** Delete for me hides only the owner's presentation; both native originals remain undeleted. */
+private suspend fun localDeletionMatches(
+    state: WhiteNoiseAppState,
     own: TimelineMessageRecordFfi?,
     peer: TimelineMessageRecordFfi?,
+    baseline: MaestroMessageBaseline,
 ): Boolean {
-    if (peer == null) return false
-    return (own == null || own.deleted) && !peer.deleted && peer.plaintext == "Generated fixture message"
+    val hidden =
+        withContext(Dispatchers.Main.immediate) {
+            state.hiddenMessageIdsInGroup(baseline.account, baseline.group) to
+                state.hiddenMessageIdsInGroup(baseline.peer, baseline.group)
+        }
+    return originalMessagesRetained(own, peer) &&
+        hidden.first == setOf(baseline.messageId.lowercase()) &&
+        hidden.second.isEmpty()
 }
 
 /** Both accounts must identify the same published deletion of the baseline message. */

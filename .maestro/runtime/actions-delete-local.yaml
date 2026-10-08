@@ -13,3 +13,12 @@ name: actions-delete-local
 - assertNotVisible: "Delete message[?]"
 - assertNotVisible: "Generated fixture message"
 - assertVisible: "Maestro group"
+- back
+- assertVisible:
+    id: "chats.scope.chats"
+- tapOn: "Maestro group"
+- assertVisible:
+    id: "composer-pill-surface"
+- assertNotVisible:
+    id: "chats.scope.chats"
+- assertNotVisible: "Generated fixture message"

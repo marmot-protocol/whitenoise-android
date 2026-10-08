@@ -1677,7 +1677,7 @@
       "manual_ids": [
         "MSG-008"
       ],
-      "assertions": "Delete for me removes the original only from the owner while the peer retains it and the conversation remains.",
+      "assertions": "Delete for me hides only the owner’s original across conversation reopen; both native originals and the peer’s presentation remain unchanged.",
       "postcondition": "message-delete-local"
     },
     "actions-delete-everyone": {
