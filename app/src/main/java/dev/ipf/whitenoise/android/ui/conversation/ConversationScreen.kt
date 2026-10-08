@@ -121,6 +121,7 @@ import dev.ipf.whitenoise.android.state.ConversationUnreadJumpState
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.MessageAvailability
 import dev.ipf.whitenoise.android.state.MessageStatus
+import dev.ipf.whitenoise.android.state.StagedAttachmentSender
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
@@ -3238,6 +3239,79 @@ internal fun ConversationScreen(
         if (pendingMediaSlots.isEmpty() && pendingDocumentUris.isEmpty()) mediaPreviewIndex = null
     }
 
+    /** Sends the staged attachments with [caption] as one message, reporting acceptance through [onResult]. */
+    fun sendStagedAttachmentsWithCaption(
+        caption: String,
+        onResult: (Boolean) -> Unit,
+    ) {
+        if (
+            importedComposerExceedsLimit(
+                pendingMediaSlots,
+                pendingDocumentUris,
+                MEDIA_PICKER_MAX_ITEMS,
+                importedShareFiles::owns,
+            )
+        ) {
+            appState.present(R.string.share_import_recovered_limit)
+            onResult(false)
+            return
+        }
+        attachmentSendPending = true
+        var dispatched = false
+        try {
+            val sendingMedia = pendingMediaSlots
+            val sendingDocuments = pendingDocumentUris
+            mediaSender.sendStagedAttachments(
+                sendingMedia,
+                sendingDocuments,
+                caption,
+                preparedImageAttachments = mediaDraftState.preparedAttachments(),
+                preparedDocumentAttachments = mediaDraftState.preparedDocumentAttachments(),
+                onAccepted = {
+                    val acceptedIds = sendingMedia.map { it.id }.toSet()
+                    mediaDraftState.forgetAcceptedAttachments(
+                        acceptedIds,
+                        sendingDocuments.toSet(),
+                    )
+                    pendingMediaSlots = pendingMediaSlots.filterNot { it.id in acceptedIds }
+                    pendingDocumentUris =
+                        removeAcceptedDocumentOccurrences(pendingDocumentUris, sendingDocuments)
+                    attachmentSendPending = false
+                    onResult(true)
+                },
+                onRejected = {
+                    attachmentSendPending = false
+                    onResult(false)
+                },
+                onAfterSend = {
+                    acceptedSendRevealedTranscript = true
+                    revealSentMessage()
+                },
+            )
+            dispatched = true
+        } finally {
+            if (!dispatched) attachmentSendPending = false
+        }
+    }
+    // Dictation's Send never sees the composer's staged attachments, so it asks the controller for this
+    // same send. The updated reference keeps the registered sender on the newest media owner.
+    val stagedAttachmentDispatch by rememberUpdatedState<(String, (Boolean) -> Unit) -> Unit> { caption, onResult ->
+        sendStagedAttachmentsWithCaption(caption, onResult)
+    }
+    DisposableEffect(controller) {
+        val sender =
+            StagedAttachmentSender(
+                hasStaged = {
+                    controller.editingMessageId == null &&
+                        (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty())
+                },
+                isBusy = { attachmentSendPending || mediaDraftState.isPreparing },
+                dispatch = { caption, onResult -> stagedAttachmentDispatch(caption, onResult) },
+            )
+        controller.stagedAttachmentSender = sender
+        onDispose { if (controller.stagedAttachmentSender === sender) controller.stagedAttachmentSender = null }
+    }
+
     key(controller, appState.runtimeGeneration) {
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
@@ -3683,56 +3757,7 @@ internal fun ConversationScreen(
                     } else {
                         null
                     },
-                onSendAttachments = sendAttachments@{ caption, onResult ->
-                    if (
-                        importedComposerExceedsLimit(
-                            pendingMediaSlots,
-                            pendingDocumentUris,
-                            MEDIA_PICKER_MAX_ITEMS,
-                            importedShareFiles::owns,
-                        )
-                    ) {
-                        appState.present(R.string.share_import_recovered_limit)
-                        onResult(false)
-                        return@sendAttachments
-                    }
-                    attachmentSendPending = true
-                    var dispatched = false
-                    try {
-                        val sendingMedia = pendingMediaSlots
-                        val sendingDocuments = pendingDocumentUris
-                        mediaSender.sendStagedAttachments(
-                            sendingMedia,
-                            sendingDocuments,
-                            caption,
-                            preparedImageAttachments = mediaDraftState.preparedAttachments(),
-                            preparedDocumentAttachments = mediaDraftState.preparedDocumentAttachments(),
-                            onAccepted = {
-                                val acceptedIds = sendingMedia.map { it.id }.toSet()
-                                mediaDraftState.forgetAcceptedAttachments(
-                                    acceptedIds,
-                                    sendingDocuments.toSet(),
-                                )
-                                pendingMediaSlots = pendingMediaSlots.filterNot { it.id in acceptedIds }
-                                pendingDocumentUris =
-                                    removeAcceptedDocumentOccurrences(pendingDocumentUris, sendingDocuments)
-                                attachmentSendPending = false
-                                onResult(true)
-                            },
-                            onRejected = {
-                                attachmentSendPending = false
-                                onResult(false)
-                            },
-                            onAfterSend = {
-                                acceptedSendRevealedTranscript = true
-                                revealSentMessage()
-                            },
-                        )
-                        dispatched = true
-                    } finally {
-                        if (!dispatched) attachmentSendPending = false
-                    }
-                },
+                onSendAttachments = { caption, onResult -> sendStagedAttachmentsWithCaption(caption, onResult) },
                 onAfterSend = {
                     acceptedSendRevealedTranscript = true
                     revealSentMessage()
