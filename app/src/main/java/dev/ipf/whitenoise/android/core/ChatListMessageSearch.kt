@@ -46,10 +46,11 @@ object ChatListMessageSearch {
     fun bodyMatches(
         plaintext: String,
         ciNeedle: String,
+        scanLimit: Int = BODY_SEARCH_SCAN_LIMIT,
     ): Boolean {
         val normalizedNeedle = normalizeWhitespace(ciNeedle)
         if (normalizedNeedle.isEmpty()) return false
-        return normalizeSearchBody(plaintext)
+        return normalizeWhitespace(plaintext.take(scanLimit))
             .contains(normalizedNeedle, ignoreCase = true)
     }
 
@@ -206,17 +207,18 @@ object ChatListMessageSearch {
      * A row counts when it is a searchable body kind, satisfies the needle (or carries content without one) and
      * the filters.
      */
-    private fun isEligibleMatch(
+    fun isEligibleMatch(
         record: SearchableRecord,
         ciNeedle: String,
-        constraints: MessageSearchConstraints?,
+        constraints: MessageSearchConstraints? = null,
+        bodyScanLimit: Int = BODY_SEARCH_SCAN_LIMIT,
     ): Boolean {
         val hasBody = record.plaintext.isNotBlank()
         val needleSatisfied =
             if (ciNeedle.isEmpty()) {
                 hasBody || record.mediaTypes.isNotEmpty()
             } else {
-                hasBody && bodyMatches(record.plaintext, ciNeedle)
+                hasBody && bodyMatches(record.plaintext, ciNeedle, bodyScanLimit)
             }
         return !record.deleted &&
             record.kind in SearchableBodyKinds &&

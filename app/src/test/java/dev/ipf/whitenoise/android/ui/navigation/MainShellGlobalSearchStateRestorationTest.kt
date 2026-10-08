@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.ui.chats.GlobalSearchSenderFilter
 import dev.ipf.whitenoise.android.ui.chats.GlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.viewportFilters
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -40,6 +41,46 @@ import org.robolectric.annotation.GraphicsMode
 class MainShellGlobalSearchStateRestorationTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    /** Broader chat search restores its origin and independent home filters only within the same account. */
+    @Test
+    fun conversationSearchHandoffPreservesOriginAndIndependentHomeFilters() {
+        val account = mutableStateOf("personal")
+        var holder: MainShellGlobalSearchStateHolder? = null
+        val restoration = StateRestorationTester(composeRule)
+        restoration.setContent {
+            val owner = rememberMainShellGlobalSearchState(account.value, 1)
+            SideEffect { holder = owner }
+        }
+        var home: GlobalSearchState? = null
+        composeRule.runOnIdle {
+            requireNotNull(holder).update { it.copy(query = "home", folderFilters = setOf("saved")) }
+        }
+        composeRule.runOnIdle {
+            home = requireNotNull(holder).scopedState
+            requireNotNull(holder).beginConversationSearch(
+                "group",
+                requireNotNull(home).copy(isOpen = true, query = "chat", folderFilters = emptySet()),
+                "saved",
+            )
+        }
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.runOnIdle {
+            assertEquals("chat", requireNotNull(holder).scopedState.query)
+            assertEquals("group", requireNotNull(holder).conversationReturn?.groupId)
+            assertEquals("saved", requireNotNull(holder).finishConversationSearch()?.previousFolderId)
+        }
+        composeRule.runOnIdle { assertEquals(home, requireNotNull(holder).scopedState) }
+        composeRule.runOnIdle {
+            requireNotNull(holder).beginConversationSearch("group", requireNotNull(home).copy(isOpen = true), null)
+        }
+        composeRule.runOnIdle { account.value = "work" }
+        composeRule.runOnIdle {
+            assertEquals(null, requireNotNull(holder).conversationReturn)
+            assertFalse(requireNotNull(holder).beginConversationSearch("old", requireNotNull(home), null))
+        }
+        composeRule.runOnIdle { assertEquals(null, requireNotNull(holder).conversationReturn) }
+    }
 
     /** Selection persists only as identifiers; rotation retains it and a new account drops it. */
     @Test
