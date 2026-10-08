@@ -27,3 +27,6 @@ dev.ipf.whitenoise.android.ui.conversation.messages.ReportMessageImeTest#sendsFr
 # Added masks must leave real keyboard forms unlayered and preserve their viewport/actions.
 dev.ipf.whitenoise.android.ui.common.ScrollEdgeFadeImeAndroidTest#activityFormRemovesMaskForRealKeyboardAndRestoresItAfterHide
 dev.ipf.whitenoise.android.ui.common.ScrollEdgeFadeImeAndroidTest#sheetFormUsesItsOwnKeyboardWindowWithoutMovingTheFooterIntoIme
+# Draft navigation retains real keyboard/viewport geometry and cancels reading momentum (#3131).
+dev.ipf.whitenoise.android.ui.ComposerDraftNavigationAndroidTest#typingAndRealImeReflowPreserveNavigation
+dev.ipf.whitenoise.android.ui.ComposerDraftNavigationAndroidTest#topActionCancelsFlingWithoutEditingOrKeyboardChanges
