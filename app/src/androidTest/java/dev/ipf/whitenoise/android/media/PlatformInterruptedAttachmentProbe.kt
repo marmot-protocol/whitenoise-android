@@ -223,21 +223,20 @@ internal object PlatformInterruptedAttachmentProbe {
     private suspend fun awaitResumedAcquisition(
         port: Int,
         nativeStates: List<NativeResumeSnapshot>,
-    ) =
-        withTimeout(NATIVE_RESUME_TIMEOUT_MILLIS) {
-            while (true) {
-                val latest = nativeStates.lastOrNull()
-                check(latest?.phase !in NATIVE_TRANSFER_TERMINAL_FAILURES) {
-                    "automatic native recovery ended as ${latest?.phase}"
-                }
-                val events = HeldAttachmentCancellationProbe.ledger(port)
-                if (events.any { it.getString("kind") == "held" && it.getLong("value") == 3L * 1024 * 1024 }) {
-                    check(latest != null) { "resumed body has no native progress observation" }
-                    return@withTimeout
-                }
-                delay(25L)
+    ) = withTimeout(NATIVE_RESUME_TIMEOUT_MILLIS) {
+        while (true) {
+            val latest = nativeStates.lastOrNull()
+            check(latest?.phase !in NATIVE_TRANSFER_TERMINAL_FAILURES) {
+                "automatic native recovery ended as ${latest?.phase}"
             }
+            val events = HeldAttachmentCancellationProbe.ledger(port)
+            if (events.any { it.getString("kind") == "held" && it.getLong("value") == 3L * 1024 * 1024 }) {
+                check(latest != null) { "resumed body has no native progress observation" }
+                return@withTimeout
+            }
+            delay(25L)
         }
+    }
 
     /** Remaining delay is relative to serialization time; only closed scheduling facts leave the fixture. */
     private fun nativeResumeDiagnostics(states: List<NativeResumeSnapshot>): JSONArray {
@@ -340,8 +339,7 @@ internal object PlatformInterruptedAttachmentProbe {
                 .put(
                     "work_states",
                     JSONArray(observations.workStates.takeLast(FAILURE_STATE_LIMIT).map { it.state.name }),
-                )
-                .put("native_resume_states", nativeResumeDiagnostics(observations.nativeStates))
+                ).put("native_resume_states", nativeResumeDiagnostics(observations.nativeStates))
                 .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
                 .put("ms_since_stop", sinceStop),
         )

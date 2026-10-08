@@ -179,11 +179,15 @@ class ContentReportScreenshotTest {
     /**
      * An admin sees complete reports in a consistently RTL Android window and composition. Matching the platform
      * direction avoids first measuring dialog text in LTR before applying the fixture's RTL composition local.
+     * The synthetic English/Arabic-script locale preserves English text while Android derives RTL from its script;
+     * Robolectric applies the locale after ldrtl, so plain English would overwrite the requested direction.
      */
     @Test
-    @Config(qualifiers = "en-ldrtl-w360dp-h780dp-mdpi")
+    @Config(qualifiers = "b+en+Arab-ldrtl-w360dp-h780dp-mdpi")
     fun detailsReportsDarkLargeRtl() {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        assertEquals("en", context.resources.configuration.locales[0].language)
+        assertEquals("Arab", context.resources.configuration.locales[0].script)
         assertEquals(View.LAYOUT_DIRECTION_RTL, context.resources.configuration.layoutDirection)
         val dismissed = mutableListOf<String>()
         composeRule.setContent {

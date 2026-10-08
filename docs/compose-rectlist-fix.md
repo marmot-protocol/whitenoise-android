@@ -58,8 +58,10 @@ production code or accepting new screenshot baselines:
   index changes in the authoritative order. It no longer expects the obsolete
   index of that chat before unpinning.
 - The large-font RTL reports dialog starts with an RTL Android configuration as
-  well as an RTL composition. This keeps initial dialog text measurement in the
-  intended direction and verifies the original PNG unchanged.
+  well as an RTL composition. Its synthetic `en-Arab` locale keeps English labels
+  while making Android derive RTL from the script throughout resource initialization.
+  This keeps initial dialog text measurement in the intended direction and verifies
+  the original PNG unchanged.
 
 The old backport identity assertion, its original-1.12.1 negative control and
 workflow calls to the APK marker checker are removed because the runtime now
