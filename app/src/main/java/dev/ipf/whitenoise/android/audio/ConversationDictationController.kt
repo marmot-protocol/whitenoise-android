@@ -864,9 +864,7 @@ internal class ConversationDictationController internal constructor(
         currentComposerRecovery(access)?.let { cancelSession() }
     }
 
-    private fun currentComposerRecovery(
-        access: ConversationDictationComposerAccess,
-    ): ConversationDictationState.Failed? {
+    private fun currentComposerRecovery(access: ConversationDictationComposerAccess): ConversationDictationState.Failed? {
         val owned =
             access.sessionId == state.sessionId &&
                 access.actionGeneration == notificationActionGeneration &&

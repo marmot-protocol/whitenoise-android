@@ -3571,8 +3571,12 @@ class ConversationDictationControllerTest {
         assertFalse(f.controller.hasDurableSession)
         assertTrue(f.platform.pendingCallerAudio)
         assertEquals(0, f.platform.discardedCallerAudio)
-        f.scheduler.runDelay(500L)
+        f.scheduler.advanceBy(500L)
         assertEquals(sessions, f.platform.sessions.size)
+        assertTrue(f.controller.state is ConversationDictationState.Failed)
+        assertFalse(f.controller.hasDurableSession)
+        assertTrue(f.platform.pendingCallerAudio)
+        assertEquals(0, f.platform.discardedCallerAudio)
     }
 
     /** Neither transcript recovery action may dispatch or paste after an undispatched sleep deadline. */
@@ -3981,8 +3985,10 @@ class ConversationDictationControllerTest {
         fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
         assertTrue(fixture.controller.hasDurableSession)
         fixture.controller.onDurableServiceDestroyed(requireNotNull(fixture.controller.notificationSessionToken))
+        val sessions = fixture.platform.sessions.size
         fixture.controller.retry()
-        fixture.scheduler.runDelay(500L)
+        fixture.scheduler.advanceBy(500L)
+        assertEquals(sessions, fixture.platform.sessions.size)
         assertTrue(fixture.controller.state is ConversationDictationState.Failed)
         assertEquals("body", (fixture.controller.state as ConversationDictationState.Failed).retainedTranscript)
         assertTrue(fixture.platform.pendingCallerAudio)
