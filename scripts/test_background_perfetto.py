@@ -13,7 +13,7 @@ import unittest
 class BackgroundPerfettoTest(unittest.TestCase):
     """Keep file-backed config and diagnostic descriptors out of the collector."""
 
-    def invoke_collector(self, body, *, existing_trace=False, existing_log=False):
+    def invoke_collector(self, body, *, existing_trace=False, existing_log=False, alias_log=None):
         """Execute the sourced device function with an observable collector child."""
         root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:
@@ -36,6 +36,14 @@ if sys.stdin.read() != "duration_ms: 5000\\n":
                 log.write_text("preserved rejected diagnostics\n")
             state = folder / "descriptors.json"
             trace = folder / "trace"
+            if alias_log == "same":
+                log = trace
+            elif alias_log == "dot":
+                log = Path(str(folder) + "/./trace")
+            elif alias_log == "symlink_parent":
+                parent = folder / "parent_alias"
+                parent.symlink_to(folder, target_is_directory=True)
+                log = parent / "trace"
             if existing_trace == "symlink":
                 trace.symlink_to("missing_trace_target")
             elif existing_trace:
@@ -107,6 +115,19 @@ if sys.stdin.read() != "duration_ms: 5000\\n":
         self.assertNotEqual(0, result.returncode)
         self.assertEqual("preserved rejected diagnostics\n", log)
         self.assertIsNone(state)
+
+    def test_trace_log_aliasing_is_rejected_before_launch(self):
+        """Resolve parent aliases so tee cannot open the collector's trace output."""
+        for alias in ("same", "dot", "symlink_parent"):
+            with self.subTest(alias=alias):
+                result, log, state, trace = self.invoke_collector(
+                    'print("12345")\n', alias_log=alias
+                )
+                self.assertNotEqual(0, result.returncode)
+                self.assertEqual("", result.stdout)
+                self.assertIsNone(log)
+                self.assertIsNone(state)
+                self.assertIsNone(trace)
 
 
 if __name__ == "__main__":
