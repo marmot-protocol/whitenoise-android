@@ -30,9 +30,10 @@ internal suspend fun verifyMaestroAccountsRetained(
             checkNotNull(native.presentedChatListRow(account, originalMessage.group)) {
                 "Cancelled account action removed its original conversation"
             }
-            val original = readMaestroMessages(native, account, originalMessage.group).singleOrNull {
-                it.messageIdHex == originalMessage.messageId
-            }
+            val original =
+                readMaestroMessages(native, account, originalMessage.group).singleOrNull {
+                    it.messageIdHex == originalMessage.messageId
+                }
             checkNotNull(original) { "Cancelled account action removed the original message" }
             check(!original.deleted)
             check(original.plaintext == "Generated fixture message")

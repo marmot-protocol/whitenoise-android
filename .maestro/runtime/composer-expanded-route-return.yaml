@@ -21,3 +21,8 @@ name: composer-expanded-route-return
 - assertVisible: "Draft: Maestro expanded draft"
 - tapOn: "Maestro group"
 - assertVisible: "Maestro expanded draft"
+- assertVisible:
+    id: composer-pill-surface
+- assertNotVisible:
+    id: chats.scope.chats
+- assertNotVisible: Generated fixture message

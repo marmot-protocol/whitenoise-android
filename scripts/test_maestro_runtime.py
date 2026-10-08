@@ -488,7 +488,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
                 with self.subTest(key=key), self.assertRaises(ValueError):
                     pair(directory, 'verify', {**retry, key: value})
 
-    def test_active_conversation_checks_reject_chat_list_preview_as_route_proof(self):
+    def test_conversation_checks_reject_chat_list_preview_as_route_proof(self):
         """Regress the observed reactor Back false pass on identical preview text."""
         guard = list(yaml.safe_load_all(
             (runtime.ROOT / '.maestro/fixtures/assert-fixture-conversation.yaml').read_text(),
@@ -496,9 +496,13 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertIn({'assertVisible': {'id': 'composer-pill-surface'}}, guard)
         self.assertIn({'assertNotVisible': {'id': 'chats.scope.chats'}}, guard)
         self.assertIn({'assertVisible': 'Generated fixture message'}, guard)
-        for name, case in runtime.CASES.items():
-            if case.get('fixture') == 'departed':
-                continue
+        history = list(yaml.safe_load_all(
+            (runtime.ROOT / '.maestro/fixtures/assert-fixture-history.yaml').read_text(),
+        ))[1]
+        self.assertIn({'assertNotVisible': {'id': 'chats.scope.chats'}}, history)
+        self.assertIn({'assertVisible': 'Generated fixture message'}, history)
+        self.assertNotIn({'assertVisible': {'id': 'composer-pill-surface'}}, history)
+        for name in runtime.CASES:
             flow = runtime.ROOT / '.maestro/runtime' / (name + '.yaml')
             commands = list(yaml.safe_load_all(flow.read_text()))[1]
             with self.subTest(case=name):

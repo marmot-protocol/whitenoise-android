@@ -715,7 +715,7 @@
       "manual_ids": [
         "CON-017"
       ],
-      "assertions": "Expanded-to-compact draft survives leaving and reopening the conversation. Independently verify the retained account/group geometry and unchanged native draft.",
+      "assertions": "Expanded draft and full-screen geometry survive leaving and reopening the conversation. Require the actual composer, hidden original bubble, absent chat-list route and native retained FullScreen preference plus unchanged draft.",
       "postcondition": "composer-expanded"
     },
     "developer-unlock": {

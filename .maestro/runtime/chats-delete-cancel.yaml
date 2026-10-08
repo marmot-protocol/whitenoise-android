@@ -11,4 +11,4 @@ name: chats-delete-cancel
 - tapOn: "Cancel"
 - assertVisible: "Maestro group"
 - tapOn: "Maestro group"
-- assertVisible: "Generated fixture message"
+- runFlow: ../fixtures/assert-fixture-history.yaml
