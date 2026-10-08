@@ -34,6 +34,8 @@ import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownListItemFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
+import dev.ipf.marmotkit.MarkdownNostrEntityFfi
+import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeechEngine
 import dev.ipf.whitenoise.android.audio.tts.TtsState
@@ -82,6 +84,7 @@ class TimelineRowTtsHighlightPaintTest {
     private val engine = FakePaintTtsSpeechEngine()
     private lateinit var appState: WhiteNoiseAppState
     private lateinit var controller: ConversationController
+    private val sentenceLayouts = ConversationTtsSentenceLayoutRegistry()
     private val composerTextState = ComposerTextState(TextFieldValue(""))
 
     @Before
@@ -89,6 +92,63 @@ class TimelineRowTtsHighlightPaintTest {
         appState = appState()
         controller = ConversationController(appState = appState, initialGroup = group())
         appState.ttsController.attachEngine(engine)
+    }
+
+    @Test
+    fun aQueuedMentionKeepsItsRenderedNameAndHighlightUntilTheSessionIsReplaced() {
+        val key = "npub1" + "q".repeat(58)
+        val doc =
+            MarkdownDocumentFfi(
+                false,
+                listOf(
+                    MarkdownBlockFfi.Paragraph(
+                        listOf(
+                            MarkdownInlineFfi.Text("Hello "),
+                            MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, key)),
+                        ),
+                    ),
+                ),
+                byteArrayOf(),
+            )
+        val record = untokenizedRecord().copy(plaintext = "Hello nostr:$key", contentTokens = doc)
+        fun entry(name: String) =
+            runBlocking {
+                projectTtsSpeakableEntry(record, null, SENDER_NAME, { doc }, { name })!!
+            }
+        renderProductionRow(record)
+        check(appState.ttsController.speak(listOf(entry("Frozen Alice")), Locale.US))
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Hello @Frozen Alice").fetchSemanticsNode()
+        val first = requireNotNull(appState.ttsController.state.value.conversationFollowTargetOrNull())
+        assertTrue(sentenceLayouts.completeSentenceBounds(first) != null)
+        check(appState.ttsController.speak(listOf(entry("Changed Alice")), Locale.US))
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Hello @Changed Alice").fetchSemanticsNode()
+        val target = requireNotNull(appState.ttsController.state.value.conversationFollowTargetOrNull())
+        assertTrue(sentenceLayouts.completeSentenceBounds(target) != null)
+    }
+
+    @Test
+    fun plainRowPublishesEachSentenceWithoutChangingItsTextOrLayout() {
+        val body = "First sentence. Second sentence."
+        val record = untokenizedRecord().copy(plaintext = body)
+        val entry =
+            runBlocking {
+                projectTtsSpeakableEntry(record, null, SENDER_NAME, { emptyDocument() })!!
+            }
+        renderProductionRow(record)
+        check(appState.ttsController.speak(listOf(entry), Locale.US))
+        composeRule.waitUntil(5_000) {
+            val target = appState.ttsController.state.value.conversationFollowTargetOrNull()
+            target != null && sentenceLayouts.completeSentenceBounds(target) != null
+        }
+        val first = requireNotNull(appState.ttsController.state.value.conversationFollowTargetOrNull())
+        composeRule.runOnIdle { appState.ttsController.seekToSentence(entry.messageIdHex, 1, entry.projectionId) }
+        composeRule.waitUntil(5_000) {
+            val target = appState.ttsController.state.value.conversationFollowTargetOrNull()
+            target?.sentenceIndex == 1 && sentenceLayouts.completeSentenceBounds(target) != null
+        }
+        assertEquals(null, sentenceLayouts.completeSentenceBounds(first))
     }
 
     @Test
@@ -454,6 +514,7 @@ class TimelineRowTtsHighlightPaintTest {
             showSenderAvatar = false,
             collapseLongMessages = collapseLongMessages,
             readOnly = false,
+            ttsSentenceLayoutSink = sentenceLayouts,
             parseMarkdown = { item.record.contentTokens },
         )
     }

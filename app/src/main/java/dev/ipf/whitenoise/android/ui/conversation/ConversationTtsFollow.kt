@@ -11,9 +11,9 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.Rect
 import dev.ipf.whitenoise.android.audio.tts.TtsState
-import dev.ipf.whitenoise.android.state.StalenessGuard
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsSentenceProjectionSegment
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -84,14 +84,8 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
         val renderedLeafId: String,
     )
 
-    private data class StampedReport(
-        val report: ConversationTtsSentenceLayoutReport,
-        val viewportGeometryRevision: Long,
-    )
-
     private val activeRows = mutableStateMapOf<String, Any>()
-    private val reports = mutableStateMapOf<ReportKey, StampedReport>()
-    private val viewportGeometryLifetime = StalenessGuard()
+    private val reports = mutableStateMapOf<ReportKey, ConversationTtsSentenceLayoutReport>()
 
     var viewportBoundsInWindow by mutableStateOf<Rect?>(null)
         private set
@@ -121,11 +115,11 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
         revision++
     }
 
-    /** Records sentence geometry under the current viewport lifetime. */
+    /** Window coordinates belong to the rendered row, independently of overlay occlusion. */
     override fun report(report: ConversationTtsSentenceLayoutReport) {
         if (activeRows[report.target.messageIdHex] !== report.rowInstance) return
         reports[ReportKey(report.target, report.rowInstance, report.renderedLeafId)] =
-            StampedReport(report, viewportGeometryLifetime.capture())
+            report
         revision++
     }
 
@@ -138,10 +132,9 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
         if (reports.remove(ReportKey(target, rowInstance, renderedLeafId)) != null) revision++
     }
 
-    /** Invalidates measured sentences when the visible viewport geometry changes. */
+    /** An overlay changes the clear viewport, not the text's absolute window coordinates. */
     fun updateViewportBounds(boundsInWindow: Rect) {
         if (viewportBoundsInWindow == boundsInWindow) return
-        if (viewportBoundsInWindow != null) viewportGeometryLifetime.advance()
         viewportBoundsInWindow = boundsInWindow
         revision++
     }
@@ -152,11 +145,7 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
         val activeRow = activeRows[target.messageIdHex] ?: return null
         val matching =
             reports.values
-                .filter { stamped ->
-                    viewportGeometryLifetime.isCurrent(stamped.viewportGeometryRevision) &&
-                        stamped.report.target == target &&
-                        stamped.report.rowInstance === activeRow
-                }.map(StampedReport::report)
+                .filter { report -> report.target == target && report.rowInstance === activeRow }
         val expected = matching.firstOrNull()?.expectedCoverage.orEmpty()
         if (expected.isEmpty() || matching.any { it.expectedCoverage != expected }) return null
         if (matching.flatMapTo(mutableSetOf()) { it.coverage } != expected) return null
@@ -169,7 +158,30 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
             )
         }
     }
+
+    /** Missing, clipped and recycled geometry always leaves an explicit recovery action. */
+    fun needsReveal(target: ConversationTtsFollowTarget?): Boolean {
+        revision
+        if (target == null) return false
+        return ttsSentenceNeedsReveal(completeSentenceBounds(target), viewportBoundsInWindow)
+    }
 }
+
+internal fun ttsSentenceNeedsReveal(sentence: Rect?, viewport: Rect?): Boolean =
+    sentence == null || viewport == null || viewport.height <= 0f ||
+        sentence.height <= 0f || sentence.top < viewport.top || sentence.bottom > viewport.bottom
+
+/** Oversized sentences can expose their beginning, but cannot fit entirely in one viewport. */
+internal fun ttsSentenceWasRevealed(sentence: Rect?, viewport: Rect?): Boolean =
+    sentence != null && viewport != null && viewport.height > 0f && sentence.height > 0f &&
+        sentence.top >= viewport.top - 1f &&
+        (
+            if (sentence.height > viewport.height) {
+                sentence.top < viewport.bottom
+            } else {
+                sentence.bottom <= viewport.bottom + 1f
+            }
+        )
 
 internal fun TtsState.conversationFollowTargetOrNull(): ConversationTtsFollowTarget? {
     val passage = passage
@@ -204,11 +216,17 @@ internal fun rememberConversationTtsFollowPolicy(groupIdHex: String): Conversati
 internal class ConversationTtsFollowPolicy private constructor(
     private var sessionId: Long?,
     initialFollowEnabled: Boolean,
-    private var activeTarget: ConversationTtsFollowTarget? = null,
+    activeTarget: ConversationTtsFollowTarget? = null,
     private var activeMessageIndex: Int? = null,
     private var activeDirection: TtsFollowDirection = TtsFollowDirection.Forward,
 ) {
     constructor() : this(sessionId = null, initialFollowEnabled = false)
+
+    private var activeTarget by mutableStateOf(activeTarget)
+    val currentTarget: ConversationTtsFollowTarget? get() = activeTarget
+
+    var requestRevision by mutableLongStateOf(0L)
+        private set
 
     var isFollowEnabled: Boolean by mutableStateOf(initialFollowEnabled)
         private set
@@ -276,7 +294,7 @@ internal class ConversationTtsFollowPolicy private constructor(
             explicitRevealTarget = explicitRevealTarget?.takeIf { wasAwaitingPreparedPassage }?.let { target }
         }
 
-        val explicitPending = target.takeIf { explicitRevealTarget == target }
+        val explicitPending = target.takeIf { explicitRevealTarget == target && evaluatedTarget != target }
         val automaticPending =
             target.takeIf {
                 isFollowEnabled &&
@@ -285,6 +303,7 @@ internal class ConversationTtsFollowPolicy private constructor(
             }
         val requestedTarget = explicitPending ?: automaticPending
         if (requestedTarget != null) {
+            if (pendingTarget != requestedTarget) requestRevision++
             pendingTarget = requestedTarget
             pendingDirection = activeDirection
             pendingAnchorAtTop = explicitPending != null
@@ -307,6 +326,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         pendingTarget = target
         pendingDirection = activeDirection
         pendingAnchorAtTop = true
+        requestRevision++
         return true
     }
 
@@ -348,6 +368,7 @@ internal class ConversationTtsFollowPolicy private constructor(
         pendingTarget = target
         pendingDirection = activeDirection
         pendingAnchorAtTop = explicitRevealTarget == target
+        requestRevision++
         return true
     }
 
@@ -369,6 +390,7 @@ internal class ConversationTtsFollowPolicy private constructor(
             evaluatedTarget = null
             pendingTarget = target
             pendingDirection = activeDirection
+            requestRevision++
             true
         }
     }
@@ -628,7 +650,13 @@ internal suspend fun followTtsTargetInViewport(
                 }
             }
         }
-    val succeeded = commandCompleted && completed
+    if (commandCompleted && completed) withFrameNanos { }
+    val succeeded =
+        commandCompleted && completed && isCurrentTarget() &&
+            ttsSentenceWasRevealed(
+                sentenceLayouts.completeSentenceBounds(target),
+                sentenceLayouts.viewportBoundsInWindow,
+            )
     if (succeeded) scrollCoordinator.settleReadingAt(currentScrollAnchor())
     return succeeded
 }

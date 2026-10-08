@@ -8,6 +8,20 @@ import org.junit.Test
 
 class TtsRangeCapabilityProbeTest {
     @Test
+    fun historicalCapabilityDoesNotClaimNativeTimingForTheNextUtterance() {
+        val probe = TtsRangeCapabilityProbe()
+        probe.restore(true)
+        probe.onUtteranceStart()
+        assertFalse(probe.hasUsableRangeForCurrentUtterance)
+        probe.onRangeStart()
+        assertTrue(probe.hasUsableRangeForCurrentUtterance)
+        probe.onUtteranceStart()
+        assertFalse(probe.hasUsableRangeForCurrentUtterance)
+        assertEquals(true, probe.reportsRanges)
+        assertTrue(probe.isConfirmed)
+    }
+
+    @Test
     fun verdictIsUnknownUntilEvidenceAccumulates() {
         val probe = TtsRangeCapabilityProbe(charsToConclude = 100)
 

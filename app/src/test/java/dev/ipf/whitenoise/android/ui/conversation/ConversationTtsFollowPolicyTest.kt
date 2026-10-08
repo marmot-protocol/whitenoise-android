@@ -370,7 +370,7 @@ class ConversationTtsFollowPolicyTest {
     }
 
     @Test
-    fun sentenceLayoutRejectsReportsFromPreviousViewportGeometry() {
+    fun overlayViewportChangesRetainWindowGeometryUntilTheRowMoves() {
         val registry = ConversationTtsSentenceLayoutRegistry()
         val target = speaking(sessionId = 1, sentenceIndex = 0).followTarget()
         val row = Any()
@@ -390,7 +390,7 @@ class ConversationTtsFollowPolicyTest {
         assertEquals(Rect(0f, 300f, 100f, 400f), registry.completeSentenceBounds(target))
 
         registry.updateViewportBounds(Rect(0f, 100f, 100f, 1_000f))
-        assertNull(registry.completeSentenceBounds(target))
+        assertEquals(Rect(0f, 300f, 100f, 400f), registry.completeSentenceBounds(target))
 
         registry.report(
             ConversationTtsSentenceLayoutReport(

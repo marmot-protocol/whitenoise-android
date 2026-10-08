@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.audio.tts.TTS_AUTO_READ_MAX_MESSAGES
 import dev.ipf.whitenoise.android.audio.tts.TtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
+import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.core.TimelineRowKind
@@ -55,7 +56,7 @@ internal class ConversationTtsFollowHandle internal constructor(
         private set
 
     val showResumeAction: Boolean
-        get() = policy.showResumeAction
+        get() = policy.showResumeAction || sentenceLayouts.needsReveal(policy.currentTarget)
 
     fun suspendForDirectDrag(
         state: TtsState,
@@ -362,10 +363,15 @@ internal fun ConversationTtsFollowEffects(
             ) {
                 return@LaunchedEffect
             }
-            val currentProjection =
-                projectConversationTtsEntry(appState, controller, row.record) ?: return@LaunchedEffect
-            if (!isCurrentTarget(target)) return@LaunchedEffect
-            if (target.projectionId.isBlank() || currentProjection.projectionId != target.projectionId) {
+            val source = resolveTtsSpeakableSource(row.record, targetEdit?.latestText)
+            val presentation =
+                appState.ttsController.presentationEntryFor(
+                    target.sessionId,
+                    target.messageIdHex,
+                    target.projectionId,
+                    source?.text,
+                )
+            if (!isCurrentTarget(target) || target.projectionId.isBlank() || presentation == null) {
                 return@LaunchedEffect
             }
 

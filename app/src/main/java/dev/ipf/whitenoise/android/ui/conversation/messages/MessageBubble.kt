@@ -783,14 +783,26 @@ internal fun MessageBubble(
         currentCoroutineContext().ensureActive()
         activeSpeakableDocument = document
     }
+    val queuedTtsPresentation =
+        ttsFollowTarget?.let { target ->
+            appState.ttsController.presentationEntryFor(
+                target.sessionId,
+                record.messageIdHex,
+                target.projectionId,
+                ttsSpeakableSource?.text,
+            )?.takeIf { effectiveTtsCandidate }
+        }
     val speakableProjection =
         remember(
+            queuedTtsPresentation,
             activeSpeakableDocument,
             effectiveTtsCandidate,
             speakableIdentity,
             controller.membersLoaded,
         ) {
-            if (!effectiveTtsCandidate || speakableIdentity == null) {
+            if (queuedTtsPresentation != null) {
+                queuedTtsPresentation.speakableProjection()
+            } else if (!effectiveTtsCandidate || speakableIdentity == null) {
                 null
             } else {
                 activeSpeakableDocument?.let { document ->
@@ -2476,6 +2488,7 @@ internal fun MessageBubble(
                                     ttsLeafHighlightResolver = ttsLeafHighlightResolver,
                                     ttsSentenceActions = ttsSentenceActions,
                                     ttsSentenceLayoutReporter = ttsSentenceLayoutReporter,
+                                    ttsMentionPresentation = queuedTtsPresentation?.mentionPresentation,
                                     ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
@@ -2565,6 +2578,7 @@ internal fun MessageBubble(
                                     ttsLeafHighlightResolver = ttsLeafHighlightResolver,
                                     ttsSentenceActions = ttsSentenceActions,
                                     ttsSentenceLayoutReporter = ttsSentenceLayoutReporter,
+                                    ttsMentionPresentation = queuedTtsPresentation?.mentionPresentation,
                                     ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                                     selectionWrapper = selectionWrapper,
                                     collapsible = collapsible,
@@ -2634,6 +2648,7 @@ internal fun MessageBubble(
                             ttsLeafHighlightResolver = ttsLeafHighlightResolver,
                             ttsSentenceActions = ttsSentenceActions,
                             ttsSentenceLayoutReporter = ttsSentenceLayoutReporter,
+                            ttsMentionPresentation = queuedTtsPresentation?.mentionPresentation,
                             ttsReadAloudProgress = effectiveTtsReadAloudProgress,
                             selectionWrapper = selectionWrapper,
                             collapsible = collapsible,

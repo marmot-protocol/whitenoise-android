@@ -838,25 +838,19 @@ class TtsController internal constructor(
         val startedAt = clock()
         pace.onStart(chunk, appliedRate, startedAt)
         activeTiming = ActiveUtteranceTiming(activeUtteranceId, startedAt, appliedRate)
-        if (rangeProbe.reportsRanges != true) {
-            // A stored capable verdict is provisional for evidence collection,
-            // but it remains the playback-lane decision until enough answerable
-            // silence overturns it. Starting the estimate over that lane races a
-            // range-capable engine and can leave neither the engine nor estimate
-            // owning the visible passage. A restored stale verdict still recovers:
-            // onDone keeps examining it and arms the estimate after overturning it.
-            wordTicker.start(
-                utteranceId = activeUtteranceId,
-                words =
-                    TtsWordTimingEstimate.plan(
-                        text = chunk.text,
-                        locale = chunk.locale,
-                        rate = appliedRate,
-                        msPerUnitAt1x = pace.msPerUnitAt1x,
-                    ),
-                emit = ::onEstimatedRange,
-            )
-        }
+        // Timing belongs to this utterance: a historically capable engine can omit its next ranges.
+        // The first usable native callback stops this estimate and owns the rest of this utterance.
+        wordTicker.start(
+            utteranceId = activeUtteranceId,
+            words =
+                TtsWordTimingEstimate.plan(
+                    text = chunk.text,
+                    locale = chunk.locale,
+                    rate = appliedRate,
+                    msPerUnitAt1x = pace.msPerUnitAt1x,
+                ),
+            emit = ::onEstimatedRange,
+        )
     }
 
     @Synchronized
@@ -865,9 +859,7 @@ class TtsController internal constructor(
         start: Int,
         end: Int,
     ): Boolean {
-        // A capable verdict (restored or confirmed here) owns this playback lane;
-        // estimated ranges are only accepted after silence overturns that verdict.
-        if (rangeProbe.reportsRanges == true) return false
+        if (rangeProbe.hasUsableRangeForCurrentUtterance) return false
         return queue.onRangeStart(utteranceId, start, end, ESTIMATED_RANGE_FRAME) !=
             TtsPlaybackQueue.RangeApplication.Stale
     }
@@ -923,11 +915,8 @@ class TtsController internal constructor(
                 start,
                 end,
                 frame,
-                // While capability is unknown or known-silent, an unusable
-                // engine callback must not erase a word already painted by the
-                // estimate. Once the engine is confirmed capable, preserve the
-                // original engine-only behavior and fall back to the sentence.
-                retainVisibleWordOnFallback = rangeProbe.reportsRanges != true,
+                // An unusable callback must not erase the estimate before this utterance has native timing.
+                retainVisibleWordOnFallback = !rangeProbe.hasUsableRangeForCurrentUtterance,
             )
         if (application != TtsPlaybackQueue.RangeApplication.VisibleWord) return
         confirmTtsRangeCapability(rangeProbe, timingStore, rangeVerdictKey, wordTicker::stop)
@@ -977,6 +966,26 @@ class TtsController internal constructor(
                 it.messageIdHex == messageIdHex &&
                     it.projectionId == projectionId
             }?.prepared
+
+    /** One active session's exact renderer coordinates, never a newly resolved profile projection. */
+    @Synchronized
+    internal fun presentationEntryFor(
+        sessionId: Long,
+        messageIdHex: String,
+        projectionId: String,
+        sourceText: String?,
+    ): TtsSpeakableEntry? {
+        val current = state.value
+        if (current.sessionId != sessionId || current.passage?.messageIdHex != messageIdHex ||
+            current.passage?.projectionId != projectionId
+        ) {
+            return null
+        }
+        return queue.queuedMessagesSnapshot()
+            .firstOrNull { it.messageIdHex == messageIdHex && it.projectionId == projectionId }
+            ?.presentationEntry
+            ?.takeIf { sourceText != null && it.sourceText == sourceText }
+    }
 }
 
 internal const val TTS_PREVIEW_MAX_LENGTH = 120

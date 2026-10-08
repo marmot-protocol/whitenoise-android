@@ -119,8 +119,15 @@ internal fun rememberTextAttachmentTtsUi(
         remember(policy, layouts, scroll, currentPlayback) {
             TextAttachmentTtsFollow(policy, layouts, scroll, currentPlayback)
         }
-    LaunchedEffect(target, policy.isFollowEnabled, viewport, dragging, selection.active, retryGeneration) {
-        if (dragging || selection.active) return@LaunchedEffect
+    val requestRevision = policy.requestRevision
+    LaunchedEffect(target, requestRevision, viewport, dragging, selection.active, retryGeneration) {
+        // Observers can schedule a newer request after composition but before this effect starts.
+        // Leave it pending for the matching effect instead of claiming work that will be cancelled.
+        if (policy.requestRevision != requestRevision || policy.currentTarget != target ||
+            dragging || selection.active
+        ) {
+            return@LaunchedEffect
+        }
         val visible = viewport ?: return@LaunchedEffect
         if (follower.reveal(visible)) retryGeneration += 1
     }
@@ -167,7 +174,8 @@ internal fun rememberTextAttachmentTtsUi(
         layoutReporter = reporter,
         sentenceActions = actions,
         deferLinkActivation = links::activate,
-        showResumeFollow = target != null && policy.showResumeAction && !selection.active,
+        showResumeFollow =
+            target != null && (policy.showResumeAction || layouts.needsReveal(target)) && !selection.active,
         resumeFollow = { policy.requestExplicitReveal() },
     )
 }
@@ -192,7 +200,7 @@ private fun rememberReaderFollowPolicy(
             policy.requestExplicitReveal()
         }
     }
-    // Insets/transport or rotation can invalidate a measured sentence without changing its identity.
+    // Insets/transport or rotation can clip a measured sentence without changing its identity.
     LaunchedEffect(viewport) {
         val directInteraction = selecting || dragging
         if (viewport != null && !directInteraction && policy.isFollowEnabled) policy.requestExplicitReveal()

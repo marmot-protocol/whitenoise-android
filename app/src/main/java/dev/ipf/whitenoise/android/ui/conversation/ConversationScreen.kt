@@ -4108,6 +4108,10 @@ internal fun ConversationScreen(
                                         textSelectionMode = textSelectionMessageId == messageId,
                                         onTextSelectionModeChange = { enabled ->
                                             if (enabled) {
+                                                ttsFollowHandle.suspendForDirectDrag(
+                                                    appState.ttsController.state.value,
+                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                                )
                                                 openActionMenuId = null
                                                 textSelectionMessageId = messageId
                                                 textSelectionBubbleBounds = null

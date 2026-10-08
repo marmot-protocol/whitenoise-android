@@ -21,6 +21,16 @@
           "TTS-004"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Read-aloud offscreen recovery independent of follow ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTtsEffects.kt",
+        "anchor": "sentenceLayouts.needsReveal(policy.currentTarget)",
+        "test_ids": [
+          "TTS-001"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

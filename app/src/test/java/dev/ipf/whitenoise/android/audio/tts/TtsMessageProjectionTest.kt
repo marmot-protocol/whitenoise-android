@@ -4,17 +4,75 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
+import dev.ipf.marmotkit.MarkdownNostrEntityFfi
+import dev.ipf.marmotkit.MarkdownNostrHrpFfi
 import dev.ipf.marmotkit.MessageTagFfi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Locale
 
 class TtsMessageProjectionTest {
+    @Test
+    fun activePresentationSurvivesProfileChangesButRejectsDifferentSourcesAndSessions() =
+        runBlocking {
+            val key = "npub1" + "q".repeat(58)
+            val doc =
+                document(
+                    "Hello ",
+                    MarkdownInlineFfi.NostrMention(MarkdownNostrEntityFfi(MarkdownNostrHrpFfi.NPUB, key)),
+                )
+            val record = message("Hello nostr:$key", contentTokens = doc)
+            var name = "Alice"
+            var member = true
+            suspend fun entry() = namedEntry(record, name, member)
+            val original = entry()
+            val controller = TtsController(audioFocus = FakeSessionFocus(), maxChunkLength = 4_000)
+            controller.attachEngine(FakeSessionEngine())
+            assertTrue(controller.speak(listOf(original), Locale.US))
+            val session = controller.state.value.sessionId
+            name = "A different display name"
+            member = false
+            val changed = entry()
+            assertFalse(original.projectionId == changed.projectionId)
+            assertEquals("Alice", original.mentionPresentation?.displayName(key))
+            assertEquals(true, original.mentionPresentation?.membershipResolver()?.invoke(key))
+            assertSame(
+                original,
+                controller.presentationEntryFor(session, record.messageIdHex, original.projectionId, record.plaintext),
+            )
+            assertNull(
+                controller.presentationEntryFor(session, record.messageIdHex, changed.projectionId, record.plaintext),
+            )
+            assertNull(
+                controller.presentationEntryFor(session, record.messageIdHex, original.projectionId, "Edited text"),
+            )
+            assertNull(controller.presentationEntryFor(session, record.messageIdHex, original.projectionId, null))
+            controller.pause()
+            assertSame(
+                original,
+                controller.presentationEntryFor(session, record.messageIdHex, original.projectionId, record.plaintext),
+            )
+            assertTrue(controller.speak(listOf(changed), Locale.US))
+            assertNull(
+                controller.presentationEntryFor(session, record.messageIdHex, original.projectionId, record.plaintext),
+            )
+            controller.stop()
+            assertNull(
+                controller.presentationEntryFor(
+                    controller.state.value.sessionId,
+                    record.messageIdHex,
+                    changed.projectionId,
+                    record.plaintext,
+                ),
+            )
+        }
+
     @Test
     fun markdownProjectionKeepsStableVisibleLeafMappings() =
         runBlocking {
@@ -268,6 +326,19 @@ class TtsMessageProjectionTest {
             ),
         blankLinesBefore = byteArrayOf(),
     )
+
+    private suspend fun namedEntry(
+        record: AppMessageRecordFfi,
+        name: String,
+        member: Boolean,
+    ) = projectTtsSpeakableEntry(
+        record,
+        null,
+        "Sender",
+        { error("stored tokens should win") },
+        { name },
+        { member },
+    )!!
 
     private fun message(
         plaintext: String,

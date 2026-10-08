@@ -16,7 +16,7 @@ import java.util.Locale
 /**
  * Behavior of the estimated word-timing lane through the real controller and
  * queue: synthetic range callbacks flow through the same validation as engine
- * ranges, real engine ranges win permanently, and the probe and calibrator
+ * ranges, usable engine ranges own their utterance, and the probe and calibrator
  * learn and persist per engine.
  *
  * What the harness does NOT model, so that claims resting on these are not
@@ -61,7 +61,7 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aRealEngineRangeSilencesTheEstimatePermanently() =
+    fun aRealEngineRangeSilencesTheEstimateForItsUtterance() =
         runTest {
             val harness = LaneHarness(this)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
@@ -115,73 +115,52 @@ class TtsEstimatedTimingLaneTest {
         }
 
     @Test
-    fun aRestoredCapableVerdictKeepsTheEngineLaneUntilAUsableRangeReconfirmsIt() =
+    fun restoredCapabilityUsesAnEstimateUntilThisUtteranceSuppliesNativeTiming() =
         runTest {
             val harness = LaneHarness(this)
             harness.store.verdicts[verdictKey()] = true
             harness.controller.detachEngine()
             harness.controller.attachEngine(harness.engine, engineKey = ENGINE_KEY)
             assertTrue(harness.controller.speak(listOf(plainEntry()), Locale.US))
-
             harness.engine.start(index = 0)
-            val enginePassage = harness.controller.state.value.passage
-            assertEquals(0, enginePassage?.sentenceIndex)
-            assertEquals(emptyList<TtsVisibleTextSpan>(), enginePassage?.visibleWord)
-            assertEquals(
-                enginePassage,
-                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
-            )
-
-            // A stored capable verdict keeps the same engine-owned lane as
-            // master. Provisionality affects evidence collection, not which
-            // producer owns the visible passage while the engine is speaking.
-            // onStart publishes the sentence immediately; no asynchronous word
-            // estimate is allowed to race the engine and replace it.
-            advanceTimeBy(2_000)
+            advanceTimeBy(150)
             runCurrent()
-            assertEquals(enginePassage, harness.controller.state.value.passage)
-
-            // An unusable callback falls back to the sentence, as it did before
-            // the restored-verdict changes, rather than handing ownership to an
-            // asynchronous estimate racing the range-capable engine.
+            val estimated = harness.controller.state.value.passage
+            assertEquals(listOf(TtsVisibleTextSpan("b0/n0", 0, 5)), estimated?.visibleWord)
             harness.engine.range(index = 0, start = 0, end = 0)
-            assertEquals(
-                0,
-                harness.controller.state.value.passage
-                    ?.sentenceIndex,
-            )
-            assertEquals(
-                emptyList<TtsVisibleTextSpan>(),
-                harness.controller.state.value.passage
-                    ?.visibleWord,
-            )
-            assertEquals(
-                enginePassage,
-                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
-            )
-
-            // The first usable real callback reconfirms the restored verdict and
-            // publishes both the active sentence and current word without
-            // rewriting an unchanged true value.
+            assertEquals(estimated, harness.controller.state.value.passage)
             harness.engine.range(index = 0, start = 6, end = 11)
-            assertEquals(0, harness.store.rangeVerdictWrites)
-            assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
-                harness.controller.state.value.passage
-                    ?.visibleWord,
-            )
-            assertEquals(
-                harness.controller.state.value.passage,
-                timelineRowTtsHighlightPassage("m1", harness.controller.state.value),
-            )
-
+            val native = harness.controller.state.value.passage
+            assertEquals(listOf(TtsVisibleTextSpan("b0/n0", 6, 11)), native?.visibleWord)
             advanceTimeBy(2_000)
             runCurrent()
-            assertEquals(
-                listOf(TtsVisibleTextSpan("b0/n0", 6, 11)),
-                harness.controller.state.value.passage
-                    ?.visibleWord,
-            )
+            assertEquals(native, harness.controller.state.value.passage)
+            assertEquals(0, harness.store.rangeVerdictWrites)
+        }
+
+    @Test
+    fun nativeTimingInOneUtteranceDoesNotHideWordsInTheNextSilentOne() =
+        runTest {
+            val harness = LaneHarness(this)
+            assertTrue(harness.controller.speak(listOf(plainEntry(), plainEntry(messageIdHex = "m2")), Locale.US))
+            val session = harness.controller.state.value.sessionId
+            harness.engine.start(index = 0)
+            harness.engine.range(index = 0, start = 0, end = 5)
+            harness.engine.complete(index = 0)
+            assertEquals(session, harness.controller.state.value.sessionId)
+            harness.engine.start(index = 1)
+            advanceTimeBy(150)
+            runCurrent()
+            val estimated = harness.controller.state.value.passage
+            assertEquals("m2", estimated?.messageIdHex)
+            assertEquals(listOf(TtsVisibleTextSpan("b0/n0", 0, 5)), estimated?.visibleWord)
+            harness.engine.range(index = 0, start = 6, end = 11)
+            assertEquals(estimated, harness.controller.state.value.passage)
+            harness.engine.range(index = 1, start = 6, end = 11)
+            val native = harness.controller.state.value.passage
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(native, harness.controller.state.value.passage)
         }
 
     @Test
@@ -327,14 +306,13 @@ class TtsEstimatedTimingLaneTest {
             )
             harness.engine.complete(index = 2)
 
-            // Returning to the confirmed US context must not inherit the silent
-            // FR verdict or start an estimate against its range-capable voice.
+            // Returning to US keeps its historical verdict while this utterance gets its own estimate.
             assertTrue(harness.controller.speak(listOf(plainEntry(messageIdHex = "m4")), Locale.US))
             harness.engine.start(index = 3)
             advanceTimeBy(150)
             runCurrent()
             assertEquals(
-                emptyList<TtsVisibleTextSpan>(),
+                listOf(TtsVisibleTextSpan("b0/n0", 0, 5)),
                 harness.controller.state.value.passage
                     ?.visibleWord,
             )
